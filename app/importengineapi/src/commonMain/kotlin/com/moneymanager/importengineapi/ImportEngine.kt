@@ -1,5 +1,7 @@
 package com.moneymanager.importengineapi
 
+import com.moneymanager.tasks.Progress
+
 /**
  * The central write engine. It has a **single** entry point, [import], which applies a declarative
  * [ImportBatch]: bulk imports (CSV/QIF/API) and every manual edit (create/update/delete of transfers,
@@ -24,7 +26,7 @@ interface ImportEngine {
      */
     suspend fun import(
         batch: ImportBatch,
-        onProgress: (suspend (ImportProgress) -> Unit)? = null,
+        onProgress: (suspend (Progress) -> Unit)? = null,
         batchSize: Int = Int.MAX_VALUE,
     ): ImportResult
 }

@@ -17,11 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.moneymanager.database.DatabaseInitializationProgress
+import com.moneymanager.tasks.Progress
 
 @Composable
 fun DatabaseProgressScreen(
-    progress: DatabaseInitializationProgress,
+    progress: Progress,
     title: String,
 ) {
     MaterialTheme {
@@ -45,7 +45,7 @@ fun DatabaseProgressScreen(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 LinearProgressIndicator(
-                    progress = { progress.fraction },
+                    progress = { progress.fraction ?: 0f },
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -53,7 +53,7 @@ fun DatabaseProgressScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = progress.text,
+                    text = progress.detail,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

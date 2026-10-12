@@ -16,12 +16,12 @@ import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
 import com.moneymanager.importengineapi.reconciledPartnerUnhideUpdates
+import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.flow.first
 
 /** Another file whose rows were matched (DUPLICATE/UPDATED) against a transaction the unimport deletes. */
@@ -106,7 +106,7 @@ suspend fun executeCsvUnimport(
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     refreshViews: Boolean = true,
 ): CsvUnimportResult {
     val source = Source.Csv(plan.importId)
@@ -116,7 +116,7 @@ suspend fun executeCsvUnimport(
     // a state a repeated unimport recovers from; the file only reads as unimported once all of them
     // succeeded. The un-hide updates share the delete batch (the engine applies updates before deletes),
     // and so do the other files' row resets, which can't be found again once the transactions are gone.
-    onProgress?.invoke(ImportProgress("Removing the file's transactions"))
+    onProgress?.invoke(Progress("Removing the file's transactions"))
     importEngine.import(
         ImportBatch(
             transfers =
@@ -138,7 +138,7 @@ suspend fun executeCsvUnimport(
         ),
     )
 
-    onProgress?.invoke(ImportProgress("Cleaning up empty accounts"))
+    onProgress?.invoke(Progress("Cleaning up empty accounts"))
     val deletedEmptyAccounts =
         importEngine.deleteEmptyImportCreatedAccounts(
             createdAccountIds = plan.createdAccountIds,
@@ -159,7 +159,7 @@ suspend fun executeCsvUnimport(
     )
 
     if (refreshViews) {
-        onProgress?.invoke(ImportProgress("Refreshing views"))
+        onProgress?.invoke(Progress("Refreshing views"))
         maintenance.refreshMaterializedViews()
     }
 
@@ -207,13 +207,13 @@ suspend fun executeCsvBulkUnimport(
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
 ): CsvUnimportResult {
     val ids = plan.plans.map { it.importId }
     val results =
         ids.mapIndexed { index, id ->
             val label = "Unimporting file ${index + 1} of ${ids.size}"
-            onProgress?.invoke(ImportProgress(label, fraction = index.toFloat() / ids.size, processed = index, total = ids.size))
+            onProgress?.invoke(Progress(label, fraction = index.toFloat() / ids.size, processed = index, total = ids.size))
             executeCsvUnimport(
                 plan = planCsvUnimport(id, csvImportRepository),
                 accountRepository = accountRepository,
@@ -226,7 +226,7 @@ suspend fun executeCsvBulkUnimport(
                 refreshViews = false,
             )
         }
-    onProgress?.invoke(ImportProgress("Refreshing views", fraction = 1f))
+    onProgress?.invoke(Progress("Refreshing views", fraction = 1f))
     maintenance.refreshMaterializedViews()
     return CsvUnimportResult(
         deletedTransfers = results.sumOf { it.deletedTransfers },

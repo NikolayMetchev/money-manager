@@ -35,6 +35,7 @@ kotlin {
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.qif)
                 api(projects.app.model.repository.read)
+                api(projects.app.tasks)
 
                 implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
@@ -43,6 +44,7 @@ kotlin {
 
         getByName("androidMain") {
             dependencies {
+                api(projects.app.tasks)
                 implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
             }

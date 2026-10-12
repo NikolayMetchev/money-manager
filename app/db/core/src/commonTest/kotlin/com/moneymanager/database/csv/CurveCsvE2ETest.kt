@@ -4,7 +4,6 @@ package com.moneymanager.database.csv
 
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.AttributeAccountMatcher
-import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.CsvBulkResult
 import com.moneymanager.csvimporter.addAttributeToken
 import com.moneymanager.csvimporter.bulkApplyCsv
@@ -22,6 +21,7 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.setAccountAttributeValue
 import com.moneymanager.importengineapi.updateCsvStrategy
+import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -124,7 +124,7 @@ class CurveCsvE2ETest : DbTest() {
     }
 
     private suspend fun applyAll(imports: List<CsvImport>): CsvBulkResult {
-        val progress = mutableListOf<BulkImportProgress>()
+        val progress = mutableListOf<Progress>()
         val attributeMatchers =
             AttributeAccountMatcher.registry(repositories.accountAttributeRepository.getAll().first())
         val result =

@@ -60,7 +60,6 @@ import com.moneymanager.importengineapi.ImportFee
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportPersonIntent
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
@@ -76,6 +75,7 @@ import com.moneymanager.importengineapi.recordApiDownloadCoverage
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiHttpResponse
 import com.moneymanager.rest.ScaParams
+import com.moneymanager.tasks.Progress
 import io.ktor.http.URLBuilder
 import io.ktor.http.encodedPath
 import kotlinx.coroutines.CancellationException
@@ -204,12 +204,19 @@ data class ApiPeopleImportResult(
     val personCount: Int,
 )
 
-data class ApiTransactionsDownloadProgress(
-    val accountIndex: Int,
-    val accountCount: Int,
-    val page: Int,
-    val downloadedResponsePageCount: Int,
-)
+/** Download progress counted in accounts: account [accountIndex] of [accountCount], on [page]. */
+internal fun apiDownloadProgress(
+    accountIndex: Int,
+    accountCount: Int,
+    page: Int,
+    downloadedResponsePageCount: Int,
+): Progress =
+    Progress.counted(
+        "Downloading account $accountIndex/$accountCount, page $page. " +
+            "$downloadedResponsePageCount response page(s) downloaded so far.",
+        done = accountIndex - 1,
+        total = accountCount,
+    )
 
 /**
  * Downloads accounts from the configured API and stores them in the session traffic.
@@ -304,7 +311,7 @@ suspend fun downloadApiSessionTransactions(
     importEngine: ImportEngine,
     watermarks: Map<String, Instant> = emptyMap(),
     forceFullDownload: Boolean = false,
-    onProgress: (ApiTransactionsDownloadProgress) -> Unit = {},
+    onProgress: (Progress) -> Unit = {},
 ): ApiTransactionsDownloadResult {
     val existingRequests = apiSessionRepository.getRequestsBySession(sessionId)
     val existingResponses = apiSessionRepository.getResponsesBySession(sessionId)
@@ -351,7 +358,7 @@ suspend fun downloadApiSessionTransactions(
                 since = if (forceFullDownload) null else watermarks[endpointKey],
                 fetch = { page ->
                     onProgress(
-                        ApiTransactionsDownloadProgress(
+                        apiDownloadProgress(
                             accountIndex = index + 1,
                             accountCount = accountEntries.size,
                             page = page.windowIndex + 1,
@@ -653,7 +660,7 @@ suspend fun importApiSessionTransactions(
     importEngine: ImportEngine,
     counterpartyAccountNames: Map<String, String> = emptyMap(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
-    onProgress: suspend (ImportProgress) -> Unit = {},
+    onProgress: suspend (Progress) -> Unit = {},
 ): ApiSessionImportResult {
     val setup =
         setupImportSession(
@@ -666,7 +673,7 @@ suspend fun importApiSessionTransactions(
             onProgress = onProgress,
             passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
         )
-    onProgress(ImportProgress(detail = "Preparing import session...", fraction = 0.05f))
+    onProgress(Progress(detail = "Preparing import session...", fraction = 0.05f))
     // Build the import model purely (no DB writes): allocate account/counterparty/people/ownership
     // intents and the transfers, then hand the whole batch to the engine, which performs every write.
     ensureSourceAccounts(setup)
@@ -680,14 +687,14 @@ suspend fun importApiSessionTransactions(
         counterpartyAccountNames = counterpartyAccountNames,
         nameMappings = setup.nameMappings,
     )
-    onProgress(ImportProgress(detail = "Counterparties prepared.", fraction = 0.2f))
+    onProgress(Progress(detail = "Counterparties prepared.", fraction = 0.2f))
     val preparedTransfers = prepareTransactionTransfers(setup)
-    onProgress(ImportProgress(detail = "Transactions prepared. Processing people...", fraction = 0.6f))
+    onProgress(Progress(detail = "Transactions prepared. Processing people...", fraction = 0.6f))
     addCustomAccountFieldAttributes(setup)
     buildPeopleAndOwnershipIntents(setup)
-    onProgress(ImportProgress(detail = "Saving to database...", fraction = 0.7f))
+    onProgress(Progress(detail = "Saving to database...", fraction = 0.7f))
     val importResult = runImportEngine(setup, preparedTransfers)
-    onProgress(ImportProgress(detail = "Import finalized.", fraction = 0.98f))
+    onProgress(Progress(detail = "Import finalized.", fraction = 0.98f))
     return ApiSessionImportResult(
         accountCount = setup.accountsById.size,
         transactionCount = importResult.transfersImported,
@@ -755,7 +762,7 @@ private data class ImportSetup(
     val peopleResolver: BatchPeopleResolver,
     val currencyCache: CurrencyCache,
     val attributeTypeCache: AttributeTypeCache,
-    val onProgress: suspend (ImportProgress) -> Unit,
+    val onProgress: suspend (Progress) -> Unit,
     val apiSessionRepository: ApiSessionReadRepository,
     val importEngine: ImportEngine,
     /** Detects pass-through (conduit) charges (e.g. Curve) from a transaction description; null disables it. */
@@ -769,7 +776,7 @@ private suspend fun setupImportSession(
     accountsSessionId: ApiSessionId?,
     strategy: ApiImportStrategy,
     importEngine: ImportEngine,
-    onProgress: suspend (ImportProgress) -> Unit,
+    onProgress: suspend (Progress) -> Unit,
     passThroughDetector: PassThroughDetector? = null,
 ): ImportSetup {
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
@@ -830,7 +837,7 @@ private suspend fun setupImportSession(
     // no two coroutines race to write the same type, which causes SQLITE_BUSY.
     for (fieldName in customTxFields.keys) attributeTypeCache.getOrCreate(fieldName)
 
-    onProgress(ImportProgress(detail = "Reading downloaded API responses..."))
+    onProgress(Progress(detail = "Reading downloaded API responses..."))
 
     return ImportSetup(
         strategy = strategy,
@@ -1027,7 +1034,7 @@ suspend fun discoverApiCounterpartiesToCreate(
     accountAttributeRepository: AccountAttributeReadRepository,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
-    onProgress: suspend (ImportProgress) -> Unit = {},
+    onProgress: suspend (Progress) -> Unit = {},
 ): List<ApiCounterpartySuggestion> {
     // Only a bank feed names counterparty ids; an exchange strategy has nothing to suggest.
     val counterpartyIdField =
@@ -1038,9 +1045,9 @@ suspend fun discoverApiCounterpartiesToCreate(
     // Reported as sub-steps so the (potentially slow) preparation phase shows what it is doing rather than
     // a single opaque "Preparing import…". Left indeterminate (no fraction) so the bar does not fill and
     // then reset when the engine phases take over with their own 0–100% progress.
-    onProgress(ImportProgress(detail = "Scanning existing accounts..."))
+    onProgress(Progress(detail = "Scanning existing accounts..."))
     val existingCounterpartyIds = loadCounterpartyIdIndex(accountAttributeRepository).keys
-    onProgress(ImportProgress(detail = "Reading downloaded transactions..."))
+    onProgress(Progress(detail = "Reading downloaded transactions..."))
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val transactionResponses =
         apiSessionRepository
@@ -1053,7 +1060,7 @@ suspend fun discoverApiCounterpartiesToCreate(
         counterpartyIdField = counterpartyIdField,
         nameMappings = CounterpartyNameMappings.from(strategy),
         onResponseProcessed = { done, total ->
-            onProgress(ImportProgress(detail = "Finding new counterparties ($done/$total)..."))
+            onProgress(Progress(detail = "Finding new counterparties ($done/$total)..."))
         },
     ).filterKeys { it !in existingCounterpartyIds }
         .map { (counterpartyId, names) ->
@@ -1777,7 +1784,7 @@ private suspend fun runImportEngine(
             batch = batch,
             onProgress = { progress ->
                 setup.onProgress(
-                    ImportProgress(
+                    Progress(
                         detail = progress.detail,
                         fraction = progress.fraction?.let { 0.7f + (it * 0.25f) },
                     ),

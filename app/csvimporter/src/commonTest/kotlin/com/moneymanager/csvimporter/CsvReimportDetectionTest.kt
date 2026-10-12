@@ -34,8 +34,8 @@ import com.moneymanager.domain.model.passthrough.PassThroughRule
 import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.PassThroughDetector
+import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -584,7 +584,7 @@ class CsvReimportDetectionTest {
             // 30 plain rows (no pass-through): progress still ticks per row scanned.
             val rows = (1L..30L).map { row(it, "Payee $it") }
             val mappedPrep = prep(rows, emptyList(), emptyList())
-            val progress = mutableListOf<ImportProgress>()
+            val progress = mutableListOf<Progress>()
 
             computeReimportRewrites(rows, mappedPrep, FakeRelationshipRepository(emptyMap()), { progress += it }) { null }
 

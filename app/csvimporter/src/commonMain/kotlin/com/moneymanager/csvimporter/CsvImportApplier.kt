@@ -45,7 +45,6 @@ import com.moneymanager.importengineapi.ImportFee
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportPersonIntent
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
@@ -63,6 +62,8 @@ import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.getOrCreateAttributeTypes
 import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.importengineapi.restageXlsxImport
+import com.moneymanager.tasks.Progress
+import com.moneymanager.tasks.WeightedProgress
 import com.moneymanager.xlsx.createXlsxParser
 import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
@@ -304,7 +305,7 @@ suspend fun bulkApplyCsv(
     csvImportRepository: CsvImportReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    onProgress: suspend (BulkImportProgress) -> Unit,
+    onProgress: suspend (Progress) -> Unit,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoRepository: CryptoReadRepository? = null,
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
@@ -317,7 +318,7 @@ suspend fun bulkApplyCsv(
     var skippedNoStrategy = 0
     var failed = 0
 
-    val tracker = BulkProgressTracker(imports.map { it.rowCount }, onProgress)
+    val tracker = WeightedProgress(imports.map { it.rowCount }, onProgress = onProgress)
     tracker.started(detail = "Preparing")
 
     // Create every crypto asset the batch needs up front, sized to the batch-wide max precision per
@@ -325,7 +326,7 @@ suspend fun bulkApplyCsv(
     ensureCryptoAssetsForImports(imports, strategies, currencies, csvImportRepository, importEngine, cryptoRepository)
 
     imports.forEachIndexed { index, listedImport ->
-        tracker.fileStarted(index, listedImport.originalFileName)
+        tracker.itemStarted(index, listedImport.originalFileName)
         // getAllImports() doesn't populate columns, so re-fetch the full import (which loads them)
         // for the strategy match below.
         val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: listedImport
@@ -349,7 +350,7 @@ suspend fun bulkApplyCsv(
                     importEngine = importEngine,
                     refreshViews = false,
                     passThroughAccounts = passThroughAccounts,
-                    onProgress = { tracker.phase(index, csvImport.originalFileName, it) },
+                    onProgress = { tracker.item(index, csvImport.originalFileName, it) },
                     engineBatchSize = BULK_ENGINE_BATCH_SIZE,
                     cryptoRepository = cryptoRepository,
                     attributeAccountMatchers = attributeAccountMatchers,
@@ -396,7 +397,7 @@ suspend fun applyStagedCsv(
     importEngine: ImportEngine,
     refreshViews: Boolean,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
     cryptoRepository: CryptoReadRepository? = null,
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
@@ -738,7 +739,7 @@ suspend fun runCsvImport(
     refreshViews: Boolean = true,
     cryptoAssets: List<CryptoAsset> = emptyList(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
     // Rows still awaiting import. Equals every row index in [rows] except when the strategy assembles

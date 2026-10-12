@@ -2,6 +2,7 @@ package com.moneymanager.database
 
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.tasks.Progress
 
 /**
  * Manages MoneyManager databases.
@@ -25,7 +26,7 @@ interface DatabaseManager {
      */
     suspend fun openDatabaseWithProgress(
         location: DbLocation,
-        onProgress: (DatabaseInitializationProgress) -> Unit,
+        onProgress: (Progress) -> Unit,
     ): MoneyManagerDatabaseWrapper = openDatabase(location)
 
     /**
@@ -93,13 +94,4 @@ interface DatabaseManager {
         location: DbLocation,
         bytes: ByteArray,
     )
-}
-
-data class DatabaseInitializationProgress(
-    val text: String,
-    val completedSteps: Int,
-    val totalSteps: Int,
-) {
-    val fraction: Float
-        get() = if (totalSteps > 0) completedSteps.toFloat() / totalSteps.toFloat() else 0f
 }

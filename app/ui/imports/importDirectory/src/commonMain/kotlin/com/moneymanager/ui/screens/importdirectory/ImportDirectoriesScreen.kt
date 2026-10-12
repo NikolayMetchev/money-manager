@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
@@ -57,12 +58,17 @@ import com.moneymanager.importengineapi.deleteImportDirectory
 import com.moneymanager.importengineapi.updateImportDirectory
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
-import com.moneymanager.ui.background.formatElapsedTime
+import com.moneymanager.tasks.Progress
+import com.moneymanager.tasks.TaskState
+import com.moneymanager.tasks.TaskStatus
+import com.moneymanager.tasks.childrenOf
+import com.moneymanager.tasks.formatElapsedTime
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.navigation.ImportTab
+import com.moneymanager.ui.tasks.LocalTaskManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -104,6 +110,8 @@ fun ImportDirectoriesScreen(
 ) {
     val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
+    val taskManager = LocalTaskManager.current
+    val tasks by taskManager.tasks.collectAsState()
 
     val directories by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         importDirectoryRepository.getAllDirectories()
@@ -126,14 +134,13 @@ fun ImportDirectoriesScreen(
     val scanProgress = remember { mutableStateMapOf<ImportDirectoryId, Pair<Int, Int>>() }
     // Top-level folders whose subfolder tree is still being walked (the value is unused).
     val discovering = remember { mutableStateMapOf<ImportDirectoryId, Unit>() }
-    // Every folder "Download all" has queued, kept after it finishes so the overall bar adds up the whole
-    // run: null until the folder's file list comes back, then its done / total.
-    val downloadAllProgress = remember { mutableStateMapOf<ImportDirectoryId, Pair<Int, Int>?>() }
-    var downloadAllRunning by remember { mutableStateOf(false) }
+    // "Download all" runs as a task whose children (one per folder, one per subfolder search) carry the
+    // overall bar's numbers.
+    val downloadAllTask = tasks.lastOrNull { it.key == DOWNLOAD_ALL_TASK_KEY && it.parentId == null }
+    val downloadAllRunning = downloadAllTask?.isRunning == true
     // Set for a whole re-download run: its per-folder progress entries come and go between folders, and
     // nothing else may start in those gaps.
     var redownloadRunning by remember { mutableStateOf(false) }
-    var downloadAllStartedAt by remember { mutableStateOf<TimeSource.Monotonic.ValueTimeMark?>(null) }
     val scanning = downloadAllRunning || redownloadRunning || scanProgress.isNotEmpty() || discovering.isNotEmpty()
     // Directories scan concurrently but the engine doesn't serialize writes, so all of them share it.
     val dbLock = remember { Mutex() }
@@ -304,14 +311,14 @@ fun ImportDirectoriesScreen(
 
     // Downloads every included folder at once. Known folders start straight away; subfolders discovered
     // under the top-level folders start as soon as they are found, so the overall total grows over the run.
+    // Runs as a task, so it carries on if this screen is left; its summary and per-file failures are kept on
+    // the task (detail and issues), so a recreated screen still shows them.
     fun downloadAll() {
         statusMessage = null
         scanFailures = emptyList()
-        downloadAllProgress.clear()
-        val startedAt = TimeSource.Monotonic.markNow()
-        downloadAllStartedAt = startedAt
-        downloadAllRunning = true
-        scope.launch {
+        taskManager.start(DOWNLOAD_ALL_TASK_KEY, "Download all", "Listing folders.") {
+            val run = this
+            val startedAt = TimeSource.Monotonic.markNow()
             try {
                 val dirsByRef = directories.associateByTo(mutableMapOf()) { it.folderRef }
                 val results = mutableListOf<Pair<ImportDirectory, ScanResult>>()
@@ -340,17 +347,22 @@ fun ImportDirectoriesScreen(
                         val runScope = this
 
                         fun startDownload(dir: ImportDirectory) {
-                            downloadAllProgress[dir.id] = null
                             runScope.launch(Dispatchers.IO) {
-                                val result =
-                                    containingFailure(dir, "download this folder", null) {
-                                        downloadFolder(dir) { done, total -> downloadAllProgress[dir.id] = done to total }
+                                try {
+                                    run.child(folderDownloadTaskKey(dir.id), dir.name, "Listing files…") {
+                                        val result =
+                                            downloadFolder(dir) { done, total ->
+                                                report(Progress.counted("$done / $total files", done, total))
+                                            }
+                                        resultsLock.withLock { results += dir to result }
                                     }
-                                if (result == null) {
-                                    // Its files never got counted, so drop it rather than leave it "still listing".
-                                    downloadAllProgress.remove(dir.id)
-                                } else {
-                                    resultsLock.withLock { results += dir to result }
+                                } catch (cancellation: CancellationException) {
+                                    throw cancellation
+                                } catch (expected: Exception) {
+                                    // The child task is marked failed; the run records it and moves on.
+                                    resultsLock.withLock {
+                                        folderFailures += "${dir.name} — couldn't download this folder: ${expected.message}"
+                                    }
                                 }
                             }
                         }
@@ -360,8 +372,10 @@ fun ImportDirectoriesScreen(
                             .filter { it.topLevel && scannable(it) && !it.excluded }
                             .map { root ->
                                 async(Dispatchers.IO) {
-                                    containingFailure(root, "search its subfolders", 0) {
-                                        createSubdirectories(root, dirsByRef, ::startDownload)
+                                    run.child(subfolderSearchTaskKey(root.id), "Subfolders of ${root.name}", "Searching…") {
+                                        containingFailure(root, "search its subfolders", 0) {
+                                            createSubdirectories(root, dirsByRef, ::startDownload)
+                                        }
                                     }
                                 }
                             }.awaitAll()
@@ -370,19 +384,23 @@ fun ImportDirectoriesScreen(
                 val downloaded = results.sumOf { (_, result) -> result.filesDownloaded }
                 val failed = results.sumOf { (_, result) -> result.filesFailed }
                 // Prefix with the directory so the same filename in two folders stays tellable apart.
-                scanFailures = folderFailures + results.flatMap { (dir, result) -> result.failures.map { "${dir.name} — $it" } }
+                (folderFailures + results.flatMap { (dir, result) -> result.failures.map { "${dir.name} — $it" } })
+                    .forEach(run::reportIssue)
                 val failedSuffix =
                     listOfNotNull(
                         "$failed file(s) failed".takeIf { failed > 0 },
                         "${folderFailures.size} folder(s) failed".takeIf { folderFailures.isNotEmpty() },
                     ).joinToString(separator = "") { "; $it" }
-                statusMessage =
-                    "Created $created new director${if (created == 1) "y" else "ies"}; downloaded $downloaded file(s)$failedSuffix " +
+                "Created $created new director${if (created == 1) "y" else "ies"}; downloaded $downloaded file(s)$failedSuffix " +
                     "in ${formatElapsedTime(startedAt.elapsedNow())}."
+            } catch (cancellation: CancellationException) {
+                throw cancellation
             } catch (expected: Exception) {
-                statusMessage = "Download all failed after ${formatElapsedTime(startedAt.elapsedNow())} — ${expected.message}"
-            } finally {
-                downloadAllRunning = false
+                // Reworded so the failed task's detail says how far the run got.
+                throw IllegalStateException(
+                    "Download all failed after ${formatElapsedTime(startedAt.elapsedNow())} — ${expected.message}",
+                    expected,
+                )
             }
         }
     }
@@ -422,17 +440,15 @@ fun ImportDirectoriesScreen(
             style = MaterialTheme.typography.bodyMedium,
         )
 
-        val startedAt = downloadAllStartedAt
-        if (downloadAllRunning && startedAt != null) {
-            DownloadAllProgress(
-                startedAt = startedAt,
-                folderProgress = downloadAllProgress.values.toList(),
-                discoveringFolders = discovering.size,
-            )
+        if (downloadAllTask != null && downloadAllRunning) {
+            DownloadAllProgress(task = downloadAllTask, children = tasks.childrenOf(downloadAllTask.id))
         }
 
-        statusMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-        scanFailures.forEach { failure ->
+        // A per-folder action's own result wins; otherwise the last finished "Download all" (kept by the task
+        // manager, so it survives leaving this screen) shows its outcome.
+        val lastDownloadAll = downloadAllTask?.takeUnless { statusMessage != null || it.isRunning }
+        (statusMessage ?: lastDownloadAll?.outcome())?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+        (lastDownloadAll?.issues ?: scanFailures).forEach { failure ->
             Text(
                 text = failure,
                 style = MaterialTheme.typography.bodySmall,
@@ -541,23 +557,25 @@ fun ImportDirectoriesScreen(
  */
 @Composable
 private fun DownloadAllProgress(
-    startedAt: TimeSource.Monotonic.ValueTimeMark,
-    folderProgress: List<Pair<Int, Int>?>,
-    discoveringFolders: Int,
+    task: TaskState,
+    children: List<TaskState>,
 ) {
-    val listed = folderProgress.filterNotNull()
+    // A folder that failed before listing its files never counted toward the total, so it drops out.
+    val folders = children.filter { it.key.startsWith(FOLDER_DOWNLOAD_TASK_PREFIX) }
+    val listed = folders.mapNotNull { folder -> folder.progress.total?.let { (folder.progress.processed ?: 0) to it } }
     val done = listed.sumOf { it.first }
     val total = listed.sumOf { it.second }
-    val stillListing = folderProgress.size - listed.size
+    val stillListing = folders.count { it.isRunning && it.progress.total == null }
+    val discoveringFolders = children.count { it.isRunning && it.key.startsWith(SUBFOLDER_SEARCH_TASK_PREFIX) }
     val pending =
         buildList {
             if (discoveringFolders > 0) add("still finding subfolders")
             if (stillListing > 0) add("$stillListing folder${if (stillListing == 1) "" else "s"} still listing files")
         }
-    var elapsed by remember(startedAt) { mutableStateOf(startedAt.elapsedNow()) }
-    LaunchedEffect(startedAt) {
+    var elapsed by remember(task.id) { mutableStateOf(task.elapsed()) }
+    LaunchedEffect(task.id) {
         while (true) {
-            elapsed = startedAt.elapsedNow()
+            elapsed = task.elapsed()
             delay(1.seconds)
         }
     }
@@ -796,3 +814,17 @@ private fun DirectoryRedownloadResult.summary(): String =
         if (failures.isNotEmpty()) append(", ${failures.size} failed")
         append(".")
     }
+
+private fun TaskState.outcome(): String =
+    when (status) {
+        TaskStatus.CANCELLED -> "Download all cancelled after ${formatElapsedTime(elapsed())}."
+        else -> progress.detail
+    }
+
+private const val DOWNLOAD_ALL_TASK_KEY = "import-directories-download-all"
+private const val FOLDER_DOWNLOAD_TASK_PREFIX = "import-directory-download-"
+private const val SUBFOLDER_SEARCH_TASK_PREFIX = "import-directory-subfolders-"
+
+private fun folderDownloadTaskKey(id: ImportDirectoryId): String = "$FOLDER_DOWNLOAD_TASK_PREFIX${id.id}"
+
+private fun subfolderSearchTaskKey(id: ImportDirectoryId): String = "$SUBFOLDER_SEARCH_TASK_PREFIX${id.id}"

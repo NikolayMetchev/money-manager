@@ -8,8 +8,9 @@ import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.tasks.Progress
+import com.moneymanager.tasks.WeightedProgress
 
 private val logger = Logger.withTag("BulkReimport")
 
@@ -83,7 +84,7 @@ sealed interface BulkReimportFileOutcome {
 /**
  * Runs [reimportFile] over every file in [imports] and folds the per-file [CsvReimportResult]s into one
  * [BulkReimportResult] — the machinery both `bulkReimportCsv` and `bulkReimportQif` need: row-weighted
- * run-wide progress via a [BulkProgressTracker], a per-file try/catch that logs and counts a failure
+ * run-wide progress via a [WeightedProgress], a per-file try/catch that logs and counts a failure
  * instead of aborting the run, and a single closing [Maintenance.refreshMaterializedViews] (each file's
  * own execute is expected to be called with `refreshViews = false`).
  *
@@ -98,10 +99,10 @@ suspend fun <T, C> runBulkReimport(
     fileName: (T) -> String,
     logLabel: String,
     maintenance: Maintenance,
-    onProgress: suspend (BulkImportProgress) -> Unit,
+    onProgress: suspend (Progress) -> Unit,
     startDetail: String? = null,
     prepare: suspend () -> C,
-    reimportFile: suspend (index: Int, file: T, context: C, onFileProgress: suspend (ImportProgress) -> Unit) -> BulkReimportFileOutcome,
+    reimportFile: suspend (index: Int, file: T, context: C, onFileProgress: suspend (Progress) -> Unit) -> BulkReimportFileOutcome,
 ): BulkReimportResult {
     var filesImported = 0
     var transfers = 0
@@ -118,15 +119,15 @@ suspend fun <T, C> runBulkReimport(
     var emptyAccountsDeleted = 0
     val skipped = mutableListOf<ReimportSkippedAccount>()
 
-    val tracker = BulkProgressTracker(imports.map(rowCount), onProgress)
+    val tracker = WeightedProgress(imports.map(rowCount), onProgress = onProgress)
     tracker.started(detail = startDetail)
     val context = prepare()
 
     imports.forEachIndexed { index, file ->
         val name = fileName(file)
-        tracker.fileStarted(index, name)
+        tracker.itemStarted(index, name)
         try {
-            when (val outcome = reimportFile(index, file, context) { tracker.phase(index, name, it) }) {
+            when (val outcome = reimportFile(index, file, context) { tracker.item(index, name, it) }) {
                 is BulkReimportFileOutcome.NoWork -> Unit
                 is BulkReimportFileOutcome.NoStrategy -> skippedNoStrategy++
                 is BulkReimportFileOutcome.Reimported -> {
@@ -192,7 +193,7 @@ suspend fun applyReimportValueUpdates(
     batchFor: (transfers: List<ImportTransfer>, rowTransferMap: Map<Long, TransferId>) -> ImportBatch,
     logLabel: String,
     rowLabel: String,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     chunkSize: Int = REIMPORT_VALUE_UPDATE_CHUNK,
 ): List<ReimportValueUpdate> {
     if (valueUpdates.isEmpty()) return emptyList()
@@ -217,7 +218,7 @@ suspend fun applyReimportValueUpdates(
     val total = valueUpdates.size
     val updated = mutableListOf<ReimportValueUpdate>()
     var done = 0
-    onProgress?.invoke(ImportProgress("Updating transactions", fraction = 0f, processed = 0, total = total))
+    onProgress?.invoke(Progress("Updating transactions", fraction = 0f, processed = 0, total = total))
     for (chunk in valueUpdates.chunked(chunkSize.coerceAtLeast(1))) {
         try {
             importEngine.import(batchOf(chunk))
@@ -243,7 +244,7 @@ suspend fun applyReimportValueUpdates(
         }
         done += chunk.size
         onProgress?.invoke(
-            ImportProgress("Updating transactions", fraction = done.toFloat() / total, processed = done, total = total),
+            Progress("Updating transactions", fraction = done.toFloat() / total, processed = done, total = total),
         )
     }
     return updated

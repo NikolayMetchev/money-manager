@@ -13,6 +13,7 @@ import com.moneymanager.remotestorage.RemoteStorageProvider
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory
 import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.reconnect
+import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -168,11 +169,11 @@ class StrategySyncController(
         selectedToPull: Set<StrategyKey> = emptySet(),
         forceUpload: Set<StrategyKey> = emptySet(),
         resolutions: Map<StrategyKey, Map<CsvUnresolvedReference, CsvResolution>> = emptyMap(),
-        onProgress: (SyncProgress) -> Unit = {},
+        onProgress: (Progress) -> Unit = {},
     ): StrategySyncSummary =
         clearingBusyOnFailure {
             if (!isConnected()) return@clearingBusyOnFailure StrategySyncSummary(0, 0)
-            onProgress(SyncProgress("Checking the remote library…", 0f))
+            onProgress(Progress("Checking the remote library…", 0f))
             val provider = resolveSignedIn()
             var remote = remoteByKey(provider)
             val local = library.listLocal(appVersion).associateBy { it.key }
@@ -182,7 +183,7 @@ class StrategySyncController(
             var completedSteps = 0
 
             fun step(message: String) {
-                onProgress(SyncProgress(message, completedSteps.toFloat() / totalSteps))
+                onProgress(Progress(message, completedSteps.toFloat() / totalSteps))
                 completedSteps++
             }
 
@@ -209,7 +210,7 @@ class StrategySyncController(
 
             step("Refreshing the library view…")
             refresh(library, appVersion)
-            onProgress(SyncProgress("Done", 1f))
+            onProgress(Progress("Done", 1f))
             StrategySyncSummary(uploaded, pulled)
         }
 

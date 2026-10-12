@@ -31,6 +31,7 @@ kotlin {
                 api(libs.androidx.compose.runtime)
                 api(libs.androidx.compose.ui)
 
+                implementation(projects.app.tasks)
                 implementation(libs.androidx.compose.foundation)
                 implementation(libs.androidx.compose.material3)
                 implementation(libs.androidx.compose.ui.graphics)
@@ -51,6 +52,7 @@ kotlin {
 
                 implementation(projects.app.model.csv)
                 implementation(projects.app.model.qif)
+                implementation(projects.app.tasks)
                 implementation(libs.compose.foundation.desktop)
                 implementation(libs.compose.material3.desktop)
                 implementation(libs.compose.ui.desktop)

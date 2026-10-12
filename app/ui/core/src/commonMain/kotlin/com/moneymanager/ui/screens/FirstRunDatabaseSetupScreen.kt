@@ -22,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.moneymanager.database.DatabaseInitializationProgress
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DEFAULT_DATABASE_NAME
@@ -32,7 +31,7 @@ import com.moneymanager.domain.model.remoteCacheLocation
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
-import com.moneymanager.remotestorage.sync.SyncProgress
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.AppServices
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.settings.GoogleDriveSetupDialog
@@ -67,7 +66,7 @@ fun FirstRunDatabaseSetupScreen(
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     var busy by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf<DatabaseInitializationProgress?>(null) }
+    var progress by remember { mutableStateOf<Progress?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
 
     var createRemoteType by remember { mutableStateOf<RemoteStorageType?>(null) }
@@ -90,15 +89,15 @@ fun FirstRunDatabaseSetupScreen(
         scope.launch {
             var database: MoneyManagerDatabaseWrapper? = null
             try {
-                progress = DatabaseInitializationProgress("Creating database...", 0, 1)
+                progress = Progress.counted("Creating database...", 0, 1)
                 // A new remote database starts as a freshly seeded local working copy that we then upload.
                 val opened = databaseManager.openDatabaseWithProgress(cache) { progress = it }
                 database = opened
-                progress = DatabaseInitializationProgress("Preparing application services...", 1, 1)
+                progress = Progress.counted("Preparing application services...", 1, 1)
                 val services = createAppServices(opened)
                 services.deviceId
                 remoteController!!.createRemote(type.id, config, name, cache, opened, password, overwriteFileId) {
-                    progress = it.toInitializationProgress()
+                    progress = it
                 }
                 // createRemote persisted the binding, armed the session and captured the sync baseline,
                 // so the database is ready to use as-is — hand it straight to the host.
@@ -130,10 +129,10 @@ fun FirstRunDatabaseSetupScreen(
         message = null
         scope.launch {
             try {
-                progress = DatabaseInitializationProgress("Opening from cloud...", 0, 1)
+                progress = Progress.counted("Opening from cloud...", 0, 1)
                 val location =
                     remoteController!!.openRemote(type.id, config, file, remoteCacheLocation(file.name), password) {
-                        progress = it.toInitializationProgress()
+                        progress = it
                     }
                 onRemoteOpened(location)
             } catch (expected: CancellationException) {
@@ -202,10 +201,10 @@ fun FirstRunDatabaseSetupScreen(
 
                 progress?.let {
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text(it.text, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+                    Text(it.detail, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
                     Spacer(modifier = Modifier.height(8.dp))
                     LinearProgressIndicator(
-                        progress = { it.fraction },
+                        progress = { it.fraction ?: 0f },
                         modifier = buttonModifier,
                     )
                 }
@@ -240,5 +239,3 @@ fun FirstRunDatabaseSetupScreen(
         )
     }
 }
-
-private fun SyncProgress.toInitializationProgress() = DatabaseInitializationProgress(message, (fraction * 100).toInt(), 100)

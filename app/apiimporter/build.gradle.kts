@@ -35,6 +35,7 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.passthrough)
                 api(projects.app.model.repository.read)
+                api(projects.app.tasks)
                 api(projects.utils.rest)
                 api(libs.kotlinx.serialization.json)
 
@@ -49,6 +50,7 @@ kotlin {
 
         getByName("androidMain") {
             dependencies {
+                api(projects.app.tasks)
                 api(libs.kotlinx.serialization.json)
 
                 implementation(projects.utils.bigdecimal)
@@ -69,12 +71,14 @@ kotlin {
         getByName("androidHostTest") {
             dependencies {
                 implementation(projects.app.model.rules)
+                implementation(projects.app.tasks)
             }
         }
 
         getByName("jvmTest") {
             dependencies {
                 implementation(projects.app.model.rules)
+                implementation(projects.app.tasks)
             }
         }
     }

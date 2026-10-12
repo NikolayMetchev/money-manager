@@ -13,7 +13,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.AttributeAccountMatcher
-import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
 import com.moneymanager.csvimporter.bulkReimportCsv
@@ -34,6 +33,7 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
 import com.moneymanager.ui.components.imports.BulkImportProgressIndicator
 import com.moneymanager.ui.components.imports.BulkMergeReport
@@ -82,7 +82,7 @@ fun CsvReimportAllDialog(
         .collectAsStateWithSchemaErrorHandling(emptyList())
 
     var isRunning by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf<BulkImportProgress?>(null) }
+    var progress by remember { mutableStateOf<Progress?>(null) }
     var result by remember { mutableStateOf<BulkReimportResult?>(null) }
 
     // Resolve each file's strategy the same way the re-import will: the one it was last imported with,

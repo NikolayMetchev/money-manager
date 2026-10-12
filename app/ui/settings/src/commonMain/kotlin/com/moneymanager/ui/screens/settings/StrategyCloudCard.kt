@@ -41,7 +41,7 @@ import com.moneymanager.remotestorage.RemoteAuthException
 import com.moneymanager.remotestorage.sync.StrategyItem
 import com.moneymanager.remotestorage.sync.StrategyItemStatus
 import com.moneymanager.remotestorage.sync.StrategySyncController
-import com.moneymanager.remotestorage.sync.SyncProgress
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.SettingsSectionCard
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
@@ -93,7 +93,7 @@ fun StrategyCloudCard(
     // Set when a pull needs the user to resolve references before it can proceed.
     var pendingSync by remember { mutableStateOf<PendingSync?>(null) }
     var busyLocal by remember { mutableStateOf(false) }
-    var syncProgress by remember { mutableStateOf<SyncProgress?>(null) }
+    var syncProgress by remember { mutableStateOf<Progress?>(null) }
     val actionsEnabled = !state.busy && !busyLocal
 
     // Records a failure message and, when the cause is an expired/revoked Drive connection, flags the
@@ -221,7 +221,7 @@ fun StrategyCloudCard(
                                 // Any references the selected pulls can't resolve locally need the user first.
                                 val unresolved = mutableMapOf<StrategyKey, List<CsvUnresolvedReference>>()
                                 pull.forEachIndexed { index, key ->
-                                    syncProgress = SyncProgress("Checking ${key.displayLabel()}…", index.toFloat() / pull.size)
+                                    syncProgress = Progress("Checking ${key.displayLabel()}…", index.toFloat() / pull.size)
                                     val references = controller.previewPull(library, key).unresolvedReferences
                                     if (references.isNotEmpty()) unresolved[key] = references
                                 }
@@ -281,9 +281,9 @@ fun StrategyCloudCard(
         }
 
         syncProgress?.let { progress ->
-            Text(progress.message, style = MaterialTheme.typography.bodySmall)
+            Text(progress.detail, style = MaterialTheme.typography.bodySmall)
             LinearProgressIndicator(
-                progress = { progress.fraction },
+                progress = { progress.fraction ?: 0f },
                 modifier = Modifier.fillMaxWidth(),
             )
         }

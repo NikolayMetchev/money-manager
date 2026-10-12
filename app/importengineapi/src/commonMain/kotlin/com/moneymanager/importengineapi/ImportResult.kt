@@ -77,17 +77,3 @@ data class ImportResult(
     val apiRequestIds: Map<String, ApiRequestId> = emptyMap(),
     val apiResponseIds: Map<String, ApiResponseId> = emptyMap(),
 )
-
-/**
- * Progress emitted during a central import run.
- *
- * @property fraction Overall completion in [0, 1] for the current phase, when known.
- * @property processed Number of transfers written so far during the write phase, when known.
- * @property total Total number of transfers to write during the write phase, when known.
- */
-data class ImportProgress(
-    val detail: String,
-    val fraction: Float? = null,
-    val processed: Int? = null,
-    val total: Int? = null,
-)

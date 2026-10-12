@@ -6,6 +6,7 @@ import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageProvider
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory
 import com.moneymanager.remotestorage.reconnect
+import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -209,7 +210,7 @@ class RemoteDatabaseController(
         database: MoneyManagerDatabaseWrapper,
         password: String,
         overwriteFileId: String? = null,
-        onProgress: (SyncProgress) -> Unit = {},
+        onProgress: (Progress) -> Unit = {},
     ): RemoteDatabaseBinding {
         val provider = resolve(providerId, config)
         val binding =
@@ -232,7 +233,7 @@ class RemoteDatabaseController(
         remoteFile: RemoteFile,
         localCachePath: DbLocation,
         password: String,
-        onProgress: (SyncProgress) -> Unit = {},
+        onProgress: (Progress) -> Unit = {},
     ): DbLocation {
         val provider = resolve(providerId, config)
         // Seed the baseline from the picked file so detection still works if hydrate can't fetch a revision.
@@ -257,7 +258,7 @@ class RemoteDatabaseController(
     suspend fun restore(
         binding: RemoteDatabaseBinding,
         password: String,
-        onProgress: (SyncProgress) -> Unit = {},
+        onProgress: (Progress) -> Unit = {},
     ): DbLocation {
         val provider = resolve(binding.providerId, binding.providerConfig)
         val result = syncService.hydrate(provider, binding, password, onProgress)
@@ -312,7 +313,7 @@ class RemoteDatabaseController(
         database: MoneyManagerDatabaseWrapper,
         force: Boolean = false,
         rebuildViews: Boolean = true,
-        onProgress: (SyncProgress) -> Unit = {},
+        onProgress: (Progress) -> Unit = {},
     ): SyncResult {
         val current = session ?: return SyncResult.NO_SESSION
         if (!force && remoteChanged()) {
@@ -330,7 +331,7 @@ class RemoteDatabaseController(
      * caller must route this through the database-switch path so the working copy is reopened; the local
      * change baseline is invalidated here and re-captured on the reopened handle (via [markSynced]).
      */
-    suspend fun download(onProgress: (SyncProgress) -> Unit = {}): DbLocation {
+    suspend fun download(onProgress: (Progress) -> Unit = {}): DbLocation {
         val current = session ?: error("download requires an active remote session")
         val result = syncService.hydrate(current.provider, current.binding, current.password, onProgress)
         recordSyncedRevision(result.revisionId)

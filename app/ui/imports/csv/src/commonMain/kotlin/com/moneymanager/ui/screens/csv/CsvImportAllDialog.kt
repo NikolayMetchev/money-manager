@@ -13,7 +13,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.AttributeAccountMatcher
-import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.needsSourceAccountOverride
@@ -36,6 +35,7 @@ import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
 import com.moneymanager.ui.components.imports.BulkImportProgressIndicator
@@ -81,7 +81,7 @@ fun CsvImportAllDialog(
 
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var isImporting by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf<BulkImportProgress?>(null) }
+    var progress by remember { mutableStateOf<Progress?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
 
     // The account each file's own import directory (or that directory's parent) resolves to, when set.

@@ -41,6 +41,7 @@ kotlin {
                 api(libs.androidx.compose.ui)
 
                 implementation(projects.app.model.passthrough)
+                implementation(projects.app.tasks)
                 implementation(libs.androidx.compose.foundation)
                 implementation(libs.androidx.compose.material.icons.core)
                 implementation(libs.androidx.compose.material3)
@@ -66,6 +67,7 @@ kotlin {
 
                 implementation(projects.app.model.passthrough)
                 implementation(projects.app.model.timeline)
+                implementation(projects.app.tasks)
                 implementation(libs.compose.foundation.desktop)
                 implementation(libs.compose.material.icons.core.desktop)
                 implementation(libs.compose.material3.desktop)

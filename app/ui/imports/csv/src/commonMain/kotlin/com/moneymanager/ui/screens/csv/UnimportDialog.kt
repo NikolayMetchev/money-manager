@@ -36,7 +36,7 @@ import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ImportProgress
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.components.imports.ReimportProgressIndicator
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -66,7 +66,7 @@ fun UnimportDialog(
     val scope = rememberSchemaAwareCoroutineScope()
     var plan by remember { mutableStateOf<CsvUnimportPlan?>(null) }
     var isRunning by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf<ImportProgress?>(null) }
+    var progress by remember { mutableStateOf<Progress?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(csvImport.id) {
@@ -93,11 +93,11 @@ fun UnimportDialog(
                 when (val currentPlan = plan) {
                     null ->
                         if (errorMessage == null) {
-                            ReimportProgressIndicator(ImportProgress("Preparing preview"))
+                            ReimportProgressIndicator(Progress("Preparing preview"))
                         }
                     else -> {
                         if (isRunning) {
-                            ReimportProgressIndicator(progress ?: ImportProgress("Starting unimport"))
+                            ReimportProgressIndicator(progress ?: Progress("Starting unimport"))
                             Spacer(modifier = Modifier.height(12.dp))
                         }
                         UnimportPlanPreview(
@@ -185,7 +185,7 @@ fun CsvUnimportAllDialog(
     val scope = rememberSchemaAwareCoroutineScope()
     var plan by remember { mutableStateOf<CsvBulkUnimportPlan?>(null) }
     var isRunning by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf<ImportProgress?>(null) }
+    var progress by remember { mutableStateOf<Progress?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(imports) {
@@ -212,11 +212,11 @@ fun CsvUnimportAllDialog(
                 when (val currentPlan = plan) {
                     null ->
                         if (errorMessage == null) {
-                            ReimportProgressIndicator(ImportProgress("Preparing preview"))
+                            ReimportProgressIndicator(Progress("Preparing preview"))
                         }
                     else -> {
                         if (isRunning) {
-                            ReimportProgressIndicator(progress ?: ImportProgress("Starting unimport"))
+                            ReimportProgressIndicator(progress ?: Progress("Starting unimport"))
                             Spacer(modifier = Modifier.height(12.dp))
                         }
                         UnimportPlanPreview(

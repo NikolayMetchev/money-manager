@@ -28,6 +28,7 @@ kotlin {
 
         getByName("androidMain") {
             dependencies {
+                api(projects.app.tasks)
                 implementation(projects.utils.bigdecimal)
             }
         }
@@ -39,6 +40,7 @@ kotlin {
                 api(projects.app.model.csv)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.repository.write)
+                api(projects.app.tasks)
 
                 implementation(projects.app.model.passthrough)
                 implementation(projects.utils.bigdecimal)

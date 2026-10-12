@@ -70,7 +70,6 @@ import com.moneymanager.importengineapi.ImportDirectoryMutation
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportOwnershipIntent
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
@@ -92,6 +91,7 @@ import com.moneymanager.importengineapi.bankKeyFromExternalId
 import com.moneymanager.importengineapi.bankKeysFrom
 import com.moneymanager.importengineapi.forRow
 import com.moneymanager.importengineapi.normalizeNameKey
+import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -159,7 +159,7 @@ class ImportEngineImpl(
 ) : ImportEngine {
     override suspend fun import(
         batch: ImportBatch,
-        onProgress: (suspend (ImportProgress) -> Unit)?,
+        onProgress: (suspend (Progress) -> Unit)?,
         batchSize: Int,
     ): ImportResult {
         editGate.ensureWritable()
@@ -309,7 +309,7 @@ class ImportEngineImpl(
                 )
         }
 
-        onProgress?.invoke(ImportProgress("Resolving accounts"))
+        onProgress?.invoke(Progress("Resolving accounts"))
         val accountResolution = resolveAccounts(batch.copy(accountsToCreate = batch.accountsToCreate.creates()))
         batch.shadowSource?.let { source ->
             val shadowIds = shadowAccountIds(source)
@@ -317,10 +317,10 @@ class ImportEngineImpl(
             require(strays.isEmpty()) { "Reconciliation import for '$source' resolved onto non-shadow account(s) $strays" }
         }
 
-        onProgress?.invoke(ImportProgress("Resolving people"))
+        onProgress?.invoke(Progress("Resolving people"))
         val personResolution = resolvePeople(batch.copy(peopleToCreate = batch.peopleToCreate.creates()))
 
-        onProgress?.invoke(ImportProgress("Linking ownerships"))
+        onProgress?.invoke(Progress("Linking ownerships"))
         createOwnerships(
             batch.copy(ownerships = batch.ownerships.creates()),
             personResolution,
@@ -388,7 +388,7 @@ class ImportEngineImpl(
             deleted++
             if (onProgress != null && (deleted % DELETE_PROGRESS_EVERY_ROWS == 0 || deleted == deleteTotal)) {
                 onProgress(
-                    ImportProgress(
+                    Progress(
                         detail = "Deleting transactions",
                         fraction = deleted.toFloat() / deleteTotal,
                         processed = deleted,
@@ -545,7 +545,7 @@ class ImportEngineImpl(
         batch: ImportBatch,
         accountKeyToId: Map<LocalAccountKey, AccountId>,
         batchSize: Int,
-        onProgress: (suspend (ImportProgress) -> Unit)?,
+        onProgress: (suspend (Progress) -> Unit)?,
     ): TransferOutcome {
         if (creates.isEmpty()) return TransferOutcome(0, 0, 0, 0, emptyMap(), emptyMap(), emptyList())
 
@@ -571,7 +571,7 @@ class ImportEngineImpl(
                 )
             }
 
-        onProgress?.invoke(ImportProgress("Detecting duplicates"))
+        onProgress?.invoke(Progress("Detecting duplicates"))
         val existing = loadExisting(resolvedTransfers, batch)
         val existingRelationships = existingRelationships(existing)
         val classified =
@@ -591,7 +591,7 @@ class ImportEngineImpl(
         val duplicates = classified.count { it.status == ImportStatus.DUPLICATE }
         val excluded = resolvedTransfers.count { it.excludedFromBalances }
 
-        onProgress?.invoke(ImportProgress("Importing transactions", fraction = 0f, processed = 0, total = toImport.size))
+        onProgress?.invoke(Progress("Importing transactions", fraction = 0f, processed = 0, total = toImport.size))
         // The engine's own cross-source reconcile marker is never "owned" by a source: a row that
         // re-imports must not un-exclude a transfer the engine reconciled away.
         val engineOwnedTypeId =
@@ -1557,7 +1557,7 @@ class ImportEngineImpl(
         toImport: List<Classified>,
         toUpdate: List<Classified>,
         batchSize: Int,
-        onProgress: (suspend (ImportProgress) -> Unit)?,
+        onProgress: (suspend (Progress) -> Unit)?,
         engineOwnedTypeId: AttributeTypeId?,
     ): List<TransferId> {
         if (toImport.isEmpty() && toUpdate.isEmpty()) return emptyList()
@@ -1636,7 +1636,7 @@ class ImportEngineImpl(
             }
             written += chunk.size
             onProgress?.invoke(
-                ImportProgress(
+                Progress(
                     detail = "Importing transactions",
                     fraction = written.toFloat() / total,
                     processed = written,

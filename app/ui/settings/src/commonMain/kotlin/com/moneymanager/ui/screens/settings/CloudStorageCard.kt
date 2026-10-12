@@ -32,10 +32,10 @@ import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.googledrive.GOOGLE_DRIVE_FOLDER_NAME
 import com.moneymanager.remotestorage.googledrive.GOOGLE_DRIVE_PROVIDER_ID
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
-import com.moneymanager.remotestorage.sync.SyncProgress
 import com.moneymanager.remotestorage.sync.SyncResult
 import com.moneymanager.remotestorage.sync.SyncState
 import com.moneymanager.remotestorage.sync.SyncStatus
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.SettingsSectionCard
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.PasswordField
@@ -66,7 +66,7 @@ fun CloudStorageCard(
     var createType by remember { mutableStateOf<RemoteStorageType?>(null) }
     var openType by remember { mutableStateOf<RemoteStorageType?>(null) }
     var showResume by remember { mutableStateOf(false) }
-    var syncProgress by remember { mutableStateOf<SyncProgress?>(null) }
+    var syncProgress by remember { mutableStateOf<Progress?>(null) }
 
     var refreshTick by remember { mutableStateOf(0) }
     var localSize by remember { mutableStateOf<Long?>(null) }
@@ -220,9 +220,9 @@ fun CloudStorageCard(
         tokenStatus?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
 
         syncProgress?.let { progress ->
-            Text(text = progress.message, style = MaterialTheme.typography.bodySmall)
+            Text(text = progress.detail, style = MaterialTheme.typography.bodySmall)
             LinearProgressIndicator(
-                progress = { progress.fraction },
+                progress = { progress.fraction ?: 0f },
                 modifier = Modifier.fillMaxWidth(),
             )
         }

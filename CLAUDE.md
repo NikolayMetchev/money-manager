@@ -100,6 +100,7 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 | `app/db/schema/`, `app/db/read/`, `app/db/repository/`, `app/db/write/`, `app/db/core/` | SQLDelight schema; generated read SQL + Mappie mappers + JSON codecs (and the strategy config migrations); read repository impls; write SQL + impls; `DatabaseManager` and services |
 | `app/db/seed/`, `app/db/schemaspy/` | Static seed SQL; SchemaSpy docs generator for the Pages site |
 | `app/cryptodata/` | Bundled crypto asset catalog plus its refresher/installer (built by `tools/crypto-dataset`) |
+| `app/tasks/` | The one progress type `Progress` (every import, download, DB open and cloud sync reports it), its `PhasedProgress`/`WeightedProgress` folding helpers, and `TaskManager`: background tasks as a `StateFlow`, deduped by key, with child tasks and cancellation. Pure coroutines, so the UI, CLI and TUI share it; the Compose `TaskPanel` (`app/ui/foundation`) only collects it |
 | `app/importengineapi/` | `ImportEngine` interface + `ImportBatch`/`ImportResult` model + `ImportEngine.*` write helpers (DB-free) |
 | `app/importer/` | `ImportEngineImpl` — the **sole** DB writer (consumes write repositories) |
 | `app/csvimporter/`, `app/qifimporter/`, `app/apiimporter/` | Parse/download sources and build an `ImportBatch` (DB-free, enforced) |

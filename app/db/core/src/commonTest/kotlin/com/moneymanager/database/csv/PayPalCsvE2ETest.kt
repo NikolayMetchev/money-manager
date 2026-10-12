@@ -4,7 +4,6 @@ package com.moneymanager.database.csv
 
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.AttributeAccountMatcher
-import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.CsvBulkResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.executeCsvReimport
@@ -21,6 +20,7 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.importengineapi.createAccount
+import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -168,7 +168,7 @@ class PayPalCsvE2ETest : DbTest() {
         imports: List<CsvImport>,
         sourceAccountOverride: AccountId? = null,
     ): CsvBulkResult {
-        val progress = mutableListOf<BulkImportProgress>()
+        val progress = mutableListOf<Progress>()
         val result =
             bulkApplyCsv(
                 imports = imports,

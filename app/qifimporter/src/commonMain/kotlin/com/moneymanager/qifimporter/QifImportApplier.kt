@@ -2,9 +2,7 @@ package com.moneymanager.qifimporter
 
 import co.touchlab.kermit.Logger
 import com.moneymanager.csvimporter.BULK_ENGINE_BATCH_SIZE
-import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.BulkImportResult
-import com.moneymanager.csvimporter.BulkProgressTracker
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ImportPreparation
 import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
@@ -42,7 +40,6 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportPersonIntent
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalPersonKey
@@ -53,6 +50,8 @@ import com.moneymanager.importengineapi.createAccountMappings
 import com.moneymanager.importengineapi.createAccounts
 import com.moneymanager.importengineapi.getOrCreateAttributeTypes
 import com.moneymanager.importengineapi.normalizeNameKey
+import com.moneymanager.tasks.Progress
+import com.moneymanager.tasks.WeightedProgress
 import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
 
@@ -121,7 +120,7 @@ suspend fun bulkApplyQif(
     qifImportRepository: QifImportReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    onProgress: suspend (BulkImportProgress) -> Unit,
+    onProgress: suspend (Progress) -> Unit,
     directoryAccounts: Map<QifImportId, AccountId> = emptyMap(),
 ): QifBulkResult {
     val qifStrategies = strategies.qifCompatible()
@@ -131,11 +130,11 @@ suspend fun bulkApplyQif(
     var skippedNoStrategy = 0
     var failed = 0
 
-    val tracker = BulkProgressTracker(imports.map { it.recordCount }, onProgress)
+    val tracker = WeightedProgress(imports.map { it.recordCount }, onProgress = onProgress)
     tracker.started()
 
     imports.forEachIndexed { index, qifImport ->
-        tracker.fileStarted(index, qifImport.originalFileName)
+        tracker.itemStarted(index, qifImport.originalFileName)
         try {
             val count = qifImportRepository.countRecords(qifImport.id)
             val records = qifImportRepository.getImportRecords(qifImport.id, count.coerceAtLeast(1), 0)
@@ -185,7 +184,7 @@ suspend fun bulkApplyQif(
                     maintenance = maintenance,
                     importEngine = importEngine,
                     refreshViews = false,
-                    onProgress = { tracker.phase(index, qifImport.originalFileName, it) },
+                    onProgress = { tracker.item(index, qifImport.originalFileName, it) },
                     engineBatchSize = BULK_ENGINE_BATCH_SIZE,
                 )
             filesImported++
@@ -267,7 +266,7 @@ suspend fun runImport(
     maintenance: Maintenance,
     importEngine: ImportEngine,
     refreshViews: Boolean = true,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
 ): QifImportResult {
     // Persist any "map to existing account" selections so future imports reuse them.

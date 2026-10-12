@@ -10,7 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.importengineapi.ImportProgress
+import com.moneymanager.tasks.Progress
 
 /**
  * The phase text plus bar shown while an API re-import runs. Shared by the single-session and
@@ -19,7 +19,7 @@ import com.moneymanager.importengineapi.ImportProgress
  */
 @Composable
 internal fun ApiReimportProgress(
-    progress: ImportProgress,
+    progress: Progress,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {

@@ -49,7 +49,7 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ImportProgress
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.components.imports.REIMPORT_PREVIEW_LIMIT
@@ -112,8 +112,8 @@ fun ReimportDialog(
     var plan by remember { mutableStateOf<ReimportPlan?>(null) }
     var isRunning by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var planProgress by remember { mutableStateOf<ImportProgress?>(null) }
-    var executeProgress by remember { mutableStateOf<ImportProgress?>(null) }
+    var planProgress by remember { mutableStateOf<Progress?>(null) }
+    var executeProgress by remember { mutableStateOf<Progress?>(null) }
 
     // Resolve the strategy that was last applied; fall back to auto-selection if it was deleted.
     LaunchedEffect(csvImport.id) {
@@ -212,11 +212,11 @@ fun ReimportDialog(
                         when (val currentPlan = plan) {
                             null ->
                                 if (errorMessage == null) {
-                                    ReimportProgressIndicator(planProgress ?: ImportProgress("Preparing preview"))
+                                    ReimportProgressIndicator(planProgress ?: Progress("Preparing preview"))
                                 }
                             else -> {
                                 if (isRunning) {
-                                    ReimportProgressIndicator(executeProgress ?: ImportProgress("Starting re-import"))
+                                    ReimportProgressIndicator(executeProgress ?: Progress("Starting re-import"))
                                     Spacer(modifier = Modifier.height(12.dp))
                                 }
                                 CsvReimportPlanPreview(currentPlan, hasUnimportedRows)

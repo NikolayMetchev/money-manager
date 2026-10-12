@@ -43,13 +43,13 @@ import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.qifimporter.executeQifReimport
 import com.moneymanager.qifimporter.planQifReimport
 import com.moneymanager.qifimporter.qifCompatible
 import com.moneymanager.qifimporter.selectForQifContent
 import com.moneymanager.qifimporter.withQifCurrency
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
@@ -107,8 +107,8 @@ fun QifReimportDialog(
     var plan by remember { mutableStateOf<ReimportPlan?>(null) }
     var isRunning by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var planProgress by remember { mutableStateOf<ImportProgress?>(null) }
-    var executeProgress by remember { mutableStateOf<ImportProgress?>(null) }
+    var planProgress by remember { mutableStateOf<Progress?>(null) }
+    var executeProgress by remember { mutableStateOf<Progress?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
 
     // Resolve the strategy that was last applied; fall back to content-aware auto-selection if it was
@@ -220,11 +220,11 @@ fun QifReimportDialog(
                         when (val currentPlan = plan) {
                             null ->
                                 if (errorMessage == null) {
-                                    ReimportProgressIndicator(planProgress ?: ImportProgress("Preparing preview"))
+                                    ReimportProgressIndicator(planProgress ?: Progress("Preparing preview"))
                                 }
                             else -> {
                                 if (isRunning) {
-                                    ReimportProgressIndicator(executeProgress ?: ImportProgress("Starting re-import"))
+                                    ReimportProgressIndicator(executeProgress ?: Progress("Starting re-import"))
                                     Spacer(modifier = Modifier.height(12.dp))
                                 }
                                 QifReimportPlanPreview(currentPlan, hasPendingRecords)

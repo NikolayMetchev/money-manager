@@ -36,7 +36,6 @@ import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalTradeKey
@@ -45,6 +44,7 @@ import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
 import com.moneymanager.importengineapi.reconciledPartnerUnhideUpdates
 import com.moneymanager.importengineapi.reconciledPartnerUnhides
 import com.moneymanager.importengineapi.selectNearestUnconsumedLeg
+import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -362,12 +362,12 @@ suspend fun computeReimportReversals(
     accountRepository: AccountReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
     rowIndexForSource: (Source) -> Long?,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
 ): List<ReimportReversal> {
     val candidates = accountRepository.getReversibleMerges().first().filter { it.deletedAccountId in importCreated }
     if (candidates.isEmpty()) return emptyList()
 
-    onProgress?.invoke(ImportProgress("Checking merges to reverse"))
+    onProgress?.invoke(Progress("Checking merges to reverse"))
     val mappedByRow = mappedNoHistoryPrep.validTransfers.associateBy { it.rowIndex }
     val reversals = mutableListOf<ReimportReversal>()
     for (merge in candidates) {
@@ -433,9 +433,9 @@ suspend fun planCsvReimport(
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoAssets: List<CryptoAsset> = emptyList(),
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
 ): ReimportPlan {
-    onProgress?.invoke(ImportProgress("Loading rows"))
+    onProgress?.invoke(Progress("Loading rows"))
     val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
     if (allRows.isEmpty()) return ReimportPlan(emptyList(), emptyList())
 
@@ -459,9 +459,9 @@ suspend fun planCsvReimport(
             attributeAccountMatchers,
         ).prepareImport(allRows)
 
-    onProgress?.invoke(ImportProgress("Analyzing rows (pass 1 of 2)"))
+    onProgress?.invoke(Progress("Analyzing rows (pass 1 of 2)"))
     val mappedPrep = prep(mappings)
-    onProgress?.invoke(ImportProgress("Analyzing rows (pass 2 of 2)"))
+    onProgress?.invoke(Progress("Analyzing rows (pass 2 of 2)"))
     val candidates = computeReimportMerges(prep(emptyList()), mappedPrep, importCreated)
     val accountsById = accounts.associateBy { it.id }
     // Reversal detection re-maps with the mappings but NO historical names, so a merged-away account's
@@ -490,7 +490,7 @@ suspend fun planCsvReimport(
         )
     // One batched load instead of a per-row getTransactionById round trip in each of the three
     // row scans below — on large files those thousands of single-row flow queries dominate the plan phase.
-    onProgress?.invoke(ImportProgress("Loading existing transactions"))
+    onProgress?.invoke(Progress("Loading existing transactions"))
     val existingTransfers = transactionRepository.getTransactionsByIds(allRows.mapNotNull { it.transferId })
     val rewrites =
         computeReimportRewrites(allRows, mappedPrep, relationshipRepository, onProgress) { transferId ->
@@ -579,7 +579,7 @@ suspend fun planCsvReimport(
     val merges = mutableListOf<ReimportMerge>()
     val skipped = mutableListOf<ReimportSkippedAccount>()
 
-    onProgress?.invoke(ImportProgress("Checking duplicate accounts"))
+    onProgress?.invoke(Progress("Checking duplicate accounts"))
     for ((duplicate, targets) in candidates.conflicts) {
         skipped +=
             ReimportSkippedAccount(
@@ -650,7 +650,7 @@ suspend fun computeReimportValueUpdates(
     mappedPrep: ImportPreparation,
     rewrittenRowIndexes: Set<Long>,
     existingTransferLookup: suspend (TransferId) -> Transfer?,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
 ): List<ReimportValueUpdate> {
     val rowsByIndex = allRows.associateBy { it.rowIndex }
     val updates = mutableListOf<ReimportValueUpdate>()
@@ -761,7 +761,7 @@ suspend fun computeDuplicateTradeReruns(
     mappedPrep: ImportPreparation,
     excludedRowIndexes: Set<Long>,
     tradesTouchingAccount: suspend (AccountId) -> List<Trade>,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
 ): List<ReimportDuplicateTrade> {
     val rowsByIndex = allRows.associateBy { it.rowIndex }
     val tradeRows =
@@ -773,7 +773,7 @@ suspend fun computeDuplicateTradeReruns(
         }
     if (tradeRows.isEmpty()) return emptyList()
 
-    onProgress?.invoke(ImportProgress("Checking duplicate conversions"))
+    onProgress?.invoke(Progress("Checking duplicate conversions"))
     // A row that never recorded its trade id must not give up a trade another row in this file owns:
     // deleting it would leave that row IMPORTED but pointing at nothing, and the `own == null` branch
     // below then refuses to repair it forever.
@@ -836,7 +836,7 @@ suspend fun computeUnidentifiedCounterpartyReruns(
     loadTransfersTouchingAccount: suspend (AccountId, Instant, Instant) -> List<Transfer>,
     /** Legs already claimed by a `reconciled` link, mirroring the engine's own rule. */
     claimedReconcileTargets: suspend (Collection<TransferId>) -> Set<TransferId>,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
 ): List<ReimportCounterpartyReconcile> {
     // Reconciliation is opt-in per strategy (the same switch the engine reads), and the window is the
     // engine's own fuzzy date tolerance, so plan and re-run agree on what will reconcile.
@@ -884,7 +884,7 @@ suspend fun computeUnidentifiedCounterpartyReruns(
         }
     if (candidates.isEmpty()) return emptyList()
 
-    onProgress?.invoke(ImportProgress("Checking unidentified counterparties"))
+    onProgress?.invoke(Progress("Checking unidentified counterparties"))
     // Legs through each owned account, bucketed by direction + amount — the whole of what an
     // unidentified-counterparty row can match on. Bounded to the candidates' span ± the window.
     val minTs = candidates.minOf { it.timestamp } - window
@@ -968,7 +968,7 @@ suspend fun computeFundingReconcileReruns(
     excludedRowIndexes: Set<Long>,
     existingTransfers: Map<TransferId, Transfer>,
     loadTransfersTouchingAccount: suspend (AccountId, Instant, Instant) -> List<Transfer>,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
 ): List<ReimportFundingReconcile> {
     val window = strategy.config.crossSourceReconcileWindowSeconds?.seconds ?: return emptyList()
     val fundingMatcher =
@@ -1006,7 +1006,7 @@ suspend fun computeFundingReconcileReruns(
     // the load to the candidates' timestamp span ± the reconcile window (a matching leg must fall inside
     // it), so a long-lived conduit isn't fully scanned on this UI-triggered path — mirrors the bounded
     // candidate load in ImportEngineImpl.loadExisting.
-    onProgress?.invoke(ImportProgress("Checking funding-card reconciliation"))
+    onProgress?.invoke(Progress("Checking funding-card reconciliation"))
     val minTs = candidates.minOf { it.timestamp } - window
     val maxTs = candidates.maxOf { it.timestamp } + window
     val legsByConduitAmount = mutableMapOf<Triple<AccountId, AccountId, Money>, MutableList<Transfer>>()
@@ -1030,9 +1030,9 @@ suspend fun computeFundingReconcileReruns(
 
 private fun Money.display(): String = "${toDisplayValue()} ${asset.code}"
 
-/** Emits a throttled per-row [ImportProgress] (every [PLAN_PROGRESS_EVERY_ROWS] rows and at the end). */
+/** Emits a throttled per-row [Progress] (every [PLAN_PROGRESS_EVERY_ROWS] rows and at the end). */
 private suspend fun emitRowProgress(
-    onProgress: (suspend (ImportProgress) -> Unit)?,
+    onProgress: (suspend (Progress) -> Unit)?,
     detail: String,
     index: Int,
     total: Int,
@@ -1040,7 +1040,7 @@ private suspend fun emitRowProgress(
     if (onProgress == null) return
     val processed = index + 1
     if (processed % PLAN_PROGRESS_EVERY_ROWS == 0 || processed == total) {
-        onProgress(ImportProgress(detail, fraction = processed.toFloat() / total, processed = processed, total = total))
+        onProgress(Progress(detail, fraction = processed.toFloat() / total, processed = processed, total = total))
     }
 }
 
@@ -1058,11 +1058,11 @@ internal suspend fun computeReimportRewrites(
     allRows: List<CsvRow>,
     mappedPrep: ImportPreparation,
     relationshipRepository: TransferRelationshipReadRepository,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     existingTransferLookup: suspend (TransferId) -> Transfer?,
 ): List<ReimportRewrite> {
     val rowsByIndex = allRows.associateBy { it.rowIndex }
-    onProgress?.invoke(ImportProgress("Loading transfer links"))
+    onProgress?.invoke(Progress("Loading transfer links"))
     val linkedLegsByRoot =
         collectLinkedLegs(
             mappedPrep.validTransfers.mapNotNull { mapped ->
@@ -1127,7 +1127,7 @@ internal suspend fun computeReimportTradeConversions(
     mappedPrep: ImportPreparation,
     rewrittenRowIndexes: Set<Long>,
     relationshipRepository: TransferRelationshipReadRepository,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     existingTransferLookup: suspend (TransferId) -> Transfer?,
 ): List<ReimportTradeConversion> {
     val rowsByIndex = allRows.associateBy { it.rowIndex }
@@ -1251,7 +1251,7 @@ suspend fun executeCsvReimport(
     maintenance: Maintenance,
     importEngine: ImportEngine,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     valueUpdateChunkSize: Int = REIMPORT_VALUE_UPDATE_CHUNK,
     refreshViews: Boolean = true,
     cryptoRepository: CryptoReadRepository? = null,
@@ -1271,7 +1271,7 @@ suspend fun executeCsvReimport(
     // per-account skip instead of aborting the remaining merges.
     for ((index, merge) in plan.merges.withIndex()) {
         onProgress?.invoke(
-            ImportProgress(
+            Progress(
                 "Merging accounts",
                 fraction = index.toFloat() / plan.merges.size,
                 processed = index,
@@ -1301,7 +1301,7 @@ suspend fun executeCsvReimport(
     val rewritten = mutableListOf<ReimportRewrite>()
     for ((index, rewrite) in plan.rewrites.withIndex()) {
         onProgress?.invoke(
-            ImportProgress(
+            Progress(
                 "Rewriting pass-through rows",
                 fraction = index.toFloat() / plan.rewrites.size,
                 processed = index,
@@ -1341,7 +1341,7 @@ suspend fun executeCsvReimport(
     val converted = mutableListOf<ReimportTradeConversion>()
     for ((index, conversion) in plan.tradeConversions.withIndex()) {
         onProgress?.invoke(
-            ImportProgress(
+            Progress(
                 "Converting transfers to trades",
                 fraction = index.toFloat() / plan.tradeConversions.size,
                 processed = index,
@@ -1399,7 +1399,7 @@ suspend fun executeCsvReimport(
     // delete — so one batch covers them all.
     val releasedDuplicates = mutableListOf<ReimportStaleDuplicate>()
     if (plan.staleDuplicates.isNotEmpty()) {
-        onProgress?.invoke(ImportProgress("Releasing rows wrongly matched as duplicates"))
+        onProgress?.invoke(Progress("Releasing rows wrongly matched as duplicates"))
         try {
             importEngine.import(
                 ImportBatch(
@@ -1426,7 +1426,7 @@ suspend fun executeCsvReimport(
     val deduplicatedTrades = mutableListOf<ReimportDuplicateTrade>()
     for ((index, duplicate) in plan.duplicateTrades.withIndex()) {
         onProgress?.invoke(
-            ImportProgress(
+            Progress(
                 "Removing duplicate conversions",
                 fraction = index.toFloat() / plan.duplicateTrades.size,
                 processed = index,
@@ -1467,7 +1467,7 @@ suspend fun executeCsvReimport(
     val counterpartyReconciled = mutableListOf<ReimportCounterpartyReconcile>()
     for ((index, reconcile) in plan.counterpartyReconciles.withIndex()) {
         onProgress?.invoke(
-            ImportProgress(
+            Progress(
                 "Rebooking unidentified counterparties",
                 fraction = index.toFloat() / plan.counterpartyReconciles.size,
                 processed = index,
@@ -1506,7 +1506,7 @@ suspend fun executeCsvReimport(
     // (which links it to the funding leg + excludes it instead of double-counting).
     for ((index, reconcile) in plan.fundingReconciles.withIndex()) {
         onProgress?.invoke(
-            ImportProgress(
+            Progress(
                 "Reconciling conduit spends",
                 fraction = index.toFloat() / plan.fundingReconciles.size,
                 processed = index,
@@ -1559,7 +1559,7 @@ suspend fun executeCsvReimport(
             tradeRepository = tradeRepository,
         )
 
-    onProgress?.invoke(ImportProgress("Cleaning up empty accounts"))
+    onProgress?.invoke(Progress("Cleaning up empty accounts"))
     val deletedEmptyAccounts =
         importEngine.deleteEmptyImportCreatedAccounts(
             createdAccountIds = csvImportRepository.getAccountsCreatedByImport(csvImport.id),
@@ -1569,7 +1569,7 @@ suspend fun executeCsvReimport(
         )
 
     if (refreshViews) {
-        onProgress?.invoke(ImportProgress("Refreshing views"))
+        onProgress?.invoke(Progress("Refreshing views"))
         maintenance.refreshMaterializedViews()
     }
 
@@ -1597,13 +1597,13 @@ suspend fun applyReimportReversals(
     reversals: List<ReimportReversal>,
     importEngine: ImportEngine,
     skipped: MutableList<ReimportSkippedAccount>,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
 ): List<ReimportReversal> {
     if (reversals.isEmpty()) return emptyList()
     val reversed = mutableListOf<ReimportReversal>()
     for ((index, reversal) in reversals.withIndex()) {
         onProgress?.invoke(
-            ImportProgress(
+            Progress(
                 "Reversing merges",
                 fraction = index.toFloat() / reversals.size,
                 processed = index,
@@ -1635,7 +1635,7 @@ private suspend fun applyValueUpdates(
     csvImport: CsvImport,
     importEngine: ImportEngine,
     skipped: MutableList<ReimportSkippedAccount>,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     chunkSize: Int = REIMPORT_VALUE_UPDATE_CHUNK,
 ): List<ReimportValueUpdate> =
     applyReimportValueUpdates(
@@ -1693,7 +1693,7 @@ suspend fun bulkReimportCsv(
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    onProgress: suspend (BulkImportProgress) -> Unit,
+    onProgress: suspend (Progress) -> Unit,
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     cryptoRepository: CryptoReadRepository? = null,
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
