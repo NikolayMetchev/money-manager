@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.kotlin-multiplatform-convention")
     id("moneymanager.android-convention")
+    id("moneymanager.native-convention")
 }
 
 // Generic remote-storage abstraction (Google Drive, OneDrive, Dropbox, ...). Pure commonMain and

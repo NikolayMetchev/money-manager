@@ -1,17 +1,17 @@
 plugins {
     alias(libs.plugins.kotlin.serialization)
-    id("moneymanager.jvm-android-shared-convention")
+    id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
 }
 
 // Bundled offline crypto catalog (ticker -> display name), plus a network refresh service.
 // The catalog is common code: the checked-in `data/coins.tsv` is compiled in as a generated constant
 // (generateBundledCryptoDataset below), so no platform loads it as a resource. The refresh service uses
-// the shared Ktor client from jvmAndroidMain. Depends on :app:model:core for CryptoCatalog/CryptoRegistry.Entry — never
+// the platform HTTP client (utils/httpclient). Depends on :app:model:core for CryptoCatalog/CryptoRegistry.Entry — never
 // the reverse (model:core stays pure-domain and dependency-free of this module).
 //
-// buildHealth (KMP quirk): ABI deps used by jvmAndroidMain must be declared `api` on each real platform
-// source set (jvmMain + androidMain); runtime-only deps live in jvmAndroidMain.
+// buildHealth (KMP quirk): ABI deps used by commonMain must also be declared on each real platform source set.
 kotlin {
     sourceSets {
         commonMain {
@@ -19,15 +19,9 @@ kotlin {
                 api(projects.app.model.core)
 
                 implementation(projects.utils.files)
+                implementation(projects.utils.httpclient)
                 implementation(libs.kotlinx.io.core)
-            }
-        }
-
-        // JVM and Android share the entire catalog loader + refresh service.
-        getByName("jvmAndroidMain") {
-            dependencies {
                 implementation(libs.kotlinx.serialization.json)
-                implementation(libs.ktor.client.cio)
                 implementation(libs.ktor.client.core)
             }
         }

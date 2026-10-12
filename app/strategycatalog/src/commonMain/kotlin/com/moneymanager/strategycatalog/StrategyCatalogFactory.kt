@@ -1,15 +1,12 @@
 package com.moneymanager.strategycatalog
 
+import com.moneymanager.httpclient.platformHttpClient
 import com.moneymanager.localsettings.LocalSettings
-import io.ktor.client.HttpClient
 
-/**
- * Builds the production controller. The engine-less [HttpClient] resolves a platform engine from the
- * runtime classpath (CIO on JVM and Android via this module's runtimeOnly dependency).
- */
+/** Builds the production controller over the platform HTTP engine. */
 fun createStrategyCatalogController(localSettings: LocalSettings): StrategyCatalogController =
     StrategyCatalogController(
-        remoteSource = StrategyCatalogClient(HttpClient()),
+        remoteSource = StrategyCatalogClient(platformHttpClient()),
         localDirectorySourceFactory = ::LocalDirectoryStrategyCatalogSource,
         localSettings = localSettings,
     )

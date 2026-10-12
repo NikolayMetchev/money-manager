@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
 }
 
 // Client for the central strategy catalog published on GitHub Pages: fetches the index.json manifest
@@ -19,14 +20,14 @@ kotlin {
                 api(libs.ktor.client.core)
 
                 implementation(projects.utils.files)
+                implementation(projects.utils.httpclient)
                 implementation(libs.kotlinx.io.core)
                 implementation(libs.kotlinx.serialization.json)
             }
         }
 
         // buildHealth (KMP quirk): ABI/impl deps used by commonMain must also be declared on each
-        // real platform source set. CIO itself is a pure runtime dependency — the engine-less
-        // HttpClient() in createStrategyCatalogController discovers it from the runtime classpath.
+        // real platform source set.
         jvmMain {
             dependencies {
                 api(projects.app.model.csvstrategy)
@@ -36,8 +37,6 @@ kotlin {
                 implementation(projects.app.model.core)
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
-
-                runtimeOnly(libs.ktor.client.cio)
             }
         }
 
@@ -50,8 +49,6 @@ kotlin {
                 implementation(projects.app.model.core)
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
-
-                runtimeOnly(libs.ktor.client.cio)
             }
         }
 

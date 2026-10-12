@@ -1,5 +1,6 @@
 package com.moneymanager.rest
 
+import com.moneymanager.httpclient.platformHttpClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.HttpSend
@@ -126,7 +127,7 @@ fun createApiClient(
     trafficRecorder: ApiTrafficRecorder,
     engine: HttpClientEngine?,
 ): ApiClient {
-    val httpClient = if (engine != null) HttpClient(engine) else HttpClient()
+    val httpClient = if (engine != null) HttpClient(engine) else platformHttpClient()
 
     httpClient.plugin(HttpSend).intercept { request ->
         val skipStore = request.attributes.getOrNull(apiSkipStoreKey) == true

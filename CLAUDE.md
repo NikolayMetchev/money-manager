@@ -90,6 +90,7 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 | `utils/credentialvault/` | The encrypted, password-protected credential file (API tokens, Google refresh tokens) that outlives the DB — see **Credentials** |
 | `utils/parsers/{csv,qif,xlsx}/` | File-format parsers |
 | `utils/rest/` | Shared Ktor `ApiClient`, request signing and API traffic recording |
+| `utils/httpclient/` | The one place the Ktor engine is chosen: `platformHttpClient()` is CIO on JVM/Android, Curl on Linux, Darwin on macOS, WinHttp on Windows (native TLS comes from the OS or the statically linked libcurl). Build every production `HttpClient` with it, never `HttpClient(CIO)` or engine discovery |
 | `utils/compose/{filePicker,scrollbar}/` | Platform file/folder pickers and scrollbar widgets |
 | `app/model/core/` | The flat `domain.model` package: entities, ids, `Money`, audit entries. Depends on nothing but `utils/bigdecimal` and `utils/files` |
 | `app/model/rules/` | The strategy vocabulary that CSV and API share: `Condition`, `ValueExpr`, `Direction`, `AssetCodeRules`, `FeeRule`, `RuleEvaluator` — see **Import Strategies** |
@@ -225,9 +226,11 @@ re-hydrates it (decrypt → inflate → write local `.db` → rebuild materializ
 - `app/remotestorage/core` — generic `RemoteStorageProvider` (a *dumb* file store:
   `upload`/`download`/`list`/`delete`) + `RemoteStorageProviderFactory`. **DB-free and crypto-free** on
   purpose, so backends stay reusable and testable. Don't add DB/encryption methods here.
-- `app/remotestorage/googledrive` — Drive REST v3 over the shared **Ktor** client, in one
-  `jvmAndroidMain` source set (runs on JVM **and** Android; the Google Java SDK is JVM-only and not used).
-  OAuth is the installed-app loopback flow; the only platform-specific piece is `BrowserLauncher`.
+- `app/remotestorage/googledrive` — Drive REST v3 over the shared **Ktor** client, all in `commonMain`
+  (runs on JVM, Android **and** native; the Google Java SDK is JVM-only and not used). OAuth is the
+  installed-app loopback flow, with the redirect received on raw `ktor-network` sockets. The only
+  platform-specific piece is `BrowserLauncher`: `DesktopBrowserLauncher` (JVM), `SystemBrowserLauncher`
+  (native), or `PrintUrlBrowserLauncher` for headless/SSH use.
 - `app/remotestorage/sync` — composes `DatabaseManager` + `ArchiveCodec` + a provider:
   `RemoteDatabaseSyncService` (the pipeline) and `RemoteDatabaseController` (session-scoped facade that
   reconstructs the provider via the factory and holds the in-memory password). `RemoteDatabaseController`
