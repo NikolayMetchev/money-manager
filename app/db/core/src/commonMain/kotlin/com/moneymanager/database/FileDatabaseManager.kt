@@ -90,10 +90,15 @@ abstract class FileDatabaseManager(
             val file = location.file
             require(SystemFileSystem.exists(file)) { "Database does not exist at: $location" }
 
-            val backup = Path("$file.backup")
-            SystemFileSystem.delete(backup, mustExist = false)
-            SystemFileSystem.atomicMove(file, backup)
-            DbLocation(backup.toString())
+            // The WAL/SHM sidecars move with the main file: committed pages can still be in the WAL, and a
+            // sidecar left behind would be paired with the fresh database created at this path next.
+            val backup = DbLocation("$file.backup")
+            (listOf(backup.file) + backup.sidecars).forEach { SystemFileSystem.delete(it, mustExist = false) }
+            SystemFileSystem.atomicMove(file, backup.file)
+            location.sidecars.zip(backup.sidecars).forEach { (sidecar, backupSidecar) ->
+                if (SystemFileSystem.exists(sidecar)) SystemFileSystem.atomicMove(sidecar, backupSidecar)
+            }
+            backup
         }
 
     override suspend fun deleteDatabase(location: DbLocation): Unit =
