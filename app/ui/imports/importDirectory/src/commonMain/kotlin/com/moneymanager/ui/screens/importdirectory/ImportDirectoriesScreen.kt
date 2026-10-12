@@ -60,6 +60,7 @@ import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.tasks.Progress
 import com.moneymanager.tasks.TaskState
+import com.moneymanager.tasks.TaskStatus
 import com.moneymanager.tasks.childrenOf
 import com.moneymanager.tasks.formatElapsedTime
 import com.moneymanager.ui.components.AccountPicker
@@ -310,7 +311,8 @@ fun ImportDirectoriesScreen(
 
     // Downloads every included folder at once. Known folders start straight away; subfolders discovered
     // under the top-level folders start as soon as they are found, so the overall total grows over the run.
-    // Runs as a task, so it carries on if this screen is left.
+    // Runs as a task, so it carries on if this screen is left; its summary and per-file failures are kept on
+    // the task (detail and issues), so a recreated screen still shows them.
     fun downloadAll() {
         statusMessage = null
         scanFailures = emptyList()
@@ -382,23 +384,23 @@ fun ImportDirectoriesScreen(
                 val downloaded = results.sumOf { (_, result) -> result.filesDownloaded }
                 val failed = results.sumOf { (_, result) -> result.filesFailed }
                 // Prefix with the directory so the same filename in two folders stays tellable apart.
-                scanFailures = folderFailures + results.flatMap { (dir, result) -> result.failures.map { "${dir.name} — $it" } }
+                (folderFailures + results.flatMap { (dir, result) -> result.failures.map { "${dir.name} — $it" } })
+                    .forEach(run::reportIssue)
                 val failedSuffix =
                     listOfNotNull(
                         "$failed file(s) failed".takeIf { failed > 0 },
                         "${folderFailures.size} folder(s) failed".takeIf { folderFailures.isNotEmpty() },
                     ).joinToString(separator = "") { "; $it" }
-                val summary =
-                    "Created $created new director${if (created == 1) "y" else "ies"}; downloaded $downloaded file(s)$failedSuffix " +
-                        "in ${formatElapsedTime(startedAt.elapsedNow())}."
-                statusMessage = summary
-                summary
+                "Created $created new director${if (created == 1) "y" else "ies"}; downloaded $downloaded file(s)$failedSuffix " +
+                    "in ${formatElapsedTime(startedAt.elapsedNow())}."
             } catch (cancellation: CancellationException) {
-                statusMessage = "Download all cancelled after ${formatElapsedTime(startedAt.elapsedNow())}."
                 throw cancellation
             } catch (expected: Exception) {
-                statusMessage = "Download all failed after ${formatElapsedTime(startedAt.elapsedNow())} — ${expected.message}"
-                throw expected
+                // Reworded so the failed task's detail says how far the run got.
+                throw IllegalStateException(
+                    "Download all failed after ${formatElapsedTime(startedAt.elapsedNow())} — ${expected.message}",
+                    expected,
+                )
             }
         }
     }
@@ -442,8 +444,11 @@ fun ImportDirectoriesScreen(
             DownloadAllProgress(task = downloadAllTask, children = tasks.childrenOf(downloadAllTask.id))
         }
 
-        statusMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-        scanFailures.forEach { failure ->
+        // A per-folder action's own result wins; otherwise the last finished "Download all" (kept by the task
+        // manager, so it survives leaving this screen) shows its outcome.
+        val lastDownloadAll = downloadAllTask?.takeUnless { statusMessage != null || it.isRunning }
+        (statusMessage ?: lastDownloadAll?.outcome())?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+        (lastDownloadAll?.issues ?: scanFailures).forEach { failure ->
             Text(
                 text = failure,
                 style = MaterialTheme.typography.bodySmall,
@@ -808,6 +813,12 @@ private fun DirectoryRedownloadResult.summary(): String =
         if (blocked.isNotEmpty()) append(", ${blocked.size} skipped")
         if (failures.isNotEmpty()) append(", ${failures.size} failed")
         append(".")
+    }
+
+private fun TaskState.outcome(): String =
+    when (status) {
+        TaskStatus.CANCELLED -> "Download all cancelled after ${formatElapsedTime(elapsed())}."
+        else -> progress.detail
     }
 
 private const val DOWNLOAD_ALL_TASK_KEY = "import-directories-download-all"

@@ -37,6 +37,8 @@ data class TaskState(
     val progress: Progress,
     val startedAt: ComparableTimeMark,
     val elapsedAtCompletion: Duration? = null,
+    /** Non-fatal problems the task recorded (a file that failed in a bulk run), kept after it finishes. */
+    val issues: List<String> = emptyList(),
 ) {
     val isRunning: Boolean get() = status == TaskStatus.RUNNING
 
@@ -49,6 +51,9 @@ interface TaskScope : CoroutineScope {
     val taskId: Long
 
     fun report(progress: Progress)
+
+    /** Records a non-fatal problem on this task, without failing it. */
+    fun reportIssue(issue: String)
 
     fun report(
         detail: String,
@@ -142,7 +147,12 @@ class TaskManager(
                 }
             }
         jobs.update { it + (task.id to job) }
-        job.invokeOnCompletion { jobs.update { it - task.id } }
+        job.invokeOnCompletion { cause ->
+            jobs.update { it - task.id }
+            // A job cancelled before its body ran (its scope was already cancelled) never reaches execute,
+            // so it would stay RUNNING and block its key. finish() leaves an already-finished task alone.
+            if (cause != null) finish(task, TaskStatus.CANCELLED, "Cancelled.")
+        }
         job.start()
         return task.id
     }
@@ -200,6 +210,15 @@ class TaskManager(
         }
     }
 
+    private fun addIssue(
+        id: Long,
+        issue: String,
+    ) {
+        mutableTasks.update { current ->
+            current.map { task -> if (task.id == id) task.copy(issues = task.issues + issue) else task }
+        }
+    }
+
     private fun finish(
         task: TaskState,
         status: TaskStatus,
@@ -241,6 +260,8 @@ class TaskManager(
     ) : TaskScope,
         CoroutineScope by coroutineScope {
         override fun report(progress: Progress) = report(taskId, progress)
+
+        override fun reportIssue(issue: String) = addIssue(taskId, issue)
 
         override fun startChild(
             key: String,

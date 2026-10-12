@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.tasks.TaskManager
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
@@ -54,6 +55,57 @@ class TaskPanelTest {
             waitUntilExactlyOneExists(hasText("1 of 2 done"))
             onNodeWithText("Folder One").assertIsDisplayed()
             onAllNodesWithText("Folder Two").assertCountEquals(0)
+            release.complete(Unit)
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun taskPanel_keepsFailedChildrenAndIssuesVisibleAfterTheParentFinishes() {
+        runMoneyManagerComposeUiTest {
+            val scope = CoroutineScope(Dispatchers.Default)
+            val manager = TaskManager(scope)
+            val release = CompletableDeferred<Unit>()
+            manager.start("all", "Download all", "Downloading") {
+                startChild("dir-1", "Folder One", "Listing files") { error("Unreachable folder") }
+                startChild("dir-2", "Folder Two", "Listing files") { "Done" }
+                reportIssue("Folder Two — b.csv: unreadable")
+                // Keeps the panel expanded so the finished children can be inspected.
+                startChild("dir-3", "Folder Three", "Listing files") { release.await().let { "Done" } }
+                "All done"
+            }
+
+            setContent { TaskPanel(manager = manager) }
+
+            waitUntilExactlyOneExists(hasText("Unreachable folder"))
+            onNodeWithText("Folder One").assertIsDisplayed()
+            onNodeWithText("Folder Two — b.csv: unreadable").assertIsDisplayed()
+            onAllNodesWithText("Folder Two").assertCountEquals(0)
+            release.complete(Unit)
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun taskPanel_keepsAnOldRunningTaskVisibleBehindNewerFinishedOnes() {
+        runMoneyManagerComposeUiTest {
+            val scope = CoroutineScope(Dispatchers.Default)
+            val manager = TaskManager(scope)
+            val release = CompletableDeferred<Unit>()
+            manager.start("long", "Long Running", "Working") { release.await().let { "Done" } }
+            repeat(3) { index ->
+                manager.start("quick-$index", "Quick $index", "Starting") { "Done" }
+                waitUntil { !manager.isRunning("quick-$index") }
+            }
+
+            setContent { TaskPanel(manager = manager) }
+
+            // The newest task already finished, so the panel starts collapsed.
+            waitUntilExactlyOneExists(hasText("background task(s)", substring = true))
+            onNodeWithText("background task(s)", substring = true).performClick()
+            waitUntilExactlyOneExists(hasText("Long Running"))
+            onNodeWithText("Quick 0").assertDoesNotExist()
+            onNodeWithText("Quick 2").assertIsDisplayed()
             release.complete(Unit)
             scope.cancel()
         }

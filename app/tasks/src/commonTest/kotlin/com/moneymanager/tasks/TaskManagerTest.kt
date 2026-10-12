@@ -1,7 +1,10 @@
 package com.moneymanager.tasks
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -111,6 +114,36 @@ class TaskManagerTest {
 
             assertEquals(TaskStatus.CANCELLED, manager.state(id).status)
             assertEquals(TaskStatus.CANCELLED, manager.state(childId).status)
+        }
+
+    @Test
+    fun aTaskStartedInACancelledScopeIsMarkedCancelledAndFreesItsKey() =
+        runTest {
+            val scope = CoroutineScope(Job()).apply { cancel() }
+            val manager = TaskManager(scope, timeSource, StandardTestDispatcher(testScheduler))
+
+            val id = manager.start("import", "Import", "Starting") { "Never runs" }
+            runCurrent()
+
+            assertEquals(TaskStatus.CANCELLED, manager.state(id).status)
+            assertTrue(!manager.isRunning("import"))
+        }
+
+    @Test
+    fun issuesAreKeptOnTheFinishedTask() =
+        runTest {
+            val manager = manager()
+
+            val id =
+                manager.start("all", "Download all", "Starting") {
+                    reportIssue("a.csv: unreadable")
+                    reportIssue("b.csv: unreadable")
+                    "Downloaded 3"
+                }
+            runCurrent()
+
+            assertEquals(TaskStatus.SUCCEEDED, manager.state(id).status)
+            assertEquals(listOf("a.csv: unreadable", "b.csv: unreadable"), manager.state(id).issues)
         }
 
     @Test

@@ -38,6 +38,7 @@ import kotlin.time.Duration.Companion.seconds
 
 private const val VISIBLE_TASKS = 3
 private const val VISIBLE_CHILDREN = 5
+private const val VISIBLE_ISSUES = 3
 
 val LocalTaskManager =
     compositionLocalOf<TaskManager> {
@@ -54,7 +55,7 @@ fun TaskPanel(
     modifier: Modifier = Modifier,
 ) {
     val tasks by manager.tasks.collectAsState()
-    val visibleTasks = tasks.filter { it.parentId == null }.takeLast(VISIBLE_TASKS)
+    val visibleTasks = visibleTopLevelTasks(tasks)
     if (visibleTasks.isEmpty()) return
 
     val hasRunningTask = visibleTasks.any { it.isRunning }
@@ -178,6 +179,30 @@ private fun TaskRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+    task.issues.take(VISIBLE_ISSUES).forEach { issue ->
+        Text(
+            text = issue,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+    if (task.issues.size > VISIBLE_ISSUES) {
+        Text(
+            text = "+${task.issues.size - VISIBLE_ISSUES} more problem(s)",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+}
+
+// Running tasks always stay visible (so they can be watched and cancelled); finished ones fill the
+// remaining slots, newest first. Shown in start order.
+private fun visibleTopLevelTasks(tasks: List<TaskState>): List<TaskState> {
+    val topLevel = tasks.filter { it.parentId == null }
+    val running = topLevel.filter { it.isRunning }
+    val finished = topLevel.filterNot { it.isRunning }.takeLast((VISIBLE_TASKS - running.size).coerceAtLeast(0))
+    val shown = (running + finished).mapTo(mutableSetOf()) { it.id }
+    return topLevel.filter { it.id in shown }
 }
 
 // Running children first, capped so a bulk run over dozens of folders keeps the panel readable.
@@ -195,7 +220,10 @@ private fun ChildTasks(
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    val shown = children.filter { it.isRunning }.take(VISIBLE_CHILDREN)
+    // Failed children stay listed after they finish: a bulk child can fail while its parent succeeds.
+    val shown =
+        (children.filter { it.isRunning } + children.filter { it.status == TaskStatus.FAILED })
+            .take(VISIBLE_CHILDREN)
     shown.forEach { child ->
         Column(
             modifier = Modifier.fillMaxWidth().padding(start = 12.dp),
@@ -204,10 +232,10 @@ private fun ChildTasks(
             TaskRow(task = child, tasks = tasks, tick = tick, onCancel = null)
         }
     }
-    val hidden = children.count { it.isRunning } - shown.size
+    val hidden = children.count { it.isRunning || it.status == TaskStatus.FAILED } - shown.size
     if (hidden > 0) {
         Text(
-            text = "+$hidden more running",
+            text = "+$hidden more",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 12.dp),
