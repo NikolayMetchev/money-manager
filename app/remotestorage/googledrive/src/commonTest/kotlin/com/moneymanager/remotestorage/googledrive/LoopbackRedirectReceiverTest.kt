@@ -23,16 +23,19 @@ class LoopbackRedirectReceiverTest {
     @Test
     fun returnsTheUrlDecodedAuthorizationCode() =
         runTest {
-            val (code, page) = redirect("code=a%2Fb&state=$STATE&scope=x")
+            val (code, pages) = redirect("code=a%2Fb&state=$STATE&scope=x")
             assertEquals("a/b", code)
-            assertTrue("Google Drive is connected" in page, page)
+            assertTrue("Google Drive is connected" in pages.single(), pages.single())
         }
 
     @Test
-    fun rejectsAMismatchedState() =
+    fun ignoresRequestsWithoutTheExpectedStateAndKeepsListening() =
         runTest {
-            val failure = assertFailsWith<RemoteAuthException> { redirect("code=c&state=forged") }
-            assertTrue("unexpected state" in failure.message.orEmpty(), failure.message)
+            val (code, pages) = redirect("code=forged&state=forged", "favicon.ico", "code=real&state=$STATE")
+            assertEquals("real", code)
+            assertTrue("Not found" in pages[0], pages[0])
+            assertTrue("Not found" in pages[1], pages[1])
+            assertTrue("Google Drive is connected" in pages[2], pages[2])
         }
 
     @Test
@@ -54,15 +57,22 @@ class LoopbackRedirectReceiverTest {
             assertTrue("Timed out" in failure.message.orEmpty(), failure.message)
         }
 
-    private suspend fun redirect(query: String): Pair<String, String> =
+    // Sends each request in turn (a bare path or a `?` query) and returns the code plus every page served.
+    private suspend fun redirect(vararg requests: String): Pair<String, List<String>> =
         withContext(Dispatchers.Default) {
             LoopbackRedirectReceiver.bind().use { receiver ->
                 coroutineScope {
                     // Held as a Result so a rejected callback doesn't cancel the request still reading the
                     // response: Curl's cancellation handler throws on native.
                     val code = async { runCatching { receiver.awaitCode(STATE, timeout = 30.seconds) } }
-                    val page = platformHttpClient().use { it.get("${receiver.redirectUri}/?$query").bodyAsText() }
-                    code.await().getOrThrow() to page
+                    val pages =
+                        platformHttpClient().use { client ->
+                            requests.map { request ->
+                                val path = if ('=' in request) "?$request" else request
+                                client.get("${receiver.redirectUri}/$path").bodyAsText()
+                            }
+                        }
+                    code.await().getOrThrow() to pages
                 }
             }
         }

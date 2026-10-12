@@ -36,48 +36,48 @@ internal class LoopbackRedirectReceiver private constructor(
 
     /**
      * Waits (up to [timeout]) for the browser to hit the loopback redirect, then returns the `code`
-     * query parameter after checking the callback's `state` equals [expectedState]. Throws
-     * `RemoteAuthException` on an OAuth `error`, a timeout, a state mismatch, or a malformed request.
+     * query parameter. Requests whose `state` isn't [expectedState] (another local client, a stray probe,
+     * a forged redirect) are answered and ignored, so they can neither end nor hijack the sign-in. Throws
+     * `RemoteAuthException` on a timeout, or when the genuine callback reports an OAuth `error` or no code.
      */
     suspend fun awaitCode(
         expectedState: String,
         timeout: Duration = DEFAULT_TIMEOUT,
-    ): String {
-        val requestTarget =
-            withTimeoutOrNull(timeout) { acceptRequestTarget() }
-                ?: throw RemoteAuthException("Timed out waiting for Google sign-in to complete")
-        return extractCode(requestTarget, expectedState)
-    }
+    ): String =
+        withTimeoutOrNull(timeout) { acceptCallback(expectedState) }
+            ?: throw RemoteAuthException("Timed out waiting for Google sign-in to complete")
 
-    private suspend fun acceptRequestTarget(): String =
-        serverSocket.accept().use { socket ->
-            val requestLine = withTimeoutOrNull(REQUEST_READ_TIMEOUT) { socket.openReadChannel().readLine() }.orEmpty()
-            socket.openWriteChannel().apply {
-                writeStringUtf8(RESPONSE_BODY)
-                flushAndClose()
-            }
-            // Request line looks like: "GET /?code=...&scope=... HTTP/1.1"
-            requestLine.split(' ').getOrNull(1).orEmpty()
-        }
-
-    private fun extractCode(
-        requestTarget: String,
-        expectedState: String,
-    ): String {
-        val params = parseQueryString(requestTarget.substringAfter('?', ""))
-        rejectErrorOrBadState(params, expectedState)
-        return params["code"] ?: throw RemoteAuthException("Google sign-in did not return an authorization code")
-    }
-
-    private fun rejectErrorOrBadState(
-        params: Parameters,
-        expectedState: String,
-    ) {
-        params["error"]?.let { throw RemoteAuthException("Google sign-in was denied: $it") }
-        if (params["state"] != expectedState) {
-            throw RemoteAuthException("Google sign-in returned an unexpected state; aborting to prevent CSRF")
+    private suspend fun acceptCallback(expectedState: String): String {
+        while (true) {
+            val outcome =
+                serverSocket.accept().use { socket ->
+                    val requestLine =
+                        withTimeoutOrNull(REQUEST_READ_TIMEOUT) { socket.openReadChannel().readLine() }.orEmpty()
+                    // Request line looks like: "GET /?code=...&state=... HTTP/1.1"
+                    val params =
+                        parseQueryString(
+                            requestLine
+                                .split(' ')
+                                .getOrNull(1)
+                                .orEmpty()
+                                .substringAfter('?', ""),
+                        )
+                    val outcome = if (params["state"] == expectedState) callbackOutcome(params) else null
+                    socket.openWriteChannel().apply {
+                        writeStringUtf8(response(outcome))
+                        flushAndClose()
+                    }
+                    outcome
+                }
+            if (outcome != null) return outcome.getOrThrow()
         }
     }
+
+    private fun callbackOutcome(params: Parameters): Result<String> =
+        runCatching {
+            params["error"]?.let { throw RemoteAuthException("Google sign-in was denied: $it") }
+            params["code"] ?: throw RemoteAuthException("Google sign-in did not return an authorization code")
+        }
 
     override fun close() {
         serverSocket.close()
@@ -88,18 +88,24 @@ internal class LoopbackRedirectReceiver private constructor(
         private const val LOOPBACK_HOST = "127.0.0.1"
         private val REQUEST_READ_TIMEOUT = 10.seconds
         private val DEFAULT_TIMEOUT = 5.minutes
-        private val RESPONSE_BODY =
-            buildString {
-                val page =
-                    "<html><body style=\"font-family:sans-serif\">" +
-                        "<h2>Money Manager</h2><p>Google Drive is connected. You can close this tab " +
-                        "and return to the app.</p></body></html>"
-                append("HTTP/1.1 200 OK\r\n")
-                append("Content-Type: text/html; charset=utf-8\r\n")
-                append("Content-Length: ${page.encodeToByteArray().size}\r\n")
-                append("Connection: close\r\n\r\n")
-                append(page)
-            }
+        private const val SIGNED_IN_PAGE = "Google Drive is connected. You can close this tab and return to the app."
+        private const val FAILED_PAGE = "Google sign-in didn't complete. You can close this tab and return to the app."
+
+        // A request that isn't the expected callback gets a 404, so nothing but the real redirect sees a page.
+        private fun response(outcome: Result<String>?): String {
+            val (status, message) =
+                when {
+                    outcome == null -> "404 Not Found" to "Not found."
+                    outcome.isSuccess -> "200 OK" to SIGNED_IN_PAGE
+                    else -> "200 OK" to FAILED_PAGE
+                }
+            val page = "<html><body style=\"font-family:sans-serif\"><h2>Money Manager</h2><p>$message</p></body></html>"
+            return "HTTP/1.1 $status\r\n" +
+                "Content-Type: text/html; charset=utf-8\r\n" +
+                "Content-Length: ${page.encodeToByteArray().size}\r\n" +
+                "Connection: close\r\n\r\n" +
+                page
+        }
 
         /** Binds a fresh loopback port for one sign-in attempt. */
         suspend fun bind(): LoopbackRedirectReceiver {

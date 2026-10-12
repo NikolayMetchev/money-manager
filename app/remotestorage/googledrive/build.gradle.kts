@@ -51,6 +51,12 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.test)
             }
         }
+
+        linuxTest {
+            dependencies {
+                implementation(projects.utils.files)
+            }
+        }
     }
 }
 
