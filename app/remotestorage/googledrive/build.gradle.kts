@@ -3,66 +3,58 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.kotlin.serialization)
     id("moneymanager.kotlin-multiplatform-convention")
-    id("moneymanager.jvm-android-shared-convention")
+    id("moneymanager.android-convention")
+    id("moneymanager.native-convention")
 }
 
-// Google Drive remote-storage backend. The Drive REST API + OAuth are spoken over the shared KMP Ktor
-// client and a raw ServerSocket loopback receiver, so the provider runs identically on JVM and Android
-// from a single jvmAndroidMain source set. The only platform-specific piece is opening the system
-// browser for consent (BrowserLauncher), implemented in jvmMain/androidMain.
-//
-// buildHealth (KMP quirk): ABI project/library deps used by jvmAndroidMain must be declared as `api` on
-// each real platform source set (jvmMain + androidMain); runtime-only deps live in jvmAndroidMain.
+// Google Drive remote-storage backend. The Drive REST API, OAuth and the loopback redirect receiver are
+// spoken over Ktor (the platform HTTP engine from utils/httpclient, and raw ktor-network sockets), so the
+// provider runs identically on JVM, Android and native from commonMain. The only platform-specific piece is
+// opening the system browser for consent (BrowserLauncher): jvmMain, the Android app, and nativeMain.
 kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                implementation(libs.kotlinx.serialization.json)
-            }
-        }
+                api(projects.app.importfilesource.core)
+                api(projects.app.remotestorage.core)
+                api(projects.utils.credentialvault)
+                api(libs.kotlinx.serialization.core)
+                api(libs.ktor.client.auth)
+                api(libs.ktor.client.core)
 
-        // JVM and Android share the entire provider, OAuth, loopback receiver and account store.
-        getByName("jvmAndroidMain") {
-            dependencies {
+                implementation(projects.utils.httpclient)
+                implementation(libs.atomicfu)
+                implementation(libs.cryptography.random)
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.io.core)
                 implementation(libs.kotlinx.serialization.json)
-                implementation(libs.ktor.client.cio)
+                implementation(libs.ktor.http)
+                implementation(libs.ktor.io)
+                implementation(libs.ktor.network)
+                implementation(libs.ktor.utils)
             }
         }
 
+        // buildHealth (KMP quirk): commonMain's api deps are repeated on jvmMain.
         jvmMain {
             dependencies {
                 api(projects.app.importfilesource.core)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.credentialvault)
-                api(libs.kotlinx.serialization.core)
-                api(libs.ktor.client.auth)
-                api(libs.ktor.client.core)
-
-                implementation(libs.ktor.http)
-                implementation(libs.ktor.utils)
             }
         }
 
-        androidMain {
-            dependencies {
-                api(projects.app.importfilesource.core)
-                api(projects.app.remotestorage.core)
-                api(projects.utils.credentialvault)
-                api(libs.kotlinx.serialization.core)
-                api(libs.ktor.client.auth)
-                api(libs.ktor.client.core)
-
-                implementation(libs.ktor.http)
-                implementation(libs.ktor.utils)
-            }
-        }
-
-        getByName("jvmTest") {
+        commonTest {
             dependencies {
                 implementation(projects.test.utils.credentialvault)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+
+        linuxTest {
+            dependencies {
+                implementation(projects.utils.files)
             }
         }
     }

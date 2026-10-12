@@ -187,7 +187,9 @@ exclude:
       - app/model/csvstrategy/src/commonMain/kotlin/com/moneymanager/domain/model/csvstrategy/FieldMapping.kt
       - app/remotestorage/di/src/androidMain
       - app/remotestorage/di/src/jvmMain
-      - app/remotestorage/googledrive/src/jvmAndroidMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProviderFactory.kt
+      - app/remotestorage/googledrive/src/commonMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProviderFactory.kt
+      # [2] — the native browser launcher is wired by the CLI (#917), which this linter has no module for.
+      - app/remotestorage/googledrive/src/nativeMain/kotlin/com/moneymanager/remotestorage/googledrive/SystemBrowserLauncher.kt
       - app/strategycatalog/src/commonTest/kotlin/com/moneymanager/strategycatalog/StrategyCatalogControllerTest.kt
       - app/ui/foundation/src/androidMain
       - app/ui/foundation/src/jvmMain
@@ -232,7 +234,9 @@ exclude:
       - app/importfilesource/di/src/androidMain
       - app/importfilesource/localfolder/src/androidMain/kotlin/com/moneymanager/importfilesource/localfolder/SafFolderImportFileSource.kt
       - app/remotestorage/di/src/androidMain
-      - app/remotestorage/googledrive/src/jvmAndroidMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProviderFactory.kt
+      - app/remotestorage/googledrive/src/commonMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProviderFactory.kt
+      # [2] — the native browser launcher is wired by the CLI (#917), which this linter has no module for.
+      - app/remotestorage/googledrive/src/nativeMain/kotlin/com/moneymanager/remotestorage/googledrive/SystemBrowserLauncher.kt
       - app/ui/foundation/src/androidMain
       - app/ui/foundation/src/jvmMain
       - test/app/db/src
