@@ -8,7 +8,6 @@ kotlin {
         getByName("commonMain") {
             dependencies {
                 api(projects.app.csvimporter)
-                api(projects.app.db.core)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
                 api(projects.app.model.csv)
@@ -25,6 +24,7 @@ kotlin {
         getByName("androidMain") {
             dependencies {
                 api(projects.app.model.rules)
+                api(projects.app.tasks)
                 api(libs.androidx.compose.foundation.layout)
                 api(libs.androidx.compose.runtime)
                 api(libs.androidx.compose.ui)
@@ -43,19 +43,19 @@ kotlin {
         getByName("jvmMain") {
             dependencies {
                 api(projects.app.csvimporter)
-                api(projects.app.db.core)
-                api(projects.app.importengineapi)
                 api(projects.app.model.core)
                 api(projects.app.model.csv)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.rules)
                 api(projects.app.model.timeline)
+                api(projects.app.tasks)
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
                 api(libs.compose.ui.desktop)
                 api(libs.compose.ui.graphics.desktop)
 
+                implementation(projects.app.importengineapi)
                 implementation(projects.utils.bigdecimal)
                 implementation(libs.compose.foundation.desktop)
                 implementation(libs.compose.material.icons.core.desktop)

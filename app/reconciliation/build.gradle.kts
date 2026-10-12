@@ -35,5 +35,17 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.test)
             }
         }
+
+        getByName("jvmTest") {
+            dependencies {
+                implementation(projects.app.tasks)
+            }
+        }
+
+        getByName("androidHostTest") {
+            dependencies {
+                implementation(projects.app.tasks)
+            }
+        }
     }
 }

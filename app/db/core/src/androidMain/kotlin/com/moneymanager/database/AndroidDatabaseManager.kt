@@ -8,6 +8,7 @@ import com.moneymanager.database.sql.seed.MoneyManagerDatabase
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DEFAULT_DATABASE_NAME
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -29,14 +30,14 @@ class AndroidDatabaseManager(
 
     override suspend fun openDatabaseWithProgress(
         location: DbLocation,
-        onProgress: (DatabaseInitializationProgress) -> Unit,
+        onProgress: (Progress) -> Unit,
     ): MoneyManagerDatabaseWrapper =
         withContext(Dispatchers.IO) {
-            onProgress(DatabaseInitializationProgress("Checking for an existing database...", 1, 6))
+            onProgress(Progress.counted("Checking for an existing database...", 1, 6))
             // Check if this is a new database before opening
             val isNewDatabase = !context.getDatabasePath(location.path).exists()
 
-            onProgress(DatabaseInitializationProgress("Opening the SQLite database...", 2, 6))
+            onProgress(Progress.counted("Opening the SQLite database...", 2, 6))
             // Use custom callback that handles existing databases gracefully
             val driver =
                 AndroidSqliteDriver(
@@ -78,23 +79,23 @@ class AndroidDatabaseManager(
 
             onProgress(
                 if (isNewDatabase) {
-                    DatabaseInitializationProgress("Creating the database schema...", 3, 6)
+                    Progress.counted("Creating the database schema...", 3, 6)
                 } else {
-                    DatabaseInitializationProgress("Checking the database schema...", 3, 6)
+                    Progress.counted("Checking the database schema...", 3, 6)
                 },
             )
             val database = MoneyManagerDatabaseWrapper(driver)
 
             // Lookups, the system device and GBP are seeded inside Schema.create (the :app:db:seed module);
             // the rest of the bundled ISO 4217 list is seeded here for a freshly created database.
-            onProgress(DatabaseInitializationProgress("Applying database settings...", 4, 6))
+            onProgress(Progress.counted("Applying database settings...", 4, 6))
             if (isNewDatabase) {
-                onProgress(DatabaseInitializationProgress("Adding default currencies...", 5, 6))
+                onProgress(Progress.counted("Adding default currencies...", 5, 6))
                 DatabaseConfig.seedCurrencies(database, currenciesToSeed())
             } else {
-                onProgress(DatabaseInitializationProgress("Preparing repositories...", 5, 6))
+                onProgress(Progress.counted("Preparing repositories...", 5, 6))
             }
-            onProgress(DatabaseInitializationProgress("Finishing database startup...", 6, 6))
+            onProgress(Progress.counted("Finishing database startup...", 6, 6))
             database
         }
 

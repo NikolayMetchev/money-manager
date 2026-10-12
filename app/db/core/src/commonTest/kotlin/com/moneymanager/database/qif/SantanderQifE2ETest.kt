@@ -2,7 +2,6 @@
 
 package com.moneymanager.database.qif
 
-import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
@@ -12,6 +11,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.qifimporter.bulkApplyQif
+import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.installBuiltInCsvStrategies
@@ -112,7 +112,7 @@ class SantanderQifE2ETest : DbTest() {
                 .firstOrNull { it.name == "Santander" }
                 ?.id
                 ?: repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Santander", openingDate = now))
-        val progress = mutableListOf<BulkImportProgress>()
+        val progress = mutableListOf<Progress>()
         bulkApplyQif(
             imports = listOf(qifImport),
             sourceAccountId = sourceId,

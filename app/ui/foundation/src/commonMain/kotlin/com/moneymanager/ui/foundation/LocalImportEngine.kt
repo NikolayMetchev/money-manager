@@ -3,8 +3,8 @@ package com.moneymanager.ui.foundation
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportResult
+import com.moneymanager.tasks.Progress
 
 /**
  * The [ImportEngine] for the active database, provided once at the app root
@@ -25,7 +25,7 @@ val LocalImportEngine =
 private object UnprovidedImportEngine : ImportEngine {
     override suspend fun import(
         batch: ImportBatch,
-        onProgress: (suspend (ImportProgress) -> Unit)?,
+        onProgress: (suspend (Progress) -> Unit)?,
         batchSize: Int,
     ): ImportResult = error("LocalImportEngine not provided — host this screen under MoneyManagerApp or provide it in tests")
 }

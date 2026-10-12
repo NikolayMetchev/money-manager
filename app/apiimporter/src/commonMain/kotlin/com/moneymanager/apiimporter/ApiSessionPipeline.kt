@@ -11,10 +11,10 @@ import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiRequestSigner
 import com.moneymanager.rest.ScaParams
+import com.moneymanager.tasks.Progress
 import kotlin.time.Instant
 
 /*
@@ -59,7 +59,7 @@ suspend fun downloadApiSession(
     forceFullDownload: Boolean = false,
     transactionsBlocked: Boolean = false,
     onPhase: (String) -> Unit = {},
-    onProgress: (ApiTransactionsDownloadProgress) -> Unit = {},
+    onProgress: (Progress) -> Unit = {},
 ): ApiSessionDownloadResult =
     when (strategy.config.accounts) {
         is ApiAccountsSource.Single -> {
@@ -179,7 +179,7 @@ suspend fun importApiSession(
     importEngine: ImportEngine,
     counterpartyAccountNames: Map<String, String> = emptyMap(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
 ): ApiSessionImportOutcome =
     when (strategy.config.accounts) {

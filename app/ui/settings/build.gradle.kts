@@ -34,6 +34,7 @@ kotlin {
                 api(libs.androidx.compose.runtime)
                 api(libs.androidx.compose.ui)
 
+                implementation(projects.app.tasks)
                 implementation(libs.androidx.compose.animation.core)
                 implementation(libs.androidx.compose.foundation)
                 implementation(libs.androidx.compose.material.icons.core)
@@ -58,6 +59,7 @@ kotlin {
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
 
+                implementation(projects.app.tasks)
                 implementation(projects.app.ui.foundation)
                 implementation(libs.compose.animation.core.desktop)
                 implementation(libs.compose.charts.desktop)

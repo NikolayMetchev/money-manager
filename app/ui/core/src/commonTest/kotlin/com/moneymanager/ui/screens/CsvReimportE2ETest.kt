@@ -29,9 +29,9 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importer.ImportEngineImpl
+import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
@@ -326,7 +326,7 @@ class CsvReimportE2ETest {
                         ),
                 )
 
-            val planProgress = mutableListOf<ImportProgress>()
+            val planProgress = mutableListOf<Progress>()
             val plan =
                 planCsvReimport(
                     csvImport = fixture.csvImport,
@@ -352,7 +352,7 @@ class CsvReimportE2ETest {
             assertEquals(2, valueScan.last().processed)
             assertEquals(2, valueScan.last().total)
 
-            val executeProgress = mutableListOf<ImportProgress>()
+            val executeProgress = mutableListOf<Progress>()
             val result =
                 executeCsvReimport(
                     plan = plan,

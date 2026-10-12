@@ -13,7 +13,6 @@ import androidx.compose.ui.window.rememberWindowState
 import co.touchlab.kermit.Logger
 import com.moneymanager.cryptodata.HttpCryptoCatalogRefresher
 import com.moneymanager.cryptodata.installCryptoCatalog
-import com.moneymanager.database.DatabaseInitializationProgress
 import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.di.createImportEngine
 import com.moneymanager.database.di.toApplication
@@ -25,6 +24,7 @@ import com.moneymanager.importfilesource.di.createDriveFolderBrowser
 import com.moneymanager.importfilesource.di.createImportFileSourceFactory
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.SyncResult
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.CloseDatabaseDialog
 import com.moneymanager.ui.components.DatabaseProgressScreen
@@ -59,11 +59,11 @@ private suspend fun performClose(
     keepLocal: Boolean,
     password: String?,
     localChanged: Boolean,
-    onProgress: (DatabaseInitializationProgress) -> Unit,
+    onProgress: (Progress) -> Unit,
 ) {
     var remoteCurrent = false
     if (upload) {
-        onProgress(DatabaseInitializationProgress("Checking for changes…", 0, 100))
+        onProgress(Progress.counted("Checking for changes…", 0, 100))
         val ready =
             remoteController.hasActiveSession() ||
                 (password != null && runCatching { remoteController.resume(password) }.getOrDefault(false))
@@ -73,7 +73,7 @@ private suspend fun performClose(
                 // (BLOCKED) rather than clobbering it — then we keep the local copy.
                 runCatching {
                     remoteController.syncNow(database, rebuildViews = false) { progress ->
-                        onProgress(DatabaseInitializationProgress(progress.message, (progress.fraction * 100).toInt(), 100))
+                        onProgress(progress)
                     }
                 }.onFailure { logger.e(it) { "Failed to sync database on close" } }
                     .getOrNull() == SyncResult.UPLOADED
@@ -85,13 +85,13 @@ private suspend fun performClose(
         // About to drop the only local copy without uploading: confirm the remote archive still exists
         // and is reachable first. A "no local changes" baseline doesn't guarantee the remote wasn't
         // deleted externally since our last sync — without this check we'd close with no recoverable copy.
-        onProgress(DatabaseInitializationProgress("Checking cloud copy…", 0, 100))
+        onProgress(Progress.counted("Checking cloud copy…", 0, 100))
         remoteCurrent =
             runCatching { remoteController.remoteArchiveSize() != null }
                 .onFailure { logger.e(it) { "Failed to verify remote copy on close; keeping local copy" } }
                 .getOrDefault(false)
     }
-    onProgress(DatabaseInitializationProgress("Finishing…", 95, 100))
+    onProgress(Progress.counted("Finishing…", 95, 100))
     database.close()
     when {
         keepLocal -> Unit
@@ -164,7 +164,7 @@ private fun MainWindow(onExit: () -> Unit) {
     val openDatabase = remember { arrayOfNulls<MoneyManagerDatabaseWrapper>(1) }
     val scope = rememberCoroutineScope()
     // Non-null while the closing sync (shrink → encrypt → upload) is running; drives the progress UI.
-    var closeProgress by remember { mutableStateOf<DatabaseInitializationProgress?>(null) }
+    var closeProgress by remember { mutableStateOf<Progress?>(null) }
     // Non-null while the close dialog (upload / keep-local tickboxes) is shown for a cloud-backed database.
     var closeDecision by remember { mutableStateOf<CloseDecision?>(null) }
 
@@ -215,7 +215,7 @@ private fun MainWindow(onExit: () -> Unit) {
                         if (database == null) {
                             onExit()
                         } else {
-                            closeProgress = DatabaseInitializationProgress("Finishing…", 0, 100)
+                            closeProgress = Progress.counted("Finishing…", 0, 100)
                             scope.launch {
                                 performClose(database, remoteController, upload, keepLocal, password, decision.localChanged) {
                                     closeProgress = it

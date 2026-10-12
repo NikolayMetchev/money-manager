@@ -26,6 +26,7 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.remotestorage.core)
+                api(projects.app.tasks)
                 api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
                 // api: StateFlow appears in RemoteDatabaseController's public API (syncState).
@@ -40,6 +41,7 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.remotestorage.core)
+                api(projects.app.tasks)
                 api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
                 // api: StateFlow appears in RemoteDatabaseController's public API (syncState).

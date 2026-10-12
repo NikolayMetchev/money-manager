@@ -2,7 +2,6 @@ package com.moneymanager.qifimporter
 
 import co.touchlab.kermit.Logger
 import com.moneymanager.csvimporter.BULK_ENGINE_BATCH_SIZE
-import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.BulkReimportFileOutcome
 import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.CsvImportResult
@@ -38,9 +37,9 @@ import com.moneymanager.importengineapi.AccountMergeRequest
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.QifImportMutation
 import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
+import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.flow.first
 
 private val logger = Logger.withTag("QifReimport")
@@ -65,9 +64,9 @@ suspend fun planQifReimport(
     qifImportRepository: QifImportReadRepository,
     transactionRepository: TransactionReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
 ): ReimportPlan {
-    onProgress?.invoke(ImportProgress("Loading records"))
+    onProgress?.invoke(Progress("Loading records"))
     val recordCount = qifImportRepository.countRecords(qifImport.id)
     val records = qifImportRepository.getImportRecords(qifImport.id, recordCount.coerceAtLeast(1), 0)
     val allRows = QifCsvAdapter.toRows(records)
@@ -88,9 +87,9 @@ suspend fun planQifReimport(
         buildMapper(strategy, accounts, currencies, accountMappings, effectiveSource, historicalAccountNames)
             .prepareImport(allRows)
 
-    onProgress?.invoke(ImportProgress("Analyzing records (pass 1 of 2)"))
+    onProgress?.invoke(Progress("Analyzing records (pass 1 of 2)"))
     val mappedPrep = prep(mappings)
-    onProgress?.invoke(ImportProgress("Analyzing records (pass 2 of 2)"))
+    onProgress?.invoke(Progress("Analyzing records (pass 2 of 2)"))
     val candidates = computeReimportMerges(prep(emptyList()), mappedPrep, importCreated)
     val accountsById = accounts.associateBy { it.id }
     // Reversal detection re-maps with the mappings but NO historical names (see computeReimportReversals):
@@ -108,7 +107,7 @@ suspend fun planQifReimport(
         )
     val reversalRowIndexes = reversals.flatMapTo(mutableSetOf()) { it.rowIndexes }
     // One batched load instead of a per-record getTransactionById round trip in the value-update scan.
-    onProgress?.invoke(ImportProgress("Loading existing transactions"))
+    onProgress?.invoke(Progress("Loading existing transactions"))
     val existingTransfers = transactionRepository.getTransactionsByIds(allRows.mapNotNull { it.transferId })
     val valueUpdates =
         computeReimportValueUpdates(
@@ -124,7 +123,7 @@ suspend fun planQifReimport(
     val merges = mutableListOf<ReimportMerge>()
     val skipped = mutableListOf<ReimportSkippedAccount>()
 
-    onProgress?.invoke(ImportProgress("Checking duplicate accounts"))
+    onProgress?.invoke(Progress("Checking duplicate accounts"))
     for ((duplicate, targets) in candidates.conflicts) {
         skipped +=
             ReimportSkippedAccount(
@@ -181,7 +180,7 @@ suspend fun executeQifReimport(
     qifImportRepository: QifImportReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     valueUpdateChunkSize: Int = REIMPORT_VALUE_UPDATE_CHUNK,
     refreshViews: Boolean = true,
 ): CsvReimportResult {
@@ -197,7 +196,7 @@ suspend fun executeQifReimport(
     // remaining merges.
     for ((index, merge) in plan.merges.withIndex()) {
         onProgress?.invoke(
-            ImportProgress(
+            Progress(
                 "Merging accounts",
                 fraction = index.toFloat() / plan.merges.size,
                 processed = index,
@@ -237,7 +236,7 @@ suspend fun executeQifReimport(
             engineBatchSize = BULK_ENGINE_BATCH_SIZE,
         )
 
-    onProgress?.invoke(ImportProgress("Cleaning up empty accounts"))
+    onProgress?.invoke(Progress("Cleaning up empty accounts"))
     val deletedEmptyAccounts =
         importEngine.deleteEmptyImportCreatedAccounts(
             createdAccountIds = qifImportRepository.getAccountsCreatedByImport(qifImport.id),
@@ -249,7 +248,7 @@ suspend fun executeQifReimport(
         )
 
     if (refreshViews) {
-        onProgress?.invoke(ImportProgress("Refreshing views"))
+        onProgress?.invoke(Progress("Refreshing views"))
         maintenance.refreshMaterializedViews()
     }
 
@@ -278,7 +277,7 @@ private suspend fun applyQifValueUpdates(
     qifImport: QifImport,
     importEngine: ImportEngine,
     skipped: MutableList<ReimportSkippedAccount>,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     chunkSize: Int = REIMPORT_VALUE_UPDATE_CHUNK,
 ): List<ReimportValueUpdate> =
     applyReimportValueUpdates(
@@ -324,7 +323,7 @@ private suspend fun applyStagedQif(
     qifImportRepository: QifImportReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
 ): QifImportResult? {
     val recordCount = qifImportRepository.countRecords(qifImport.id)
@@ -382,7 +381,7 @@ suspend fun bulkReimportQif(
     transferSourceRepository: TransferSourceReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    onProgress: suspend (BulkImportProgress) -> Unit,
+    onProgress: suspend (Progress) -> Unit,
 ): BulkReimportResult {
     val qifStrategies = strategies.qifCompatible()
     return runBulkReimport(

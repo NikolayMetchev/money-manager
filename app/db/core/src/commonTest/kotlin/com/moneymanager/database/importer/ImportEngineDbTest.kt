@@ -28,7 +28,6 @@ import com.moneymanager.importengineapi.ImportOrderIntent
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportPersonIntent
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
@@ -44,6 +43,7 @@ import com.moneymanager.importengineapi.createTrade
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.personalCounterpartyKey
 import com.moneymanager.importer.ImportEngineImpl
+import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
@@ -568,7 +568,7 @@ class ImportEngineDbTest : DbTest() {
             val ids = created.createdTransferIds.values.toList()
             assertEquals(3, ids.size)
 
-            val progress = mutableListOf<ImportProgress>()
+            val progress = mutableListOf<Progress>()
             engine().import(
                 ImportBatch(
                     transfers =

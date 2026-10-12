@@ -12,7 +12,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.QifImportId
@@ -29,6 +28,7 @@ import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setLastQifAccount
 import com.moneymanager.qifimporter.bulkApplyQif
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
 import com.moneymanager.ui.components.imports.BulkImportProgressIndicator
@@ -67,7 +67,7 @@ fun QifImportAllDialog(
 
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var isImporting by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf<BulkImportProgress?>(null) }
+    var progress by remember { mutableStateOf<Progress?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
 
     // The account each file's own import directory (or that directory's parent) resolves to, when set.

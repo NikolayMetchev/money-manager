@@ -24,13 +24,14 @@ import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
 import com.moneymanager.importengineapi.markApiSessionImported
 import com.moneymanager.importengineapi.reconciledPartnerUnhideUpdates
+import com.moneymanager.tasks.PhasedProgress
+import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -38,7 +39,7 @@ import kotlin.time.Clock
 
 private val logger = Logger.withTag("ApiReimport")
 
-// Slices one session's re-import gets on the progress bar (see ScaledProgress). Deleting the
+// Slices one session's re-import gets on the progress bar (see PhasedProgress). Deleting the
 // session's own rows and re-running the import both sweep their own 0..1; the tail steps are single
 // unmeasurable operations, so they only advance the bar to their mark.
 private const val DELETE_BASE = 0f
@@ -109,14 +110,14 @@ suspend fun executeApiReimport(
     importEngine: ImportEngine,
     counterpartyAccountNames: Map<String, String> = emptyMap(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     refreshViews: Boolean = true,
 ): ApiReimportResult {
     require(plan.sessionId == session.id) {
         "plan is for session ${plan.sessionId} but executeApiReimport was called with session ${session.id}"
     }
     val importStartedAt = Clock.System.now()
-    val bar = ScaledProgress(onProgress)
+    val bar = PhasedProgress(onProgress)
 
     // Rides in the delete batch: the engine applies updates before deletes, so the un-hide can't be lost.
     val unhideUpdates = reconciledPartnerUnhideUpdates(plan.transferIds, transferRelationshipRepository, transactionRepository)
@@ -237,7 +238,7 @@ suspend fun bulkReimportApiSessions(
     importEngine: ImportEngine,
     counterpartyAccountNames: Map<String, String> = emptyMap(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
 ): ApiBulkReimportResult {
     val importedSessionIds = apiSessionRepository.getImportedSessionRevisions().map { it.sessionId }.toSet()
     val sessions =
@@ -278,12 +279,12 @@ suspend fun bulkReimportApiSessions(
 internal suspend fun reimportSessionsResiliently(
     sessions: List<ApiSession>,
     maintenance: Maintenance,
-    onProgress: (suspend (ImportProgress) -> Unit)?,
-    reimport: suspend (ApiSession, (suspend (ImportProgress) -> Unit)?) -> Unit,
+    onProgress: (suspend (Progress) -> Unit)?,
+    reimport: suspend (ApiSession, (suspend (Progress) -> Unit)?) -> Unit,
 ): ApiBulkReimportResult {
     var reimported = 0
     val failures = mutableListOf<ApiSessionReimportFailure>()
-    val bar = ScaledProgress(onProgress)
+    val bar = PhasedProgress(onProgress)
     val runFailure =
         runCatching {
             for ((index, session) in sessions.withIndex()) {
@@ -292,7 +293,7 @@ internal suspend fun reimportSessionsResiliently(
                 val base = index.toFloat() / sessions.size
                 val span = 1f / sessions.size
                 val label = "Session ${index + 1} of ${sessions.size}"
-                val sessionProgress: (suspend (ImportProgress) -> Unit)? =
+                val sessionProgress: (suspend (Progress) -> Unit)? =
                     if (onProgress == null) {
                         null
                     } else {

@@ -1,20 +1,18 @@
-package com.moneymanager.apiimporter
-
-import com.moneymanager.importengineapi.ImportProgress
+package com.moneymanager.tasks
 
 /**
- * Folds the phases of one API import (or re-import) into a single monotonic 0..1 bar.
+ * Folds the phases of one run (an API import or re-import, say) into a single monotonic 0..1 bar.
  *
  * A run is a sequence of phases of very different cost — parsing responses, resolving assets, the
  * engine write — and several of them emit their own independent 0..1 sweep. Each phase is given a
  * slice of the bar (`base`..`base + span`) that its inner fraction scales, and emissions are
- * clamped non-decreasing so a later phase starting its own sweep at 0 never rewinds the bar. This
- * mirrors how bulk CSV imports aggregate per-file progress (`BulkProgressTracker`).
+ * clamped non-decreasing so a later phase starting its own sweep at 0 never rewinds the bar. [WeightedProgress]
+ * does the same across the items of a bulk run.
  *
  * A null sink makes every call a no-op, so callers can instrument unconditionally.
  */
-internal class ScaledProgress(
-    private val onProgress: (suspend (ImportProgress) -> Unit)?,
+class PhasedProgress(
+    private val onProgress: (suspend (Progress) -> Unit)?,
 ) {
     private var lastFraction = 0f
 
@@ -30,7 +28,7 @@ internal class ScaledProgress(
         val sink = onProgress ?: return
         val scaled = (base + span * (innerFraction ?: 0f).coerceIn(0f, 1f)).coerceIn(0f, 1f)
         lastFraction = maxOf(lastFraction, scaled)
-        sink(ImportProgress(detail, fraction = lastFraction, processed = processed, total = total))
+        sink(Progress(detail, fraction = lastFraction, processed = processed, total = total))
     }
 
     /**
@@ -43,7 +41,7 @@ internal class ScaledProgress(
         base: Float,
         span: Float,
         detail: String? = null,
-    ): (suspend (ImportProgress) -> Unit)? =
+    ): (suspend (Progress) -> Unit)? =
         if (onProgress == null) {
             null
         } else {

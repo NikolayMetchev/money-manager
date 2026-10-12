@@ -37,7 +37,7 @@ import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ImportProgress
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.CancellationException
@@ -73,7 +73,7 @@ fun ApiReimportDialog(
     var plan by remember { mutableStateOf<ApiReimportPlan?>(null) }
     var isRunning by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var executeProgress by remember { mutableStateOf<ImportProgress?>(null) }
+    var executeProgress by remember { mutableStateOf<Progress?>(null) }
 
     LaunchedEffect(session.id) {
         plan = planApiReimport(session.id, apiSessionRepository)
@@ -109,7 +109,7 @@ fun ApiReimportDialog(
                         }
                         if (isRunning) {
                             Spacer(modifier = Modifier.height(12.dp))
-                            ApiReimportProgress(executeProgress ?: ImportProgress("Starting re-import"))
+                            ApiReimportProgress(executeProgress ?: Progress("Starting re-import"))
                         }
                     }
                 }

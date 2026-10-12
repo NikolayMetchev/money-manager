@@ -41,7 +41,6 @@ import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOrderIntent
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
@@ -54,6 +53,8 @@ import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.recordApiDownloadCoverage
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiRequestSigner
+import com.moneymanager.tasks.PhasedProgress
+import com.moneymanager.tasks.Progress
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.encodeURLPathPart
 import kotlinx.coroutines.delay
@@ -126,7 +127,7 @@ private val TRADE_RECONCILE_WINDOW = 5.seconds
 /** Upper bound on exponential rate-limit backoff, so a misconfigured base delay can't stall for hours. */
 private const val MAX_RATE_LIMIT_BACKOFF_MILLIS = 60_000L
 
-// Slices of the import's progress bar (see ScaledProgress): parsing the stored responses, then
+// Slices of the import's progress bar (see PhasedProgress): parsing the stored responses, then
 // building the batch, then the engine write — which dominates, so it gets the largest share.
 private const val PARSE_BASE = 0f
 private const val PARSE_SPAN = 0.35f
@@ -175,7 +176,7 @@ suspend fun downloadApiSessionExchange(
     // Crypto.com's get-trades / get-order-history are limited to 1 request/second, so pace every request
     // just over 1s to stay clear of rate-limit rejections across all endpoints.
     rateLimitMillis: Long = 1100,
-    onProgress: (ApiTransactionsDownloadProgress) -> Unit = {},
+    onProgress: (Progress) -> Unit = {},
 ): ApiTransactionsDownloadResult {
     requireNotNull(strategy.config.requestSigning) { "SIGNED strategy '${strategy.name}' has no requestSigning" }
     val existingRequests = apiSessionRepository.getRequestsBySession(sessionId)
@@ -394,7 +395,7 @@ suspend fun downloadApiSessionExchange(
                 since = if (forceFullDownload) null else watermarks[coverageKey],
                 fetch = { page ->
                     onProgress(
-                        ApiTransactionsDownloadProgress(
+                        apiDownloadProgress(
                             accountIndex = endpointIndex + 1,
                             accountCount = endpointCount,
                             page = page.windowIndex + 1,
@@ -803,14 +804,14 @@ suspend fun importApiSessionExchange(
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
     importEngine: ImportEngine,
-    onProgress: (suspend (ImportProgress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
 ): ExchangeImportResult {
     val synthetic =
         strategy.config.accounts as? ApiAccountsSource.Single
             ?: error("Exchange strategy '${strategy.name}' doesn't import into a single account")
     val source = Source.Api(sessionId)
-    val bar = ScaledProgress(onProgress)
+    val bar = PhasedProgress(onProgress)
 
     bar.emit(base = 0f, detail = "Reading downloaded responses")
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }

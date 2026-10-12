@@ -49,6 +49,7 @@ kotlin {
                 api(projects.app.model.importdirectory)
                 api(projects.app.model.passthrough)
                 api(projects.app.model.repository.read)
+                api(projects.app.tasks)
                 api(libs.kotlinx.coroutines.core)
 
                 implementation(projects.app.model.qif)
@@ -62,6 +63,7 @@ kotlin {
         getByName("androidMain") {
             dependencies {
                 api(projects.app.importfilesource.core)
+                api(projects.app.tasks)
                 api(libs.kotlinx.coroutines.core)
 
                 implementation(libs.kermit.core)
@@ -81,6 +83,7 @@ kotlin {
         getByName("jvmTest") {
             dependencies {
                 implementation(projects.app.model.rules)
+                implementation(projects.app.tasks)
                 implementation(projects.utils.bigdecimal)
             }
         }
@@ -88,6 +91,7 @@ kotlin {
         getByName("androidHostTest") {
             dependencies {
                 implementation(projects.app.model.rules)
+                implementation(projects.app.tasks)
                 implementation(projects.utils.bigdecimal)
             }
         }

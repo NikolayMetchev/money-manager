@@ -7,9 +7,9 @@ import com.moneymanager.domain.model.reconciliation.ReconciliationSource
 import com.moneymanager.domain.model.reconciliation.ShadowAccount
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ReconciliationLinkMutation
+import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -122,7 +122,7 @@ class AutoLinkerTest {
                 object : ImportEngine {
                     override suspend fun import(
                         batch: ImportBatch,
-                        onProgress: (suspend (ImportProgress) -> Unit)?,
+                        onProgress: (suspend (Progress) -> Unit)?,
                         batchSize: Int,
                     ): ImportResult {
                         batches += batch

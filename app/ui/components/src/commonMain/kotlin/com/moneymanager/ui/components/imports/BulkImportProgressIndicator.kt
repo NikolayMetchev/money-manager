@@ -10,27 +10,22 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.csvimporter.BulkImportProgress
+import com.moneymanager.tasks.Progress
 
 /**
- * One determinate bar for a whole bulk import run: a file counter + current file/phase label over a
- * `LinearProgressIndicator` driven by the row-weighted [BulkImportProgress.overallFraction], so the bar
+ * One determinate bar for a whole bulk import run: the run's detail (file counter, current file and
+ * phase) and row counter over a `LinearProgressIndicator` driven by the row-weighted fraction, so the bar
  * advances within large files instead of jumping once per file. Shared by the CSV and QIF
  * "Import all"/"Re-import all" dialogs.
  */
 @Composable
-fun BulkImportProgressIndicator(progress: BulkImportProgress) {
+fun BulkImportProgressIndicator(progress: Progress) {
     Column(modifier = Modifier.fillMaxWidth()) {
         val label =
             buildString {
-                if (progress.filesDone >= progress.filesTotal) {
-                    append("Finishing up")
-                    append(" — ${progress.rowsDone} of ${progress.rowsTotal} rows")
-                } else {
-                    append("File ${progress.filesDone + 1} of ${progress.filesTotal}")
-                    append(" — ${progress.rowsDone} of ${progress.rowsTotal} rows")
-                    progress.currentFileName?.let { append(" — $it") }
-                    progress.detail?.let { append(": $it") }
+                append(progress.detail)
+                if (progress.processed != null && progress.total != null) {
+                    append(" — ${progress.processed} of ${progress.total} rows")
                 }
             }
         Text(
@@ -39,6 +34,6 @@ fun BulkImportProgressIndicator(progress: BulkImportProgress) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(4.dp))
-        LinearProgressIndicator(progress = { progress.overallFraction }, modifier = Modifier.fillMaxWidth())
+        LinearProgressIndicator(progress = { progress.fraction ?: 0f }, modifier = Modifier.fillMaxWidth())
     }
 }

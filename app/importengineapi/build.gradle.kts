@@ -18,6 +18,7 @@ kotlin {
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
                 api(projects.app.model.repository.read)
+                api(projects.app.tasks)
 
                 implementation(libs.kotlinx.coroutines.core)
             }
@@ -42,6 +43,7 @@ kotlin {
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
                 api(projects.app.model.repository.read)
+                api(projects.app.tasks)
                 api(projects.utils.bigdecimal)
 
                 implementation(libs.kotlinx.coroutines.core)

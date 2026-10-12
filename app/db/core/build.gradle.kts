@@ -23,6 +23,7 @@ kotlin {
                 api(projects.app.model.repository.read)
                 api(projects.app.model.repository.write)
                 api(projects.app.model.timeline)
+                api(projects.app.tasks)
                 api(projects.utils.currency)
                 api(libs.kotlinx.coroutines.core)
                 api(libs.kotlinx.io.core)
@@ -73,6 +74,7 @@ kotlin {
         getByName("jvmMain") {
             dependencies {
                 api(projects.app.db.write)
+                api(projects.app.tasks)
                 api(projects.utils.currency)
                 api(libs.kotlinx.serialization.core)
                 // sqldelight.runtime + read/write are used directly by jvmMain (JvmDatabaseManager uses

@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.defaultFileDatabaseLocation
 import com.moneymanager.files.absolutePath
 import com.moneymanager.files.readBytes
 import com.moneymanager.files.writeAtomically
+import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.io.files.Path
@@ -44,36 +45,36 @@ abstract class FileDatabaseManager(
 
     override suspend fun openDatabaseWithProgress(
         location: DbLocation,
-        onProgress: (DatabaseInitializationProgress) -> Unit,
+        onProgress: (Progress) -> Unit,
     ): MoneyManagerDatabaseWrapper =
         withContext(ioDispatcher) {
-            onProgress(DatabaseInitializationProgress("Checking for an existing database...", 1, OPEN_STEPS))
+            onProgress(Progress.counted("Checking for an existing database...", 1, OPEN_STEPS))
             val file = location.file
             val isNewDatabase = !SystemFileSystem.exists(file)
 
-            onProgress(DatabaseInitializationProgress("Preparing the database folder...", 2, OPEN_STEPS))
+            onProgress(Progress.counted("Preparing the database folder...", 2, OPEN_STEPS))
             file.parent?.let { SystemFileSystem.createDirectories(it) }
 
-            onProgress(DatabaseInitializationProgress("Opening the SQLite database...", 3, OPEN_STEPS))
+            onProgress(Progress.counted("Opening the SQLite database...", 3, OPEN_STEPS))
             val driver = openDriver(file)
 
             if (isNewDatabase) {
-                onProgress(DatabaseInitializationProgress("Creating the database schema...", 4, OPEN_STEPS))
+                onProgress(Progress.counted("Creating the database schema...", 4, OPEN_STEPS))
                 // Lookups, the system device and GBP are seeded inside Schema.create (the :app:db:seed module).
                 MoneyManagerDatabase.Schema.create(driver)
             } else {
-                onProgress(DatabaseInitializationProgress("Checking the database schema...", 4, OPEN_STEPS))
+                onProgress(Progress.counted("Checking the database schema...", 4, OPEN_STEPS))
             }
 
             val database = MoneyManagerDatabaseWrapper(driver)
             if (isNewDatabase) {
                 // The rest of the bundled ISO 4217 list is seeded here for a freshly created database.
-                onProgress(DatabaseInitializationProgress("Adding default currencies...", 5, OPEN_STEPS))
+                onProgress(Progress.counted("Adding default currencies...", 5, OPEN_STEPS))
                 DatabaseConfig.seedCurrencies(database, currenciesToSeed())
             } else {
-                onProgress(DatabaseInitializationProgress("Preparing repositories...", 5, OPEN_STEPS))
+                onProgress(Progress.counted("Preparing repositories...", 5, OPEN_STEPS))
             }
-            onProgress(DatabaseInitializationProgress("Finishing database startup...", OPEN_STEPS, OPEN_STEPS))
+            onProgress(Progress.counted("Finishing database startup...", OPEN_STEPS, OPEN_STEPS))
             database
         }
 

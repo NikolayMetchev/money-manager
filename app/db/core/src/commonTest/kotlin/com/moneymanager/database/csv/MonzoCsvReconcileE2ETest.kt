@@ -3,7 +3,6 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.AttributeAccountMatcher
-import com.moneymanager.csvimporter.BulkImportProgress
 import com.moneymanager.csvimporter.CsvBulkResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.database.assertBulkProgress
@@ -14,6 +13,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.importengineapi.createAccount
+import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
@@ -116,7 +116,7 @@ class MonzoCsvReconcileE2ETest : DbTest() {
         imports: List<CsvImport>,
         sourceAccountOverride: AccountId?,
     ): CsvBulkResult {
-        val progress = mutableListOf<BulkImportProgress>()
+        val progress = mutableListOf<Progress>()
         val attributeMatchers =
             AttributeAccountMatcher.registry(repositories.accountAttributeRepository.getAll().first())
         val result =

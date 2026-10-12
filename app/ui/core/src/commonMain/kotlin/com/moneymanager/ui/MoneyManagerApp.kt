@@ -60,9 +60,6 @@ import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.remotestorage.sync.SyncState
 import com.moneymanager.remotestorage.sync.SyncStatus
 import com.moneymanager.strategycatalog.StrategyCatalogController
-import com.moneymanager.ui.background.BackgroundTaskPanel
-import com.moneymanager.ui.background.LocalBackgroundTaskManager
-import com.moneymanager.ui.background.rememberBackgroundTaskManager
 import com.moneymanager.ui.components.DefaultCurrencyInitDialog
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -107,6 +104,9 @@ import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
 import com.moneymanager.ui.screens.transactions.TradeEntryDialog
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
 import com.moneymanager.ui.screens.transactions.TransactionEditDialog
+import com.moneymanager.ui.tasks.LocalTaskManager
+import com.moneymanager.ui.tasks.TaskPanel
+import com.moneymanager.ui.tasks.rememberTaskManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
@@ -131,7 +131,7 @@ fun MoneyManagerApp(
 ) {
     ProvideSchemaAwareScope {
         val scope = rememberSchemaAwareCoroutineScope()
-        val backgroundTaskManager = rememberBackgroundTaskManager(scope)
+        val taskManager = rememberTaskManager(scope)
         val backStack = rememberNavBackStack(ScreenSavedStateConfiguration, Screen.Accounts())
         val navigationHistory = remember(backStack) { NavigationHistory(backStack) }
         val currentScreen = navigationHistory.currentScreen
@@ -194,7 +194,7 @@ fun MoneyManagerApp(
 
         MaterialTheme {
             CompositionLocalProvider(
-                LocalBackgroundTaskManager provides backgroundTaskManager,
+                LocalTaskManager provides taskManager,
                 LocalDeviceId provides services.deviceId,
                 LocalImportEngine provides services.transactions.importEngine,
             ) {
@@ -984,8 +984,8 @@ fun MoneyManagerApp(
                                         }
                                     },
                             )
-                            BackgroundTaskPanel(
-                                manager = backgroundTaskManager,
+                            TaskPanel(
+                                manager = taskManager,
                                 modifier =
                                     Modifier
                                         .align(Alignment.BottomEnd)

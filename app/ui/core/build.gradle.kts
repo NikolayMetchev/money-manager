@@ -74,6 +74,7 @@ kotlin {
 
                 implementation(projects.app.model.apistrategy)
                 implementation(projects.app.model.repository.write)
+                implementation(projects.app.tasks)
                 implementation(libs.androidx.compose.animation)
                 implementation(libs.androidx.compose.material3)
                 implementation(libs.androidx.compose.runtime.annotation)
@@ -112,6 +113,7 @@ kotlin {
                 implementation(projects.app.model.passthrough)
                 implementation(projects.app.model.repository.write)
                 implementation(projects.app.remotestorage.core)
+                implementation(projects.app.tasks)
                 implementation(libs.androidx.compose.runtime.annotation)
                 implementation(libs.androidx.navigation3.runtime.desktop)
                 implementation(libs.androidx.savedstate.desktop)
@@ -142,6 +144,7 @@ kotlin {
                 implementation(projects.app.model.repository.write)
                 implementation(projects.app.model.rules)
                 implementation(projects.app.qifimporter)
+                implementation(projects.app.tasks)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.credentialvault)
                 implementation(projects.utils.rest)
@@ -185,6 +188,7 @@ kotlin {
                 implementation(projects.app.model.apistrategy)
                 implementation(projects.app.model.repository.write)
                 implementation(projects.app.model.rules)
+                implementation(projects.app.tasks)
                 implementation(projects.test.app.db)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.credentialvault)
@@ -197,6 +201,7 @@ kotlin {
         getByName("androidDeviceTest") {
             dependencies {
                 implementation(projects.app.model.rules)
+                implementation(projects.app.tasks)
             }
         }
     }

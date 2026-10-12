@@ -24,7 +24,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.moneymanager.credentialvault.CredentialVault
-import com.moneymanager.database.DatabaseInitializationProgress
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AppVersion
@@ -39,6 +38,7 @@ import com.moneymanager.remotestorage.sync.CredentialSyncController
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.strategycatalog.StrategyCatalogController
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.DatabaseProgressScreen
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.error.GlobalSchemaErrorState
@@ -55,7 +55,7 @@ import kotlinx.coroutines.launch
 
 private sealed class AppDatabaseState {
     data class Loading(
-        val progress: DatabaseInitializationProgress = initialDatabaseProgress(),
+        val progress: Progress = initialDatabaseProgress(),
     ) : AppDatabaseState()
 
     data class Loaded(
@@ -83,12 +83,7 @@ private data class RemoteUnlockState(
     val password: String = "",
 )
 
-private fun initialDatabaseProgress() =
-    DatabaseInitializationProgress(
-        text = "Finding the default database...",
-        completedSteps = 0,
-        totalSteps = 1,
-    )
+private fun initialDatabaseProgress() = Progress.counted("Finding the default database...", 0, 1)
 
 @Composable
 fun AppStartupHost(
@@ -282,7 +277,7 @@ private fun AppStartupContent(
                         scope.launch {
                             val loaded = databaseState as? AppDatabaseState.Loaded ?: return@launch
                             databaseState =
-                                AppDatabaseState.Loading(DatabaseInitializationProgress("Downloading from cloud…", 0, 100))
+                                AppDatabaseState.Loading(Progress.counted("Downloading from cloud…", 0, 100))
                             onDatabaseReady(null, null)
                             try {
                                 // Release the file lock so restore can overwrite the working copy. If the
@@ -293,11 +288,7 @@ private fun AppStartupContent(
                                     remoteController.download { progress ->
                                         databaseState =
                                             AppDatabaseState.Loading(
-                                                DatabaseInitializationProgress(
-                                                    progress.message,
-                                                    (progress.fraction * 100).toInt(),
-                                                    100,
-                                                ),
+                                                progress,
                                             )
                                     }
                                 val error =
@@ -402,13 +393,13 @@ private fun AppStartupContent(
         suspend fun restoreWithPassword(password: String) {
             if (binding == null) return
             databaseState =
-                AppDatabaseState.Loading(DatabaseInitializationProgress("Restoring from cloud…", 0, 100))
+                AppDatabaseState.Loading(Progress.counted("Restoring from cloud…", 0, 100))
             try {
                 val location =
                     controller.restore(binding, password) { progress ->
                         databaseState =
                             AppDatabaseState.Loading(
-                                DatabaseInitializationProgress(progress.message, (progress.fraction * 100).toInt(), 100),
+                                progress,
                             )
                     }
                 val error =
@@ -462,7 +453,7 @@ private fun AppStartupContent(
                     scope.launch {
                         databaseState =
                             AppDatabaseState.Loading(
-                                DatabaseInitializationProgress("Reconnecting to ${binding.remoteName}…", 0, 100),
+                                Progress.counted("Reconnecting to ${binding.remoteName}…", 0, 100),
                             )
                         try {
                             // Full interactive consent mints a fresh refresh token; then retry the restore
@@ -607,9 +598,9 @@ private suspend fun openAndLoad(
             databaseManager.openDatabaseWithProgress(location) { progress ->
                 databaseStateUpdater(AppDatabaseState.Loading(progress))
             }
-        databaseStateUpdater(AppDatabaseState.Loading(DatabaseInitializationProgress("Preparing application services...", 1, 1)))
+        databaseStateUpdater(AppDatabaseState.Loading(Progress.counted("Preparing application services...", 1, 1)))
         val services = createAppServices(database)
-        databaseStateUpdater(AppDatabaseState.Loading(DatabaseInitializationProgress("Verifying this device...", 1, 1)))
+        databaseStateUpdater(AppDatabaseState.Loading(Progress.counted("Verifying this device...", 1, 1)))
         services.deviceId
         databaseStateUpdater(AppDatabaseState.Loaded(location, services, database))
         onInfoLog("Database opened successfully")

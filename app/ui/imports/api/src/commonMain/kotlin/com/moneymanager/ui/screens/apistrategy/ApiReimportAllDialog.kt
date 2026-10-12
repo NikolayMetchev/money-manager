@@ -26,7 +26,7 @@ import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ImportProgress
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.CancellationException
@@ -59,7 +59,7 @@ fun ApiReimportAllDialog(
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     var isRunning by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf<ImportProgress?>(null) }
+    var progress by remember { mutableStateOf<Progress?>(null) }
     var result by remember { mutableStateOf<ApiBulkReimportResult?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -138,7 +138,7 @@ fun ApiReimportAllDialog(
         )
         if (isRunning) {
             Spacer(modifier = Modifier.height(12.dp))
-            ApiReimportProgress(progress ?: ImportProgress("Starting re-import"))
+            ApiReimportProgress(progress ?: Progress("Starting re-import"))
         }
         errorMessage?.let {
             Spacer(modifier = Modifier.height(8.dp))

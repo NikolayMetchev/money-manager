@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.ReimportPlan
-import com.moneymanager.importengineapi.ImportProgress
+import com.moneymanager.tasks.Progress
 
 /** How many bullets a preview section lists before collapsing the rest into an "…and N more" line. */
 const val REIMPORT_PREVIEW_LIMIT = 20
@@ -23,7 +23,7 @@ const val REIMPORT_PREVIEW_LIMIT = 20
  * the phase reports a fraction, indeterminate otherwise.
  */
 @Composable
-fun ReimportProgressIndicator(progress: ImportProgress) {
+fun ReimportProgressIndicator(progress: Progress) {
     Column(modifier = Modifier.fillMaxWidth()) {
         val counts =
             progress.processed
