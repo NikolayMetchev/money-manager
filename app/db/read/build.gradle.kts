@@ -2,6 +2,7 @@ plugins {
     id("moneymanager.android-convention")
     id("moneymanager.mappie-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     alias(libs.plugins.sqldelight)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -18,8 +19,10 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.passthrough)
+                api(libs.kotlinx.serialization.core)
                 api(libs.mappie.api)
 
+                implementation(projects.utils.bigdecimal)
                 implementation(libs.kotlinx.serialization.json)
             }
         }
@@ -32,15 +35,11 @@ kotlin {
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.passthrough)
                 api(libs.kotlinx.serialization.core)
-
-                implementation(projects.utils.bigdecimal)
             }
         }
         getByName("androidMain") {
             dependencies {
                 api(libs.kotlinx.serialization.core)
-
-                implementation(projects.utils.bigdecimal)
             }
         }
         getByName("commonTest") {
@@ -67,6 +66,9 @@ kotlin {
 // codecs. Generates MoneyManagerDatabase in com.moneymanager.database.sql.read; does NOT depend on
 // :app:db:write.
 sqldelight {
+    // Native binaries link the SQLite bundled by :utils:sqlite3; the Kotlin/Native sysroots have no system
+    // libsqlite3 for the plugin's default -lsqlite3 to find.
+    linkSqlite.set(false)
     databases {
         create("MoneyManagerDatabase") {
             packageName.set("com.moneymanager.database.sql.read")

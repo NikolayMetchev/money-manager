@@ -1,5 +1,6 @@
 plugins {
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     id("moneymanager.android-convention")
 }
 
@@ -15,6 +16,7 @@ kotlin {
                 api(projects.app.model.csvstrategy)
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
+                implementation(projects.app.model.rules)
             }
         }
         getByName("jvmMain") {
@@ -25,13 +27,6 @@ kotlin {
 
                 implementation(projects.app.model.core)
                 implementation(projects.app.model.qif)
-                implementation(projects.app.model.rules)
-            }
-        }
-
-        getByName("androidMain") {
-            dependencies {
-                implementation(projects.app.model.rules)
             }
         }
     }

@@ -13,44 +13,29 @@ class DeviceWriteRepositoryImpl(
     DeviceReadRepository by reader {
     override fun getOrCreateDevice(deviceInfo: DeviceInfo): DeviceId =
         when (deviceInfo) {
-            is DeviceInfo.Jvm -> getOrCreateJvmDevice(deviceInfo)
+            is DeviceInfo.Host -> getOrCreateHostDevice(deviceInfo)
             is DeviceInfo.Android -> getOrCreateAndroidDevice(deviceInfo)
         }
 
-    private fun getOrCreateJvmDevice(deviceInfo: DeviceInfo.Jvm): DeviceId {
-        // Get or create OS
+    private fun getOrCreateHostDevice(deviceInfo: DeviceInfo.Host): DeviceId {
+        val platform = deviceInfo.platform
+        database.deviceWriteQueries.insertOrIgnorePlatform(platform.id, platform.name)
+
         database.deviceWriteQueries.insertOrIgnoreOs(deviceInfo.osName)
         val osId = database.deviceSelectQueries.selectOsByName(deviceInfo.osName).executeAsOne()
 
-        // Get or create Machine
         database.deviceWriteQueries.insertOrIgnoreMachine(deviceInfo.machineName)
         val machineId = database.deviceSelectQueries.selectMachineByName(deviceInfo.machineName).executeAsOne()
 
-        // Try to find existing device
-        val existingDevice =
+        fun existing() =
             database.deviceSelectQueries
-                .selectByAttributesJvm(
-                    os_id = osId,
-                    machine_id = machineId,
-                ).executeAsOneOrNull()
+                .selectByAttributesHost(platform_id = platform.id, os_id = osId, machine_id = machineId)
+                .executeAsOneOrNull()
 
-        if (existingDevice != null) {
-            return DeviceId(existingDevice)
-        }
-
-        // Create new device
-        database.deviceWriteQueries.insertJvm(
-            os_id = osId,
-            machine_id = machineId,
-        )
+        existing()?.let { return DeviceId(it) }
+        database.deviceWriteQueries.insertHost(platform_id = platform.id, os_id = osId, machine_id = machineId)
         // Re-query to get the ID (lastInsertRowId doesn't work reliably with JDBC)
-        return DeviceId(
-            database.deviceSelectQueries
-                .selectByAttributesJvm(
-                    os_id = osId,
-                    machine_id = machineId,
-                ).executeAsOne(),
-        )
+        return DeviceId(checkNotNull(existing()) { "Device row for $deviceInfo not found after insert" })
     }
 
     private fun getOrCreateAndroidDevice(deviceInfo: DeviceInfo.Android): DeviceId {

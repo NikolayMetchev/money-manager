@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
 }
 
 // The DI scope markers, and nothing else. Every module that contributes a Metro module to a graph needs

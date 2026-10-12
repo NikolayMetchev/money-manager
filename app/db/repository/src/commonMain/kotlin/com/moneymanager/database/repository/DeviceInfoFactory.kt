@@ -1,12 +1,11 @@
 package com.moneymanager.database.repository
 
+import com.moneymanager.database.mapper.deviceInfoOrNull
 import com.moneymanager.domain.model.DeviceInfo
 
 /**
- * Builds a [DeviceInfo] from the stored device columns (platform/os/machine/make/model).
- *
- * Shared by the device write repository and the QIF/CSV import read repositories. Lives in the read
- * module (package `com.moneymanager.database.repository`) so both sides can call it unqualified.
+ * Builds a [DeviceInfo] from the stored device columns (platform/os/machine/make/model), failing on a
+ * platform without device details. Shared by the QIF/CSV import read repositories.
  */
 fun createDeviceInfo(
     platformName: String,
@@ -15,16 +14,6 @@ fun createDeviceInfo(
     deviceMake: String?,
     deviceModel: String?,
 ): DeviceInfo =
-    when (platformName) {
-        "JVM" ->
-            DeviceInfo.Jvm(
-                osName = osName ?: "Unknown",
-                machineName = machineName ?: "Unknown",
-            )
-        "ANDROID" ->
-            DeviceInfo.Android(
-                deviceMake = deviceMake ?: "Unknown",
-                deviceModel = deviceModel ?: "Unknown",
-            )
-        else -> throw IllegalArgumentException("Unknown platform: $platformName")
+    requireNotNull(deviceInfoOrNull(platformName, osName, machineName, deviceMake, deviceModel)) {
+        "Unknown platform: $platformName"
     }

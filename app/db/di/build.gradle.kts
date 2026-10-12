@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.metro-convention")
+    id("moneymanager.native-convention")
 }
 
 // The database-scoped graph and everything that fills it: the repository bindings, the ImportEngine

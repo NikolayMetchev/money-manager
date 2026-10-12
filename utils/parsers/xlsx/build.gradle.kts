@@ -1,11 +1,12 @@
 plugins {
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     id("moneymanager.android-convention")
 }
 
 // Excel parsing uses Apache POI, which is JVM-only (not Android-friendly: large, reflection-heavy,
 // and not designed for the Android runtime). commonMain declares the parsing contract; jvmMain
-// implements it with POI; androidMain's actual reports the platform as unsupported.
+// implements it with POI; the android and native actuals return the common UnsupportedXlsxParser.
 kotlin {
     sourceSets {
         commonMain {

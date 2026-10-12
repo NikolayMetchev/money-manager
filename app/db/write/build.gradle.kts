@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     alias(libs.plugins.sqldelight)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -25,11 +26,14 @@ kotlin {
                 api(projects.app.model.importdirectory)
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
+                api(projects.app.model.reconciliation)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.repository.write)
                 api(libs.kotlinx.coroutines.core)
                 api(libs.sqldelight.runtime)
 
+                implementation(projects.utils.bigdecimal)
+                implementation(libs.kotlinx.serialization.core)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.sqldelight.coroutines.extensions)
             }
@@ -51,14 +55,11 @@ kotlin {
                 api(projects.app.model.repository.write)
 
                 implementation(projects.app.db.repository)
-                implementation(projects.utils.bigdecimal)
                 implementation(libs.kotlinx.serialization.core)
             }
         }
         getByName("androidMain") {
             dependencies {
-                api(projects.app.model.reconciliation)
-                implementation(projects.utils.bigdecimal)
                 implementation(libs.kotlinx.serialization.core)
             }
         }
@@ -70,6 +71,9 @@ kotlin {
 // Generates MoneyManagerDatabase in com.moneymanager.database.sql.write. Needs SQLDelight 2.4.0+ for
 // Gradle Isolated Projects support (sqldelight#6259).
 sqldelight {
+    // Native binaries link the SQLite bundled by :utils:sqlite3; the Kotlin/Native sysroots have no system
+    // libsqlite3 for the plugin's default -lsqlite3 to find.
+    linkSqlite.set(false)
     databases {
         create("MoneyManagerDatabase") {
             packageName.set("com.moneymanager.database.sql.write")

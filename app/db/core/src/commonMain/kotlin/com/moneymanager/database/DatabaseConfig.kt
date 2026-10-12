@@ -34,6 +34,12 @@ object DatabaseConfig {
         )
 
     /**
+     * How long a file-backed connection waits for another connection's lock before failing with
+     * SQLITE_BUSY. Android's connection pool handles contention itself.
+     */
+    const val BUSY_TIMEOUT_MS = 5000
+
+    /**
      * The ISO 4217 currencies a new database is seeded with: the table bundled into the app, the same on
      * every platform. The strategy catalog publishes a newer copy that installs any codes added since.
      */

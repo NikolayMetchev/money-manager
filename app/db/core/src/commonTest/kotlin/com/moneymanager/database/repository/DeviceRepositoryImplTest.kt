@@ -64,21 +64,7 @@ class DeviceRepositoryImplTest : DbTest() {
             val retrievedDevice = repositories.deviceRepository.getDeviceById(deviceId)
             assertNotNull(retrievedDevice, "Should be able to retrieve device by ID")
 
-            // Verify the retrieved device matches the original
-            when (deviceInfo) {
-                is DeviceInfo.Jvm -> {
-                    val retrieved = retrievedDevice as? DeviceInfo.Jvm
-                    assertNotNull(retrieved, "Retrieved device should be JVM")
-                    assertEquals(deviceInfo.osName, retrieved.osName)
-                    assertEquals(deviceInfo.machineName, retrieved.machineName)
-                }
-                is DeviceInfo.Android -> {
-                    val retrieved = retrievedDevice as? DeviceInfo.Android
-                    assertNotNull(retrieved, "Retrieved device should be Android")
-                    assertEquals(deviceInfo.deviceMake, retrieved.deviceMake)
-                    assertEquals(deviceInfo.deviceModel, retrieved.deviceModel)
-                }
-            }
+            assertEquals(deviceInfo, retrievedDevice)
 
             // Calling again should return the same ID (idempotent)
             val deviceId2 = repositories.deviceRepository.getOrCreateDevice(deviceInfo)
@@ -100,5 +86,29 @@ class DeviceRepositoryImplTest : DbTest() {
             val androidPlatform = platforms.find { it.id == 2L }
             assertNotNull(androidPlatform, "Platform(id=2) should exist for Android")
             assertEquals("ANDROID", androidPlatform.name)
+
+            assertEquals("NATIVE", platforms.find { it.id == 3L }?.name)
+        }
+
+    @Test
+    fun `desktop and CLI hosts on one machine are separate devices`() =
+        runTest {
+            val desktop = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("Linux", "box"))
+            val cli = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Native("Linux", "box"))
+
+            assertTrue(desktop != cli, "JVM and NATIVE devices must not share a row")
+            assertEquals(DeviceInfo.Jvm("Linux", "box"), repositories.deviceRepository.getDeviceById(desktop))
+            assertEquals(DeviceInfo.Native("Linux", "box"), repositories.deviceRepository.getDeviceById(cli))
+        }
+
+    @Test
+    fun `a database created before the NATIVE platform gains its row on first CLI use`() =
+        runTest {
+            database.execute(null, "DELETE FROM platform WHERE id = 3", 0)
+
+            val cli = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Native("Linux", "box"))
+
+            assertEquals("NATIVE", selectAllPlatforms().find { it.id == 3L }?.name)
+            assertEquals(DeviceInfo.Native("Linux", "box"), repositories.deviceRepository.getDeviceById(cli))
         }
 }

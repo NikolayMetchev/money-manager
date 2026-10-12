@@ -60,6 +60,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -276,7 +277,7 @@ suspend fun downloadApiSessionExchange(
                             params
                         } else {
                             LinkedHashMap(params).apply {
-                                signedParams.forEach { p -> p.value?.let { putIfAbsent(p.name, it) } }
+                                signedParams.forEach { p -> p.value?.let { value -> getOrPut(p.name) { value } } }
                             }
                         }
                     val signed =
@@ -1753,8 +1754,6 @@ private fun moneyExact(
         )
     }
 
-private fun JsonObject.str(path: String): String? =
-    (resolveJsonPathElement(path) as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNullCompat()
+private fun JsonObject.str(path: String): String? = (resolveJsonPathElement(path) as? JsonPrimitive)?.contentOrNullCompat()
 
-private fun kotlinx.serialization.json.JsonPrimitive.contentOrNullCompat(): String? =
-    if (this is kotlinx.serialization.json.JsonNull) null else content
+private fun JsonPrimitive.contentOrNullCompat(): String? = if (this is JsonNull) null else content

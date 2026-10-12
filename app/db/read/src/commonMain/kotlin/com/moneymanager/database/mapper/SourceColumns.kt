@@ -3,7 +3,6 @@ package com.moneymanager.database.mapper
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.CsvImportId
-import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.QifImportId
@@ -73,7 +72,7 @@ fun buildSourceRecord(columns: SourceColumns): SourceRecord? {
         source = source,
         deviceId = deviceId,
         deviceInfo =
-            auditDeviceInfo(
+            deviceInfoOrNull(
                 platformName = columns.platformName,
                 machineName = columns.machineName,
                 osName = columns.osName,
@@ -112,29 +111,4 @@ private fun SourceColumns.reconstructSource(sourceType: SourceType): Pair<Source
                 requestId = apiRequestId?.let { ApiRequestId(it) },
                 jsonPath = apiJsonPath?.let { JsonPath(it) },
             ) to null
-    }
-
-/**
- * Reuses `DeviceRepositoryImpl.createDeviceInfo`'s logic but tolerates unknown/absent platform by
- * returning null (audit rows may lack device metadata), rather than throwing.
- */
-private fun auditDeviceInfo(
-    platformName: String?,
-    machineName: String?,
-    osName: String?,
-    deviceMake: String?,
-    deviceModel: String?,
-): DeviceInfo? =
-    when (platformName) {
-        "JVM" ->
-            DeviceInfo.Jvm(
-                machineName = machineName ?: "Unknown",
-                osName = osName ?: "Unknown",
-            )
-        "ANDROID", "Android" ->
-            DeviceInfo.Android(
-                deviceMake = deviceMake ?: "Unknown",
-                deviceModel = deviceModel ?: "Unknown",
-            )
-        else -> null
     }

@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     id("moneymanager.pure-importer-convention")
 }
 
@@ -9,6 +10,7 @@ kotlin {
         getByName("commonMain") {
             dependencies {
                 api(projects.app.importengineapi)
+                api(projects.app.importfilesource.core)
                 api(projects.app.model.accountmapping)
                 api(projects.app.model.core)
                 api(projects.app.model.csv)
@@ -19,12 +21,23 @@ kotlin {
                 api(projects.app.model.repository.read)
                 api(libs.kotlinx.coroutines.core)
 
+                implementation(projects.app.model.rules)
+                implementation(projects.utils.bigdecimal)
+                implementation(projects.utils.parsers.csv)
+                implementation(projects.utils.parsers.qif)
+                implementation(projects.utils.parsers.xlsx)
                 implementation(libs.cryptography.core)
                 implementation(libs.kermit)
+                implementation(libs.kermit.core)
                 implementation(libs.kotlinx.datetime)
             }
         }
 
+        nativeMain {
+            dependencies {
+                implementation(libs.cryptography.provider.openssl3.prebuilt)
+            }
+        }
         getByName("jvmMain") {
             dependencies {
                 api(projects.app.importengineapi)
@@ -39,11 +52,6 @@ kotlin {
                 api(libs.kotlinx.coroutines.core)
 
                 implementation(projects.app.model.qif)
-                implementation(projects.app.model.rules)
-                implementation(projects.utils.bigdecimal)
-                implementation(projects.utils.parsers.csv)
-                implementation(projects.utils.parsers.qif)
-                implementation(projects.utils.parsers.xlsx)
                 implementation(libs.kermit.core)
 
                 // Provider is resolved at runtime via CryptographyProvider.Default (no compile usage).
@@ -56,11 +64,6 @@ kotlin {
                 api(projects.app.importfilesource.core)
                 api(libs.kotlinx.coroutines.core)
 
-                implementation(projects.app.model.rules)
-                implementation(projects.utils.bigdecimal)
-                implementation(projects.utils.parsers.csv)
-                implementation(projects.utils.parsers.qif)
-                implementation(projects.utils.parsers.xlsx)
                 implementation(libs.kermit.core)
 
                 runtimeOnly(libs.cryptography.provider.jdk)

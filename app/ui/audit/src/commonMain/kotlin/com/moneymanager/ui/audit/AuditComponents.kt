@@ -268,6 +268,7 @@ private fun PlatformOriginRows(
     val platform =
         when (deviceInfo) {
             is DeviceInfo.Jvm -> " (Desktop)"
+            is DeviceInfo.Native -> " (CLI)"
             is DeviceInfo.Android -> " (Android)"
             null -> ""
         }
@@ -281,7 +282,7 @@ private fun DeviceInfoRows(
     labelWidth: Dp,
 ) {
     when (deviceInfo) {
-        is DeviceInfo.Jvm -> {
+        is DeviceInfo.Host -> {
             FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
             FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
         }

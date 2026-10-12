@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     id("moneymanager.pure-importer-convention")
 }
 
@@ -15,17 +16,18 @@ kotlin {
                 api(projects.app.model.repository.read)
                 api(projects.app.model.repository.write)
 
+                implementation(projects.app.model.accountmapping)
+                implementation(projects.app.model.apistrategy)
+                implementation(projects.app.model.csvstrategy)
+                implementation(projects.app.model.importdirectory)
+                implementation(projects.app.model.reconciliation)
+                implementation(projects.utils.bigdecimal)
                 implementation(libs.kotlinx.coroutines.core)
             }
         }
 
         getByName("androidMain") {
             dependencies {
-                implementation(projects.app.model.accountmapping)
-                implementation(projects.app.model.apistrategy)
-                implementation(projects.app.model.csvstrategy)
-                implementation(projects.app.model.importdirectory)
-                implementation(projects.app.model.reconciliation)
                 implementation(projects.utils.bigdecimal)
             }
         }
@@ -38,12 +40,7 @@ kotlin {
                 api(projects.app.model.repository.read)
                 api(projects.app.model.repository.write)
 
-                implementation(projects.app.model.accountmapping)
-                implementation(projects.app.model.apistrategy)
-                implementation(projects.app.model.csvstrategy)
-                implementation(projects.app.model.importdirectory)
                 implementation(projects.app.model.passthrough)
-                implementation(projects.app.model.reconciliation)
                 implementation(projects.utils.bigdecimal)
             }
         }

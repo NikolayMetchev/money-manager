@@ -106,7 +106,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
     }
 
     @Test
-    fun `imports a cross-asset trade, a deposit and auto-creates crypto assets, idempotently`() =
+    fun `imports a cross-asset trade - a deposit and auto-creates crypto assets - idempotently`() =
         runTest {
             stageSessionAndImport()
 

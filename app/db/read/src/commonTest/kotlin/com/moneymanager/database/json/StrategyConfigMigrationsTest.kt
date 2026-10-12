@@ -56,7 +56,7 @@ class StrategyConfigMigrationsTest {
 
 class SharedRulesMigrationTest {
     @Test
-    fun `v0 csv conditions, content rules, value columns and asset aliases decode onto the shared rules`() {
+    fun `v0 csv conditions - content rules - value columns and asset aliases decode onto the shared rules`() {
         val legacy =
             """
             {
@@ -124,7 +124,7 @@ class SharedRulesMigrationTest {
     }
 
     @Test
-    fun `v0 api predicates, exclusions, declines and asset rules decode onto the shared rules`() {
+    fun `v0 api predicates - exclusions - declines and asset rules decode onto the shared rules`() {
         val legacyMappings =
             """
             {
@@ -422,7 +422,7 @@ class LegGroupsAndFeesMigrationTest {
     private val csvPackage = "com.moneymanager.domain.model.csvstrategy"
 
     @Test
-    fun `conversion and trade-group configs become leg rules, conversion first`() {
+    fun `conversion and trade-group configs become leg rules - conversion first`() {
         val legacy =
             """
             {

@@ -2425,7 +2425,7 @@ internal fun responseCodeOk(
         }
     if (errorArrayField != null) {
         val errors = root.resolveJsonPathElement(errorArrayField) as? JsonArray
-        if (errors != null && errors.isNotEmpty()) return false
+        if (!errors.isNullOrEmpty()) return false
     }
     if (successCodeField == null) return true
     // Fail closed: a configured status field with no expected value must never pass (an absent code

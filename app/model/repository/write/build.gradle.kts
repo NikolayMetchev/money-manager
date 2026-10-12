@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
 }
 
 // Write repository interfaces. Only the ImportEngine — and the DI wiring that builds it — may depend on this.

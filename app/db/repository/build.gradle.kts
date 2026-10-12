@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
 }
 
 // The read repository implementations. Split from :app:db:read — which owns the generated SQL, the
@@ -20,18 +21,20 @@ kotlin {
                 api(projects.app.model.importdirectory)
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
+                api(projects.app.model.reconciliation)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
                 api(libs.kotlinx.coroutines.core)
 
                 implementation(projects.utils.bigdecimal)
+                implementation(libs.kotlinx.serialization.core)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.sqldelight.coroutines.extensions)
+                implementation(libs.sqldelight.runtime)
             }
         }
         getByName("androidMain") {
             dependencies {
-                api(projects.app.model.reconciliation)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.sqldelight.runtime)
             }

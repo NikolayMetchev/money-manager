@@ -76,7 +76,7 @@ class SantanderQifMapperTest {
     }
 
     @Test
-    fun `direct debit extracts payee, reference and mandate`() {
+    fun `direct debit extracts payee - reference and mandate`() {
         val r = map("DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013, 1352.23", "-1352.23")
         assertEquals("AMERICAN EXPRESS", newTargetName(r))
         assertEquals("DIRECT_DEBIT", r.attrs()["santander-transaction-type"])
@@ -110,7 +110,7 @@ class SantanderQifMapperTest {
     }
 
     @Test
-    fun `bank giro credit extracts reference as counterparty (not a person)`() {
+    fun `bank giro credit extracts reference as counterparty - not a person`() {
         val r = map("BANK GIRO CREDIT REF HMRC CHILD BENEFIT, METCHEVNIKOL850001, 84.60", "84.60")
         assertEquals("HMRC CHILD BENEFIT", newTargetName(r))
         assertEquals("BANK_GIRO_CREDIT", r.attrs()["santander-transaction-type"])

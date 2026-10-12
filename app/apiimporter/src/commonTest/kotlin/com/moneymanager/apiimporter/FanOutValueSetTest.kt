@@ -15,7 +15,7 @@ class FanOutValueSetTest {
     private fun obj(vararg pairs: Pair<String, String>): JsonObject = buildJsonObject { pairs.forEach { (k, v) -> put(k, v) } }
 
     @Test
-    fun `static values pass through, uppercased and blank-filtered`() {
+    fun `static values pass through - uppercased and blank-filtered`() {
         val result = resolveValueSet(ApiValueSet.Static(listOf("usdt", "", "btc")), emptyMap(), emptyMap())
         assertEquals(listOf("USDT", "BTC"), result)
     }
@@ -46,7 +46,7 @@ class FanOutValueSetTest {
     }
 
     @Test
-    fun `from-data-endpoint reads several fields per item, unioned`() {
+    fun `from-data-endpoint reads several fields per item - unioned`() {
         val data =
             mapOf(
                 "convert" to listOf(obj("fromAsset" to "usdt", "toAsset" to "bnb")),

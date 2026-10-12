@@ -8,16 +8,31 @@ sealed interface DeviceInfo {
     val platform: Platform
 
     /**
-     * Device info for JVM desktop applications.
+     * A desktop host, identified by its OS and machine name. The desktop app and the native CLI both run
+     * on one, so they share how a device row is stored and only differ in [platform].
      *
      * @property osName Operating system name (e.g., "Windows 11", "macOS 14.0", "Linux")
      * @property machineName Hostname of the machine
      */
+    sealed interface Host : DeviceInfo {
+        val osName: String
+        val machineName: String
+    }
+
+    /** Device info for the JVM desktop application. */
     data class Jvm(
-        val osName: String,
-        val machineName: String,
-    ) : DeviceInfo {
+        override val osName: String,
+        override val machineName: String,
+    ) : Host {
         override val platform: Platform = Platform.JVM
+    }
+
+    /** Device info for the Kotlin/Native command-line client. */
+    data class Native(
+        override val osName: String,
+        override val machineName: String,
+    ) : Host {
+        override val platform: Platform = Platform.NATIVE
     }
 
     /**

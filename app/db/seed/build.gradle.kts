@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     alias(libs.plugins.sqldelight)
 }
 
@@ -26,6 +27,9 @@ kotlin {
 // fire their audit triggers exactly as the old runtime seeding did. Built-in strategies are no longer
 // seeded: they live in the strategy-library/ catalog and are installed on demand from the UI.
 sqldelight {
+    // Native binaries link the SQLite bundled by :utils:sqlite3; the Kotlin/Native sysroots have no system
+    // libsqlite3 for the plugin's default -lsqlite3 to find.
+    linkSqlite.set(false)
     databases {
         create("MoneyManagerDatabase") {
             packageName.set("com.moneymanager.database.sql.seed")

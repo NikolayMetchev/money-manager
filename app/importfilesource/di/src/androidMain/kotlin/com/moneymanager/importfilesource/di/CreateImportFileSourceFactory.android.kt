@@ -16,8 +16,6 @@ actual fun createImportFileSourceFactory(
     vault: CredentialVault,
 ): ImportFileSourceFactory =
     object : ImportFileSourceFactory {
-        override fun supportsProvider(provider: ImportDirectoryProvider): Boolean = true
-
         override suspend fun create(directory: ImportDirectory): ImportFileSource =
             when (directory.provider) {
                 ImportDirectoryProvider.LOCAL ->

@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -24,11 +25,22 @@ kotlin {
                 api(projects.app.model.timeline)
                 api(projects.utils.currency)
                 api(libs.kotlinx.coroutines.core)
+                api(libs.kotlinx.io.core)
 
+                implementation(projects.app.db.seed)
                 implementation(projects.app.importer)
                 implementation(projects.utils.bigdecimal)
+                implementation(projects.utils.files)
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.json)
+            }
+        }
+
+        nativeMain {
+            dependencies {
+                // Links the bundled SQLite into every native binary; the driver only binds its C API.
+                implementation(projects.utils.sqlite3)
+                implementation(libs.sqldelight.native.driver)
             }
         }
 
@@ -70,7 +82,6 @@ kotlin {
                 api(libs.sqldelight.jdbc.driver)
                 api(libs.sqldelight.runtime)
 
-                implementation(projects.app.db.seed)
                 implementation(projects.app.model.rules)
 
                 // No longer used directly (CachingJdbcSqliteDriver replaces JdbcSqliteDriver), but it
@@ -95,7 +106,6 @@ kotlin {
                 api(libs.kotlinx.serialization.core)
                 api(libs.sqldelight.runtime)
 
-                implementation(projects.app.db.seed)
                 implementation(projects.app.model.rules)
                 implementation(libs.androidx.sqlite)
                 implementation(libs.sqldelight.android.driver)

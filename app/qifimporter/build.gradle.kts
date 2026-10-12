@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     id("moneymanager.pure-importer-convention")
 }
 
@@ -17,7 +18,10 @@ kotlin {
                 api(projects.app.model.qif)
                 api(projects.app.model.repository.read)
 
+                implementation(projects.app.model.rules)
                 implementation(libs.kermit)
+                implementation(libs.kermit.core)
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
 
@@ -32,7 +36,6 @@ kotlin {
                 api(projects.app.model.qif)
                 api(projects.app.model.repository.read)
 
-                implementation(projects.app.model.rules)
                 implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
             }
@@ -40,7 +43,6 @@ kotlin {
 
         getByName("androidMain") {
             dependencies {
-                implementation(projects.app.model.rules)
                 implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
             }

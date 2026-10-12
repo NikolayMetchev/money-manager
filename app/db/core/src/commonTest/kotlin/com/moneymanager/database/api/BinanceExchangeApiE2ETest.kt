@@ -237,7 +237,7 @@ class BinanceExchangeApiE2ETest : DbTest() {
     }
 
     @Test
-    fun `imports status-filtered transfers, both fiat_orders endpoints, fixed-side trades and fan-out spot trades, idempotently`() =
+    fun `imports status-filtered transfers - both fiat_orders endpoints - fixed-side trades and fan-out spot trades - idempotently`() =
         runTest {
             stageSessionAndImport()
 
@@ -360,7 +360,7 @@ class BinanceExchangeApiE2ETest : DbTest() {
             ).first()
 
     @Test
-    fun `imports Simple Earn principal and rewards, dust conversions, distributions and wallet transfers`() =
+    fun `imports Simple Earn principal and rewards - dust conversions - distributions and wallet transfers`() =
         runTest {
             stageSessionAndImport()
 

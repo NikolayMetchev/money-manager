@@ -953,7 +953,7 @@ suspend fun computeUnidentifiedCounterpartyReruns(
  * Only rows for which an unconsumed funding leg actually exists (same funding account → conduit, same
  * amount+currency within [CsvStrategyConfig.crossSourceReconcileWindowSeconds]) are returned, so rows
  * whose funder was never imported don't get reset on every re-import. Consumes each funding leg once
- * (nearest timestamp), matching the engine's [com.moneymanager.importer] funding-reconcile so the
+ * (nearest timestamp), matching the engine's (`app/importer`) funding-reconcile so the
  * plan and the re-run agree on which rows will link.
  *
  * NB: does not exclude funding legs already consumed by a PRE-EXISTING reconcile (needs a bulk
