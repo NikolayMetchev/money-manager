@@ -11,10 +11,10 @@ import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.test.database.copyDatabaseFromResources
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.test.MoneyManagerTestApp
+import com.moneymanager.ui.test.copyDatabaseFromResources
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.AfterTest
 import kotlin.test.Test

@@ -1,31 +1,5 @@
-import org.gradle.work.DisableCachingByDefault
-
 plugins {
     id("moneymanager.android-application-convention")
-}
-
-/**
- * Writes the project VERSION file into a generated assets directory, so the app can read it at runtime
- * (VersionReader). Registered through the variant API below, which wires the task in front of every
- * consumer of the assets — no dependsOn on AGP's internal tasks, and nothing written into src/.
- */
-@DisableCachingByDefault(because = "Copying one small file is cheaper than a cache round-trip")
-abstract class GenerateVersionAsset : DefaultTask() {
-    @get:InputFile
-    @get:PathSensitive(PathSensitivity.NONE)
-    abstract val versionFile: RegularFileProperty
-
-    @get:OutputDirectory
-    abstract val outputDirectory: DirectoryProperty
-
-    @TaskAction
-    fun generate() {
-        outputDirectory
-            .file("VERSION")
-            .get()
-            .asFile
-            .writeText(versionFile.get().asFile.readText())
-    }
 }
 
 android {
@@ -35,19 +9,6 @@ android {
         applicationId = "com.moneymanager"
         versionCode = 1
         versionName = "1.0.0"
-    }
-}
-
-val generateVersionAsset =
-    tasks.register<GenerateVersionAsset>("generateVersionAsset") {
-        group = "build"
-        description = "Copies the project VERSION file into the app's generated assets."
-        versionFile.set(layout.settingsDirectory.file("VERSION"))
-    }
-
-androidComponents {
-    onVariants { variant ->
-        variant.sources.assets?.addGeneratedSourceDirectory(generateVersionAsset, GenerateVersionAsset::outputDirectory)
     }
 }
 

@@ -12,5 +12,5 @@ import dev.zacsweers.metro.SingleIn
 object AppVersionModule {
     @Provides
     @SingleIn(AppScope::class)
-    fun provideAppVersion(): AppVersion = readAppVersion()
+    fun provideAppVersion(): AppVersion = AppVersion(GeneratedAppVersion.VERSION)
 }

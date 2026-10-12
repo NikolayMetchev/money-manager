@@ -5,10 +5,9 @@ plugins {
 }
 
 // Bundled offline crypto catalog (ticker -> display name), plus a network refresh service.
-// The catalog and refresh run identically on JVM and Android from a single jvmAndroidMain source set
-// (the resource loader uses classpath IO available on both; the refresh uses the shared Ktor client).
-// The large `coins.tsv` dataset lives once under src/commonResources and is wired onto each platform's
-// runtime resources below. Depends on :app:model:core for CryptoCatalog/CryptoRegistry.Entry — never
+// The catalog is common code: the checked-in `data/coins.tsv` is compiled in as a generated constant
+// (generateBundledCryptoDataset below), so no platform loads it as a resource. The refresh service uses
+// the shared Ktor client from jvmAndroidMain. Depends on :app:model:core for CryptoCatalog/CryptoRegistry.Entry — never
 // the reverse (model:core stays pure-domain and dependency-free of this module).
 //
 // buildHealth (KMP quirk): ABI deps used by jvmAndroidMain must be declared `api` on each real platform
@@ -34,7 +33,6 @@ kotlin {
         }
 
         jvmMain {
-            resources.srcDir("src/commonResources")
             dependencies {
                 api(projects.app.model.core)
                 api(libs.ktor.client.core)
@@ -45,7 +43,6 @@ kotlin {
         }
 
         androidMain {
-            resources.srcDir("src/commonResources")
             dependencies {
                 api(projects.app.model.core)
                 api(libs.ktor.client.core)
@@ -62,4 +59,16 @@ kotlin {
             }
         }
     }
+}
+
+val generateBundledCryptoDataset =
+    tasks.register<GenerateKotlinConstantsTask>("generateBundledCryptoDataset") {
+        description = "Compiles data/coins.tsv into the bundled crypto catalog constant."
+        packageName.set("com.moneymanager.cryptodata")
+        objectName.set("GeneratedCryptoDataset")
+        constants.put("COINS_TSV", providers.fileContents(layout.projectDirectory.file("data/coins.tsv")).asText)
+    }
+
+kotlin.sourceSets.named("commonMain") {
+    kotlin.srcDir(generateBundledCryptoDataset)
 }

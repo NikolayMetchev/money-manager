@@ -1,4 +1,4 @@
-package com.moneymanager.test.database
+package com.moneymanager.ui.test
 
 import com.moneymanager.domain.model.DbLocation
 import java.nio.file.Files

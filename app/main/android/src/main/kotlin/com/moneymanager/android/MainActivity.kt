@@ -15,7 +15,6 @@ import com.moneymanager.database.di.createImportEngine
 import com.moneymanager.database.di.toApplication
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.AppComponent
-import com.moneymanager.di.initializeVersionReader
 import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.importengineapi.EditingLockedException
 import com.moneymanager.importfilesource.di.createDriveFolderBrowser
@@ -93,7 +92,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        initializeVersionReader(applicationContext)
         // Install the bundled crypto-asset name catalog (+ any refreshed layer) before imports run.
         // This auxiliary feature must not take down the app, so a failure is logged rather than propagated.
         runCatching {

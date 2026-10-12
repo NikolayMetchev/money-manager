@@ -5,7 +5,7 @@ plugins {
 }
 
 // JVM maintainer tool that regenerates the bundled crypto catalog checked in at
-// app/cryptodata/src/commonResources/crypto/coins.tsv. It fetches CoinGecko's coin list (long tail) and
+// app/cryptodata/data/coins.tsv. It fetches CoinGecko's coin list (long tail) and
 // top coins by market cap (canonical names for colliding tickers), de-duplicates by symbol with the
 // ranked names winning, and writes the TSV via the shared renderCryptoDataset. Run manually / on a
 // schedule — NOT part of the app build, so offline builds stay reproducible from the checked-in file.
@@ -24,9 +24,9 @@ dependencies {
 
 tasks.register<JavaExec>("generateCryptoDataset") {
     group = "build"
-    description = "Regenerates app/cryptodata/src/commonResources/crypto/coins.tsv from CoinGecko."
+    description = "Regenerates app/cryptodata/data/coins.tsv from CoinGecko."
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass.set("com.moneymanager.tools.cryptodataset.CryptoDatasetToolKt")
-    val output = rootDir.resolve("app/cryptodata/src/commonResources/crypto/coins.tsv").absolutePath
+    val output = rootDir.resolve("app/cryptodata/data/coins.tsv").absolutePath
     args(output)
 }
