@@ -5,9 +5,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.localsettings.JvmLocalSettings
 import com.moneymanager.localsettings.KEY_LAST_DIRECTORY
 import com.moneymanager.localsettings.LocalSettings
+import com.moneymanager.localsettings.desktopLocalSettings
 import kotlinx.coroutines.launch
 import java.awt.FileDialog
 import java.awt.Frame
@@ -71,7 +71,7 @@ actual fun rememberDatabaseLocationPicker(onResult: (DbLocation?) -> Unit): Data
     return remember(onResult) {
         DatabaseLocationPickerLauncher(
             onResult = { result -> scope.launch { onResult(result) } },
-            localSettings = JvmLocalSettings(),
+            localSettings = desktopLocalSettings,
         )
     }
 }
