@@ -1,4 +1,3 @@
-import org.jetbrains.kotlin.gradle.plugin.getKotlinPluginVersion
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.CInteropProcess
 
@@ -50,10 +49,7 @@ kotlin {
                 description = "Compiles the SQLite amalgamation into a static library for ${target.name}."
                 amalgamationDirectory.set(downloadSqliteAmalgamation.flatMap { it.outputDirectory })
                 konanTarget.set(target.konanTarget.name)
-                kotlinVersion.set(getKotlinPluginVersion())
                 defines.set(sqliteDefines)
-                konanHome.set(kotlinNativeHome())
-                konanDataDir.set(kotlinNativeDataDir())
                 outputDirectory.set(libraryDirectory)
                 // KGP unpacks the Kotlin/Native distribution only when a native task first needs it; the
                 // commonizer is one that this module's cinterop (and so this task) doesn't feed.

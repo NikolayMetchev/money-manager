@@ -11,6 +11,7 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecOperations
+import org.jetbrains.kotlin.gradle.plugin.getKotlinPluginVersion
 import java.io.File
 import javax.inject.Inject
 
@@ -63,6 +64,12 @@ abstract class CompileBundledSqliteTask
 
         @get:OutputDirectory
         abstract val outputDirectory: DirectoryProperty
+
+        init {
+            kotlinVersion.convention(project.getKotlinPluginVersion())
+            konanHome.convention(project.kotlinNativeHome())
+            konanDataDir.convention(project.kotlinNativeDataDir())
+        }
 
         @TaskAction
         fun compile() {
