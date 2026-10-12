@@ -241,7 +241,7 @@ class ImportEngineImpl(
                     intent.toAccountId,
                     intent.toAmount,
                 )
-            val occurrence = tradeOccurrences.getOrDefault(tupleKey, 0)
+            val occurrence = tradeOccurrences[tupleKey] ?: 0
             val tradeResult =
                 tradeRepository.createTrade(
                     timestamp = requireNotNull(intent.timestamp),
@@ -654,7 +654,7 @@ class ImportEngineImpl(
             val (from, to) = if (conversion.incoming) amount to conversion.settled else conversion.settled to amount
             // Keyed on the persisted millisecond, as createTrade matches on it (see the leg-group trade loop).
             val key = listOf(timestamp.toEpochMilliseconds(), account, from, to)
-            val occurrence = occurrences.getOrDefault(key, 0)
+            val occurrence = occurrences[key] ?: 0
             occurrences[key] = occurrence + 1
             val trade =
                 tradeRepository.createTrade(
@@ -860,7 +860,7 @@ class ImportEngineImpl(
             // same-batch intent asking for the same name (e.g. a second external id for the same
             // merchant) must find this account even when resolvedName was suffixed to dodge a
             // pre-existing account's UNIQUE collision.
-            batchCreatedByName.putIfAbsent(requestedName, newId)
+            batchCreatedByName.getOrPut(requestedName) { newId }
         }
         return AccountResolution(keyToId, created)
     }

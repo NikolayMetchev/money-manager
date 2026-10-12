@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     id("moneymanager.pure-importer-convention")
 }
 
@@ -15,10 +16,14 @@ kotlin {
                 api(projects.app.model.passthrough)
                 api(projects.app.model.repository.read)
                 api(projects.utils.rest)
+                api(libs.kotlinx.serialization.json)
 
+                implementation(projects.app.model.rules)
+                implementation(projects.utils.bigdecimal)
                 implementation(libs.kermit)
+                implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.kotlinx.serialization.json)
+                implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.http)
             }
         }
@@ -34,7 +39,6 @@ kotlin {
                 api(libs.kotlinx.serialization.json)
 
                 implementation(projects.app.model.csv)
-                implementation(projects.app.model.rules)
                 implementation(projects.utils.bigdecimal)
                 implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
@@ -47,7 +51,6 @@ kotlin {
             dependencies {
                 api(libs.kotlinx.serialization.json)
 
-                implementation(projects.app.model.rules)
                 implementation(projects.utils.bigdecimal)
                 implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)

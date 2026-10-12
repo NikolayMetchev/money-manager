@@ -46,7 +46,7 @@ class StrategyLibraryServiceTest : DbTest() {
     private val version = AppVersion("test")
 
     @Test
-    fun `csv strategy round-trips with its per-strategy account mapping, keyed by name (no duplicates)`() =
+    fun `csv strategy round-trips with its per-strategy account mapping - keyed by name - no duplicates`() =
         runTest {
             val library = repositories.strategyLibrary
             val engine = repositories.importEngine
@@ -94,7 +94,7 @@ class StrategyLibraryServiceTest : DbTest() {
         }
 
     @Test
-    fun `a QIF strategy is classified as QIF, a plain one as CSV`() =
+    fun `a QIF strategy is classified as QIF - a plain one as CSV`() =
         runTest {
             val engine = repositories.importEngine
             val now = Clock.System.now()
@@ -186,7 +186,7 @@ class StrategyLibraryServiceTest : DbTest() {
         }
 
     @Test
-    fun `currency list lists seeded currencies, skips user-created ones, and installs only missing codes`() =
+    fun `currency list lists seeded currencies - skips user-created ones - and installs only missing codes`() =
         runTest {
             val library = repositories.strategyLibrary
             val engine = repositories.importEngine

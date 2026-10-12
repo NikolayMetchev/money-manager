@@ -1,0 +1,7 @@
+# Links the bundled SQLite (built by CompileBundledSqliteTask) into this klib, so every native binary that
+# depends on :utils:sqlite3 carries SQLite statically. SQLDelight's native driver (SQLiter) only binds the
+# sqlite3 C API and leaves linking it to the app, and the Kotlin/Native sysroots have no libsqlite3.
+#
+# No headers: SQLiter already binds the API, so this klib declares nothing in Kotlin. The library itself is
+# passed per target from build.gradle.kts, and only where the host can build it.
+package = com.moneymanager.sqlite3

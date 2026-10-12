@@ -106,7 +106,7 @@ class KrakenReimportE2ETest : DbTest() {
     }
 
     @Test
-    fun `re-import rewrites a withdrawal onto a bridge configured after the fact, excluding the pre-existing bank leg`() =
+    fun `re-import rewrites a withdrawal onto a bridge configured after the fact - excluding the pre-existing bank leg`() =
         runTest {
             val sessionId = stageAndImport()
 

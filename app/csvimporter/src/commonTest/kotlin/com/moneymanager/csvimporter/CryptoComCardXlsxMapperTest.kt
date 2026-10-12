@@ -112,7 +112,7 @@ class CryptoComCardXlsxMapperTest {
     }
 
     @Test
-    fun `identification columns match the real workbook headers, including the trailing space`() {
+    fun `identification columns match the real workbook headers - including the trailing space`() {
         assertEquals(columns.map { it.originalName }.toSet(), strategy.config.identificationColumns)
     }
 
@@ -139,7 +139,7 @@ class CryptoComCardXlsxMapperTest {
     }
 
     @Test
-    fun `a CRV_ card acceptor name is routed through the Curve pass-through, not a raw junk account`() {
+    fun `a CRV_ card acceptor name is routed through the Curve pass-through - not a raw junk account`() {
         val r =
             map(
                 row(
@@ -162,7 +162,7 @@ class CryptoComCardXlsxMapperTest {
     }
 
     @Test
-    fun `a blank card acceptor name routes to the top-up placeholder, not a blank account`() {
+    fun `a blank card acceptor name routes to the top-up placeholder - not a blank account`() {
         val r =
             map(
                 row(
@@ -184,7 +184,7 @@ class CryptoComCardXlsxMapperTest {
     }
 
     @Test
-    fun `a positive card load credits the card from the top-up placeholder, not a merchant lookup`() {
+    fun `a positive card load credits the card from the top-up placeholder - not a merchant lookup`() {
         val r =
             map(
                 row(

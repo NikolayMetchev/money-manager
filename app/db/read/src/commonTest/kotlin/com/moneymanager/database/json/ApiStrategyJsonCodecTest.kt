@@ -169,7 +169,7 @@ class ApiStrategyJsonCodecTest {
     }
 
     @Test
-    fun `kraken-shaped keyed-object, offset paging, enrichment and asset aliases round-trip`() {
+    fun `kraken-shaped keyed-object - offset paging - enrichment and asset aliases round-trip`() {
         val original =
             config(null).copy(
                 requestSigning =
@@ -279,7 +279,7 @@ class ApiStrategyJsonCodecTest {
     }
 
     @Test
-    fun `nested items, fixed trade assets and a composite transfer id round-trip`() {
+    fun `nested items - fixed trade assets and a composite transfer id round-trip`() {
         val original =
             config(null).copy(
                 accounts = ApiAccountsSource.Single(name = "Binance", externalId = "binance"),

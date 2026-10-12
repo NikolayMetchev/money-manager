@@ -42,7 +42,7 @@ class JsonPrimitivesTest {
     }
 
     @Test
-    fun `error array check honors an empty or absent array as success (Kraken)`() {
+    fun `error array check honors an empty or absent array as success - Kraken`() {
         val ok = """{ "error": [], "result": { "trades": {} } }"""
         val okAbsent = """{ "result": { "trades": {} } }"""
         val bad = """{ "error": ["EGeneral:Invalid arguments"] }"""
@@ -92,7 +92,7 @@ class JsonPrimitivesTest {
     }
 
     @Test
-    fun `a nested items key flattens each container into its own rows, with resolvable audit paths`() {
+    fun `a nested items key flattens each container into its own rows - with resolvable audit paths`() {
         // Binance asset/dribblet: one conversion sweeps several small balances into BNB, and only the
         // nested detail rows carry the per-asset movement.
         val json =
@@ -127,7 +127,7 @@ class JsonPrimitivesTest {
     }
 
     @Test
-    fun `plain array items report no key, falling back to index paths`() {
+    fun `plain array items report no key - falling back to index paths`() {
         val json = """{ "trades": [ { "id": "T1" }, { "id": "T2" } ] }"""
         val items = responseItemsWithKeys(json, "trades")
         assertEquals(listOf<String?>(null, null), items?.map { (key, _) -> key })

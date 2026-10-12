@@ -215,7 +215,7 @@ class CryptoComCsvMapperTest {
     }
 
     @Test
-    fun `card spend in an unknown foreign currency is an error, not a silently mispriced row`() {
+    fun `card spend in an unknown foreign currency is an error - not a silently mispriced row`() {
         val result = mapper(cardStrategy).mapRow(row("Somewhere", "XYZ", "-3.97", "", "", "-3.03", ""))
         assertTrue(result is MappingResult.Error)
     }

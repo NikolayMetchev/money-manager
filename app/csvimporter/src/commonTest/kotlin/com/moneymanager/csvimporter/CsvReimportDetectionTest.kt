@@ -162,7 +162,7 @@ class CsvReimportDetectionTest {
     ) = CsvRow(rowIndex = index, values = listOf(date, description, amount, payee))
 
     @Test
-    fun `rows sharing one transaction at different instants are released, identical ones are not`() {
+    fun `rows sharing one transaction at different instants are released - identical ones are not`() {
         // A wallet export words every deposit the same, so two deposits hours apart differ only in their
         // timestamp — which the fuzzy pass tolerated, collapsing the second onto the first's transfer.
         // A row genuinely listed twice (same instant) stays a duplicate.
@@ -546,7 +546,7 @@ class CsvReimportDetectionTest {
         }
 
     @Test
-    fun `single-hop row is rewritten when the chain is now longer, deleting the old leg too`() =
+    fun `single-hop row is rewritten when the chain is now longer - deleting the old leg too`() =
         runTest {
             val paypal =
                 PassThroughAccount(
@@ -698,7 +698,7 @@ class CsvReimportDetectionTest {
         }
 
     @Test
-    fun `duplicate, unimported and already-converted rows are never trade-converted`() =
+    fun `duplicate - unimported and already-converted rows are never trade-converted`() =
         runTest {
             val rows =
                 listOf(

@@ -1,5 +1,6 @@
 plugins {
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     id("moneymanager.android-convention")
 }
 
@@ -12,9 +13,15 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.repository.write)
                 api(projects.app.strategies)
+                api(kotlin("test"))
 
                 implementation(projects.utils.currency)
                 implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+        nativeMain {
+            dependencies {
+                implementation(projects.utils.files)
             }
         }
         getByName("jvmMain") {

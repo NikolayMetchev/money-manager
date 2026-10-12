@@ -418,7 +418,7 @@ class CsvTransferMapper(
                         ),
                     )
                     // Count by status
-                    statusCounts[result.importStatus] = statusCounts.getOrDefault(result.importStatus, 0) + 1
+                    statusCounts[result.importStatus] = (statusCounts[result.importStatus] ?: 0) + 1
 
                     newAccounts.addAll(result.newAccounts)
                 }

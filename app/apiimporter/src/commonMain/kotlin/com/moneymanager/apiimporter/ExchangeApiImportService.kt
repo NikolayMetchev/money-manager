@@ -276,7 +276,7 @@ suspend fun downloadApiSessionExchange(
                             params
                         } else {
                             LinkedHashMap(params).apply {
-                                signedParams.forEach { p -> p.value?.let { putIfAbsent(p.name, it) } }
+                                signedParams.forEach { p -> p.value?.let { value -> getOrPut(p.name) { value } } }
                             }
                         }
                     val signed =

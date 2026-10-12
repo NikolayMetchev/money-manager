@@ -110,7 +110,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
     }
 
     @Test
-    fun `imports keyed-object trades and ledger transfers with asset-alias normalization and enrichment, idempotently`() =
+    fun `imports keyed-object trades and ledger transfers with asset-alias normalization and enrichment - idempotently`() =
         runTest {
             stageSessionAndImport()
 
@@ -176,7 +176,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
         }
 
     @Test
-    fun `a fiat withdrawal's WithdrawStatus enrichment books against the funding account, not a bogus wallet account`() =
+    fun `a fiat withdrawal's WithdrawStatus enrichment books against the funding account - not a bogus wallet account`() =
         runTest {
             // Real shape observed from Kraken's WithdrawStatus for a fiat withdrawal: "info" carries the
             // user's own bank-transfer label ("Monzo"), not a blockchain address — unlike the crypto case
@@ -614,7 +614,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
     // only below the millisecond (as Kraken's real ones do), so occurrence counting must group them by
     // the persisted ms value, not the full-precision Instant.
     @Test
-    fun `books each of several byte-identical fills as its own trade, but stays idempotent on re-import`() =
+    fun `books each of several byte-identical fills as its own trade - but stays idempotent on re-import`() =
         runTest {
             val trades =
                 """

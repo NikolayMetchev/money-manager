@@ -10,10 +10,15 @@ INSERT OR IGNORE INTO device_make (name) VALUES (?);
 insertOrIgnoreDeviceModel:
 INSERT OR IGNORE INTO device_model (name) VALUES (?);
 
--- Insert JVM device
-insertJvm:
+-- A database created before a platform existed lacks its row; adding it on first use keeps such a
+-- database usable from the newer client without a migration.
+insertOrIgnorePlatform:
+INSERT OR IGNORE INTO platform (id, name) VALUES (?, ?);
+
+-- Insert a host device (JVM desktop app or NATIVE CLI)
+insertHost:
 INSERT INTO device (platform_id, os_id, machine_id, device_make_id, device_model_id)
-VALUES (1, ?, ?, NULL, NULL);
+VALUES (?, ?, ?, NULL, NULL);
 
 -- Insert Android device
 insertAndroid:

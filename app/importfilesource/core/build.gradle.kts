@@ -1,5 +1,6 @@
 plugins {
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     id("moneymanager.android-convention")
 }
 
@@ -10,14 +11,14 @@ plugins {
 
 kotlin {
     sourceSets {
-        // KMP ABI deps are declared per platform source set for dependency-analysis.
-        jvmMain {
+        commonMain {
             dependencies {
                 api(projects.app.model.importdirectory)
             }
         }
 
-        androidMain {
+        // KMP ABI deps are declared per platform source set for dependency-analysis.
+        jvmMain {
             dependencies {
                 api(projects.app.model.importdirectory)
             }

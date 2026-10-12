@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.native-convention")
     id("moneymanager.pure-importer-convention")
 }
 
@@ -13,6 +14,7 @@ kotlin {
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
                 api(projects.app.model.reconciliation)
+                implementation(projects.utils.bigdecimal)
             }
         }
 
