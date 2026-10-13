@@ -23,6 +23,7 @@ kotlin {
                 api(projects.app.qifimporter)
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
+                api(projects.app.session)
                 api(projects.app.strategycatalog)
                 api(projects.app.ui.accounts)
                 api(projects.app.ui.categories)
@@ -38,7 +39,6 @@ kotlin {
                 api(projects.app.ui.people)
                 api(projects.app.ui.settings)
                 api(projects.app.ui.transactions)
-                api(projects.utils.localsettings)
                 api(projects.utils.rest)
                 api(libs.kotlinx.coroutines.core)
                 api(libs.kotlinx.serialization.json)
@@ -63,6 +63,7 @@ kotlin {
         }
         getByName("androidMain") {
             dependencies {
+                api(projects.app.db.di)
                 api(projects.app.db.write)
                 api(projects.app.model.reconciliation)
                 api(projects.utils.credentialvault)
@@ -73,7 +74,6 @@ kotlin {
                 api(libs.androidx.compose.ui.unit)
 
                 implementation(projects.app.model.apistrategy)
-                implementation(projects.app.model.repository.write)
                 implementation(projects.app.tasks)
                 implementation(libs.androidx.compose.animation)
                 implementation(libs.androidx.compose.material3)
@@ -92,26 +92,26 @@ kotlin {
         getByName("jvmMain") {
             dependencies {
                 api(projects.app.db.core)
+                api(projects.app.db.di)
                 api(projects.app.db.write)
                 api(projects.app.importengineapi)
                 api(projects.app.importfilesource.core)
                 api(projects.app.model.core)
-                api(projects.app.model.csvstrategy)
                 api(projects.app.model.importdirectory)
                 api(projects.app.model.reconciliation)
                 api(projects.app.model.repository.read)
                 api(projects.app.model.timeline)
                 api(projects.app.remotestorage.sync)
+                api(projects.app.session)
                 api(projects.app.strategycatalog)
                 api(projects.app.ui.foundation)
                 api(projects.utils.credentialvault)
-                api(projects.utils.localsettings)
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
 
                 implementation(projects.app.model.apistrategy)
+                implementation(projects.app.model.csvstrategy)
                 implementation(projects.app.model.passthrough)
-                implementation(projects.app.model.repository.write)
                 implementation(projects.app.remotestorage.core)
                 implementation(projects.app.tasks)
                 implementation(libs.androidx.compose.runtime.annotation)

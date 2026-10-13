@@ -357,10 +357,12 @@ class StrategySyncController(
         provider: RemoteStorageProvider,
         files: Collection<RemoteFile>,
     ): RemoteContents {
+        // Downloads suspend rather than block (Ktor), so Default is enough to run them all at once, and
+        // common code can't name Dispatchers.IO on native.
         val bodies =
             coroutineScope {
                 files
-                    .map { file -> async(Dispatchers.IO) { file.id to provider.download(file.id).decodeToString() } }
+                    .map { file -> async(Dispatchers.Default) { file.id to provider.download(file.id).decodeToString() } }
                     .awaitAll()
                     .toMap()
             }

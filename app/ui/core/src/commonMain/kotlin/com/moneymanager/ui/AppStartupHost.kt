@@ -31,12 +31,13 @@ import com.moneymanager.domain.model.CryptoCatalogRefresher
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
-import com.moneymanager.localsettings.KEY_LAST_DATABASE
-import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.RemoteAuthException
 import com.moneymanager.remotestorage.sync.CredentialSyncController
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
+import com.moneymanager.session.DatabaseSession
+import com.moneymanager.session.DatabaseSessions
+import com.moneymanager.session.StartupTarget
 import com.moneymanager.strategycatalog.StrategyCatalogController
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.DatabaseProgressScreen
@@ -59,10 +60,11 @@ private sealed class AppDatabaseState {
     ) : AppDatabaseState()
 
     data class Loaded(
-        val location: DbLocation,
-        val services: AppServices,
-        val database: MoneyManagerDatabaseWrapper,
-    ) : AppDatabaseState()
+        val session: DatabaseSession,
+    ) : AppDatabaseState() {
+        val location: DbLocation get() = session.location
+        val database: MoneyManagerDatabaseWrapper get() = session.database
+    }
 
     data class Error(
         val location: DbLocation,
@@ -89,8 +91,7 @@ private fun initialDatabaseProgress() = Progress.counted("Finding the default da
 fun AppStartupHost(
     databaseManager: DatabaseManager,
     appVersion: AppVersion,
-    localSettings: LocalSettings,
-    createAppServices: (MoneyManagerDatabaseWrapper) -> AppServices,
+    sessions: DatabaseSessions,
     onInfoLog: (String) -> Unit,
     onErrorLog: (String, Throwable) -> Unit,
     remoteController: RemoteDatabaseController? = null,
@@ -111,8 +112,7 @@ fun AppStartupHost(
         AppStartupContent(
             databaseManager = databaseManager,
             appVersion = appVersion,
-            localSettings = localSettings,
-            createAppServices = createAppServices,
+            sessions = sessions,
             onInfoLog = onInfoLog,
             onErrorLog = onErrorLog,
             remoteController = remoteController,
@@ -121,7 +121,6 @@ fun AppStartupHost(
             importFileSourceFactory = importFileSourceFactory,
             driveFolderBrowser = driveFolderBrowser,
             cryptoCatalogRefresher = cryptoCatalogRefresher,
-            credentialVault = vault,
             onDatabaseReady = onDatabaseReady,
         )
         // Mounted over every startup state, so a secret needed before a database is open (restoring a
@@ -135,8 +134,7 @@ fun AppStartupHost(
 private fun AppStartupContent(
     databaseManager: DatabaseManager,
     appVersion: AppVersion,
-    localSettings: LocalSettings,
-    createAppServices: (MoneyManagerDatabaseWrapper) -> AppServices,
+    sessions: DatabaseSessions,
     onInfoLog: (String) -> Unit,
     onErrorLog: (String, Throwable) -> Unit,
     remoteController: RemoteDatabaseController?,
@@ -145,7 +143,6 @@ private fun AppStartupContent(
     importFileSourceFactory: ImportFileSourceFactory?,
     driveFolderBrowser: DriveFolderBrowser?,
     cryptoCatalogRefresher: CryptoCatalogRefresher?,
-    credentialVault: CredentialVault,
     onDatabaseReady: (MoneyManagerDatabaseWrapper?, DbLocation?) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -153,63 +150,33 @@ private fun AppStartupContent(
     var switchError by remember { mutableStateOf<Pair<DbLocation, Throwable>?>(null) }
     var remoteUnlock by remember { mutableStateOf<RemoteUnlockState?>(null) }
 
-    LaunchedEffect(Unit) {
-        val binding = remoteController?.activeBinding()
-        // Bind the vault to the database we expect to open before opening anything, since restoring a
-        // cloud-backed database already needs the Google sign-in it holds.
-        credentialVault.bindToDatabase(
-            binding?.localCachePath
-                ?: localSettings.getString(KEY_LAST_DATABASE)
-                ?: databaseManager.getDefaultLocation().toString(),
+    suspend fun load(
+        location: DbLocation,
+        remoteCache: Boolean = false,
+    ): Throwable? =
+        openAndLoad(
+            location = location,
+            remoteCache = remoteCache,
+            sessions = sessions,
+            databaseStateUpdater = { databaseState = it },
+            onErrorLog = onErrorLog,
         )
-        if (binding != null) {
-            // If the working copy was kept on the previous close, open it directly: no password, no
-            // download, no network. The remote is only touched at close, and only to upload changes.
-            val cacheLocation = DbLocation(binding.localCachePath)
-            if (databaseManager.databaseExists(cacheLocation)) {
-                val error =
-                    openAndLoad(
-                        location = cacheLocation,
-                        databaseManager = databaseManager,
-                        createAppServices = createAppServices,
-                        databaseStateUpdater = { databaseState = it },
-                        onInfoLog = onInfoLog,
-                        onErrorLog = onErrorLog,
-                    )
-                if (error == null) {
-                    // Seed the dirty baseline from the persisted binding so the close dialog can tell
-                    // whether the local copy changed since its last upload.
-                    (databaseState as? AppDatabaseState.Loaded)?.database?.let { remoteController.adoptLocalCache(it) }
-                    localSettings.putString(KEY_LAST_DATABASE, cacheLocation.toString())
-                    return@LaunchedEffect
+
+    LaunchedEffect(Unit) {
+        when (val target = sessions.resolveStartup()) {
+            is StartupTarget.Open -> {
+                val error = load(target.location, target.remoteCache)
+                // The kept working copy is unusable (corrupt/unreadable): recover from the encrypted remote copy.
+                val binding = remoteController?.activeBinding()
+                if (error != null && target.remoteCache && binding != null) {
+                    remoteUnlock = RemoteUnlockState(prompt = "Unlock “${binding.remoteName}” from cloud storage")
                 }
-                // The kept copy is unusable (corrupt/unreadable). Fall through to the remote restore below
-                // so a cloud-backed DB can still recover from the encrypted remote copy.
             }
-            // No (usable) local copy — first run on this device, the user chose not to keep it, or the kept
-            // copy failed to open: the encrypted remote copy is all we have, so restore it, which requires
-            // the user's password first.
-            remoteUnlock = RemoteUnlockState(prompt = "Unlock “${binding.remoteName}” from cloud storage")
-            return@LaunchedEffect
-        }
-        // A corrupted persisted value (e.g. an invalid path) doesn't exist, so it's treated as absent.
-        val stored = localSettings.getString(KEY_LAST_DATABASE)?.let(::DbLocation)
-        if (stored == null || !databaseManager.databaseExists(stored)) {
-            // Fresh run: no valid remembered database and no remote binding → the user must choose one.
-            databaseState = AppDatabaseState.ChoosingDatabase
-            return@LaunchedEffect
-        }
-        val error =
-            openAndLoad(
-                location = stored,
-                databaseManager = databaseManager,
-                createAppServices = createAppServices,
-                databaseStateUpdater = { databaseState = it },
-                onInfoLog = onInfoLog,
-                onErrorLog = onErrorLog,
-            )
-        if (error == null) {
-            localSettings.putString(KEY_LAST_DATABASE, stored.toString())
+            // No (usable) local copy — first run on this device, or the user chose not to keep it: the
+            // encrypted remote copy is all we have, so restore it, which requires the user's password first.
+            is StartupTarget.NeedsRemoteUnlock ->
+                remoteUnlock = RemoteUnlockState(prompt = "Unlock “${target.binding.remoteName}” from cloud storage")
+            StartupTarget.ChooseDatabase -> databaseState = AppDatabaseState.ChoosingDatabase
         }
     }
 
@@ -233,17 +200,12 @@ private fun AppStartupContent(
     when (val state = databaseState) {
         is AppDatabaseState.Loaded -> {
             LaunchedEffect(state.database) {
-                credentialVault.bindToDatabase(state.location.toString())
                 onDatabaseReady(state.database, state.location)
-                // Capture the "everything synced" baseline at session start for cloud-backed databases.
-                if (remoteController?.hasActiveSession() == true && !remoteController.hasSyncBaseline()) {
-                    remoteController.markSynced(state.database)
-                }
             }
             MoneyManagerApp(
                 appVersion = appVersion,
                 databaseLocation = state.location,
-                services = state.services,
+                services = state.session.services,
                 remoteController = remoteController,
                 database = state.database,
                 strategySyncController = strategySyncController,
@@ -256,10 +218,8 @@ private fun AppStartupContent(
                         switchDatabase(
                             target = target,
                             currentState = databaseState,
-                            databaseManager = databaseManager,
-                            createAppServices = createAppServices,
+                            sessions = sessions,
                             databaseStateUpdater = { databaseState = it },
-                            localSettings = localSettings,
                             onInfoLog = onInfoLog,
                             onErrorLog = onErrorLog,
                             onSwitchFailed = { location, error -> switchError = location to error },
@@ -280,27 +240,12 @@ private fun AppStartupContent(
                                 AppDatabaseState.Loading(Progress.counted("Downloading from cloud…", 0, 100))
                             onDatabaseReady(null, null)
                             try {
-                                // Release the file lock so restore can overwrite the working copy. If the
-                                // close fails we must NOT proceed — restoring over a still-open handle is the
-                                // file-busy case this flow exists to avoid — so let it abort into the catch.
-                                loaded.database.close()
-                                val location =
-                                    remoteController.download { progress ->
-                                        databaseState =
-                                            AppDatabaseState.Loading(
-                                                progress,
-                                            )
-                                    }
-                                val error =
-                                    openAndLoad(
-                                        location = location,
-                                        databaseManager = databaseManager,
-                                        createAppServices = createAppServices,
-                                        databaseStateUpdater = { databaseState = it },
-                                        onInfoLog = onInfoLog,
-                                        onErrorLog = onErrorLog,
+                                databaseState =
+                                    AppDatabaseState.Loaded(
+                                        sessions.reloadFromRemote(loaded.session) { progress ->
+                                            databaseState = AppDatabaseState.Loading(progress)
+                                        },
                                     )
-                                if (error == null) localSettings.putString(KEY_LAST_DATABASE, location.toString())
                             } catch (expected: CancellationException) {
                                 throw expected
                             } catch (expected: Exception) {
@@ -320,40 +265,11 @@ private fun AppStartupContent(
                 FirstRunDatabaseSetupScreen(
                     databaseManager = databaseManager,
                     remoteController = remoteController,
-                    createAppServices = createAppServices,
-                    onLocalReady = { location ->
-                        scope.launch {
-                            val error =
-                                openAndLoad(
-                                    location = location,
-                                    databaseManager = databaseManager,
-                                    createAppServices = createAppServices,
-                                    databaseStateUpdater = { databaseState = it },
-                                    onInfoLog = onInfoLog,
-                                    onErrorLog = onErrorLog,
-                                )
-                            if (error == null) localSettings.putString(KEY_LAST_DATABASE, location.toString())
-                        }
-                    },
-                    onRemoteOpened = { location ->
-                        scope.launch {
-                            val error =
-                                openAndLoad(
-                                    location = location,
-                                    databaseManager = databaseManager,
-                                    createAppServices = createAppServices,
-                                    databaseStateUpdater = { databaseState = it },
-                                    onInfoLog = onInfoLog,
-                                    onErrorLog = onErrorLog,
-                                )
-                            if (error == null) localSettings.putString(KEY_LAST_DATABASE, location.toString())
-                        }
-                    },
+                    sessions = sessions,
+                    onLocalReady = { location -> scope.launch { load(location) } },
+                    onRemoteOpened = { location -> scope.launch { load(location) } },
                     // createRemote already opened, seeded, uploaded and bound the database, so go straight to Loaded.
-                    onRemoteCreated = { location, services, database ->
-                        localSettings.putString(KEY_LAST_DATABASE, location.toString())
-                        databaseState = AppDatabaseState.Loaded(location, services, database)
-                    },
+                    onRemoteCreated = { session -> databaseState = AppDatabaseState.Loaded(session) },
                     onErrorLog = onErrorLog,
                 )
             }
@@ -397,23 +313,10 @@ private fun AppStartupContent(
             try {
                 val location =
                     controller.restore(binding, password) { progress ->
-                        databaseState =
-                            AppDatabaseState.Loading(
-                                progress,
-                            )
+                        databaseState = AppDatabaseState.Loading(progress)
                     }
-                val error =
-                    openAndLoad(
-                        location = location,
-                        databaseManager = databaseManager,
-                        createAppServices = createAppServices,
-                        databaseStateUpdater = { databaseState = it },
-                        onInfoLog = onInfoLog,
-                        onErrorLog = onErrorLog,
-                    )
-                if (error == null) {
-                    localSettings.putString(KEY_LAST_DATABASE, location.toString())
-                } else {
+                val error = load(location)
+                if (error != null) {
                     // A non-auth failure: leave reconnect mode so the password field returns.
                     remoteUnlock =
                         unlock.copy(needsReconnect = false, password = "", error = error.message ?: "Failed to open database")
@@ -492,8 +395,7 @@ private fun AppStartupContent(
                             try {
                                 recreateDatabase(
                                     location = location,
-                                    databaseManager = databaseManager,
-                                    createAppServices = createAppServices,
+                                    sessions = sessions,
                                     databaseStateUpdater = { databaseState = it },
                                     onInfoLog = onInfoLog,
                                     onErrorLog = onErrorLog,
@@ -512,8 +414,7 @@ private fun AppStartupContent(
                             try {
                                 recreateDatabase(
                                     location = location,
-                                    databaseManager = databaseManager,
-                                    createAppServices = createAppServices,
+                                    sessions = sessions,
                                     databaseStateUpdater = { databaseState = it },
                                     onInfoLog = onInfoLog,
                                     onErrorLog = onErrorLog,
@@ -580,30 +481,22 @@ private fun RemoteDatabaseUnlockDialog(
 }
 
 /**
- * Opens [location] (creating + seeding it if missing), builds the application services, and moves the
- * state machine to Loaded. Returns null on success, or the failure cause (with the state left at
- * Error) otherwise.
+ * Opens [location] through [sessions] and moves the state machine to Loaded. Returns null on success,
+ * or the failure cause (with the state left at Error) otherwise.
  */
 private suspend fun openAndLoad(
     location: DbLocation,
-    databaseManager: DatabaseManager,
-    createAppServices: (MoneyManagerDatabaseWrapper) -> AppServices,
+    remoteCache: Boolean = false,
+    sessions: DatabaseSessions,
     databaseStateUpdater: (AppDatabaseState) -> Unit,
-    onInfoLog: (String) -> Unit,
     onErrorLog: (String, Throwable) -> Unit,
 ): Throwable? =
     try {
-        onInfoLog("Opening database at: $location")
-        val database =
-            databaseManager.openDatabaseWithProgress(location) { progress ->
+        val session =
+            sessions.open(location, remoteCache) { progress ->
                 databaseStateUpdater(AppDatabaseState.Loading(progress))
             }
-        databaseStateUpdater(AppDatabaseState.Loading(Progress.counted("Preparing application services...", 1, 1)))
-        val services = createAppServices(database)
-        databaseStateUpdater(AppDatabaseState.Loading(Progress.counted("Verifying this device...", 1, 1)))
-        services.deviceId
-        databaseStateUpdater(AppDatabaseState.Loaded(location, services, database))
-        onInfoLog("Database opened successfully")
+        databaseStateUpdater(AppDatabaseState.Loaded(session))
         null
     } catch (expected: CancellationException) {
         throw expected
@@ -621,10 +514,8 @@ private suspend fun openAndLoad(
 private suspend fun switchDatabase(
     target: DbLocation,
     currentState: AppDatabaseState,
-    databaseManager: DatabaseManager,
-    createAppServices: (MoneyManagerDatabaseWrapper) -> AppServices,
+    sessions: DatabaseSessions,
     databaseStateUpdater: (AppDatabaseState) -> Unit,
-    localSettings: LocalSettings,
     onInfoLog: (String) -> Unit,
     onErrorLog: (String, Throwable) -> Unit,
     onSwitchFailed: (DbLocation, Throwable) -> Unit,
@@ -636,17 +527,12 @@ private suspend fun switchDatabase(
     val error =
         openAndLoad(
             location = target,
-            databaseManager = databaseManager,
-            createAppServices = createAppServices,
+            sessions = sessions,
             databaseStateUpdater = databaseStateUpdater,
-            onInfoLog = onInfoLog,
             onErrorLog = onErrorLog,
         )
     when {
-        error == null -> {
-            GlobalSchemaErrorState.clearError()
-            localSettings.putString(KEY_LAST_DATABASE, target.toString())
-        }
+        error == null -> GlobalSchemaErrorState.clearError()
         // Schema-incompatible targets fall through to the schema-error recovery dialog (state stays Error).
         SchemaErrorDetector.isSchemaError(error) -> Unit
         // Any other failure: surface it and revert so the user keeps working in the current database.
@@ -661,27 +547,14 @@ private suspend fun switchDatabase(
 
 private suspend fun recreateDatabase(
     location: DbLocation,
-    databaseManager: DatabaseManager,
-    createAppServices: (MoneyManagerDatabaseWrapper) -> AppServices,
+    sessions: DatabaseSessions,
     databaseStateUpdater: (AppDatabaseState) -> Unit,
     onInfoLog: (String) -> Unit,
     onErrorLog: (String, Throwable) -> Unit,
     shouldBackup: Boolean,
 ) {
     try {
-        if (shouldBackup) {
-            onInfoLog("Backing up database and creating new one...")
-            val backupLocation = databaseManager.backupDatabase(location)
-            onInfoLog("Database backed up to: $backupLocation")
-        } else {
-            onInfoLog("Deleting database and creating new one...")
-            databaseManager.deleteDatabase(location)
-            onInfoLog("Database deleted")
-        }
-
-        val database = databaseManager.openDatabase(location)
-        val services = createAppServices(database)
-        databaseStateUpdater(AppDatabaseState.Loaded(location, services, database))
+        databaseStateUpdater(AppDatabaseState.Loaded(sessions.recreate(location, backup = shouldBackup)))
         GlobalSchemaErrorState.clearError()
         onInfoLog("New database created successfully")
     } catch (expected: CancellationException) {

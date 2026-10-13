@@ -46,7 +46,7 @@ import dev.zacsweers.metro.Provides
  *
  * Repository accessors expose the **write** interface (which extends the read interface), so test
  * setup and the read-facing groupings can both pull from here; the read-only [AuditReadRepository]
- * has no write variant. App-facing groupings ([com.moneymanager.database.Application]) narrow the
+ * has no write variant. The app-facing [AppServices] ([toAppServices]) narrows the
  * entity repositories to their read interfaces so the UI cannot mutate them outside the ImportEngine.
  */
 @DependencyGraph(DatabaseScope::class)

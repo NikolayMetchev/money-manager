@@ -10,23 +10,19 @@ import com.moneymanager.android.auth.GoogleAuthConsentLauncher
 import com.moneymanager.cryptodata.HttpCryptoCatalogRefresher
 import com.moneymanager.cryptodata.initializeCryptoCatalogStore
 import com.moneymanager.cryptodata.installCryptoCatalog
-import com.moneymanager.database.di.DatabaseComponent
-import com.moneymanager.database.di.createImportEngine
-import com.moneymanager.database.di.toApplication
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.params.AppComponentParams
-import com.moneymanager.importengineapi.EditingLockedException
 import com.moneymanager.importfilesource.di.createDriveFolderBrowser
 import com.moneymanager.importfilesource.di.createImportFileSourceFactory
 import com.moneymanager.remotestorage.googledrive.DRIVE_FILE_SCOPE
 import com.moneymanager.remotestorage.googledrive.DRIVE_READONLY_SCOPE
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.SyncResult
+import com.moneymanager.session.DatabaseSessions
 import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.SchemaErrorDetector
-import com.moneymanager.ui.toAppServices
 import kotlinx.coroutines.runBlocking
 
 private val logger = Logger.withTag("MainActivity")
@@ -116,22 +112,14 @@ class MainActivity : ComponentActivity() {
         remoteController = controller
         val importFileSourceFactory = createImportFileSourceFactory(params, component.credentialVault)
         val driveFolderBrowser = createDriveFolderBrowser(params, component.credentialVault)
+        val sessions =
+            DatabaseSessions(component.databaseManager, component.localSettings, component.credentialVault, controller)
 
         setContent {
             AppStartupHost(
                 databaseManager = component.databaseManager,
                 appVersion = component.appVersion,
-                localSettings = component.localSettings,
-                createAppServices = { database ->
-                    val component = DatabaseComponent.create(database)
-                    val importEngine =
-                        component.createImportEngine(
-                            editGate = {
-                                if (controller.syncState.value.editingLocked) throw EditingLockedException()
-                            },
-                        )
-                    component.toApplication().toAppServices(importEngine)
-                },
+                sessions = sessions,
                 onInfoLog = { message -> logger.i { message } },
                 onErrorLog = { message, error -> logger.e(error) { message } },
                 remoteController = controller,
