@@ -12,6 +12,7 @@ kotlin {
                 api(projects.app.model.repository.read)
 
                 implementation(projects.app.importengineapi)
+                implementation(projects.app.query)
                 implementation(projects.app.ui.audit)
                 implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
