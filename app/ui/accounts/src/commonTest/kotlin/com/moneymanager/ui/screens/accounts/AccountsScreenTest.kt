@@ -2,7 +2,9 @@
 
 package com.moneymanager.ui.screens.accounts
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -678,6 +680,49 @@ class AccountsScreenTest {
             // Then - only the GBP account is visible
             onNodeWithText("GBP Checking").assertIsDisplayed()
             onNodeWithText("USD Savings").assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun accountsScreen_assetFilter_listsOnlySelectedAssetBalances() {
+        runMoneyManagerComposeUiTest {
+            // Given - one account holding both GBP and USD
+            val now = Clock.System.now()
+            val gbp = Currency(id = CurrencyId(1L), code = "GBP", name = "British Pound", scaleFactor = 100)
+            val usd = Currency(id = CurrencyId(2L), code = "USD", name = "US Dollar", scaleFactor = 100)
+            val account = Account(id = AccountId(1L), name = "Multi Currency", openingDate = now)
+            val balances =
+                listOf(
+                    AccountBalance(accountId = AccountId(1L), balance = Money(12345L, gbp)),
+                    AccountBalance(accountId = AccountId(1L), balance = Money(67890L, usd)),
+                )
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = createAccountRepository(listOf(account)),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(balances),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        scrollToAccountId = null,
+                        onAccountClick = {},
+                    )
+                }
+            }
+            onAllNodesWithText("678.9", substring = true).assertCountEquals(1)
+
+            // When - filtering by GBP
+            onNodeWithText("Filter by asset").performClick()
+            onNodeWithText("GBP — British Pound").performClick()
+
+            // Then - the card keeps its GBP balance and drops the USD one
+            onNodeWithText("Multi Currency").assertIsDisplayed()
+            onAllNodesWithText("123.45", substring = true).assertCountEquals(1)
+            onAllNodesWithText("678.9", substring = true).assertCountEquals(0)
         }
     }
 

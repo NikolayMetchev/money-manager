@@ -18,17 +18,15 @@ import co.touchlab.kermit.Logger
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountMerge
-import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.AssetId
-import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Person
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
@@ -41,6 +39,12 @@ import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.query.AccountQuery
+import com.moneymanager.query.AccountQueryCriteria
+import com.moneymanager.query.AccountSnapshot
+import com.moneymanager.query.AssetRef
+import com.moneymanager.query.NameMatch
+import com.moneymanager.query.OwnerRef
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.components.EditAccountDialog
@@ -50,7 +54,6 @@ import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.formatAmount
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 private val logger = Logger.withTag("AccountsScreen")
@@ -69,22 +72,29 @@ fun AccountsScreen(
     onAccountClick: (Account) -> Unit,
     onAuditClick: (Account) -> Unit = {},
 ) {
-    // Use schema-error-aware collection for flows that may fail on old databases.
-    // Flows are remembered so they subscribe once instead of re-querying on every recomposition.
-    val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
-        accountRepository.getAllAccounts()
-    }
-    val balances by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
-        transactionRepository.getAccountBalances()
+    // The account query joins accounts, owners, balances and the shadow flag; the screen only holds the
+    // filter state. The snapshot is collected once and re-filtered locally, so typing never re-subscribes.
+    val accountQuery =
+        remember(
+            accountRepository,
+            accountAttributeRepository,
+            transactionRepository,
+            personRepository,
+            personAccountOwnershipRepository,
+        ) {
+            AccountQuery(
+                accountRepository = accountRepository,
+                accountAttributeRepository = accountAttributeRepository,
+                transactionRepository = transactionRepository,
+                personRepository = personRepository,
+                personAccountOwnershipRepository = personAccountOwnershipRepository,
+            )
+        }
+    val snapshot by rememberFlowAsStateWithSchemaErrorHandling(accountQuery, initial = AccountSnapshot(emptyList(), emptyList())) {
+        accountQuery.snapshot()
     }
     val categories by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         categoryRepository.getAllCategories()
-    }
-    val people by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
-        personRepository.getAllPeople()
-    }
-    val ownerships by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
-        personAccountOwnershipRepository.getAllOwnerships()
     }
     var showCreateDialog by remember { mutableStateOf(false) }
     var accountToEdit by remember { mutableStateOf<Account?>(null) }
@@ -92,13 +102,10 @@ fun AccountsScreen(
     var nameFilter by remember { mutableStateOf("") }
     var selectedAssetIds by remember { mutableStateOf<Set<AssetId>>(emptySet()) }
     var showShadowAccounts by remember { mutableStateOf(false) }
-    // Shadow accounts hold a reconciliation source's copy of the data (e.g. Koinly's), not real money,
-    // so they're hidden unless asked for.
-    val shadowAccountIds by rememberFlowAsStateWithSchemaErrorHandling(initial = emptySet()) {
-        accountAttributeRepository
-            .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID))
-            .map { attributes -> attributes.mapTo(mutableSetOf()) { it.accountId } }
-    }
+
+    val accounts = snapshot.accounts
+    val people = snapshot.people
+    val availableAssets = snapshot.availableAssets
 
     // Drop selections for owners that no longer exist (e.g. a person was deleted).
     val availableOwnerIds = people.map { it.id.id }.toSet()
@@ -106,56 +113,24 @@ fun AccountsScreen(
         selectedOwnerIds = selectedOwnerIds intersect availableOwnerIds
     }
 
-    val ownerIdsByAccount: Map<AccountId, Set<Long>> =
-        remember(ownerships) {
-            ownerships.groupBy({ it.accountId }, { it.personId.id }).mapValues { it.value.toSet() }
-        }
-
-    // Precompute per-account lookups once so each card avoids O(accounts)/O(balances) scans.
-    val ownersByAccount: Map<AccountId, List<Person>> =
-        remember(ownerships, people) {
-            val peopleById = people.associateBy { it.id }
-            ownerships
-                .groupBy { it.accountId }
-                .mapValues { (_, os) -> os.mapNotNull { peopleById[it.personId] } }
-        }
-    val balancesByAccount = remember(balances) { balances.groupBy { it.accountId } }
-    val categoriesById = remember(categories) { categories.associateBy { it.id } }
-
-    // Unique assets that appear in at least one account balance, sorted by code for stable display.
-    val availableAssets: List<Asset> =
-        remember(balances) {
-            balances.map { it.balance.asset }.distinctBy { it.id }.sortedBy { it.code }
-        }
-
     // Drop asset selections for assets that no longer have any balances.
     val availableAssetIds = availableAssets.map { it.id }.toSet()
     LaunchedEffect(availableAssetIds) {
         selectedAssetIds = selectedAssetIds intersect availableAssetIds
     }
 
+    val categoriesById = remember(categories) { categories.associateBy { it.id } }
+
     val displayedAccounts =
-        remember(
-            accounts,
-            nameFilter,
-            selectedOwnerIds,
-            ownerIdsByAccount,
-            selectedAssetIds,
-            balancesByAccount,
-            showShadowAccounts,
-            shadowAccountIds,
-        ) {
-            accounts.filter { account ->
-                val matchesShadow = showShadowAccounts || account.id !in shadowAccountIds
-                val matchesName = nameFilter.isBlank() || account.name.contains(nameFilter, ignoreCase = true)
-                val matchesOwner =
-                    selectedOwnerIds.isEmpty() ||
-                        ownerIdsByAccount[account.id].orEmpty().any { it in selectedOwnerIds }
-                val matchesAsset =
-                    selectedAssetIds.isEmpty() ||
-                        balancesByAccount[account.id].orEmpty().any { it.balance.asset.id in selectedAssetIds }
-                matchesShadow && matchesName && matchesOwner && matchesAsset
-            }
+        remember(snapshot, nameFilter, selectedOwnerIds, selectedAssetIds, showShadowAccounts) {
+            snapshot.filter(
+                AccountQueryCriteria(
+                    owners = selectedOwnerIds.mapTo(mutableSetOf()) { OwnerRef.Id(PersonId(it)) },
+                    name = NameMatch.Substring(nameFilter).takeIf { nameFilter.isNotBlank() },
+                    assets = selectedAssetIds.mapTo(mutableSetOf()) { AssetRef.Id(it) },
+                    includeShadow = showShadowAccounts,
+                ),
+            )
         }
 
     Column(
@@ -227,10 +202,10 @@ fun AccountsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            if (shadowAccountIds.isNotEmpty()) {
+            if (snapshot.shadowAccountCount > 0) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = showShadowAccounts, onCheckedChange = { showShadowAccounts = it })
-                    Text("Show reconciliation accounts (${shadowAccountIds.size})")
+                    Text("Show reconciliation accounts (${snapshot.shadowAccountCount})")
                 }
             }
 
@@ -253,7 +228,7 @@ fun AccountsScreen(
             // Scroll to the specified account when navigating back
             LaunchedEffect(scrollToAccountId, displayedAccounts) {
                 if (scrollToAccountId != null && displayedAccounts.isNotEmpty()) {
-                    val index = displayedAccounts.indexOfFirst { it.id == scrollToAccountId }
+                    val index = displayedAccounts.indexOfFirst { it.account.id == scrollToAccountId }
                     if (index >= 0) {
                         lazyListState.animateScrollToItem(index)
                     }
@@ -265,12 +240,13 @@ fun AccountsScreen(
                     state = lazyListState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(displayedAccounts, key = { it.id.id }) { account ->
+                    items(displayedAccounts, key = { it.account.id.id }) { entry ->
+                        val account = entry.account
                         AccountCard(
                             account = account,
                             category = categoriesById[account.categoryId],
-                            balances = balancesByAccount[account.id].orEmpty(),
-                            owners = ownersByAccount[account.id].orEmpty(),
+                            balances = entry.balances,
+                            owners = entry.owners,
                             accountRepository = accountRepository,
                             maintenance = maintenance,
                             onClick = { onAccountClick(account) },
@@ -292,7 +268,7 @@ fun AccountsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             onDismiss = { showCreateDialog = false },
-            existingNames = accounts.map { it.name }.toSet(),
+            existingNames = accounts.map { it.account.name }.toSet(),
         )
     }
 
@@ -306,7 +282,7 @@ fun AccountsScreen(
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
             onDismiss = { accountToEdit = null },
-            existingNames = accounts.filter { it.id != currentAccountToEdit.id }.map { it.name }.toSet(),
+            existingNames = accounts.filter { it.account.id != currentAccountToEdit.id }.map { it.account.name }.toSet(),
         )
     }
 }
@@ -315,7 +291,7 @@ fun AccountsScreen(
 fun AccountCard(
     account: Account,
     category: Category?,
-    balances: List<AccountBalance>,
+    balances: List<Money>,
     owners: List<Person>,
     accountRepository: AccountReadRepository,
     maintenance: Maintenance,
@@ -399,17 +375,17 @@ fun AccountCard(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = balance.balance.asset.code,
+                            text = balance.asset.code,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = formatAmount(balance.balance),
+                            text = formatAmount(balance),
                             style = MaterialTheme.typography.bodyLarge,
                             color =
                                 when {
-                                    balance.balance.isPositive() -> MaterialTheme.colorScheme.primary
-                                    balance.balance.isNegative() -> MaterialTheme.colorScheme.error
+                                    balance.isPositive() -> MaterialTheme.colorScheme.primary
+                                    balance.isNegative() -> MaterialTheme.colorScheme.error
                                     else -> MaterialTheme.colorScheme.onSurface
                                 },
                         )
