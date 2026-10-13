@@ -10,6 +10,7 @@ kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
+                api(projects.app.apiimport)
                 api(projects.app.db.core)
                 api(projects.app.db.di)
                 api(projects.app.db.write)
@@ -29,6 +30,7 @@ kotlin {
         }
         getByName("jvmMain") {
             dependencies {
+                api(projects.app.apiimport)
                 api(projects.app.db.core)
                 api(projects.app.db.di)
                 api(projects.app.db.write)
@@ -44,6 +46,7 @@ kotlin {
                 implementation(projects.app.model.repository.read)
                 implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.ktor.client.core)
             }
         }
         getByName("androidMain") {
@@ -52,6 +55,7 @@ kotlin {
 
                 implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.ktor.client.core)
             }
         }
         getByName("commonTest") {

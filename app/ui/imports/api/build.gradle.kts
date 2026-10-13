@@ -1,13 +1,13 @@
 plugins {
     id("moneymanager.compose-ui-feature-convention")
     alias(libs.plugins.compose.compiler)
-    id("moneymanager.jvm-android-shared-convention")
 }
 
 kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
+                api(projects.app.apiimport)
                 api(projects.app.apiimporter)
                 api(projects.app.importengineapi)
                 api(projects.app.model.apistrategy)
@@ -23,7 +23,6 @@ kotlin {
                 implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.compose.scrollbar)
                 implementation(projects.utils.credentialvault)
-                implementation(projects.utils.rest)
                 implementation(libs.kermit)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
@@ -40,7 +39,6 @@ kotlin {
                 api(libs.androidx.compose.runtime)
                 api(libs.androidx.compose.ui)
 
-                implementation(projects.app.model.passthrough)
                 implementation(projects.app.tasks)
                 implementation(libs.androidx.compose.foundation)
                 implementation(libs.androidx.compose.material.icons.core)
@@ -51,11 +49,11 @@ kotlin {
                 implementation(libs.kermit.core)
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.core)
-                implementation(libs.ktor.client.core)
             }
         }
         getByName("jvmMain") {
             dependencies {
+                api(projects.app.apiimport)
                 api(projects.app.apiimporter)
                 api(projects.app.importengineapi)
                 api(projects.app.model.apistrategy)
@@ -65,7 +63,6 @@ kotlin {
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
 
-                implementation(projects.app.model.passthrough)
                 implementation(projects.app.model.timeline)
                 implementation(projects.app.tasks)
                 implementation(libs.compose.foundation.desktop)
@@ -78,7 +75,6 @@ kotlin {
                 implementation(libs.kermit.core)
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.core)
-                implementation(libs.ktor.client.core)
             }
         }
         getByName("jvmTest") {

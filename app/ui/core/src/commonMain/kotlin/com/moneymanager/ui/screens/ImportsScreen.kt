@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.moneymanager.apiimport.ApiImportService
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.executeCsvUnimport
 import com.moneymanager.csvimporter.planCsvUnimport
@@ -71,6 +72,7 @@ fun ImportsScreen(
     importTimelineRepository: ImportTimelineReadRepository,
     reconciliationRepository: ReconciliationReadRepository,
     importDirectoryService: ImportDirectoryService,
+    apiImportService: ApiImportService,
     driveFolderBrowser: DriveFolderBrowser?,
     csvImportRepository: CsvImportReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
@@ -214,12 +216,12 @@ fun ImportsScreen(
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     cryptoRepository = cryptoRepository,
-                    passThroughAccountRepository = passThroughAccountRepository,
                     transactionRepository = transactionRepository,
                     transferRelationshipRepository = transferRelationshipRepository,
                     tradeRepository = tradeRepository,
                     maintenance = maintenance,
                     deviceId = deviceId,
+                    apiImportService = apiImportService,
                     onAddCredentialClick = onAddCredentialClick,
                     onApiStrategiesClick = onApiStrategiesClick,
                     onSessionClick = onSessionClick,

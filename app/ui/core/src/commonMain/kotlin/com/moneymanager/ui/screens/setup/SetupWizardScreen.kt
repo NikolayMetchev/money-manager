@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.apiimport.ApiImportService
 import com.moneymanager.currency.Currency
 import com.moneymanager.database.di.AppServices
 import com.moneymanager.domain.model.AppVersion
@@ -56,6 +57,7 @@ fun SetupWizardScreen(
     strategySyncController: StrategySyncController?,
     importFileSourceFactory: ImportFileSourceFactory?,
     importDirectoryService: ImportDirectoryService,
+    apiImportService: ApiImportService,
     driveFolderBrowser: DriveFolderBrowser?,
     includeDatabaseStep: Boolean,
     onFinished: () -> Unit,
@@ -142,6 +144,7 @@ fun SetupWizardScreen(
             strategyCatalogController = strategyCatalogController,
             strategySyncController = strategySyncController,
             importDirectoryService = importDirectoryService,
+            apiImportService = apiImportService,
             driveFolderBrowser = driveFolderBrowser,
             selectedCurrencyId = selectedCurrencyId,
             onCurrencySelected = { selectedCurrencyId = it },
@@ -158,6 +161,7 @@ private fun ColumnScope.StepBody(
     strategyCatalogController: StrategyCatalogController?,
     strategySyncController: StrategySyncController?,
     importDirectoryService: ImportDirectoryService,
+    apiImportService: ApiImportService,
     driveFolderBrowser: DriveFolderBrowser?,
     selectedCurrencyId: CurrencyId?,
     onCurrencySelected: (CurrencyId) -> Unit,
@@ -218,6 +222,7 @@ private fun ColumnScope.StepBody(
             ApiConnectionsScreen(
                 apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
                 apiSessionRepository = services.imports.apiSessionRepository,
+                apiImportService = apiImportService,
                 // The wizard prints the step title and owns Back/Next, so the screen shows neither.
                 showHeader = false,
             )

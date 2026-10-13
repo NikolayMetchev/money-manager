@@ -13,6 +13,8 @@ import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.StoredApiCredential
 import com.moneymanager.credentialvault.bundleOrNull
 import com.moneymanager.credentialvault.testing.unlockedCredentialVault
+import com.moneymanager.database.di.toAppServices
+import com.moneymanager.session.apiImportService
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.foundation.LocalCredentialVault
@@ -55,6 +57,7 @@ class ApiConnectionsVaultE2ETest : DbTest() {
                     ApiConnectionsScreen(
                         apiImportStrategyRepository = repositories.apiImportStrategyRepository,
                         apiSessionRepository = repositories.apiSessionRepository,
+                        apiImportService = repositories.toAppServices(repositories.importEngine).apiImportService(vault),
                     )
                 }
             }

@@ -61,17 +61,20 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
-import com.moneymanager.apiimporter.API_ENGINE_BATCH_SIZE
+import com.moneymanager.apiimport.API_DOWNLOAD_IMPORT_ALL_TASK_KEY
+import com.moneymanager.apiimport.ApiImportListener
+import com.moneymanager.apiimport.ApiImportService
+import com.moneymanager.apiimport.apiDownloadTaskKey
+import com.moneymanager.apiimport.apiImportTaskKey
+import com.moneymanager.apiimport.displaySummary
+import com.moneymanager.apiimport.filterCredentialsByStrategy
+import com.moneymanager.apiimport.sessionImportedAtCurrentRevision
+import com.moneymanager.apiimport.splitSessionsByImportState
+import com.moneymanager.apiimport.storeNewSigningKey
 import com.moneymanager.apiimporter.ApiCounterpartySuggestion
-import com.moneymanager.apiimporter.ApiDownloadCredentials
-import com.moneymanager.apiimporter.ApiDownloadNotPossibleException
-import com.moneymanager.apiimporter.ApiImportReads
 import com.moneymanager.apiimporter.ApiSessionDownloadResult
 import com.moneymanager.apiimporter.ApiSessionImportResult
-import com.moneymanager.apiimporter.discoverApiCounterpartiesToCreate
 import com.moneymanager.apiimporter.displaySummary
-import com.moneymanager.apiimporter.downloadApiSession
-import com.moneymanager.apiimporter.importApiSession
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.StoredApiCredential
@@ -98,42 +101,26 @@ import com.moneymanager.domain.repository.ApiSessionImportRevision
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
-import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
-import com.moneymanager.importengineapi.createApiSession
-import com.moneymanager.importengineapi.markApiSessionImported
-import com.moneymanager.rest.ApiSessionTrafficRecorder
-import com.moneymanager.rest.ScaParams
-import com.moneymanager.rest.createApiClient
 import com.moneymanager.tasks.Progress
-import com.moneymanager.tasks.TaskScope
 import com.moneymanager.tasks.TaskState
 import com.moneymanager.tasks.formatElapsedTime
 import com.moneymanager.tasks.isRunning
-import com.moneymanager.ui.api.sca.signScaChallenge
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.tasks.LocalTaskManager
 import com.moneymanager.ui.util.ContentCopyIcon
-import com.moneymanager.ui.util.currentCountryCode
 import com.moneymanager.ui.util.displayDate
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -155,12 +142,12 @@ fun ApiSessionsScreen(
     accountRepository: AccountReadRepository,
     currencyRepository: CurrencyReadRepository,
     cryptoRepository: com.moneymanager.domain.repository.CryptoReadRepository,
-    passThroughAccountRepository: PassThroughAccountReadRepository,
     transactionRepository: TransactionReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     deviceId: DeviceId,
+    apiImportService: ApiImportService,
     onAddCredentialClick: () -> Unit = {},
     onApiStrategiesClick: () -> Unit = {},
     onSessionClick: (ApiSession) -> Unit = {},
@@ -174,9 +161,6 @@ fun ApiSessionsScreen(
     val taskManager = LocalTaskManager.current
     val tasks by taskManager.tasks.collectAsState()
     val clipboard = LocalClipboard.current
-    val passThroughAccounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
-        passThroughAccountRepository.getAll()
-    }
     val dateRangeBySession by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyMap()) {
         importTimelineRepository.getApiSessionDateRanges().map { ranges -> ranges.associateBy { it.fileId } }
     }
@@ -215,28 +199,6 @@ fun ApiSessionsScreen(
     var pendingReimport by remember { mutableStateOf<PendingApiReimport?>(null) }
     var pendingReimportAll by remember { mutableStateOf<PendingApiReimportAll?>(null) }
 
-    // A credential with no linked strategyId is orphaned (its strategy was deleted, or it was never
-    // linked) — null propagates to the call sites below, which surface a clear error rather than
-    // guessing a provider.
-    suspend fun resolveStrategy(credential: ApiCredential): ApiImportStrategy? =
-        credential.strategyId?.let { apiImportStrategyRepository.getStrategyById(it).first() }
-
-    // Builds the SCA request-signing params when the strategy is SCA-protected and the credential
-    // has a signing key (e.g. Wise statements). Null disables signing (e.g. Monzo).
-    fun scaParamsFor(
-        strategy: ApiImportStrategy,
-        secrets: StoredApiCredential,
-    ): ScaParams? {
-        val signing = strategy.config.signing ?: return null
-        val privateKey = secrets.privateKeyPem ?: return null
-        return ScaParams(
-            challengeHeader = signing.challengeHeader,
-            signatureHeader = signing.signatureHeader,
-            triggerStatus = signing.triggerStatus,
-            sign = { oneTimeToken -> signScaChallenge(privateKey, oneTimeToken) },
-        )
-    }
-
     fun refresh() {
         scope.launch {
             try {
@@ -268,26 +230,12 @@ fun ApiSessionsScreen(
                         val strategy = credential.strategyId?.let { strategyById[it] }
                         credential.id to (strategy?.config?.signing != null)
                     }
-                val country = currentCountryCode()
                 transactionsBlockReasonByCredential =
                     allCredentials
                         .mapNotNull { credential ->
-                            val strategy = credential.strategyId?.let { strategyById[it] }
-                            val countries =
-                                strategy
-                                    ?.config
-                                    ?.signing
-                                    ?.statementCountries
-                                    .orEmpty()
-                            if (countries.isNotEmpty() && (country == null || country !in countries)) {
-                                credential.id to
-                                    "Transaction download isn't available for your region" +
-                                    (country?.let { " ($it)" } ?: "") +
-                                    ". ${strategy?.name ?: "This provider"} only supports statements for: " +
-                                    countries.sorted().joinToString(", ") + "."
-                            } else {
-                                null
-                            }
+                            apiImportService
+                                .transactionsBlockReason(credential.strategyId?.let { strategyById[it] })
+                                ?.let { credential.id to it }
                         }.toMap()
                 importedSessionRevisions = apiSessionRepository.getImportedSessionRevisions()
             } finally {
@@ -296,218 +244,68 @@ fun ApiSessionsScreen(
         }
     }
 
-    // A task of its own, or a child of [parent] so a bulk run shows it under its own bar. False when a task
-    // with [key] is already running.
-    fun startTask(
-        parent: TaskScope?,
-        key: String,
-        title: String,
-        initialDetail: String,
-        block: suspend TaskScope.() -> String,
-    ): Boolean =
-        if (parent == null) {
-            taskManager.start(key, title, initialDetail, block) != null
-        } else {
-            parent.startChild(key, title, initialDetail, block) != null
+    // Keeps the cards current while a download or import runs, whichever button started it.
+    val importListener =
+        object : ApiImportListener {
+            override fun onSessionCreated(
+                credentialId: ApiCredentialId,
+                sessionId: ApiSessionId,
+            ) = refresh()
+
+            override fun onDownloaded(
+                credentialId: ApiCredentialId,
+                result: ApiSessionDownloadResult,
+            ) {
+                downloadResultByCredential = downloadResultByCredential + (credentialId to result)
+                refresh()
+            }
+
+            override fun onImported(
+                sessionId: ApiSessionId,
+                result: ApiSessionImportResult,
+            ) {
+                importResultBySession = importResultBySession + (sessionId to result)
+                refresh()
+                onTransactionsImported()
+            }
         }
 
-    suspend fun TaskScope.runImport(
-        session: ApiSession,
-        strategy: ApiImportStrategy,
-        counterpartyAccountNames: Map<String, String>,
-    ): String {
-        val importStartedAt = System.currentTimeMillis()
-        val outcome =
-            importApiSession(
-                reads =
-                    ApiImportReads(
-                        apiSessionRepository = apiSessionRepository,
-                        accountRepository = accountRepository,
-                        accountAttributeRepository = accountAttributeRepository,
-                        currencyRepository = currencyRepository,
-                        cryptoRepository = cryptoRepository,
-                    ),
-                sessionId = session.id,
-                strategy = strategy,
-                importEngine = importEngine,
-                counterpartyAccountNames = counterpartyAccountNames,
-                passThroughAccounts = passThroughAccounts,
-                onProgress = { report(it) },
-                engineBatchSize = API_ENGINE_BATCH_SIZE,
-            )
-        val result =
-            ApiSessionImportResult(
-                accountCount = outcome.accountCount,
-                transactionCount = outcome.transactionCount + outcome.tradeCount,
-                personCount = outcome.personCount,
-                duplicateCount = outcome.duplicateCount,
-                errorCount = outcome.errorCount,
-            )
-        val importDurationMillis = System.currentTimeMillis() - importStartedAt
-        importEngine.markApiSessionImported(
-            id = session.id,
-            revisionId = strategy.revisionId,
-            importedAt = Clock.System.now(),
-            importDurationMillis = importDurationMillis,
-        )
-        maintenance.refreshMaterializedViews()
-        importResultBySession = importResultBySession + (session.id to result)
-        refresh()
-        onTransactionsImported()
-        return result.displaySummary()
-    }
-
-    // [onFinished] reports whether the import finished, so "Download & import all" can run imports one at a time.
     fun startImport(
         session: ApiSession,
         strategy: ApiImportStrategy,
         counterpartyAccountNames: Map<String, String>,
-        parent: TaskScope? = null,
-        onFinished: (imported: Boolean) -> Unit = {},
     ) {
-        val started =
-            startTask(
-                parent = parent,
-                key = apiImportTaskKey(session.id),
-                title = "Import",
-                initialDetail = "Starting import for session #${session.id}.",
-            ) {
-                var imported = false
-                try {
-                    runImport(session, strategy, counterpartyAccountNames).also { imported = true }
-                } finally {
-                    onFinished(imported)
-                }
-            }
-        if (!started) onFinished(false)
+        taskManager.start(
+            key = apiImportTaskKey(session.id),
+            title = "Import",
+            initialDetail = "Starting import for session #${session.id}.",
+        ) {
+            val result = apiImportService.import(this, session.id, strategy, counterpartyAccountNames)
+            importListener.onImported(session.id, result)
+            result.displaySummary()
+        }
     }
 
-    // Downloads a new session for [credential] as its own background task, so its card shows the same progress
-    // as a single Download. Returns the session once the download succeeds; null when it was skipped or
-    // failed, with the reason left in the task panel.
-    suspend fun downloadCredential(
+    fun startDownload(
         credential: ApiCredential,
         forceFull: Boolean,
-        parent: TaskScope? = null,
-    ): ApiSessionId? {
-        if (taskManager.isRunning(apiDownloadTaskKey(credential.id))) return null
+    ) {
+        if (taskManager.isRunning(apiDownloadTaskKey(credential.id))) return
         downloadResultByCredential = downloadResultByCredential - credential.id
-        val transactionsBlocked = transactionsBlockReasonByCredential[credential.id] != null
-        val resolvedStrategy = resolveStrategy(credential)
-        // Fetch the secrets before creating a session, so a locked or empty vault doesn't leave an empty
-        // session behind.
-        val secrets =
-            try {
-                resolvedStrategy?.let { vault.downloadSecretsFor(it) }
-            } catch (blocked: MissingApiSecretsException) {
-                startTask(
-                    parent = parent,
-                    key = apiDownloadTaskKey(credential.id),
-                    title = "Download",
-                    initialDetail = "Fetching credentials.",
-                ) {
-                    blocked.message.orEmpty()
-                }
-                return null
-            }
-        val newSessionId =
-            importEngine.createApiSession(
-                deviceId = deviceId,
-                createdAt = Clock.System.now(),
-                credentialId = credential.id,
-            )
-        // How far earlier sessions of this credential already reached, so this download only fetches the
-        // tail. Read before any request is recorded into the new session, and skipped entirely when the user
-        // asked for a full re-download.
-        val watermarks =
-            if (forceFull) {
-                emptyMap()
-            } else {
-                apiSessionRepository.getDownloadWatermarks(credential.id, newSessionId)
-            }
-        refresh()
-        val downloaded = CompletableDeferred<ApiSessionId?>()
-        val started =
-            startTask(
-                parent = parent,
-                key = apiDownloadTaskKey(credential.id),
-                title = "Download",
-                initialDetail = "Starting download for session #$newSessionId.",
-            ) {
-                try {
-                    // An orphaned credential (its strategy was deleted, or it was never linked) has nothing to
-                    // download with.
-                    val strategy =
-                        resolvedStrategy
-                            ?: return@startTask "No import strategy is linked to this credential; reconnect it."
-                    val credentialSecrets = requireNotNull(secrets)
-                    // One client/session for accounts, transactions and people.
-                    val apiClient =
-                        createApiClient(
-                            trafficRecorder =
-                                ApiSessionTrafficRecorder(
-                                    sessionId = newSessionId,
-                                    importEngine = importEngine,
-                                ),
-                            engine = null,
-                        )
-                    val result =
-                        try {
-                            downloadApiSession(
-                                apiClient = apiClient,
-                                apiSessionRepository = apiSessionRepository,
-                                sessionId = newSessionId,
-                                strategy = strategy,
-                                importEngine = importEngine,
-                                credentials =
-                                    ApiDownloadCredentials(
-                                        token = credentialSecrets.token,
-                                        apiSecret = credentialSecrets.apiSecret,
-                                        sca = scaParamsFor(strategy, credentialSecrets),
-                                    ),
-                                watermarks = watermarks,
-                                forceFullDownload = forceFull,
-                                transactionsBlocked = transactionsBlocked,
-                                onPhase = { report(it) },
-                                onProgress = { report(it) },
-                            )
-                        } catch (notPossible: ApiDownloadNotPossibleException) {
-                            logger.w { "Download for '${strategy.name}' (session #$newSessionId) not possible: ${notPossible.message}" }
-                            return@startTask notPossible.message
-                        }
-                    downloadResultByCredential = downloadResultByCredential + (credential.id to result)
-                    refresh()
-                    downloaded.complete(newSessionId)
-                    result.displaySummary()
-                } finally {
-                    downloaded.complete(null)
-                }
-            }
-        if (!started) downloaded.complete(null)
-        return downloaded.await()
+        taskManager.start(
+            key = apiDownloadTaskKey(credential.id),
+            title = "Download",
+            initialDetail = "Fetching credentials.",
+        ) {
+            apiImportService.download(this, credential, forceFull, importListener).message
+        }
     }
 
-    suspend fun importAndAwait(
-        session: ApiSession,
-        strategy: ApiImportStrategy,
-        parent: TaskScope,
-    ): Boolean {
-        val imported = CompletableDeferred<Boolean>()
-        startImport(session, strategy, emptyMap(), parent, onFinished = { imported.complete(it) })
-        return imported.await()
-    }
-
-    // Downloads every credential in [targets] at once (different providers don't contend) and imports as the
-    // downloads land: each credential's never-imported sessions join one import queue, oldest first, the
-    // moment its own download finishes, and the queue is imported one session at a time, as a single Import
-    // would. A session whose import needs counterparty names confirmed is left outstanding rather than
-    // imported with unconfirmed names; a session imported under an older strategy revision is left for
-    // Re-import.
     fun downloadAndImportAll(targets: List<ApiCredential>) {
         val forceFullIds = forceFullDownloadByCredential.intersect(targets.map { it.id }.toSet())
         forceFullDownloadByCredential = forceFullDownloadByCredential - forceFullIds
         scope.launch {
-            // Unlock once up front, so the parallel downloads below don't each raise a prompt.
+            // Unlock before starting the task, so declining the prompt doesn't leave a failed task behind.
             try {
                 vault.requireUnlocked("Download all APIs")
             } catch (_: CredentialVaultLockedException) {
@@ -518,79 +316,18 @@ fun ApiSessionsScreen(
                 title = "Download & import all",
                 initialDetail = "Downloading ${targets.size} API connection(s).",
             ) {
-                // Each download and import runs as a child task, so every connection gets its own bar.
-                val parent = this
-                val strategyByCredential = targets.associate { it.id to resolveStrategy(it) }
-                val readyToImport = Channel<ApiSession>(Channel.UNLIMITED)
-                var downloadsLeft = targets.size
-                var downloadedCount = 0
-                var sessionCount = 0
-                var importedCount = 0
-                var needsReviewCount = 0
-                // One thread for the coordination only: the downloads and imports run as child tasks, and
-                // this keeps the task registrations and counters here from racing each other.
-                withContext(Dispatchers.Default.limitedParallelism(1)) {
-                    launch {
-                        targets
-                            .map { credential ->
-                                async {
-                                    // Each connection fails on its own: one provider's error mustn't cancel the
-                                    // other downloads or the import queue.
-                                    val downloaded =
-                                        isolatedBulkStep("Bulk download of credential ${credential.id}") {
-                                            downloadCredential(credential, credential.id in forceFullIds, parent)
-                                        }
-                                    if (downloaded != null) downloadedCount++
-                                    downloadsLeft--
-                                    // Queued even when the download failed: sessions left from earlier downloads
-                                    // still hold data the next download won't fetch again.
-                                    isolatedBulkStep("Queueing sessions of credential ${credential.id}") {
-                                        sessionsToImportInBulk(
-                                            sessions = apiSessionRepository.getSessionsByDevice(deviceId),
-                                            credentialIds = setOf(credential.id),
-                                            everImportedSessionIds =
-                                                apiSessionRepository.getImportedSessionRevisions().map { it.sessionId }.toSet(),
-                                        ).forEach { readyToImport.send(it) }
-                                    }
-                                }
-                            }.awaitAll()
-                        readyToImport.close()
-                    }
-                    for (session in readyToImport) {
-                        val strategy = strategyByCredential[session.credentialId] ?: continue
-                        sessionCount++
-                        parent.report("Importing session #${session.id}; $downloadsLeft download(s) still running.")
-                        // Counted as failed in the summary; the queue moves on to the next session.
-                        isolatedBulkStep("Bulk import of session ${session.id}") {
-                            val counterparties =
-                                withContext(Dispatchers.Default) {
-                                    discoverApiCounterpartiesToCreate(
-                                        apiSessionRepository = apiSessionRepository,
-                                        accountAttributeRepository = accountAttributeRepository,
-                                        sessionId = session.id,
-                                        strategy = strategy,
-                                    )
-                                }
-                            when {
-                                counterparties.isNotEmpty() -> needsReviewCount++
-                                importAndAwait(session, strategy, parent) -> importedCount++
-                            }
-                        }
-                    }
-                }
-                bulkDownloadImportSummary(
-                    credentialCount = targets.size,
-                    downloadedCount = downloadedCount,
-                    sessionCount = sessionCount,
-                    importedCount = importedCount,
-                    needsReviewCount = needsReviewCount,
-                )
+                apiImportService.downloadAndImportAll(this, targets, forceFullIds, importListener).summary()
             }
         }
     }
 
     LaunchedEffect(Unit) { refresh() }
-    EnsureApiConnectionRows(strategies = strategies, credentialRows = credentials, onCreated = { refresh() })
+    EnsureApiConnectionRows(
+        apiImportService = apiImportService,
+        strategies = strategies,
+        credentialRows = credentials,
+        onCreated = { refresh() },
+    )
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -774,7 +511,7 @@ fun ApiSessionsScreen(
                                 onDownload = {
                                     val forceFull = credential.id in forceFullDownloadByCredential
                                     forceFullDownloadByCredential = forceFullDownloadByCredential - credential.id
-                                    scope.launch { downloadCredential(credential, forceFull) }
+                                    startDownload(credential, forceFull)
                                 },
                                 onImport = { session ->
                                     importResultBySession = importResultBySession - session.id
@@ -785,7 +522,7 @@ fun ApiSessionsScreen(
                                     scope.launch {
                                         try {
                                             val strategy =
-                                                resolveStrategy(credential) ?: run {
+                                                apiImportService.resolveStrategy(credential) ?: run {
                                                     importErrorBySession =
                                                         importErrorBySession + (session.id to "No import strategy configured")
                                                     return@launch
@@ -794,9 +531,7 @@ fun ApiSessionsScreen(
                                             // counterparty field, skipping the confirmation dialog. Its
                                             // sub-step progress surfaces on the same bar as the import phases.
                                             val suggestions =
-                                                discoverApiCounterpartiesToCreate(
-                                                    apiSessionRepository = apiSessionRepository,
-                                                    accountAttributeRepository = accountAttributeRepository,
+                                                apiImportService.counterpartiesToConfirm(
                                                     sessionId = session.id,
                                                     strategy = strategy,
                                                     onProgress = { progress ->
@@ -824,7 +559,7 @@ fun ApiSessionsScreen(
                                 onReimport = { session ->
                                     scope.launch {
                                         val strategy =
-                                            resolveStrategy(credential) ?: run {
+                                            apiImportService.resolveStrategy(credential) ?: run {
                                                 importErrorBySession =
                                                     importErrorBySession + (session.id to "No import strategy configured")
                                                 return@launch
@@ -834,7 +569,7 @@ fun ApiSessionsScreen(
                                 },
                                 onReimportAll = { importedCount ->
                                     scope.launch {
-                                        val strategy = resolveStrategy(credential) ?: return@launch
+                                        val strategy = apiImportService.resolveStrategy(credential) ?: return@launch
                                         pendingReimportAll =
                                             PendingApiReimportAll(
                                                 credentialId = credential.id,
@@ -2060,134 +1795,6 @@ private fun ApiRequest.displayBody(): String =
         }
     }.trimEnd()
 
-private fun ApiSessionImportResult.displaySummary(): String =
-    buildString {
-        append("Import complete: ")
-        append(accountCount)
-        append(" account(s), ")
-        append(transactionCount)
-        append(" imported transaction(s)")
-        if (personCount > 0) {
-            append(", ")
-            append(personCount)
-            append(" person(s) created")
-        }
-        if (duplicateCount > 0) {
-            append(", ")
-            append(duplicateCount)
-            append(" duplicate(s)")
-        }
-        if (errorCount > 0) {
-            append(", ")
-            append(errorCount)
-            append(" error(s)")
-        }
-        append(".")
-    }
-
-/**
- * A session counts as imported only at the credential's current strategy revision — a session
- * imported under an older revision is outstanding again, because re-importing it would apply the
- * updated strategy.
- */
-internal fun sessionImportedAtCurrentRevision(
-    sessionId: ApiSessionId,
-    currentRevision: Long?,
-    importedSessionRevisions: Set<ApiSessionImportRevision>,
-): Boolean =
-    currentRevision?.let { revision ->
-        ApiSessionImportRevision(sessionId, revision) in importedSessionRevisions
-    } == true
-
-internal fun filterCredentialsByStrategy(
-    credentials: List<ApiCredential>,
-    strategyIdByCredential: Map<ApiCredentialId, ApiImportStrategyId?>,
-    selectedStrategyId: ApiImportStrategyId?,
-): List<ApiCredential> =
-    if (selectedStrategyId == null) {
-        credentials
-    } else {
-        credentials.filter { strategyIdByCredential[it.id] == selectedStrategyId }
-    }
-
-internal data class ApiSessionsSplit(
-    val outstandingByCredential: Map<ApiCredentialId, List<ApiSession>>,
-    val importedByCredential: Map<ApiCredentialId, List<ApiSession>>,
-) {
-    val outstandingCount: Int get() = outstandingByCredential.values.sumOf { it.size }
-    val importedCount: Int get() = importedByCredential.values.sumOf { it.size }
-}
-
-internal fun splitSessionsByImportState(
-    credentials: List<ApiCredential>,
-    sessionsByCredential: Map<ApiCredentialId, List<ApiSession>>,
-    currentStrategyRevisionByCredential: Map<ApiCredentialId, Long?>,
-    importedSessionRevisions: Set<ApiSessionImportRevision>,
-): ApiSessionsSplit {
-    val outstanding = mutableMapOf<ApiCredentialId, List<ApiSession>>()
-    val imported = mutableMapOf<ApiCredentialId, List<ApiSession>>()
-    credentials.forEach { credential ->
-        val (importedSessions, outstandingSessions) =
-            sessionsByCredential[credential.id].orEmpty().partition { session ->
-                sessionImportedAtCurrentRevision(
-                    sessionId = session.id,
-                    currentRevision = currentStrategyRevisionByCredential[credential.id],
-                    importedSessionRevisions = importedSessionRevisions,
-                )
-            }
-        outstanding[credential.id] = outstandingSessions
-        imported[credential.id] = importedSessions
-    }
-    return ApiSessionsSplit(outstandingByCredential = outstanding, importedByCredential = imported)
-}
-
-/**
- * Runs one step of "Download & import all", logging its failure instead of letting it cancel the other
- * downloads and the import queue. Null when it failed; cancellation still propagates.
- */
-private suspend fun <T> isolatedBulkStep(
-    description: String,
-    step: suspend () -> T,
-): T? =
-    try {
-        step()
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (expected: Exception) {
-        logger.e(expected) { "$description failed: ${expected.message}" }
-        null
-    }
-
-/**
- * The sessions "Download & import all" imports: every session of [credentialIds] that has never been
- * imported, oldest first, so overlapping sessions land in the order they were downloaded.
- */
-internal fun sessionsToImportInBulk(
-    sessions: List<ApiSession>,
-    credentialIds: Set<ApiCredentialId>,
-    everImportedSessionIds: Set<ApiSessionId>,
-): List<ApiSession> =
-    sessions
-        .filter { it.credentialId in credentialIds && it.id !in everImportedSessionIds }
-        .sortedWith(compareBy<ApiSession> { it.createdAt }.thenBy { it.id.id })
-
-internal fun bulkDownloadImportSummary(
-    credentialCount: Int,
-    downloadedCount: Int,
-    sessionCount: Int,
-    importedCount: Int,
-    needsReviewCount: Int,
-): String =
-    buildList {
-        add("Downloaded $downloadedCount of $credentialCount connection(s).")
-        add("Imported $importedCount of $sessionCount session(s).")
-        if (needsReviewCount > 0) {
-            add("$needsReviewCount session(s) need new counterparties confirmed; import them from their cards.")
-        }
-        val failedCount = sessionCount - importedCount - needsReviewCount
-        if (failedCount > 0) add("$failedCount import(s) failed or were skipped; see their tasks.")
-    }.joinToString(" ")
-
 @Composable
 private fun StrategyFilterDropdown(
     strategies: List<ApiImportStrategy>,
@@ -2241,12 +1848,6 @@ private fun StrategyFilterDropdown(
 private const val ALL_STRATEGIES_LABEL = "All strategies"
 
 private fun List<TaskState>.runningProgress(key: String): Progress? = firstOrNull { it.key == key && it.isRunning }?.progress
-
-private fun apiDownloadTaskKey(credentialId: ApiCredentialId): String = "api-download-cred-${credentialId.id}"
-
-private const val API_DOWNLOAD_IMPORT_ALL_TASK_KEY = "api-download-import-all"
-
-private fun apiImportTaskKey(sessionId: ApiSessionId): String = "api-import-${sessionId.id}"
 
 private fun JsonElement.childCount(): Int =
     when (this) {

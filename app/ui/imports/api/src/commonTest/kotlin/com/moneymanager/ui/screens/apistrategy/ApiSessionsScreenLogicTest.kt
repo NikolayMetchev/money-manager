@@ -1,8 +1,5 @@
 package com.moneymanager.ui.screens.apistrategy
 
-import com.moneymanager.domain.model.ApiCredential
-import com.moneymanager.domain.model.ApiCredentialId
-import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponse
@@ -10,17 +7,13 @@ import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiResponseTransaction
 import com.moneymanager.domain.model.ApiResponseTransactionId
 import com.moneymanager.domain.model.ApiResponseTransactionState
-import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.repository.ApiSessionImportRevision
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 class ApiSessionsScreenLogicTest {
     @Test
@@ -109,144 +102,6 @@ class ApiSessionsScreenLogicTest {
             )
         assertTrue(highlighted)
     }
-
-    @Test
-    fun sessionImportedAtCurrentRevision_onlyMatchesCurrentRevision() {
-        val imported = setOf(ApiSessionImportRevision(ApiSessionId(1), revisionId = 2))
-        assertTrue(sessionImportedAtCurrentRevision(ApiSessionId(1), currentRevision = 2, imported))
-        // Imported under an older strategy revision only -> outstanding again.
-        assertFalse(sessionImportedAtCurrentRevision(ApiSessionId(1), currentRevision = 3, imported))
-        assertFalse(sessionImportedAtCurrentRevision(ApiSessionId(2), currentRevision = 2, imported))
-        assertFalse(sessionImportedAtCurrentRevision(ApiSessionId(1), currentRevision = null, imported))
-    }
-
-    @Test
-    fun filterCredentialsByStrategy_nullSelectsAll() {
-        val credentials = listOf(credential(1, strategyA), credential(2, strategyB), credential(3, strategyId = null))
-        val strategyByCredential = credentials.associate { it.id to it.strategyId }
-        assertEquals(credentials, filterCredentialsByStrategy(credentials, strategyByCredential, selectedStrategyId = null))
-    }
-
-    @Test
-    fun filterCredentialsByStrategy_keepsOnlyMatchingCredentials() {
-        val a = credential(1, strategyA)
-        val b = credential(2, strategyB)
-        // An orphaned credential (its strategy was deleted, or never linked) resolves to no strategy id
-        // and so never matches a specific selectedStrategyId filter — only "All strategies" (null) shows it.
-        val orphaned = credential(3, strategyId = null)
-        val credentials = listOf(a, b, orphaned)
-        val strategyByCredential = credentials.associate { it.id to it.strategyId }
-        assertEquals(
-            listOf(a),
-            filterCredentialsByStrategy(credentials, strategyByCredential, selectedStrategyId = strategyA),
-        )
-        assertEquals(
-            listOf(b),
-            filterCredentialsByStrategy(credentials, strategyByCredential, selectedStrategyId = strategyB),
-        )
-    }
-
-    @Test
-    fun splitSessionsByImportState_partitionsPerCredentialAndCounts() {
-        val credentialA = credential(1, strategyA)
-        val credentialB = credential(2, strategyB)
-        val importedSession = session(10, credentialA.id)
-        val oldRevisionSession = session(11, credentialA.id)
-        val neverImportedSession = session(12, credentialB.id)
-        val split =
-            splitSessionsByImportState(
-                credentials = listOf(credentialA, credentialB),
-                sessionsByCredential =
-                    mapOf(
-                        credentialA.id to listOf(importedSession, oldRevisionSession),
-                        credentialB.id to listOf(neverImportedSession),
-                    ),
-                currentStrategyRevisionByCredential = mapOf(credentialA.id to 2L, credentialB.id to 1L),
-                importedSessionRevisions =
-                    setOf(
-                        ApiSessionImportRevision(importedSession.id, revisionId = 2),
-                        ApiSessionImportRevision(oldRevisionSession.id, revisionId = 1),
-                    ),
-            )
-        assertEquals(listOf(importedSession), split.importedByCredential[credentialA.id])
-        assertEquals(listOf(oldRevisionSession), split.outstandingByCredential[credentialA.id])
-        assertEquals(listOf(neverImportedSession), split.outstandingByCredential[credentialB.id])
-        assertEquals(emptyList(), split.importedByCredential[credentialB.id])
-        assertEquals(2, split.outstandingCount)
-        assertEquals(1, split.importedCount)
-    }
-
-    @Test
-    fun splitSessionsByImportState_retainsSessionlessCredentials() {
-        val sessionless = credential(1, strategyA)
-        val split =
-            splitSessionsByImportState(
-                credentials = listOf(sessionless),
-                sessionsByCredential = emptyMap(),
-                currentStrategyRevisionByCredential = mapOf(sessionless.id to 1L),
-                importedSessionRevisions = emptySet(),
-            )
-        assertEquals(emptyList(), split.outstandingByCredential[sessionless.id])
-        assertEquals(emptyList(), split.importedByCredential[sessionless.id])
-        assertEquals(0, split.outstandingCount)
-        assertEquals(0, split.importedCount)
-    }
-
-    private val strategyA = ApiImportStrategyId(Uuid.parse("00000000-0000-0000-0000-00000000000a"))
-    private val strategyB = ApiImportStrategyId(Uuid.parse("00000000-0000-0000-0000-00000000000b"))
-
-    @Test
-    fun sessionsToImportInBulk_takesNeverImportedSessionsOfTheTargetsOldestFirst() {
-        val target = ApiCredentialId(1)
-        val other = ApiCredentialId(2)
-        val newer = session(3, target).copy(createdAt = Instant.fromEpochSeconds(200))
-        val older = session(4, target).copy(createdAt = Instant.fromEpochSeconds(100))
-        val imported = session(5, target)
-        val otherCredential = session(6, other)
-
-        val toImport =
-            sessionsToImportInBulk(
-                sessions = listOf(newer, imported, otherCredential, older),
-                credentialIds = setOf(target),
-                everImportedSessionIds = setOf(imported.id),
-            )
-
-        assertEquals(listOf(older.id, newer.id), toImport.map { it.id })
-    }
-
-    @Test
-    fun bulkDownloadImportSummary_reportsReviewAndFailuresOnlyWhenPresent() {
-        assertEquals(
-            "Downloaded 2 of 2 connection(s). Imported 2 of 2 session(s).",
-            bulkDownloadImportSummary(credentialCount = 2, downloadedCount = 2, sessionCount = 2, importedCount = 2, needsReviewCount = 0),
-        )
-        assertEquals(
-            "Downloaded 1 of 3 connection(s). Imported 1 of 4 session(s). " +
-                "2 session(s) need new counterparties confirmed; import them from their cards. " +
-                "1 import(s) failed or were skipped; see their tasks.",
-            bulkDownloadImportSummary(credentialCount = 3, downloadedCount = 1, sessionCount = 4, importedCount = 1, needsReviewCount = 2),
-        )
-    }
-
-    private fun credential(
-        id: Long,
-        strategyId: ApiImportStrategyId?,
-    ) = ApiCredential(
-        id = ApiCredentialId(id),
-        createdAt = Instant.DISTANT_PAST,
-        strategyId = strategyId,
-    )
-
-    private fun session(
-        id: Long,
-        credentialId: ApiCredentialId,
-    ) = ApiSession(
-        id = ApiSessionId(id),
-        deviceId = DeviceId(1),
-        createdAt = Instant.DISTANT_PAST,
-        expiresAt = null,
-        credentialId = credentialId,
-    )
 
     private fun request(id: Long) =
         ApiRequest(
