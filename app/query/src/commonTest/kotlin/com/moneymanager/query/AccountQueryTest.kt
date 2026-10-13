@@ -6,11 +6,6 @@ import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.model.WellKnownIds
-import com.moneymanager.domain.repository.AccountAttributeReadRepository
-import com.moneymanager.domain.repository.AccountReadRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
-import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.TransactionReadRepository
 import dev.mokkery.answering.returns
 import dev.mokkery.every
 import dev.mokkery.matcher.any
@@ -29,16 +24,16 @@ class AccountQueryTest {
     private val query =
         AccountQuery(
             accountRepository =
-                mock<AccountReadRepository> { every { getAllAccounts() } returns flowOf(listOf(current, wallet, koinly)) },
+                mock { every { getAllAccounts() } returns flowOf(listOf(current, wallet, koinly)) },
             accountAttributeRepository =
-                mock<AccountAttributeReadRepository> {
+                mock {
                     val type =
                         AttributeType(AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID), "reconciliation-source")
                     every { getByType(any()) } returns
                         flowOf(listOf(AccountAttribute(id = 1, accountId = koinly.id, attributeType = type, value = "Koinly")))
                 },
             transactionRepository =
-                mock<TransactionReadRepository> {
+                mock {
                     every { getAccountBalances() } returns
                         flowOf(
                             listOf(
@@ -49,9 +44,9 @@ class AccountQueryTest {
                             ),
                         )
                 },
-            personRepository = mock<PersonReadRepository> { every { getAllPeople() } returns flowOf(listOf(alice, bob)) },
+            personRepository = mock { every { getAllPeople() } returns flowOf(listOf(alice, bob)) },
             personAccountOwnershipRepository =
-                mock<PersonAccountOwnershipReadRepository> {
+                mock {
                     every { getAllOwnerships() } returns
                         flowOf(
                             listOf(
