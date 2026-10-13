@@ -43,15 +43,14 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
-import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
+import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.importfilesource.DriveFolderBrowser
-import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.screens.accountmapping.AccountMappingsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiSessionsScreen
@@ -71,7 +70,7 @@ fun ImportsScreen(
     importDirectoryRepository: ImportDirectoryReadRepository,
     importTimelineRepository: ImportTimelineReadRepository,
     reconciliationRepository: ReconciliationReadRepository,
-    importFileSourceFactory: ImportFileSourceFactory?,
+    importDirectoryService: ImportDirectoryService,
     driveFolderBrowser: DriveFolderBrowser?,
     csvImportRepository: CsvImportReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
@@ -81,7 +80,6 @@ fun ImportsScreen(
     qifImportRepository: QifImportReadRepository,
     passThroughAccountRepository: PassThroughAccountReadRepository,
     categoryRepository: CategoryReadRepository,
-    settingsRepository: SettingsReadRepository,
     apiSessionRepository: ApiSessionReadRepository,
     apiImportStrategyRepository: ApiImportStrategyReadRepository,
     accountAttributeRepository: AccountAttributeReadRepository,
@@ -151,6 +149,7 @@ fun ImportsScreen(
         when (selectedTab) {
             ImportTab.DIRECTORIES ->
                 ImportDirectoriesScreen(
+                    importDirectoryService = importDirectoryService,
                     importDirectoryRepository = importDirectoryRepository,
                     csvImportRepository = csvImportRepository,
                     qifImportRepository = qifImportRepository,
@@ -158,7 +157,6 @@ fun ImportsScreen(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     deviceId = deviceId,
-                    importFileSourceFactory = importFileSourceFactory,
                     driveFolderBrowser = driveFolderBrowser,
                     onOpenImports = onTabSelected,
                     onOpenAudit = onImportDirectoryAuditClick,
@@ -178,21 +176,16 @@ fun ImportsScreen(
                 )
             ImportTab.CSV ->
                 CsvImportsScreen(
+                    importDirectoryService = importDirectoryService,
                     csvImportRepository = csvImportRepository,
                     importTimelineRepository = importTimelineRepository,
                     importDirectoryRepository = importDirectoryRepository,
                     csvImportStrategyRepository = csvImportStrategyRepository,
-                    accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
-                    accountAttributeRepository = accountAttributeRepository,
                     categoryRepository = categoryRepository,
-                    currencyRepository = currencyRepository,
-                    cryptoRepository = cryptoRepository,
                     personRepository = personRepository,
-                    passThroughAccountRepository = passThroughAccountRepository,
                     transactionRepository = transactionRepository,
                     transferRelationshipRepository = transferRelationshipRepository,
-                    transferSourceRepository = transferSourceRepository,
                     tradeRepository = tradeRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
@@ -201,19 +194,13 @@ fun ImportsScreen(
                 )
             ImportTab.QIF ->
                 QifImportsScreen(
+                    importDirectoryService = importDirectoryService,
                     qifImportRepository = qifImportRepository,
                     importTimelineRepository = importTimelineRepository,
-                    importDirectoryRepository = importDirectoryRepository,
-                    csvImportStrategyRepository = csvImportStrategyRepository,
-                    accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     personRepository = personRepository,
-                    settingsRepository = settingsRepository,
-                    transactionRepository = transactionRepository,
-                    transferSourceRepository = transferSourceRepository,
-                    maintenance = maintenance,
                     importEngine = importEngine,
                     onImportClick = onQifImportClick,
                     onStrategiesClick = onCsvStrategiesClick,

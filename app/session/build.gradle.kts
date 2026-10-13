@@ -13,13 +13,16 @@ kotlin {
                 api(projects.app.db.core)
                 api(projects.app.db.di)
                 api(projects.app.db.write)
+                api(projects.app.importdirectory)
                 api(projects.app.importengineapi)
+                api(projects.app.importfilesource.core)
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.sync)
                 api(projects.app.tasks)
                 api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
 
+                implementation(projects.app.model.repository.read)
                 implementation(libs.kermit)
                 implementation(libs.kotlinx.coroutines.core)
             }
@@ -29,13 +32,16 @@ kotlin {
                 api(projects.app.db.core)
                 api(projects.app.db.di)
                 api(projects.app.db.write)
+                api(projects.app.importdirectory)
                 api(projects.app.importengineapi)
+                api(projects.app.importfilesource.core)
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.sync)
                 api(projects.app.tasks)
                 api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
 
+                implementation(projects.app.model.repository.read)
                 implementation(libs.kermit.core)
                 implementation(libs.kotlinx.coroutines.core)
             }

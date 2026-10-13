@@ -49,6 +49,7 @@ kotlin {
             dependencies {
                 implementation(projects.app.apiimporter)
                 implementation(projects.app.csvimporter)
+                implementation(projects.app.importdirectory)
                 implementation(projects.app.importengineapi)
                 implementation(projects.app.model.accountmapping)
                 implementation(projects.app.model.apistrategy)
@@ -65,6 +66,7 @@ kotlin {
                 implementation(projects.app.qifimporter)
                 implementation(projects.app.reconciliation)
                 implementation(projects.app.strategies)
+                implementation(projects.app.tasks)
                 implementation(projects.test.app.db)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)

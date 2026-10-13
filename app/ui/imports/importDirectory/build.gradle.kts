@@ -4,11 +4,12 @@ plugins {
 }
 
 // Import Directories tab UI: configure local/Drive folders to download importable files from. The
-// scan/download lives in app/csvimporter; this module is just the Compose screen + dialogs.
+// downloads run through app/importdirectory's ImportDirectoryService; this module is just the Compose screen + dialogs.
 kotlin {
     sourceSets {
         getByName("commonMain") {
             dependencies {
+                api(projects.app.importdirectory)
                 api(projects.app.importfilesource.core)
                 api(projects.app.model.core)
                 api(projects.app.model.csv)
@@ -18,7 +19,6 @@ kotlin {
                 api(projects.app.ui.audit)
                 api(projects.app.ui.foundation)
 
-                implementation(projects.app.csvimporter)
                 implementation(projects.app.importengineapi)
                 implementation(projects.app.ui.components)
                 implementation(projects.utils.compose.filePicker)
@@ -31,6 +31,7 @@ kotlin {
                 api(libs.androidx.compose.runtime)
                 api(libs.androidx.compose.ui)
 
+                implementation(projects.app.csvimporter)
                 implementation(projects.app.tasks)
                 implementation(libs.androidx.compose.foundation)
                 implementation(libs.androidx.compose.material3)
@@ -41,6 +42,7 @@ kotlin {
         }
         getByName("jvmMain") {
             dependencies {
+                api(projects.app.importdirectory)
                 api(projects.app.importfilesource.core)
                 api(projects.app.model.core)
                 api(projects.app.model.importdirectory)
@@ -50,6 +52,7 @@ kotlin {
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.layout.desktop)
 
+                implementation(projects.app.csvimporter)
                 implementation(projects.app.model.csv)
                 implementation(projects.app.model.qif)
                 implementation(projects.app.tasks)

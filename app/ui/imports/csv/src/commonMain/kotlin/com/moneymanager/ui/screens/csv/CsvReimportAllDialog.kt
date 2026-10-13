@@ -12,34 +12,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkReimportResult
-import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
-import com.moneymanager.csvimporter.bulkReimportCsv
-import com.moneymanager.csvimporter.selectForCsv
-import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.csv.CsvImport
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.repository.AccountAttributeReadRepository
-import com.moneymanager.domain.repository.AccountMappingReadRepository
-import com.moneymanager.domain.repository.AccountReadRepository
-import com.moneymanager.domain.repository.CryptoReadRepository
-import com.moneymanager.domain.repository.CsvImportReadRepository
-import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
-import com.moneymanager.domain.repository.CurrencyReadRepository
-import com.moneymanager.domain.repository.PassThroughAccountReadRepository
-import com.moneymanager.domain.repository.TradeReadRepository
-import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
-import com.moneymanager.domain.repository.TransferSourceReadRepository
-import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importdirectory.CsvReimportAllPlan
+import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
 import com.moneymanager.ui.components.imports.BulkImportProgressIndicator
 import com.moneymanager.ui.components.imports.BulkMergeReport
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -56,54 +37,21 @@ import kotlinx.coroutines.launch
 @Composable
 fun CsvReimportAllDialog(
     imported: List<CsvImport>,
-    csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    accountMappingRepository: AccountMappingReadRepository,
-    accountRepository: AccountReadRepository,
-    accountAttributeRepository: AccountAttributeReadRepository,
-    currencyRepository: CurrencyReadRepository,
-    cryptoRepository: CryptoReadRepository,
-    passThroughAccountRepository: PassThroughAccountReadRepository,
-    csvImportRepository: CsvImportReadRepository,
-    transactionRepository: TransactionReadRepository,
-    transferRelationshipRepository: TransferRelationshipReadRepository,
-    transferSourceRepository: TransferSourceReadRepository,
-    tradeRepository: TradeReadRepository,
-    maintenance: Maintenance,
-    importEngine: ImportEngine,
+    importDirectoryService: ImportDirectoryService,
     onDismiss: () -> Unit,
     onComplete: () -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val strategies by csvImportStrategyRepository.getAllStrategies().collectAsStateWithSchemaErrorHandling(emptyList())
-    val currencies by currencyRepository.getAllCurrencies().collectAsStateWithSchemaErrorHandling(emptyList())
-    val passThroughAccounts by passThroughAccountRepository.getAll().collectAsStateWithSchemaErrorHandling(emptyList())
-    val accountAttributes by accountAttributeRepository
-        .getAll()
-        .collectAsStateWithSchemaErrorHandling(emptyList())
 
     var isRunning by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<Progress?>(null) }
     var result by remember { mutableStateOf<BulkReimportResult?>(null) }
 
-    // Resolve each file's strategy the same way the re-import will: the one it was last imported with,
-    // falling back to content-aware auto-selection. Lets us report how many files will be skipped (no
-    // matching strategy). getAllImports() omits columns, so re-fetch.
-    var matchedStrategies by remember { mutableStateOf<List<CsvImportStrategy?>?>(null) }
-    LaunchedEffect(imported, strategies) {
-        if (strategies.isEmpty()) {
-            matchedStrategies = null
-            return@LaunchedEffect
-        }
-        matchedStrategies =
-            imported.map { listedImport ->
-                val fullImport = csvImportRepository.getImport(listedImport.id).first() ?: return@map null
-                val sampleRows = csvImportRepository.getImportRows(listedImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
-                fullImport.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
-                    ?: strategies.selectForCsv(fullImport.originalFileName, fullImport.columns, sampleRows)
-            }
-    }
-    val matches = matchedStrategies
-    val skippedNoStrategyCount = if (matches == null) 0 else imported.size - matches.count { it != null }
+    // Resolves each file's strategy the same way the re-import will, so the dialog can say how many files
+    // will be skipped (no matching strategy).
+    var plan by remember { mutableStateOf<CsvReimportAllPlan?>(null) }
+    LaunchedEffect(imported) { plan = importDirectoryService.planCsvReimportAll(imported) }
+    val skippedNoStrategyCount = plan?.skippedNoStrategy ?: 0
 
     BulkImportDialogScaffold(
         pendingTitle = "Re-import all imported files",
@@ -111,31 +59,13 @@ fun CsvReimportAllDialog(
         result = result,
         isRunning = isRunning,
         confirmLabel = "Re-import ${imported.size} files",
-        confirmEnabled = matches != null,
+        confirmEnabled = plan != null,
         onRun = {
+            val ready = plan ?: return@BulkImportDialogScaffold
             isRunning = true
             scope.launch {
                 try {
-                    result =
-                        bulkReimportCsv(
-                            imports = imported,
-                            sourceAccountOverride = null,
-                            strategies = strategies,
-                            currencies = currencies,
-                            accountMappingRepository = accountMappingRepository,
-                            accountRepository = accountRepository,
-                            csvImportRepository = csvImportRepository,
-                            transactionRepository = transactionRepository,
-                            relationshipRepository = transferRelationshipRepository,
-                            transferSourceRepository = transferSourceRepository,
-                            maintenance = maintenance,
-                            importEngine = importEngine,
-                            onProgress = { progress = it },
-                            passThroughAccounts = passThroughAccounts,
-                            cryptoRepository = cryptoRepository,
-                            tradeRepository = tradeRepository,
-                            attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
-                        )
+                    result = importDirectoryService.applyCsvReimportAll(ready, onProgress = { progress = it })
                 } finally {
                     isRunning = false
                 }

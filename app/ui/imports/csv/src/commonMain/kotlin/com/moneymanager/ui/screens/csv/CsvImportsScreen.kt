@@ -41,8 +41,6 @@ import com.moneymanager.compose.filepicker.rememberBinaryFilePicker
 import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
 import com.moneymanager.csv.CsvParseOptions
 import com.moneymanager.csv.CsvParser
-import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
-import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.csvimporter.sha256Hex
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
@@ -54,22 +52,17 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
-import com.moneymanager.domain.repository.AccountAttributeReadRepository
-import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
-import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
-import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
-import com.moneymanager.domain.repository.TransferSourceReadRepository
+import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createCsvImport
 import com.moneymanager.importengineapi.createXlsxImport
@@ -87,7 +80,6 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.xlsx.createXlsxParser
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -95,21 +87,16 @@ import kotlin.time.Clock
 @Suppress("LongParameterList", "LongMethod")
 @Composable
 fun CsvImportsScreen(
+    importDirectoryService: ImportDirectoryService,
     csvImportRepository: CsvImportReadRepository,
     importTimelineRepository: ImportTimelineReadRepository,
     importDirectoryRepository: ImportDirectoryReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
-    accountAttributeRepository: AccountAttributeReadRepository,
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyReadRepository,
-    cryptoRepository: CryptoReadRepository,
     personRepository: PersonReadRepository,
-    passThroughAccountRepository: PassThroughAccountReadRepository,
     transactionRepository: TransactionReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
-    transferSourceRepository: TransferSourceReadRepository,
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
@@ -139,39 +126,12 @@ fun CsvImportsScreen(
     }
     val importDirectories = remember(importDirectoryIds, directories) { resolveImportDirectories(importDirectoryIds, directories) }
 
-    // Unimported files carry no stored strategy, so match one per file the same way "Import all" does
-    // (content/filename-aware, needs each file's columns + sampled rows — not in getAllImports()), to
-    // group the Unimported tab by strategy and flag files with no match. Keyed by import id (not
-    // position) since `imports` can change under this effect between runs.
-    //
-    // `strategies` starts as emptyList() before its flow's first emission (the collectAsState initial
-    // value), which is indistinguishable from a genuinely empty strategy list — so `strategies.isEmpty()`
-    // alone can't tell "still loading" from "user has zero strategies configured". A dedicated
-    // one-shot subscription tracks the real load instead: once it flips, an empty `strategies` correctly
-    // routes every unimported file to "No strategy" rather than getting stuck in "Matching strategies…".
-    var strategiesLoaded by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        csvImportStrategyRepository.getAllStrategies().first()
-        strategiesLoaded = true
-    }
+    // Unimported files carry no stored strategy, so match one per file exactly as "Import all" will, to
+    // group the Unimported tab by strategy and flag files with no match. Re-run when the strategies change.
     val unimportedForMatching = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt == null } }
     var matchedStrategies by remember { mutableStateOf<Map<CsvImportId, CsvImportStrategy?>?>(null) }
-    LaunchedEffect(unimportedForMatching, strategies, strategiesLoaded) {
-        if (!strategiesLoaded) {
-            matchedStrategies = null
-            return@LaunchedEffect
-        }
-        matchedStrategies =
-            unimportedForMatching.associate { listedImport ->
-                val fullImport = csvImportRepository.getImport(listedImport.id).first()
-                val strategy =
-                    fullImport?.let {
-                        val sampleRows =
-                            csvImportRepository.getImportRows(listedImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
-                        strategies.selectForCsv(it.originalFileName, it.columns, sampleRows)
-                    }
-                listedImport.id to strategy
-            }
+    LaunchedEffect(unimportedForMatching, strategies) {
+        matchedStrategies = importDirectoryService.planCsvImportAll(unimportedForMatching).matches
     }
 
     var isImporting by remember { mutableStateOf(false) }
@@ -341,20 +301,10 @@ fun CsvImportsScreen(
             importAllScope?.let { scopedUnimported ->
                 CsvImportAllDialog(
                     unimported = scopedUnimported,
-                    importDirectoryRepository = importDirectoryRepository,
-                    csvImportStrategyRepository = csvImportStrategyRepository,
-                    accountMappingRepository = accountMappingRepository,
+                    importDirectoryService = importDirectoryService,
                     accountRepository = accountRepository,
-                    accountAttributeRepository = accountAttributeRepository,
                     categoryRepository = categoryRepository,
-                    currencyRepository = currencyRepository,
-                    cryptoRepository = cryptoRepository,
-                    tradeRepository = tradeRepository,
                     personRepository = personRepository,
-                    passThroughAccountRepository = passThroughAccountRepository,
-                    csvImportRepository = csvImportRepository,
-                    maintenance = maintenance,
-                    importEngine = importEngine,
                     onDismiss = { importAllScope = null },
                     onComplete = { importAllScope = null },
                 )
@@ -363,20 +313,7 @@ fun CsvImportsScreen(
             reimportAllScope?.let { scopedImported ->
                 CsvReimportAllDialog(
                     imported = scopedImported,
-                    csvImportStrategyRepository = csvImportStrategyRepository,
-                    accountMappingRepository = accountMappingRepository,
-                    accountRepository = accountRepository,
-                    accountAttributeRepository = accountAttributeRepository,
-                    currencyRepository = currencyRepository,
-                    cryptoRepository = cryptoRepository,
-                    passThroughAccountRepository = passThroughAccountRepository,
-                    csvImportRepository = csvImportRepository,
-                    transactionRepository = transactionRepository,
-                    transferRelationshipRepository = transferRelationshipRepository,
-                    transferSourceRepository = transferSourceRepository,
-                    tradeRepository = tradeRepository,
-                    maintenance = maintenance,
-                    importEngine = importEngine,
+                    importDirectoryService = importDirectoryService,
                     onDismiss = { reimportAllScope = null },
                     onComplete = { reimportAllScope = null },
                 )

@@ -65,6 +65,7 @@ kotlin {
             dependencies {
                 api(projects.app.db.di)
                 api(projects.app.db.write)
+                api(projects.app.importdirectory)
                 api(projects.app.model.reconciliation)
                 api(projects.utils.credentialvault)
                 api(libs.androidx.compose.foundation)
@@ -94,6 +95,7 @@ kotlin {
                 api(projects.app.db.core)
                 api(projects.app.db.di)
                 api(projects.app.db.write)
+                api(projects.app.importdirectory)
                 api(projects.app.importengineapi)
                 api(projects.app.importfilesource.core)
                 api(projects.app.model.core)
