@@ -60,7 +60,6 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import co.touchlab.kermit.Logger
 import com.moneymanager.apiimport.API_DOWNLOAD_IMPORT_ALL_TASK_KEY
 import com.moneymanager.apiimport.ApiImportListener
 import com.moneymanager.apiimport.ApiImportService
@@ -130,8 +129,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
-
-private val logger = Logger.withTag("ApiSessionsScreen")
 
 @Composable
 fun ApiSessionsScreen(
