@@ -486,10 +486,9 @@ set of writes.
 
 ### Common Issues
 
-1. **Java**: Requires JDK 25 toolchain. **JVM version sync**: the version is pinned in four places
-   that must move together — `gradle/libs.versions.toml` (`jvm-target`/`jvm-toolchain`),
-   `.github/actions/gradle-setup/action.yml`, `.github/workflows/build.yml` and
-   `.github/workflows/lint-format.yml`
+1. **Java**: Requires JDK 25 toolchain. **JVM version sync**: the version is pinned in two places
+   that must move together — `gradle/libs.versions.toml` (`jvm-target`/`jvm-toolchain`) and
+   `.github/actions/gradle-setup/action.yml`, which every CI job sets up Java through
 2. **Metro**: Keep the Kotlin version compatible with Metro (both in `gradle/libs.versions.toml`). Graphs
    must be `interface`; binding containers `object`
 3. **SQLDelight**: `execute()`/`update()`/`delete()` return `Long`, not `Unit`

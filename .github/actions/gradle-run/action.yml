@@ -34,7 +34,7 @@ runs:
   using: 'composite'
   steps:
     - name: Setup Gradle environment
-      uses: ./.github/actions/gradle-setup
+      uses: $/.github/actions/gradle-setup
       with:
         cache-read-only: ${{ inputs.cache-read-only }}
         cache-encryption-key: ${{ inputs.cache-encryption-key }}

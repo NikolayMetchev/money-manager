@@ -34,10 +34,11 @@ jobs:
           persist-credentials: false  # read-only job, no git push
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/gradle-setup
+        uses: $/.github/actions/gradle-setup
         with:
           cache-read-only: true
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          android-emulator: 'true'
 
       # Same key as build.yml's android-test job, so the snapshot it saves on main is reused here.
       # Saved only from main (below), since a dispatch on a PR branch saves a branch-scoped entry.
