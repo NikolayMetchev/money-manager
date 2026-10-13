@@ -369,8 +369,9 @@ class ApiImportService(
                 readyToImport.close()
             }
             for (session in readyToImport) {
-                val strategy = strategyByCredential[session.credentialId] ?: continue
+                // Counted before the strategy check, so a session whose strategy is gone shows as skipped.
                 sessionCount++
+                val strategy = strategyByCredential[session.credentialId] ?: continue
                 task.report("Importing session #${session.id}; $downloadsLeft download(s) still running.")
                 // Counted as failed in the summary; the queue moves on to the next session.
                 isolatedBulkStep("Bulk import of session ${session.id}") {
