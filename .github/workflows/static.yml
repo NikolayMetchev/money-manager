@@ -50,7 +50,7 @@ jobs:
         # SchemaSpy needs the `dot` binary to render schema relationship diagrams
         run: sudo apt-get update && sudo apt-get install -y graphviz
       - name: Generate database schema docs
-        uses: ./.github/actions/gradle-run
+        uses: $/.github/actions/gradle-run
         with:
           command: ':app:db:schemaspy:publishSchemaSpyDocs --stacktrace'
           cache-read-only: true
@@ -59,7 +59,7 @@ jobs:
         # The module-graph plugin reads the whole project via `allprojects`, which is
         # incompatible with Isolated Projects / the configuration cache, so disable both
         # for this single reporting task. It writes webpage/modules-graph.md.
-        uses: ./.github/actions/gradle-run
+        uses: $/.github/actions/gradle-run
         with:
           command: 'createModuleGraph -Dorg.gradle.isolated-projects=false --no-configuration-cache --stacktrace'
           cache-read-only: true
@@ -67,7 +67,7 @@ jobs:
         # Renders the Kotlin built-in strategy definitions (app/strategies) into
         # webpage/strategy-library/{index.json, *.json} — gitignored, generated per deploy;
         # the app fetches <pages-url>/strategy-library/index.json.
-        uses: ./.github/actions/gradle-run
+        uses: $/.github/actions/gradle-run
         with:
           command: ':tools:strategy-catalog:generateCatalogSite --stacktrace'
           cache-read-only: true
@@ -78,7 +78,7 @@ jobs:
         # reads all subprojects, so — like the module graph above — Isolated Projects and the
         # configuration cache must be disabled for this task. webpage/kdoc is gitignored, generated
         # per deploy.
-        uses: ./.github/actions/gradle-run
+        uses: $/.github/actions/gradle-run
         with:
           command: 'publishKdoc -PenableDokka=true -Dorg.gradle.isolated-projects=false --no-configuration-cache --stacktrace'
           cache-read-only: true

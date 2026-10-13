@@ -69,7 +69,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Build with Gradle
-        uses: ./.github/actions/gradle-run
+        uses: $/.github/actions/gradle-run
         # Default desktop Google OAuth client, injected into the JVM build by the
         # generateGoogleOAuthDefaults task. Scoped to this step only. Empty on forks/PRs without the
         # secrets — the build still compiles and Google Drive reports "not configured".
@@ -91,7 +91,7 @@ jobs:
           kotlin-native: 'true'
 
       - name: Upload coverage and test results to Codecov
-        uses: ./.github/actions/codecov-upload
+        uses: $/.github/actions/codecov-upload
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit
@@ -115,7 +115,7 @@ jobs:
           persist-credentials: false  # read-only job, no git push
 
       - name: Cross-link linuxArm64 test binaries with Gradle
-        uses: ./.github/actions/gradle-run
+        uses: $/.github/actions/gradle-run
         with:
           command: linkDebugTestLinuxArm64 --stacktrace
           # Gradle User Home stays read-only (restored from the build job), but ~/.konan is saved
@@ -171,7 +171,7 @@ jobs:
           persist-credentials: false  # read-only job, no git push
 
       - name: Run macosArm64 tests with Gradle
-        uses: ./.github/actions/gradle-run
+        uses: $/.github/actions/gradle-run
         with:
           command: macosArm64Test --stacktrace
           # The only macOS job, so it saves Gradle User Home and ~/.konan (from main only).
@@ -195,7 +195,7 @@ jobs:
           persist-credentials: false  # read-only job, no git push
 
       - name: Run mingwX64 tests with Gradle
-        uses: ./.github/actions/gradle-run
+        uses: $/.github/actions/gradle-run
         with:
           # Selecting a task by name configures every project, and :app:main:jvm's Compose WiX setup
           # breaks isolated projects on Windows (https://youtrack.jetbrains.com/issue/CMP-8375).
@@ -228,7 +228,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/gradle-setup
+        uses: $/.github/actions/gradle-setup
         with:
           # Read-only (the action's default): restores the build job's Gradle User Home.
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
@@ -298,7 +298,7 @@ jobs:
 
       - name: Upload coverage and test results to Codecov
         if: always() && github.ref == 'refs/heads/main'
-        uses: ./.github/actions/codecov-upload
+        uses: $/.github/actions/codecov-upload
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: instrumented
@@ -332,7 +332,7 @@ jobs:
           persist-credentials: false  # read-only job, no git push
 
       - name: Run buildHealth with Gradle
-        uses: ./.github/actions/gradle-run
+        uses: $/.github/actions/gradle-run
         env:
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
@@ -359,7 +359,7 @@ jobs:
           persist-credentials: false  # read-only job, no git push
 
       - name: Run ProGuard with Gradle
-        uses: ./.github/actions/gradle-run
+        uses: $/.github/actions/gradle-run
         env:
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
@@ -387,7 +387,7 @@ jobs:
           persist-credentials: false  # read-only job, no git push
 
       - name: Package MSI with Gradle
-        uses: ./.github/actions/gradle-run
+        uses: $/.github/actions/gradle-run
         with:
           # Compose configures WiX by registering tasks on the root project, which isolated projects
           # rejects (https://youtrack.jetbrains.com/issue/CMP-8375), so opt out for this build only.
@@ -413,7 +413,7 @@ jobs:
           persist-credentials: false  # read-only job, no git push
 
       - name: Build release APK with Gradle
-        uses: ./.github/actions/gradle-run
+        uses: $/.github/actions/gradle-run
         env:
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
@@ -446,7 +446,7 @@ jobs:
           fetch-depth: 0  # a full history is required for pull request analysis
           persist-credentials: false  # read-only job, no git push
       - name: Generate SQLDelight and Mappie sources
-        uses: ./.github/actions/gradle-run
+        uses: $/.github/actions/gradle-run
         with:
           command: jvmMainClasses
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
@@ -502,7 +502,7 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
 
       - name: Setup Gradle environment
-        uses: ./.github/actions/gradle-setup
+        uses: $/.github/actions/gradle-setup
 
       - name: Run lintFormat
         run: ./gradlew lintFormat --no-daemon -Dktlint.ignoreFailures=true --continue

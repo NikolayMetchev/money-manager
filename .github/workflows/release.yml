@@ -107,7 +107,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Build ${{ matrix.platform }}
-        uses: ./.github/actions/gradle-run
+        uses: $/.github/actions/gradle-run
         with:
           command: ${{ matrix.task }} --stacktrace
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
