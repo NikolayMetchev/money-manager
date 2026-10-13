@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
  * rows imported, emptied import-created accounts removed). Each file's strategy is the one it was last
  * imported with, falling back to content-aware auto-selection (files with no match are skipped). A
  * file whose strategy needs a source account (no SOURCE_ACCOUNT mapping) always resolves it from its
- * own import history ([CsvImportReadRepository.historicalSourceAccounts]) rather than a shared,
+ * own import history (`CsvImportReadRepository.historicalSourceAccounts`) rather than a shared,
  * dialog-level pick — different files can (and do) belong to different accounts, so one shared choice
  * across the whole batch never made sense here. Single confirm + aggregated summary — no per-file
  * preview.
