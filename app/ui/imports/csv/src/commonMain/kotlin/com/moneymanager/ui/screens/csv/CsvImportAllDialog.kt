@@ -12,36 +12,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.csvimporter.AttributeAccountMatcher
-import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
-import com.moneymanager.csvimporter.bulkApplyCsv
-import com.moneymanager.csvimporter.needsSourceAccountOverride
-import com.moneymanager.csvimporter.selectForCsv
-import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.csv.CsvImport
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.repository.AccountAttributeReadRepository
-import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CryptoReadRepository
-import com.moneymanager.domain.repository.CsvImportReadRepository
-import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
-import com.moneymanager.domain.repository.CurrencyReadRepository
-import com.moneymanager.domain.repository.ImportDirectoryReadRepository
-import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.TradeReadRepository
-import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importdirectory.CsvImportAllPlan
+import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
 import com.moneymanager.ui.components.imports.BulkImportProgressIndicator
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -54,77 +36,27 @@ import kotlinx.coroutines.launch
 @Composable
 fun CsvImportAllDialog(
     unimported: List<CsvImport>,
-    importDirectoryRepository: ImportDirectoryReadRepository,
-    csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    accountMappingRepository: AccountMappingReadRepository,
+    importDirectoryService: ImportDirectoryService,
     accountRepository: AccountReadRepository,
-    accountAttributeRepository: AccountAttributeReadRepository,
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyReadRepository,
-    cryptoRepository: CryptoReadRepository,
-    tradeRepository: TradeReadRepository,
     personRepository: PersonReadRepository,
-    passThroughAccountRepository: PassThroughAccountReadRepository,
-    csvImportRepository: CsvImportReadRepository,
-    maintenance: Maintenance,
-    importEngine: ImportEngine,
     onDismiss: () -> Unit,
     onComplete: () -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val strategies by csvImportStrategyRepository.getAllStrategies().collectAsStateWithSchemaErrorHandling(emptyList())
-    val currencies by currencyRepository.getAllCurrencies().collectAsStateWithSchemaErrorHandling(emptyList())
-    val passThroughAccounts by passThroughAccountRepository.getAll().collectAsStateWithSchemaErrorHandling(emptyList())
-    val accountAttributes by accountAttributeRepository
-        .getAll()
-        .collectAsStateWithSchemaErrorHandling(emptyList())
 
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var isImporting by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<Progress?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
 
-    // The account each file's own import directory (or that directory's parent) resolves to, when set.
-    // Takes priority over the shared picker below, so two folders of identically-formatted files (e.g.
-    // main vs joint Monzo exports) each land on their own account without user disambiguation.
-    var directoryAccounts by remember { mutableStateOf<Map<CsvImportId, AccountId>>(emptyMap()) }
-    LaunchedEffect(Unit) {
-        directoryAccounts = importDirectoryRepository.csvImportSourceAccounts()
-    }
-
-    // Match each file's strategy (filename + content aware), so we can tell how many files will be
-    // skipped (no matching strategy) and whether any matched strategy needs a user-chosen source
-    // account. getAllImports() doesn't populate columns, so load each file's columns before matching.
-    // Keyed by import id (not position): `unimported` shrinks as files get imported elsewhere, and a
-    // stale positional list would go out of sync with it between this effect's runs.
-    var matchedStrategies by remember { mutableStateOf<Map<CsvImportId, CsvImportStrategy?>?>(null) }
-    LaunchedEffect(unimported, strategies) {
-        if (strategies.isEmpty()) {
-            matchedStrategies = null
-            return@LaunchedEffect
-        }
-        matchedStrategies =
-            unimported.associate { listedImport ->
-                val fullImport = csvImportRepository.getImport(listedImport.id).first()
-                val strategy =
-                    fullImport?.let {
-                        val sampleRows =
-                            csvImportRepository.getImportRows(listedImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
-                        strategies.selectForCsv(it.originalFileName, it.columns, sampleRows)
-                    }
-                listedImport.id to strategy
-            }
-    }
-    val matches = matchedStrategies
-    val skippedNoStrategyCount =
-        if (matches == null) 0 else unimported.count { matches[it.id] == null }
-    val needsSourceAccount =
-        matches?.let { m ->
-            unimported.any { listedImport ->
-                val strategy = m[listedImport.id]
-                strategy != null && strategy.needsSourceAccountOverride() && listedImport.id !in directoryAccounts
-            }
-        } ?: false
+    // Each file's matched strategy and its import directory's account (which takes priority over the shared
+    // picker below, so two folders of identically-formatted files each land on their own account). Lets the
+    // dialog say how many files will be skipped and whether a shared source account is needed.
+    var plan by remember { mutableStateOf<CsvImportAllPlan?>(null) }
+    LaunchedEffect(unimported) { plan = importDirectoryService.planCsvImportAll(unimported) }
+    val skippedNoStrategyCount = plan?.skippedNoStrategy ?: 0
+    val needsSourceAccount = plan?.needsSourceAccount == true
 
     BulkImportDialogScaffold(
         pendingTitle = "Import all unimported files",
@@ -132,30 +64,13 @@ fun CsvImportAllDialog(
         result = summary,
         isRunning = isImporting,
         confirmLabel = "Import ${unimported.size} files",
-        confirmEnabled = !needsSourceAccount || sourceAccountId != null,
+        confirmEnabled = plan != null && (!needsSourceAccount || sourceAccountId != null),
         onRun = {
+            val ready = plan ?: return@BulkImportDialogScaffold
             isImporting = true
             scope.launch {
                 try {
-                    val result =
-                        bulkApplyCsv(
-                            imports = unimported,
-                            sourceAccountOverride = sourceAccountId,
-                            strategies = strategies,
-                            currencies = currencies,
-                            accountMappingRepository = accountMappingRepository,
-                            accountRepository = accountRepository,
-                            csvImportRepository = csvImportRepository,
-                            maintenance = maintenance,
-                            importEngine = importEngine,
-                            onProgress = { progress = it },
-                            passThroughAccounts = passThroughAccounts,
-                            cryptoRepository = cryptoRepository,
-                            tradeRepository = tradeRepository,
-                            attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
-                            directoryAccounts = directoryAccounts,
-                        )
-                    summary = result.toSummary()
+                    summary = importDirectoryService.applyCsvImportAll(ready, sourceAccountId, onProgress = { progress = it }).toSummary()
                 } finally {
                     isImporting = false
                 }

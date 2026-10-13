@@ -12,29 +12,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.qif.QifImport
-import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
-import com.moneymanager.domain.repository.CurrencyReadRepository
-import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.QifImportReadRepository
-import com.moneymanager.domain.repository.SettingsReadRepository
-import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.setLastQifAccount
-import com.moneymanager.qifimporter.bulkApplyQif
+import com.moneymanager.importdirectory.ImportDirectoryService
+import com.moneymanager.importdirectory.QifImportAllPlan
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
 import com.moneymanager.ui.components.imports.BulkImportProgressIndicator
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -46,45 +35,29 @@ import kotlinx.coroutines.launch
 @Composable
 fun QifImportAllDialog(
     unimported: List<QifImport>,
-    importDirectoryRepository: ImportDirectoryReadRepository,
-    csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    accountMappingRepository: AccountMappingReadRepository,
+    importDirectoryService: ImportDirectoryService,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
-    currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
-    qifImportRepository: QifImportReadRepository,
-    settingsRepository: SettingsReadRepository,
-    maintenance: Maintenance,
-    importEngine: ImportEngine,
     onDismiss: () -> Unit,
     onComplete: () -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val strategies by csvImportStrategyRepository.getAllStrategies().collectAsStateWithSchemaErrorHandling(emptyList())
-    val currencies by currencyRepository.getAllCurrencies().collectAsStateWithSchemaErrorHandling(emptyList())
-    val accounts by accountRepository.getAllAccounts().collectAsStateWithSchemaErrorHandling(emptyList())
 
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var isImporting by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<Progress?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
 
-    // The account each file's own import directory (or that directory's parent) resolves to, when set.
-    // Takes priority over the shared picker below, so two folders of identically-formatted files each
-    // land on their own account without user disambiguation.
-    var directoryAccounts by remember { mutableStateOf<Map<QifImportId, AccountId>>(emptyMap()) }
-    LaunchedEffect(Unit) {
-        directoryAccounts = importDirectoryRepository.qifImportSourceAccounts()
+    // Each file's import directory account takes priority over the shared picker below, so two folders of
+    // identically-formatted files each land on their own account without user disambiguation.
+    var plan by remember { mutableStateOf<QifImportAllPlan?>(null) }
+    LaunchedEffect(unimported) {
+        val planned = importDirectoryService.planQifImportAll(unimported)
+        if (sourceAccountId == null) sourceAccountId = planned.defaultSourceAccountId
+        plan = planned
     }
-    val needsSourceAccount = unimported.any { it.id !in directoryAccounts }
-
-    LaunchedEffect(accounts) {
-        if (sourceAccountId == null) {
-            val last = settingsRepository.getLastQifAccountId().first()
-            if (last != null && accounts.any { it.id == last }) sourceAccountId = last
-        }
-    }
+    val needsSourceAccount = plan?.needsSourceAccount == true
 
     BulkImportDialogScaffold(
         pendingTitle = "Import all unimported files",
@@ -92,27 +65,13 @@ fun QifImportAllDialog(
         result = summary,
         isRunning = isImporting,
         confirmLabel = "Import ${unimported.size} files",
-        confirmEnabled = !needsSourceAccount || sourceAccountId != null,
+        confirmEnabled = plan != null && (!needsSourceAccount || sourceAccountId != null),
         onRun = {
+            val ready = plan ?: return@BulkImportDialogScaffold
             isImporting = true
             scope.launch {
                 try {
-                    val result =
-                        bulkApplyQif(
-                            imports = unimported,
-                            sourceAccountId = sourceAccountId,
-                            strategies = strategies,
-                            currencies = currencies,
-                            accountMappingRepository = accountMappingRepository,
-                            accountRepository = accountRepository,
-                            qifImportRepository = qifImportRepository,
-                            maintenance = maintenance,
-                            importEngine = importEngine,
-                            onProgress = { progress = it },
-                            directoryAccounts = directoryAccounts,
-                        )
-                    sourceAccountId?.let { importEngine.setLastQifAccount(it) }
-                    summary = result.toSummary()
+                    summary = importDirectoryService.applyQifImportAll(ready, sourceAccountId, onProgress = { progress = it }).toSummary()
                 } finally {
                     isImporting = false
                 }

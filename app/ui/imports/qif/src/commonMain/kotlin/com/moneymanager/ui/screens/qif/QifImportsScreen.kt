@@ -20,20 +20,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
 import com.moneymanager.csvimporter.sha256Hex
-import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.QifImportId
-import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
-import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
-import com.moneymanager.domain.repository.SettingsReadRepository
-import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferSourceReadRepository
+import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createQifImport
 import com.moneymanager.importengineapi.setQifImportIgnored
@@ -55,19 +49,13 @@ import kotlin.time.Clock
 @Composable
 @Suppress("LongParameterList")
 fun QifImportsScreen(
+    importDirectoryService: ImportDirectoryService,
     qifImportRepository: QifImportReadRepository,
     importTimelineRepository: ImportTimelineReadRepository,
-    importDirectoryRepository: ImportDirectoryReadRepository,
-    csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    accountMappingRepository: AccountMappingReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
-    settingsRepository: SettingsReadRepository,
-    transactionRepository: TransactionReadRepository,
-    transferSourceRepository: TransferSourceReadRepository,
-    maintenance: Maintenance,
     importEngine: ImportEngine,
     onImportClick: (QifImportId) -> Unit,
     onStrategiesClick: () -> Unit = {},
@@ -179,17 +167,10 @@ fun QifImportsScreen(
             if (showImportAll) {
                 QifImportAllDialog(
                     unimported = unimported,
-                    importDirectoryRepository = importDirectoryRepository,
-                    csvImportStrategyRepository = csvImportStrategyRepository,
-                    accountMappingRepository = accountMappingRepository,
+                    importDirectoryService = importDirectoryService,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
-                    currencyRepository = currencyRepository,
                     personRepository = personRepository,
-                    qifImportRepository = qifImportRepository,
-                    settingsRepository = settingsRepository,
-                    maintenance = maintenance,
-                    importEngine = importEngine,
                     onDismiss = { showImportAll = false },
                     onComplete = { showImportAll = false },
                 )
@@ -198,18 +179,11 @@ fun QifImportsScreen(
             if (showReimportAll) {
                 QifReimportAllDialog(
                     imported = importedList,
-                    csvImportStrategyRepository = csvImportStrategyRepository,
-                    accountMappingRepository = accountMappingRepository,
+                    importDirectoryService = importDirectoryService,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     personRepository = personRepository,
-                    qifImportRepository = qifImportRepository,
-                    transactionRepository = transactionRepository,
-                    transferSourceRepository = transferSourceRepository,
-                    settingsRepository = settingsRepository,
-                    maintenance = maintenance,
-                    importEngine = importEngine,
                     onDismiss = { showReimportAll = false },
                     onComplete = { showReimportAll = false },
                 )

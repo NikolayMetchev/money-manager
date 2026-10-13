@@ -60,6 +60,7 @@ import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.remotestorage.sync.SyncState
 import com.moneymanager.remotestorage.sync.SyncStatus
+import com.moneymanager.session.importDirectoryService
 import com.moneymanager.strategycatalog.StrategyCatalogController
 import com.moneymanager.ui.components.DefaultCurrencyInitDialog
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
@@ -133,6 +134,10 @@ fun MoneyManagerApp(
     ProvideSchemaAwareScope {
         val scope = rememberSchemaAwareCoroutineScope()
         val taskManager = rememberTaskManager(scope)
+        // One per database: its write lock keeps concurrent directory downloads (which outlive any screen)
+        // from interleaving engine writes.
+        val importDirectoryService =
+            remember(services, importFileSourceFactory) { services.importDirectoryService(importFileSourceFactory) }
         val backStack = rememberNavBackStack(ScreenSavedStateConfiguration, Screen.Accounts())
         val navigationHistory = remember(backStack) { NavigationHistory(backStack) }
         val currentScreen = navigationHistory.currentScreen
@@ -206,6 +211,7 @@ fun MoneyManagerApp(
                         strategyCatalogController = strategyCatalogController,
                         strategySyncController = strategySyncController,
                         importFileSourceFactory = importFileSourceFactory,
+                        importDirectoryService = importDirectoryService,
                         driveFolderBrowser = driveFolderBrowser,
                         // The database was chosen just before the wizard on a first run; a manual re-run from
                         // Settings leaves the current database alone, so that step isn't part of it.
@@ -610,7 +616,7 @@ fun MoneyManagerApp(
                                                 importDirectoryRepository = services.imports.importDirectoryRepository,
                                                 importTimelineRepository = services.imports.importTimelineRepository,
                                                 reconciliationRepository = services.imports.reconciliationRepository,
-                                                importFileSourceFactory = importFileSourceFactory,
+                                                importDirectoryService = importDirectoryService,
                                                 driveFolderBrowser = driveFolderBrowser,
                                                 csvImportRepository = services.imports.csvImportRepository,
                                                 csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
@@ -620,7 +626,6 @@ fun MoneyManagerApp(
                                                 qifImportRepository = services.imports.qifImportRepository,
                                                 passThroughAccountRepository = services.imports.passThroughAccountRepository,
                                                 categoryRepository = services.accounts.categoryRepository,
-                                                settingsRepository = services.settings.settingsRepository,
                                                 apiSessionRepository = services.imports.apiSessionRepository,
                                                 apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
                                                 accountAttributeRepository = services.accounts.accountAttributeRepository,

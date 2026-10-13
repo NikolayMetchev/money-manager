@@ -13,31 +13,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.BulkReimportResult
-import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.qif.QifImport
-import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.QifImportReadRepository
-import com.moneymanager.domain.repository.SettingsReadRepository
-import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferSourceReadRepository
-import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.qifimporter.bulkReimportQif
+import com.moneymanager.importdirectory.ImportDirectoryService
+import com.moneymanager.importdirectory.QifReimportAllPlan
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
 import com.moneymanager.ui.components.imports.BulkImportProgressIndicator
 import com.moneymanager.ui.components.imports.BulkMergeReport
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -52,25 +43,15 @@ import kotlinx.coroutines.launch
 @Composable
 fun QifReimportAllDialog(
     imported: List<QifImport>,
-    csvImportStrategyRepository: CsvImportStrategyReadRepository,
-    accountMappingRepository: AccountMappingReadRepository,
+    importDirectoryService: ImportDirectoryService,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
-    qifImportRepository: QifImportReadRepository,
-    transactionRepository: TransactionReadRepository,
-    transferSourceRepository: TransferSourceReadRepository,
-    settingsRepository: SettingsReadRepository,
-    maintenance: Maintenance,
-    importEngine: ImportEngine,
     onDismiss: () -> Unit,
     onComplete: () -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val strategies by csvImportStrategyRepository.getAllStrategies().collectAsStateWithSchemaErrorHandling(emptyList())
-    val currencies by currencyRepository.getAllCurrencies().collectAsStateWithSchemaErrorHandling(emptyList())
-    val accounts by accountRepository.getAllAccounts().collectAsStateWithSchemaErrorHandling(emptyList())
 
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
@@ -78,17 +59,12 @@ fun QifReimportAllDialog(
     var progress by remember { mutableStateOf<Progress?>(null) }
     var result by remember { mutableStateOf<BulkReimportResult?>(null) }
 
-    LaunchedEffect(accounts) {
-        if (sourceAccountId == null) {
-            val last = settingsRepository.getLastQifAccountId().first()
-            if (last != null && accounts.any { it.id == last }) sourceAccountId = last
-        }
-    }
-    LaunchedEffect(currencies) {
-        if (selectedCurrencyId == null && currencies.isNotEmpty()) {
-            val defaultId = settingsRepository.getDefaultCurrencyId().first()
-            selectedCurrencyId = defaultId?.takeIf { id -> currencies.any { it.id == id } } ?: currencies.firstOrNull()?.id
-        }
+    var plan by remember { mutableStateOf<QifReimportAllPlan?>(null) }
+    LaunchedEffect(imported) {
+        val planned = importDirectoryService.planQifReimportAll(imported)
+        if (sourceAccountId == null) sourceAccountId = planned.defaultSourceAccountId
+        if (selectedCurrencyId == null) selectedCurrencyId = planned.defaultCurrencyId
+        plan = planned
     }
 
     BulkImportDialogScaffold(
@@ -97,27 +73,14 @@ fun QifReimportAllDialog(
         result = result,
         isRunning = isRunning,
         confirmLabel = "Re-import ${imported.size} files",
-        confirmEnabled = selectedCurrencyId != null,
+        confirmEnabled = plan != null && selectedCurrencyId != null,
         onRun = {
+            val ready = plan ?: return@BulkImportDialogScaffold
+            val currencyId = selectedCurrencyId ?: return@BulkImportDialogScaffold
             isRunning = true
             scope.launch {
                 try {
-                    result =
-                        bulkReimportQif(
-                            imports = imported,
-                            sourceAccountOverride = sourceAccountId,
-                            currencyId = selectedCurrencyId,
-                            strategies = strategies,
-                            currencies = currencies,
-                            accountMappingRepository = accountMappingRepository,
-                            accountRepository = accountRepository,
-                            qifImportRepository = qifImportRepository,
-                            transactionRepository = transactionRepository,
-                            transferSourceRepository = transferSourceRepository,
-                            maintenance = maintenance,
-                            importEngine = importEngine,
-                            onProgress = { progress = it },
-                        )
+                    result = importDirectoryService.applyQifReimportAll(ready, sourceAccountId, currencyId, onProgress = { progress = it })
                 } finally {
                     isRunning = false
                 }

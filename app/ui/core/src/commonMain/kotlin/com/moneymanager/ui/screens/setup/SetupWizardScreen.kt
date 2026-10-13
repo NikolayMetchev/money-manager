@@ -18,6 +18,7 @@ import com.moneymanager.currency.Currency
 import com.moneymanager.database.di.AppServices
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.setDefaultCurrency
 import com.moneymanager.importengineapi.setSetupWizardCompleted
 import com.moneymanager.importfilesource.DriveFolderBrowser
@@ -54,6 +55,7 @@ fun SetupWizardScreen(
     strategyCatalogController: StrategyCatalogController?,
     strategySyncController: StrategySyncController?,
     importFileSourceFactory: ImportFileSourceFactory?,
+    importDirectoryService: ImportDirectoryService,
     driveFolderBrowser: DriveFolderBrowser?,
     includeDatabaseStep: Boolean,
     onFinished: () -> Unit,
@@ -139,7 +141,7 @@ fun SetupWizardScreen(
             appVersion = appVersion,
             strategyCatalogController = strategyCatalogController,
             strategySyncController = strategySyncController,
-            importFileSourceFactory = importFileSourceFactory,
+            importDirectoryService = importDirectoryService,
             driveFolderBrowser = driveFolderBrowser,
             selectedCurrencyId = selectedCurrencyId,
             onCurrencySelected = { selectedCurrencyId = it },
@@ -155,7 +157,7 @@ private fun ColumnScope.StepBody(
     appVersion: AppVersion,
     strategyCatalogController: StrategyCatalogController?,
     strategySyncController: StrategySyncController?,
-    importFileSourceFactory: ImportFileSourceFactory?,
+    importDirectoryService: ImportDirectoryService,
     driveFolderBrowser: DriveFolderBrowser?,
     selectedCurrencyId: CurrencyId?,
     onCurrencySelected: (CurrencyId) -> Unit,
@@ -202,6 +204,7 @@ private fun ColumnScope.StepBody(
             }
         SetupWizardStep.IMPORT_DIRECTORIES ->
             ImportDirectoriesScreen(
+                importDirectoryService = importDirectoryService,
                 importDirectoryRepository = services.imports.importDirectoryRepository,
                 csvImportRepository = services.imports.csvImportRepository,
                 qifImportRepository = services.imports.qifImportRepository,
@@ -209,7 +212,6 @@ private fun ColumnScope.StepBody(
                 categoryRepository = services.accounts.categoryRepository,
                 personRepository = services.people.personRepository,
                 deviceId = services.deviceId,
-                importFileSourceFactory = importFileSourceFactory,
                 driveFolderBrowser = driveFolderBrowser,
             )
         SetupWizardStep.API_IMPORTS ->
