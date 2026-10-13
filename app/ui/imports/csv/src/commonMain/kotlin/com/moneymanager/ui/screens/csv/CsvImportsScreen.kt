@@ -131,7 +131,7 @@ fun CsvImportsScreen(
     val unimportedForMatching = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt == null } }
     var matchedStrategies by remember { mutableStateOf<Map<CsvImportId, CsvImportStrategy?>?>(null) }
     LaunchedEffect(unimportedForMatching, strategies) {
-        matchedStrategies = importDirectoryService.planCsvImportAll(unimportedForMatching).matches
+        matchedStrategies = importDirectoryService.matchCsvStrategies(unimportedForMatching)
     }
 
     var isImporting by remember { mutableStateOf(false) }

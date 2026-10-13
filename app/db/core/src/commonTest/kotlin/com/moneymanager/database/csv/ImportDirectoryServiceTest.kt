@@ -218,6 +218,29 @@ class ImportDirectoryServiceTest : DbTest() {
         }
 
     @Test
+    fun `a failed subfolder search does not stop a folder downloading its own files`() =
+        runTest {
+            val root = directory("root")
+            val factory =
+                FakeFileSourceFactory(
+                    folders = mapOf("/fake/root" to FakeFolder(files = mapOf("a.csv" to plainCsv), subfolders = listOf("/fake/root/sub"))),
+                    failing = setOf("/fake/root/sub"),
+                )
+
+            val (result, tasks) = backgroundScope.runTask { service(factory).downloadDirectory(this, root) }
+
+            assertEquals(1, result.scan.filesDownloaded, "the folder's own file still downloads")
+            assertEquals(null, result.createdSubfolders, "the failed search created nothing")
+            assertTrue(
+                tasks
+                    .single { it.parentId == null }
+                    .issues
+                    .single()
+                    .startsWith("root — couldn't search its subfolders: "),
+            )
+        }
+
+    @Test
     fun `local folders only scan on the device that added them`() =
         runTest {
             val dir = directory("local")

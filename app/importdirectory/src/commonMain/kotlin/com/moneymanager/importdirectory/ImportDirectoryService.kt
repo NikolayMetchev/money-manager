@@ -214,9 +214,17 @@ class ImportDirectoryService(
                 val created =
                     async(Dispatchers.IO) {
                         if (directory.topLevel) {
-                            task.child(subfolderSearchTaskKey(directory.id), "Subfolders of ${directory.name}", "Searching…") {
-                                val known = importDirectoryRepository.getAllDirectories().first()
-                                createSubdirectories(directory, known.associateByTo(mutableMapOf()) { it.folderRef })
+                            // A failed search is reported without cancelling the folder's own download.
+                            try {
+                                task.child(subfolderSearchTaskKey(directory.id), "Subfolders of ${directory.name}", "Searching…") {
+                                    val known = importDirectoryRepository.getAllDirectories().first()
+                                    createSubdirectories(directory, known.associateByTo(mutableMapOf()) { it.folderRef })
+                                }
+                            } catch (cancellation: CancellationException) {
+                                throw cancellation
+                            } catch (expected: Exception) {
+                                task.reportIssue("${directory.name} — couldn't search its subfolders: ${expected.message}")
+                                null
                             }
                         } else {
                             null
@@ -310,7 +318,7 @@ class ImportDirectoryService(
         val files = imports ?: unimportedCsvFiles()
         val strategies = csvImportStrategyRepository.getAllStrategies().first()
         val directoryAccounts = importDirectoryRepository.csvImportSourceAccounts()
-        val matches = files.associate { it.id to matchCsvStrategy(it, strategies, preferLastApplied = false) }
+        val matches = matchCsvStrategies(files, strategies)
         val needsSourceAccountIds =
             files
                 .filter { file -> matches[file.id]?.needsSourceAccountOverride() == true && file.id !in directoryAccounts }
@@ -335,6 +343,15 @@ class ImportDirectoryService(
             needsSourceAccountIds = needsSourceAccountIds,
         )
     }
+
+    /** Each of [files]' strategy as "import all" would match it (null = no match), without the rest of a plan. */
+    suspend fun matchCsvStrategies(files: List<CsvImport>): Map<CsvImportId, CsvImportStrategy?> =
+        matchCsvStrategies(files, csvImportStrategyRepository.getAllStrategies().first())
+
+    private suspend fun matchCsvStrategies(
+        files: List<CsvImport>,
+        strategies: List<CsvImportStrategy>,
+    ): Map<CsvImportId, CsvImportStrategy?> = files.associate { it.id to matchCsvStrategy(it, strategies, preferLastApplied = false) }
 
     /**
      * Applies [plan]. A file whose folder gives no account uses [sourceAccountOverride] when its strategy
