@@ -243,29 +243,18 @@ fun ApiSessionsScreen(
 
     // Keeps the cards current while a download or import runs, whichever button started it.
     val importListener =
-        object : ApiImportListener {
-            override fun onSessionCreated(
-                credentialId: ApiCredentialId,
-                sessionId: ApiSessionId,
-            ) = refresh()
-
-            override fun onDownloaded(
-                credentialId: ApiCredentialId,
-                result: ApiSessionDownloadResult,
-            ) {
+        ApiImportListener(
+            onSessionCreated = { _, _ -> refresh() },
+            onDownloaded = { credentialId, result ->
                 downloadResultByCredential = downloadResultByCredential + (credentialId to result)
                 refresh()
-            }
-
-            override fun onImported(
-                sessionId: ApiSessionId,
-                result: ApiSessionImportResult,
-            ) {
+            },
+            onImported = { sessionId, result ->
                 importResultBySession = importResultBySession + (sessionId to result)
                 refresh()
                 onTransactionsImported()
-            }
-        }
+            },
+        )
 
     fun startImport(
         session: ApiSession,

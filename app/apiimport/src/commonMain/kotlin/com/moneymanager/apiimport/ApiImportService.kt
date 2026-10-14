@@ -99,26 +99,19 @@ data class ApiDownloadAndImportAllResult(
         )
 }
 
-/** What a front end hears while a download or import runs, to keep its own view of the sessions current. */
-interface ApiImportListener {
-    /** [credentialId]'s download created [sessionId], before any request is made. */
-    fun onSessionCreated(
-        credentialId: ApiCredentialId,
-        sessionId: ApiSessionId,
-    ) {}
-
-    fun onDownloaded(
-        credentialId: ApiCredentialId,
-        result: ApiSessionDownloadResult,
-    ) {}
-
-    fun onImported(
-        sessionId: ApiSessionId,
-        result: ApiSessionImportResult,
-    ) {}
-
+/**
+ * What a front end hears while a download or import runs, to keep its own view of the sessions current.
+ * Every callback defaults to doing nothing, so a front end (the CLI) passes only the ones it needs.
+ *
+ * @property onSessionCreated a credential's download created a session, before any request is made.
+ */
+class ApiImportListener(
+    val onSessionCreated: (ApiCredentialId, ApiSessionId) -> Unit = { _, _ -> },
+    val onDownloaded: (ApiCredentialId, ApiSessionDownloadResult) -> Unit = { _, _ -> },
+    val onImported: (ApiSessionId, ApiSessionImportResult) -> Unit = { _, _ -> },
+) {
     companion object {
-        val None: ApiImportListener = object : ApiImportListener {}
+        val None = ApiImportListener()
     }
 }
 
