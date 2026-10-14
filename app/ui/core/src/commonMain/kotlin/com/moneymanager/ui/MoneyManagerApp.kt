@@ -60,6 +60,7 @@ import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.remotestorage.sync.SyncState
 import com.moneymanager.remotestorage.sync.SyncStatus
+import com.moneymanager.session.apiImportService
 import com.moneymanager.session.importDirectoryService
 import com.moneymanager.strategycatalog.StrategyCatalogController
 import com.moneymanager.ui.components.DefaultCurrencyInitDialog
@@ -67,6 +68,7 @@ import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalDeviceId
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.navigation.ImportTab
@@ -138,6 +140,8 @@ fun MoneyManagerApp(
         // from interleaving engine writes.
         val importDirectoryService =
             remember(services, importFileSourceFactory) { services.importDirectoryService(importFileSourceFactory) }
+        val credentialVault = LocalCredentialVault.current
+        val apiImportService = remember(services, credentialVault) { services.apiImportService(credentialVault) }
         val backStack = rememberNavBackStack(ScreenSavedStateConfiguration, Screen.Accounts())
         val navigationHistory = remember(backStack) { NavigationHistory(backStack) }
         val currentScreen = navigationHistory.currentScreen
@@ -212,6 +216,7 @@ fun MoneyManagerApp(
                         strategySyncController = strategySyncController,
                         importFileSourceFactory = importFileSourceFactory,
                         importDirectoryService = importDirectoryService,
+                        apiImportService = apiImportService,
                         driveFolderBrowser = driveFolderBrowser,
                         // The database was chosen just before the wizard on a first run; a manual re-run from
                         // Settings leaves the current database alone, so that step isn't part of it.
@@ -617,6 +622,7 @@ fun MoneyManagerApp(
                                                 importTimelineRepository = services.imports.importTimelineRepository,
                                                 reconciliationRepository = services.imports.reconciliationRepository,
                                                 importDirectoryService = importDirectoryService,
+                                                apiImportService = apiImportService,
                                                 driveFolderBrowser = driveFolderBrowser,
                                                 csvImportRepository = services.imports.csvImportRepository,
                                                 csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
@@ -972,6 +978,7 @@ fun MoneyManagerApp(
                                             ApiConnectionsScreen(
                                                 apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
                                                 apiSessionRepository = services.imports.apiSessionRepository,
+                                                apiImportService = apiImportService,
                                                 onBack = { navigationHistory.navigateBack() },
                                             )
                                         }

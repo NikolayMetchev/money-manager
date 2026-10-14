@@ -63,6 +63,7 @@ kotlin {
         }
         getByName("androidMain") {
             dependencies {
+                api(projects.app.apiimport)
                 api(projects.app.db.di)
                 api(projects.app.db.write)
                 api(projects.app.importdirectory)
@@ -92,6 +93,7 @@ kotlin {
         }
         getByName("jvmMain") {
             dependencies {
+                api(projects.app.apiimport)
                 api(projects.app.db.core)
                 api(projects.app.db.di)
                 api(projects.app.db.write)
@@ -136,6 +138,7 @@ kotlin {
         }
         getByName("jvmTest") {
             dependencies {
+                implementation(projects.app.apiimport)
                 implementation(projects.app.apiimporter)
                 implementation(projects.app.csvimporter)
                 implementation(projects.app.db.di)
@@ -161,6 +164,7 @@ kotlin {
             // Note: Cannot use dependsOn(commonTest) due to source set tree restrictions
             // Tests are shared via kotlin.srcDir() below
             dependencies {
+                implementation(projects.app.apiimport)
                 implementation(projects.app.db.di)
                 implementation(projects.app.db.write)
                 implementation(projects.app.importer)
@@ -184,6 +188,7 @@ kotlin {
         }
         getByName("androidHostTest") {
             dependencies {
+                implementation(projects.app.apiimport)
                 implementation(projects.app.db.di)
                 implementation(projects.app.db.write)
                 implementation(projects.app.importer)

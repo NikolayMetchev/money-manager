@@ -16,59 +16,34 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import co.touchlab.kermit.Logger
-import com.moneymanager.credentialvault.CredentialVault
+import com.moneymanager.apiimport.ApiImportService
+import com.moneymanager.apiimport.strategiesMissingConnections
 import com.moneymanager.credentialvault.CredentialVaultLockedException
-import com.moneymanager.credentialvault.StoredApiCredential
 import com.moneymanager.credentialvault.VaultState
 import com.moneymanager.domain.model.ApiCredential
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.importengineapi.ensureApiCredentials
-import com.moneymanager.ui.api.sca.generateScaKeyPair
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalCredentialVault
-import com.moneymanager.ui.foundation.LocalImportEngine
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlin.time.Clock
-
-private val logger = Logger.withTag("ApiCredentialVaultSupport")
 
 /**
  * Gives every installed strategy that has secrets in the unlocked credential vault a connection row in
- * the database. This is what makes a recreated database pick its APIs straight back up: reinstall the
- * strategy, unlock the vault, and it's connected again with no token re-entry.
+ * the database (see [ApiImportService.ensureConnections]), whenever the vault unlocks or the strategies
+ * change. This is what makes a recreated database pick its APIs straight back up.
  */
 @Composable
 internal fun EnsureApiConnectionRows(
+    apiImportService: ApiImportService,
     strategies: List<ApiImportStrategy>,
     credentialRows: List<ApiCredential>,
     onCreated: () -> Unit = {},
 ) {
     val vault = LocalCredentialVault.current
-    val importEngine = LocalImportEngine.current
     val vaultState by vault.state.collectAsState()
     val bundle = (vaultState as? VaultState.Unlocked)?.bundle ?: return
-    val connectedStrategyIds = credentialRows.mapNotNull { it.strategyId }.toSet()
-    val missing =
-        strategies
-            .filter { it.id !in connectedStrategyIds && bundle.apiCredential(it.name) != null }
-            .map { it.id }
-            .toSet()
+    val missing = strategiesMissingConnections(strategies, credentialRows, bundle)
     LaunchedEffect(missing) {
-        if (missing.isEmpty()) return@LaunchedEffect
-        // Best effort: editing may be locked (a cloud-backed database whose remote copy is ahead), and this
-        // runs unprompted whenever the screen opens. The rows stay missing, so a later visit retries.
-        try {
-            importEngine.ensureApiCredentials(missing, Clock.System.now())
-            onCreated()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (expected: Exception) {
-            logger.e(expected) { "Couldn't create API connection rows: ${expected.message}" }
-        }
+        if (missing.isNotEmpty() && apiImportService.ensureConnections() > 0) onCreated()
     }
 }
 
@@ -104,44 +79,4 @@ internal fun CredentialsLockedBanner(reason: String) {
             ) { Text("Unlock credentials") }
         }
     }
-}
-
-/**
- * Generates a fresh SCA signing key pair and stores it with [strategyName]'s credentials. Returns null on
- * success, or a message for the signing-key section when the vault stays locked or can't be written.
- */
-internal suspend fun CredentialVault.storeNewSigningKey(strategyName: String): String? =
-    try {
-        val keyPair = withContext(Dispatchers.Default) { generateScaKeyPair() }
-        update("Save the $strategyName signing key") { bundle ->
-            val existing = bundle.apiCredential(strategyName) ?: return@update bundle
-            bundle.withApiCredential(existing.copy(privateKeyPem = keyPair.privateKeyPem, publicKeyPem = keyPair.publicKeyPem))
-        }
-        null
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (_: CredentialVaultLockedException) {
-        "Unlock your credential file to save the signing key."
-    } catch (expected: Exception) {
-        "Couldn't save the signing key: ${expected.message ?: expected::class.simpleName}"
-    }
-
-/** Why a download can't get the secrets it needs, worded for the user. */
-internal class MissingApiSecretsException(
-    message: String,
-) : Exception(message)
-
-/**
- * [strategy]'s secrets from the vault, prompting to unlock it first. Throws [MissingApiSecretsException]
- * when the user declines to unlock or nothing is saved for the strategy.
- */
-internal suspend fun CredentialVault.downloadSecretsFor(strategy: ApiImportStrategy): StoredApiCredential {
-    val bundle =
-        try {
-            requireUnlocked("Download ${strategy.name}")
-        } catch (_: CredentialVaultLockedException) {
-            throw MissingApiSecretsException("Your credentials are locked; unlock them to download.")
-        }
-    return bundle.apiCredential(strategy.name)
-        ?: throw MissingApiSecretsException("No ${strategy.name} credentials are saved in your credential file; reconnect it.")
 }

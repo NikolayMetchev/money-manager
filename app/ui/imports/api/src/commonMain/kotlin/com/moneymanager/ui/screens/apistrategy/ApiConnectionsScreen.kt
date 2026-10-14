@@ -31,6 +31,8 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.moneymanager.apiimport.ApiImportService
+import com.moneymanager.apiimport.storeNewSigningKey
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.StoredApiCredential
 import com.moneymanager.credentialvault.VaultState
@@ -62,6 +64,7 @@ import kotlin.time.Clock
 fun ApiConnectionsScreen(
     apiImportStrategyRepository: ApiImportStrategyReadRepository,
     apiSessionRepository: ApiSessionReadRepository,
+    apiImportService: ApiImportService,
     showHeader: Boolean = true,
     onBack: (() -> Unit)? = null,
 ) {
@@ -77,7 +80,7 @@ fun ApiConnectionsScreen(
     val credentialByStrategy =
         strategies.mapNotNull { strategy -> bundle?.apiCredential(strategy.name)?.let { strategy.id to it } }.toMap()
 
-    EnsureApiConnectionRows(strategies = strategies, credentialRows = credentialRows)
+    EnsureApiConnectionRows(apiImportService = apiImportService, strategies = strategies, credentialRows = credentialRows)
 
     // Skipping is a "not now", not a decision worth persisting: the row stays listed as not connected, so the
     // checklist itself is the reminder. Forgotten when the screen goes away.

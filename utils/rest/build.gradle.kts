@@ -30,6 +30,7 @@ kotlin {
 
         androidMain {
             dependencies {
+                implementation(libs.cryptography.bigint)
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
 
@@ -50,6 +51,7 @@ kotlin {
                 api(projects.app.model.apistrategy)
 
                 implementation(projects.app.model.core)
+                implementation(libs.cryptography.bigint)
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
 

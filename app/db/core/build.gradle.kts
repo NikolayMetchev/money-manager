@@ -47,6 +47,7 @@ kotlin {
 
         getByName("commonTest") {
             dependencies {
+                implementation(projects.app.apiimport)
                 implementation(projects.app.apiimporter)
                 implementation(projects.app.csvimporter)
                 implementation(projects.app.importdirectory)
@@ -68,8 +69,11 @@ kotlin {
                 implementation(projects.app.strategies)
                 implementation(projects.app.tasks)
                 implementation(projects.test.app.db)
+                implementation(projects.test.utils.credentialvault)
+                implementation(projects.utils.credentialvault)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.ktor.client.mock)
             }
         }
 
@@ -101,6 +105,9 @@ kotlin {
                 implementation(projects.app.db.read)
                 implementation(projects.app.importfilesource.core)
                 implementation(projects.app.model.rules)
+                implementation(projects.utils.localsettings)
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.http)
                 implementation(libs.sqldelight.runtime)
             }
         }
@@ -121,6 +128,9 @@ kotlin {
                 implementation(projects.app.db.di)
                 implementation(projects.app.importfilesource.core)
                 implementation(projects.app.model.rules)
+                implementation(projects.utils.localsettings)
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.http)
                 implementation(libs.sqldelight.runtime)
             }
         }
