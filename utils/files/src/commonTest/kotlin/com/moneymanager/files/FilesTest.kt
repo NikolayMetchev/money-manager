@@ -56,6 +56,15 @@ class FilesTest {
     }
 
     @Test
+    fun appendTextCreatesThenAppends() {
+        val file = Path(dir, "mm.log")
+        appendText(file, "one\n")
+        appendText(file, "two\n")
+
+        assertEquals("one\ntwo\n", readText(file))
+    }
+
+    @Test
     fun absolutePathKeepsAbsoluteAndResolvesRelative() {
         assertEquals(dir, absolutePath(dir))
         val relative = absolutePath(Path("missing.db"))

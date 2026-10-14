@@ -8,6 +8,7 @@ import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.importfilesource.ImportSubfolder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 import kotlinx.io.IOException
 import kotlinx.io.files.FileMetadata

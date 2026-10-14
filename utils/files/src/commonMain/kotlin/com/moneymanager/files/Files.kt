@@ -50,6 +50,15 @@ fun writeText(
     SystemFileSystem.sink(path).buffered().use { it.writeString(text) }
 }
 
+/** Appends [text] to [path], creating it and its parent directories if missing. */
+fun appendText(
+    path: Path,
+    text: String,
+) {
+    path.parent?.let { SystemFileSystem.createDirectories(it) }
+    SystemFileSystem.sink(path, append = true).buffered().use { it.writeString(text) }
+}
+
 /**
  * Replaces [path] with [bytes], creating its parent directories. Writes beside the target and renames over
  * it, so a crash mid-write leaves the old file intact.

@@ -126,6 +126,7 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 | `test/{app/db,app/ui,utils/credentialvault}/` | Test fixtures only (see **Testing**) |
 | `app/main/jvm/` | JVM Desktop entry point |
 | `app/main/android/` | Android entry point |
+| `app/main/cli/` | `mm`, the command-line client (Clikt): native executables for every native target, plus a JVM build the desktop installer starts as `mm-jvm` on its bundled runtime — see **CLI** |
 | `app/main/android-smoketest/` | Self-instrumenting UiAutomator smoke test of the R8-minified release APK (only included in the build with `-PreleaseSmokeTest=true`) |
 
 ### Domain Entities
@@ -410,6 +411,29 @@ log4j's console and rolling-file appenders (`log4j2.xml`). Android keeps Kermit'
 must write to stderr, never stdout, so logs can't corrupt its JSON output, and `--quiet` should drop
 the writers or raise the minimum severity.
 
+## CLI
+
+`mm` (`app/main/cli`) opens databases through `DatabaseSessions` like the desktop app, so it adds only how it asks
+the person. **Global options**: `--db` (default: the last database either front end opened, from the shared
+settings file), `--format json|table` (table in a terminal, JSON when stdout is redirected), `--quiet`,
+`--verbose`. **Exit codes**: 0 ok, 1 error, 2 usage, 3 partial failure or needs attention (`NeedsAttention`).
+stdout carries only the result: prompts, warnings and errors go to stderr, and Info+ logs to
+`~/.moneymanager/logs/mm.log`.
+
+- **Vault**: `VaultUnlocker` answers `CredentialVault.unlockRequest` for the life of a command (otherwise
+  `requireUnlocked` hangs). Password from `--vault-password-stdin`, then `MM_VAULT_PASSWORD`, then a no-echo prompt;
+  with no vault file it offers to create one at the default path (terminal only). It never stores the password.
+- **Cloud-backed databases**: opened from the kept local copy (no password, no network) unless `--hydrate`
+  re-downloads first. When the cloud password is known (`MM_REMOTE_PASSWORD` or a prompt) the remote is checked,
+  so the edit gate refuses writes while it's ahead. On exit a changed copy gets the desktop close dialog's choices
+  (`closeDecision`/`performClose` in `app/session`, shared with `Main.kt`) as prompts, or `--push/--no-push` and
+  `--keep-local/--drop-local`. A refused or failed upload exits 3.
+- **Shipping**: `build` links only the host's release executable. The release workflow uploads `mm-<os>-<arch>`
+  for all four targets, and each desktop installer carries `mm-jvm` (jpackage `--add-launcher`) and, with
+  `-PbundleNativeCli=true`, the host's native `mm` under `lib/cli` (`--app-content`).
+- Clikt's two klibs both define a private `Context.selfAndAncestors()`, so the CLI's native binaries link with the
+  compiler caches off (`disableNativeCache`, pinned to the Kotlin version).
+
 ## UI
 
 **Compose Multiplatform** with Material 3. JVM and Android only.
@@ -471,7 +495,7 @@ set of writes.
 
 ### Platform Support
 
-- **JVM** ✅ | **Android** ✅ | **iOS** ⚠️ planned | **Web** ⚠️ planned | **Native** ⚠️ in progress (CLI, #917)
+- **JVM** ✅ | **Android** ✅ | **iOS** ⚠️ planned | **Web** ⚠️ planned | **Native** ⚠️ in progress (CLI `mm`, #917)
 - **Kotlin/Native** (`linuxX64`, `linuxArm64`, `macosArm64`, `mingwX64`): a module joins by applying
   `moneymanager.native-convention`. Only the CLI's dependency closure does, never `app/ui/*`. Once a module has
   a native target, JVM-only APIs in its `commonMain` (`java.*`, `System.*`, implicit `kotlin.jvm` imports) fail the

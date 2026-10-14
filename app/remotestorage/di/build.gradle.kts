@@ -1,4 +1,5 @@
 plugins {
+    id("moneymanager.native-convention")
     id("moneymanager.android-convention")
     id("moneymanager.metro-convention")
 }
@@ -14,6 +15,8 @@ kotlin {
                 api(projects.app.remotestorage.sync)
                 api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
+
+                implementation(projects.app.remotestorage.googledrive)
             }
         }
 
@@ -26,8 +29,6 @@ kotlin {
                 api(projects.app.remotestorage.sync)
                 api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
-
-                implementation(projects.app.remotestorage.googledrive)
             }
         }
 

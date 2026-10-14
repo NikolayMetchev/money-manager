@@ -83,17 +83,20 @@ jobs:
             os: windows-latest
             # Compose configures WiX by registering tasks on the root project, which isolated projects
             # rejects (https://youtrack.jetbrains.com/issue/CMP-8375), so opt out for this build only.
-            task: :app:main:jvm:packageReleaseMsi -Dorg.gradle.isolated-projects=false
+            task: :app:main:jvm:packageReleaseMsi -PbundleNativeCli=true -Dorg.gradle.isolated-projects=false
+            kotlin-native: 'true'
             artifact-name: windows-installer
             artifact-path: app/main/jvm/build/compose/binaries/main-release/msi/*.msi
           - platform: macOS
             os: macos-latest
-            task: :app:main:jvm:packageReleaseDmg
+            task: :app:main:jvm:packageReleaseDmg -PbundleNativeCli=true
+            kotlin-native: 'true'
             artifact-name: macos-installer
             artifact-path: app/main/jvm/build/compose/binaries/main-release/dmg/*.dmg
           - platform: Linux
             os: ubuntu-latest
-            task: :app:main:jvm:packageReleaseDeb
+            task: :app:main:jvm:packageReleaseDeb -PbundleNativeCli=true
+            kotlin-native: 'true'
             artifact-name: linux-installer
             artifact-path: app/main/jvm/build/compose/binaries/main-release/deb/*.deb
           - platform: Android
@@ -111,6 +114,8 @@ jobs:
         with:
           command: ${{ matrix.task }} --stacktrace
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          # The desktop installers bundle the host's native mm (app/main/cli)
+          kotlin-native: ${{ matrix.kotlin-native || 'false' }}
 
       - name: Upload ${{ matrix.platform }} artifacts
         uses: actions/upload-artifact@v7
@@ -119,9 +124,61 @@ jobs:
           path: ${{ matrix.artifact-path }}
           retention-days: 7
 
+  # The standalone `mm` command-line client (app/main/cli), one native binary per target. linuxArm64 is
+  # cross-linked on x64: there is no Kotlin/Native compiler for Linux arm64 hosts.
+  build-cli:
+    name: Build mm (${{ matrix.platform }})
+    needs: [check-build]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - platform: Linux
+            os: ubuntu-latest
+            task: :app:main:cli:linkReleaseExecutableLinuxX64 :app:main:cli:linkReleaseExecutableLinuxArm64
+          - platform: macOS
+            os: macos-latest
+            task: :app:main:cli:linkReleaseExecutableMacosArm64
+          - platform: Windows
+            os: windows-latest
+            # Selecting a task by name configures every project, and :app:main:jvm's Compose WiX setup
+            # breaks isolated projects on Windows (https://youtrack.jetbrains.com/issue/CMP-8375).
+            task: :app:main:cli:linkReleaseExecutableMingwX64 -Dorg.gradle.isolated-projects=false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Link mm
+        uses: $/.github/actions/gradle-run
+        with:
+          command: ${{ matrix.task }} --stacktrace
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          kotlin-native: 'true'
+
+      - name: Name the binaries after their targets
+        shell: bash
+        run: |
+          mkdir -p cli-dist
+          for target in linuxX64:linux-x64 linuxArm64:linux-arm64 macosArm64:macos-arm64 mingwX64:windows-x64; do
+            dir="app/main/cli/build/bin/${target%%:*}/releaseExecutable"
+            if [ -f "$dir/mm.kexe" ]; then cp "$dir/mm.kexe" "cli-dist/mm-${target##*:}"; fi
+            if [ -f "$dir/mm.exe" ]; then cp "$dir/mm.exe" "cli-dist/mm-${target##*:}.exe"; fi
+          done
+          ls -la cli-dist
+          [ -n "$(ls cli-dist)" ]
+
+      - name: Upload mm (${{ matrix.platform }})
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-${{ matrix.platform }}
+          path: cli-dist/*
+          if-no-files-found: error
+          retention-days: 7
+
   create-release:
     name: Create GitHub Release
-    needs: [build-all]
+    needs: [build-all, build-cli]
     runs-on: ubuntu-latest
 
     steps:
@@ -147,6 +204,7 @@ jobs:
             release-artifacts/macos-installer/*.dmg
             release-artifacts/linux-installer/*.deb
             release-artifacts/android-apk/*.apk
+            release-artifacts/cli-*/mm-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
