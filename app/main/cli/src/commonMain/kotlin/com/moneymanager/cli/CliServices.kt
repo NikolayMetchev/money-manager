@@ -11,6 +11,7 @@ import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.googledrive.BrowserLauncher
 import com.moneymanager.remotestorage.googledrive.PrintUrlBrowserLauncher
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
+import com.moneymanager.terminal.stderrIsTerminal
 import kotlinx.io.files.Path
 
 /** The app-scoped services a command runs on: the [AppComponent]'s in production, test doubles in tests. */
@@ -30,6 +31,8 @@ internal class CliPlatform(
     val systemBrowser: () -> BrowserLauncher,
     /** The Info+ log file, or null for no file log. */
     val logFile: Path?,
+    /** Whether stderr is a terminal, where live progress bars can draw. */
+    val stderrIsTerminal: () -> Boolean = ::stderrIsTerminal,
 ) {
     fun browser(
         noBrowser: Boolean,

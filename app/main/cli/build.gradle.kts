@@ -51,6 +51,8 @@ kotlin {
                 implementation(projects.app.di.params)
                 implementation(projects.app.remotestorage.googledrive)
                 implementation(projects.app.session)
+                implementation(projects.app.tasks)
+                implementation(projects.app.terminal)
                 implementation(projects.utils.archive)
                 implementation(projects.utils.files)
                 implementation(libs.clikt)
@@ -78,6 +80,7 @@ kotlin {
                 implementation(libs.clikt.core)
                 implementation(libs.kermit.core)
                 implementation(libs.kotlinx.serialization.core)
+                implementation(libs.mosaic.terminal)
             }
         }
 
@@ -103,6 +106,12 @@ kotlin {
             }
         }
     }
+}
+
+// From 1.9 JetBrains' compose runtime-desktop jar (pulled in by Mosaic) is an empty pointer to androidx's, and the two
+// share a file name, so `mm-jvm`'s lib/ would hold one or the other at random. app/terminal declares androidx's directly.
+configurations.named("jvmRuntimeClasspath") {
+    exclude(group = "org.jetbrains.compose.runtime", module = "runtime-desktop")
 }
 
 // `build` links the host's `mm` only (so a link failure still fails it). The other targets link on demand: the

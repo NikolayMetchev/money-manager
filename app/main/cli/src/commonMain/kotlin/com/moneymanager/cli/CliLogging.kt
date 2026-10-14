@@ -3,8 +3,8 @@ package com.moneymanager.cli
 import co.touchlab.kermit.LogWriter
 import co.touchlab.kermit.Logger
 import co.touchlab.kermit.Severity
-import com.github.ajalt.mordant.terminal.Terminal
 import com.moneymanager.files.appendText
+import com.moneymanager.terminal.StderrRegion
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlin.time.Clock
@@ -14,7 +14,7 @@ import kotlin.time.Clock
  * everything with [verbose]) go to stderr, unless [quiet]; Info and above go to [logFile] as well.
  */
 internal fun installCliLogging(
-    terminal: Terminal,
+    stderr: StderrRegion,
     verbose: Boolean,
     quiet: Boolean,
     logFile: Path?,
@@ -22,15 +22,16 @@ internal fun installCliLogging(
     val stderrSeverity = if (verbose) Severity.Debug else Severity.Error
     val writers =
         buildList {
-            if (!quiet) add(StderrLogWriter(terminal, stderrSeverity))
+            if (!quiet) add(StderrLogWriter(stderr, stderrSeverity))
             logFile?.let { add(FileLogWriter(it)) }
         }
     Logger.setLogWriters(writers)
     Logger.setMinSeverity(if (logFile != null) minOf(stderrSeverity, Severity.Info) else stderrSeverity)
 }
 
+// Through the region, so a log line during live progress is printed above the bars rather than torn by them.
 private class StderrLogWriter(
-    private val terminal: Terminal,
+    private val stderr: StderrRegion,
     private val minSeverity: Severity,
 ) : LogWriter() {
     override fun isLoggable(
@@ -45,7 +46,7 @@ private class StderrLogWriter(
         throwable: Throwable?,
     ) {
         val cause = throwable?.let { ": $it" }.orEmpty()
-        terminal.rawPrint("${severity.name.lowercase()}: $message$cause\n", stderr = true)
+        stderr.printAbove("${severity.name.lowercase()}: $message$cause\n")
     }
 }
 
