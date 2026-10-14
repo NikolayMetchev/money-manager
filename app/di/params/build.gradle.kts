@@ -13,5 +13,16 @@ kotlin {
                 api(projects.app.remotestorage.googledrive)
             }
         }
+        // BrowserLauncher is a field type of the JVM and native AppComponentParams.
+        getByName("jvmMain") {
+            dependencies {
+                api(projects.app.remotestorage.googledrive)
+            }
+        }
+        nativeMain {
+            dependencies {
+                api(projects.app.remotestorage.googledrive)
+            }
+        }
     }
 }

@@ -177,6 +177,12 @@ dependencyAnalysis {
             ignoreSourceSet("commonTest")
         }
 
+        project(":app:di:params") {
+            // The native AppComponentParams carries a BrowserLauncher, but DAGP only analyses JVM bytecode, so it
+            // can't see the native actual use :app:remotestorage:googledrive.
+            ignoreSourceSet("nativeMain")
+        }
+
         project(":app:model:passthrough") {
             sourceSet("commonMain") {
                 onUnusedDependencies {

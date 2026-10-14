@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logging for the mm-jvm launcher. mm logs through Kermit (stderr and ~/.moneymanager/logs/mm.log); this only
+  catches libraries that log through SLF4J, and keeps them off stdout, which carries mm's JSON output.
+-->
+<Configuration status="ERROR">
+    <Appenders>
+        <Console name="Stderr" target="SYSTEM_ERR">
+            <PatternLayout pattern="%level: %logger{36} - %msg%n"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <Root level="error">
+            <AppenderRef ref="Stderr"/>
+        </Root>
+    </Loggers>
+</Configuration>

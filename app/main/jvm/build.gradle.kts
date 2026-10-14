@@ -1,3 +1,4 @@
+import org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask
 import org.jetbrains.compose.desktop.application.tasks.AbstractProguardTask
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
@@ -23,6 +24,7 @@ dependencies {
     implementation(projects.app.importfilesource.core)
     implementation(projects.app.importfilesource.di)
     implementation(projects.app.model.core)
+    implementation(projects.app.remotestorage.googledrive)
     implementation(projects.app.remotestorage.sync)
     implementation(projects.app.session)
     implementation(projects.app.strategycatalog)
@@ -40,6 +42,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.swing)
     implementation(libs.slf4j.api)
 
+    // The JVM build of mm rides in the installer's lib/app, started by the mm-jvm launcher.
+    runtimeOnly(projects.app.main.cli)
     runtimeOnly(compose.desktop.currentOs)
     runtimeOnly(libs.log4j.core)
     runtimeOnly(libs.log4j.slf4j2.impl)
@@ -124,6 +128,41 @@ dependencies {
 // runtimeClasspath feeds `run`, the distributables and ProGuard, so all of them get the stripped jar
 configurations.named("runtimeClasspath") {
     attributes.attribute(sqliteNativesStripped, true)
+}
+
+// The installer ships the CLI beside the app (#936): the `mm-jvm` launcher (jpackage's --add-launcher, so it runs
+// on the bundled runtime) always, and the host's native `mm` with -PbundleNativeCli=true (the release workflow
+// passes it) through --app-content. The native link is opt-in because it takes minutes.
+val mmExecutable =
+    configurations.dependencyScope("mmExecutable") {
+        dependencies.add(project.dependencies.create(projects.app.main.cli))
+    }
+val mmExecutableFiles =
+    configurations.resolvable("mmExecutableFiles") {
+        extendsFrom(mmExecutable.get())
+        attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named("moneymanager-mm-executable"))
+    }
+val bundleNativeCli = providers.gradleProperty("bundleNativeCli").map(String::toBoolean).getOrElse(false)
+
+// jpackage copies an --app-content directory into the app under its own name, keeping file permissions.
+val assembleNativeCli =
+    tasks.register<Sync>("assembleNativeCli") {
+        description = "Collects the host's native mm for the installer."
+        into(layout.buildDirectory.dir("native-cli/cli"))
+        from(mmExecutableFiles) {
+            rename { if (it.endsWith(".exe")) "mm.exe" else "mm" }
+        }
+    }
+
+val mmJvmLauncher = layout.projectDirectory.file("mm-jvm.properties")
+tasks.withType<AbstractJPackageTask>().configureEach {
+    inputs.file(mmJvmLauncher).withPropertyName("mmJvmLauncher").withPathSensitivity(PathSensitivity.NONE)
+    freeArgs.addAll("--add-launcher", "mm-jvm=${mmJvmLauncher.asFile.absolutePath}")
+    if (bundleNativeCli) {
+        val nativeCli = assembleNativeCli.map { it.destinationDir }
+        inputs.dir(nativeCli).withPropertyName("nativeCli").withPathSensitivity(PathSensitivity.RELATIVE)
+        freeArgs.addAll(nativeCli.map { listOf("--app-content", it.absolutePath) })
+    }
 }
 
 compose.desktop {

@@ -1,4 +1,5 @@
 plugins {
+    id("moneymanager.native-convention")
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
 }
@@ -12,6 +13,10 @@ kotlin {
                 api(projects.app.di.params)
                 api(projects.app.importfilesource.core)
                 api(projects.utils.credentialvault)
+
+                implementation(projects.app.importfilesource.localfolder)
+                implementation(projects.app.model.importdirectory)
+                implementation(projects.app.remotestorage.googledrive)
             }
         }
 
@@ -20,10 +25,6 @@ kotlin {
                 api(projects.app.di.params)
                 api(projects.app.importfilesource.core)
                 api(projects.utils.credentialvault)
-
-                implementation(projects.app.importfilesource.localfolder)
-                implementation(projects.app.model.importdirectory)
-                implementation(projects.app.remotestorage.googledrive)
             }
         }
 

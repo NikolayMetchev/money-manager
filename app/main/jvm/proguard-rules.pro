@@ -3,6 +3,20 @@
 # Keep main entry point
 -keep class com.moneymanager.MainKt { *; }
 
+# The mm-jvm launcher (app/main/cli) starts from the same shrunk jars
+-keep class com.moneymanager.cli.MainKt { public static void main(java.lang.String[]); }
+
+# Mordant finds its terminal backend through ServiceLoader. The JNA backend binds libc through interface
+# proxies, and the FFM one looks symbols and struct fields up by name, so keep them whole. The GraalVM
+# native-image backend references classes that only exist inside a native image.
+-keep class com.github.ajalt.mordant.terminal.terminalinterface.** { *; }
+-keep class com.sun.jna.** { *; }
+-dontwarn org.graalvm.**
+-dontwarn com.oracle.svm.**
+-dontwarn com.github.ajalt.mordant.terminal.terminalinterface.nativeimage.**
+# ProGuard can't resolve the FFM backend's signature-polymorphic MethodHandle/VarHandle calls
+-dontwarn com.github.ajalt.mordant.terminal.terminalinterface.ffm.**
+
 # Ignore warnings for optional log4j dependencies that aren't used
 -dontwarn com.lmax.disruptor.**
 -dontwarn org.jctools.**

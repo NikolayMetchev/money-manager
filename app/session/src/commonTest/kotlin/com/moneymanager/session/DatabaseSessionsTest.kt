@@ -7,6 +7,7 @@ import com.moneymanager.database.DatabaseManager
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.importengineapi.EditingLockedException
 import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.createCurrency
 import com.moneymanager.localsettings.KEY_LAST_DATABASE
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageProvider
@@ -15,6 +16,7 @@ import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.sync.RemoteDatabaseBinding
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.RemoteDatabaseSyncService
+import com.moneymanager.remotestorage.sync.SyncResult
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
@@ -22,6 +24,9 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DatabaseSessionsTest {
@@ -162,6 +167,60 @@ class DatabaseSessionsTest {
                 session.database.close()
                 deleteTestDatabase(DbLocation("$location.backup"))
             }
+        }
+
+    @Test
+    fun aLocalDatabaseHasNoCloseDecision() =
+        withLocations(1) { (location) ->
+            val controller = controller()
+            val session = sessions(controller).open(location)
+            try {
+                assertNull(controller.closeDecision(session.database))
+            } finally {
+                session.database.close()
+            }
+        }
+
+    @Test
+    fun closingUploadsTheChangedCopyAndDropsItWhenAsked() =
+        withLocations(1) { (location) ->
+            val provider = OneFileProvider()
+            val controller = controller(provider)
+            val session = sessions(controller).open(location)
+            controller.createRemote(OneFileProvider.ID, null, "db.mmdb", location, session.database, "pw")
+            session.importEngine.createCurrency("ZZZ", "Test")
+
+            val decision = assertNotNull(controller.closeDecision(session.database))
+            assertEquals("db.mmdb", decision.remoteName)
+            assertTrue(decision.localChanged)
+            assertFalse(decision.needsPassword)
+
+            val outcome =
+                controller.performClose(
+                    session.database,
+                    upload = true,
+                    keepLocal = false,
+                    password = null,
+                    decision.localChanged,
+                )
+            assertEquals(SyncResult.UPLOADED, outcome.syncResult)
+            assertFalse(outcome.keptLocal)
+            assertFalse(manager.databaseExists(location))
+        }
+
+    @Test
+    fun closingKeepsTheLocalCopyWhenAnotherDevicePushedFirst() =
+        withLocations(1) { (location) ->
+            val provider = OneFileProvider()
+            val controller = controller(provider)
+            val session = sessions(controller).open(location)
+            controller.createRemote(OneFileProvider.ID, null, "db.mmdb", location, session.database, "pw")
+            provider.revision++
+
+            val outcome = controller.performClose(session.database, upload = true, keepLocal = false, password = null, localChanged = true)
+            assertEquals(SyncResult.BLOCKED, outcome.syncResult)
+            assertTrue(outcome.keptLocal)
+            assertTrue(manager.databaseExists(location))
         }
 
     private fun binding(cache: DbLocation) =
