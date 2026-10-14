@@ -136,10 +136,8 @@ internal class CliSession(
         // Like the desktop's close dialog, but only when there's something to decide: a read-only command
         // leaves an unchanged copy, and asking every time would make `mm` unusable in a loop.
         val ask = console.interactive && decision.localChanged
-        val upload =
-            options.push ?: if (ask) console.confirm("Upload the changes to ${decision.remoteName}", default = true) else false
-        val keepLocal =
-            options.keepLocal ?: if (ask) console.confirm("Keep the local copy on this device", default = true) else true
+        val upload = options.push ?: (ask && console.confirm("Upload the changes to ${decision.remoteName}", default = true))
+        val keepLocal = options.keepLocal ?: (!ask || console.confirm("Keep the local copy on this device", default = true))
         val password = if (upload && decision.needsPassword) console.remotePassword(decision.remoteName) else null
         val outcome =
             controller.performClose(session.database, upload, keepLocal, password, decision.localChanged)

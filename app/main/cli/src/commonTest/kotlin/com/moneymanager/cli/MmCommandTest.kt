@@ -9,7 +9,6 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class MmCommandTest {
     @Test
@@ -80,7 +79,7 @@ class MmCommandTest {
                 // The next run opens the remembered database without --db.
                 val again = cli.run("status")
                 assertEquals(ExitCodes.OK, again.exitCode, again.stderr)
-                assertTrue(again.stdout.contains(location.path))
+                assertEquals(location.path, Json.decodeFromString<StatusJson>(again.stdout).database)
             } finally {
                 deleteTestDatabase(location)
             }

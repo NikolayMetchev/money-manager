@@ -14,7 +14,6 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.nullableFlag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.enum
-import com.github.ajalt.mordant.terminal.Terminal
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.importengineapi.EditingLockedException
 import com.moneymanager.session.DatabaseSession
@@ -24,7 +23,6 @@ private val logger = Logger.withTag("MmCommand")
 
 /** What every subcommand gets from the root: the parsed global options and the services behind them. */
 internal class CliRuntime(
-    val terminal: Terminal,
     val output: Output,
     val console: Console,
     private val sessionOptions: SessionOptions,
@@ -75,7 +73,6 @@ internal class MmCommand(
         val resolvedFormat = format ?: if (terminal.terminalInfo.outputInteractive) OutputFormat.TABLE else OutputFormat.JSON
         currentContext.obj =
             CliRuntime(
-                terminal = terminal,
                 output = Output(terminal, resolvedFormat),
                 console = console,
                 sessionOptions = SessionOptions(db, hydrate, push, keepLocal),
@@ -94,28 +91,30 @@ internal class MmCommand(
             echoFormattedHelp(error)
             exitCodeFor(error)
         } catch (locked: EditingLockedException) {
-            fail(locked, "The cloud copy has changes this device hasn't downloaded; rerun with --hydrate")
+            report(locked, "The cloud copy has changes this device hasn't downloaded; rerun with --hydrate")
+            ExitCodes.ERROR
         } catch (locked: CredentialVaultLockedException) {
-            fail(locked, "The credential vault is locked: ${locked.message}")
+            report(locked, "The credential vault is locked: ${locked.message}")
+            ExitCodes.ERROR
         } catch (expected: Exception) {
-            fail(expected, expected.message ?: expected.toString())
+            report(expected, expected.message ?: expected.toString())
+            ExitCodes.ERROR
         }
 
-    private fun fail(
+    private fun report(
         failure: Exception,
         message: String,
-    ): Int {
+    ) {
         logger.i(failure) { "mm failed" }
         terminal.rawPrint("Error: $message\n", stderr = true)
-        return ExitCodes.ERROR
     }
 
     private companion object {
         // Clikt reports usage errors with status 1; mm documents 2.
         fun exitCodeFor(error: CliktError): Int =
-            when {
-                error is UsageError -> ExitCodes.USAGE
-                error is PrintHelpMessage && error.error -> ExitCodes.USAGE
+            when (error) {
+                is UsageError -> ExitCodes.USAGE
+                is PrintHelpMessage -> if (error.error) ExitCodes.USAGE else error.statusCode
                 else -> error.statusCode
             }
     }
