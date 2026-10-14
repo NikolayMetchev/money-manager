@@ -204,8 +204,9 @@ compose.desktop {
         }
 
         nativeDistributions {
-            // Include java.sql module in the custom runtime
-            modules("java.sql")
+            // Include java.sql module in the custom runtime, and jdk.unsupported for mm-jvm's Ctrl-C handler
+            // (sun.misc.Signal), which prints the task summary before exiting.
+            modules("java.sql", "jdk.unsupported")
             targetFormats(
                 // macOS
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,

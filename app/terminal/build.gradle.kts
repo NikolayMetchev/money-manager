@@ -15,6 +15,7 @@ kotlin {
                 api(libs.mosaic.runtime)
 
                 implementation(libs.atomicfu)
+                implementation(libs.kermit)
             }
         }
 
@@ -24,6 +25,8 @@ kotlin {
             dependencies {
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.mosaic.terminal)
+
+                implementation(libs.kermit.core)
             }
         }
 
