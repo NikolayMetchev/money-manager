@@ -231,6 +231,8 @@ exclude:
       - app/main/cli/src/commonMain/kotlin/com/moneymanager/cli/MmCommand.kt
   - name: UnusedSymbol
     paths:
+      # CliRuntime.withProgress has no caller until the import commands (#939) land; drop this entry then.
+      - app/main/cli/src/commonMain/kotlin/com/moneymanager/cli/MmCommand.kt
       - app/db/core/src/androidMain/kotlin/com/moneymanager/database/AndroidDatabaseManager.kt
       - app/db/di/src/androidMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.android.kt
       - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/DatabaseComponent.kt
