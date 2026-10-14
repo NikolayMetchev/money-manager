@@ -156,13 +156,20 @@ jobs:
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
           kotlin-native: 'true'
 
-      - name: Name the binaries after their targets
+      # Artifacts and release assets don't keep the executable bit, so the Unix binaries ship as tarballs
+      # (holding a ready-to-run `mm`); the Windows .exe needs no permission and stays a direct asset.
+      - name: Package the binaries per target
         shell: bash
         run: |
           mkdir -p cli-dist
           for target in linuxX64:linux-x64 linuxArm64:linux-arm64 macosArm64:macos-arm64 mingwX64:windows-x64; do
             dir="app/main/cli/build/bin/${target%%:*}/releaseExecutable"
-            if [ -f "$dir/mm.kexe" ]; then cp "$dir/mm.kexe" "cli-dist/mm-${target##*:}"; fi
+            if [ -f "$dir/mm.kexe" ]; then
+              staging="$(mktemp -d)"
+              cp "$dir/mm.kexe" "$staging/mm"
+              chmod +x "$staging/mm"
+              tar -czf "cli-dist/mm-${target##*:}.tar.gz" -C "$staging" mm
+            fi
             if [ -f "$dir/mm.exe" ]; then cp "$dir/mm.exe" "cli-dist/mm-${target##*:}.exe"; fi
           done
           ls -la cli-dist

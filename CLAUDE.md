@@ -428,7 +428,7 @@ stdout carries only the result: prompts, warnings and errors go to stderr, and I
   so the edit gate refuses writes while it's ahead. On exit a changed copy gets the desktop close dialog's choices
   (`closeDecision`/`performClose` in `app/session`, shared with `Main.kt`) as prompts, or `--push/--no-push` and
   `--keep-local/--drop-local`. A refused or failed upload exits 3.
-- **Shipping**: `build` links only the host's release executable. The release workflow uploads `mm-<os>-<arch>`
+- **Shipping**: `build` links only the host's release executable. The release workflow uploads `mm-<os>-<arch>` (`.tar.gz` on Unix, keeping the exec bit; `.exe` on Windows)
   for all four targets, and each desktop installer carries `mm-jvm` (jpackage `--add-launcher`) and, with
   `-PbundleNativeCli=true`, the host's native `mm` under `lib/cli` (`--app-content`).
 - Clikt's two klibs both define a private `Context.selfAndAncestors()`, so the CLI's native binaries link with the
