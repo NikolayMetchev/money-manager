@@ -85,4 +85,22 @@ class MmCommandTest {
                 deleteTestDatabase(location)
             }
         }
+
+    @Test
+    fun tuiNeedsATerminal() =
+        runTest {
+            val run = TestCli().run("tui")
+
+            assertEquals(ExitCodes.USAGE, run.exitCode)
+            assertContains(run.stderr, "mm tui needs a terminal")
+        }
+
+    @Test
+    fun tuiRefusesTheVaultPasswordOnStdin() =
+        runTest {
+            val run = TestCli().run("--vault-password-stdin", "tui")
+
+            assertEquals(ExitCodes.USAGE, run.exitCode)
+            assertContains(run.stderr, Console.VAULT_PASSWORD_ENV)
+        }
 }

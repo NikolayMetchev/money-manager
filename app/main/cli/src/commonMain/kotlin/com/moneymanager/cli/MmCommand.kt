@@ -14,14 +14,17 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.nullableFlag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.enum
+import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.importengineapi.EditingLockedException
 import com.moneymanager.session.DatabaseSession
 import com.moneymanager.tasks.TaskManager
 import com.moneymanager.terminal.ProgressMode
+import com.moneymanager.terminal.Prompter
 import com.moneymanager.terminal.StderrRegion
 import com.moneymanager.terminal.TaskProgressRenderer
 import com.moneymanager.terminal.TasksInterruptedException
+import com.moneymanager.tui.TuiController
 import kotlinx.coroutines.CancellationException
 
 private val logger = Logger.withTag("MmCommand")
@@ -32,12 +35,19 @@ internal class CliRuntime(
     val console: Console,
     private val sessionOptions: SessionOptions,
     private val progress: TaskProgressRenderer,
+    /** Stops logging to stderr (the log file keeps everything), for a command that takes over the terminal. */
+    val silenceStderrLogs: () -> Unit,
+    /** Runs the TUI full screen (see [CliPlatform.runTui]). */
+    val runTui: suspend (TuiController, CredentialVault) -> Unit,
     servicesFactory: () -> CliServices,
 ) {
     val services: CliServices by lazy(servicesFactory)
 
     /** Runs [block] on the open database, then closes it (asking about a cloud upload when it changed). */
-    suspend fun <T> withSession(block: suspend (DatabaseSession) -> T): T = CliSession(services, console, sessionOptions).run(block)
+    suspend fun <T> withSession(block: suspend (DatabaseSession) -> T): T = session().run(block)
+
+    /** How this run opens and closes databases, asking its questions through [prompter]. */
+    fun session(prompter: Prompter = console): CliSession = CliSession(services, console, sessionOptions, prompter)
 
     /**
      * Runs [block] while showing the tasks it starts on [manager] on stderr: live bars in a terminal, plain
@@ -82,6 +92,7 @@ internal class MmCommand(
             StrategiesCommand(),
             ImportDirsCommand(),
             ImportCommand(),
+            TuiCommand(),
         )
     }
 
@@ -110,6 +121,8 @@ internal class MmCommand(
                         region = stderr,
                         width = { terminal.updateSize().width },
                     ),
+                silenceStderrLogs = { installCliLogging(stderr, verbose = false, quiet = true, platform.logFile) },
+                runTui = platform.runTui,
                 servicesFactory = { platform.services(platform.browser(noBrowser, console::error)) },
             )
     }

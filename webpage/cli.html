@@ -336,6 +336,32 @@ MM_VAULT_PASSWORD=… mm --quiet --push --keep-local import all
 
 # What needs a person?
 mm import dirs | jq '.data.needsAttention'</code></pre>
+
+      <h3><code>tui</code></h3>
+      <p class="synopsis"><code>mm [--db PATH] [--hydrate] [--push|--no-push] [--keep-local|--drop-local] tui</code></p>
+      <p>
+        <code>tui</code> opens a full-screen terminal UI. It opens databases the same way every other command does, from
+        <code>--db</code>, the cloud copy or the last database. When there's none to open, it asks for a path, and it
+        creates a new database if no file exists there. It asks for the vault password, and on exit whether to upload a
+        changed cloud copy, in dialogs. <code>MM_VAULT_PASSWORD</code> and <code>MM_REMOTE_PASSWORD</code> still answer
+        without asking. It needs a terminal, so it exits <code>2</code> when stdin or stdout is redirected or with
+        <code>--vault-password-stdin</code>. Logs go only to the log file while it runs.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Key</th><th>Does</th></tr>
+          <tr><td><code>Tab</code> <code>→</code> <code>←</code>, <code>1</code>…<code>9</code></td><td>Switch tabs</td></tr>
+          <tr><td><code>o</code></td><td>Open or create another database</td></tr>
+          <tr><td><code>?</code></td><td>Show every key, including the current tab's own</td></tr>
+          <tr><td><code>Esc</code></td><td>Dismiss a message, or cancel a dialog</td></tr>
+          <tr><td><code>q</code>, <code>Ctrl-C</code></td><td>Quit after closing the database (a second <code>Ctrl-C</code> quits at once and exits <code>130</code>)</td></tr>
+        </table>
+      </div>
+      <p>
+        Keys outside ASCII, such as <code>é</code> or <code>£</code>, can't be typed into the TUI's prompts yet, and a
+        paste of more than about 64 characters at once can lose some of them. Use the environment variables for passwords
+        that contain such keys, and <code>--db</code> for a long database path.
+      </p>
     </section>
 
     <section id="json">

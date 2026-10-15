@@ -83,6 +83,7 @@ mm accounts --owner "Alice Smith"                    # accounts with owners and 
 mm balances --asset GBP --non-zero                   # one row per account and asset
 mm transactions --account Current --from 2024-03-01  # newest first, with running balances
 mm --push import all                                 # download + import every folder and API, then upload
+mm tui                                               # full-screen terminal UI (tabs, ? for keys, q to quit)
 ```
 
 **Credential vault.** Commands that need API tokens or a Google sign-in unlock the vault with the password from

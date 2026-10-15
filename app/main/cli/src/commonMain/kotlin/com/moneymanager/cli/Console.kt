@@ -1,6 +1,7 @@
 package com.moneymanager.cli
 
 import com.github.ajalt.mordant.terminal.Terminal
+import com.moneymanager.terminal.Prompter
 import com.moneymanager.terminal.StderrRegion
 
 /**
@@ -12,20 +13,21 @@ import com.moneymanager.terminal.StderrRegion
 internal class Console(
     private val terminal: Terminal,
     private val readEnvvar: (String) -> String?,
-    private val vaultPasswordFromStdin: Boolean,
+    /** `--vault-password-stdin`: the vault password is the first line of stdin, so stdin isn't the person. */
+    val vaultPasswordFromStdin: Boolean,
     private val quiet: Boolean,
     private val stderr: StderrRegion = StderrRegion { terminal.rawPrint(it, stderr = true) },
-) {
+) : Prompter {
     private var stdinPassword: String? = null
     private var stdinRead = false
 
     /** True when there's a person at a terminal to answer prompts. Reading the vault password from stdin rules that out. */
-    val interactive: Boolean get() = !vaultPasswordFromStdin && terminal.terminalInfo.inputInteractive
+    override val interactive: Boolean get() = !vaultPasswordFromStdin && terminal.terminalInfo.inputInteractive
 
     /** A message the person must see, even with `--quiet`. */
-    fun error(message: String) = stderr.printAbove("$message\n")
+    override fun error(message: String) = stderr.printAbove("$message\n")
 
-    fun warn(message: String) {
+    override fun warn(message: String) {
         if (!quiet) error(message)
     }
 
@@ -45,25 +47,18 @@ internal class Console(
         return readEnvvar(VAULT_PASSWORD_ENV)?.takeIf { it.isNotEmpty() }
     }
 
-    /** The cloud database password from [REMOTE_PASSWORD_ENV], or asked for when [interactive]. */
-    fun remotePassword(remoteName: String): String? =
-        readEnvvar(REMOTE_PASSWORD_ENV)?.takeIf { it.isNotEmpty() }
-            ?: if (interactive) secret("Password for the cloud database $remoteName") else null
-
     /** The cloud database password from [REMOTE_PASSWORD_ENV] only, never asking. */
     fun suppliedRemotePassword(): String? = readEnvvar(REMOTE_PASSWORD_ENV)?.takeIf { it.isNotEmpty() }
 
-    /** Asks for a secret without echoing it; null when the input ended or was empty. */
-    fun secret(label: String): String? = ask(label, hideInput = true)?.takeIf { it.isNotEmpty() }
+    override suspend fun secret(label: String): String? = ask(label, hideInput = true)?.takeIf { it.isNotEmpty() }
 
-    /** Asks for a line of text, offering [default] for an empty answer. */
-    fun text(
+    override suspend fun text(
         label: String,
         default: String,
     ): String? = ask("$label [$default]", hideInput = false)?.trim()?.ifEmpty { default }
 
-    /** Asks a yes/no question; an empty answer takes [default], end of input takes [default] too. */
-    fun confirm(
+    // An empty answer takes [default], and so does the end of input.
+    override suspend fun confirm(
         label: String,
         default: Boolean,
     ): Boolean {

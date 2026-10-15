@@ -187,7 +187,7 @@ private fun TaskStatus.symbol(): Pair<String, Color> =
     }
 
 /** [text] on one line, cut to [width] columns and ending in an ellipsis when it was cut. */
-internal fun fit(
+fun fit(
     text: String,
     width: Int,
 ): String {

@@ -1,14 +1,18 @@
 package com.moneymanager.cli
 
 import com.github.ajalt.mordant.terminal.TerminalRecorder
+import com.jakewharton.mosaic.layout.KeyEvent
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.VaultState
 import com.moneymanager.credentialvault.testing.TEST_VAULT_PASSWORD
 import com.moneymanager.credentialvault.testing.inMemoryCredentialVault
+import com.moneymanager.tui.DialogPrompter
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -109,5 +113,23 @@ class VaultUnlockerTest {
             assertFailsWith<CredentialVaultLockedException> { vault.requireUnlocked("test") }
             assertIs<VaultState.NoFile>(vault.state.value)
             assertContains(recorder.stderr(), "no credential vault yet")
+        }
+
+    @Test
+    fun inTheTuiTheSameUnlockAsksThroughADialog() =
+        runTest {
+            val vault = lockedVault()
+            val dialogs = DialogPrompter()
+            backgroundScope.launch { VaultUnlocker(vault, console(recorder()), dialogs).answerRequests() }
+            val unlocked = async { vault.requireUnlocked("Downloading Monzo") }
+            while (dialogs.request == null) yield()
+
+            assertEquals("Vault password", dialogs.request?.label)
+            assertContains(dialogs.notice?.message.orEmpty(), "Downloading Monzo: unlock the credential vault")
+            TEST_VAULT_PASSWORD.forEach { dialogs.handleKey(KeyEvent(it.toString())) }
+            dialogs.handleKey(KeyEvent("Enter"))
+
+            unlocked.await()
+            assertIs<VaultState.Unlocked>(vault.state.value)
         }
 }

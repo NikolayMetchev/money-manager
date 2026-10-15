@@ -14,8 +14,10 @@ import com.moneymanager.remotestorage.googledrive.BrowserLauncher
 import com.moneymanager.remotestorage.googledrive.PrintUrlBrowserLauncher
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.terminal.stderrIsTerminal
+import com.moneymanager.tui.TuiController
 import io.ktor.client.engine.HttpClientEngine
 import kotlinx.io.files.Path
+import com.moneymanager.tui.runTui as runFullScreenTui
 
 /** The app-scoped services a command runs on: the [AppComponent]'s in production, test doubles in tests. */
 internal class CliServices(
@@ -40,6 +42,11 @@ internal class CliPlatform(
     val logFile: Path?,
     /** Whether stderr is a terminal, where live progress bars can draw. */
     val stderrIsTerminal: () -> Boolean = ::stderrIsTerminal,
+    /**
+     * Runs `mm tui` full screen. Tests replace it: whether a test process has a terminal depends on the runner
+     * (Windows CI has a console), so the real one would sometimes start drawing.
+     */
+    val runTui: suspend (TuiController, CredentialVault) -> Unit = { controller, vault -> runFullScreenTui(controller, vault) },
 ) {
     fun browser(
         noBrowser: Boolean,
