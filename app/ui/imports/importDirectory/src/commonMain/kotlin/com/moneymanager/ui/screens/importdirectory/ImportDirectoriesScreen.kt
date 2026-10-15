@@ -389,7 +389,7 @@ private fun ImportDirectoryRow(
             qifCount.takeIf { it > 0 }?.let { "$it qif" },
         ).joinToString(" and ").ifEmpty { "No" }.let { "$it files downloaded" }
 
-    val onWrongDevice = directory.provider == ImportDirectoryProvider.LOCAL && directory.deviceId != deviceId
+    val onWrongDevice = !directory.isOn(deviceId)
     // Top-level folders download their own files AND discover/create child directories for subfolders;
     // discovered subfolders just download their files.
     val actionLabel = if (directory.topLevel) "Download & find subfolders" else "Download"

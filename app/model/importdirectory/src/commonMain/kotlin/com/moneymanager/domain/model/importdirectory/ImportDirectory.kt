@@ -60,4 +60,7 @@ data class ImportDirectory(
     val createdAt: Instant,
     val updatedAt: Instant,
     override val source: Source = Source.Manual,
-) : Auditable
+) : Auditable {
+    /** Whether [device] can reach this folder: a LOCAL folder lives on the one device that added it, the others are shared. */
+    fun isOn(device: DeviceId): Boolean = provider != ImportDirectoryProvider.LOCAL || deviceId == device
+}

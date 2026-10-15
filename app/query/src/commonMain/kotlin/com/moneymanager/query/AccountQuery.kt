@@ -108,6 +108,32 @@ data class AccountSnapshot(
         }
     }
 
+    /**
+     * The one account [ref] names. A name only matches a reconciliation source's shadow accounts with
+     * [includeShadow], as in [filter]; an id names its account either way.
+     *
+     * @throws UnknownAccountException if [ref] names no account
+     * @throws AmbiguousAccountException if a [AccountRef.Name] matches several accounts
+     */
+    fun resolveAccount(
+        ref: AccountRef,
+        includeShadow: Boolean = false,
+    ): AccountWithBalances =
+        when (ref) {
+            is AccountRef.Id -> accounts.firstOrNull { it.account.id == ref.id } ?: throw UnknownAccountException(ref)
+            is AccountRef.Name -> {
+                val matches = accounts.filter { (includeShadow || !it.isShadow) && ref.match.matches(it.account.name) }
+                // A name that is exactly one account's wins over the others it is part of ("Cash" vs "Cash ISA").
+                matches.singleOrNull()
+                    ?: matches.singleOrNull { it.account.name.equals(ref.match.text, ignoreCase = true) }
+                    ?: throw if (matches.isEmpty()) {
+                        UnknownAccountException(ref)
+                    } else {
+                        AmbiguousAccountException(ref, matches.map { it.account })
+                    }
+            }
+        }
+
     private fun resolveOwner(ref: OwnerRef): PersonId =
         when (ref) {
             is OwnerRef.Id -> ref.id
