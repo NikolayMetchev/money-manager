@@ -5,7 +5,6 @@ import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.repository.TransactionReadRepository
 import dev.mokkery.answering.calls
 import dev.mokkery.everySuspend
 import dev.mokkery.matcher.any
@@ -25,7 +24,7 @@ class TransactionQueryTest {
 
     private val query =
         TransactionQuery(
-            mock<TransactionReadRepository> {
+            mock {
                 everySuspend { getRunningBalanceByAccountPaginated(any(), any(), any(), any()) } calls
                     { (_: AccountId, size: Int, paging: PagingInfo?) -> pageOf(size, paging) }
             },

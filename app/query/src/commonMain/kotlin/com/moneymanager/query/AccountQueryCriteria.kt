@@ -110,7 +110,7 @@ class AmbiguousOwnerException(
 
 /** An [AccountRef] that names no account. */
 class UnknownAccountException(
-    val ref: AccountRef,
+    ref: AccountRef,
 ) : UnresolvedReferenceException(
         when (ref) {
             is AccountRef.Id -> "No account has id ${ref.id}"
@@ -120,7 +120,7 @@ class UnknownAccountException(
 
 /** An [AccountRef.Name] that matches several accounts; [candidates] lists them so the caller can narrow it or pass an id. */
 class AmbiguousAccountException(
-    val ref: AccountRef.Name,
+    ref: AccountRef.Name,
     val candidates: List<Account>,
 ) : UnresolvedReferenceException(
         "Several accounts match '${ref.match.text}': ${candidates.joinToString { "${it.name} (id ${it.id})" }}",
