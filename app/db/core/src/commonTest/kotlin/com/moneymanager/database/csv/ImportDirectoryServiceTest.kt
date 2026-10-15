@@ -2,6 +2,7 @@
 
 package com.moneymanager.database.csv
 
+import com.moneymanager.csvimporter.BulkFileStatus
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -268,7 +269,7 @@ class ImportDirectoryServiceTest : DbTest() {
 
             val plan = service(factory).planCsvImportAll()
 
-            val reasons = plan.needsAttention.associate { it.fileName to it.reason }
+            val reasons = plan.needsAttention.associate { it.subject to it.reason }
             assertEquals(
                 mapOf(
                     "loose-monzo.csv" to NeedsAttentionReason.NEEDS_SOURCE_ACCOUNT,
@@ -293,7 +294,11 @@ class ImportDirectoryServiceTest : DbTest() {
             val (result, tasks) = backgroundScope.runTask { service(factory).importAll(this) }
 
             assertEquals(1, result.csv.filesImported, "the folder's file imports onto its account")
-            assertEquals(listOf("loose-monzo.csv"), result.needsAttention.map { it.fileName })
+            val file = result.csv.files.single()
+            assertEquals(BulkFileStatus.IMPORTED, file.status)
+            assertEquals("main.csv", file.fileName)
+            assertEquals(1, file.transfersCreated)
+            assertEquals(listOf("loose-monzo.csv"), result.needsAttention.map { it.subject })
             val stillUnimported =
                 repositories.csvImportRepository
                     .getAllImports()
@@ -308,6 +313,92 @@ class ImportDirectoryServiceTest : DbTest() {
                     .single()
                     .startsWith("loose-monzo.csv: "),
             )
+        }
+
+    @Test
+    fun `import all limited to some folders leaves the others alone`() =
+        runTest {
+            val account = monzoAccount()
+            val picked = directory("picked", accountId = account)
+            val other = directory("other", accountId = account)
+            val factory =
+                FakeFileSourceFactory(
+                    mapOf(
+                        picked.folderRef to FakeFolder(files = mapOf("picked.csv" to monzoCsv("tx_1"))),
+                        other.folderRef to FakeFolder(files = mapOf("other.csv" to monzoCsv("tx_2"))),
+                    ),
+                )
+            stageLooseMonzoFile()
+
+            val (result, _) = backgroundScope.runTask { service(factory).importAll(this, directories = listOf(picked)) }
+
+            assertEquals(listOf(picked.id), result.download.results.map { it.first.id }, "only the picked folder downloads")
+            assertEquals(listOf("picked.csv"), result.csv.files.map { it.fileName })
+            assertEquals(emptyList(), result.needsAttention, "a file from no picked folder isn't this run's concern")
+        }
+
+    @Test
+    fun `import all can stop after downloading`() =
+        runTest {
+            val account = monzoAccount()
+            val dir = directory("main", accountId = account)
+            val factory = FakeFileSourceFactory(mapOf(dir.folderRef to FakeFolder(files = mapOf("main.csv" to monzoCsv("tx_1")))))
+
+            val (result, _) = backgroundScope.runTask { service(factory).importAll(this, apply = false) }
+
+            assertEquals(1, result.download.filesDownloaded)
+            assertEquals(emptyList(), result.csv.files)
+            assertTrue(
+                repositories.csvImportRepository
+                    .getAllImports()
+                    .first()
+                    .single()
+                    .lastAppliedAt == null,
+                "the file is staged, not imported",
+            )
+        }
+
+    @Test
+    fun `a re-download that would need an unimport is left for a person`() =
+        runTest {
+            val account = monzoAccount()
+            val dir = directory("main", accountId = account)
+            val first = FakeFileSourceFactory(mapOf(dir.folderRef to FakeFolder(files = mapOf("main.csv" to monzoCsv("tx_1")))))
+            backgroundScope.runTask { service(first).importAll(this) }
+            // The new copy no longer has the imported row.
+            val changed = FakeFileSourceFactory(mapOf(dir.folderRef to FakeFolder(files = mapOf("main.csv" to monzoCsv("tx_2")))))
+
+            val (result, _) = backgroundScope.runTask { service(changed).importAll(this, redownloadFirst = true) }
+
+            assertEquals(listOf("main.csv"), result.redownload?.blocked)
+            assertEquals(
+                listOf("main.csv" to NeedsAttentionReason.REDOWNLOAD_BLOCKED),
+                result.needsAttention.map { it.subject to it.reason },
+            )
+        }
+
+    @Test
+    fun `import all lists card references no account owns`() =
+        runTest {
+            val dir = directory("curve")
+            val curveCsv =
+                """
+                ,Created Date,Merchant Name,Funding Card Last 4 Digits,Merchant MCC Code,Txn Currency,Txn Amount
+                1,2023-11-19,ALDI,1142,5999,GBP,31.25
+                """.trimIndent()
+            repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
+            val factory =
+                FakeFileSourceFactory(mapOf(dir.folderRef to FakeFolder(files = mapOf("Transaction History 2023-11-19.csv" to curveCsv))))
+
+            val (result, _) = backgroundScope.runTask { service(factory).importAll(this) }
+
+            assertEquals(
+                BulkFileStatus.IMPORTED,
+                result.csv.files
+                    .single()
+                    .status,
+            )
+            assertEquals(listOf("1142" to NeedsAttentionReason.UNASSIGNED_CARD), result.needsAttention.map { it.subject to it.reason })
         }
 
     private suspend fun monzoAccount(): AccountId {

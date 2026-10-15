@@ -81,6 +81,7 @@ internal class MmCommand(
             PeopleCommand(),
             StrategiesCommand(),
             ImportDirsCommand(),
+            ImportCommand(),
         )
     }
 

@@ -115,6 +115,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -136,12 +137,13 @@ fun MoneyManagerApp(
     ProvideSchemaAwareScope {
         val scope = rememberSchemaAwareCoroutineScope()
         val taskManager = rememberTaskManager(scope)
-        // One per database: its write lock keeps concurrent directory downloads (which outlive any screen)
-        // from interleaving engine writes.
+        // One write lock per database, shared by both services: directory and API runs (which outlive any
+        // screen) can run at once, and the engine doesn't serialize their writes itself.
+        val writeLock = remember(services) { Mutex() }
         val importDirectoryService =
-            remember(services, importFileSourceFactory) { services.importDirectoryService(importFileSourceFactory) }
+            remember(services, importFileSourceFactory) { services.importDirectoryService(importFileSourceFactory, writeLock) }
         val credentialVault = LocalCredentialVault.current
-        val apiImportService = remember(services, credentialVault) { services.apiImportService(credentialVault) }
+        val apiImportService = remember(services, credentialVault) { services.apiImportService(credentialVault, writeLock) }
         val backStack = rememberNavBackStack(ScreenSavedStateConfiguration, Screen.Accounts())
         val navigationHistory = remember(backStack) { NavigationHistory(backStack) }
         val currentScreen = navigationHistory.currentScreen

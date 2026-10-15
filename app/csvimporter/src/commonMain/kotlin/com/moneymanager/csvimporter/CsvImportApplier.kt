@@ -275,15 +275,6 @@ private suspend fun createCryptoAssets(
     }
 }
 
-/** Summary of a bulk CSV import run across many files. */
-data class CsvBulkResult(
-    override val filesImported: Int,
-    override val transfersCreated: Int,
-    override val duplicatesSkipped: Int,
-    override val filesSkippedNoStrategy: Int,
-    override val filesFailed: Int,
-) : BulkImportResult
-
 /**
  * Applies the matching strategy to every [imports] file. Each file's strategy is auto-matched from its
  * column headers, so files from different banks each get the right strategy; files with no match are
@@ -291,8 +282,9 @@ data class CsvBulkResult(
  * confirmation). For files whose strategy needs a user-chosen source (no SOURCE_ACCOUNT mapping), the
  * source account is [directoryAccounts]'s entry for that file if present (the import directory it was
  * scanned from, or that directory's parent), else the shared [sourceAccountOverride]; hard-coded and
- * per-row strategies resolve their own regardless. Refreshes
- * materialized views once at the end. Reports row-weighted run-wide progress via [onProgress].
+ * per-row strategies resolve their own regardless. Refreshes materialized views once at the end unless
+ * [refreshViews] is false (a caller batching several runs refreshes once itself). Reports row-weighted
+ * run-wide progress via [onProgress].
  */
 @Suppress("LongParameterList")
 suspend fun bulkApplyCsv(
@@ -311,12 +303,9 @@ suspend fun bulkApplyCsv(
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
     directoryAccounts: Map<CsvImportId, AccountId> = emptyMap(),
     tradeRepository: TradeReadRepository? = null,
-): CsvBulkResult {
-    var filesImported = 0
-    var transfers = 0
-    var duplicates = 0
-    var skippedNoStrategy = 0
-    var failed = 0
+    refreshViews: Boolean = true,
+): BulkApplyResult {
+    val outcomes = mutableListOf<BulkFileOutcome>()
 
     val tracker = WeightedProgress(imports.map { it.rowCount }, onProgress = onProgress)
     tracker.started(detail = "Preparing")
@@ -332,8 +321,24 @@ suspend fun bulkApplyCsv(
         val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: listedImport
         val sampleRows = csvImportRepository.getImportRows(csvImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
         val matched = strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, sampleRows)
+
+        fun outcome(
+            status: BulkFileStatus,
+            result: CsvImportResult? = null,
+            error: String? = null,
+        ) = outcomes.add(
+            BulkFileOutcome(
+                fileId = csvImport.id.toString(),
+                fileName = csvImport.originalFileName,
+                status = status,
+                strategyName = matched?.name,
+                transfersCreated = result?.successCount ?: 0,
+                duplicatesSkipped = result?.duplicateCount ?: 0,
+                error = error,
+            ),
+        )
         if (matched == null) {
-            skippedNoStrategy++
+            outcome(BulkFileStatus.SKIPPED_NO_STRATEGY)
             return@forEachIndexed
         }
         try {
@@ -355,26 +360,18 @@ suspend fun bulkApplyCsv(
                     cryptoRepository = cryptoRepository,
                     attributeAccountMatchers = attributeAccountMatchers,
                     tradeRepository = tradeRepository,
-                ) ?: return@forEachIndexed
-            filesImported++
-            transfers += result.successCount
-            duplicates += result.duplicateCount
+                )
+            if (result == null) outcome(BulkFileStatus.NOTHING_TO_IMPORT) else outcome(BulkFileStatus.IMPORTED, result)
         } catch (expected: Exception) {
             logger.e(expected) { "Bulk CSV import failed for ${csvImport.originalFileName}: ${expected.message}" }
-            failed++
+            outcome(BulkFileStatus.FAILED, error = expected.message ?: expected::class.simpleName)
         }
     }
 
     tracker.done()
-    maintenance.refreshMaterializedViews()
+    if (refreshViews) maintenance.refreshMaterializedViews()
 
-    return CsvBulkResult(
-        filesImported = filesImported,
-        transfersCreated = transfers,
-        duplicatesSkipped = duplicates,
-        filesSkippedNoStrategy = skippedNoStrategy,
-        filesFailed = failed,
-    )
+    return BulkApplyResult(outcomes)
 }
 
 /**

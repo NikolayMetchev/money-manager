@@ -232,3 +232,47 @@ internal val TRANSACTIONS_GOLDEN =
         ]
     }
     """.trimIndent()
+
+// `mm import dirs` over ImportCommandsTest's fixture, ids masked as <uuid>.
+internal val IMPORT_DIRS_GOLDEN =
+    """
+    {
+        "schemaVersion": 1,
+        "data": {
+            "directories": {
+                "folders": [
+                    {
+                        "id": "<uuid>",
+                        "name": "Monzo",
+                        "downloaded": 2,
+                        "unchanged": 0,
+                        "skipped": 0,
+                        "failed": 0,
+                        "failures": []
+                    }
+                ],
+                "foldersCreated": 0,
+                "files": [
+                    {
+                        "id": "<uuid>",
+                        "file": "monzo.csv",
+                        "format": "csv",
+                        "status": "imported",
+                        "strategy": "Monzo CSV",
+                        "transfers": 1,
+                        "duplicates": 0
+                    }
+                ],
+                "failures": []
+            },
+            "needsAttention": [
+                {
+                    "kind": "noStrategy",
+                    "subject": "unknown.csv",
+                    "reason": "no strategy matches it"
+                }
+            ],
+            "errors": []
+        }
+    }
+    """.trimIndent()

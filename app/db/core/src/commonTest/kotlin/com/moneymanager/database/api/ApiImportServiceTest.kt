@@ -2,6 +2,7 @@ package com.moneymanager.database.api
 
 import com.moneymanager.apiimport.ApiDownloadOutcome
 import com.moneymanager.apiimport.ApiImportService
+import com.moneymanager.apiimport.ApiSessionImportStatus
 import com.moneymanager.apiimport.apiDownloadTaskKey
 import com.moneymanager.apiimport.apiImportTaskKey
 import com.moneymanager.credentialvault.CredentialBundle
@@ -19,6 +20,7 @@ import com.moneymanager.tasks.TaskScope
 import com.moneymanager.tasks.TaskState
 import com.moneymanager.tasks.TaskStatus
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.MonzoApiFixtures
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -38,33 +40,15 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Instant
 
-private const val ACCOUNT_ID = "acc_00009TEST000000000001"
-
-private val MONZO_ACCOUNTS_JSON =
-    """
-    {"accounts": [{"id": "$ACCOUNT_ID", "closed": false, "created": "2022-01-01T00:00:00.000Z",
-      "description": "user_00009TEST000000user", "type": "uk_retail", "currency": "GBP"}]}
-    """.trimIndent()
-
-private val MONZO_TRANSACTIONS_JSON =
-    """
-    {"transactions": [
-      {"id": "tx_1", "account_id": "$ACCOUNT_ID", "created": "2024-06-03T09:15:00.000Z", "amount": -1250,
-       "currency": "GBP", "description": "COFFEE SHOP LTD", "merchant": {"name": "Coffee Shop Ltd"}, "counterparty": {}}
-    ]}
-    """.trimIndent()
-
 /** A transfer to a counterparty Monzo identifies by id, whose account name a person must confirm. */
 private val MONZO_COUNTERPARTY_TRANSACTIONS_JSON =
     """
     {"transactions": [
-      {"id": "tx_2", "account_id": "$ACCOUNT_ID", "created": "2024-06-04T09:15:00.000Z", "amount": -2500,
+      {"id": "tx_2", "account_id": "${MonzoApiFixtures.ACCOUNT_ID}", "created": "2024-06-04T09:15:00.000Z", "amount": -2500,
        "currency": "GBP", "description": "PAYMENT TO ALICE", "merchant": null,
        "counterparty": {"id": "cp_alice_001", "name": "Alice"}}
     ]}
     """.trimIndent()
-
-private const val EMPTY_TRANSACTIONS_JSON = """{"transactions": []}"""
 
 /**
  * [ApiImportService] against a real database and a mocked provider: "Download & import all" downloads and
@@ -98,7 +82,7 @@ class ApiImportServiceTest : DbTest() {
 
     private val requestedUrls = mutableListOf<String>()
 
-    private var monzoTransactionsJson = MONZO_TRANSACTIONS_JSON
+    private var monzoTransactionsJson = MonzoApiFixtures.TRANSACTIONS_JSON
 
     /** Monzo answers from fixtures; any other host (Starling) fails with a server error. */
     private fun mockProviders(): HttpClientEngine =
@@ -111,8 +95,8 @@ class ApiImportServiceTest : DbTest() {
                     respond(
                         content =
                             when {
-                                "/accounts" in url -> MONZO_ACCOUNTS_JSON
-                                "before=" in url -> EMPTY_TRANSACTIONS_JSON
+                                "/accounts" in url -> MonzoApiFixtures.ACCOUNTS_JSON
+                                "before=" in url -> MonzoApiFixtures.EMPTY_TRANSACTIONS_JSON
                                 else -> monzoTransactionsJson
                             },
                         status = HttpStatusCode.OK,
@@ -211,15 +195,50 @@ class ApiImportServiceTest : DbTest() {
                     ),
                 )
 
-            val (result, _) = backgroundScope.runTask { service(vault).downloadAndImportAll(this, listOf(starling, monzo)) }
+            val (result, tasks) = backgroundScope.runTask { service(vault).downloadAndImportAll(this, listOf(starling, monzo)) }
 
             assertEquals(2, result.credentialCount)
             assertEquals(1, result.downloadedCount, "Starling's server error leaves it undownloaded")
+            assertEquals(listOf(starling.id, monzo.id), result.credentials.map { it.credential.id }, "in the order asked for")
+            val starlingDownload = result.credentials.first()
+            assertEquals("Starling", starlingDownload.strategyName)
+            assertNotNull(starlingDownload.error ?: (starlingDownload.download as? ApiDownloadOutcome.NotDownloaded)?.message)
+            assertTrue(
+                tasks.single { it.parentId == null }.issues.any { it.startsWith("Starling: ") },
+                "the failure is reported on the run",
+            )
             val monzoSession = repositories.apiSessionRepository.getSessionsByDevice(deviceId()).single { it.credentialId == monzo.id }
             assertTrue(
                 monzoSession.id in repositories.apiSessionRepository.getImportedSessionRevisions().map { it.sessionId },
                 "Monzo still downloads and imports",
             )
+        }
+
+    @Test
+    fun `download and import all can only download and can leave the view refresh to the caller`() =
+        runTest {
+            val monzo = connection("Monzo")
+            val vault = unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzoSecrets)))
+            val service = service(vault)
+
+            val (downloaded, _) = backgroundScope.runTask { service.downloadAndImportAll(this, listOf(monzo), importSessions = false) }
+
+            assertEquals(1, downloaded.downloadedCount)
+            assertEquals(emptyList(), downloaded.sessions, "nothing is queued for import")
+            assertEquals(emptySet(), repositories.apiSessionRepository.getImportedSessionRevisions())
+
+            val (imported, _) = backgroundScope.runTask { service.downloadAndImportAll(this, listOf(monzo), refreshViews = false) }
+
+            assertEquals(2, imported.sessionCount, "the earlier download's session is imported too")
+            assertEquals(listOf(ApiSessionImportStatus.IMPORTED, ApiSessionImportStatus.IMPORTED), imported.sessions.map { it.status })
+            assertEquals(
+                1,
+                imported.sessions
+                    .first()
+                    .result
+                    ?.transactionCount,
+            )
+            assertEquals(0, materializedViewRefreshes, "the caller refreshes once itself")
         }
 
     @Test

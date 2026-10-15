@@ -23,6 +23,7 @@ import com.moneymanager.ui.screens.apistrategy.ApiConnectionsScreen
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -57,7 +58,7 @@ class ApiConnectionsVaultE2ETest : DbTest() {
                     ApiConnectionsScreen(
                         apiImportStrategyRepository = repositories.apiImportStrategyRepository,
                         apiSessionRepository = repositories.apiSessionRepository,
-                        apiImportService = repositories.toAppServices(repositories.importEngine).apiImportService(vault),
+                        apiImportService = repositories.toAppServices(repositories.importEngine).apiImportService(vault, Mutex()),
                     )
                 }
             }

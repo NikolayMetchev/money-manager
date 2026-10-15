@@ -3,7 +3,7 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.bigdecimal.BigDecimal
-import com.moneymanager.csvimporter.CsvBulkResult
+import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.CsvReimportResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.executeCsvReimport
@@ -120,7 +120,7 @@ class CryptoComCsvE2ETest : DbTest() {
         return repositories.csvImportRepository.getImport(id).first()!!
     }
 
-    private suspend fun applyAll(imports: List<CsvImport>): CsvBulkResult {
+    private suspend fun applyAll(imports: List<CsvImport>): BulkApplyResult {
         val progress = mutableListOf<Progress>()
         val result =
             bulkApplyCsv(

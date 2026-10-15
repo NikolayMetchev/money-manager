@@ -3,7 +3,7 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.AttributeAccountMatcher
-import com.moneymanager.csvimporter.CsvBulkResult
+import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.CsvUnimportResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.bulkReimportCsv
@@ -129,7 +129,7 @@ class CsvUnimportE2ETest : DbTest() {
     private suspend fun apply(
         import: CsvImport,
         sourceAccount: AccountId,
-    ): CsvBulkResult =
+    ): BulkApplyResult =
         bulkApplyCsv(
             imports = listOf(import),
             sourceAccountOverride = sourceAccount,

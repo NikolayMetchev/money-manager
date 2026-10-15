@@ -7,11 +7,14 @@ import com.moneymanager.di.AppComponent
 import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.files.appDataDirectory
+import com.moneymanager.importfilesource.ImportFileSourceFactory
+import com.moneymanager.importfilesource.di.createImportFileSourceFactory
 import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.googledrive.BrowserLauncher
 import com.moneymanager.remotestorage.googledrive.PrintUrlBrowserLauncher
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.terminal.stderrIsTerminal
+import io.ktor.client.engine.HttpClientEngine
 import kotlinx.io.files.Path
 
 /** The app-scoped services a command runs on: the [AppComponent]'s in production, test doubles in tests. */
@@ -21,6 +24,10 @@ internal class CliServices(
     val credentialVault: CredentialVault,
     val remoteController: RemoteDatabaseController?,
     val appVersion: AppVersion,
+    /** Opens import directories' files (local folders and Google Drive); null leaves every folder unscannable. */
+    val importFileSources: ImportFileSourceFactory?,
+    /** Replaces the platform HTTP engine for API downloads (tests pass a mock one). */
+    val httpEngine: HttpClientEngine? = null,
 )
 
 /** Where `mm` gets its services and writes its log file; tests swap both out. */
@@ -46,13 +53,15 @@ internal class CliPlatform(
                 services = { browser ->
                     // Crypto names for imports; a failure is logged, not fatal, as in the desktop app.
                     runCatching { installCryptoCatalog() }
-                    AppComponent.create(cliComponentParams(browser)).let { component ->
+                    val params = cliComponentParams(browser)
+                    AppComponent.create(params).let { component ->
                         CliServices(
                             databaseManager = component.databaseManager,
                             localSettings = component.localSettings,
                             credentialVault = component.credentialVault,
                             remoteController = component.remoteDatabaseController,
                             appVersion = component.appVersion,
+                            importFileSources = createImportFileSourceFactory(params, component.credentialVault),
                         )
                     }
                 },

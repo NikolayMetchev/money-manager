@@ -46,9 +46,14 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
+                implementation(projects.app.apiimport)
                 implementation(projects.app.cryptodata)
+                implementation(projects.app.csvimporter)
                 implementation(projects.app.di.core)
                 implementation(projects.app.di.params)
+                implementation(projects.app.importdirectory)
+                implementation(projects.app.importfilesource.core)
+                implementation(projects.app.importfilesource.di)
                 implementation(projects.app.query)
                 implementation(projects.app.remotestorage.googledrive)
                 implementation(projects.app.session)
@@ -64,6 +69,7 @@ kotlin {
                 implementation(libs.kotlinx.io.core)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.kotlinx.serialization.json)
+                implementation(libs.ktor.client.core)
                 implementation(libs.mordant.core)
             }
         }
@@ -72,11 +78,14 @@ kotlin {
         // only reads JVM bytecode, and wants the ones it sees used declared here.
         jvmMain {
             dependencies {
+                implementation(projects.app.apiimporter)
                 implementation(projects.app.db.core)
                 implementation(projects.app.db.di)
                 implementation(projects.app.db.write)
                 implementation(projects.app.importengineapi)
+                implementation(projects.app.model.apistrategy)
                 implementation(projects.app.model.core)
+                implementation(projects.app.model.importdirectory)
                 implementation(projects.app.model.repository.read)
                 implementation(projects.app.remotestorage.sync)
                 implementation(projects.utils.credentialvault)
@@ -94,6 +103,7 @@ kotlin {
                 implementation(projects.test.utils.credentialvault)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.ktor.client.mock)
             }
         }
 
@@ -102,6 +112,7 @@ kotlin {
                 implementation(projects.app.db.core)
                 implementation(projects.app.db.di)
                 implementation(projects.app.db.write)
+                implementation(projects.app.model.apistrategy)
                 implementation(projects.app.model.core)
                 implementation(projects.app.model.importdirectory)
                 implementation(projects.app.model.repository.write)
@@ -110,6 +121,7 @@ kotlin {
                 implementation(projects.utils.localsettings)
                 implementation(libs.clikt.core)
                 implementation(libs.kotlinx.serialization.core)
+                implementation(libs.ktor.http)
             }
         }
     }

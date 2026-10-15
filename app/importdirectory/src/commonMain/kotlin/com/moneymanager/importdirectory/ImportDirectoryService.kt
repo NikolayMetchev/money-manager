@@ -1,14 +1,16 @@
 package com.moneymanager.importdirectory
 
 import com.moneymanager.csvimporter.AttributeAccountMatcher
+import com.moneymanager.csvimporter.BulkApplyResult
+import com.moneymanager.csvimporter.BulkFileStatus
 import com.moneymanager.csvimporter.BulkReimportResult
-import com.moneymanager.csvimporter.CsvBulkResult
 import com.moneymanager.csvimporter.DirectoryRedownloadResult
 import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
 import com.moneymanager.csvimporter.ScanResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.bulkReimportCsv
 import com.moneymanager.csvimporter.discoverImportableFolders
+import com.moneymanager.csvimporter.findUnmatchedFundingReferences
 import com.moneymanager.csvimporter.needsSourceAccountOverride
 import com.moneymanager.csvimporter.redownloadImportDirectory
 import com.moneymanager.csvimporter.scanImportDirectory
@@ -44,7 +46,6 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createImportDirectory
 import com.moneymanager.importengineapi.setLastQifAccount
 import com.moneymanager.importfilesource.ImportFileSourceFactory
-import com.moneymanager.qifimporter.QifBulkResult
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.qifimporter.bulkApplyQif
 import com.moneymanager.qifimporter.bulkReimportQif
@@ -75,8 +76,9 @@ import kotlin.uuid.Uuid
  *
  * Directory runs report through the [TaskScope] they're given, one child task per folder, so whoever
  * starts them (a screen, the CLI) picks the parent and sees the same progress and issues. Folders are
- * listed and downloaded concurrently, but the engine doesn't serialize writes, so every run shares one
- * write lock: create one service per database session.
+ * listed and downloaded concurrently, but the engine doesn't serialize writes, so every run holds
+ * [writeLock] around its writes. Share one lock per database session, with [ApiImportService] too when
+ * both run at once.
  *
  * [fileSourceFactory] opens a folder's files; null (no file access on this platform) makes no folder
  * scannable. LOCAL folders only scan on the device that added them ([deviceId]).
@@ -102,9 +104,8 @@ class ImportDirectoryService(
     private val importEngine: ImportEngine,
     private val fileSourceFactory: ImportFileSourceFactory?,
     private val deviceId: DeviceId,
+    private val writeLock: Mutex = Mutex(),
 ) {
-    private val dbLock = Mutex()
-
     /** Whether [directory] can be downloaded here: there is file access, and a LOCAL folder belongs to this device. */
     fun isScannable(directory: ImportDirectory): Boolean = fileSourceFactory != null && directory.isOn(deviceId)
 
@@ -120,16 +121,34 @@ class ImportDirectoryService(
             .filter { isScannable(it) && !it.excluded }
 
     /**
-     * Downloads every included folder at once. Known folders start straight away; subfolders discovered
-     * under the top-level folders start as soon as they are found, so the overall total grows over the run.
-     * Each folder and each subfolder search is a child of [task]; every failure is reported on [task] as
-     * an issue, and one folder failing never stops the others.
+     * The included folders [roots] cover here: each root plus its subfolders, or every scannable included
+     * folder when [roots] is null.
+     */
+    fun scope(
+        roots: List<ImportDirectory>?,
+        all: List<ImportDirectory>,
+    ): List<ImportDirectory> {
+        val rootIds = roots?.mapTo(mutableSetOf()) { it.id }
+        return all.filter { dir ->
+            isScannable(dir) && !dir.excluded && (rootIds == null || dir.id in rootIds || dir.parentId in rootIds)
+        }
+    }
+
+    /**
+     * Downloads every included folder at once (only [roots] and their subfolders, when given). Known
+     * folders start straight away; subfolders discovered under the top-level folders start as soon as they
+     * are found, so the overall total grows over the run. Each folder and each subfolder search is a child
+     * of [task]; every failure is reported on [task] as an issue, and one folder failing never stops the others.
      */
     @Suppress("LongMethod")
-    suspend fun downloadAll(task: TaskScope): DownloadAllResult {
+    suspend fun downloadAll(
+        task: TaskScope,
+        roots: List<ImportDirectory>? = null,
+    ): DownloadAllResult {
         val startedAt = TimeSource.Monotonic.markNow()
         try {
             val directories = importDirectoryRepository.getAllDirectories().first()
+            val inScope = scope(roots, directories)
             val dirsByRef = directories.associateByTo(mutableMapOf()) { it.folderRef }
             val results = mutableListOf<Pair<ImportDirectory, ScanResult>>()
             val folderFailures = mutableListOf<String>()
@@ -170,9 +189,9 @@ class ImportDirectoryService(
                         }
                     }
 
-                    dirsByRef.values.filter { isScannable(it) && !it.excluded }.forEach(::startDownload)
-                    directories
-                        .filter { it.topLevel && isScannable(it) && !it.excluded }
+                    inScope.forEach(::startDownload)
+                    inScope
+                        .filter { it.topLevel }
                         .map { root ->
                             async(Dispatchers.IO) {
                                 task.child(subfolderSearchTaskKey(root.id), "Subfolders of ${root.name}", "Searching…") {
@@ -262,7 +281,7 @@ class ImportDirectoryService(
                 try {
                     task.child(folderDownloadTaskKey(folder.id), folder.name, "Listing files…") {
                         withContext(Dispatchers.IO) {
-                            dbLock.withLock {
+                            writeLock.withLock {
                                 redownloadImportDirectory(
                                     directory = folder,
                                     fileSource = requireFileSourceFactory().create(folder),
@@ -288,23 +307,71 @@ class ImportDirectoryService(
     /**
      * Downloads every folder, then applies every unimported CSV and QIF file that needs no decision, each
      * phase a child of [task]. Files that need a person (no matching strategy, a source account nobody set)
-     * are left staged and returned in [ImportAllResult.needsAttention], also reported as issues on [task].
+     * are left staged and returned in [ImportAllResult.needsAttention], also reported as issues on [task],
+     * with the card references the applied files carry that no account owns.
+     *
+     * [directories] limits the run to those folders and their subfolders. [redownloadFirst] first re-stages the
+     * files already staged from them ([redownload], never unimporting; a file that would need it is left
+     * for a person). [apply] false stops after downloading. [refreshViews] false leaves the materialized
+     * views to a caller that batches several runs.
      */
-    suspend fun importAll(task: TaskScope): ImportAllResult {
-        val download = task.child(DOWNLOAD_ALL_TASK_KEY, "Download all", "Listing folders.") { downloadAll(this) }
-        val csvPlan = planCsvImportAll()
+    suspend fun importAll(
+        task: TaskScope,
+        directories: List<ImportDirectory>? = null,
+        apply: Boolean = true,
+        redownloadFirst: Boolean = false,
+        refreshViews: Boolean = true,
+    ): ImportAllResult {
+        val redownloaded =
+            if (redownloadFirst) {
+                val folders = scope(directories, importDirectoryRepository.getAllDirectories().first())
+                task.child("$IMPORT_ALL_TASK_KEY-redownload", "Re-download", "Listing files…") {
+                    redownload(this, folders, unimport = null)
+                }
+            } else {
+                null
+            }
+        val redownloadAttention =
+            redownloaded?.blocked.orEmpty().map { NeedsAttention(it, NeedsAttentionReason.REDOWNLOAD_BLOCKED) } +
+                redownloaded?.reimportSuggested.orEmpty().map { NeedsAttention(it, NeedsAttentionReason.REIMPORT_SUGGESTED) }
+        val download = task.child(DOWNLOAD_ALL_TASK_KEY, "Download all", "Listing folders.") { downloadAll(this, directories) }
+        if (!apply) {
+            return ImportAllResult(download, BulkApplyResult(emptyList()), BulkApplyResult(emptyList()), redownloadAttention, redownloaded)
+        }
+        val files = directories?.let { filesIn(scope(it, importDirectoryRepository.getAllDirectories().first())) }
+        val csvPlan = planCsvImportAll(files?.let { ids -> unimportedCsvFiles().filter { it.id.toString() in ids } })
         val csv =
             task.child("${IMPORT_ALL_TASK_KEY}-csv", "Import CSV files", "Preparing") {
-                applyCsvImportAll(csvPlan.unattended(), sourceAccountOverride = null, onProgress = ::report)
+                applyCsvImportAll(csvPlan.unattended(), sourceAccountOverride = null, onProgress = ::report, refreshViews = false)
             }
-        val qifPlan = planQifImportAll()
+        val qifPlan = planQifImportAll(files?.let { ids -> unimportedQifFiles().filter { it.id.toString() in ids } })
         val qif =
             task.child("${IMPORT_ALL_TASK_KEY}-qif", "Import QIF files", "Preparing") {
-                applyQifImportAll(qifPlan.unattended(), sourceAccountId = null, onProgress = ::report)
+                applyQifImportAll(qifPlan.unattended(), sourceAccountId = null, onProgress = ::report, refreshViews = false)
             }
-        val needsAttention = csvPlan.needsAttention + qifPlan.needsAttention
-        needsAttention.forEach { task.reportIssue("${it.fileName}: ${it.reason.description}") }
-        return ImportAllResult(download, csv, qif, needsAttention)
+        if (refreshViews) maintenance.refreshMaterializedViews()
+        val needsAttention =
+            csvPlan.needsAttention + qifPlan.needsAttention + redownloadAttention + unassignedCards(csv)
+        needsAttention.forEach { task.reportIssue("${it.subject}: ${it.reason.description}") }
+        return ImportAllResult(download, csv, qif, needsAttention, redownloaded)
+    }
+
+    // The CSV and QIF import ids (as strings, the two id types differ) staged from [folders].
+    private suspend fun filesIn(folders: List<ImportDirectory>): Set<String> =
+        folders
+            .flatMap { importDirectoryRepository.getTrackedFiles(it.id).first() }
+            .mapNotNullTo(mutableSetOf()) { file -> (file.csvImportId ?: file.qifImportId)?.toString() }
+
+    // Card references in the files [csv] imported that no account owns, as the Card Last-4 tab finds them.
+    private suspend fun unassignedCards(csv: BulkApplyResult): List<NeedsAttention> {
+        val imported = csv.files.filter { it.status == BulkFileStatus.IMPORTED }.mapTo(mutableSetOf()) { it.fileId }
+        if (imported.isEmpty()) return emptyList()
+        return findUnmatchedFundingReferences(
+            imports = csvImportRepository.getAllImports().first().filter { it.id.toString() in imported },
+            strategies = csvImportStrategyRepository.getAllStrategies().first(),
+            csvImportRepository = csvImportRepository,
+            attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first()),
+        ).map { NeedsAttention(it.value, NeedsAttentionReason.UNASSIGNED_CARD) }
     }
 
     /**
@@ -358,24 +425,28 @@ class ImportDirectoryService(
         plan: CsvImportAllPlan,
         sourceAccountOverride: AccountId?,
         onProgress: suspend (Progress) -> Unit,
-    ): CsvBulkResult =
-        bulkApplyCsv(
-            imports = plan.files,
-            sourceAccountOverride = sourceAccountOverride,
-            strategies = plan.strategies,
-            currencies = plan.currencies,
-            accountMappingRepository = accountMappingRepository,
-            accountRepository = accountRepository,
-            csvImportRepository = csvImportRepository,
-            maintenance = maintenance,
-            importEngine = importEngine,
-            onProgress = onProgress,
-            passThroughAccounts = plan.passThroughAccounts,
-            cryptoRepository = cryptoRepository,
-            attributeAccountMatchers = plan.attributeAccountMatchers,
-            directoryAccounts = plan.directoryAccounts,
-            tradeRepository = tradeRepository,
-        )
+        refreshViews: Boolean = true,
+    ): BulkApplyResult =
+        writeLock.withLock {
+            bulkApplyCsv(
+                imports = plan.files,
+                sourceAccountOverride = sourceAccountOverride,
+                strategies = plan.strategies,
+                currencies = plan.currencies,
+                accountMappingRepository = accountMappingRepository,
+                accountRepository = accountRepository,
+                csvImportRepository = csvImportRepository,
+                maintenance = maintenance,
+                importEngine = importEngine,
+                onProgress = onProgress,
+                passThroughAccounts = plan.passThroughAccounts,
+                cryptoRepository = cryptoRepository,
+                attributeAccountMatchers = plan.attributeAccountMatchers,
+                directoryAccounts = plan.directoryAccounts,
+                tradeRepository = tradeRepository,
+                refreshViews = refreshViews,
+            )
+        }
 
     /** Plans a QIF "import all" over [imports] (every unimported file when null). */
     suspend fun planQifImportAll(imports: List<QifImport>? = null): QifImportAllPlan {
@@ -418,21 +489,25 @@ class ImportDirectoryService(
         plan: QifImportAllPlan,
         sourceAccountId: AccountId?,
         onProgress: suspend (Progress) -> Unit,
-    ): QifBulkResult {
+        refreshViews: Boolean = true,
+    ): BulkApplyResult {
         val result =
-            bulkApplyQif(
-                imports = plan.files,
-                sourceAccountId = sourceAccountId,
-                strategies = plan.strategies,
-                currencies = plan.currencies,
-                accountMappingRepository = accountMappingRepository,
-                accountRepository = accountRepository,
-                qifImportRepository = qifImportRepository,
-                maintenance = maintenance,
-                importEngine = importEngine,
-                onProgress = onProgress,
-                directoryAccounts = plan.directoryAccounts,
-            )
+            writeLock.withLock {
+                bulkApplyQif(
+                    imports = plan.files,
+                    sourceAccountId = sourceAccountId,
+                    strategies = plan.strategies,
+                    currencies = plan.currencies,
+                    accountMappingRepository = accountMappingRepository,
+                    accountRepository = accountRepository,
+                    qifImportRepository = qifImportRepository,
+                    maintenance = maintenance,
+                    importEngine = importEngine,
+                    onProgress = onProgress,
+                    directoryAccounts = plan.directoryAccounts,
+                    refreshViews = refreshViews,
+                )
+            }
         sourceAccountId?.let { importEngine.setLastQifAccount(it) }
         return result
     }
@@ -552,7 +627,7 @@ class ImportDirectoryService(
             csvImportRepository = csvImportRepository,
             qifImportRepository = qifImportRepository,
             importEngine = importEngine,
-            dbLock = dbLock,
+            dbLock = writeLock,
             onProgress = { done, total -> task.report(Progress.counted("$done / $total files", done, total)) },
         )
 
@@ -571,7 +646,7 @@ class ImportDirectoryService(
             rootDisplayPath = root.displayPath ?: root.folderRef,
             openFolder = { ref -> factory.create(probeDirectory(root, ref)) },
             onFound = { folder ->
-                dbLock.withLock {
+                writeLock.withLock {
                     if (folder.folderRef !in dirsByRef) {
                         val leaf =
                             ImportDirectory(

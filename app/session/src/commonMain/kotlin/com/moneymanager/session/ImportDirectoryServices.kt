@@ -3,12 +3,17 @@ package com.moneymanager.session
 import com.moneymanager.database.di.AppServices
 import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importfilesource.ImportFileSourceFactory
+import kotlinx.coroutines.sync.Mutex
 
 /**
  * The [ImportDirectoryService] over a session's read services and engine. Build one per session and
- * share it: its write lock is what keeps concurrent directory runs from interleaving engine writes.
+ * share it. [writeLock] keeps concurrent runs from interleaving engine writes: pass the same lock to
+ * [apiImportService], so directory and API imports running at once take turns too.
  */
-fun AppServices.importDirectoryService(fileSourceFactory: ImportFileSourceFactory?): ImportDirectoryService =
+fun AppServices.importDirectoryService(
+    fileSourceFactory: ImportFileSourceFactory?,
+    writeLock: Mutex,
+): ImportDirectoryService =
     ImportDirectoryService(
         importDirectoryRepository = imports.importDirectoryRepository,
         csvImportRepository = imports.csvImportRepository,
@@ -29,4 +34,5 @@ fun AppServices.importDirectoryService(fileSourceFactory: ImportFileSourceFactor
         importEngine = transactions.importEngine,
         fileSourceFactory = fileSourceFactory,
         deviceId = deviceId,
+        writeLock = writeLock,
     )

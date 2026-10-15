@@ -22,9 +22,10 @@ kotlin {
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
                 api(projects.app.model.repository.read)
-                api(projects.app.qifimporter)
                 api(projects.app.tasks)
                 api(libs.kotlinx.coroutines.core)
+
+                implementation(projects.app.qifimporter)
             }
         }
 
@@ -46,8 +47,9 @@ kotlin {
                 api(projects.app.model.passthrough)
                 api(projects.app.model.qif)
                 api(projects.app.model.repository.read)
-                api(projects.app.qifimporter)
                 api(projects.app.tasks)
+
+                implementation(projects.app.qifimporter)
             }
         }
     }
