@@ -3,9 +3,19 @@ package com.moneymanager.session
 import com.moneymanager.apiimport.ApiImportService
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.database.di.AppServices
+import io.ktor.client.engine.HttpClientEngine
+import kotlinx.coroutines.sync.Mutex
 
-/** The [ApiImportService] over a session's read services and engine, taking API secrets from [credentialVault]. */
-fun AppServices.apiImportService(credentialVault: CredentialVault): ApiImportService =
+/**
+ * The [ApiImportService] over a session's read services and engine, taking API secrets from [credentialVault].
+ * [writeLock] is the session's write lock, shared with [importDirectoryService]. [httpEngine] replaces the
+ * platform HTTP engine (tests pass a mock one).
+ */
+fun AppServices.apiImportService(
+    credentialVault: CredentialVault,
+    writeLock: Mutex,
+    httpEngine: HttpClientEngine? = null,
+): ApiImportService =
     ApiImportService(
         apiSessionRepository = imports.apiSessionRepository,
         apiImportStrategyRepository = imports.apiImportStrategyRepository,
@@ -18,4 +28,6 @@ fun AppServices.apiImportService(credentialVault: CredentialVault): ApiImportSer
         importEngine = transactions.importEngine,
         credentialVault = credentialVault,
         deviceId = deviceId,
+        httpEngine = httpEngine,
+        writeLock = writeLock,
     )

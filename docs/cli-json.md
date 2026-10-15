@@ -136,3 +136,62 @@ Dates:
 | `onThisDevice` | `false` for a local folder on another device |
 | `trackedFiles`, `importedFiles` | files downloaded so far, and how many of those were imported |
 | `lastImportedAt` | instant of the latest import, or `null` |
+
+### `import dirs [--dir NAME]… [--download-only] [--redownload]`, `import apis [--strategy NAME]… [--force-full] [--download-only]`, `import all [--force-full] [--download-only]`
+
+These commands download and import. `import dirs` downloads every included import directory (local and Google
+Drive), or only the `--dir` folders and their subfolders, and then imports every new CSV and QIF file.
+`--redownload` first re-stages the files that are already staged. `import apis` makes sure every installed API
+strategy with secrets in the vault has a connection, downloads every connection in parallel (or only the
+`--strategy` ones), and imports the new sessions. `import all` runs both at once. Live progress goes to stderr,
+and the materialized views are refreshed once at the end.
+
+`data` is one object. A section the command didn't run is left out.
+
+| Field | |
+|---|---|
+| `directories` | `{ folders, foldersCreated, redownload?, files, failures }` (see below) |
+| `apis` | `{ connections, sessions }` (see below) |
+| `needsAttention` | `[{ kind, subject, reason }]`: everything a person must resolve |
+| `errors` | `import all` only: a side that failed as a whole, while the other side carried on |
+
+`directories`:
+- `folders`: `[{ id, name, downloaded, unchanged, skipped, failed, failures }]`, one entry per folder downloaded.
+  `failures` are `"file: reason"` strings.
+- `foldersCreated`: how many subfolders were discovered and added as directories.
+- `redownload`, with `--redownload` only: `{ replaced, unchanged, blocked, reimportSuggested, failures }`, each a
+  list of file names.
+- `files`: `[{ id, file, format: "csv" | "qif", status, strategy, transfers, duplicates, error }]`. `status` is
+  `imported`, `nothingToImport`, `skipped` or `failed`. `error` is present only when the file failed.
+- `failures`: folders that couldn't be downloaded or searched at all.
+
+`apis`:
+- `connections`: `[{ id, strategy, status, sessionId, message }]`. `status` is one of:
+  - `downloaded`;
+  - `notDownloaded`: no strategy, no secrets in the vault, or blocked by region;
+  - `failed`;
+  - `busy`: already downloading elsewhere.
+- `sessions`: `[{ id, connectionId, strategy, status, accounts, transactions, people, duplicates, errors, error }]`.
+  These are the never-imported sessions that were queued, including ones left over from earlier downloads.
+  `status` is `imported`, `needsAttention`, `skipped` (its strategy is gone) or `failed`.
+
+`needsAttention.kind` is one of the following. mm never guesses any of them.
+
+| `kind` | `subject` | Resolve it by |
+|---|---|---|
+| `noStrategy` | file name | installing or writing a strategy that matches it |
+| `needsSourceAccount` | file name | setting an account on its import folder |
+| `redownloadBlocked` | file name | re-downloading with "unimport" in the app (its imported rows are gone from the new copy) |
+| `reimportSuggested` | file name | re-importing it (its columns changed) |
+| `unassignedCard` | card reference | assigning it to an account (Imports → Reconciliation → Card Last-4) |
+| `counterparties` | `"<strategy> session #<id>"` | confirming the account names when importing the session in the app |
+| `vaultLocked` | `"APIs"` | `import all` only: unlocking the vault (`--vault-password-stdin` or `MM_VAULT_PASSWORD`) |
+
+The exit code is `3` when anything needs attention or any folder, file, connection or session failed. The summary
+is printed either way.
+
+A Google Drive folder with no sign-in in the vault opens the Google consent page. With `--no-browser`, mm prints
+the URL instead and waits for the redirect on a loopback port. Over SSH, forward that port
+(`ssh -L <port>:localhost:<port> host`) and open the URL locally. On a cloud-backed database, writes are refused
+until the local copy is current (exit `1`, rerun with `--hydrate`). On exit you're asked whether to upload the
+changes (or pass `--push`).

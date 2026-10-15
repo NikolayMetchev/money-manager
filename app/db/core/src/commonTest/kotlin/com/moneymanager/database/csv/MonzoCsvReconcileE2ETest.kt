@@ -3,7 +3,7 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.AttributeAccountMatcher
-import com.moneymanager.csvimporter.CsvBulkResult
+import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
@@ -115,7 +115,7 @@ class MonzoCsvReconcileE2ETest : DbTest() {
     private suspend fun applyAll(
         imports: List<CsvImport>,
         sourceAccountOverride: AccountId?,
-    ): CsvBulkResult {
+    ): BulkApplyResult {
         val progress = mutableListOf<Progress>()
         val attributeMatchers =
             AttributeAccountMatcher.registry(repositories.accountAttributeRepository.getAll().first())

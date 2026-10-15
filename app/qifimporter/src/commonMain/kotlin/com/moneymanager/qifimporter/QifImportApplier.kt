@@ -2,7 +2,9 @@ package com.moneymanager.qifimporter
 
 import co.touchlab.kermit.Logger
 import com.moneymanager.csvimporter.BULK_ENGINE_BATCH_SIZE
-import com.moneymanager.csvimporter.BulkImportResult
+import com.moneymanager.csvimporter.BulkApplyResult
+import com.moneymanager.csvimporter.BulkFileOutcome
+import com.moneymanager.csvimporter.BulkFileStatus
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ImportPreparation
 import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
@@ -57,15 +59,6 @@ import kotlin.time.Clock
 
 private val logger = Logger.withTag("QifImportApplier")
 
-/** Summary of a bulk QIF import run across many files. */
-data class QifBulkResult(
-    override val filesImported: Int,
-    override val transfersCreated: Int,
-    override val duplicatesSkipped: Int,
-    override val filesSkippedNoStrategy: Int,
-    override val filesFailed: Int,
-) : BulkImportResult
-
 /**
  * Strategies usable for QIF imports: those whose identification columns are a (non-empty) subset of
  * QIF's fixed columns. Excludes CSV strategies (Wise/Monzo) whose columns aren't QIF columns.
@@ -106,8 +99,8 @@ fun List<CsvImportStrategy>.selectForQifContent(
  * alongside the no-matching-strategy files. The currency comes from each file's auto-detected strategy
  * (QIF data has none, so the strategy's configured currency is authoritative), so there is no
  * per-import currency prompt. Payee/counterparty accounts are auto-created with their detected names
- * (no per-file confirmation). Refreshes materialized views once at the end. Reports row-weighted
- * run-wide progress via [onProgress].
+ * (no per-file confirmation). Refreshes materialized views once at the end unless [refreshViews] is
+ * false. Reports row-weighted run-wide progress via [onProgress].
  */
 @Suppress("LongParameterList")
 suspend fun bulkApplyQif(
@@ -122,37 +115,56 @@ suspend fun bulkApplyQif(
     importEngine: ImportEngine,
     onProgress: suspend (Progress) -> Unit,
     directoryAccounts: Map<QifImportId, AccountId> = emptyMap(),
-): QifBulkResult {
+    refreshViews: Boolean = true,
+): BulkApplyResult {
     val qifStrategies = strategies.qifCompatible()
-    var filesImported = 0
-    var transfers = 0
-    var duplicates = 0
-    var skippedNoStrategy = 0
-    var failed = 0
+    val outcomes = mutableListOf<BulkFileOutcome>()
 
     val tracker = WeightedProgress(imports.map { it.recordCount }, onProgress = onProgress)
     tracker.started()
 
     imports.forEachIndexed { index, qifImport ->
         tracker.itemStarted(index, qifImport.originalFileName)
+        var strategyName: String? = null
+
+        fun outcome(
+            status: BulkFileStatus,
+            transfers: Int = 0,
+            duplicates: Int = 0,
+            error: String? = null,
+        ) = outcomes.add(
+            BulkFileOutcome(
+                fileId = qifImport.id.toString(),
+                fileName = qifImport.originalFileName,
+                status = status,
+                strategyName = strategyName,
+                transfersCreated = transfers,
+                duplicatesSkipped = duplicates,
+                error = error,
+            ),
+        )
         try {
             val count = qifImportRepository.countRecords(qifImport.id)
             val records = qifImportRepository.getImportRecords(qifImport.id, count.coerceAtLeast(1), 0)
             val rows = QifCsvAdapter.toRows(records)
-            if (rows.isEmpty()) return@forEachIndexed
+            if (rows.isEmpty()) {
+                outcome(BulkFileStatus.NOTHING_TO_IMPORT)
+                return@forEachIndexed
+            }
 
             // Auto-detect the bank strategy from the file's content (Santander vs the generic fallback).
             val matched = qifStrategies.selectForQifContent(rows, QifCsvAdapter.columns)
             if (matched == null) {
-                skippedNoStrategy++
+                outcome(BulkFileStatus.SKIPPED_NO_STRATEGY)
                 return@forEachIndexed
             }
+            strategyName = matched.name
 
             // The strategy's own (configured) currency is used — no per-import override.
             val strategy = matched
             val effectiveSourceAccountId = directoryAccounts[qifImport.id] ?: sourceAccountId
             if (effectiveSourceAccountId == null && strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT] == null) {
-                skippedNoStrategy++
+                outcome(BulkFileStatus.SKIPPED_NO_STRATEGY)
                 return@forEachIndexed
             }
             // Re-fetch accounts so payee accounts created by earlier files are seen.
@@ -187,25 +199,17 @@ suspend fun bulkApplyQif(
                     onProgress = { tracker.item(index, qifImport.originalFileName, it) },
                     engineBatchSize = BULK_ENGINE_BATCH_SIZE,
                 )
-            filesImported++
-            transfers += result.successCount
-            duplicates += result.duplicateCount
+            outcome(BulkFileStatus.IMPORTED, result.successCount, result.duplicateCount)
         } catch (expected: Exception) {
             logger.e(expected) { "Bulk QIF import failed for ${qifImport.originalFileName}: ${expected.message}" }
-            failed++
+            outcome(BulkFileStatus.FAILED, error = expected.message ?: expected::class.simpleName)
         }
     }
 
     tracker.done()
-    maintenance.refreshMaterializedViews()
+    if (refreshViews) maintenance.refreshMaterializedViews()
 
-    return QifBulkResult(
-        filesImported = filesImported,
-        transfersCreated = transfers,
-        duplicatesSkipped = duplicates,
-        filesSkippedNoStrategy = skippedNoStrategy,
-        filesFailed = failed,
-    )
+    return BulkApplyResult(outcomes)
 }
 
 /**

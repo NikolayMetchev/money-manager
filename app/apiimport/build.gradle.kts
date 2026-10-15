@@ -21,11 +21,11 @@ kotlin {
                 api(projects.app.model.repository.read)
                 api(projects.app.tasks)
                 api(projects.utils.credentialvault)
+                api(libs.kotlinx.coroutines.core)
                 api(libs.ktor.client.core)
 
                 implementation(projects.utils.rest)
                 implementation(libs.kermit)
-                implementation(libs.kotlinx.coroutines.core)
             }
         }
 

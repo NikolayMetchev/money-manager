@@ -9,9 +9,12 @@ import com.moneymanager.credentialvault.testing.InMemoryLocalSettings
 import com.moneymanager.credentialvault.testing.inMemoryCredentialVault
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.importfilesource.ImportFileSourceFactory
+import com.moneymanager.importfilesource.di.createImportFileSourceFactory
 import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.googledrive.BrowserLauncher
 import com.moneymanager.test.database.createTestDatabaseManager
+import io.ktor.client.engine.HttpClientEngine
 
 internal class MmRun(
     val exitCode: Int,
@@ -26,16 +29,30 @@ internal fun recorder(
     inputLines = input.toMutableList()
 }
 
-/** Test services: a test database manager, in-memory settings and vault, no cloud. */
+/**
+ * Test services: a test database manager, in-memory settings and vault, no cloud. Import directories read
+ * real local folders; [httpEngine] answers API downloads.
+ */
 internal class TestCli(
     val databaseManager: DatabaseManager = createTestDatabaseManager(),
     val localSettings: LocalSettings = InMemoryLocalSettings(),
     val vault: CredentialVault = inMemoryCredentialVault(),
+    private val httpEngine: HttpClientEngine? = null,
 ) {
     private val platform =
         CliPlatform(
-            services = { CliServices(databaseManager, localSettings, vault, remoteController = null, AppVersion("9.9.9")) },
-            systemBrowser = { BrowserLauncher { error("tests never open a browser") } },
+            services = {
+                CliServices(
+                    databaseManager = databaseManager,
+                    localSettings = localSettings,
+                    credentialVault = vault,
+                    remoteController = null,
+                    appVersion = AppVersion("9.9.9"),
+                    importFileSources = fileSources(vault),
+                    httpEngine = httpEngine,
+                )
+            },
+            systemBrowser = { NO_BROWSER },
             logFile = null,
             stderrIsTerminal = { false },
         )
@@ -54,6 +71,14 @@ internal class TestCli(
         }
         val code = command.execute(argv.asList())
         return MmRun(code, recorder.stdout(), recorder.stderr())
+    }
+
+    companion object {
+        private val NO_BROWSER = BrowserLauncher { error("tests never open a browser") }
+
+        /** The real file sources `mm` reads import directories with (local folders; Drive would need a browser). */
+        fun fileSources(vault: CredentialVault): ImportFileSourceFactory =
+            createImportFileSourceFactory(cliComponentParams(NO_BROWSER), vault)
     }
 }
 

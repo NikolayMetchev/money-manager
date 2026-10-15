@@ -425,6 +425,12 @@ stdout carries only the result: prompts, warnings and errors go to stderr, and I
   print. Filtering and resolution live in `app/query`. Every command's JSON is `{"schemaVersion":1,"data":…}` (plus
   `nextCursor` on a paged result), documented in `docs/cli-json.md`. Renaming or removing a field bumps `Envelope.SCHEMA_VERSION`.
   The golden tests (`QueryGoldens.kt`) guard the contract. Unknown or ambiguous names exit 2 with a message listing the candidates.
+- **Import commands** (`import dirs|apis|all`, `ImportRun`) run `ImportDirectoryService.importAll` and
+  `ApiImportService.downloadAndImportAll`. These are the same services the desktop screens use, built with one shared
+  session write lock (the engine doesn't serialize writes, and `import all` runs both at once). The services hand
+  back per-file, per-connection and per-session outcomes (`BulkApplyResult`, `ApiDownloadAndImportAllResult`) and
+  everything a person must resolve (`NeedsAttention`, including unassigned card last-4). The CLI prints these and
+  exits 3; it never guesses. Each run passes `refreshViews = false` and refreshes the materialized views once at the end.
 - **Vault**: `VaultUnlocker` answers `CredentialVault.unlockRequest` for the life of a command (otherwise
   `requireUnlocked` hangs). Password from `--vault-password-stdin`, then `MM_VAULT_PASSWORD`, then a no-echo prompt;
   with no vault file it offers to create one at the default path (terminal only). It never stores the password.

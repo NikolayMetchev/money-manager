@@ -1,7 +1,8 @@
 package com.moneymanager.importdirectory
 
 import com.moneymanager.csvimporter.AttributeAccountMatcher
-import com.moneymanager.csvimporter.BulkImportResult
+import com.moneymanager.csvimporter.BulkApplyResult
+import com.moneymanager.csvimporter.DirectoryRedownloadResult
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Currency
@@ -12,17 +13,26 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.qif.QifImport
 
-/** Why a file can't be imported without a person deciding something. */
+/** Why something can't be finished without a person deciding something. */
 enum class NeedsAttentionReason(
     val description: String,
 ) {
     NO_STRATEGY("no strategy matches it"),
     NEEDS_SOURCE_ACCOUNT("its strategy needs a source account and its folder has none"),
+
+    /** A re-download whose new copy lost rows that were already imported: unimport it to replace it. */
+    REDOWNLOAD_BLOCKED("its new copy no longer has rows that were imported, so it was left as it was"),
+
+    /** A re-download changed the file's columns, so its imported rows may now map differently. */
+    REIMPORT_SUGGESTED("its columns changed, so re-importing it may change its transactions"),
+
+    /** A card or funding reference in an imported file that no account owns (the Card Last-4 tab). */
+    UNASSIGNED_CARD("no account owns this card reference"),
 }
 
-/** A file an unattended "import all" leaves alone, and why. */
+/** A file (or, for [NeedsAttentionReason.UNASSIGNED_CARD], a card reference) an unattended run leaves alone, and why. */
 data class NeedsAttention(
-    val fileName: String,
+    val subject: String,
     val reason: NeedsAttentionReason,
 )
 
@@ -103,18 +113,23 @@ data class QifReimportAllPlan(
     val currencies: List<Currency>,
 )
 
-/** What an unattended [ImportDirectoryService.importAll] did: download, then apply, plus what it left for a person. */
+/**
+ * What an unattended [ImportDirectoryService.importAll] did: an optional re-download, the download, then
+ * the apply (empty when the run only downloaded), plus what it left for a person.
+ */
 data class ImportAllResult(
     val download: DownloadAllResult,
-    val csv: BulkImportResult,
-    val qif: BulkImportResult,
+    val csv: BulkApplyResult,
+    val qif: BulkApplyResult,
     val needsAttention: List<NeedsAttention>,
+    val redownload: DirectoryRedownloadResult? = null,
 ) {
     fun summary(): String =
         buildString {
+            redownload?.let { append(it.summary()).append(' ') }
             append(download.summary())
             append(" CSV: ${csv.toSummary()}.")
             append(" QIF: ${qif.toSummary()}.")
-            if (needsAttention.isNotEmpty()) append(" ${needsAttention.size} file(s) need attention.")
+            if (needsAttention.isNotEmpty()) append(" ${needsAttention.size} item(s) need attention.")
         }
 }

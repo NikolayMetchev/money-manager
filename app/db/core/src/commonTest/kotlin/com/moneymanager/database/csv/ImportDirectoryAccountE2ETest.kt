@@ -3,7 +3,7 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.AttributeAccountMatcher
-import com.moneymanager.csvimporter.CsvBulkResult
+import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.scanImportDirectory
 import com.moneymanager.domain.Maintenance
@@ -135,7 +135,7 @@ class ImportDirectoryAccountE2ETest : DbTest() {
         return repositories.csvImportRepository.getImport(id).first()!!
     }
 
-    private suspend fun applyAllUnimported(): CsvBulkResult {
+    private suspend fun applyAllUnimported(): BulkApplyResult {
         val unimported =
             repositories.csvImportRepository
                 .getAllImports()

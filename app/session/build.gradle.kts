@@ -22,10 +22,11 @@ kotlin {
                 api(projects.app.tasks)
                 api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
+                api(libs.kotlinx.coroutines.core)
+                api(libs.ktor.client.core)
 
                 implementation(projects.app.model.repository.read)
                 implementation(libs.kermit)
-                implementation(libs.kotlinx.coroutines.core)
             }
         }
         getByName("jvmMain") {
@@ -43,19 +44,20 @@ kotlin {
                 api(projects.utils.credentialvault)
                 api(projects.utils.localsettings)
 
+                api(libs.kotlinx.coroutines.core)
+                api(libs.ktor.client.core)
+
                 implementation(projects.app.model.repository.read)
                 implementation(libs.kermit.core)
-                implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.ktor.client.core)
             }
         }
         getByName("androidMain") {
             dependencies {
                 api(projects.app.db.write)
+                api(libs.kotlinx.coroutines.core)
+                api(libs.ktor.client.core)
 
                 implementation(libs.kermit.core)
-                implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.ktor.client.core)
             }
         }
         getByName("commonTest") {
