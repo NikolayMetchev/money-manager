@@ -14,9 +14,9 @@ import com.moneymanager.credentialvault.StoredApiCredential
 import com.moneymanager.credentialvault.bundleOrNull
 import com.moneymanager.credentialvault.testing.unlockedCredentialVault
 import com.moneymanager.database.di.toAppServices
+import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.session.apiImportService
 import com.moneymanager.test.database.DbTest
-import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.screens.apistrategy.ApiConnectionsScreen

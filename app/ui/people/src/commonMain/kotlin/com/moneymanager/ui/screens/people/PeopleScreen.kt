@@ -39,9 +39,9 @@ import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.components.DeletePersonConfirmationDialog
 import com.moneymanager.ui.components.EditPersonDialog
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 
 @Composable
 fun PeopleScreen(

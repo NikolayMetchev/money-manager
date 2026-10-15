@@ -40,8 +40,8 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createPassThroughAccount
 import com.moneymanager.importengineapi.deletePassThroughAccount
 import com.moneymanager.importengineapi.updatePassThroughAccount
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 
 /**

@@ -13,9 +13,9 @@ import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.di.toAppServices
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.presenter.error.GlobalSchemaErrorState
 import com.moneymanager.ui.MoneyManagerApp
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
-import com.moneymanager.ui.error.GlobalSchemaErrorState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch

@@ -18,6 +18,8 @@ import com.moneymanager.di.AppComponent
 import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.importfilesource.di.createDriveFolderBrowser
 import com.moneymanager.importfilesource.di.createImportFileSourceFactory
+import com.moneymanager.presenter.error.GlobalSchemaErrorState
+import com.moneymanager.presenter.error.SchemaErrorDetector
 import com.moneymanager.session.CloseDecision
 import com.moneymanager.session.DatabaseSessions
 import com.moneymanager.session.closeDecision
@@ -26,8 +28,6 @@ import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.CloseDatabaseDialog
 import com.moneymanager.ui.components.DatabaseProgressScreen
-import com.moneymanager.ui.error.GlobalSchemaErrorState
-import com.moneymanager.ui.error.SchemaErrorDetector
 import com.moneymanager.ui.foundation.CredentialVaultPromptHost
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

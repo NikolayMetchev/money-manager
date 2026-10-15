@@ -17,9 +17,9 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.deleteCrypto
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.components.CreateCryptoDialog
 import com.moneymanager.ui.components.DestructiveConfirmDialog
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.foundation.LocalImportEngine
 
 /**

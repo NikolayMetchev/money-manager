@@ -16,6 +16,8 @@ kotlin {
                 api(libs.kotlinx.coroutines.core)
                 api(libs.mosaic.runtime)
 
+                implementation(projects.app.presenter.accounts)
+                implementation(projects.app.query)
                 implementation(projects.utils.files)
                 implementation(libs.kermit)
                 implementation(libs.mosaic.terminal)
@@ -32,12 +34,16 @@ kotlin {
                 api(projects.utils.credentialvault)
                 api(libs.androidx.compose.runtime.desktop)
 
+                implementation(projects.app.db.di)
+                implementation(projects.app.model.repository.read)
+                implementation(projects.utils.bigdecimal)
                 implementation(libs.kermit.core)
             }
         }
 
         commonTest {
             dependencies {
+                implementation(projects.app.importengineapi)
                 implementation(projects.test.app.db)
                 implementation(projects.test.utils.credentialvault)
                 implementation(kotlin("test"))

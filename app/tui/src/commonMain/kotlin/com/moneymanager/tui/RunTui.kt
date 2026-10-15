@@ -3,7 +3,7 @@ package com.moneymanager.tui
 import com.moneymanager.credentialvault.CredentialVault
 
 /** The screens `mm tui` shows, in tab order. */
-val DEFAULT_SCREENS: List<TuiScreen> = listOf(DatabaseScreen)
+val DEFAULT_SCREENS: List<TuiScreen> = listOf(DatabaseScreen, AccountsScreen)
 
 /**
  * Runs the TUI full screen until the person quits and the open database has closed. Throws

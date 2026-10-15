@@ -1,4 +1,4 @@
-package com.moneymanager.ui.error
+package com.moneymanager.presenter.error
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect

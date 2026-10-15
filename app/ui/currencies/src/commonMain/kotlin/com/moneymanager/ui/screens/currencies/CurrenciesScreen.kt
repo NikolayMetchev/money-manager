@@ -8,9 +8,9 @@ import androidx.compose.runtime.getValue
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.deleteCurrency
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.components.CreateCurrencyDialog
 import com.moneymanager.ui.components.DestructiveConfirmDialog
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.foundation.LocalImportEngine
 
 @Composable

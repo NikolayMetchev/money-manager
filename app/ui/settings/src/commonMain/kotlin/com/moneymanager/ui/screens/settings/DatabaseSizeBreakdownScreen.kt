@@ -56,7 +56,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.humanreadable.HumanReadable
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.ScreenSizeClass
 import com.moneymanager.ui.util.formatGroupedNumber
 import ir.ehsannarmani.compose_charts.PieChart

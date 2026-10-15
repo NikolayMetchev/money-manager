@@ -44,6 +44,7 @@ kotlin {
                 api(libs.kotlinx.serialization.json)
 
                 implementation(projects.app.db.read)
+                implementation(projects.app.presenter.core)
                 implementation(projects.app.remotestorage.googledrive)
                 implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.currency)
@@ -53,6 +54,7 @@ kotlin {
         }
         getByName("commonTest") {
             dependencies {
+                implementation(projects.app.presenter.core)
                 implementation(projects.test.app.db)
                 implementation(projects.test.app.ui)
                 implementation(projects.test.utils.credentialvault)

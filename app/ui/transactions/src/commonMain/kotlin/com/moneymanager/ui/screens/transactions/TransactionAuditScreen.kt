@@ -35,6 +35,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
+import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.audit.AttributeChange
 import com.moneymanager.ui.audit.AuditDiffCard
 import com.moneymanager.ui.audit.AuditEntryDiff
@@ -47,7 +48,6 @@ import com.moneymanager.ui.audit.SourceInfoSection
 import com.moneymanager.ui.audit.UpdateNewValues
 import com.moneymanager.ui.audit.computeAuditDiff
 import com.moneymanager.ui.audit.reverseAttributeChanges
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone

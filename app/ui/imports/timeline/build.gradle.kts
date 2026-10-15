@@ -11,12 +11,14 @@ kotlin {
                 api(projects.app.model.timeline)
                 api(libs.kotlinx.datetime)
 
+                implementation(projects.app.presenter.core)
                 implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
             }
         }
         getByName("commonTest") {
             dependencies {
+                implementation(projects.app.presenter.core)
                 implementation(projects.test.app.ui)
                 implementation(kotlin("test"))
             }

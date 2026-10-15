@@ -1,0 +1,3 @@
+[*.{kt,kts}]
+# Composables that emit content are PascalCase, as in Compose UI
+ktlint_function_naming_ignore_when_annotated_with = Composable

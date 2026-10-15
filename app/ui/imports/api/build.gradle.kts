@@ -17,6 +17,7 @@ kotlin {
                 api(projects.app.ui.audit)
 
                 implementation(projects.app.db.read)
+                implementation(projects.app.presenter.core)
                 implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
                 implementation(projects.utils.bigdecimal)

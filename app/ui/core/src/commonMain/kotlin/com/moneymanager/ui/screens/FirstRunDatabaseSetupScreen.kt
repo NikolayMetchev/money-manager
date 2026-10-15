@@ -28,13 +28,13 @@ import com.moneymanager.domain.model.DEFAULT_DATABASE_NAME
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.defaultRemoteArchiveName
 import com.moneymanager.domain.model.remoteCacheLocation
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.session.DatabaseSession
 import com.moneymanager.session.DatabaseSessions
 import com.moneymanager.tasks.Progress
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.settings.GoogleDriveSetupDialog
 import com.moneymanager.ui.screens.settings.GoogleDriveSetupMode
 import kotlinx.coroutines.CancellationException

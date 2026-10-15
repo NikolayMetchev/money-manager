@@ -17,6 +17,7 @@ kotlin {
                 api(projects.utils.credentialvault)
 
                 implementation(projects.app.importengineapi)
+                implementation(projects.app.presenter.core)
                 implementation(projects.app.remotestorage.googledrive)
                 implementation(projects.app.ui.components)
                 implementation(projects.utils.compose.filePicker)

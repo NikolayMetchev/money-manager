@@ -358,6 +358,13 @@ mm import dirs | jq '.data.needsAttention'</code></pre>
         </table>
       </div>
       <p>
+        The <b>Accounts</b> tab lists accounts with their owners and balances, and keeps the same accounts as the desktop
+        Accounts screen for the same filter. Press <code>/</code> to type a name filter (<code>Enter</code> or
+        <code>Esc</code> to stop), <code>r</code> to switch it between plain text and a regex, <code>s</code> to show
+        reconciliation (shadow) accounts, <code>z</code> to show only non-zero balances, and <code>↑</code>
+        <code>↓</code> <code>PgUp</code> <code>PgDn</code> to move.
+      </p>
+      <p>
         Keys outside ASCII, such as <code>é</code> or <code>£</code>, can't be typed into the TUI's prompts yet, and a
         paste of more than about 64 characters at once can lose some of them. Use the environment variables for passwords
         that contain such keys, and <code>--db</code> for a long database path.

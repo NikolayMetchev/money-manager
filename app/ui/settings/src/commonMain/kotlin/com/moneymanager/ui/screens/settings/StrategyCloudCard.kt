@@ -37,13 +37,13 @@ import com.moneymanager.domain.strategy.CsvUnresolvedReference
 import com.moneymanager.domain.strategy.StrategyKey
 import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.domain.strategy.StrategyLibrary
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.remotestorage.RemoteAuthException
 import com.moneymanager.remotestorage.sync.StrategyItem
 import com.moneymanager.remotestorage.sync.StrategyItemStatus
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.SettingsSectionCard
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 
 private val logger = Logger.withTag("StrategyCloudCard")

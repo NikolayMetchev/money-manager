@@ -52,11 +52,11 @@ import com.moneymanager.domain.repository.write.CurrencyWriteRepository
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
+import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.test.database.testSource
-import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import com.moneymanager.ui.util.ScreenSizeClass

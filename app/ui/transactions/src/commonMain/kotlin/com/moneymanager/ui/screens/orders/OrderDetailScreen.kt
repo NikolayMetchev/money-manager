@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.repository.ExchangeOrderReadRepository
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime

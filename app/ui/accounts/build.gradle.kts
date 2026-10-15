@@ -12,6 +12,8 @@ kotlin {
                 api(projects.app.model.repository.read)
 
                 implementation(projects.app.importengineapi)
+                implementation(projects.app.presenter.accounts)
+                implementation(projects.app.presenter.core)
                 implementation(projects.app.query)
                 implementation(projects.app.ui.audit)
                 implementation(projects.app.ui.components)
@@ -23,6 +25,7 @@ kotlin {
         }
         getByName("commonTest") {
             dependencies {
+                implementation(projects.app.presenter.core)
                 implementation(projects.test.app.ui)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)

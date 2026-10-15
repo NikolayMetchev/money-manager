@@ -65,6 +65,7 @@ proguard = "7.8.2"
 junit = "4.13.2"
 metro = "1.4.5"
 mokkery = "3.5.1"
+molecule = "2.2.0"
 schemaspy = "7.0.2"
 slf4j = "2.0.20"
 sort-dependencies = "0.21.0"
@@ -153,6 +154,7 @@ compose-gradle-plugin = { module = "org.jetbrains.compose:compose-gradle-plugin"
 compose-material-icons-core-desktop = { module = "org.jetbrains.compose.material:material-icons-core-desktop", version.ref = "compose-material-icons-desktop" }
 compose-material3-desktop = { module = "org.jetbrains.compose.material3:material3-desktop", version.ref = "compose-material3-desktop" }
 compose-material-desktop = { module = "org.jetbrains.compose.material:material-desktop", version.ref = "compose-plugin" }
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-plugin" }
 compose-runtime-desktop = { module = "org.jetbrains.compose.runtime:runtime-desktop", version.ref = "compose-plugin" }
 compose-ui-desktop = { module = "org.jetbrains.compose.ui:ui-desktop", version.ref = "compose-plugin" }
 compose-ui-geometry-desktop = { module = "org.jetbrains.compose.ui:ui-geometry-desktop", version.ref = "compose-plugin" }
@@ -211,6 +213,7 @@ metro-gradle-plugin = { module = "dev.zacsweers.metro:dev.zacsweers.metro.gradle
 metro-runtime = { module = "dev.zacsweers.metro:runtime", version.ref = "metro" }
 mokkery-core = { module = "dev.mokkery:mokkery-core", version.ref = "mokkery" }
 mokkery-runtime = { module = "dev.mokkery:mokkery-runtime", version.ref = "mokkery" }
+molecule-runtime = { module = "app.cash.molecule:molecule-runtime", version.ref = "molecule" }
 poi = { module = "org.apache.poi:poi", version.ref = "poi" }
 poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "poi" }
 schemaspy = { module = "org.schemaspy:schemaspy", version.ref = "schemaspy" }

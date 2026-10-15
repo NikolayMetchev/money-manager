@@ -25,7 +25,7 @@ import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CryptoRegistry
 import com.moneymanager.importengineapi.createCrypto
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.CancellationException

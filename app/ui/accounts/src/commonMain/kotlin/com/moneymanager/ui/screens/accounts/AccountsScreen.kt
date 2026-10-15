@@ -20,11 +20,9 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountMerge
-import com.moneymanager.domain.model.AssetId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Person
-import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
@@ -39,19 +37,16 @@ import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.presenter.accounts.AccountsEvent
+import com.moneymanager.presenter.accounts.presentAccounts
+import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.query.AccountQuery
-import com.moneymanager.query.AccountQueryCriteria
-import com.moneymanager.query.AccountSnapshot
-import com.moneymanager.query.AssetRef
-import com.moneymanager.query.NameMatch
-import com.moneymanager.query.OwnerRef
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.components.MultiSelectFilterDropdown
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.launch
@@ -72,8 +67,8 @@ fun AccountsScreen(
     onAccountClick: (Account) -> Unit,
     onAuditClick: (Account) -> Unit = {},
 ) {
-    // The account query joins accounts, owners, balances and the shadow flag; the screen only holds the
-    // filter state. The snapshot is collected once and re-filtered locally, so typing never re-subscribes.
+    // The filters and what they keep live in the shared presenter (the TUI's Accounts tab renders the same
+    // model); this screen adds the dialogs, categories and scroll position.
     val accountQuery =
         remember(
             accountRepository,
@@ -90,48 +85,20 @@ fun AccountsScreen(
                 personAccountOwnershipRepository = personAccountOwnershipRepository,
             )
         }
-    val snapshot by rememberFlowAsStateWithSchemaErrorHandling(accountQuery, initial = AccountSnapshot(emptyList(), emptyList())) {
-        accountQuery.snapshot()
-    }
+    val snapshots = remember(accountQuery) { accountQuery.snapshot() }
+    val model = presentAccounts(snapshots)
     val categories by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         categoryRepository.getAllCategories()
     }
     var showCreateDialog by remember { mutableStateOf(false) }
     var accountToEdit by remember { mutableStateOf<Account?>(null) }
-    var selectedOwnerIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
-    var nameFilter by remember { mutableStateOf("") }
-    var selectedAssetIds by remember { mutableStateOf<Set<AssetId>>(emptySet()) }
-    var showShadowAccounts by remember { mutableStateOf(false) }
 
-    val accounts = snapshot.accounts
-    val people = snapshot.people
-    val availableAssets = snapshot.availableAssets
-
-    // Drop selections for owners that no longer exist (e.g. a person was deleted).
-    val availableOwnerIds = people.map { it.id.id }.toSet()
-    LaunchedEffect(availableOwnerIds) {
-        selectedOwnerIds = selectedOwnerIds intersect availableOwnerIds
-    }
-
-    // Drop asset selections for assets that no longer have any balances.
-    val availableAssetIds = availableAssets.map { it.id }.toSet()
-    LaunchedEffect(availableAssetIds) {
-        selectedAssetIds = selectedAssetIds intersect availableAssetIds
-    }
+    val accounts = model.all
+    val people = model.people
+    val availableAssets = model.availableAssets
+    val displayedAccounts = model.displayed
 
     val categoriesById = remember(categories) { categories.associateBy { it.id } }
-
-    val displayedAccounts =
-        remember(snapshot, nameFilter, selectedOwnerIds, selectedAssetIds, showShadowAccounts) {
-            snapshot.filter(
-                AccountQueryCriteria(
-                    owners = selectedOwnerIds.mapTo(mutableSetOf()) { OwnerRef.Id(PersonId(it)) },
-                    name = NameMatch.Substring(nameFilter).takeIf { nameFilter.isNotBlank() },
-                    assets = selectedAssetIds.mapTo(mutableSetOf()) { AssetRef.Id(it) },
-                    includeShadow = showShadowAccounts,
-                ),
-            )
-        }
 
     Column(
         modifier =
@@ -167,8 +134,8 @@ fun AccountsScreen(
             }
         } else {
             OutlinedTextField(
-                value = nameFilter,
-                onValueChange = { nameFilter = it },
+                value = model.filter.nameText,
+                onValueChange = { model.eventSink(AccountsEvent.SetName(it)) },
                 label = { Text("Search accounts") },
                 placeholder = { Text("Type to search...") },
                 modifier = Modifier.fillMaxWidth(),
@@ -179,11 +146,11 @@ fun AccountsScreen(
             if (people.isNotEmpty()) {
                 MultiSelectFilterDropdown(
                     items = people,
-                    selectedKeys = selectedOwnerIds,
-                    itemKey = { it.id.id },
+                    selectedKeys = model.filter.ownerIds,
+                    itemKey = { it.id },
                     itemLabel = { it.fullName },
                     itemNoun = "owner",
-                    onSelectionChange = { selectedOwnerIds = it },
+                    onSelectionChange = { model.eventSink(AccountsEvent.SetOwners(it)) },
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -191,21 +158,24 @@ fun AccountsScreen(
             if (availableAssets.isNotEmpty()) {
                 MultiSelectFilterDropdown(
                     items = availableAssets,
-                    selectedKeys = selectedAssetIds,
+                    selectedKeys = model.filter.assetIds,
                     itemKey = { it.id },
                     itemLabel = { "${it.code} — ${it.name}" },
                     itemNoun = "asset",
-                    onSelectionChange = { selectedAssetIds = it },
+                    onSelectionChange = { model.eventSink(AccountsEvent.SetAssets(it)) },
                     selectedLabel = { it.code },
                     searchText = { "${it.code} ${it.name}" },
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            if (snapshot.shadowAccountCount > 0) {
+            if (model.shadowAccountCount > 0) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = showShadowAccounts, onCheckedChange = { showShadowAccounts = it })
-                    Text("Show reconciliation accounts (${snapshot.shadowAccountCount})")
+                    Checkbox(
+                        checked = model.filter.includeShadow,
+                        onCheckedChange = { model.eventSink(AccountsEvent.SetIncludeShadow(it)) },
+                    )
+                    Text("Show reconciliation accounts (${model.shadowAccountCount})")
                 }
             }
 

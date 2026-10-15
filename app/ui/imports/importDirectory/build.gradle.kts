@@ -20,6 +20,7 @@ kotlin {
                 api(projects.app.ui.foundation)
 
                 implementation(projects.app.importengineapi)
+                implementation(projects.app.presenter.core)
                 implementation(projects.app.ui.components)
                 implementation(projects.utils.compose.filePicker)
                 implementation(libs.kotlinx.coroutines.core)

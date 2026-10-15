@@ -56,6 +56,10 @@ import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
+import com.moneymanager.presenter.error.ProvideSchemaAwareScope
+import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.remotestorage.sync.SyncState
@@ -64,10 +68,6 @@ import com.moneymanager.session.apiImportService
 import com.moneymanager.session.importDirectoryService
 import com.moneymanager.strategycatalog.StrategyCatalogController
 import com.moneymanager.ui.components.DefaultCurrencyInitDialog
-import com.moneymanager.ui.error.ProvideSchemaAwareScope
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalDeviceId
 import com.moneymanager.ui.foundation.LocalImportEngine

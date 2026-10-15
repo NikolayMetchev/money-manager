@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.importengineapi.createCurrency
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.launch

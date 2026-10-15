@@ -10,9 +10,9 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.model.repository.read)
 
+                implementation(projects.app.presenter.core)
                 implementation(projects.app.ui.audit)
                 implementation(projects.app.ui.components)
-                implementation(projects.app.ui.foundation)
                 implementation(projects.utils.compose.scrollbar)
                 implementation(libs.kotlinx.coroutines.core)
             }

@@ -22,7 +22,7 @@ import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.VaultState
 import com.moneymanager.domain.model.ApiCredential
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import kotlinx.coroutines.launch
 

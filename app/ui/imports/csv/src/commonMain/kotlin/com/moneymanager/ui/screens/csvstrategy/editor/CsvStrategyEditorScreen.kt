@@ -45,8 +45,8 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.createCsvStrategy
 import com.moneymanager.importengineapi.deleteAccountMapping
 import com.moneymanager.importengineapi.updateCsvStrategy
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.screens.accountmapping.AccountMappingEditorDialog
 import com.moneymanager.ui.screens.csvstrategy.ColumnDetector
