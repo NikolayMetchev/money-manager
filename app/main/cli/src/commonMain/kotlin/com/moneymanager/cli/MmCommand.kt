@@ -72,7 +72,16 @@ internal class MmCommand(
         .nullableFlag("--drop-local")
 
     init {
-        subcommands(VersionCommand(), StatusCommand())
+        subcommands(
+            VersionCommand(),
+            StatusCommand(),
+            AccountsCommand(),
+            BalancesCommand(),
+            TransactionsCommand(),
+            PeopleCommand(),
+            StrategiesCommand(),
+            ImportDirsCommand(),
+        )
     }
 
     override fun help(context: Context): String =
@@ -91,7 +100,7 @@ internal class MmCommand(
         val progressMode = ProgressMode.of(quiet, platform.stderrIsTerminal(), currentContext.readEnvvar)
         currentContext.obj =
             CliRuntime(
-                output = Output(terminal, resolvedFormat),
+                output = Output(terminal, resolvedFormat, console::warn),
                 console = console,
                 sessionOptions = SessionOptions(db, hydrate, push, keepLocal),
                 progress =

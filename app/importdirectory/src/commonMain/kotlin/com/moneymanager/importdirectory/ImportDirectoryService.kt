@@ -24,7 +24,6 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
-import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
@@ -107,9 +106,7 @@ class ImportDirectoryService(
     private val dbLock = Mutex()
 
     /** Whether [directory] can be downloaded here: there is file access, and a LOCAL folder belongs to this device. */
-    fun isScannable(directory: ImportDirectory): Boolean =
-        fileSourceFactory != null &&
-            (directory.provider != ImportDirectoryProvider.LOCAL || directory.deviceId == deviceId)
+    fun isScannable(directory: ImportDirectory): Boolean = fileSourceFactory != null && directory.isOn(deviceId)
 
     /**
      * The folders a re-download of [directory] covers: itself, plus its discovered subfolders when it is a

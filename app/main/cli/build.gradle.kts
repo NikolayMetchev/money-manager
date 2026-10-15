@@ -49,6 +49,7 @@ kotlin {
                 implementation(projects.app.cryptodata)
                 implementation(projects.app.di.core)
                 implementation(projects.app.di.params)
+                implementation(projects.app.query)
                 implementation(projects.app.remotestorage.googledrive)
                 implementation(projects.app.session)
                 implementation(projects.app.tasks)
@@ -59,6 +60,7 @@ kotlin {
                 implementation(libs.clikt.core)
                 implementation(libs.kermit)
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.io.core)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.kotlinx.serialization.json)
@@ -71,9 +73,11 @@ kotlin {
         jvmMain {
             dependencies {
                 implementation(projects.app.db.core)
+                implementation(projects.app.db.di)
                 implementation(projects.app.db.write)
                 implementation(projects.app.importengineapi)
                 implementation(projects.app.model.core)
+                implementation(projects.app.model.repository.read)
                 implementation(projects.app.remotestorage.sync)
                 implementation(projects.utils.credentialvault)
                 implementation(projects.utils.localsettings)
@@ -96,8 +100,11 @@ kotlin {
         jvmTest {
             dependencies {
                 implementation(projects.app.db.core)
+                implementation(projects.app.db.di)
                 implementation(projects.app.db.write)
                 implementation(projects.app.model.core)
+                implementation(projects.app.model.importdirectory)
+                implementation(projects.app.model.repository.write)
                 implementation(projects.app.remotestorage.sync)
                 implementation(projects.utils.credentialvault)
                 implementation(projects.utils.localsettings)

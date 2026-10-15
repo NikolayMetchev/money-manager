@@ -1,5 +1,7 @@
 package com.moneymanager.query
 
+import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AssetId
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
@@ -45,13 +47,27 @@ sealed interface AssetRef {
     ) : AssetRef
 }
 
+/** One account, named by id or by a [NameMatch] that must match exactly one account's name. */
+sealed interface AccountRef {
+    data class Id(
+        val id: AccountId,
+    ) : AccountRef
+
+    data class Name(
+        val match: NameMatch,
+    ) : AccountRef
+}
+
 /** How an account's name is matched. Both forms ignore case and match anywhere in the name. */
 sealed interface NameMatch {
+    /** What the person typed. */
+    val text: String
+
     fun matches(name: String): Boolean
 
     /** Plain text, as typed into a search box: regex metacharacters are literal. */
     data class Substring(
-        val text: String,
+        override val text: String,
     ) : NameMatch {
         override fun matches(name: String): Boolean = name.contains(text, ignoreCase = true)
     }
@@ -61,6 +77,8 @@ sealed interface NameMatch {
         val pattern: String,
     ) : NameMatch {
         private val regex = Regex(pattern, RegexOption.IGNORE_CASE)
+
+        override val text: String get() = pattern
 
         override fun matches(name: String): Boolean = regex.containsMatchIn(name)
 
@@ -72,15 +90,38 @@ sealed interface NameMatch {
     }
 }
 
+/** A reference in the criteria (an owner or an account) that names nobody, or several; the message says which. */
+sealed class UnresolvedReferenceException(
+    message: String,
+) : IllegalArgumentException(message)
+
 /** An [OwnerRef.Name] that names nobody. */
 class UnknownOwnerException(
     val name: String,
-) : IllegalArgumentException("No person is named '$name'")
+) : UnresolvedReferenceException("No person is named '$name'")
 
 /** An [OwnerRef.Name] that names several people; [candidates] lists them so the caller can ask for an id. */
 class AmbiguousOwnerException(
     val name: String,
     val candidates: List<Person>,
-) : IllegalArgumentException(
+) : UnresolvedReferenceException(
         "Several people are named '$name': ${candidates.joinToString { "${it.fullName} (id ${it.id})" }}",
+    )
+
+/** An [AccountRef] that names no account. */
+class UnknownAccountException(
+    ref: AccountRef,
+) : UnresolvedReferenceException(
+        when (ref) {
+            is AccountRef.Id -> "No account has id ${ref.id}"
+            is AccountRef.Name -> "No account matches '${ref.match.text}'"
+        },
+    )
+
+/** An [AccountRef.Name] that matches several accounts; [candidates] lists them so the caller can narrow it or pass an id. */
+class AmbiguousAccountException(
+    ref: AccountRef.Name,
+    val candidates: List<Account>,
+) : UnresolvedReferenceException(
+        "Several accounts match '${ref.match.text}': ${candidates.joinToString { "${it.name} (id ${it.id})" }}",
     )

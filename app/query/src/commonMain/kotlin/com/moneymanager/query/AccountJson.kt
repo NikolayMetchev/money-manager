@@ -65,5 +65,5 @@ fun Money.toBalanceJson(): BalanceJson =
                 is Currency -> AssetKind.CURRENCY
                 is CryptoAsset -> AssetKind.CRYPTO
             },
-        amount = toDisplayValue().toString(),
+        amount = decimalString(),
     )

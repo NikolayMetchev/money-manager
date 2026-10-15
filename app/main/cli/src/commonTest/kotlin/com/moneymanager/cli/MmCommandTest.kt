@@ -1,6 +1,7 @@
 package com.moneymanager.cli
 
 import com.moneymanager.localsettings.KEY_LAST_DATABASE
+import com.moneymanager.query.Envelope
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.deleteTestDatabase
 import kotlinx.coroutines.test.runTest
@@ -17,7 +18,7 @@ class MmCommandTest {
             val run = TestCli().run("version")
 
             assertEquals(ExitCodes.OK, run.exitCode)
-            assertEquals(VersionJson("9.9.9"), Json.decodeFromString<VersionJson>(run.stdout))
+            assertEquals(VersionJson("9.9.9"), Json.decodeFromString<Envelope<VersionJson>>(run.stdout).data)
         }
 
     @Test
@@ -70,7 +71,7 @@ class MmCommandTest {
                 val run = cli.run("--db", location.path, "status")
 
                 assertEquals(ExitCodes.OK, run.exitCode, run.stderr)
-                val status = Json.decodeFromString<StatusJson>(run.stdout)
+                val status = Json.decodeFromString<Envelope<StatusJson>>(run.stdout).data
                 assertEquals(location.path, status.database)
                 assertNull(status.cloud)
                 assertEquals("no_file", status.vault.state)
@@ -79,7 +80,7 @@ class MmCommandTest {
                 // The next run opens the remembered database without --db.
                 val again = cli.run("status")
                 assertEquals(ExitCodes.OK, again.exitCode, again.stderr)
-                assertEquals(location.path, Json.decodeFromString<StatusJson>(again.stdout).database)
+                assertEquals(location.path, Json.decodeFromString<Envelope<StatusJson>>(again.stdout).data.database)
             } finally {
                 deleteTestDatabase(location)
             }
