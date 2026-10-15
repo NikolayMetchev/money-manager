@@ -11,7 +11,6 @@ import com.moneymanager.tui.DialogPrompter
 import com.moneymanager.tui.NotATerminalException
 import com.moneymanager.tui.TuiController
 import com.moneymanager.tui.TuiSessionHost
-import com.moneymanager.tui.runTui
 
 /**
  * `mm tui`: the full-screen terminal UI. It opens databases exactly as the other commands do (the global
@@ -35,7 +34,7 @@ internal class TuiCommand : SuspendingCliktCommand(name = "tui") {
         // A log line on stderr would land in the middle of the screen; the log file still gets everything.
         runtime.silenceStderrLogs()
         try {
-            runTui(controller, services.credentialVault)
+            runtime.runTui(controller, services.credentialVault)
         } catch (notATerminal: NotATerminalException) {
             throw UsageError("mm tui needs a terminal: run it without redirecting stdin or stdout")
         }

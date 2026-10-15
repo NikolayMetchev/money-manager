@@ -25,5 +25,4 @@ class TuiScreenScope(
     val session: DatabaseSession,
     val prompter: DialogPrompter,
     val width: Int,
-    val height: Int,
 )

@@ -55,12 +55,13 @@ class TuiAppTest {
         startup: DbLocation?,
         test: suspend TestMosaic<String>.(FakeHost, TuiController) -> Unit,
     ) = runBlocking {
+        val scope = this
         val host = FakeHost(startup)
         val controller = TuiController(host)
         runMosaicTest {
             // Wide enough for a whole test database path (native ones are long).
             state.size.value = Terminal.Size(columns = 240, rows = 24)
-            val running = launch { controller.run() }
+            val running = scope.launch { controller.run() }
             setContentAndSnapshot { TuiApp(controller, DEFAULT_SCREENS + PlaceholderScreen, host.vault) }
             try {
                 test(host, controller)
@@ -170,10 +171,11 @@ class TuiAppTest {
         val location = createTestDatabaseLocation()
         try {
             runBlocking {
+                val scope = this
                 val host = FakeHost(location)
                 val controller = TuiController(host)
                 runMosaicTest {
-                    val running = launch { controller.run() }
+                    val running = scope.launch { controller.run() }
                     setContentAndSnapshot { TuiApp(controller, DEFAULT_SCREENS, host.vault) }
                     screen(::databaseOpen)
 

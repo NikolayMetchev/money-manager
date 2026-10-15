@@ -108,7 +108,7 @@ fun TuiApp(
             TabBar(screens, selected, width)
             Box(modifier = Modifier.size(width, bodyHeight)) {
                 if (session != null) {
-                    screens[selected].content(TuiScreenScope(session, prompter, width, bodyHeight))
+                    screens[selected].content(TuiScreenScope(session, prompter, width))
                 }
             }
             Footer(controller, vaultState, width)

@@ -89,7 +89,6 @@ class MmCommandTest {
     @Test
     fun tuiNeedsATerminal() =
         runTest {
-            // Test runs have no TTY, as when stdin or stdout is redirected.
             val run = TestCli().run("tui")
 
             assertEquals(ExitCodes.USAGE, run.exitCode)

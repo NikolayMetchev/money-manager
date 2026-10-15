@@ -14,6 +14,7 @@ import com.moneymanager.importfilesource.di.createImportFileSourceFactory
 import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.googledrive.BrowserLauncher
 import com.moneymanager.test.database.createTestDatabaseManager
+import com.moneymanager.tui.NotATerminalException
 import io.ktor.client.engine.HttpClientEngine
 
 internal class MmRun(
@@ -55,6 +56,8 @@ internal class TestCli(
             systemBrowser = { NO_BROWSER },
             logFile = null,
             stderrIsTerminal = { false },
+            // Like a redirected run: some CI runners give tests a console, where the real TUI would start drawing.
+            runTui = { _, _ -> throw NotATerminalException() },
         )
 
     suspend fun run(

@@ -35,8 +35,9 @@ exclude:
     paths:
       - app/ui
       - app/main/android/src
-      # Mosaic composables (the terminal progress widgets) follow the same convention.
+      # Mosaic composables (the terminal progress widgets, the TUI) follow the same convention.
       - app/terminal/src/commonMain/kotlin/com/moneymanager/terminal/TaskProgressView.kt
+      - app/tui/src/commonMain
 
   # [3] — `?: error(...)` inside runMoneyManagerComposeUiTest/use{} lambdas.
   - name: KotlinUnreachableCode
@@ -71,6 +72,7 @@ exclude:
     paths:
       - app/ui/.editorconfig
       - app/terminal/.editorconfig
+      - app/tui/.editorconfig
 
   # `import kotlinx.serialization.modules.subclassesOfSealed` is used on the next screenful; the
   # linter fails to resolve this experimental serialization API and calls the import unused.
