@@ -117,6 +117,7 @@
     <div class="links">
       <a class="primary" href="https://github.com/NikolayMetchev/money-manager">View on GitHub</a>
       <a href="https://github.com/NikolayMetchev/money-manager/releases">Releases</a>
+      <a href="cli.html">Command line</a>
       <a href="database/index.html">Database schema</a>
       <a href="modules.html">Module tree</a>
       <a href="kdoc/index.html">API docs</a>
@@ -153,6 +154,7 @@
             <li>Cloud-backed databases (Google Drive, encrypted)</li>
             <li>Desktop (JVM) app</li>
             <li>Android app</li>
+            <li><code>mm</code> command-line client (Linux, macOS, Windows)</li>
             <li>Automated deploys</li>
           </ul>
         </div>
@@ -169,6 +171,22 @@
           </ul>
         </div>
       </div>
+    </section>
+
+    <section id="cli">
+      <h2>Command line</h2>
+      <p>
+        <code>mm</code> opens the same databases as the desktop app. Use it to query accounts, balances and
+        transactions, or to run every import from a script. It's a single native binary for Linux, macOS and Windows,
+        and it prints JSON when piped.
+      </p>
+      <pre><code>mm balances --asset GBP --non-zero
+mm transactions --account Current --from 2024-03-01
+mm import all --push</code></pre>
+      <p>
+        See the <a href="cli.html">command-line guide</a> for installation, every command, the credential vault,
+        the JSON output and exit codes.
+      </p>
     </section>
 
     <section id="concepts">

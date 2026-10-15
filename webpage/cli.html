@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="mm, the Money Manager command-line client: install, commands, JSON output and exit codes.">
+  <title>Money Manager · Command line</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #1f2328;
+      --muted: #59636e;
+      --accent: #1a7f37;
+      --accent-soft: #dafbe1;
+      --border: #d1d9e0;
+      --code-bg: #f6f8fa;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --fg: #e6edf3;
+        --muted: #9198a1;
+        --accent: #3fb950;
+        --accent-soft: #12261e;
+        --border: #30363d;
+        --code-bg: #161b22;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 2.5rem 1rem 1.5rem;
+      text-align: center;
+    }
+    header h1 { margin: 0 0 0.5rem; font-size: 2rem; }
+    header p { margin: 0 auto; max-width: 42rem; color: var(--muted); }
+    nav.toc { margin-top: 1rem; font-size: 0.95rem; }
+    nav.toc a { margin: 0 0.4rem; white-space: nowrap; }
+    main { max-width: 56rem; margin: 0 auto; padding: 1rem; }
+    section { margin: 2.5rem 0; }
+    h2 {
+      font-size: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.3em;
+    }
+    h3 { font-size: 1.1rem; margin: 1.75rem 0 0.5rem; }
+    a { color: var(--accent); }
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      background: var(--code-bg);
+      border-radius: 6px;
+    }
+    code { padding: 0.15em 0.4em; font-size: 0.9em; overflow-wrap: anywhere; }
+    pre {
+      padding: 1em;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      font-size: 0.9em;
+    }
+    pre code { padding: 0; background: none; font-size: 1em; overflow-wrap: normal; }
+    .table-wrap { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid var(--border); padding: 0.5em 0.8em; text-align: left; vertical-align: top; }
+    th { background: var(--code-bg); }
+    .note {
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+      padding: 0.6em 1em;
+      border-radius: 0 6px 6px 0;
+    }
+    .synopsis { color: var(--muted); }
+    footer {
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+      padding: 1.5rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>⌨️ <code>mm</code>: Money Manager on the command line</h1>
+    <p>
+      Query accounts, balances and transactions and run every import from a terminal or a script. <code>mm</code> opens the
+      same database files as the desktop app and shares its settings, so you can use both on the same database.
+    </p>
+    <nav class="toc">
+      <a href="index.html">← Home</a>
+      <a href="#install">Install</a>
+      <a href="#databases">Databases</a>
+      <a href="#vault">Credential vault</a>
+      <a href="#options">Global options</a>
+      <a href="#commands">Commands</a>
+      <a href="#json">JSON output</a>
+      <a href="#exit-codes">Exit codes</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="install">
+      <h2>Install</h2>
+      <h3>Standalone binary</h3>
+      <p>
+        Every <a href="https://github.com/NikolayMetchev/money-manager/releases">release</a> attaches a native
+        <code>mm</code> for each platform. It's a single file and needs no Java:
+      </p>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Platform</th><th>Release asset</th></tr>
+          <tr><td>Linux x64</td><td><code>mm-linux-x64.tar.gz</code></td></tr>
+          <tr><td>Linux ARM64</td><td><code>mm-linux-arm64.tar.gz</code></td></tr>
+          <tr><td>macOS (Apple silicon)</td><td><code>mm-macos-arm64.tar.gz</code></td></tr>
+          <tr><td>Windows x64</td><td><code>mm-windows-x64.exe</code></td></tr>
+        </table>
+      </div>
+      <p>Linux and macOS: the tarball holds an executable <code>mm</code>. Put it on your <code>PATH</code>:</p>
+      <pre><code>tar -xzf mm-linux-x64.tar.gz
+install -m 755 mm ~/.local/bin/mm
+mm version</code></pre>
+      <p>
+        The macOS binary isn't signed. If Gatekeeper blocks it, clear the quarantine flag:
+        <code>xattr -d com.apple.quarantine mm</code>.
+      </p>
+      <p>
+        Windows: rename <code>mm-windows-x64.exe</code> to <code>mm.exe</code> and put it in a folder on your
+        <code>PATH</code>.
+      </p>
+
+      <h3>With the desktop app</h3>
+      <p>
+        The desktop installers ship the CLI as well. <code>mm-jvm</code> is a launcher that runs on the app's bundled
+        Java runtime. The host's native <code>mm</code> is installed alongside it:
+      </p>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Installer</th><th><code>mm-jvm</code></th><th>native <code>mm</code></th></tr>
+          <tr><td>Linux (<code>.deb</code>)</td><td><code>/opt/moneymanager/bin/mm-jvm</code></td><td><code>/opt/moneymanager/lib/cli/mm</code></td></tr>
+          <tr><td>macOS (<code>.dmg</code>)</td><td><code>MoneyManager.app/Contents/MacOS/mm-jvm</code></td><td><code>MoneyManager.app/Contents/cli/mm</code></td></tr>
+          <tr><td>Windows (<code>.msi</code>)</td><td><code>mm-jvm.exe</code> in the install folder</td><td><code>cli\mm.exe</code> in the install folder</td></tr>
+        </table>
+      </div>
+      <p>Both builds behave the same. The native one starts faster.</p>
+
+      <h3>From source</h3>
+      <pre><code># Native binary for this machine (Linux x64 shown; also LinuxArm64, MacosArm64, MingwX64)
+./gradlew :app:main:cli:linkReleaseExecutableLinuxX64 --console=plain
+app/main/cli/build/bin/linuxX64/releaseExecutable/mm.kexe version
+
+# JVM build, a quicker way to try a change
+./gradlew :app:main:cli:installJvmDist --console=plain
+app/main/cli/build/install/mm-jvm-jvm/bin/mm-jvm version</code></pre>
+    </section>
+
+    <section id="databases">
+      <h2>Databases</h2>
+      <p>
+        With no <code>--db</code>, <code>mm</code> opens the database that the desktop app or <code>mm</code> last opened.
+        Both keep it in <code>~/.moneymanager/settings.json</code>. Pass <code>--db PATH</code> to choose a different file.
+        <code>mm</code> opens existing databases only. Create a new one in the desktop app.
+      </p>
+      <p>
+        <strong>Cloud-backed databases</strong> (Google Drive) open from the local working copy the desktop app keeps, so
+        opening one needs no password and no network. Two things change that:
+      </p>
+      <ul>
+        <li><code>--hydrate</code> downloads the cloud copy first.</li>
+        <li>
+          When the cloud password is available (<code>MM_REMOTE_PASSWORD</code>, or a prompt in a terminal),
+          <code>mm</code> checks the remote. If another device has changes you haven't downloaded, writes are refused
+          (exit <code>1</code>) until you rerun with <code>--hydrate</code>.
+        </li>
+      </ul>
+      <p>
+        On exit, if a command changed a cloud-backed database, <code>mm</code> asks whether to upload it and whether to
+        keep the local copy, just like the desktop app's close dialog. In scripts, answer up front with
+        <code>--push</code>/<code>--no-push</code> and <code>--keep-local</code>/<code>--drop-local</code>. A refused or
+        failed upload exits <code>3</code>.
+      </p>
+    </section>
+
+    <section id="vault">
+      <h2>Credential vault</h2>
+      <p>
+        API tokens and Google sign-ins live in the encrypted, password-protected credential vault, not in the database.
+        <code>mm</code> unlocks it only when a command needs a secret, such as <code>import apis</code> or a Google Drive
+        import folder. It takes the password from the first of these that is available:
+      </p>
+      <ol>
+        <li><code>--vault-password-stdin</code>: the first line of stdin;</li>
+        <li>the <code>MM_VAULT_PASSWORD</code> environment variable;</li>
+        <li>a no-echo prompt, in a terminal.</li>
+      </ol>
+      <p>
+        If none of these is available, the command fails with exit <code>1</code>. If the database has no vault yet,
+        <code>mm</code> offers to create one at the default path (only in a terminal). <code>mm</code> never stores the
+        password.
+      </p>
+      <pre><code># From a password manager
+pass show money-manager/vault | mm --vault-password-stdin import apis
+
+# From the environment, e.g. in a scheduled job
+MM_VAULT_PASSWORD="$(secret-tool lookup app mm-vault)" mm import all --push</code></pre>
+      <p>
+        <strong>Google sign-in over SSH.</strong> The first time a Google Drive folder needs a sign-in, <code>mm</code>
+        opens the consent page in a browser. With <code>--no-browser</code> it prints the URL instead and waits for the
+        redirect on a loopback port. On a remote machine, forward that port and open the URL locally:
+      </p>
+      <pre><code>ssh -L &lt;port&gt;:localhost:&lt;port&gt; my-server
+mm --no-browser import dirs</code></pre>
+    </section>
+
+    <section id="options">
+      <h2>Global options</h2>
+      <p>Global options go before the command: <code>mm --db ~/finance.db --format json accounts</code>.</p>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Option</th><th>Meaning</th></tr>
+          <tr><td><code>--db PATH</code></td><td>Database file. Default: the last one the desktop app or <code>mm</code> opened</td></tr>
+          <tr><td><code>--format json|table</code></td><td>Output format. Default: a table in a terminal, JSON when stdout is redirected</td></tr>
+          <tr><td><code>-q</code>, <code>--quiet</code></td><td>Print only the result and errors (no progress, no warnings)</td></tr>
+          <tr><td><code>-v</code>, <code>--verbose</code></td><td>Also print debug logs to stderr</td></tr>
+          <tr><td><code>--vault-password-stdin</code></td><td>Read the vault password from the first line of stdin</td></tr>
+          <tr><td><code>--no-browser</code></td><td>Print the Google sign-in URL instead of opening a browser</td></tr>
+          <tr><td><code>--hydrate</code></td><td>Cloud database: download the cloud copy before running</td></tr>
+          <tr><td><code>--push</code> / <code>--no-push</code></td><td>Cloud database: upload changes on exit, or don't (default: ask in a terminal)</td></tr>
+          <tr><td><code>--keep-local</code> / <code>--drop-local</code></td><td>Cloud database: keep the local working copy on exit (default), or delete it</td></tr>
+        </table>
+      </div>
+      <p>
+        <strong>stdout carries only the result.</strong> Prompts, warnings, errors and progress go to stderr, so you can
+        pipe the output straight into <code>jq</code>. Info-level logs and above go to
+        <code>~/.moneymanager/logs/mm.log</code>. Progress shows as live bars in a terminal and as plain lines when stderr
+        isn't a terminal, <code>NO_COLOR</code> is set or <code>TERM=dumb</code>. Every command takes
+        <code>--help</code>.
+      </p>
+    </section>
+
+    <section id="commands">
+      <h2>Commands</h2>
+
+      <h3><code>version</code>, <code>status</code></h3>
+      <p>
+        <code>version</code> prints the app version. <code>status</code> shows the open database, its cloud sync state
+        and whether the credential vault is unbound, missing, locked or unlocked.
+      </p>
+      <pre><code>mm status</code></pre>
+
+      <h3><code>accounts</code></h3>
+      <p class="synopsis"><code>mm accounts [--owner NAME|ID]… [--account REGEX] [--include-shadow]</code></p>
+      <p>Lists accounts with their owners and balances in every asset.</p>
+      <pre><code>mm accounts --owner "Alice Smith"
+mm accounts --account 'monzo|starling'</code></pre>
+
+      <h3><code>balances</code></h3>
+      <p class="synopsis"><code>mm balances [--owner NAME|ID]… [--account REGEX] [--asset CODE]… [--include-shadow] [--non-zero]</code></p>
+      <p>One row per account and asset. Balances are brought up to date before they're read.</p>
+      <pre><code>mm balances --asset GBP --non-zero
+mm balances --asset BTC --asset ETH --owner 1
+
+# Tab-separated account and amount, for a spreadsheet
+mm balances --asset GBP --non-zero | jq -r '.data[] | "\(.account)\t\(.amount)"'</code></pre>
+      <p class="note">
+        Filters work the same way in <code>accounts</code> and <code>balances</code>. <code>--owner</code> matches a
+        person's full name, ignoring case, or takes their id. <code>--account</code> is a case-insensitive regular
+        expression that can match anywhere in the account name. Different filters combine with AND, and repeated values of
+        one filter combine with OR. Shadow accounts (a reconciliation source's copy, such as Koinly's) are left out unless
+        you pass <code>--include-shadow</code>.
+      </p>
+
+      <h3><code>transactions</code></h3>
+      <p class="synopsis"><code>mm transactions --account REGEX|ID [--from DATE] [--to DATE] [--limit N] [--cursor C] [--include-shadow]</code></p>
+      <p>
+        One account's transactions, newest first, with the running balance after each one. <code>--account</code> must
+        resolve to exactly one account: an id, or a pattern matching one name. If several names match and one of them is
+        an exact match, the exact match wins.
+      </p>
+      <ul>
+        <li><code>--from</code> and <code>--to</code> take <code>YYYY-MM-DD</code> (local time) or an ISO-8601 instant.</li>
+        <li><code>--from</code> is inclusive.</li>
+        <li><code>--to</code> includes that whole day when given a date, and is exclusive when given an instant.</li>
+      </ul>
+      <pre><code>mm transactions --account Current --from 2024-03-01 --to 2024-03-31
+
+# Page through everything: pass nextCursor back, with the same --account and --from
+page=$(mm transactions --account 7 --limit 500)
+cursor=$(jq -r '.nextCursor // empty' &lt;&lt;&lt;"$page")
+mm transactions --account 7 --limit 500 --cursor "$cursor"</code></pre>
+
+      <h3><code>people</code>, <code>strategies</code>, <code>import-dirs</code></h3>
+      <p class="synopsis"><code>mm people</code> · <code>mm strategies [--kind csv|api]</code> · <code>mm import-dirs</code></p>
+      <p>
+        <code>people</code> lists the full names that <code>--owner</code> takes. <code>strategies</code> lists the
+        installed CSV and API import strategies. <code>import-dirs</code> lists the configured import folders, how many
+        files have been downloaded from each and how many of those were imported.
+      </p>
+      <pre><code>mm strategies --kind api
+mm --format table import-dirs</code></pre>
+
+      <h3><code>import dirs</code>, <code>import apis</code>, <code>import all</code></h3>
+      <p class="synopsis">
+        <code>mm import dirs [--dir NAME]… [--download-only] [--redownload]</code><br>
+        <code>mm import apis [--strategy NAME]… [--force-full] [--download-only]</code><br>
+        <code>mm import all [--force-full] [--download-only]</code>
+      </p>
+      <p>These commands download and import, using the same services as the desktop app's import screens.</p>
+      <ul>
+        <li>
+          <code>import dirs</code> downloads every included import folder (local and Google Drive), or only the
+          <code>--dir</code> folders and their subfolders. It then imports every new CSV and QIF file.
+          <code>--redownload</code> first re-downloads the files that were already downloaded.
+        </li>
+        <li>
+          <code>import apis</code> downloads every API connection that has secrets in the vault, all at once, or only the
+          <code>--strategy</code> ones. It then imports the new sessions. <code>--force-full</code> downloads everything
+          again, not just what's new.
+        </li>
+        <li><code>import all</code> does both at once.</li>
+      </ul>
+      <p>
+        Live progress goes to stderr, and the summary goes to stdout. <code>mm</code> never guesses. Anything only a person
+        can resolve, such as a file no strategy matches, a folder with no source account, counterparties to confirm or an
+        unassigned card, is listed under <code>needsAttention</code> and exits <code>3</code>.
+      </p>
+      <pre><code># Nightly: import everything, upload the cloud copy, fail loudly on anything to resolve
+MM_VAULT_PASSWORD=… mm --quiet import all --push --keep-local
+[ $? -eq 3 ] &amp;&amp; echo "Money Manager needs attention"
+
+# What needs a person?
+mm import dirs | jq '.data.needsAttention'</code></pre>
+    </section>
+
+    <section id="json">
+      <h2>JSON output</h2>
+      <p>
+        <code>mm</code> prints JSON when stdout isn't a terminal, or when you pass <code>--format json</code>. Every command
+        prints one envelope:
+      </p>
+      <pre><code>{
+    "schemaVersion": 1,
+    "data": [
+        {
+            "id": 3,
+            "name": "Wallet",
+            "openingDate": "2024-01-01T00:00:00Z",
+            "categoryId": -1,
+            "shadow": false,
+            "owners": [{ "id": 1, "name": "Alice Smith" }],
+            "balances": [
+                { "asset": "BTC", "kind": "crypto", "amount": "0.00012345" },
+                { "asset": "GBP", "kind": "currency", "amount": "100" }
+            ]
+        }
+    ],
+    "nextCursor": "…"
+}</code></pre>
+      <ul>
+        <li>
+          <code>data</code> is the result: an object for <code>version</code>, <code>status</code> and the import
+          commands, and an array for the queries.
+        </li>
+        <li><code>nextCursor</code> appears only when another page follows (only <code>transactions</code> pages).</li>
+        <li>
+          <strong>Amounts</strong> are exact decimal strings such as <code>"-12.5"</code>, never JSON numbers, which
+          would round.
+        </li>
+        <li><strong>Times</strong> are ISO-8601 instants in UTC.</li>
+        <li>
+          <strong>Ids</strong>: accounts, people and transactions have integer ids. Strategies and import folders have
+          UUIDs. A strategy's id differs between databases, so match strategies by <code>name</code>.
+        </li>
+        <li>
+          <strong>Versioning</strong>: <code>schemaVersion</code> changes only when a field is renamed or removed, or its
+          meaning changes. New fields can appear at any time, so ignore fields you don't know.
+        </li>
+      </ul>
+      <p>
+        Every command's fields are documented in the JSON contract,
+        <a href="https://github.com/NikolayMetchev/money-manager/blob/main/docs/cli-json.md"><code>docs/cli-json.md</code></a>.
+        Golden tests check it, so scripts can rely on it.
+      </p>
+    </section>
+
+    <section id="exit-codes">
+      <h2>Exit codes</h2>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Code</th><th>Meaning</th></tr>
+          <tr><td><code>0</code></td><td>OK</td></tr>
+          <tr><td><code>1</code></td><td>Error: the command failed (e.g. a locked vault with no password, writes refused on a stale cloud copy)</td></tr>
+          <tr><td><code>2</code></td><td>Usage error: a bad option, no database, or an unknown or ambiguous name (the message lists the candidates with their ids)</td></tr>
+          <tr><td><code>3</code></td><td>Partial failure or needs attention: some folder, file, connection or session failed, something is listed under <code>needsAttention</code>, or a cloud upload was refused. The summary is printed anyway</td></tr>
+          <tr><td><code>130</code></td><td>Interrupted: the first Ctrl-C cancels the running tasks and prints the summary; a second Ctrl-C exits at once</td></tr>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Money Manager · <a href="index.html">Home</a> ·
+    <a href="https://github.com/NikolayMetchev/money-manager">GitHub</a> ·
+    <a href="https://github.com/NikolayMetchev/money-manager/blob/main/LICENSE">License</a>
+  </footer>
+</body>
+</html>

@@ -34,6 +34,8 @@ A personal finance money manager built with **Kotlin Multiplatform** and **Compo
   (no app-owned secrets) via an in-app wizard; least-privilege `drive.file` scope. Works on Desktop and Android.
 * **Desktop app** — JVM/Compose Desktop with native distributions (Windows, macOS, Linux)
 * **Android app**
+* **Command line** — `mm`, a native CLI for Linux, macOS and Windows: query accounts, balances and transactions, and
+  run every import from a script (see [Command line](#command-line-mm))
 * **Database documentation** — auto-generated [SchemaSpy ER diagrams & docs](https://nikolaymetchev.github.io/money-manager/database/)
 * **CI/CD** — automated build, test, coverage, static analysis, tagging and releases
 
@@ -56,7 +58,40 @@ A personal finance money manager built with **Kotlin Multiplatform** and **Compo
 | Android | ✅ Supported |
 | iOS | ⚠️ Planned |
 | Web (JS/WASM) | ⚠️ Planned |
-| Native | ❌ Not planned |
+| Native | ⚠️ CLI only — `mm` for Linux x64/ARM64, macOS ARM64, Windows x64 |
+
+## Command line (mm)
+
+`mm` opens the same database files as the desktop app and shares its settings, so the two can be used side by side.
+It prints a table in a terminal and JSON when piped. Prompts, progress and errors go to stderr, so stdout holds only
+the result.
+
+**Install.** Download the binary for your platform from the
+[latest release](https://github.com/NikolayMetchev/money-manager/releases) and put it on your `PATH`:
+
+| Platform | Release asset |
+|----------|---------------|
+| Linux x64 / ARM64 | `mm-linux-x64.tar.gz` / `mm-linux-arm64.tar.gz` (holds an executable `mm`) |
+| macOS (Apple silicon) | `mm-macos-arm64.tar.gz` |
+| Windows x64 | `mm-windows-x64.exe` |
+
+The desktop installers also include the CLI: `mm-jvm`, which runs on the bundled Java runtime, and the native `mm`.
+
+```sh
+mm status                                            # open database, cloud sync and vault state
+mm accounts --owner "Alice Smith"                    # accounts with owners and balances
+mm balances --asset GBP --non-zero                   # one row per account and asset
+mm transactions --account Current --from 2024-03-01  # newest first, with running balances
+mm import all --push                                 # download + import every folder and API, then upload
+```
+
+**Credential vault.** Commands that need API tokens or a Google sign-in unlock the vault with the password from
+`--vault-password-stdin`, then `MM_VAULT_PASSWORD`, then a no-echo prompt in a terminal. The password is never stored.
+
+**Exit codes**: `0` ok, `1` error, `2` usage, `3` partial failure or needs attention, `130` interrupted.
+
+The full guide is on the [command-line page](https://nikolaymetchev.github.io/money-manager/cli.html), and the
+JSON contract that scripts can rely on is in [`docs/cli-json.md`](docs/cli-json.md).
 
 ## Technology Stack
 
@@ -71,27 +106,28 @@ A personal finance money manager built with **Kotlin Multiplatform** and **Compo
 
 ## Project Structure
 
+The main modules (see [`CLAUDE.md`](CLAUDE.md) for the full table and the
+[module dependency tree](https://nikolaymetchev.github.io/money-manager/modules.html)):
+
 | Module | Purpose |
 |--------|---------|
-| `gradle/build-logic/` | Convention plugins (Kotlin, Android, Compose, Metro, Mappie) |
-| `utils/bigdecimal/` | Arbitrary-precision decimal arithmetic |
-| `utils/currency/` | Locale-aware currency formatting |
-| `utils/parsers/csv/`, `utils/parsers/qif/` | CSV and QIF file parsers |
-| `utils/rest/` | REST/HTTP utilities |
-| `utils/compose/*` | Reusable Compose components (file picker, scrollbar) |
-| `utils/archive/` | Compress + password-encrypt the database archive (shared by remote backends) |
-| `app/model/core/` | Domain models and `*ReadRepository`/`*WriteRepository` interfaces |
-| `app/db/core/` | SQLDelight database, repository implementations, mappers |
-| `app/importengineapi/` | DB-free import/write API — `ImportBatch`/`ImportResult`, `ImportEngine.*` helpers, dedup policies, source/key types |
+| `gradle/build-logic/` | Convention plugins (Kotlin, Android, Compose, Metro, Mappie, native) and build checks |
+| `utils/*` | Platform-neutral helpers: `bigdecimal`, `currency`, `archive`, `files`, `credentialvault`, `localsettings`, `rest`, `httpclient`, `sqlite3`, parsers (CSV, QIF, XLSX), Compose widgets |
+| `app/model/core/`, `app/model/*` | Domain model; the strategy vocabulary (`app/model/rules`) shared by CSV and API imports |
+| `app/model/repository/read/`, `app/model/repository/write/` | `*ReadRepository` / `*WriteRepository` interfaces |
+| `app/db/*` | SQLDelight schema, read/write SQL, repository implementations, `DatabaseManager` |
+| `app/importengineapi/` | DB-free import/write API: `ImportBatch`/`ImportResult` and `ImportEngine.*` helpers |
 | `app/csvimporter/`, `app/qifimporter/`, `app/apiimporter/` | Per-format importers that build an `ImportBatch` (DB-free) |
-| `app/importer/` | Central import engine — applies an `ImportBatch`, deduplicates; the sole DB writer |
-| `app/remotestorage/core/` | Generic remote-storage provider interface (DB-free, backend-agnostic) |
-| `app/remotestorage/googledrive/` | Google Drive backend — Drive REST v3 over Ktor (JVM + Android) |
-| `app/remotestorage/sync/` | Hydrate/push orchestration + remote-binding persistence |
-| `app/di/core/` | Metro DI configuration |
-| `app/ui/core/` | Compose UI (JVM/Android) |
-| `app/main/jvm/` | JVM Desktop entry point |
-| `app/main/android/` | Android entry point |
+| `app/importer/` | Central import engine: applies an `ImportBatch` and deduplicates. The sole DB writer |
+| `app/importdirectory/`, `app/apiimport/` | Import-folder and API-connection orchestration shared by the desktop app and the CLI |
+| `app/session/` | Headless database bootstrap shared by every front end |
+| `app/query/` | Read queries and JSON DTOs shared by the desktop app and the CLI |
+| `app/tasks/`, `app/terminal/` | Background tasks and progress; terminal progress rendering (Mosaic) for the CLI |
+| `app/remotestorage/*` | Remote-storage provider interface, Google Drive backend, hydrate/push sync |
+| `app/strategies/`, `app/strategycatalog/` | Built-in strategy definitions; browse/install the published catalog |
+| `app/di/core/` | Metro DI graph |
+| `app/ui/*` | Compose UI (JVM/Android) |
+| `app/main/jvm/`, `app/main/android/`, `app/main/cli/` | Desktop, Android and `mm` CLI entry points |
 | `app/db/schemaspy/` | Generates the published SchemaSpy database docs |
 
 ## Building & Running
@@ -100,9 +136,11 @@ A personal finance money manager built with **Kotlin Multiplatform** and **Compo
 
 | Command | Description |
 |---------|-------------|
-| `./gradlew build` | Build everything, run tests, coverage and dependency health |
+| `./gradlew build` | Build everything and run tests |
 | `./gradlew :app:main:jvm:run` | Run the JVM desktop application |
 | `./gradlew :app:main:android:installDebug` | Install the Android debug APK |
+| `./gradlew :app:main:cli:installJvmDist` | Build the JVM `mm` into `app/main/cli/build/install/mm-jvm-jvm/bin/mm-jvm` |
+| `./gradlew :app:main:cli:linkReleaseExecutableLinuxX64` | Link the native `mm` (also `LinuxArm64`, `MacosArm64`, `MingwX64`) |
 | `./gradlew lintFormat` | Format code (ktlint + sort dependencies) |
 | `./gradlew detekt` | Static analysis |
 | `./gradlew buildHealth` | Check dependency health |
