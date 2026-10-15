@@ -77,7 +77,7 @@ import kotlin.uuid.Uuid
  * Directory runs report through the [TaskScope] they're given, one child task per folder, so whoever
  * starts them (a screen, the CLI) picks the parent and sees the same progress and issues. Folders are
  * listed and downloaded concurrently, but the engine doesn't serialize writes, so every run holds
- * [writeLock] around its writes. Share one lock per database session, with [ApiImportService] too when
+ * [writeLock] around its writes. Share one lock per database session, with `ApiImportService` too when
  * both run at once.
  *
  * [fileSourceFactory] opens a folder's files; null (no file access on this platform) makes no folder

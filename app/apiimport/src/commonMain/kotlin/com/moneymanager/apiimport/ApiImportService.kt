@@ -156,7 +156,7 @@ class ApiImportListener(
  * Downloads and imports API sessions outside any UI, so the desktop app, Android and the CLI share one
  * implementation. Every run reports through the [TaskScope] it is given; "Download & import all" starts one
  * child task per credential download and per session import. Imports hold [writeLock], the session's
- * write lock that [ImportDirectoryService][com.moneymanager.importdirectory.ImportDirectoryService] shares,
+ * write lock that `ImportDirectoryService` shares,
  * since the engine doesn't serialize writes itself.
  *
  * [httpEngine] replaces the platform HTTP engine (tests pass a mock one); [countryCode] is the device
