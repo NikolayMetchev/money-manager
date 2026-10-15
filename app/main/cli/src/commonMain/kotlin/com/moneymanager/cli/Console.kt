@@ -1,17 +1,20 @@
 package com.moneymanager.cli
 
 import com.github.ajalt.mordant.terminal.Terminal
+import com.moneymanager.terminal.StderrRegion
 
 /**
  * Talks to the person running `mm`. Prompts and messages go to stderr, so stdout stays the command's result
  * even when a prompt is answered; secrets come from the environment, stdin or a no-echo prompt, and are
- * never written anywhere.
+ * never written anywhere. Everything goes through [stderr], so a message or prompt during a run with live
+ * progress bars lands above them, or clears them while the person answers.
  */
 internal class Console(
     private val terminal: Terminal,
     private val readEnvvar: (String) -> String?,
     private val vaultPasswordFromStdin: Boolean,
     private val quiet: Boolean,
+    private val stderr: StderrRegion = StderrRegion { terminal.rawPrint(it, stderr = true) },
 ) {
     private var stdinPassword: String? = null
     private var stdinRead = false
@@ -20,7 +23,7 @@ internal class Console(
     val interactive: Boolean get() = !vaultPasswordFromStdin && terminal.terminalInfo.inputInteractive
 
     /** A message the person must see, even with `--quiet`. */
-    fun error(message: String) = terminal.rawPrint("$message\n", stderr = true)
+    fun error(message: String) = stderr.printAbove("$message\n")
 
     fun warn(message: String) {
         if (!quiet) error(message)
@@ -30,7 +33,11 @@ internal class Console(
     fun suppliedVaultPassword(): String? {
         if (vaultPasswordFromStdin) {
             if (!stdinRead) {
-                stdinPassword = terminal.readLineOrNull(hideInput = true)?.trimEnd('\r', '\n')?.takeIf { it.isNotEmpty() }
+                stdinPassword =
+                    stderr
+                        .paused { terminal.readLineOrNull(hideInput = true) }
+                        ?.trimEnd('\r', '\n')
+                        ?.takeIf { it.isNotEmpty() }
                 stdinRead = true
             }
             return stdinPassword
@@ -75,13 +82,14 @@ internal class Console(
     private fun ask(
         label: String,
         hideInput: Boolean,
-    ): String? {
-        terminal.rawPrint("$label: ", stderr = true)
-        val line = terminal.readLineOrNull(hideInput)
-        // A hidden read swallows the newline the person typed.
-        if (hideInput) terminal.rawPrint("\n", stderr = true)
-        return line
-    }
+    ): String? =
+        stderr.paused {
+            stderr.printAbove("$label: ")
+            val line = terminal.readLineOrNull(hideInput)
+            // A hidden read swallows the newline the person typed.
+            if (hideInput) stderr.printAbove("\n")
+            line
+        }
 
     companion object {
         const val VAULT_PASSWORD_ENV = "MM_VAULT_PASSWORD"

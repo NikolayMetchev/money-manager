@@ -101,6 +101,7 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 | `app/db/seed/`, `app/db/schemaspy/` | Static seed SQL; SchemaSpy docs generator for the Pages site |
 | `app/cryptodata/` | Bundled crypto asset catalog plus its refresher/installer (built by `tools/crypto-dataset`) |
 | `app/tasks/` | The one progress type `Progress` (every import, download, DB open and cloud sync reports it), its `PhasedProgress`/`WeightedProgress` folding helpers, and `TaskManager`: background tasks as a `StateFlow`, deduped by key, with child tasks and cancellation. Pure coroutines, so the UI, CLI and TUI share it; the Compose `TaskPanel` (`app/ui/foundation`) only collects it |
+| `app/terminal/` | Terminal widgets for `TaskManager` tasks on **Mosaic** (`TaskProgressView`), shared by the CLI and the TUI. Mosaic only lays out: `TaskProgressRenderer` composes each frame to text and draws it into `StderrRegion` on stderr (Mosaic's own runner writes to stdout and takes raw mode, which would break JSON output and prompts). `ProgressMode` picks live bars, plain lines (not a TTY, `NO_COLOR`, `TERM=dumb`) or nothing (`--quiet`); Ctrl-C cancels the tasks, leaves the summary and throws `TasksInterruptedException` |
 | `app/session/` | Headless database bootstrap shared by the desktop app, Android and the CLI: `DatabaseSessions` resolves what to open at startup (`StartupTarget`: explicit `--db`, a cloud binding's kept copy or password restore, the last database, or first run), opens it into a `DatabaseSession` (the database, `DatabaseComponent`, the edit-gated `ImportEngine`, read-only `AppServices`), binds the credential vault and captures the cloud sync baseline. `AppServices.importDirectoryService` builds the session's `ImportDirectoryService`, `AppServices.apiImportService(vault)` its `ApiImportService`. `AppStartupHost` only adds the screens and prompts |
 | `app/query/` | Non-UI read queries the desktop app, CLI and TUI share: `AccountQuery` joins accounts, owners, balances and the shadow flag, and `AccountSnapshot.filter(AccountQueryCriteria)` is the one owner/name (substring or regex)/asset/shadow/non-zero filter. `@Serializable` JSON DTOs (`AccountJson`, `BalanceJson`) carry amounts as decimal strings |
 | `app/importdirectory/` | `ImportDirectoryService`: import-directory orchestration the desktop app, CLI and TUI share. "Download all" (concurrent, discovers subfolders while downloading, one failing folder never stops the rest), single-folder download and re-download, each folder a child task of the `TaskScope` it's given; plan + apply for CSV/QIF "import all" / "re-import all". Plans return the files that need a person (`NeedsAttention`: no strategy, a source account nobody set) instead of skipping them silently. Owns the write lock its concurrent runs share, so build one per session (`AppServices.importDirectoryService`, `app/session`) |
@@ -416,7 +417,7 @@ the writers or raise the minimum severity.
 `mm` (`app/main/cli`) opens databases through `DatabaseSessions` like the desktop app, so it adds only how it asks
 the person. **Global options**: `--db` (default: the last database either front end opened, from the shared
 settings file), `--format json|table` (table in a terminal, JSON when stdout is redirected), `--quiet`,
-`--verbose`. **Exit codes**: 0 ok, 1 error, 2 usage, 3 partial failure or needs attention (`NeedsAttention`).
+`--verbose`. **Exit codes**: 0 ok, 1 error, 2 usage, 3 partial failure or needs attention (`NeedsAttention`), 130 interrupted.
 stdout carries only the result: prompts, warnings and errors go to stderr, and Info+ logs to
 `~/.moneymanager/logs/mm.log`.
 
@@ -431,6 +432,9 @@ stdout carries only the result: prompts, warnings and errors go to stderr, and I
 - **Shipping**: `build` links only the host's release executable. The release workflow uploads `mm-<os>-<arch>` (`.tar.gz` on Unix, keeping the exec bit; `.exe` on Windows)
   for all four targets, and each desktop installer carries `mm-jvm` (jpackage `--add-launcher`) and, with
   `-PbundleNativeCli=true`, the host's native `mm` under `lib/cli` (`--app-content`).
+- **Progress**: commands that run tasks wrap them in `CliRuntime.withProgress` (`app/terminal`). Every stderr write
+  (`Console`, the log writer) goes through the one `StderrRegion`, so messages print above live bars and prompts clear
+  them while the person types. Ctrl-C exits 130 after the summary; a second Ctrl-C exits at once.
 - Clikt's two klibs both define a private `Context.selfAndAncestors()`, so the CLI's native binaries link with the
   compiler caches off (`disableNativeCache`, pinned to the Kotlin version).
 

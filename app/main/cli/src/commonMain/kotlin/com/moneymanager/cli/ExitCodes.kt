@@ -1,6 +1,7 @@
 package com.moneymanager.cli
 
 import com.github.ajalt.clikt.core.CliktError
+import com.moneymanager.terminal.INTERRUPTED_EXIT_CODE
 
 /** The process exit codes `mm` documents. */
 internal object ExitCodes {
@@ -10,6 +11,9 @@ internal object ExitCodes {
 
     /** Some of the work failed, or something needs a person (a refused upload, files no strategy matched). */
     const val NEEDS_ATTENTION = 3
+
+    /** Ctrl-C stopped the running tasks (after printing their summary). */
+    const val INTERRUPTED = INTERRUPTED_EXIT_CODE
 }
 
 /** The command finished, but part of it failed or needs a person; exits with [ExitCodes.NEEDS_ATTENTION]. */

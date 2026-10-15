@@ -17,6 +17,11 @@ import com.github.ajalt.clikt.parameters.types.enum
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.importengineapi.EditingLockedException
 import com.moneymanager.session.DatabaseSession
+import com.moneymanager.tasks.TaskManager
+import com.moneymanager.terminal.ProgressMode
+import com.moneymanager.terminal.StderrRegion
+import com.moneymanager.terminal.TaskProgressRenderer
+import com.moneymanager.terminal.TasksInterruptedException
 import kotlinx.coroutines.CancellationException
 
 private val logger = Logger.withTag("MmCommand")
@@ -26,12 +31,22 @@ internal class CliRuntime(
     val output: Output,
     val console: Console,
     private val sessionOptions: SessionOptions,
+    private val progress: TaskProgressRenderer,
     servicesFactory: () -> CliServices,
 ) {
     val services: CliServices by lazy(servicesFactory)
 
     /** Runs [block] on the open database, then closes it (asking about a cloud upload when it changed). */
     suspend fun <T> withSession(block: suspend (DatabaseSession) -> T): T = CliSession(services, console, sessionOptions).run(block)
+
+    /**
+     * Runs [block] while showing the tasks it starts on [manager] on stderr: live bars in a terminal, plain
+     * lines otherwise, nothing with `--quiet`. Ctrl-C cancels them and exits with [ExitCodes.INTERRUPTED].
+     */
+    suspend fun <T> withProgress(
+        manager: TaskManager,
+        block: suspend () -> T,
+    ): T = progress.render(manager, block)
 }
 
 /** `mm`: global options, then a subcommand. */
@@ -64,18 +79,27 @@ internal class MmCommand(
         """
         Money Manager on the command line.
 
-        Exit codes: 0 ok, 1 error, 2 usage, 3 partial failure or needs attention.
+        Exit codes: 0 ok, 1 error, 2 usage, 3 partial failure or needs attention, 130 interrupted (Ctrl-C).
         """.trimIndent()
 
     override suspend fun run() {
-        installCliLogging(terminal, verbose, quiet, platform.logFile)
-        val console = Console(terminal, currentContext.readEnvvar, vaultPasswordStdin, quiet)
+        // One region owns stderr, so logs, messages and prompts all print around any live progress bars.
+        val stderr = StderrRegion { terminal.rawPrint(it, stderr = true) }
+        installCliLogging(stderr, verbose, quiet, platform.logFile)
+        val console = Console(terminal, currentContext.readEnvvar, vaultPasswordStdin, quiet, stderr)
         val resolvedFormat = format ?: if (terminal.terminalInfo.outputInteractive) OutputFormat.TABLE else OutputFormat.JSON
+        val progressMode = ProgressMode.of(quiet, platform.stderrIsTerminal(), currentContext.readEnvvar)
         currentContext.obj =
             CliRuntime(
                 output = Output(terminal, resolvedFormat),
                 console = console,
                 sessionOptions = SessionOptions(db, hydrate, push, keepLocal),
+                progress =
+                    TaskProgressRenderer(
+                        mode = progressMode,
+                        region = stderr,
+                        width = { terminal.updateSize().width },
+                    ),
                 servicesFactory = { platform.services(platform.browser(noBrowser, console::error)) },
             )
     }
@@ -90,6 +114,9 @@ internal class MmCommand(
         } catch (error: CliktError) {
             echoFormattedHelp(error)
             exitCodeFor(error)
+        } catch (interrupted: TasksInterruptedException) {
+            logger.i(interrupted) { "mm interrupted" }
+            ExitCodes.INTERRUPTED
         } catch (locked: EditingLockedException) {
             report(locked, "The cloud copy has changes this device hasn't downloaded; rerun with --hydrate")
             ExitCodes.ERROR

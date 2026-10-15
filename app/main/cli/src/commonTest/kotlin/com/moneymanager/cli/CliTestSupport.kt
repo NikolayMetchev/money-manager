@@ -37,6 +37,7 @@ internal class TestCli(
             services = { CliServices(databaseManager, localSettings, vault, remoteController = null, AppVersion("9.9.9")) },
             systemBrowser = { BrowserLauncher { error("tests never open a browser") } },
             logFile = null,
+            stderrIsTerminal = { false },
         )
 
     suspend fun run(

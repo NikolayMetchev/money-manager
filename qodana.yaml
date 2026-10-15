@@ -35,6 +35,8 @@ exclude:
     paths:
       - app/ui
       - app/main/android/src
+      # Mosaic composables (the terminal progress widgets) follow the same convention.
+      - app/terminal/src/commonMain/kotlin/com/moneymanager/terminal/TaskProgressView.kt
 
   # [3] — `?: error(...)` inside runMoneyManagerComposeUiTest/use{} lambdas.
   - name: KotlinUnreachableCode
@@ -68,6 +70,7 @@ exclude:
   - name: EditorConfigKeyCorrectness
     paths:
       - app/ui/.editorconfig
+      - app/terminal/.editorconfig
 
   # `import kotlinx.serialization.modules.subclassesOfSealed` is used on the next screenful; the
   # linter fails to resolve this experimental serialization API and calls the import unused.
@@ -116,6 +119,8 @@ exclude:
       - app/remotestorage/core/src/commonMain/kotlin/com/moneymanager/remotestorage/RemoteStorageProvider.kt
       - app/ui/imports/timeline/src/commonTest/kotlin/com/moneymanager/ui/screens/timeline/ImportTimelineScreenTest.kt
       - test/app/db/src/androidMain/kotlin/com/moneymanager/test/database/TestDatabaseHelper.kt
+      # The JVM can't switch console modes, so its VT-enable actual is always true (Windows' actual isn't).
+      - app/terminal/src/jvmMain/kotlin/com/moneymanager/terminal/TerminalFacts.jvm.kt
 
   # [4] — deliberate no-op bodies: the Android onCreate-for-existing-DB branch and the Android
   # scrollbar actuals (Android has no desktop-style scrollbars).
@@ -218,8 +223,16 @@ exclude:
       - utils/credentialvault/di/src/androidMain
       - utils/credentialvault/di/src/jvmMain
       - test/utils/credentialvault/src
+      # [2] — the expect fun's parameters are read by the native actual; the JVM actual's shutdown hook
+      # needs no coroutine scope ([4]).
+      - app/terminal/src/commonMain/kotlin/com/moneymanager/terminal/Interrupts.kt
+      - app/terminal/src/jvmMain/kotlin/com/moneymanager/terminal/Interrupts.jvm.kt
+      # CliRuntime.withProgress has no caller until the import commands (#939) land; drop this entry then.
+      - app/main/cli/src/commonMain/kotlin/com/moneymanager/cli/MmCommand.kt
   - name: UnusedSymbol
     paths:
+      # CliRuntime.withProgress has no caller until the import commands (#939) land; drop this entry then.
+      - app/main/cli/src/commonMain/kotlin/com/moneymanager/cli/MmCommand.kt
       - app/db/core/src/androidMain/kotlin/com/moneymanager/database/AndroidDatabaseManager.kt
       - app/db/di/src/androidMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.android.kt
       - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/DatabaseComponent.kt
