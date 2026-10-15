@@ -445,6 +445,8 @@ stdout carries only the result: prompts, warnings and errors go to stderr, and I
 - **Progress**: commands that run tasks wrap them in `CliRuntime.withProgress` (`app/terminal`). Every stderr write
   (`Console`, the log writer) goes through the one `StderrRegion`, so messages print above live bars and prompts clear
   them while the person types. Ctrl-C exits 130 after the summary; a second Ctrl-C exits at once.
+- **User docs**: the guide is `webpage/cli.html` (Pages), with a summary in `README.md`, and `docs/cli-json.md` is the
+  JSON contract. When you change a command, option, exit code, env var or release asset name, update all three.
 - Clikt's two klibs both define a private `Context.selfAndAncestors()`, so the CLI's native binaries link with the
   compiler caches off (`disableNativeCache`, pinned to the Kotlin version).
 
