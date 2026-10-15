@@ -15,7 +15,9 @@ import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -32,6 +34,8 @@ import kotlin.time.TimeSource
 class TuiAppTest {
     private class FakeHost(
         private val startup: DbLocation?,
+        /** Closing this database fails, like a refused cloud upload. */
+        private val refuseClosing: DbLocation? = null,
     ) : TuiSessionHost {
         val vault = inMemoryCredentialVault()
         private val sessions = DatabaseSessions(createTestDatabaseManager(), InMemoryLocalSettings(), vault)
@@ -44,6 +48,7 @@ class TuiAppTest {
         override suspend fun close(session: DatabaseSession) {
             session.database.close()
             closed += session.location
+            if (session.location == refuseClosing) throw IllegalStateException("Didn't upload")
         }
 
         override suspend fun answerVaultRequests() = awaitCancellation()
@@ -187,6 +192,32 @@ class TuiAppTest {
             }
         } finally {
             deleteTestDatabase(location)
+        }
+    }
+
+    @Test
+    fun aCloseThatFailedWhileSwitchingFailsTheRunAfterTheLastClose() {
+        val first = createTestDatabaseLocation()
+        val second = createTestDatabaseLocation()
+        try {
+            runBlocking {
+                val host = FakeHost(first, refuseClosing = first)
+                val controller = TuiController(host)
+                val running = async { runCatching { controller.run() } }
+                withTimeout(10.seconds) { while (controller.session?.location != first) delay(10.milliseconds) }
+
+                controller.open(second)
+                withTimeout(10.seconds) { while (controller.session?.location != second) delay(10.milliseconds) }
+                controller.quit()
+
+                val failure = withTimeout(10.seconds) { running.await() }.exceptionOrNull()
+                // The last close succeeded, yet the run still fails with the switch's refused upload.
+                assertEquals("Didn't upload", failure?.message)
+                assertEquals(listOf(first, second), host.closed)
+            }
+        } finally {
+            deleteTestDatabase(first)
+            deleteTestDatabase(second)
         }
     }
 

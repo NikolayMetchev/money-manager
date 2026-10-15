@@ -67,6 +67,9 @@ class TuiController(
     }
 
     private val commands = Channel<Command>(Channel.UNLIMITED)
+
+    /** The first close that failed while switching databases (a refused cloud upload), rethrown when [run] ends. */
+    private var switchCloseFailure: Exception? = null
     private var main: Job? = null
     private var forced = false
 
@@ -116,9 +119,9 @@ class TuiController(
     }
 
     /**
-     * Runs until the person quits, then closes the open database. A failed close (a refused cloud upload)
-     * is rethrown once everything is shut, so `mm` exits with its usual code; a forced stop throws
-     * [TasksInterruptedException].
+     * Runs until the person quits, then closes the open database. A failed close (a refused cloud upload),
+     * whether on quitting or earlier when switching databases, is rethrown once everything is shut, so `mm`
+     * exits with its usual code; a forced stop throws [TasksInterruptedException].
      */
     suspend fun run() =
         coroutineScope {
@@ -146,21 +149,25 @@ class TuiController(
                 is Command.Open -> switchTo(command.location)
             }
         }
-        val open = session ?: return
-        busy = "Closing ${open.location}"
-        try {
-            host.close(open)
-        } finally {
-            session = null
-            busy = null
+        session?.let { open ->
+            busy = "Closing ${open.location}"
+            try {
+                host.close(open)
+            } finally {
+                session = null
+                busy = null
+            }
         }
+        switchCloseFailure?.let { throw it }
     }
 
     private suspend fun switchTo(location: DbLocation) {
         choice = null
         session?.let { current ->
             if (current.location == location) return
-            attempt("Closing ${current.location}") { host.close(current) }
+            attempt("Closing ${current.location}", onFailure = { if (switchCloseFailure == null) switchCloseFailure = it }) {
+                host.close(current)
+            }
             session = null
         }
         session = attempt("Opening $location") { host.open(location) }
@@ -174,6 +181,7 @@ class TuiController(
 
     private suspend fun <T> attempt(
         label: String,
+        onFailure: (Exception) -> Unit = {},
         block: suspend () -> T,
     ): T? {
         busy = label
@@ -185,6 +193,7 @@ class TuiController(
             // Whatever went wrong, the person is told and can choose again; the TUI keeps running.
             logger.w(expected) { "$label failed" }
             prompter.error("$label failed: ${expected.message ?: expected}")
+            onFailure(expected)
             null
         } finally {
             busy = null

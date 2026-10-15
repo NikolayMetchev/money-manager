@@ -39,28 +39,33 @@ suspend fun runFullScreen(
         val terminal = KeyFilterTerminal(tty.asTerminalIn(this), this)
         try {
             val screen = ScreenWriter(terminal) { tty.writeFully(it) }
-            screen.enter()
-            val clock = BroadcastFrameClock()
-            val mosaic =
-                Mosaic(
-                    coroutineContext = coroutineContext + clock,
-                    onDraw = { screen.draw(it.draw()) },
-                    terminal = terminal,
-                )
-            val frames =
-                launch {
-                    val start = TimeSource.Monotonic.markNow()
-                    while (true) {
-                        clock.sendFrame(start.elapsedNow().inWholeNanoseconds)
-                        delay(FRAME_INTERVAL)
-                    }
-                }
+            // Leaving is in a finally that also covers entering: a write failing halfway through entering
+            // must still switch the alternate screen back off.
             try {
-                mosaic.setContent(content)
-                body()
+                screen.enter()
+                val clock = BroadcastFrameClock()
+                val mosaic =
+                    Mosaic(
+                        coroutineContext = coroutineContext + clock,
+                        onDraw = { screen.draw(it.draw()) },
+                        terminal = terminal,
+                    )
+                val frames =
+                    launch {
+                        val start = TimeSource.Monotonic.markNow()
+                        while (true) {
+                            clock.sendFrame(start.elapsedNow().inWholeNanoseconds)
+                            delay(FRAME_INTERVAL)
+                        }
+                    }
+                try {
+                    mosaic.setContent(content)
+                    body()
+                } finally {
+                    frames.cancel()
+                    mosaic.cancel()
+                }
             } finally {
-                frames.cancel()
-                mosaic.cancel()
                 screen.leave()
             }
         } finally {
