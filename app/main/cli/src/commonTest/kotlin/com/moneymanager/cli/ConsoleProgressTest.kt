@@ -2,6 +2,7 @@ package com.moneymanager.cli
 
 import com.github.ajalt.mordant.terminal.Terminal
 import com.moneymanager.terminal.StderrRegion
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -21,12 +22,13 @@ class ConsoleProgressTest {
     }
 
     @Test
-    fun aPromptClearsTheBarsUntilItIsAnswered() {
-        region.draw("bar")
+    fun aPromptClearsTheBarsUntilItIsAnswered() =
+        runTest {
+            region.draw("bar")
 
-        val answer = console.text("Name", default = "Bob")
+            val answer = console.text("Name", default = "Bob")
 
-        assertEquals("Alice", answer)
-        assertEquals("\u001b[?25lbar\n\u001b[1F\u001b[J\u001b[?25hName [Bob]: \u001b[?25lbar\n", recorder.stderr())
-    }
+            assertEquals("Alice", answer)
+            assertEquals("\u001b[?25lbar\n\u001b[1F\u001b[J\u001b[?25hName [Bob]: \u001b[?25lbar\n", recorder.stderr())
+        }
 }

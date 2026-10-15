@@ -19,6 +19,7 @@ import com.moneymanager.importengineapi.EditingLockedException
 import com.moneymanager.session.DatabaseSession
 import com.moneymanager.tasks.TaskManager
 import com.moneymanager.terminal.ProgressMode
+import com.moneymanager.terminal.Prompter
 import com.moneymanager.terminal.StderrRegion
 import com.moneymanager.terminal.TaskProgressRenderer
 import com.moneymanager.terminal.TasksInterruptedException
@@ -32,12 +33,17 @@ internal class CliRuntime(
     val console: Console,
     private val sessionOptions: SessionOptions,
     private val progress: TaskProgressRenderer,
+    /** Stops logging to stderr (the log file keeps everything), for a command that takes over the terminal. */
+    val silenceStderrLogs: () -> Unit,
     servicesFactory: () -> CliServices,
 ) {
     val services: CliServices by lazy(servicesFactory)
 
     /** Runs [block] on the open database, then closes it (asking about a cloud upload when it changed). */
-    suspend fun <T> withSession(block: suspend (DatabaseSession) -> T): T = CliSession(services, console, sessionOptions).run(block)
+    suspend fun <T> withSession(block: suspend (DatabaseSession) -> T): T = session().run(block)
+
+    /** How this run opens and closes databases, asking its questions through [prompter]. */
+    fun session(prompter: Prompter = console): CliSession = CliSession(services, console, sessionOptions, prompter)
 
     /**
      * Runs [block] while showing the tasks it starts on [manager] on stderr: live bars in a terminal, plain
@@ -82,6 +88,7 @@ internal class MmCommand(
             StrategiesCommand(),
             ImportDirsCommand(),
             ImportCommand(),
+            TuiCommand(),
         )
     }
 
@@ -110,6 +117,7 @@ internal class MmCommand(
                         region = stderr,
                         width = { terminal.updateSize().width },
                     ),
+                silenceStderrLogs = { installCliLogging(stderr, verbose = false, quiet = true, platform.logFile) },
                 servicesFactory = { platform.services(platform.browser(noBrowser, console::error)) },
             )
     }

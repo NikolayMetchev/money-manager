@@ -201,6 +201,8 @@ mordant-core = { module = "com.github.ajalt.mordant:mordant-core", version.ref =
 mosaic-runtime = { module = "com.jakewharton.mosaic:mosaic-runtime", version.ref = "mosaic" }
 mosaic-terminal = { module = "com.jakewharton.mosaic:mosaic-terminal", version.ref = "mosaic" }
 mosaic-testing = { module = "com.jakewharton.mosaic:mosaic-testing", version.ref = "mosaic" }
+mosaic-tty = { module = "com.jakewharton.mosaic:mosaic-tty", version.ref = "mosaic" }
+mosaic-tty-terminal = { module = "com.jakewharton.mosaic:mosaic-tty-terminal", version.ref = "mosaic" }
 log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
 log4j-slf4j2-impl = { module = "org.apache.logging.log4j:log4j-slf4j2-impl", version.ref = "log4j" }
 mappie-api = { module = "tech.mappie:mappie-api", version.ref = "mappie" }

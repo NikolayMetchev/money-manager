@@ -59,6 +59,7 @@ kotlin {
                 implementation(projects.app.session)
                 implementation(projects.app.tasks)
                 implementation(projects.app.terminal)
+                implementation(projects.app.tui)
                 implementation(projects.utils.archive)
                 implementation(projects.utils.files)
                 implementation(libs.clikt)
@@ -122,6 +123,7 @@ kotlin {
                 implementation(libs.clikt.core)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.http)
+                implementation(libs.mosaic.runtime)
             }
         }
     }

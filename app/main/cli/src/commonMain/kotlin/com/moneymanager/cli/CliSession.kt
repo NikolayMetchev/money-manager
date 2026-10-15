@@ -10,6 +10,7 @@ import com.moneymanager.session.DatabaseSessions
 import com.moneymanager.session.StartupTarget
 import com.moneymanager.session.closeDecision
 import com.moneymanager.session.performClose
+import com.moneymanager.terminal.Prompter
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -29,11 +30,16 @@ internal data class SessionOptions(
  * desktop app's close dialog does. Cloud-backed databases open from the kept local copy (no password, no
  * network) unless `--hydrate`; when the cloud password is known the remote is checked, so the edit gate
  * refuses writes while another device's changes are waiting.
+ *
+ * Passwords given up front come from [console]; everything asked goes through [prompter], which is [console]
+ * on the command line and dialogs in `mm tui`. The TUI opens, switches and closes databases with [openStartup],
+ * [open] and [close] while [answerVaultRequests] runs for its whole life; a command uses [run].
  */
 internal class CliSession(
     private val services: CliServices,
     private val console: Console,
     private val options: SessionOptions,
+    private val prompter: Prompter = console,
 ) {
     private val controller: RemoteDatabaseController? = services.remoteController
     private val sessions =
@@ -41,9 +47,11 @@ internal class CliSession(
 
     suspend fun <T> run(block: suspend (DatabaseSession) -> T): T =
         coroutineScope {
-            val unlocker = launch { VaultUnlocker(services.credentialVault, console).answerRequests() }
+            val unlocker = launch { answerVaultRequests() }
             try {
-                val session = open()
+                val session =
+                    openStartup()
+                        ?: usage("No database to open: pass --db <path>, or open one in the desktop app first")
                 var succeeded = false
                 try {
                     val result = block(session)
@@ -59,31 +67,50 @@ internal class CliSession(
             }
         }
 
-    private suspend fun open(): DatabaseSession {
+    /** Answers the credential vault's unlock requests until cancelled. */
+    suspend fun answerVaultRequests() = VaultUnlocker(services.credentialVault, console, prompter).answerRequests()
+
+    /** Opens `--db`, or what the desktop app would open at startup; null when there's nothing to open, so the person must choose. */
+    suspend fun openStartup(): DatabaseSession? {
         val explicit = options.db?.let { DbLocation(expandTilde(it)) }
         if (explicit != null && !services.databaseManager.databaseExists(explicit)) {
             usage("No database at $explicit")
         }
-        var restored = false
-        var session =
-            when (val target = sessions.resolveStartup(explicit)) {
-                is StartupTarget.Open -> sessions.open(target.location, remoteCache = target.remoteCache || isCloudCache(target.location))
-                is StartupTarget.NeedsRemoteUnlock -> {
-                    val password =
-                        console.remotePassword(target.binding.remoteName)
-                            ?: usage(
-                                "${target.binding.remoteName} has no local copy on this device; restoring it needs its password " +
-                                    "(set ${Console.REMOTE_PASSWORD_ENV} or run in a terminal)",
-                            )
-                    restored = true
-                    sessions.restoreRemote(target.binding, password)
-                }
-                StartupTarget.ChooseDatabase ->
-                    usage("No database to open: pass --db <path>, or open one in the desktop app first")
+        return when (val target = sessions.resolveStartup(explicit)) {
+            is StartupTarget.Open ->
+                prepare(
+                    sessions.open(
+                        target.location,
+                        remoteCache =
+                            target.remoteCache || isCloudCache(target.location),
+                    ),
+                )
+            is StartupTarget.NeedsRemoteUnlock -> {
+                val password =
+                    remotePassword(target.binding.remoteName)
+                        ?: usage(
+                            "${target.binding.remoteName} has no local copy on this device; restoring it needs its password " +
+                                "(set ${Console.REMOTE_PASSWORD_ENV} or run in a terminal)",
+                        )
+                prepare(sessions.restoreRemote(target.binding, password), restored = true)
             }
+            StartupTarget.ChooseDatabase -> null
+        }
+    }
+
+    /** Opens the database at [location], creating it when there's no file there yet. `--hydrate` only applies at startup. */
+    suspend fun open(location: DbLocation): DatabaseSession =
+        prepare(sessions.open(location, remoteCache = isCloudCache(location)), hydrate = false)
+
+    private suspend fun prepare(
+        opened: DatabaseSession,
+        restored: Boolean = false,
+        hydrate: Boolean = options.hydrate,
+    ): DatabaseSession {
+        var session = opened
         val binding = cloudBinding(session)
         if (binding == null) {
-            if (options.hydrate) {
+            if (hydrate) {
                 session.database.close()
                 usage("--hydrate needs a cloud-backed database")
             }
@@ -91,14 +118,14 @@ internal class CliSession(
         }
         val controller = checkNotNull(controller)
         if (!controller.hasActiveSession()) {
-            val password = if (options.hydrate) console.remotePassword(binding.remoteName) else console.suppliedRemotePassword()
+            val password = if (hydrate) remotePassword(binding.remoteName) else console.suppliedRemotePassword()
             if (password != null) {
                 runCatching { controller.resume(password) }
-                    .onSuccess { resumed -> if (!resumed) console.warn("The password for ${binding.remoteName} is wrong.") }
-                    .onFailure { console.warn("Couldn't reach ${binding.remoteName}: ${it.message}") }
+                    .onSuccess { resumed -> if (!resumed) prompter.warn("The password for ${binding.remoteName} is wrong.") }
+                    .onFailure { prompter.warn("Couldn't reach ${binding.remoteName}: ${it.message}") }
             }
         }
-        if (options.hydrate && !restored) {
+        if (hydrate && !restored) {
             if (!controller.hasActiveSession()) {
                 session.database.close()
                 usage("--hydrate needs the password for ${binding.remoteName}")
@@ -108,15 +135,20 @@ internal class CliSession(
         // Offline, the local copy still opens; the edit gate just can't know about other devices' changes.
         if (controller.hasActiveSession()) {
             runCatching { controller.checkRemote(session.database) }
-                .onFailure { console.warn("Couldn't check ${binding.remoteName} for changes from other devices: ${it.message}") }
+                .onFailure { prompter.warn("Couldn't check ${binding.remoteName} for changes from other devices: ${it.message}") }
         }
         if (controller.syncState.value.editingLocked) {
-            console.warn(
+            prompter.warn(
                 "${binding.remoteName} has changes this device hasn't downloaded; writes are refused until you rerun with --hydrate.",
             )
         }
         return session
     }
+
+    /** The cloud database password from [Console.REMOTE_PASSWORD_ENV], or asked for when there's a person to ask. */
+    private suspend fun remotePassword(remoteName: String): String? =
+        console.suppliedRemotePassword()
+            ?: if (prompter.interactive) prompter.secret("Password for the cloud database $remoteName") else null
 
     private fun usage(message: String): Nothing = throw UsageError(message)
 
@@ -126,7 +158,8 @@ internal class CliSession(
     private fun cloudBinding(session: DatabaseSession): RemoteDatabaseBinding? =
         controller?.activeBinding()?.takeIf { it.localCachePath == session.location.path }
 
-    private suspend fun close(session: DatabaseSession) {
+    /** Closes [session], asking (or following `--push`/`--keep-local`) whether to upload a changed cloud-backed copy. */
+    suspend fun close(session: DatabaseSession) {
         val controller = controller
         val decision = if (controller != null && cloudBinding(session) != null) controller.closeDecision(session.database) else null
         if (controller == null || decision == null) {
@@ -135,10 +168,10 @@ internal class CliSession(
         }
         // Like the desktop's close dialog, but only when there's something to decide: a read-only command
         // leaves an unchanged copy, and asking every time would make `mm` unusable in a loop.
-        val ask = console.interactive && decision.localChanged
-        val upload = options.push ?: (ask && console.confirm("Upload the changes to ${decision.remoteName}", default = true))
-        val keepLocal = options.keepLocal ?: (!ask || console.confirm("Keep the local copy on this device", default = true))
-        val password = if (upload && decision.needsPassword) console.remotePassword(decision.remoteName) else null
+        val ask = prompter.interactive && decision.localChanged
+        val upload = options.push ?: (ask && prompter.confirm("Upload the changes to ${decision.remoteName}", default = true))
+        val keepLocal = options.keepLocal ?: (!ask || prompter.confirm("Keep the local copy on this device", default = true))
+        val password = if (upload && decision.needsPassword) remotePassword(decision.remoteName) else null
         val outcome =
             controller.performClose(session.database, upload, keepLocal, password, decision.localChanged)
         if (upload && !outcome.uploaded) {
@@ -151,7 +184,7 @@ internal class CliSession(
             throw NeedsAttention("Didn't upload to ${decision.remoteName}: $reason. The local copy was kept.")
         }
         if (!upload && decision.localChanged) {
-            console.warn("The local copy has changes not uploaded to ${decision.remoteName}; rerun with --push to upload them.")
+            prompter.warn("The local copy has changes not uploaded to ${decision.remoteName}; rerun with --push to upload them.")
         }
     }
 }
