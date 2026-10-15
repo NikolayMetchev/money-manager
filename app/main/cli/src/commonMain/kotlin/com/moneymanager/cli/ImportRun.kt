@@ -20,10 +20,12 @@ import com.moneymanager.tasks.TaskManager
 import com.moneymanager.tasks.TaskScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
 
 /** What to do with import directories: [names] limits it to those folders (all when empty). */
 internal data class DirectoriesRequest(
@@ -99,29 +101,35 @@ internal class ImportRun(
             }
 
         val outcome =
-            coroutineScope {
-                val manager = TaskManager(this)
-                runtime.withProgress(manager) {
-                    val apiRun = targets?.let { list -> list to apis }
-                    when {
-                        directories != null && apiRun != null ->
-                            manager.await("import-all", "Import all", ImportOutcome::summary) {
-                                importBoth(directoryService, folders, directories, apiService, apiRun.first, apiRun.second)
-                            }
-                        directories != null ->
-                            manager.await(IMPORT_ALL_TASK_KEY, "Import directories", ImportOutcome::summary) {
-                                ImportOutcome(directories = importDirectories(directoryService, folders, directories))
-                            }
-                        apiRun != null ->
-                            manager.await(API_DOWNLOAD_IMPORT_ALL_TASK_KEY, "Import APIs", ImportOutcome::summary) {
-                                ImportOutcome(apis = importApis(apiService, apiRun.first, apiRun.second))
-                            }
-                        else -> ImportOutcome()
+            try {
+                coroutineScope {
+                    val manager = TaskManager(this)
+                    runtime.withProgress(manager) {
+                        val apiRun = targets?.let { list -> list to apis }
+                        when {
+                            directories != null && apiRun != null ->
+                                manager.await("import-all", "Import all", ImportOutcome::summary) {
+                                    importBoth(directoryService, folders, directories, apiService, apiRun.first, apiRun.second)
+                                }
+                            directories != null ->
+                                manager.await(IMPORT_ALL_TASK_KEY, "Import directories", ImportOutcome::summary) {
+                                    ImportOutcome(directories = importDirectories(directoryService, folders, directories))
+                                }
+                            apiRun != null ->
+                                manager.await(API_DOWNLOAD_IMPORT_ALL_TASK_KEY, "Import APIs", ImportOutcome::summary) {
+                                    ImportOutcome(apis = importApis(apiService, apiRun.first, apiRun.second))
+                                }
+                            else -> ImportOutcome()
+                        }
                     }
                 }
+            } finally {
+                // Once for the whole run, since every import above was told not to; also when one failed or
+                // the run was cancelled, so whatever it wrote shows up.
+                if (directories?.apply == true || apis?.apply == true) {
+                    withContext(NonCancellable) { services.imports.maintenance.refreshMaterializedViews() }
+                }
             }
-        // Once for the whole run: every import above was told not to.
-        if (directories?.apply == true || apis?.apply == true) services.imports.maintenance.refreshMaterializedViews()
         return outcome.toJson(needsAttention)
     }
 

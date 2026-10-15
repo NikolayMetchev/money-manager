@@ -531,7 +531,8 @@ private suspend fun <T : Any> TaskScope.awaitChild(
                 finished.complete(Result.success(result))
                 finalDetail(result)
             } catch (cancelled: CancellationException) {
-                finished.complete(Result.failure(cancelled))
+                // Cancellation reaches the awaiting caller as cancellation, never as a recorded failure.
+                finished.completeExceptionally(cancelled)
                 throw cancelled
             } catch (expected: Exception) {
                 finished.complete(Result.failure(expected))

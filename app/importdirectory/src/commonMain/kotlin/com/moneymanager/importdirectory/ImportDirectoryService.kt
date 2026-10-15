@@ -57,6 +57,7 @@ import com.moneymanager.tasks.formatElapsedTime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -339,17 +340,25 @@ class ImportDirectoryService(
             return ImportAllResult(download, BulkApplyResult(emptyList()), BulkApplyResult(emptyList()), redownloadAttention, redownloaded)
         }
         val files = directories?.let { filesIn(scope(it, importDirectoryRepository.getAllDirectories().first())) }
-        val csvPlan = planCsvImportAll(files?.let { ids -> unimportedCsvFiles().filter { it.id.toString() in ids } })
-        val csv =
-            task.child("${IMPORT_ALL_TASK_KEY}-csv", "Import CSV files", "Preparing") {
-                applyCsvImportAll(csvPlan.unattended(), sourceAccountOverride = null, onProgress = ::report, refreshViews = false)
-            }
-        val qifPlan = planQifImportAll(files?.let { ids -> unimportedQifFiles().filter { it.id.toString() in ids } })
-        val qif =
-            task.child("${IMPORT_ALL_TASK_KEY}-qif", "Import QIF files", "Preparing") {
-                applyQifImportAll(qifPlan.unattended(), sourceAccountId = null, onProgress = ::report, refreshViews = false)
-            }
-        if (refreshViews) maintenance.refreshMaterializedViews()
+        val csvPlan: CsvImportAllPlan
+        val qifPlan: QifImportAllPlan
+        val csv: BulkApplyResult
+        val qif: BulkApplyResult
+        try {
+            csvPlan = planCsvImportAll(files?.let { ids -> unimportedCsvFiles().filter { it.id.toString() in ids } })
+            csv =
+                task.child("${IMPORT_ALL_TASK_KEY}-csv", "Import CSV files", "Preparing") {
+                    applyCsvImportAll(csvPlan.unattended(), sourceAccountOverride = null, onProgress = ::report, refreshViews = false)
+                }
+            qifPlan = planQifImportAll(files?.let { ids -> unimportedQifFiles().filter { it.id.toString() in ids } })
+            qif =
+                task.child("${IMPORT_ALL_TASK_KEY}-qif", "Import QIF files", "Preparing") {
+                    applyQifImportAll(qifPlan.unattended(), sourceAccountId = null, onProgress = ::report, refreshViews = false)
+                }
+        } finally {
+            // Whatever the CSV phase wrote must show up even when the QIF phase fails or the run is cancelled.
+            if (refreshViews) withContext(NonCancellable) { maintenance.refreshMaterializedViews() }
+        }
         val needsAttention =
             csvPlan.needsAttention + qifPlan.needsAttention + redownloadAttention + unassignedCards(csv)
         needsAttention.forEach { task.reportIssue("${it.subject}: ${it.reason.description}") }
@@ -490,27 +499,23 @@ class ImportDirectoryService(
         sourceAccountId: AccountId?,
         onProgress: suspend (Progress) -> Unit,
         refreshViews: Boolean = true,
-    ): BulkApplyResult {
-        val result =
-            writeLock.withLock {
-                bulkApplyQif(
-                    imports = plan.files,
-                    sourceAccountId = sourceAccountId,
-                    strategies = plan.strategies,
-                    currencies = plan.currencies,
-                    accountMappingRepository = accountMappingRepository,
-                    accountRepository = accountRepository,
-                    qifImportRepository = qifImportRepository,
-                    maintenance = maintenance,
-                    importEngine = importEngine,
-                    onProgress = onProgress,
-                    directoryAccounts = plan.directoryAccounts,
-                    refreshViews = refreshViews,
-                )
-            }
-        sourceAccountId?.let { importEngine.setLastQifAccount(it) }
-        return result
-    }
+    ): BulkApplyResult =
+        writeLock.withLock {
+            bulkApplyQif(
+                imports = plan.files,
+                sourceAccountId = sourceAccountId,
+                strategies = plan.strategies,
+                currencies = plan.currencies,
+                accountMappingRepository = accountMappingRepository,
+                accountRepository = accountRepository,
+                qifImportRepository = qifImportRepository,
+                maintenance = maintenance,
+                importEngine = importEngine,
+                onProgress = onProgress,
+                directoryAccounts = plan.directoryAccounts,
+                refreshViews = refreshViews,
+            ).also { sourceAccountId?.let { importEngine.setLastQifAccount(it) } }
+        }
 
     /** Plans a CSV "re-import all" over [imports]: each file keeps the strategy it was last imported with. */
     suspend fun planCsvReimportAll(imports: List<CsvImport>): CsvReimportAllPlan {
