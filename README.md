@@ -82,7 +82,7 @@ mm status                                            # open database, cloud sync
 mm accounts --owner "Alice Smith"                    # accounts with owners and balances
 mm balances --asset GBP --non-zero                   # one row per account and asset
 mm transactions --account Current --from 2024-03-01  # newest first, with running balances
-mm import all --push                                 # download + import every folder and API, then upload
+mm --push import all                                 # download + import every folder and API, then upload
 ```
 
 **Credential vault.** Commands that need API tokens or a Google sign-in unlock the vault with the password from

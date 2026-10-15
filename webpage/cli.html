@@ -208,7 +208,7 @@ app/main/cli/build/install/mm-jvm-jvm/bin/mm-jvm version</code></pre>
 pass show money-manager/vault | mm --vault-password-stdin import apis
 
 # From the environment, e.g. in a scheduled job
-MM_VAULT_PASSWORD="$(secret-tool lookup app mm-vault)" mm import all --push</code></pre>
+MM_VAULT_PASSWORD="$(secret-tool lookup app mm-vault)" mm --push import all</code></pre>
       <p>
         <strong>Google sign-in over SSH.</strong> The first time a Google Drive folder needs a sign-in, <code>mm</code>
         opens the consent page in a browser. With <code>--no-browser</code> it prints the URL instead and waits for the
@@ -331,7 +331,7 @@ mm --format table import-dirs</code></pre>
         unassigned card, is listed under <code>needsAttention</code> and exits <code>3</code>.
       </p>
       <pre><code># Nightly: import everything, upload the cloud copy, fail loudly on anything to resolve
-MM_VAULT_PASSWORD=… mm --quiet import all --push --keep-local
+MM_VAULT_PASSWORD=… mm --quiet --push --keep-local import all
 [ $? -eq 3 ] &amp;&amp; echo "Money Manager needs attention"
 
 # What needs a person?
@@ -359,8 +359,7 @@ mm import dirs | jq '.data.needsAttention'</code></pre>
                 { "asset": "GBP", "kind": "currency", "amount": "100" }
             ]
         }
-    ],
-    "nextCursor": "…"
+    ]
 }</code></pre>
       <ul>
         <li>
