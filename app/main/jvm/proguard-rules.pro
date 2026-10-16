@@ -122,7 +122,7 @@
 # also bound to its native library over JNI.
 -keep class org.sqlite.** { *; }
 -keep class dev.whyoleg.cryptography.** { *; }
--keep class io.ktor.client.engine.cio.CIOEngineContainer { *; }
+-keep class io.ktor.client.engine.okhttp.OkHttpEngineContainer { *; }
 
 # Log4j. log4j-api and the SLF4J bridge are small and found through ServiceLoader and by name.
 -keep class !org.apache.logging.log4j.core.**,org.apache.logging.log4j.** { *; }

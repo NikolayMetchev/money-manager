@@ -91,7 +91,7 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 | `utils/credentialvault/` | The encrypted, password-protected credential file (API tokens, Google refresh tokens) that outlives the DB — see **Credentials** |
 | `utils/parsers/{csv,qif,xlsx}/` | File-format parsers |
 | `utils/rest/` | Shared Ktor `ApiClient`, request signing, SCA challenge signing (`ScaCrypto`: RSA keys + SHA256withRSA on cryptography-kotlin, so native too) and API traffic recording |
-| `utils/httpclient/` | The one place the Ktor engine is chosen: `platformHttpClient()` is CIO on JVM/Android, Curl on Linux, Darwin on macOS, WinHttp on Windows (native TLS comes from the OS or the statically linked libcurl). Build every production `HttpClient` with it, never `HttpClient(CIO)` or engine discovery |
+| `utils/httpclient/` | The one place the Ktor engine is chosen: `platformHttpClient()` runs on Ktor's `ktor-client-engine-defaults` (OkHttp on JVM/Android, Curl on Linux, Darwin on macOS, WinHttp on Windows; native TLS comes from the OS or the statically linked libcurl), found by engine discovery. Build every production `HttpClient` with it, never with a named engine. ProGuard keeps `OkHttpEngineContainer` for the ServiceLoader lookup |
 | `utils/compose/{filePicker,scrollbar}/` | Platform file/folder pickers and scrollbar widgets |
 | `app/model/core/` | The flat `domain.model` package: entities, ids, `Money`, audit entries. Depends on nothing but `utils/bigdecimal` and `utils/files` |
 | `app/model/rules/` | The strategy vocabulary that CSV and API share: `Condition`, `ValueExpr`, `Direction`, `AssetCodeRules`, `FeeRule`, `RuleEvaluator` — see **Import Strategies** |
