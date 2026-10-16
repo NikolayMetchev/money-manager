@@ -31,6 +31,25 @@ class TuiWidgetsTest {
     }
 
     @Test
+    fun aMultiSelectTicksWhatTheFilterLeavesUnderTheCursor() {
+        val picker = MultiSelect("Assets", listOf(1 to "BTC", 2 to "ETH", 3 to "GBP"), initial = setOf(3))
+
+        assertEquals(PickResult.Continue, picker.handle(KeyEvent("ArrowDown"), pageRows = 5))
+        picker.handle(KeyEvent(" "), pageRows = 5)
+        assertEquals(setOf(2, 3), picker.selected)
+
+        // Typing narrows the list and puts the cursor back on its first item.
+        "bt".forEach { picker.handle(KeyEvent(it.toString()), pageRows = 5) }
+        assertEquals(listOf("BTC"), picker.shown.map { it.second })
+        picker.handle(KeyEvent(" "), pageRows = 5)
+        assertEquals(PickResult.Apply(setOf(1, 2, 3)), picker.handle(KeyEvent("Enter"), pageRows = 5))
+
+        picker.handle(KeyEvent("a", ctrl = true), pageRows = 5)
+        assertEquals(PickResult.Apply(emptySet<Int>()), picker.handle(KeyEvent("Enter"), pageRows = 5))
+        assertEquals(PickResult.Cancel, picker.handle(KeyEvent("Escape"), pageRows = 5))
+    }
+
+    @Test
     fun aSecretIsAnsweredFromTheKeysTypedIntoItsDialog() =
         runTest {
             val prompter = DialogPrompter()

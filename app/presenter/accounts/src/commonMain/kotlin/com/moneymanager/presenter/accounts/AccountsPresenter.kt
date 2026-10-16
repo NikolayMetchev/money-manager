@@ -55,6 +55,12 @@ sealed interface AccountsEvent {
     ) : AccountsEvent
 }
 
+/** One owner's accounts in a list grouped by owner; a null [owner] holds the accounts nobody owns. */
+data class OwnerGroup(
+    val owner: Person?,
+    val accounts: List<AccountWithBalances>,
+)
+
 /**
  * What an accounts screen shows. [all] is every account, whatever the filter (e.g. to keep a new account's
  * name unique); [displayed] is what the filter keeps.
@@ -63,6 +69,8 @@ data class AccountsModel(
     val loaded: Boolean,
     val all: List<AccountWithBalances>,
     val displayed: List<AccountWithBalances>,
+    /** [displayed] grouped by owner: a jointly owned account is under each of its owners. */
+    val byOwner: List<OwnerGroup>,
     val people: List<Person>,
     val availableAssets: List<Asset>,
     val shadowAccountCount: Int,
@@ -109,12 +117,20 @@ fun presentAccounts(snapshots: Flow<AccountSnapshot>): AccountsModel {
             )
         }
 
+    val byOwner =
+        remember(displayed, current.people, state.filter.ownerIds) {
+            val ownerIds = state.filter.ownerIds
+            // With owners picked, the other owners of their joint accounts don't get a group of their own.
+            groupByOwner(displayed, if (ownerIds.isEmpty()) current.people else current.people.filter { it.id in ownerIds })
+        }
+
     val eventSink: (AccountsEvent) -> Unit = remember { { event -> state = state.on(event) } }
 
     return AccountsModel(
         loaded = snapshot != null,
         all = current.accounts,
         displayed = displayed,
+        byOwner = byOwner,
         people = current.people,
         availableAssets = current.availableAssets,
         shadowAccountCount = current.shadowAccountCount,
@@ -122,6 +138,22 @@ fun presentAccounts(snapshots: Flow<AccountSnapshot>): AccountsModel {
         nameError = state.nameError,
         eventSink = eventSink,
     )
+}
+
+/**
+ * [people] by name, each with their accounts in [accounts]' order and only when they have any, then the accounts
+ * nobody owns.
+ */
+internal fun groupByOwner(
+    accounts: List<AccountWithBalances>,
+    people: List<Person>,
+): List<OwnerGroup> {
+    val owned =
+        people
+            .sortedBy { it.fullName.lowercase() }
+            .map { person -> OwnerGroup(person, accounts.filter { entry -> entry.owners.any { it.id == person.id } }) }
+    val unowned = OwnerGroup(null, accounts.filter { it.owners.isEmpty() })
+    return (owned + unowned).filter { it.accounts.isNotEmpty() }
 }
 
 private data class FilterState(

@@ -358,11 +358,15 @@ mm import dirs | jq '.data.needsAttention'</code></pre>
         </table>
       </div>
       <p>
-        The <b>Accounts</b> tab lists accounts with their owners and balances, and keeps the same accounts as the desktop
-        Accounts screen for the same filter. Press <code>/</code> to type a name filter (<code>Enter</code> or
-        <code>Esc</code> to stop), <code>r</code> to switch it between plain text and a regex, <code>s</code> to show
-        reconciliation (shadow) accounts, <code>z</code> to show only non-zero balances, and <code>↑</code>
-        <code>↓</code> <code>PgUp</code> <code>PgDn</code> to move.
+        The <b>Accounts</b> tab lists accounts with their owners and per-asset balances, keeps the same accounts as the
+        desktop Accounts screen for the same filter, and follows the database as it changes, for example while an
+        import runs. Press <code>/</code> to type a name filter (<code>Enter</code> or <code>Esc</code> to stop),
+        <code>r</code> to switch it between plain text and a regex, <code>p</code> to pick owners and <code>a</code> to
+        pick assets (type to narrow the list, <code>Space</code> to tick, <code>Ctrl-A</code> for any,
+        <code>Enter</code> to apply), <code>s</code> to show reconciliation (shadow) accounts, <code>z</code> to show
+        only non-zero balances, <code>g</code> to group the list by owner (a joint account is listed under each owner,
+        and accounts nobody owns come last), and <code>↑</code> <code>↓</code> <code>PgUp</code> <code>PgDn</code>
+        to move. <code>Enter</code> on an account will open its transactions once the Transactions tab arrives.
       </p>
       <p>
         Keys outside ASCII, such as <code>é</code> or <code>£</code>, can't be typed into the TUI's prompts yet, and a

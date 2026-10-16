@@ -1,6 +1,7 @@
 package com.moneymanager.tui
 
 import androidx.compose.runtime.Composable
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.session.DatabaseSession
 
 /** A key and what it does, as the help overlay lists it. */
@@ -27,4 +28,6 @@ class TuiScreenScope(
     val width: Int,
     /** The body's rows, between the tab bar and the footer. */
     val height: Int,
+    /** Shows an account's transactions, wherever the shell keeps them. */
+    val openAccount: (AccountId) -> Unit,
 )
