@@ -67,6 +67,8 @@ class AccountsScreenTest {
                 press("r")
                 press("/")
                 press("Backspace")
+                // The valid "kraken" must apply before "(" breaks it, or the last valid one is still "krakenq".
+                screen { it.contains("Accounts · 2 of 3") }
                 type("(")
                 assertContains(screen { it.contains("Regex:") && it.contains("kraken(") }, "Accounts · 2 of 3")
             }
