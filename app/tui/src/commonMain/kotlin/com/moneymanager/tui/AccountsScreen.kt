@@ -25,6 +25,7 @@ import com.moneymanager.presenter.accounts.presentAccounts
 import com.moneymanager.query.AccountQuery
 import com.moneymanager.query.AccountWithBalances
 import com.moneymanager.terminal.fit
+import kotlin.math.abs
 
 /** The rows above the list: title, two filter lines, the filter's error or a blank line, and the column headings. */
 private const val HEADER_ROWS = 5
@@ -100,6 +101,8 @@ private fun AccountsView(
     var picker by remember { mutableStateOf<OpenPicker<*>?>(null) }
     // The selection counts accounts, not lines: in a grouped list the same account can be under two owners.
     var selected by remember { mutableIntStateOf(0) }
+    // Which account that was, so the selection follows it when the list changes under it (an import, a filter).
+    var selectedId by remember { mutableStateOf<AccountId?>(null) }
     var top by remember { mutableIntStateOf(0) }
     val count = model.displayed.size
 
@@ -113,16 +116,18 @@ private fun AccountsView(
             model.displayed.map { ListLine.Entry(it) }
         }
     val entryLines = lines.indices.filter { lines[it] is ListLine.Entry }
+    val entryIds = entryLines.map { (lines[it] as ListLine.Entry).account.account.id }
 
     LaunchedEffect(editor.text) { model.eventSink(AccountsEvent.SetName(editor.text)) }
     // The list can shrink under the selection (a filter, a deleted account), so clamp what's drawn.
     val last = (entryLines.size - 1).coerceAtLeast(0)
-    val current = selected.coerceIn(0, last)
+    val current = followSelection(entryIds, selectedId, selected)
     val currentLine = entryLines.getOrElse(current) { 0 }
     val first = top.coerceIn((currentLine - visibleRows + 1).coerceAtLeast(0), currentLine)
 
     fun select(index: Int) {
         selected = index.coerceIn(0, last)
+        selectedId = entryIds.getOrNull(selected)
         val line = entryLines.getOrElse(selected) { 0 }
         top = first.coerceIn((line - visibleRows + 1).coerceAtLeast(0), line)
     }
@@ -154,11 +159,7 @@ private fun AccountsView(
                     }
             "s" -> model.eventSink(AccountsEvent.SetIncludeShadow(!model.filter.includeShadow))
             "z" -> model.eventSink(AccountsEvent.SetNonZeroOnly(!model.filter.nonZeroOnly))
-            "g" -> {
-                grouped = !grouped
-                selected = 0
-                top = 0
-            }
+            "g" -> grouped = !grouped
             "Enter" -> (lines.getOrNull(currentLine) as? ListLine.Entry)?.let { openAccount(it.account.account.id) }
             "ArrowUp" -> select(current - 1)
             "ArrowDown" -> select(current + 1)
@@ -256,6 +257,18 @@ private fun columns(
     val ownersWidth = width / 4
     return fit(name, nameWidth - 1).padEnd(nameWidth) + fit(owners, ownersWidth - 1).padEnd(ownersWidth) + balances
 }
+
+/**
+ * Where the selection is in a list of [entries]: on [selectedId] when it's still listed (the occurrence nearest
+ * [previous] when it's listed twice), otherwise at [previous], clamped to the list.
+ */
+internal fun followSelection(
+    entries: List<AccountId>,
+    selectedId: AccountId?,
+    previous: Int,
+): Int =
+    entries.indices.filter { entries[it] == selectedId }.minByOrNull { abs(it - previous) }
+        ?: previous.coerceIn(0, (entries.size - 1).coerceAtLeast(0))
 
 /** The account query over the session's read services, as `mm accounts` builds it. */
 internal fun AppServices.accountQuery(): AccountQuery =
