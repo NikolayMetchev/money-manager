@@ -1,6 +1,5 @@
-package com.moneymanager.cli
+package com.moneymanager.query
 
-import com.github.ajalt.clikt.core.UsageError
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,7 +22,7 @@ class DateBoundTest {
     }
 
     @Test
-    fun anythingElseIsAUsageError() {
-        assertFailsWith<UsageError> { parseDateBound("yesterday", london, through = false) }
+    fun anythingElseIsRejected() {
+        assertFailsWith<IllegalArgumentException> { parseDateBound("yesterday", london, through = false) }
     }
 }

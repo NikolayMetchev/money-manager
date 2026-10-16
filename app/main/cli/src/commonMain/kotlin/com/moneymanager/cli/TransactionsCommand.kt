@@ -27,9 +27,9 @@ internal class TransactionsCommand(
     private val account by accountRefOption().required()
     private val includeShadow by includeShadowOption()
     private val from by option("--from", metavar = "DATE", help = "From this date (YYYY-MM-DD, local time) or ISO-8601 instant")
-        .convert { parseDateBound(it, zone(), through = false) }
+        .convert { parseDateOption(it, zone(), through = false) }
     private val to by option("--to", metavar = "DATE", help = "Up to and including this date, or before this ISO-8601 instant")
-        .convert { parseDateBound(it, zone(), through = true) }
+        .convert { parseDateOption(it, zone(), through = true) }
     private val limit by option("--limit", metavar = "N", help = "Rows per page (default $DEFAULT_LIMIT)")
         .int()
         .restrictTo(min = 1)
