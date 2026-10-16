@@ -70,13 +70,13 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportCategoryIntent
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.LocalCategoryKey
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.components.CreateCategoryDialog
 import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.components.ErrorMessageText
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.components.ParentCategorySelector
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.navigation.linuxHorizontalScrollWheel
 import com.moneymanager.ui.util.CategoryNode

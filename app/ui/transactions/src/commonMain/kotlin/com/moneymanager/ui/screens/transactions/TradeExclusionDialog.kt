@@ -24,8 +24,8 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.importengineapi.setTradeExcluded
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.formatAmount

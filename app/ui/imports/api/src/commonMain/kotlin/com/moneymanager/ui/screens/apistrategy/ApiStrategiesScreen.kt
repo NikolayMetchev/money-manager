@@ -40,7 +40,7 @@ import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.deleteApiStrategy
 import com.moneymanager.importengineapi.updateApiStrategy
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.foundation.LocalImportEngine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch

@@ -46,12 +46,12 @@ import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.humanreadable.HumanReadable
 import com.moneymanager.importengineapi.setDefaultCurrency
+import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.SettingsSectionCard
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.DatabasePickerMode
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.foundation.rememberDatabaseLocationPicker

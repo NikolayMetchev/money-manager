@@ -14,6 +14,7 @@ kotlin {
                 api(projects.app.ui.foundation)
 
                 implementation(projects.app.importengineapi)
+                implementation(projects.app.presenter.core)
                 implementation(projects.app.ui.audit)
                 implementation(projects.app.ui.components)
                 implementation(projects.utils.bigdecimal)
@@ -25,6 +26,7 @@ kotlin {
         }
         getByName("commonTest") {
             dependencies {
+                implementation(projects.app.presenter.core)
                 implementation(projects.test.app.db)
                 implementation(projects.test.app.ui)
                 implementation(kotlin("test"))

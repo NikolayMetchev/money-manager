@@ -24,11 +24,11 @@ import com.moneymanager.importengineapi.setDefaultCurrency
 import com.moneymanager.importengineapi.setSetupWizardCompleted
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.strategycatalog.StrategyCatalogController
 import com.moneymanager.ui.components.CurrencyPicker
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.screens.apistrategy.ApiConnectionsScreen
 import com.moneymanager.ui.screens.importdirectory.ImportDirectoriesScreen

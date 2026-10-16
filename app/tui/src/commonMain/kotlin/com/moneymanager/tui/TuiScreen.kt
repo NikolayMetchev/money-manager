@@ -25,4 +25,6 @@ class TuiScreenScope(
     val session: DatabaseSession,
     val prompter: DialogPrompter,
     val width: Int,
+    /** The body's rows, between the tab bar and the footer. */
+    val height: Int,
 )

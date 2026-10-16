@@ -1,4 +1,4 @@
-package com.moneymanager.ui.error
+package com.moneymanager.presenter.error
 
 /**
  * Utility object for detecting if an exception is a SQLite schema error.

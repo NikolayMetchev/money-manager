@@ -55,8 +55,8 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.components.MultiSelectFilterDropdown
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.util.displayDate
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone

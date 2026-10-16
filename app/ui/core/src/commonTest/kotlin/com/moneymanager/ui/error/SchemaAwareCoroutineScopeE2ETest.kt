@@ -11,6 +11,7 @@ import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.presenter.error.GlobalSchemaErrorState
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.test.MoneyManagerTestApp

@@ -26,7 +26,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ExchangeOrder
 import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.repository.ExchangeOrderReadRepository
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 

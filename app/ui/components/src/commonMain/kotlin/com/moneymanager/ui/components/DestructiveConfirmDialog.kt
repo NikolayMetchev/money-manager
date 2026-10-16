@@ -18,7 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 
 private val logger = Logger.withTag("DestructiveConfirmDialog")

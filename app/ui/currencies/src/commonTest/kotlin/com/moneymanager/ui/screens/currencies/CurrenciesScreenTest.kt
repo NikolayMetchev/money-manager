@@ -9,7 +9,7 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.repository.write.CurrencyWriteRepository
-import com.moneymanager.ui.error.ProvideSchemaAwareScope
+import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.MockMode
 import dev.mokkery.answering.returns

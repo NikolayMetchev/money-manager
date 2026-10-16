@@ -43,6 +43,8 @@ import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.qifimporter.executeQifReimport
 import com.moneymanager.qifimporter.planQifReimport
@@ -55,8 +57,6 @@ import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.components.imports.ReimportPlanPreview
 import com.moneymanager.ui.components.imports.ReimportProgressIndicator
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 

@@ -23,7 +23,7 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ReconciliationLinkMutation
-import com.moneymanager.ui.error.ProvideSchemaAwareScope
+import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.answering.calls

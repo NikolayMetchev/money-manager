@@ -16,6 +16,7 @@ kotlin {
                 api(projects.app.model.timeline)
                 api(projects.app.ui.foundation)
 
+                implementation(projects.app.presenter.core)
                 implementation(projects.utils.currency)
                 implementation(libs.kermit)
                 implementation(libs.kotlinx.coroutines.core)

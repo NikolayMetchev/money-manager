@@ -22,7 +22,7 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.ui.error.ProvideSchemaAwareScope
+import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf

@@ -37,8 +37,8 @@ import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportCategoryIntent
 import com.moneymanager.importengineapi.LocalCategoryKey
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.launch

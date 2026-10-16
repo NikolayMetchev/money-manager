@@ -20,6 +20,7 @@ kotlin {
                 api(projects.app.qifimporter)
                 api(projects.utils.parsers.qif)
 
+                implementation(projects.app.presenter.core)
                 implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
                 implementation(projects.app.ui.imports.csv)

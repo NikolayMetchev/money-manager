@@ -20,6 +20,7 @@ kotlin {
                 api(projects.app.ui.audit)
 
                 implementation(projects.app.model.importdirectory)
+                implementation(projects.app.presenter.core)
                 implementation(projects.app.ui.components)
                 implementation(projects.app.ui.foundation)
                 implementation(projects.utils.compose.filePicker)

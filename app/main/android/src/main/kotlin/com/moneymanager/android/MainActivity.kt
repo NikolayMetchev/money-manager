@@ -15,14 +15,14 @@ import com.moneymanager.di.AppComponent
 import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.importfilesource.di.createDriveFolderBrowser
 import com.moneymanager.importfilesource.di.createImportFileSourceFactory
+import com.moneymanager.presenter.error.GlobalSchemaErrorState
+import com.moneymanager.presenter.error.SchemaErrorDetector
 import com.moneymanager.remotestorage.googledrive.DRIVE_FILE_SCOPE
 import com.moneymanager.remotestorage.googledrive.DRIVE_READONLY_SCOPE
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.SyncResult
 import com.moneymanager.session.DatabaseSessions
 import com.moneymanager.ui.AppStartupHost
-import com.moneymanager.ui.error.GlobalSchemaErrorState
-import com.moneymanager.ui.error.SchemaErrorDetector
 import kotlinx.coroutines.runBlocking
 
 private val logger = Logger.withTag("MainActivity")

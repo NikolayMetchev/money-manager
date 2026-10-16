@@ -28,7 +28,7 @@ import com.moneymanager.domain.repository.write.CategoryWriteRepository
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
-import com.moneymanager.ui.error.ProvideSchemaAwareScope
+import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.MockMode
 import dev.mokkery.answering.returns

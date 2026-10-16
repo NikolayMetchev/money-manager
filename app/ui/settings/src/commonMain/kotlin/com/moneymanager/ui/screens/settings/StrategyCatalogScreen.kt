@@ -44,10 +44,10 @@ import com.moneymanager.domain.strategy.CsvUnresolvedReference
 import com.moneymanager.domain.strategy.StrategyKey
 import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.domain.strategy.StrategyLibrary
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.strategycatalog.CatalogItem
 import com.moneymanager.strategycatalog.CatalogItemStatus
 import com.moneymanager.strategycatalog.StrategyCatalogController
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 
 /** An install paused on a dialog: reference resolution (unresolved refs) or overwrite confirmation. */

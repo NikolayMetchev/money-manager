@@ -1,4 +1,4 @@
-package com.moneymanager.ui.error
+package com.moneymanager.presenter.error
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

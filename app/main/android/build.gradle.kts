@@ -21,6 +21,7 @@ dependencies {
     implementation(projects.app.importfilesource.core)
     implementation(projects.app.importfilesource.di)
     implementation(projects.app.model.core)
+    implementation(projects.app.presenter.core)
     implementation(projects.app.remotestorage.core)
     // Native Android Google Drive auth (AndroidGoogleAccessTokenSource) implements the googledrive seam.
     implementation(projects.app.remotestorage.googledrive)
@@ -28,7 +29,6 @@ dependencies {
     implementation(projects.app.session)
     implementation(projects.app.strategycatalog)
     implementation(projects.app.ui.core)
-    implementation(projects.app.ui.foundation)
     implementation(projects.utils.credentialvault)
     implementation(projects.utils.localsettings)
     implementation(libs.androidx.activity)

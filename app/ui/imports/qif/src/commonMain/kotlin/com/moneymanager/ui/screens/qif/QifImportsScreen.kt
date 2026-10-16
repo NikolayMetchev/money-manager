@@ -31,6 +31,8 @@ import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createQifImport
 import com.moneymanager.importengineapi.setQifImportIgnored
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.qif.QifParser
 import com.moneymanager.ui.components.imports.ImportFileCard
 import com.moneymanager.ui.components.imports.ImportStatusMessage
@@ -40,8 +42,6 @@ import com.moneymanager.ui.components.imports.ImportsEmptyMessage
 import com.moneymanager.ui.components.imports.ImportsScreenHeader
 import com.moneymanager.ui.components.imports.emptyImportTabMessage
 import com.moneymanager.ui.components.imports.importPickedFiles
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Clock

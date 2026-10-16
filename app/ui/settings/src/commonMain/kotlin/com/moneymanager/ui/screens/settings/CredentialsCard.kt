@@ -22,11 +22,11 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.VaultState
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.remotestorage.sync.CredentialSyncController
 import com.moneymanager.remotestorage.sync.CredentialSyncState
 import com.moneymanager.remotestorage.sync.CredentialSyncStatus
 import com.moneymanager.ui.components.SettingsSectionCard
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.CredentialFilePickerMode
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.rememberCredentialFileLocationPicker

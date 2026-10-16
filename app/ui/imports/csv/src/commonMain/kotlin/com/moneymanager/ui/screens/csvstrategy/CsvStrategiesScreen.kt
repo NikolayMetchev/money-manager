@@ -56,7 +56,7 @@ import com.moneymanager.domain.strategy.CsvImportParseResult
 import com.moneymanager.domain.strategy.CsvStrategyImportExport
 import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.humanreadable.HumanReadable
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.launch
 
 @Composable

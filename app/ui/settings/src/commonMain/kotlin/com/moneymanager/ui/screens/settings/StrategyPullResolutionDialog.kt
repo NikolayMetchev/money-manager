@@ -23,8 +23,8 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.strategy.CsvResolution
 import com.moneymanager.domain.strategy.CsvUnresolvedReference
 import com.moneymanager.domain.strategy.StrategyKey
+import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.components.ReferenceResolutionRow
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 
 /**
  * Collects resolutions for the references that the selected remote strategies need before they can be

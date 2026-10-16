@@ -102,9 +102,10 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 | `app/cryptodata/` | Bundled crypto asset catalog plus its refresher/installer (built by `tools/crypto-dataset`) |
 | `app/tasks/` | The one progress type `Progress` (every import, download, DB open and cloud sync reports it), its `PhasedProgress`/`WeightedProgress` folding helpers, and `TaskManager`: background tasks as a `StateFlow`, deduped by key, with child tasks and cancellation. Pure coroutines, so the UI, CLI and TUI share it; the Compose `TaskPanel` (`app/ui/foundation`) only collects it |
 | `app/terminal/` | Terminal widgets for `TaskManager` tasks on **Mosaic** (`TaskProgressView`), shared by the CLI and the TUI. Mosaic only lays out: `TaskProgressRenderer` composes each frame to text and draws it into `StderrRegion` on stderr (Mosaic's own runner writes to stdout and takes raw mode, which would break JSON output and prompts). `ProgressMode` picks live bars, plain lines (not a TTY, `NO_COLOR`, `TERM=dumb`) or nothing (`--quiet`); Ctrl-C cancels the tasks, leaves the summary and throws `TasksInterruptedException` |
-| `app/tui/` | The full-screen terminal UI on **Mosaic**, run as `mm tui`: `runFullScreen` (its own runner: raw mode, alternate screen, and `KeyFilterTerminal` dropping keys Mosaic 0.18 would throw on), the `TuiApp` shell (tabs, `?` help, footer), `TuiController` (open, switch, close databases through a `TuiSessionHost` the CLI supplies) and `DialogPrompter`, the dialog `Prompter`. Screens are `TuiScreen` entries in `DEFAULT_SCREENS`. No clikt, no CLI options |
+| `app/tui/` | The full-screen terminal UI on **Mosaic**, run as `mm tui`: `runFullScreen` (its own runner: raw mode, alternate screen, and `KeyFilterTerminal` dropping keys Mosaic 0.18 would throw on), the `TuiApp` shell (tabs, `?` help, footer), `TuiController` (open, switch, close databases through a `TuiSessionHost` the CLI supplies) and `DialogPrompter`, the dialog `Prompter`. Screens are `TuiScreen` entries in `DEFAULT_SCREENS` (Database, Accounts), rendering the shared presenters. No clikt, no CLI options |
 | `app/session/` | Headless database bootstrap shared by the desktop app, Android and the CLI: `DatabaseSessions` resolves what to open at startup (`StartupTarget`: explicit `--db`, a cloud binding's kept copy or password restore, the last database, or first run), opens it into a `DatabaseSession` (the database, `DatabaseComponent`, the edit-gated `ImportEngine`, read-only `AppServices`), binds the credential vault and captures the cloud sync baseline. `AppServices.importDirectoryService` builds the session's `ImportDirectoryService`, `AppServices.apiImportService(vault)` its `ApiImportService`. `AppStartupHost` only adds the screens and prompts |
 | `app/query/` | Non-UI read queries the desktop app, CLI and TUI share: `AccountQuery` joins accounts, owners, balances and the shadow flag, and `AccountSnapshot.filter(AccountQueryCriteria)` is the one owner/name (substring or regex)/asset/shadow/non-zero filter, and `resolveAccount(AccountRef)` the one "exactly one account" lookup. `TransactionQuery` pages one account's running balances behind an opaque cursor; `ImportDirectoryQuery` reports each folder's file counts. `@Serializable` JSON DTOs (`AccountJson`, `TransactionJson`, …, wrapped in `Envelope`) carry amounts as decimal strings |
+| `app/presenter/core/`, `app/presenter/accounts/` | Screen presenters shared by the Compose UI and the TUI (see **Presenters**). `core` holds the schema-error-aware flow collection (`collectAsStateWithSchemaErrorHandling`, `rememberFlowAsStateWithSchemaErrorHandling`, `GlobalSchemaErrorState`, `rememberSchemaAwareCoroutineScope`); one module per feature after that. Compose runtime only, so native too |
 | `app/importdirectory/` | `ImportDirectoryService`: import-directory orchestration the desktop app, CLI and TUI share. "Download all" (concurrent, discovers subfolders while downloading, one failing folder never stops the rest), single-folder download and re-download, each folder a child task of the `TaskScope` it's given; plan + apply for CSV/QIF "import all" / "re-import all". Plans return the files that need a person (`NeedsAttention`: no strategy, a source account nobody set) instead of skipping them silently. Owns the write lock its concurrent runs share, so build one per session (`AppServices.importDirectoryService`, `app/session`) |
 | `app/apiimport/` | `ApiImportService`: API-connection orchestration the desktop app, CLI and TUI share. Creates missing connection rows from the unlocked vault (`ensureConnections`), downloads a credential's new session (secrets from the vault, incremental unless forced, the statement-region gate from `currentCountryCode()`), imports a session (then marks it imported and refreshes the materialized views), and "download & import all": every download a child task, one import queue. Sessions whose counterparties need confirming come back as `needsAttention` |
 | `app/importengineapi/` | `ImportEngine` interface + `ImportBatch`/`ImportResult` model + `ImportEngine.*` write helpers (DB-free) |
@@ -459,6 +460,28 @@ stdout carries only the result: prompts, warnings and errors go to stderr, and I
 ## UI
 
 **Compose Multiplatform** with Material 3. JVM and Android only.
+
+## Presenters
+
+Screen state lives in a **presenter** that the Compose screen and the TUI tab both call, so neither front end
+re-derives it: `@Composable fun presentX(…): XModel`, molecule-style, in `app/presenter/<feature>` (#942). A
+presenter uses only the Compose runtime (no Compose UI, no Mosaic), so it compiles for native and its tests
+run there too, driven by Molecule (a test-only dependency: both front ends are already compositions and call
+the presenter directly).
+
+- **Presenter**: filter/selection state, flow collection, loading, and what's derived from them. Input
+  arrives as one `eventSink: (XEvent) -> Unit` on the model. Keep related state in one value, so a model
+  never pairs a new input with a stale derived result.
+- **View**: layout, scroll position, focus, dialogs, keys. Viewport-driven paging (page size from the viewport,
+  near-edge triggers, scroll anchoring) stays in the view and reaches the presenter as events.
+- Queries and filtering stay in `app/query` and services: a presenter composes them, it doesn't replace them.
+- Module recipe: `android-convention` + `kotlin-multiplatform-convention` + `native-convention` + the Compose
+  compiler plugin; `androidx.compose.runtime` in `commonMain` (`androidx.compose.runtime.desktop` again on
+  `jvmMain` for `buildHealth`). `app/presenter/core` lifts Mosaic's JetBrains runtime so native binaries carry
+  one runtime.
+- Migrated: Accounts. Next: Transactions (#944: paging data in the presenter, `TransactionQuery` gains backward
+  paging and "page containing"), Imports (#945: from `TaskManager.tasks`, passed in rather than
+  `LocalTaskManager`), Status (#946).
 
 **Schema Error Handling**: Always use `collectAsStateWithSchemaErrorHandling()` instead of `collectAsState()` for repository Flows to catch and display database schema errors gracefully.
 

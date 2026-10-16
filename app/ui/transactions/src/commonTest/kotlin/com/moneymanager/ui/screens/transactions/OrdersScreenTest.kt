@@ -26,7 +26,7 @@ import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.ExchangeOrderReadRepository
-import com.moneymanager.ui.error.ProvideSchemaAwareScope
+import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.screens.orders.ExchangeOrderAuditScreen
 import com.moneymanager.ui.screens.orders.OrderDetailScreen
 import com.moneymanager.ui.screens.orders.OrdersScreen

@@ -31,6 +31,9 @@ import com.moneymanager.domain.model.CryptoCatalogRefresher
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
+import com.moneymanager.presenter.error.GlobalSchemaErrorState
+import com.moneymanager.presenter.error.ProvideSchemaAwareScope
+import com.moneymanager.presenter.error.SchemaErrorDetector
 import com.moneymanager.remotestorage.RemoteAuthException
 import com.moneymanager.remotestorage.sync.CredentialSyncController
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
@@ -42,9 +45,6 @@ import com.moneymanager.strategycatalog.StrategyCatalogController
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.DatabaseProgressScreen
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
-import com.moneymanager.ui.error.GlobalSchemaErrorState
-import com.moneymanager.ui.error.ProvideSchemaAwareScope
-import com.moneymanager.ui.error.SchemaErrorDetector
 import com.moneymanager.ui.foundation.CredentialVaultPromptHost
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.screens.FirstRunDatabaseSetupScreen

@@ -24,6 +24,7 @@ dependencies {
     implementation(projects.app.importfilesource.core)
     implementation(projects.app.importfilesource.di)
     implementation(projects.app.model.core)
+    implementation(projects.app.presenter.core)
     implementation(projects.app.remotestorage.googledrive)
     implementation(projects.app.remotestorage.sync)
     implementation(projects.app.session)

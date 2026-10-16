@@ -17,7 +17,7 @@ import com.moneymanager.domain.repository.write.CategoryWriteRepository
 import com.moneymanager.domain.repository.write.CurrencyWriteRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importer.ImportEngineImpl
-import com.moneymanager.ui.error.ProvideSchemaAwareScope
+import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.MockMode

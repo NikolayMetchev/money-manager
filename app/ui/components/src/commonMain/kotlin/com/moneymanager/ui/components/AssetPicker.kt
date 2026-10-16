@@ -25,7 +25,7 @@ import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
-import com.moneymanager.ui.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.util.onEnterKeyDown
 
 /**

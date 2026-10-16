@@ -36,8 +36,8 @@ import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.updateApiStrategy
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 import com.moneymanager.ui.screens.apistrategy.extractFirstArrayItem
