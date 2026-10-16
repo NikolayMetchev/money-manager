@@ -197,9 +197,7 @@ jobs:
       - name: Run mingwX64 tests with Gradle
         uses: $/.github/actions/gradle-run
         with:
-          # Selecting a task by name configures every project, and :app:main:jvm's Compose WiX setup
-          # breaks isolated projects on Windows (https://youtrack.jetbrains.com/issue/CMP-8375).
-          command: mingwX64Test -Dorg.gradle.isolated-projects=false --stacktrace
+          command: mingwX64Test --stacktrace
           # The Windows job that saves Gradle User Home and ~/.konan (from main only); the
           # main-only installer job restores its entry read-only.
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}

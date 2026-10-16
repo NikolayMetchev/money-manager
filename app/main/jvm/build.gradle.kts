@@ -12,6 +12,17 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
 }
 
+// On Windows, Compose sets up its WiX download on the root project, which isolated projects rejects
+// (https://youtrack.jetbrains.com/issue/CMP-8375). Selecting any task by name configures this project too, so
+// that would break every Windows build. Only an MSI/EXE package needs WiX, and those builds pass
+// -Dorg.gradle.isolated-projects=false. Compose reads this project's extra property before Gradle properties.
+val packagesWindowsInstaller =
+    gradle.startParameter.taskNames.any { task ->
+        val name = task.substringAfterLast(':')
+        name.endsWith("Msi") || name.endsWith("Exe") || name.endsWith("DistributionForCurrentOS")
+    }
+extra["compose.desktop.application.downloadWix"] = packagesWindowsInstaller.toString()
+
 dependencies {
     api(libs.androidx.compose.runtime.desktop)
     api(libs.compose.ui.desktop)
