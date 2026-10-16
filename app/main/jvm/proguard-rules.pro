@@ -117,6 +117,11 @@
 # app uses the JDK provider only
 -dontwarn org.bouncycastle.**
 
+# Conscrypt and OpenJSSE are optional OkHttp TLS providers, used only when present; the app uses the
+# JDK's TLS
+-dontwarn org.conscrypt.**
+-dontwarn org.openjsse.**
+
 # Libraries found at runtime through META-INF/services (java.util.ServiceLoader), which ProGuard
 # doesn't follow: shrinking removes the provider classes and the lookup then fails. sqlite-jdbc is
 # also bound to its native library over JNI.

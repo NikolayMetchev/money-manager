@@ -198,6 +198,18 @@ dependencyAnalysis {
             ignoreSourceSet("commonTest")
         }
 
+        project(":utils:httpclient") {
+            // ktor-client-engine-defaults is an aggregator: it only brings in each platform's engine, which the
+            // engine-less HttpClient() then finds through ServiceLoader. Nothing references it at compile time,
+            // and declaring the engine it picks (OkHttp on JVM/Android) directly would defeat its purpose.
+            onUnusedDependencies {
+                exclude("io.ktor:ktor-client-engine-defaults")
+            }
+            onUsedTransitiveDependencies {
+                exclude("io.ktor:ktor-client-okhttp")
+            }
+        }
+
         project(":app:db:core") {
             sourceSet("commonTest") {
                 // dependency-analysis asks for these to be `api`, but Kotlin deprecates API dependencies
