@@ -45,7 +45,7 @@ class TuiWidgetsTest {
         assertEquals(PickResult.Apply(setOf(1, 2, 3)), picker.handle(KeyEvent("Enter"), pageRows = 5))
 
         picker.handle(KeyEvent("a", ctrl = true), pageRows = 5)
-        assertEquals(PickResult.Apply(emptySet<Int>()), picker.handle(KeyEvent("Enter"), pageRows = 5))
+        assertEquals(PickResult.Apply(emptySet()), picker.handle(KeyEvent("Enter"), pageRows = 5))
         assertEquals(PickResult.Cancel, picker.handle(KeyEvent("Escape"), pageRows = 5))
     }
 
