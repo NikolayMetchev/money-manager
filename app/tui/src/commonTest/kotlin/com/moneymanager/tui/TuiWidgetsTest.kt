@@ -51,6 +51,19 @@ class TuiWidgetsTest {
     }
 
     @Test
+    fun aSingleChoicePicksTheHighlightedItemOnEnterAndIgnoresTicks() {
+        val picker = MultiSelect("Account", listOf(1 to "Current", 2 to "Savings"), initial = setOf(1), single = true)
+
+        assertEquals(PickResult.Continue, picker.handle(KeyEvent(" "), pageRows = 5))
+        assertEquals(setOf(1), picker.selected)
+        picker.handle(KeyEvent("ArrowDown"), pageRows = 5)
+        assertEquals(PickResult.Apply(setOf(2)), picker.handle(KeyEvent("Enter"), pageRows = 5))
+
+        picker.handle(KeyEvent("x"), pageRows = 5)
+        assertEquals(PickResult.Continue, picker.handle(KeyEvent("Enter"), pageRows = 5))
+    }
+
+    @Test
     fun theAccountsSelectionFollowsItsAccountWhenTheListChanges() {
         val (a, b, c) = listOf(AccountId(1), AccountId(2), AccountId(3))
 

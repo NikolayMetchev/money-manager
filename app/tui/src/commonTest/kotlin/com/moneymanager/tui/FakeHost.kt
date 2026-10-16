@@ -75,6 +75,10 @@ internal suspend fun TestMosaic<String>.press(key: String) {
             "Backspace" -> 127
             "ArrowUp" -> KeyboardEvent.Up
             "ArrowDown" -> KeyboardEvent.Down
+            "PageUp" -> KeyboardEvent.PageUp
+            "PageDown" -> KeyboardEvent.PageDown
+            "Home" -> KeyboardEvent.Home
+            "End" -> KeyboardEvent.End
             else -> key.single().code
         }
     sendKeyEvent(KeyboardEvent(codepoint))

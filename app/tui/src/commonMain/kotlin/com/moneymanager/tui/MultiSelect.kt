@@ -24,12 +24,13 @@ sealed interface PickResult<out T> {
 
 /**
  * Ticking any number of [items] (a value and its label), narrowed by typing. An empty selection means "any", as
- * the accounts filters read it.
+ * the accounts filters read it. A [single] choice applies the highlighted item on Enter instead, without ticks.
  */
 class MultiSelect<T>(
     val title: String,
     private val items: List<Pair<T, String>>,
     initial: Set<T>,
+    val single: Boolean = false,
 ) {
     val filter = LineEditor()
     var selected: Set<T> by mutableStateOf(initial)
@@ -48,8 +49,11 @@ class MultiSelect<T>(
         val last = (shown.size - 1).coerceAtLeast(0)
         val current = cursor.coerceIn(0, last)
         when {
+            single && event.key == "Enter" ->
+                return shown.getOrNull(current)?.let { (value, _) -> PickResult.Apply(setOf(value)) } ?: PickResult.Continue
             event.key == "Enter" -> return PickResult.Apply(selected)
             event.key == "Escape" -> return PickResult.Cancel
+            single && event.key == " " -> return PickResult.Continue
             event.ctrl && event.key == "a" -> selected = emptySet()
             event.key == " " -> shown.getOrNull(current)?.let { (value, _) -> selected = toggle(value) }
             event.key == "ArrowUp" -> cursor = (current - 1).coerceAtLeast(0)
@@ -79,18 +83,45 @@ fun MultiSelectDialog(
     val first = (current - rows + 1).coerceAtLeast(0)
     Panel(width, areaColumns, areaRows) {
         val count = if (picker.selected.isEmpty()) "any" else "${picker.selected.size} picked"
-        Text(fit("${picker.title} · $count", inner), textStyle = TextStyle.Bold)
+        Text(fit(if (picker.single) picker.title else "${picker.title} · $count", inner), textStyle = TextStyle.Bold)
         Row {
             Text("Filter: ", textStyle = TextStyle.Dim)
             LineField(picker.filter, (inner - "Filter: ".length).coerceAtLeast(1))
         }
         if (shown.isEmpty()) Text(fit("Nothing matches.", inner), textStyle = TextStyle.Dim)
         shown.drop(first).take(rows).forEachIndexed { offset, (value, label) ->
-            val mark = if (value in picker.selected) "[x] " else "[ ] "
+            val mark =
+                when {
+                    picker.single -> ""
+                    value in picker.selected -> "[x] "
+                    else -> "[ ] "
+                }
             Text(fit(mark + label, inner), textStyle = if (first + offset == current) TextStyle.Invert else TextStyle.Unspecified)
         }
-        Text(fit("Space to tick · Ctrl-A for any · Enter to apply · Esc to cancel", inner), textStyle = TextStyle.Dim)
+        val hint =
+            if (picker.single) "Enter to choose · Esc to cancel" else "Space to tick · Ctrl-A for any · Enter to apply · Esc to cancel"
+        Text(fit(hint, inner), textStyle = TextStyle.Dim)
     }
+}
+
+/** A picker that's open, and what applying it does. */
+internal class OpenPicker<T>(
+    val select: MultiSelect<T>,
+    private val apply: (Set<T>) -> Unit,
+) {
+    /** Handles [event]; false once the picker is done with. */
+    fun handle(
+        event: KeyEvent,
+        pageRows: Int,
+    ): Boolean =
+        when (val result = select.handle(event, pageRows)) {
+            PickResult.Continue -> true
+            PickResult.Cancel -> false
+            is PickResult.Apply -> {
+                apply(result.selected)
+                false
+            }
+        }
 }
 
 /** The item rows a picker dialog fits in [areaRows]: what's left after its border, title, filter and hint lines. */

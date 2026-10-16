@@ -17,6 +17,8 @@ kotlin {
                 api(libs.mosaic.runtime)
 
                 implementation(projects.app.presenter.accounts)
+                implementation(projects.app.presenter.core)
+                implementation(projects.app.presenter.transactions)
                 implementation(projects.app.query)
                 implementation(projects.utils.files)
                 implementation(libs.kermit)
@@ -38,6 +40,7 @@ kotlin {
                 implementation(projects.app.model.repository.read)
                 implementation(projects.utils.bigdecimal)
                 implementation(libs.kermit.core)
+                implementation(libs.kotlinx.datetime)
             }
         }
 

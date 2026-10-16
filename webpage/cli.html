@@ -366,7 +366,19 @@ mm import dirs | jq '.data.needsAttention'</code></pre>
         <code>Enter</code> to apply), <code>s</code> to show reconciliation (shadow) accounts, <code>z</code> to show
         only non-zero balances, <code>g</code> to group the list by owner (a joint account is listed under each owner,
         and accounts nobody owns come last), and <code>↑</code> <code>↓</code> <code>PgUp</code> <code>PgDn</code>
-        to move. <code>Enter</code> on an account will open its transactions once the Transactions tab arrives.
+        to move. <code>Enter</code> on an account opens it in the Transactions tab.
+      </p>
+      <p>
+        The <b>Transactions</b> tab lists one account's transactions, newest first, with the running balance after each.
+        Older and newer rows load as <code>↑</code> <code>↓</code> <code>PgUp</code> <code>PgDn</code> reach either end;
+        <code>Home</code> goes back to the newest row and <code>End</code> to the last one loaded. Press <code>a</code>
+        to pick the account, <code>f</code> to keep a date range (from and to, both included; leave either blank for
+        an open end), <code>x</code> to clear it, <code>g</code> to go to a date, and <code>r</code> to refresh the
+        balances and reload. Dates are written as for <code>--from</code>/<code>--to</code>: <code>YYYY-MM-DD</code> in
+        local time, or an ISO-8601 instant. <code>Enter</code> shows the selected row's detail: what moved between which
+        accounts, its attributes, the transfers linked to it (fee, pass-through, reconciled, …) and where each revision
+        came from. In the detail, <code>n</code> highlights the next linked transfer and <code>l</code> goes to it,
+        opening its account when it isn't this one. The tab is read-only.
       </p>
       <p>
         Keys outside ASCII, such as <code>é</code> or <code>£</code>, can't be typed into the TUI's prompts yet, and a

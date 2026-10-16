@@ -66,26 +66,6 @@ private sealed interface ListLine {
     ) : ListLine
 }
 
-/** A picker that's open, and what applying it does. */
-private class OpenPicker<T>(
-    val select: MultiSelect<T>,
-    private val apply: (Set<T>) -> Unit,
-) {
-    /** Handles [event]; false once the picker is done with. */
-    fun handle(
-        event: KeyEvent,
-        pageRows: Int,
-    ): Boolean =
-        when (val result = select.handle(event, pageRows)) {
-            PickResult.Continue -> true
-            PickResult.Cancel -> false
-            is PickResult.Apply -> {
-                apply(result.selected)
-                false
-            }
-        }
-}
-
 @Composable
 private fun AccountsView(
     model: AccountsModel,
@@ -262,9 +242,9 @@ private fun columns(
  * Where the selection is in a list of [entries]: on [selectedId] when it's still listed (the occurrence nearest
  * [previous] when it's listed twice), otherwise at [previous], clamped to the list.
  */
-internal fun followSelection(
-    entries: List<AccountId>,
-    selectedId: AccountId?,
+internal fun <T> followSelection(
+    entries: List<T>,
+    selectedId: T?,
     previous: Int,
 ): Int =
     entries.indices.filter { entries[it] == selectedId }.minByOrNull { abs(it - previous) }

@@ -160,10 +160,6 @@ class AccountsScreenTest {
                 val headings = lines.filter { it.matches(Regex("""^(Alice Smith|Bob Jones|No owner) · \d+$""")) }
                 assertEquals(listOf("Alice Smith · 2", "Bob Jones · 2", "No owner · 1"), headings)
                 assertEquals(2, lines.count { it.startsWith("Joint Savings") })
-
-                // Enter on the first account asks for its transactions, which #944 brings.
-                press("Enter")
-                screen { it.contains("come with the Transactions tab") }
             }
         } finally {
             deleteTestDatabase(location)

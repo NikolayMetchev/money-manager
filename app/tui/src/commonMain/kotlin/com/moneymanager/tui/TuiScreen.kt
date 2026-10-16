@@ -28,6 +28,8 @@ class TuiScreenScope(
     val width: Int,
     /** The body's rows, between the tab bar and the footer. */
     val height: Int,
+    /** The account whose transactions are being browsed, once one has been opened. */
+    val browsedAccount: AccountId?,
     /** Shows an account's transactions, wherever the shell keeps them. */
     val openAccount: (AccountId) -> Unit,
 )

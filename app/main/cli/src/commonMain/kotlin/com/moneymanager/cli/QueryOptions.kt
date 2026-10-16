@@ -16,12 +16,9 @@ import com.moneymanager.query.AssetRef
 import com.moneymanager.query.NameMatch
 import com.moneymanager.query.OwnerRef
 import com.moneymanager.query.UnresolvedReferenceException
+import com.moneymanager.query.parseDateBound
 import kotlinx.coroutines.flow.first
-import kotlinx.datetime.DatePeriod
-import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atStartOfDayIn
-import kotlinx.datetime.plus
 import kotlin.time.Instant
 
 // The options the query commands share. Each only parses; what a value matches is app/query's call, so the
@@ -54,22 +51,17 @@ private fun nameMatch(value: String): NameMatch =
         throw UsageError("'$value' isn't a valid regular expression: ${invalid.message}")
     }
 
-/**
- * A `--from`/`--to` value: a date (`YYYY-MM-DD`, in [zone]) or an ISO-8601 instant. A date [through] the
- * end of the day is the start of the next one, so a `--to` date includes that day.
- */
-internal fun parseDateBound(
+/** A `--from`/`--to` value (see [parseDateBound]); anything else is a usage error. */
+internal fun parseDateOption(
     value: String,
     zone: TimeZone,
     through: Boolean,
-): Instant {
-    runCatching { LocalDate.parse(value) }.getOrNull()?.let { date ->
-        return (if (through) date.plus(DatePeriod(days = 1)) else date).atStartOfDayIn(zone)
+): Instant =
+    try {
+        parseDateBound(value, zone, through)
+    } catch (invalid: IllegalArgumentException) {
+        throw UsageError(invalid.message.orEmpty())
     }
-    return runCatching { Instant.parse(value) }.getOrElse {
-        throw UsageError("'$value' isn't a date (YYYY-MM-DD) or an ISO-8601 instant")
-    }
-}
 
 /** Every account with owners, balances and the shadow flag, read the way the Accounts screen reads them. */
 internal suspend fun AppServices.accountSnapshot(): AccountSnapshot =

@@ -80,7 +80,6 @@ enum class TransactionKindJson {
 
 /** [accountNames] names the counterparty: the side of the row that isn't its own account. */
 fun AccountRow.toJson(accountNames: Map<AccountId, String>): TransactionJson {
-    val counterparty = if (sourceAccountId == accountId) targetAccountId else sourceAccountId
     val amount = transactionAmount.toBalanceJson()
     return TransactionJson(
         id = transactionId.id,
@@ -95,12 +94,15 @@ fun AccountRow.toJson(accountNames: Map<AccountId, String>): TransactionJson {
         assetKind = amount.kind,
         amount = amount.amount,
         runningBalance = runningBalance.decimalString(),
-        counterpartyAccountId = counterparty.id,
-        counterpartyAccount = accountNames[counterparty],
+        counterpartyAccountId = counterpartyId.id,
+        counterpartyAccount = accountNames[counterpartyId],
         excluded = isExcluded,
         reconciled = isReconciled,
     )
 }
+
+/** The side of the row that isn't its own account. */
+val AccountRow.counterpartyId: AccountId get() = if (sourceAccountId == accountId) targetAccountId else sourceAccountId
 
 fun List<Account>.namesById(): Map<AccountId, String> = associate { it.id to it.name }
 

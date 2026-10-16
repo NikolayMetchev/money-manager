@@ -25,6 +25,7 @@ import com.jakewharton.mosaic.ui.Text
 import com.jakewharton.mosaic.ui.TextStyle
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.VaultState
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.files.expandTilde
 import com.moneymanager.terminal.fit
@@ -55,8 +56,10 @@ fun TuiApp(
     val vaultState by vault.state.collectAsState()
     var selected by remember { mutableIntStateOf(0) }
     var help by remember { mutableStateOf(false) }
-    val prompter = controller.prompter
     val session = controller.session
+    // Kept by the shell so the Accounts tab can open an account in the Transactions tab; another database forgets it.
+    var browsedAccount by remember(session) { mutableStateOf<AccountId?>(null) }
+    val prompter = controller.prompter
     val choice = controller.choice
     val busy = controller.busy
     val width = size.columns
@@ -109,8 +112,9 @@ fun TuiApp(
             Box(modifier = Modifier.size(width, bodyHeight)) {
                 if (session != null) {
                     val scope =
-                        TuiScreenScope(session, prompter, width, bodyHeight) {
-                            prompter.warn("An account's transactions come with the Transactions tab (#944).")
+                        TuiScreenScope(session, prompter, width, bodyHeight, browsedAccount) { account ->
+                            browsedAccount = account
+                            screens.indexOf(TransactionsScreen).takeIf { it >= 0 }?.let { selected = it }
                         }
                     screens[selected].content(scope)
                 }
