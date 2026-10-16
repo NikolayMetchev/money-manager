@@ -4,9 +4,11 @@ plugins {
     id("moneymanager.native-convention")
 }
 
-// The one place that picks the Ktor engine for every HTTP client in the app. JVM and Android use CIO; each
-// native target uses an engine backed by the OS (or libcurl) TLS stack and trust store, because CIO's TLS
-// on Kotlin/Native is unproven.
+// The one place that picks the Ktor engine for every HTTP client in the app: Ktor's curated per-platform
+// defaults (OkHttp on JVM and Android, Curl on Linux, Darwin on Apple, WinHttp on Windows), found at
+// runtime by the engine-less HttpClient(). Nothing compiles against them, so JVM and Android take them
+// runtimeOnly; Kotlin/Native links only the klibs on a binary's compile classpath, so native needs
+// implementation or the engine is left out of the executable.
 kotlin {
     sourceSets {
         commonMain {
@@ -17,25 +19,13 @@ kotlin {
 
         getByName("jvmAndroidMain") {
             dependencies {
-                implementation(libs.ktor.client.cio)
+                runtimeOnly(libs.ktor.client.engine.defaults)
             }
         }
 
-        linuxMain {
+        nativeMain {
             dependencies {
-                implementation(libs.ktor.client.curl)
-            }
-        }
-
-        appleMain {
-            dependencies {
-                implementation(libs.ktor.client.darwin)
-            }
-        }
-
-        mingwMain {
-            dependencies {
-                implementation(libs.ktor.client.winhttp)
+                implementation(libs.ktor.client.engine.defaults)
             }
         }
     }
