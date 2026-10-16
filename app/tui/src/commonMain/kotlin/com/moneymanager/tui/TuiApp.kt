@@ -108,7 +108,11 @@ fun TuiApp(
             TabBar(screens, selected, width)
             Box(modifier = Modifier.size(width, bodyHeight)) {
                 if (session != null) {
-                    screens[selected].content(TuiScreenScope(session, prompter, width, bodyHeight))
+                    val scope =
+                        TuiScreenScope(session, prompter, width, bodyHeight) {
+                            prompter.warn("An account's transactions come with the Transactions tab (#944).")
+                        }
+                    screens[selected].content(scope)
                 }
             }
             Footer(controller, vaultState, width)
@@ -261,14 +265,15 @@ private fun NoticeLine(
     if (notice != null) Text(fit(notice.message, width), color = if (notice.error) Color.Red else Color.Yellow)
 }
 
-/** A bordered box over the centre of the screen, blanking what's beneath it. */
+/** A bordered box over the centre of the screen (or of the [areaColumns] × [areaRows] it's in), blanking what's beneath it. */
 @Composable
-private fun Panel(
+internal fun Panel(
     columns: Int,
+    areaColumns: Int = LocalTerminalState.current.size.columns,
+    areaRows: Int = LocalTerminalState.current.size.rows,
     content: @Composable () -> Unit,
 ) {
-    val screen = LocalTerminalState.current.size
-    Box(modifier = Modifier.size(screen.columns, screen.rows), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.size(areaColumns, areaRows), contentAlignment = Alignment.Center) {
         Column(
             modifier =
                 Modifier
@@ -292,5 +297,5 @@ private fun Panel(
 }
 
 /** Columns a panel's border and padding take from its width. */
-private const val PANEL_INSET = 4
-private const val MAX_DIALOG_WIDTH = 72
+internal const val PANEL_INSET = 4
+internal const val MAX_DIALOG_WIDTH = 72

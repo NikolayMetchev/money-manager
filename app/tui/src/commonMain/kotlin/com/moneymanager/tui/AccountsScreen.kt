@@ -11,25 +11,28 @@ import com.jakewharton.mosaic.layout.KeyEvent
 import com.jakewharton.mosaic.layout.onKeyEvent
 import com.jakewharton.mosaic.layout.padding
 import com.jakewharton.mosaic.modifier.Modifier
+import com.jakewharton.mosaic.ui.Box
 import com.jakewharton.mosaic.ui.Color
 import com.jakewharton.mosaic.ui.Column
 import com.jakewharton.mosaic.ui.Row
 import com.jakewharton.mosaic.ui.Text
 import com.jakewharton.mosaic.ui.TextStyle
 import com.moneymanager.database.di.AppServices
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.presenter.accounts.AccountsEvent
 import com.moneymanager.presenter.accounts.AccountsModel
 import com.moneymanager.presenter.accounts.presentAccounts
 import com.moneymanager.query.AccountQuery
 import com.moneymanager.query.AccountWithBalances
 import com.moneymanager.terminal.fit
+import kotlin.math.abs
 
-/** The rows above the list: title, filter line, and the filter's error or a blank line. */
-private const val HEADER_ROWS = 4
+/** The rows above the list: title, two filter lines, the filter's error or a blank line, and the column headings. */
+private const val HEADER_ROWS = 5
 
 /**
- * Accounts with their owners and balances, filtered live. The filter state is the shared accounts presenter's,
- * so it keeps what the desktop Accounts screen keeps. Owner and asset pickers come with #943.
+ * Accounts with their owners and balances, filtered live and optionally grouped by owner. The filter state is the
+ * shared accounts presenter's, so it keeps what the desktop Accounts screen keeps.
  */
 val AccountsScreen =
     TuiScreen(
@@ -38,42 +41,104 @@ val AccountsScreen =
             listOf(
                 KeyBinding("/", "Edit the name filter (Enter or Esc to stop)"),
                 KeyBinding("r", "Name filter: plain text or regex"),
+                KeyBinding("p", "Pick owners"),
+                KeyBinding("a", "Pick assets"),
                 KeyBinding("s", "Show or hide reconciliation (shadow) accounts"),
                 KeyBinding("z", "Show only non-zero balances"),
+                KeyBinding("g", "Group by owner, or list by name"),
+                KeyBinding("Enter", "Open the account's transactions"),
                 KeyBinding("↑  ↓  PgUp  PgDn", "Move through the list"),
             ),
     ) { scope ->
         val services = scope.session.services
         val snapshots = remember(services) { services.accountQuery().snapshot() }
-        AccountsView(presentAccounts(snapshots), scope.width, scope.height)
+        AccountsView(presentAccounts(snapshots), scope.width, scope.height, scope.openAccount)
     }
+
+/** A row of the list: an owner's heading when grouped, or an account. */
+private sealed interface ListLine {
+    data class Heading(
+        val text: String,
+    ) : ListLine
+
+    data class Entry(
+        val account: AccountWithBalances,
+    ) : ListLine
+}
+
+/** A picker that's open, and what applying it does. */
+private class OpenPicker<T>(
+    val select: MultiSelect<T>,
+    private val apply: (Set<T>) -> Unit,
+) {
+    /** Handles [event]; false once the picker is done with. */
+    fun handle(
+        event: KeyEvent,
+        pageRows: Int,
+    ): Boolean =
+        when (val result = select.handle(event, pageRows)) {
+            PickResult.Continue -> true
+            PickResult.Cancel -> false
+            is PickResult.Apply -> {
+                apply(result.selected)
+                false
+            }
+        }
+}
 
 @Composable
 private fun AccountsView(
     model: AccountsModel,
     width: Int,
     height: Int,
+    openAccount: (AccountId) -> Unit,
 ) {
     val inner = (width - 2).coerceAtLeast(0)
     val visibleRows = (height - HEADER_ROWS - 1).coerceAtLeast(1)
     val editor = remember { LineEditor(model.filter.nameText) }
     var editing by remember { mutableStateOf(false) }
+    var grouped by remember { mutableStateOf(false) }
+    var picker by remember { mutableStateOf<OpenPicker<*>?>(null) }
+    // The selection counts accounts, not lines: in a grouped list the same account can be under two owners.
     var selected by remember { mutableIntStateOf(0) }
+    // Which account that was, so the selection follows it when the list changes under it (an import, a filter).
+    var selectedId by remember { mutableStateOf<AccountId?>(null) }
     var top by remember { mutableIntStateOf(0) }
     val count = model.displayed.size
 
+    val lines =
+        if (grouped) {
+            model.byOwner.flatMap { group ->
+                val owner = group.owner?.fullName ?: "No owner"
+                listOf(ListLine.Heading("$owner · ${group.accounts.size}")) + group.accounts.map { ListLine.Entry(it) }
+            }
+        } else {
+            model.displayed.map { ListLine.Entry(it) }
+        }
+    val entryLines = lines.indices.filter { lines[it] is ListLine.Entry }
+    val entryIds = entryLines.map { (lines[it] as ListLine.Entry).account.account.id }
+
     LaunchedEffect(editor.text) { model.eventSink(AccountsEvent.SetName(editor.text)) }
     // The list can shrink under the selection (a filter, a deleted account), so clamp what's drawn.
-    val last = (count - 1).coerceAtLeast(0)
-    val current = selected.coerceIn(0, last)
-    val first = top.coerceIn((current - visibleRows + 1).coerceAtLeast(0), current)
+    val last = (entryLines.size - 1).coerceAtLeast(0)
+    val current = followSelection(entryIds, selectedId, selected)
+    val currentLine = entryLines.getOrElse(current) { 0 }
+    val first = top.coerceIn((currentLine - visibleRows + 1).coerceAtLeast(0), currentLine)
 
     fun select(index: Int) {
         selected = index.coerceIn(0, last)
-        top = first.coerceIn((selected - visibleRows + 1).coerceAtLeast(0), selected)
+        selectedId = entryIds.getOrNull(selected)
+        val line = entryLines.getOrElse(selected) { 0 }
+        top = first.coerceIn((line - visibleRows + 1).coerceAtLeast(0), line)
     }
 
     fun key(event: KeyEvent): Boolean {
+        val open = picker
+        if (open != null) {
+            if (!open.handle(event, multiSelectRows(height))) picker = null
+            // Every key belongs to an open picker, even the shell's own.
+            return true
+        }
         if (editing) {
             if (event.key == "Enter" || event.key == "Escape") editing = false else editor.handle(event)
             // Every other key is text while the filter is being edited, even the shell's own.
@@ -82,8 +147,20 @@ private fun AccountsView(
         when (event.key) {
             "/" -> editing = true
             "r" -> model.eventSink(AccountsEvent.SetNameIsRegex(!model.filter.nameIsRegex))
+            "p" ->
+                picker =
+                    OpenPicker(MultiSelect("Owners", model.people.map { it.id to it.fullName }, model.filter.ownerIds)) {
+                        model.eventSink(AccountsEvent.SetOwners(it))
+                    }
+            "a" ->
+                picker =
+                    OpenPicker(MultiSelect("Assets", model.availableAssets.map { it.id to it.code }, model.filter.assetIds)) {
+                        model.eventSink(AccountsEvent.SetAssets(it))
+                    }
             "s" -> model.eventSink(AccountsEvent.SetIncludeShadow(!model.filter.includeShadow))
             "z" -> model.eventSink(AccountsEvent.SetNonZeroOnly(!model.filter.nonZeroOnly))
+            "g" -> grouped = !grouped
+            "Enter" -> (lines.getOrNull(currentLine) as? ListLine.Entry)?.let { openAccount(it.account.account.id) }
             "ArrowUp" -> select(current - 1)
             "ArrowDown" -> select(current + 1)
             "PageUp" -> select(current - visibleRows)
@@ -93,43 +170,70 @@ private fun AccountsView(
         return true
     }
 
-    Column(modifier = Modifier.padding(horizontal = 1).onKeyEvent(::key)) {
-        val shown = if (model.loaded) "$count of ${model.all.size}" else "loading…"
-        Text(fit("Accounts · $shown", inner), textStyle = TextStyle.Bold)
-        FilterLine(model, editor, editing, inner)
-        val error = model.nameError
-        if (error != null) Text(fit(error, inner), color = Color.Red) else Text("")
-        Text(fit(columns("Name", "Owners", "Balances", inner), inner), textStyle = TextStyle.Dim)
-        if (model.loaded && count == 0) {
-            Text(fit(if (model.all.isEmpty()) "No accounts yet." else "No accounts match the filters.", inner))
+    Box(modifier = Modifier.onKeyEvent(::key)) {
+        Column(modifier = Modifier.padding(horizontal = 1)) {
+            val shown = if (model.loaded) "$count of ${model.all.size}" else "loading…"
+            Text(fit("Accounts · $shown", inner), textStyle = TextStyle.Bold)
+            NameLine(model, editor, editing, inner)
+            Text(fit(flags(model, grouped), inner), textStyle = TextStyle.Dim)
+            val error = model.nameError
+            if (error != null) Text(fit(error, inner), color = Color.Red) else Text("")
+            Text(fit(columns("Name", "Owners", "Balances", inner), inner), textStyle = TextStyle.Dim)
+            if (model.loaded && count == 0) {
+                Text(fit(if (model.all.isEmpty()) "No accounts yet." else "No accounts match the filters.", inner))
+            }
+            lines.drop(first).take(visibleRows).forEachIndexed { offset, line ->
+                when (line) {
+                    is ListLine.Heading -> Text(fit(line.text, inner), textStyle = TextStyle.Bold)
+                    is ListLine.Entry -> {
+                        val text = fit(line.account.line(inner), inner)
+                        Text(text, textStyle = if (first + offset == currentLine) TextStyle.Invert else TextStyle.Unspecified)
+                    }
+                }
+            }
         }
-        model.displayed.drop(first).take(visibleRows).forEachIndexed { offset, entry ->
-            val line = fit(entry.line(inner), inner)
-            Text(line, textStyle = if (first + offset == current) TextStyle.Invert else TextStyle.Unspecified)
-        }
+        picker?.let { MultiSelectDialog(it.select, width, height) }
     }
 }
 
 @Composable
-private fun FilterLine(
+private fun NameLine(
     model: AccountsModel,
     editor: LineEditor,
     editing: Boolean,
     width: Int,
 ) {
-    val filter = model.filter
-    val label = if (filter.nameIsRegex) "Regex: " else "Name: "
-    val flags = " · shadow ${onOff(filter.includeShadow)} · non-zero ${onOff(filter.nonZeroOnly)}"
-    val fieldWidth = (width - label.length - flags.length).coerceAtLeast(1)
+    val label = if (model.filter.nameIsRegex) "Regex: " else "Name: "
+    val fieldWidth = (width - label.length).coerceAtLeast(1)
     Row {
         Text(label, textStyle = TextStyle.Dim)
         if (editing) {
             LineField(editor, fieldWidth)
         } else {
-            Text(fit(editor.text.ifEmpty { "(press / to filter)" }.padEnd(fieldWidth), fieldWidth))
+            Text(fit(editor.text.ifEmpty { "(press / to filter)" }, fieldWidth))
         }
-        Text(fit(flags, width - label.length - fieldWidth), textStyle = TextStyle.Dim)
     }
+}
+
+/** Every filter but the name, and how the list is laid out. */
+private fun flags(
+    model: AccountsModel,
+    grouped: Boolean,
+): String {
+    val filter = model.filter
+    val owners =
+        model.people
+            .filter { it.id in filter.ownerIds }
+            .joinToString { it.fullName }
+            .ifEmpty { "any" }
+    val assets =
+        model.availableAssets
+            .filter { it.id in filter.assetIds }
+            .joinToString { it.code }
+            .ifEmpty { "any" }
+    val layout = if (grouped) "grouped by owner" else "by name"
+    return "Owners: $owners · Assets: $assets · shadow ${onOff(filter.includeShadow)} · " +
+        "non-zero ${onOff(filter.nonZeroOnly)} · $layout"
 }
 
 private fun onOff(on: Boolean) = if (on) "on" else "off"
@@ -153,6 +257,18 @@ private fun columns(
     val ownersWidth = width / 4
     return fit(name, nameWidth - 1).padEnd(nameWidth) + fit(owners, ownersWidth - 1).padEnd(ownersWidth) + balances
 }
+
+/**
+ * Where the selection is in a list of [entries]: on [selectedId] when it's still listed (the occurrence nearest
+ * [previous] when it's listed twice), otherwise at [previous], clamped to the list.
+ */
+internal fun followSelection(
+    entries: List<AccountId>,
+    selectedId: AccountId?,
+    previous: Int,
+): Int =
+    entries.indices.filter { entries[it] == selectedId }.minByOrNull { abs(it - previous) }
+        ?: previous.coerceIn(0, (entries.size - 1).coerceAtLeast(0))
 
 /** The account query over the session's read services, as `mm accounts` builds it. */
 internal fun AppServices.accountQuery(): AccountQuery =

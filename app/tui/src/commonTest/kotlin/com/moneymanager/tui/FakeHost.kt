@@ -73,9 +73,16 @@ internal suspend fun TestMosaic<String>.press(key: String) {
             "Escape" -> 27
             "Tab" -> 9
             "Backspace" -> 127
+            "ArrowUp" -> KeyboardEvent.Up
+            "ArrowDown" -> KeyboardEvent.Down
             else -> key.single().code
         }
     sendKeyEvent(KeyboardEvent(codepoint))
+    screen()
+}
+
+internal suspend fun TestMosaic<String>.pressCtrl(key: Char) {
+    sendKeyEvent(KeyboardEvent(key.code, modifiers = KeyboardEvent.ModifierCtrl))
     screen()
 }
 

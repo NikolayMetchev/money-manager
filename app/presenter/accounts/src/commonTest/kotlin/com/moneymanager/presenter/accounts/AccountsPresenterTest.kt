@@ -120,6 +120,25 @@ class AccountsPresenterTest {
             }
         }
 
+    @Test
+    fun groupsTheDisplayedAccountsByOwner() =
+        runTest {
+            present().test {
+                val model = awaitUntil { it.loaded }
+                val unowned = entry(5, "Cash", emptyList(), emptyList())
+                snapshots.value = snapshots.value.copy(accounts = snapshots.value.accounts + unowned)
+                val grouped = awaitUntil { it.all.size == 5 }
+                assertEquals(listOf(alice, bob, null), grouped.byOwner.map { it.owner })
+                assertEquals(listOf(listOf(1L, 2L), listOf(2L, 3L), listOf(5L)), grouped.byOwner.map { it.ids() })
+
+                model.eventSink(AccountsEvent.SetOwners(setOf(bob.id)))
+                val bobs = awaitUntil { it.filter.ownerIds.isNotEmpty() }
+                // Alice co-owns the joint account, but she wasn't picked.
+                assertEquals(listOf(bob), bobs.byOwner.map { it.owner })
+                assertEquals(listOf(listOf(2L, 3L)), bobs.byOwner.map { it.ids() })
+            }
+        }
+
     private fun present(flow: Flow<AccountSnapshot> = snapshots) = moleculeFlow(RecompositionMode.Immediate) { presentAccounts(flow) }
 
     private suspend fun ReceiveTurbine<AccountsModel>.awaitUntil(predicate: (AccountsModel) -> Boolean): AccountsModel {
@@ -128,6 +147,8 @@ class AccountsPresenterTest {
             if (predicate(model)) return model
         }
     }
+
+    private fun OwnerGroup.ids() = accounts.map { it.account.id.id }
 
     private fun AccountsModel.displayedIds() = displayed.map { it.account.id.id }
 

@@ -2,6 +2,7 @@ package com.moneymanager.tui
 
 import com.jakewharton.mosaic.layout.KeyEvent
 import com.jakewharton.mosaic.terminal.KeyboardEvent
+import com.moneymanager.domain.model.AccountId
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
@@ -28,6 +29,38 @@ class TuiWidgetsTest {
         editor.handle(KeyEvent("u", ctrl = true))
         assertEquals("", editor.text)
         assertFalse(editor.handle(KeyEvent("Enter")))
+    }
+
+    @Test
+    fun aMultiSelectTicksWhatTheFilterLeavesUnderTheCursor() {
+        val picker = MultiSelect("Assets", listOf(1 to "BTC", 2 to "ETH", 3 to "GBP"), initial = setOf(3))
+
+        assertEquals(PickResult.Continue, picker.handle(KeyEvent("ArrowDown"), pageRows = 5))
+        picker.handle(KeyEvent(" "), pageRows = 5)
+        assertEquals(setOf(2, 3), picker.selected)
+
+        // Typing narrows the list and puts the cursor back on its first item.
+        "bt".forEach { picker.handle(KeyEvent(it.toString()), pageRows = 5) }
+        assertEquals(listOf("BTC"), picker.shown.map { it.second })
+        picker.handle(KeyEvent(" "), pageRows = 5)
+        assertEquals(PickResult.Apply(setOf(1, 2, 3)), picker.handle(KeyEvent("Enter"), pageRows = 5))
+
+        picker.handle(KeyEvent("a", ctrl = true), pageRows = 5)
+        assertEquals(PickResult.Apply(emptySet()), picker.handle(KeyEvent("Enter"), pageRows = 5))
+        assertEquals(PickResult.Cancel, picker.handle(KeyEvent("Escape"), pageRows = 5))
+    }
+
+    @Test
+    fun theAccountsSelectionFollowsItsAccountWhenTheListChanges() {
+        val (a, b, c) = listOf(AccountId(1), AccountId(2), AccountId(3))
+
+        // An account added above the selection moves it down a row, not onto another account.
+        assertEquals(2, followSelection(listOf(c, a, b), selectedId = b, previous = 1))
+        // Listed twice (under two owners): the row nearest where it was.
+        assertEquals(3, followSelection(listOf(b, a, c, b), selectedId = b, previous = 2))
+        // Gone, or nothing picked yet: the same row, kept on the list.
+        assertEquals(1, followSelection(listOf(a, c), selectedId = b, previous = 4))
+        assertEquals(0, followSelection(emptyList(), selectedId = null, previous = 3))
     }
 
     @Test
