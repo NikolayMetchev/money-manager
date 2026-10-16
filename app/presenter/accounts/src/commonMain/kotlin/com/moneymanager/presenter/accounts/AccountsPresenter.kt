@@ -141,7 +141,7 @@ private data class FilterState(
             }
         if (next.nameText == filter.nameText && next.nameIsRegex == filter.nameIsRegex) return copy(filter = next)
         return parseName(next).fold(
-            onSuccess = { FilterState(next, it, nameError = null) },
+            onSuccess = { FilterState(next, it) },
             onFailure = { copy(filter = next, nameError = it.message ?: "Invalid regular expression") },
         )
     }

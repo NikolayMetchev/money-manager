@@ -73,6 +73,7 @@ exclude:
       - app/ui/.editorconfig
       - app/terminal/.editorconfig
       - app/tui/.editorconfig
+      - app/presenter/.editorconfig
 
   # `import kotlinx.serialization.modules.subclassesOfSealed` is used on the next screenful; the
   # linter fails to resolve this experimental serialization API and calls the import unused.
