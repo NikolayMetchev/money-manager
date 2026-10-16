@@ -38,6 +38,7 @@ exclude:
       # Mosaic composables (the terminal progress widgets, the TUI) follow the same convention.
       - app/terminal/src/commonMain/kotlin/com/moneymanager/terminal/TaskProgressView.kt
       - app/tui/src/commonMain
+      - app/presenter/core/src/commonMain
 
   # [3] — `?: error(...)` inside runMoneyManagerComposeUiTest/use{} lambdas.
   - name: KotlinUnreachableCode
