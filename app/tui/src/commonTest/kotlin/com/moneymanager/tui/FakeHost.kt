@@ -92,9 +92,12 @@ internal suspend fun TestMosaic<String>.pressCtrl(key: Char) {
 
 internal suspend fun TestMosaic<String>.type(text: String) = text.forEach { press(it.toString()) }
 
-/** The screen once it matches [until]; fails with the last screen after a while. */
+/**
+ * The screen once it matches [until]; fails with the last screen after a while. Generous, since creating a test
+ * database on a loaded CI runner (Windows native especially) can take over ten seconds, and a pass returns at once.
+ */
 internal suspend fun TestMosaic<String>.screen(until: (String) -> Boolean = { true }): String {
-    val deadline = TimeSource.Monotonic.markNow() + 10.seconds
+    val deadline = TimeSource.Monotonic.markNow() + 30.seconds
     var last =
         try {
             awaitSnapshot(200.milliseconds)

@@ -101,7 +101,7 @@ class TuiAppTest {
 
                     press("q")
 
-                    withTimeout(10.seconds) { running.join() }
+                    withTimeout(30.seconds) { running.join() }
                     assertEquals(listOf(location), host.closed)
                 }
             }
@@ -119,13 +119,13 @@ class TuiAppTest {
                 val host = FakeHost(first, refuseClosing = first)
                 val controller = TuiController(host)
                 val running = async { runCatching { controller.run() } }
-                withTimeout(10.seconds) { while (controller.session?.location != first) delay(10.milliseconds) }
+                withTimeout(30.seconds) { while (controller.session?.location != first) delay(10.milliseconds) }
 
                 controller.open(second)
-                withTimeout(10.seconds) { while (controller.session?.location != second) delay(10.milliseconds) }
+                withTimeout(30.seconds) { while (controller.session?.location != second) delay(10.milliseconds) }
                 controller.quit()
 
-                val failure = withTimeout(10.seconds) { running.await() }.exceptionOrNull()
+                val failure = withTimeout(30.seconds) { running.await() }.exceptionOrNull()
                 // The last close succeeded, yet the run still fails with the switch's refused upload.
                 assertEquals("Didn't upload", failure?.message)
                 assertEquals(listOf(first, second), host.closed)
