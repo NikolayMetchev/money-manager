@@ -141,9 +141,7 @@ jobs:
             task: :app:main:cli:linkReleaseExecutableMacosArm64
           - platform: Windows
             os: windows-latest
-            # Selecting a task by name configures every project, and :app:main:jvm's Compose WiX setup
-            # breaks isolated projects on Windows (https://youtrack.jetbrains.com/issue/CMP-8375).
-            task: :app:main:cli:linkReleaseExecutableMingwX64 -Dorg.gradle.isolated-projects=false
+            task: :app:main:cli:linkReleaseExecutableMingwX64
 
     steps:
       - name: Checkout code
