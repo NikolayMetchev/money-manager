@@ -1,0 +1,18 @@
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_binary")
+
+# The SQLDelight compiler as a Bazel tool (see SqlDelightGenerator.kt and sqldelight.bzl).
+kt_jvm_binary(
+    name = "generator",
+    srcs = ["src/com/moneymanager/bazel/sqldelight/SqlDelightGenerator.kt"],
+    main_class = "com.moneymanager.bazel.sqldelight.SqlDelightGeneratorKt",
+    visibility = ["//visibility:public"],
+    runtime_deps = [
+        "@maven_kmp//:sqldelight_compiler_env_jvm",
+        "@maven_kmp//:sqldelight_dialect_sqlite_jvm",
+        "@rules_kotlin//kotlin/compiler:kotlin-reflect",
+    ],
+    deps = [
+        "@maven_kmp//:dev_lysine_sql_psi_environment_jvm",
+        "@maven_kmp//:sqldelight_gradle_plugin_jvm",
+    ],
+)
