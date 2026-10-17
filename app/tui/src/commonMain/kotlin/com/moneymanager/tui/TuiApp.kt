@@ -29,7 +29,6 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.files.expandTilde
 import com.moneymanager.remotestorage.sync.SyncState
-import com.moneymanager.session.bindingFor
 import com.moneymanager.terminal.fit
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -62,7 +61,8 @@ fun TuiApp(
     var help by remember { mutableStateOf(false) }
     val session = controller.session
     val work = controller.work
-    val editingLocked = session != null && controller.remote?.bindingFor(session.location) != null && syncState.editingLocked
+    // Exactly what the edit gate refuses writes on, so no settings-file read on every recomposition.
+    val editingLocked = session != null && syncState.editingLocked
     // Kept by the shell so the Accounts tab can open an account in the Transactions tab; another database forgets it.
     var browsedAccount by remember(session) { mutableStateOf<AccountId?>(null) }
     val prompter = controller.prompter
