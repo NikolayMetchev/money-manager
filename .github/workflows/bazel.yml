@@ -1,0 +1,45 @@
+# Bazel build beside Gradle while the build moves over (#995). Not a required check: Gradle stays the
+# source of truth until the cutover.
+name: Bazel
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths-ignore: [ 'docs/**', 'webpage/**', '**/*.md' ]
+  pull_request:
+    branches: [ main ]
+    paths-ignore: [ 'docs/**', 'webpage/**', '**/*.md' ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  bazel:
+    name: Bazel build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.19.1
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
+          # Only main writes the caches, so PR runs don't evict the entries everyone restores.
+          cache-save: ${{ github.event_name == 'push' }}
+
+      - name: Build
+        run: bazel build //...
+
+      # Exit code 4 means "no test targets", which holds until the first kmp_test lands.
+      - name: Test
+        run: bazel test //... || [ $? -eq 4 ]

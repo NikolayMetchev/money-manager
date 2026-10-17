@@ -74,6 +74,12 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 
 **Pre-push**: Always run `./gradlew build buildHealth` locally before pushing.
 
+**Bazel (in progress, #995)**: Bazel is being brought up beside Gradle, which stays the source of truth until
+the cutover. Run it through bazelisk (`.bazelversion`): `bazel build //...`. It is bzlmod only (`MODULE.bazel`,
+committed `MODULE.bazel.lock`), on the same JDK 25 (`.bazelrc`). The KMP rules live in `//bazel/kmp` and the Gazelle
+extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output). CI runs it in the non-required
+`bazel.yml` workflow.
+
 ## Project Structure
 
 ### Modules

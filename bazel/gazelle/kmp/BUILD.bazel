@@ -1,0 +1,2 @@
+# The Gazelle language extension that generates every BUILD.bazel for Kotlin Multiplatform modules (#995).
+# Gazelle extensions can't be Starlark, so it will be a go_library here.
