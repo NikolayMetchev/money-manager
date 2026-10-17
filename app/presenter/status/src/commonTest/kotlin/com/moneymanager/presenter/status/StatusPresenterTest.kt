@@ -28,11 +28,13 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 private val VERSION = AppVersion("9.9.9-test")
@@ -112,9 +114,17 @@ class StatusPresenterTest {
     ) = moleculeFlow(RecompositionMode.Immediate) { presentStatus(session, remote, vault, VERSION, scope) }
 
     private suspend fun ReceiveTurbine<StatusModel>.awaitUntil(predicate: (StatusModel) -> Boolean): StatusModel {
-        var item = awaitItem()
-        while (!predicate(item)) item = awaitItem()
-        return item
+        var last: StatusModel? = null
+        try {
+            var item = awaitItem()
+            while (!predicate(item)) {
+                last = item
+                item = awaitItem()
+            }
+            return item
+        } catch (timeout: AssertionError) {
+            throw AssertionError("Still waiting; the last model was $last", timeout)
+        }
     }
 
     // The presenter gets its own unlocked vault: opening a database rebinds the session's vault to that file.
@@ -129,8 +139,11 @@ class StatusPresenterTest {
         val session = DatabaseSessions(manager, settings, inMemoryCredentialVault(), remote).open(location)
         val scope = CoroutineScope(SupervisorJob())
         try {
-            if (cloud) remote.createRemote(provider.id, null, "db.mmdb", location, session.database, "pw")
-            test(session, remote, unlockedCredentialVault(), scope)
+            // A hang fails the test rather than the whole CI job.
+            withTimeout(WHOLE_TEST_TIMEOUT) {
+                if (cloud) remote.createRemote(provider.id, null, "db.mmdb", location, session.database, "pw")
+                test(session, remote, unlockedCredentialVault(), scope)
+            }
         } finally {
             scope.cancel()
             session.database.close()
@@ -140,5 +153,6 @@ class StatusPresenterTest {
 
     private companion object {
         val TIMEOUT = 30.seconds
+        val WHOLE_TEST_TIMEOUT = 3.minutes
     }
 }
