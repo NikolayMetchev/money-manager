@@ -66,8 +66,11 @@ fun TuiApp(
     val width = size.columns
     val bodyHeight = (size.rows - 2).coerceAtLeast(0)
 
-    fun preview(event: KeyEvent): Boolean =
-        when {
+    // Reads the controller's state when the key arrives, not as the last composition saw it: keys that arrive together
+    // (fast typing, a paste) are handled before the screen recomposes.
+    fun preview(event: KeyEvent): Boolean {
+        val pending = controller.choice
+        return when {
             event.ctrl && event.key == "c" -> {
                 controller.interrupt()
                 true
@@ -77,14 +80,15 @@ fun TuiApp(
                 if (event.key == "?" || event.key == "Escape" || event.key == "q") help = false
                 true
             }
-            choice != null -> {
-                handleChoiceKey(controller, choice, event)
+            pending != null -> {
+                handleChoiceKey(controller, pending, event)
                 true
             }
             // Nothing to act on while a database opens or closes.
-            busy != null || session == null -> true
+            controller.busy != null || controller.session == null -> true
             else -> false
         }
+    }
 
     fun global(event: KeyEvent): Boolean {
         val tab = event.key.toIntOrNull()

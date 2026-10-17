@@ -117,8 +117,15 @@ private fun TransactionsView(
     val rows = model.rows
     val ids = rows.map { it.transactionId }
     val last = (rows.size - 1).coerceAtLeast(0)
-    val current = followSelection(ids, selectedId, selected)
-    val first = ids.indexOf(topId).coerceAtLeast(0).coerceIn((current - visibleRows + 1).coerceAtLeast(0), current)
+
+    // Read from the state each time, never kept from the last composition: keys that arrive together (fast typing, a
+    // paste) are handled before the screen recomposes, and each must see where the one before it moved.
+    fun currentIndex() = followSelection(ids, selectedId, selected)
+
+    fun firstShown(index: Int) = ids.indexOf(topId).coerceAtLeast(0).coerceIn((index - visibleRows + 1).coerceAtLeast(0), index)
+
+    val current = currentIndex()
+    val first = firstShown(current)
     val currentId = ids.getOrNull(current)
 
     // A new account, range or jump starts at the top, or on the row the jump landed on.
@@ -137,9 +144,10 @@ private fun TransactionsView(
     }
 
     fun select(index: Int) {
+        val shownFrom = firstShown(currentIndex())
         selected = index.coerceIn(0, last)
         selectedId = ids.getOrNull(selected)
-        topId = ids.getOrNull(first.coerceIn((selected - visibleRows + 1).coerceAtLeast(0), selected))
+        topId = ids.getOrNull(shownFrom.coerceIn((selected - visibleRows + 1).coerceAtLeast(0), selected))
         if (selected >= rows.size - PAGE_AHEAD && model.hasOlder) model.eventSink(TransactionsEvent.LoadOlder)
         if (selected < PAGE_AHEAD && model.hasNewer) model.eventSink(TransactionsEvent.LoadNewer)
     }
@@ -203,6 +211,7 @@ private fun TransactionsView(
             return true
         }
         val links = model.detail?.links.orEmpty()
+        val at = currentIndex()
         when (event.key) {
             "a" ->
                 picker =
@@ -213,14 +222,14 @@ private fun TransactionsView(
             "x" -> model.eventSink(TransactionsEvent.SetRange(TransactionRange()))
             "g" -> askJump()
             "r" -> model.eventSink(TransactionsEvent.Refresh)
-            "Enter" -> detailOpen = !detailOpen && currentId != null
+            "Enter" -> detailOpen = !detailOpen && ids.getOrNull(at) != null
             "Escape" -> if (detailOpen) detailOpen = false else return false
             "n" -> if (detailOpen && links.isNotEmpty()) link = (link + 1) % links.size
             "l" -> links.getOrNull(link)?.takeIf { detailOpen }?.let(::follow)
-            "ArrowUp" -> select(current - 1)
-            "ArrowDown" -> select(current + 1)
-            "PageUp" -> select(current - visibleRows)
-            "PageDown" -> select(current + visibleRows)
+            "ArrowUp" -> select(at - 1)
+            "ArrowDown" -> select(at + 1)
+            "PageUp" -> select(at - visibleRows)
+            "PageDown" -> select(at + visibleRows)
             "Home" -> if (model.hasNewer) model.eventSink(TransactionsEvent.SetRange(model.range)) else select(0)
             "End" -> select(last)
             else -> return false

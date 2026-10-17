@@ -79,6 +79,17 @@ internal fun tui(
 }
 
 internal suspend fun TestMosaic<String>.press(key: String) {
+    sendKeyEvent(keyboardEvent(key))
+    screen()
+}
+
+/** Sends [keys] before the screen redraws, as a fast typist or a paste does, so they all reach one composition. */
+internal suspend fun TestMosaic<String>.pressTogether(vararg keys: String) {
+    keys.forEach { sendKeyEvent(keyboardEvent(it)) }
+    screen()
+}
+
+private fun keyboardEvent(key: String): KeyboardEvent {
     val codepoint =
         when (key) {
             "Enter" -> 13
@@ -93,8 +104,7 @@ internal suspend fun TestMosaic<String>.press(key: String) {
             "End" -> KeyboardEvent.End
             else -> key.single().code
         }
-    sendKeyEvent(KeyboardEvent(codepoint))
-    screen()
+    return KeyboardEvent(codepoint)
 }
 
 internal suspend fun TestMosaic<String>.pressCtrl(key: Char) {
