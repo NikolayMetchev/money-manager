@@ -93,6 +93,14 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   bump. rules_kotlin bundles its own Kotlin compiler, so `bazel_dep(rules_kotlin)` must match the catalog's
   `kotlin`. The toolchain is `//bazel/kmp:kotlin_toolchain` (`-Werror`, JVM 25, indy lambdas). ABI jars stay off:
   Metro and Compose metadata must reach downstream compiles.
+- **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
+  `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
+  libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.
+  The version is rules_kotlin's Kotlin release; after a Kotlin bump run `bazel run @kotlin_native_repin//:repin`
+  (it downloads every archive: JetBrains' `.sha256` files all hold the same wrong checksum). Rules call konan
+  through `run_konan` (`toolchain.bzl`), which passes `airplaneMode=true`, so nothing is fetched at build time. One
+  toolchain per exec host carries every target it builds (Linux and Windows hosts: linuxX64, linuxArm64,
+  mingwX64; macOS adds macosArm64), picked by name rather than by platform.
 - **Maven**: `maven.install` in `MODULE.bazel` takes the explicit `-jvm` artifacts until KMP variant resolution
   (#1000), with versions copied from `gradle/libs.versions.toml`, and the lockfile `bazel/kmp/deps/maven_install.json`.
   After changing them, run `bazel run @maven//:pin`. Modules name external libraries through `//bazel/kmp/deps`
