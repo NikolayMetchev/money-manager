@@ -9,12 +9,27 @@
 # gazelle:kmp_export @maven_kmp//:ktor_client_core
 # gazelle:kmp_keep_dep @maven_kmp//:ktor_utils
 
+# gazelle:kmp_generated_srcs :generated_google_oauth
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+load("//bazel/kmp/constants:constants.bzl", "kotlin_constants")
+
+# GenerateKotlinConstantsTask in the Gradle build, which generated_by names until the cutover (#1031).
+kotlin_constants(
+    name = "generated_google_oauth",
+    generated_by = ":app:remotestorage:googledrive:generateGoogleOAuthDefaults",
+    obfuscated = {
+        "@google_oauth//:client_id.hex": "CLIENT_ID",
+        "@google_oauth//:client_secret.hex": "CLIENT_SECRET",
+    },
+    object = "GeneratedGoogleOAuth",
+    package = "com.moneymanager.remotestorage.googledrive",
+)
 
 kmp_library(
     name = "googledrive",
     apple_srcs = glob(["src/appleMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    generated_srcs = [":generated_google_oauth"],
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
     linux_srcs = glob(["src/linuxMain/kotlin/**/*.kt"]),
     mingw_srcs = glob(["src/mingwMain/kotlin/**/*.kt"]),

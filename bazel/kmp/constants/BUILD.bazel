@@ -1,0 +1,17 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_test")
+
+# The kotlin_constants generator (#1011), a port of build-logic's GenerateKotlinConstantsTask.
+go_binary(
+    name = "generator",
+    srcs = ["generator.go"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "generator_test",
+    size = "small",
+    srcs = [
+        "generator.go",
+        "generator_test.go",
+    ],
+)

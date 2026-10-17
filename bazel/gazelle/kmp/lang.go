@@ -54,7 +54,7 @@ func (*kmpLang) Kinds() map[string]rule.KindInfo {
 	return map[string]rule.KindInfo{
 		"kmp_library": {
 			NonEmptyAttrs:  map[string]bool{"common_srcs": true, "sqldelight": true},
-			MergeableAttrs: mergeable("sqldelight"),
+			MergeableAttrs: mergeable("sqldelight", "generated_srcs"),
 			ResolveAttrs:   resolvedAttrs,
 		},
 		"kmp_test": {

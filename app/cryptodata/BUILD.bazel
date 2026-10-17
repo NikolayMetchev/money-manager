@@ -5,11 +5,23 @@
 # gazelle:kmp_export @maven_kmp//:ktor_client_core jvmMain
 # gazelle:kmp_keep_dep @maven_kmp//:ktor_http jvmMain
 
+# gazelle:kmp_generated_srcs :generated_crypto_dataset
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+load("//bazel/kmp/constants:constants.bzl", "kotlin_constants")
+
+# GenerateKotlinConstantsTask in the Gradle build, which generated_by names until the cutover (#1031).
+kotlin_constants(
+    name = "generated_crypto_dataset",
+    constants = {"data/coins.tsv": "COINS_TSV"},
+    generated_by = ":app:cryptodata:generateBundledCryptoDataset",
+    object = "GeneratedCryptoDataset",
+    package = "com.moneymanager.cryptodata",
+)
 
 kmp_library(
     name = "cryptodata",
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    generated_srcs = [":generated_crypto_dataset"],
     jvm_deps = ["@maven_kmp//:ktor_http"],
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
     native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
