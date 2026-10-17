@@ -7,6 +7,7 @@ into a program with `-generate-test-runner`.
 """
 
 load("//bazel/kmp/native:toolchain.bzl", "KONAN_TARGETS", "TOOLCHAIN_TYPE", "run_konan")
+load("//bazel/kmp/plugins:plugins.bzl", "NativePluginInfo", "native_plugin_args")
 
 KlibInfo = provider(
     doc = "A Kotlin/Native library for one konan target.",
@@ -37,7 +38,7 @@ def _fragment_args(args, prefix, chain):
             args.add("-Xfragment-sources=%s%s:%s" % (prefix, fragment, f.path))
     return [f for _, files in present for f in files]
 
-def _compile_klib(ctx, kgp_target, out, chain, fragment_suffix, deps, friends, module_name, short_name):
+def _compile_klib(ctx, kgp_target, out, chain, fragment_suffix, deps, friends, module_name, short_name, plugins):
     target = KONAN_TARGETS[kgp_target]
     transitive = depset(transitive = [d[KlibInfo].transitive_klibs for d in deps + friends])
     args = ctx.actions.args()
@@ -45,6 +46,7 @@ def _compile_klib(ctx, kgp_target, out, chain, fragment_suffix, deps, friends, m
     # KGP compiles every klib as debug, whatever the binary that later links it.
     args.add_all(["-g", "-enable-assertions", "-Werror", "-Xexpect-actual-classes"])
     args.add_all(["-module-name", module_name, "-Xshort-module-name=" + short_name])
+    plugin_jars = native_plugin_args(args, plugins)
 
     # konanc names fragments by source set (commonMain, linuxX64Test, …), as KGP does.
     srcs = _fragment_args(args, "", [(f + fragment_suffix, files) for f, files in chain])
@@ -59,7 +61,7 @@ def _compile_klib(ctx, kgp_target, out, chain, fragment_suffix, deps, friends, m
         tool = "konanc",
         target = target,
         arguments = [args],
-        inputs = depset(srcs, transitive = [transitive]),
+        inputs = depset(srcs + plugin_jars, transitive = [transitive]),
         outputs = [out],
         mnemonic = "KotlinNativeCompile",
         progress_message = "Compiling Kotlin/Native %{label} for " + kgp_target,
@@ -96,11 +98,13 @@ def _klib_impl(ctx):
         friends = [],
         module_name = _unique_name(ctx.label, ""),
         short_name = ctx.attr.module,
+        plugins = ctx.attr.plugins,
     )
     return [DefaultInfo(files = depset([out])), info]
 
 _SRC_ATTRS = {
     "common_srcs": attr.label_list(allow_files = [".kt"]),
+    "plugins": attr.label_list(providers = [NativePluginInfo], doc = "Compiler plugins, in the order they run."),
     "family_srcs": attr.label_list(allow_files = [".kt"], doc = "linuxMain, appleMain or mingwMain."),
     "native_srcs": attr.label_list(allow_files = [".kt"]),
     "target": attr.string(mandatory = True, values = KONAN_TARGETS.keys()),
@@ -131,6 +135,7 @@ def _test_impl(ctx):
         friends = [ctx.attr.associate],
         module_name = _unique_name(ctx.attr.associate.label, "_test"),
         short_name = ctx.attr.module + "_test",
+        plugins = ctx.attr.plugins,
     )
 
     target = KONAN_TARGETS[ctx.attr.target]

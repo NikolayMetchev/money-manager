@@ -1,10 +1,22 @@
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
+NATIVE_TARGETS = [
+    "linuxArm64",
+    "linuxX64",
+    "macosArm64",
+    "mingwX64",
+]
+
 kmp_library(
     name = "core",
+    apple_srcs = glob(["src/appleMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
-    plugins = ["//bazel/kmp/deps:serialization_plugin"],
+    linux_srcs = glob(["src/linuxMain/kotlin/**/*.kt"]),
+    mingw_srcs = glob(["src/mingwMain/kotlin/**/*.kt"]),
+    native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
+    native_targets = NATIVE_TARGETS,
+    plugins = ["serialization"],
     visibility = ["//visibility:public"],
     deps = [
         "@maven_kmp//:kotlinx_io_core",
@@ -20,5 +32,7 @@ kmp_test(
     name = "test",
     associate = ":core",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = NATIVE_TARGETS,
+    plugins = ["serialization"],
     deps = ["//bazel/kmp/deps:kotlin_test"],
 )
