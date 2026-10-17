@@ -475,15 +475,30 @@ jobs:
         with:
           command: jvmMainClasses
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
-      - name: Restore Qodana cache (read-only on non-main branches)
-        if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/releases/')
+      # The job restores and saves the Qodana cache itself (use-caches: false on the action) so it can
+      # drop the IDE's cached project model first. A scan that finds a model skips the Gradle import,
+      # but the model points at files only the import writes (the container's /root/.konan, the
+      # project's .kotlin/metadata klibs). With those gone every native-target module is unresolved and
+      # the scan reports ~4,000 false findings. Whether the IDE re-imported depended on what changed,
+      # which is why Qodana went red and green at random. Indexes and the Gradle/Maven homes stay cached.
+      - name: Restore Qodana cache
         uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/qodana/caches
-          # qodana-action saves its cache as `native-false-qodana-<version>-<ref>-<sha>`; a key without
-          # that prefix never matched, so every PR scan started cold.
-          key: native-false-qodana-2026.2-refs/heads/main
-          restore-keys: native-false-qodana-2026.2-refs/heads/main-
+          key: qodana-2026.2-${{ github.sha }}
+          restore-keys: |
+            qodana-2026.2-main-
+            native-false-qodana-2026.2-refs/heads/main-
+      - name: Drop the cached IDE project model
+        env:
+          CACHES: ${{ runner.temp }}/qodana/caches
+        run: |
+          if [ ! -d "$CACHES" ]; then echo "No Qodana cache restored"; exit 0; fi
+          echo "Cache layout:"
+          find "$CACHES" -mindepth 1 -maxdepth 3 -type d -not -path '*/caches/*/caches/*' | sort | head -80
+          find "$CACHES" -maxdepth 5 -type d \( -name external_build_system -o -name projects \) \
+            -not -path '*gradle*' -not -path '*.m2*' -print -prune -exec rm -rf {} +
+          find "$CACHES" -maxdepth 6 -type f -path '*/workspace/*.cache' -not -path '*gradle*' -print -delete
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.2
         env:
@@ -495,7 +510,13 @@ jobs:
           # (e.g. a change in one module making another module's code flaggable). Main carries no
           # accepted findings, so with a fail threshold of 0 a PR fails exactly when main would.
           pr-mode: false
-          use-caches: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/releases/') }}
+          use-caches: false
+      - name: Save Qodana cache
+        if: always() && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/releases/'))
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/qodana/caches
+          key: qodana-2026.2-main-${{ github.sha }}
       - name: Upload SARIF as artifact
         if: always()
         uses: actions/upload-artifact@v7

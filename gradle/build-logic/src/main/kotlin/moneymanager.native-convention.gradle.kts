@@ -49,7 +49,9 @@ if (providers.gradleProperty("skipNative").map(String::toBoolean).getOrElse(fals
                 this is CompileBundledSqliteTask ||
                 this is DownloadSqliteAmalgamationTask ||
                 nativeToolchainTask.matches(name)
-        if (native) enabled = false
+        // onlyIf, not `enabled = false`: KGP's cinterop registration sets `enabled` after configureEach runs,
+        // which re-enabled cinterop and failed on the missing (skipped) bundled SQLite.
+        if (native) onlyIf("-PskipNative=true") { false }
     }
 }
 
