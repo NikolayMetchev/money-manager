@@ -34,7 +34,7 @@ class AccountsScreenTest {
         val location = createTestDatabaseLocation()
         try {
             tui(location, DEFAULT_SCREENS) { _, controller ->
-                screen { it.contains("Press o to open") }
+                screen { it.contains("o open another database") }
                 val engine = checkNotNull(controller.session).importEngine
                 listOf("Bank fees", "Current", "Shop").forEach { engine.createAccount(account(it), Source.Manual) }
                 press("2")
