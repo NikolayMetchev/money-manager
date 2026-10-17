@@ -1,0 +1,8 @@
+# Patches applied to rules_kotlin through single_version_override in MODULE.bazel.
+#
+# fragments.patch: Kotlin Multiplatform fragment compilation (#997). Adds `fragment_srcs` and
+# `fragment_refines` to kt_jvm_library/kt_jvm_test, which become -Xmulti-platform, -Xfragments,
+# -Xfragment-refines and -Xfragment-sources, and an `x_expect_actual_classes` kotlinc option. It touches
+# Starlark only: the worker forwards --kotlin_passthrough_flags to the compiler unchanged. Rebase it on
+# every rules_kotlin bump, and drop it once upstream supports fragments.
+exports_files(["fragments.patch"])

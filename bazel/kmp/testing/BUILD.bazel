@@ -1,0 +1,9 @@
+load("@rules_java//java:java_library.bzl", "java_library")
+
+# Runs a kmp_test's JUnit 4 classes (see defs.bzl).
+java_library(
+    name = "runner",
+    srcs = ["src/com/moneymanager/bazel/kmp/testing/KmpJUnitRunner.java"],
+    visibility = ["//visibility:public"],
+    deps = ["@maven//:junit_junit"],
+)

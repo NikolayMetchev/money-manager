@@ -1,0 +1,24 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "core",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    plugins = ["//bazel/kmp/deps:serialization_plugin"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//bazel/kmp/deps:kotlinx_io_core",
+        "//utils/files:files_jvm",
+    ],
+    exports = [
+        "//bazel/kmp/deps:kotlinx_serialization_core",
+        "//utils/bigdecimal:bigdecimal_jvm",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":core",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    deps = ["//bazel/kmp/deps:kotlin_test"],
+)

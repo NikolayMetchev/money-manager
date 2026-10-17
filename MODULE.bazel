@@ -20,3 +20,33 @@ bazel_dep(name = "gazelle", version = "0.54.0")
 
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.download(version = "1.27.2")
+
+# Kotlin Multiplatform fragment support (see bazel/third_party/rules_kotlin/BUILD.bazel).
+single_version_override(
+    module_name = "rules_kotlin",
+    patch_strip = 1,
+    patches = ["//bazel/third_party/rules_kotlin:fragments.patch"],
+)
+
+register_toolchains("//bazel/kmp:kotlin_toolchain")
+
+# Maven libraries, by their -jvm artifact until KMP variant resolution lands (#1000). Versions move with
+# gradle/libs.versions.toml. After a change, repin: bazel run @maven//:pin
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+maven.install(
+    artifacts = [
+        "junit:junit:4.13.2",
+        "org.jetbrains.kotlinx:kotlinx-io-core-jvm:0.9.1",
+        "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.11.0",
+    ],
+    # The Kotlin toolchain provides the standard library (as KGP does), at the compiler's own version.
+    excluded_artifacts = [
+        "org.jetbrains.kotlin:kotlin-stdlib",
+        "org.jetbrains.kotlin:kotlin-stdlib-common",
+    ],
+    # protobuf (through rules_java) adds its own artifacts to this repository.
+    known_contributing_modules = ["protobuf"],
+    lock_file = "//bazel/kmp/deps:maven_install.json",
+    repositories = ["https://repo1.maven.org/maven2"],
+)
+use_repo(maven, "maven")

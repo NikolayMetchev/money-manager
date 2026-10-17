@@ -1,0 +1,15 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "bigdecimal",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_android_srcs = glob(["src/jvmAndroidMain/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":bigdecimal",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    deps = ["//bazel/kmp/deps:kotlin_test"],
+)

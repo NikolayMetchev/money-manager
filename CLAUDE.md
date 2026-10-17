@@ -78,7 +78,23 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 the cutover. Run it through bazelisk (`.bazelversion`): `bazel build //...`. It is bzlmod only (`MODULE.bazel`,
 committed `MODULE.bazel.lock`), on the same JDK 25 (`.bazelrc`). The KMP rules live in `//bazel/kmp` and the Gazelle
 extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output). CI runs it in the non-required
-`bazel.yml` workflow.
+`bazel.yml` workflow (`bazel build //...` and `bazel test //...`).
+
+- **`kmp_library` / `kmp_test`** (`//bazel/kmp:defs.bzl`) compile a module's JVM target the way KGP does: one K2 call
+  over every fragment (`commonMain ← jvmAndroidMain ← jvmMain`, empty ones left out), so expect/actual and common
+  code are checked per fragment. `exports` is Gradle's `api` (also on the module's own classpath). Tests run through
+  `KmpJUnitRunner` (JUnit 4), named `:test_jvm`. Their `test.xml` matches Gradle's `jvmTest` results case for case,
+  apart from KGP's `[jvm]` name suffix.
+- **The compile is rules_kotlin's `kt_jvm_library`, patched**: rules_kotlin has no fragment flags, so
+  `bazel/third_party/rules_kotlin/fragments.patch` (via `single_version_override`) adds `fragment_srcs` /
+  `fragment_refines` and an `x_expect_actual_classes` option. It is Starlark only. Rebase it on every rules_kotlin
+  bump. rules_kotlin bundles its own Kotlin compiler, so `bazel_dep(rules_kotlin)` must match the catalog's
+  `kotlin`. The toolchain is `//bazel/kmp:kotlin_toolchain` (`-Werror`, JVM 25, indy lambdas). ABI jars stay off:
+  Metro and Compose metadata must reach downstream compiles.
+- **Maven**: `maven.install` in `MODULE.bazel` takes the explicit `-jvm` artifacts until KMP variant resolution
+  (#1000), with versions copied from `gradle/libs.versions.toml`, and the lockfile `bazel/kmp/deps/maven_install.json`.
+  After changing them, run `bazel run @maven//:pin`. Modules name external libraries through `//bazel/kmp/deps`
+  labels, never `@maven//` directly.
 
 ## Project Structure
 
