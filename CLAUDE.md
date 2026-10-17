@@ -105,6 +105,10 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   konanc) with the options its Gradle plugin passes, plus the runtime its convention adds (Metro's as `api`,
   mappie-api, mokkery-runtime for tests). Metro runs before Compose and serialization (`-Xcompiler-plugin-order`).
   Plugin options may use `{temp}`, a directory of the compile's own (Mappie keeps state there).
+- **Metro across modules** (#1002): contribution hints (`metro/hints`) reach the graph's compile through ordinary
+  `deps`, in jars and klibs alike, because ABI jars stay off. A dep that exists only so Metro sees it (app/di/core's
+  feature DI modules) is a plain dep marked `# keep`, so Gazelle (and the Gazelle-diff check, #1016) keeps it
+  though no import explains it.
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.
