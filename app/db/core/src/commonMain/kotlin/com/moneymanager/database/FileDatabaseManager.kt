@@ -60,15 +60,26 @@ abstract class FileDatabaseManager(
 
             val database = MoneyManagerDatabaseWrapper(driver)
             if (isNewDatabase) {
-                // One transaction for the whole creation: on its own every statement and seeded currency commits
-                // separately, about a thousand syncs to disk, which takes seconds where syncing is slow (Windows).
-                database.transaction {
-                    onProgress(Progress.counted("Creating the database schema...", 4, OPEN_STEPS))
-                    // Lookups, the system device and GBP are seeded inside Schema.create (the :app:db:seed module).
-                    MoneyManagerDatabase.Schema.create(driver)
-                    // The rest of the bundled ISO 4217 list is seeded here for a freshly created database.
-                    onProgress(Progress.counted("Adding default currencies...", 5, OPEN_STEPS))
-                    DatabaseConfig.seedCurrencies(database, currenciesToSeed())
+                var created = false
+                try {
+                    // One transaction for the whole creation: on its own every statement and seeded currency commits
+                    // separately, about a thousand syncs to disk, which takes seconds where syncing is slow (Windows).
+                    database.transaction {
+                        onProgress(Progress.counted("Creating the database schema...", 4, OPEN_STEPS))
+                        // Lookups, the system device and GBP are seeded inside Schema.create (the :app:db:seed module).
+                        MoneyManagerDatabase.Schema.create(driver)
+                        // The rest of the bundled ISO 4217 list is seeded here for a freshly created database.
+                        onProgress(Progress.counted("Adding default currencies...", 5, OPEN_STEPS))
+                        DatabaseConfig.seedCurrencies(database, currenciesToSeed())
+                    }
+                    created = true
+                } finally {
+                    // A file left behind would be opened next time as an existing, empty database, so a failed
+                    // creation leaves nothing: close the driver first, so it releases the file.
+                    if (!created) {
+                        database.close()
+                        (listOf(file) + location.sidecars).forEach { SystemFileSystem.delete(it, mustExist = false) }
+                    }
                 }
             } else {
                 onProgress(Progress.counted("Checking the database schema...", 4, OPEN_STEPS))
