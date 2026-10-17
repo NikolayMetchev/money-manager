@@ -176,7 +176,10 @@ junit = { module = "junit:junit", version.ref = "junit" }
 kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 kermit-core = { module = "co.touchlab:kermit-core", version.ref = "kermit" }
 kotlin-compose-compiler-gradle-plugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
+# Compiler plugins as Bazel applies them (//bazel/kmp:plugins.bzl); Gradle gets them through the plugins block.
+kotlin-compose-compiler-plugin-embeddable = { module = "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable", version.ref = "kotlin" }
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+kotlin-serialization-compiler-plugin-embeddable = { module = "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
@@ -206,10 +209,13 @@ mosaic-tty-terminal = { module = "com.jakewharton.mosaic:mosaic-tty-terminal", v
 log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
 log4j-slf4j2-impl = { module = "org.apache.logging.log4j:log4j-slf4j2-impl", version.ref = "log4j" }
 mappie-api = { module = "tech.mappie:mappie-api", version.ref = "mappie" }
+mappie-compiler-plugin = { module = "tech.mappie:mappie-compiler-plugin", version.ref = "mappie" }
 mappie-gradle-plugin = { module = "tech.mappie.plugin:tech.mappie.plugin.gradle.plugin", version.ref = "mappie" }
 metro-gradle-plugin = { module = "dev.zacsweers.metro:dev.zacsweers.metro.gradle.plugin", version.ref = "metro" }
+metro-compiler = { module = "dev.zacsweers.metro:compiler", version.ref = "metro" }
 metro-runtime = { module = "dev.zacsweers.metro:runtime", version.ref = "metro" }
 mokkery-core = { module = "dev.mokkery:mokkery-core", version.ref = "mokkery" }
+mokkery-plugin = { module = "dev.mokkery:mokkery-plugin", version.ref = "mokkery" }
 mokkery-runtime = { module = "dev.mokkery:mokkery-runtime", version.ref = "mokkery" }
 molecule-runtime = { module = "app.cash.molecule:molecule-runtime", version.ref = "molecule" }
 poi = { module = "org.apache.poi:poi", version.ref = "poi" }
