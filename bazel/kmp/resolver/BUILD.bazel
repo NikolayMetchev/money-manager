@@ -1,0 +1,27 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+# The KMP Maven resolver (#1000). Run through `bazel run @maven_kmp//:pin`.
+go_library(
+    name = "resolver_lib",
+    srcs = [
+        "catalog.go",
+        "main.go",
+        "metadata.go",
+        "resolve.go",
+    ],
+    importpath = "github.com/NikolayMetchev/money-manager/bazel/kmp/resolver",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "resolver",
+    embed = [":resolver_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "resolver_test",
+    size = "small",
+    srcs = ["resolve_test.go"],
+    embed = [":resolver_lib"],
+)

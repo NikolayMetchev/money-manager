@@ -7,11 +7,11 @@ kmp_library(
     plugins = ["//bazel/kmp/deps:serialization_plugin"],
     visibility = ["//visibility:public"],
     deps = [
-        "//bazel/kmp/deps:kotlinx_io_core",
+        "@maven_kmp//:kotlinx_io_core",
         "//utils/files:files",
     ],
     exports = [
-        "//bazel/kmp/deps:kotlinx_serialization_core",
+        "@maven_kmp//:kotlinx_serialization_core",
         "//utils/bigdecimal:bigdecimal",
     ],
 )
