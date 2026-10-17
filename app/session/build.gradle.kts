@@ -71,6 +71,7 @@ kotlin {
                 implementation(projects.app.db.write)
                 implementation(projects.app.remotestorage.core)
                 implementation(projects.test.app.db)
+                implementation(projects.test.app.remotestorage)
                 implementation(projects.test.utils.credentialvault)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)

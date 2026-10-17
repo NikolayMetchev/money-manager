@@ -24,7 +24,7 @@ class TuiAppTest {
     private fun tui(
         startup: DbLocation?,
         test: suspend TestMosaic<String>.(FakeHost, TuiController) -> Unit,
-    ) = tui(startup, listOf(DatabaseScreen, PlaceholderScreen), test)
+    ) = tui(startup, listOf(StatusScreen, PlaceholderScreen), test)
 
     @Test
     fun opensTheStartupDatabaseWithTabsAndAFooter() {
@@ -33,7 +33,7 @@ class TuiAppTest {
             tui(location) { _, _ ->
                 val screen = screen(::databaseOpen)
 
-                assertContains(screen, "1 Database")
+                assertContains(screen, "1 Status")
                 assertContains(screen, "2 Other")
                 assertContains(screen, location.path)
                 assertContains(screen, "? help · q quit")
@@ -53,7 +53,7 @@ class TuiAppTest {
                 press("2")
                 assertContains(screen { it.contains("Placeholder body") }, "Placeholder body")
                 press("Tab")
-                assertContains(screen { it.contains("Press o to open") }, "Press o to open")
+                assertContains(screen { it.contains("o open another database") }, "o open another database")
 
                 press("?")
                 val help = screen { it.contains("Keys") }
@@ -157,8 +157,8 @@ class TuiAppTest {
     }
 
     private companion object {
-        /** The Database tab, which only shows once the database has opened. */
-        fun databaseOpen(screen: String) = screen.contains("Press o to open")
+        /** The Status tab, which only shows once the database has opened. */
+        fun databaseOpen(screen: String) = screen.contains("o open another database")
 
         val PlaceholderScreen =
             TuiScreen(title = "Other") { Text("Placeholder body") }

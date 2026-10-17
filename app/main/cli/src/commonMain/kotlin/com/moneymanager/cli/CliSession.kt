@@ -8,6 +8,7 @@ import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.session.DatabaseSession
 import com.moneymanager.session.DatabaseSessions
 import com.moneymanager.session.StartupTarget
+import com.moneymanager.session.bindingFor
 import com.moneymanager.session.closeDecision
 import com.moneymanager.session.performClose
 import com.moneymanager.terminal.Prompter
@@ -102,6 +103,10 @@ internal class CliSession(
     suspend fun open(location: DbLocation): DatabaseSession =
         prepare(sessions.open(location, remoteCache = isCloudCache(location)), hydrate = false)
 
+    /** Downloads the cloud copy over [session]'s working copy (closing it) and reopens it, as `--hydrate` does at startup. */
+    suspend fun reload(session: DatabaseSession): DatabaseSession =
+        prepare(sessions.reloadFromRemote(session), restored = true, hydrate = false)
+
     private suspend fun prepare(
         opened: DatabaseSession,
         restored: Boolean = false,
@@ -152,11 +157,9 @@ internal class CliSession(
 
     private fun usage(message: String): Nothing = throw UsageError(message)
 
-    private fun isCloudCache(location: DbLocation): Boolean = controller?.activeBinding()?.localCachePath == location.path
+    private fun isCloudCache(location: DbLocation): Boolean = controller?.bindingFor(location) != null
 
-    /** The cloud binding [session] is the working copy of; a remembered binding for another file doesn't count. */
-    private fun cloudBinding(session: DatabaseSession): RemoteDatabaseBinding? =
-        controller?.activeBinding()?.takeIf { it.localCachePath == session.location.path }
+    private fun cloudBinding(session: DatabaseSession): RemoteDatabaseBinding? = controller?.bindingFor(session.location)
 
     /** Closes [session], asking (or following `--push`/`--keep-local`) whether to upload a changed cloud-backed copy. */
     suspend fun close(session: DatabaseSession) {

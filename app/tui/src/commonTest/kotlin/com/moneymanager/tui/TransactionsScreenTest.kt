@@ -32,7 +32,7 @@ class TransactionsScreenTest {
         val location = createTestDatabaseLocation()
         try {
             tui(location, DEFAULT_SCREENS) { _, controller ->
-                screen { it.contains("Press o to open") }
+                screen { it.contains("o open another database") }
                 val session = checkNotNull(controller.session)
                 val engine = session.importEngine
                 val gbp =
