@@ -19,6 +19,7 @@ The native compile is `native.bzl`, on the toolchain in `//bazel/kmp/native`.
 load("@rules_java//java:java_test.bzl", "java_test")
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 load(":native.bzl", "BUILDS_ON", "FAMILIES", "RUNS_ON", "kt_native_klib", "kt_native_test_binary")
+load("//bazel/kmp/plugins:plugins.bzl", "plugin_deps", "plugin_labels")
 
 def _fragments(chain):
     """Fragment flags for a `[(fragment, srcs), …]` chain, root first, leaving out empty fragments."""
@@ -93,10 +94,14 @@ def kmp_library(
         native_deps: `nativeMain` dependencies.
         exports: `commonMain` `api` dependencies: on the classpath of everything that depends on this module.
         jvm_exports: `jvmAndroidMain`/`jvmMain` `api` dependencies.
-        plugins: compiler plugins (`kt_compiler_plugin`).
+        plugins: compiler plugins by name (`serialization`, `compose`, `metro`, `mappie`; see
+            //bazel/kmp/plugins:plugins.bzl), applied on every platform with the runtime they bring.
         visibility: the targets' visibility.
     """
     fragments = _jvm_fragments("Main", common_srcs, jvm_android_srcs, jvm_srcs)
+    brought = plugin_deps(plugins)
+    deps = deps + brought.deps
+    exports = exports + brought.exports
     jvm_exported = _on("jvm", exports + jvm_exports)
     kt_jvm_library(
         name = name + "_jvm",
@@ -106,7 +111,7 @@ def kmp_library(
         # Gradle's api is on the module's own classpath too; Bazel's exports are only on its dependents'.
         deps = _on("jvm", deps + jvm_deps) + jvm_exported,
         exports = jvm_exported,
-        plugins = plugins,
+        plugins = plugin_labels(plugins, "jvm"),
         visibility = visibility,
     )
     for target in native_targets:
@@ -119,6 +124,7 @@ def kmp_library(
             native_srcs = native_srcs,
             family_srcs = _family_srcs(target, linux_srcs, apple_srcs, mingw_srcs),
             deps = _on(target, deps + native_deps + exports),
+            plugins = plugin_labels(plugins, "native"),
             target_compatible_with = BUILDS_ON.get(target, []),
             visibility = visibility,
         )
@@ -159,10 +165,12 @@ def kmp_test(
         deps: test dependencies (Gradle `implementation` on `commonTest`), by module label.
         jvm_deps: `jvmAndroidTest`/`jvmTest` dependencies.
         native_deps: `nativeTest` dependencies.
-        plugins: compiler plugins (`kt_compiler_plugin`).
+        plugins: compiler plugins by name, as for kmp_library, plus `mokkery`.
         size: the Bazel test size. Unit tests are small; give slower suites a bigger size.
     """
     fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, jvm_srcs)
+    brought = plugin_deps(plugins)
+    deps = deps + brought.deps + brought.exports
     lib = name + "_jvm_lib"
     kt_jvm_library(
         name = lib,
@@ -172,7 +180,7 @@ def kmp_test(
         fragment_refines = fragments.fragment_refines,
         associates = [platform_label(associate, "jvm")],
         deps = _on("jvm", deps + jvm_deps),
-        plugins = plugins,
+        plugins = plugin_labels(plugins, "jvm"),
     )
     java_test(
         name = name + "_jvm",
@@ -199,6 +207,7 @@ def kmp_test(
             native_srcs = native_srcs,
             family_srcs = _family_srcs(target, linux_srcs, apple_srcs, mingw_srcs),
             deps = _on(target, deps + native_deps),
+            plugins = plugin_labels(plugins, "native"),
             target_compatible_with = RUNS_ON[target],
         )
         java_test(

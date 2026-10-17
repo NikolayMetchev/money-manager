@@ -1,0 +1,35 @@
+# One check per compiler plugin, on the JVM and natively (#1001).
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+PLUGINS = [
+    "compose",
+    "mappie",
+    "metro",
+    "serialization",
+]
+
+kmp_library(
+    name = "plugins",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = ["linuxX64"],
+    plugins = PLUGINS,
+    deps = [
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:kotlinx_serialization_core",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":plugins",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = ["linuxX64"],
+    plugins = PLUGINS + ["mokkery"],
+    deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:kotlinx_serialization_core",
+    ],
+)

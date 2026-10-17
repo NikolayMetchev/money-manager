@@ -1,5 +1,6 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@rules_kotlin//kotlin:core.bzl", "define_kt_toolchain", "kt_kotlinc_options")
+load("//bazel/kmp/plugins:plugins.bzl", "PLUGIN_ORDER")
 
 bzl_library(
     name = "defs",
@@ -13,6 +14,7 @@ kt_kotlinc_options(
     name = "kotlinc_options",
     # allWarningsAsErrors.
     warn = "error",
+    x_compiler_plugin_order = PLUGIN_ORDER,
     x_expect_actual_classes = True,
     # Gradle's default; rules_kotlin's is "class".
     x_lambdas = "indy",

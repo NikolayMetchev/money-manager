@@ -99,6 +99,12 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   bump. rules_kotlin bundles its own Kotlin compiler, so `bazel_dep(rules_kotlin)` must match the catalog's
   `kotlin`. The toolchain is `//bazel/kmp:kotlin_toolchain` (`-Werror`, JVM 25, indy lambdas). ABI jars stay off:
   Metro and Compose metadata must reach downstream compiles.
+- **Compiler plugins** (`//bazel/kmp/plugins`, #1001): `kmp_library(plugins = ["serialization", "compose", "metro",
+  "mappie"])` and `kmp_test(plugins = [… "mokkery"])` name plugins, and each name applies the same embeddable jar KGP
+  uses on every platform (`kt_compiler_plugin` with `target_embedded_compiler` on the JVM, `-Xplugin`/`-P` on
+  konanc) with the options its Gradle plugin passes, plus the runtime its convention adds (Metro's as `api`,
+  mappie-api, mokkery-runtime for tests). Metro runs before Compose and serialization (`-Xcompiler-plugin-order`).
+  Plugin options may use `{temp}`, a directory of the compile's own (Mappie keeps state there).
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.
