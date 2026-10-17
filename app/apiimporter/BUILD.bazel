@@ -1,0 +1,66 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export //app/importengineapi
+# gazelle:kmp_export //app/model/apistrategy
+# gazelle:kmp_export //app/model/core
+# gazelle:kmp_export //app/model/csv
+# gazelle:kmp_export //app/model/passthrough
+# gazelle:kmp_export //app/model/repository/read
+# gazelle:kmp_export //utils/rest
+# gazelle:kmp_export @maven_kmp//:kotlinx_serialization_json
+# gazelle:kmp_export //app/tasks jvmMain
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "apiimporter",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/importengineapi",
+        "//app/model/apistrategy",
+        "//app/model/core",
+        "//app/model/csv",
+        "//app/model/passthrough",
+        "//app/model/repository/read",
+        "//app/tasks",
+        "//utils/rest",
+        "@maven_kmp//:kotlinx_serialization_json",
+    ],
+    deps = [
+        "//app/model/rules",
+        "//utils/bigdecimal",
+        "@maven_kmp//:kermit",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_serialization_core",
+        "@maven_kmp//:ktor_http",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":apiimporter",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    deps = [
+        "//app/model/apistrategy",
+        "//app/model/core",
+        "//app/model/rules",
+        "//app/tasks",
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:kotlinx_serialization_json",
+    ],
+)

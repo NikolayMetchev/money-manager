@@ -1,0 +1,36 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export //utils/bigdecimal
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "currency",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_android_srcs = glob(["src/jvmAndroidMain/kotlin/**/*.kt"]),
+    native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+    exports = ["//utils/bigdecimal"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":currency",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    jvm_android_srcs = glob(["src/jvmAndroidTest/kotlin/**/*.kt"]),
+    native_deps = ["//utils/bigdecimal"],
+    native_srcs = glob(["src/nativeTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    deps = ["//bazel/kmp/deps:kotlin_test"],
+)

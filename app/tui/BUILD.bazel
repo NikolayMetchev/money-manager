@@ -1,0 +1,88 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_plugins compose
+# gazelle:kmp_export //app/session
+# gazelle:kmp_export //app/terminal
+# gazelle:kmp_export @maven_kmp//:kotlinx_coroutines_core
+# gazelle:kmp_export @maven_kmp//:mosaic_runtime
+# gazelle:kmp_export //app/model/core jvmMain
+# gazelle:kmp_export //app/remotestorage/sync jvmMain
+# gazelle:kmp_export //app/tasks jvmMain
+# gazelle:kmp_export //utils/credentialvault jvmMain
+# gazelle:kmp_export @maven_kmp//:androidx_compose_runtime_desktop jvmMain
+# gazelle:kmp_keep_dep @maven_kmp//:ktor_client_core jvmTest
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "tui",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_exports = ["@maven_kmp//:androidx_compose_runtime_desktop"],
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["compose"],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/model/core",
+        "//app/remotestorage/sync",
+        "//app/session",
+        "//app/tasks",
+        "//app/terminal",
+        "//utils/credentialvault",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:mosaic_runtime",
+    ],
+    deps = [
+        "//app/db/di",
+        "//app/presenter/accounts",
+        "//app/presenter/core",
+        "//app/presenter/imports",
+        "//app/presenter/status",
+        "//app/presenter/transactions",
+        "//app/query",
+        "//utils/files",
+        "@maven_kmp//:androidx_compose_runtime_runtime_annotation",
+        "@maven_kmp//:kermit",
+        "@maven_kmp//:kotlinx_datetime",
+        "@maven_kmp//:mosaic_terminal",
+        "@maven_kmp//:mosaic_tty",
+        "@maven_kmp//:mosaic_tty_terminal",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":tui",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    jvm_deps = ["@maven_kmp//:ktor_client_core"],
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["compose"],
+    deps = [
+        "//app/importengineapi",
+        "//app/importfilesource/core",
+        "//app/importfilesource/localfolder",
+        "//app/model/core",
+        "//app/model/importdirectory",
+        "//app/remotestorage/sync",
+        "//app/session",
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/app/db",
+        "//test/utils/credentialvault",
+        "//utils/files",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:kotlinx_io_core",
+        "@maven_kmp//:mosaic_runtime",
+        "@maven_kmp//:mosaic_terminal",
+        "@maven_kmp//:mosaic_testing",
+    ],
+)

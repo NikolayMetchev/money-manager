@@ -1,0 +1,62 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export //app/apiimporter
+# gazelle:kmp_export //app/importengineapi
+# gazelle:kmp_export //app/model/apistrategy
+# gazelle:kmp_export //app/model/core
+# gazelle:kmp_export //app/model/repository/read
+# gazelle:kmp_export //app/tasks
+# gazelle:kmp_export //utils/credentialvault
+# gazelle:kmp_export @maven_kmp//:kotlinx_coroutines_core
+# gazelle:kmp_export @maven_kmp//:ktor_client_core
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "apiimport",
+    apple_srcs = glob(["src/appleMain/kotlin/**/*.kt"]),
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_android_srcs = glob(["src/jvmAndroidMain/kotlin/**/*.kt"]),
+    linux_srcs = glob(["src/linuxMain/kotlin/**/*.kt"]),
+    mingw_srcs = glob(["src/mingwMain/kotlin/**/*.kt"]),
+    native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/apiimporter",
+        "//app/importengineapi",
+        "//app/model/apistrategy",
+        "//app/model/core",
+        "//app/model/repository/read",
+        "//app/tasks",
+        "//utils/credentialvault",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:ktor_client_core",
+    ],
+    deps = [
+        "//utils/rest",
+        "@maven_kmp//:kermit",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":apiimport",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    deps = [
+        "//app/model/core",
+        "//app/model/repository/read",
+        "//bazel/kmp/deps:kotlin_test",
+    ],
+)

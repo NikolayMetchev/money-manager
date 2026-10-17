@@ -1,0 +1,55 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_plugins serialization
+# gazelle:kmp_export //utils/localsettings
+# gazelle:kmp_export @maven_kmp//:kotlinx_coroutines_core
+# gazelle:kmp_export @maven_kmp//:kotlinx_serialization_core
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "credentialvault",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["serialization"],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//utils/localsettings",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_serialization_core",
+    ],
+    deps = [
+        "//utils/archive",
+        "//utils/files",
+        "@maven_kmp//:kotlinx_io_core",
+        "@maven_kmp//:kotlinx_serialization_json",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":credentialvault",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["serialization"],
+    deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/utils/credentialvault",
+        "//utils/archive",
+        "//utils/files",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:kotlinx_io_core",
+        "@maven_kmp//:kotlinx_serialization_json",
+    ],
+)

@@ -275,8 +275,30 @@ func (f *Fetcher) effectivePom(c Coordinate) (*effectivePom, error) {
 	for _, p := range pom.Properties.Entries {
 		e.properties[p.XMLName.Local] = p.Value
 	}
+	var boms []Coordinate
+	own := map[string]bool{}
 	for _, d := range pom.DependencyManagement.Dependencies {
-		e.managed[e.expand(d.GroupID)+":"+e.expand(d.ArtifactID)] = e.expand(d.Version)
+		group, artifact, version := e.expand(d.GroupID), e.expand(d.ArtifactID), e.expand(d.Version)
+		if d.Scope == "import" && d.Type == "pom" {
+			boms = append(boms, Coordinate{group, artifact, version})
+			continue
+		}
+		e.managed[group+":"+artifact] = version
+		own[group+":"+artifact] = true
+	}
+	// A BOM's managed versions are this POM's too, over its parent's, unless the POM itself (or an earlier
+	// BOM) manages the module.
+	for _, coordinate := range boms {
+		bom, err := f.effectivePom(coordinate)
+		if err != nil {
+			return nil, fmt.Errorf("%s BOM: %w", c, err)
+		}
+		for k, v := range bom.managed {
+			if !own[k] {
+				e.managed[k] = v
+				own[k] = true
+			}
+		}
 	}
 	return e, nil
 }

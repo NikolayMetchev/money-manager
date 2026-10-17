@@ -1,0 +1,87 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export //app/importengineapi
+# gazelle:kmp_export //app/importfilesource/core
+# gazelle:kmp_export //app/model/accountmapping
+# gazelle:kmp_export //app/model/core
+# gazelle:kmp_export //app/model/csv
+# gazelle:kmp_export //app/model/csvstrategy
+# gazelle:kmp_export //app/model/importdirectory
+# gazelle:kmp_export //app/model/passthrough
+# gazelle:kmp_export //app/model/qif
+# gazelle:kmp_export //app/model/repository/read
+# gazelle:kmp_export @maven_kmp//:kotlinx_coroutines_core
+# gazelle:kmp_export //app/tasks jvmMain
+# gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_jdk jvmMain
+# gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_openssl3_prebuilt nativeMain
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "csvimporter",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_deps = ["@maven_kmp//:cryptography_provider_jdk"],
+    native_deps = ["@maven_kmp//:cryptography_provider_openssl3_prebuilt"],
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/importengineapi",
+        "//app/importfilesource/core",
+        "//app/model/accountmapping",
+        "//app/model/core",
+        "//app/model/csv",
+        "//app/model/csvstrategy",
+        "//app/model/importdirectory",
+        "//app/model/passthrough",
+        "//app/model/qif",
+        "//app/model/repository/read",
+        "//app/tasks",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+    deps = [
+        "//app/model/rules",
+        "//utils/bigdecimal",
+        "//utils/parsers/csv",
+        "//utils/parsers/qif",
+        "//utils/parsers/xlsx",
+        "@maven_kmp//:cryptography_core",
+        "@maven_kmp//:kermit",
+        "@maven_kmp//:kotlinx_datetime",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":csvimporter",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    jvm_deps = ["//app/importfilesource/core"],
+    jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    deps = [
+        "//app/importengineapi",
+        "//app/model/accountmapping",
+        "//app/model/core",
+        "//app/model/csv",
+        "//app/model/csvstrategy",
+        "//app/model/passthrough",
+        "//app/model/repository/read",
+        "//app/model/rules",
+        "//app/strategies",
+        "//app/tasks",
+        "//bazel/kmp/deps:kotlin_test",
+        "//utils/bigdecimal",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:kotlinx_datetime",
+    ],
+)

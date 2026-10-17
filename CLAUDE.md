@@ -122,7 +122,7 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   its directory's `src/<sourceSet>/kotlin` dirs (plus `src/commonMain/sqldelight`); imports become `deps` per platform,
   resolved by package to a module or to the `@maven_kmp` library whose files declare it (the lockfile lists each
   library's packages); plugins are inferred (`@Serializable`, `@Composable`, Metro/Mappie/Mokkery imports). Directives
-  for what sources can't say: `kmp_generate true` (opt-in until #1008), `kmp_targets`, `kmp_export <label> [sourceSet]`
+  for what sources can't say: `kmp_generate true` (every native-convention module has it since #1008; the rest join with their phase), `kmp_targets`, `kmp_export <label> [sourceSet]`
   (Gradle `api`: always a dep, and exported), `kmp_keep_dep <label> [sourceSet]` (a dep no import explains: Metro
   contributors, runtime-only libraries), `kmp_plugins`, `kmp_sqldelight_package`, `kmp_sqldelight_dep`. Directives
   are per module, not inherited. `# keep` on a dep keeps it too. `//bazel/gazelle/kmp:generation_test` holds golden

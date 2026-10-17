@@ -1,0 +1,78 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_plugins serialization
+# gazelle:kmp_export //app/importfilesource/core
+# gazelle:kmp_export //app/remotestorage/core
+# gazelle:kmp_export //utils/credentialvault
+# gazelle:kmp_export @maven_kmp//:kotlinx_serialization_core
+# gazelle:kmp_export @maven_kmp//:ktor_client_auth
+# gazelle:kmp_export @maven_kmp//:ktor_client_core
+# gazelle:kmp_keep_dep @maven_kmp//:ktor_utils
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "googledrive",
+    apple_srcs = glob(["src/appleMain/kotlin/**/*.kt"]),
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    linux_srcs = glob(["src/linuxMain/kotlin/**/*.kt"]),
+    mingw_srcs = glob(["src/mingwMain/kotlin/**/*.kt"]),
+    native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["serialization"],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/importfilesource/core",
+        "//app/remotestorage/core",
+        "//utils/credentialvault",
+        "@maven_kmp//:kotlinx_serialization_core",
+        "@maven_kmp//:ktor_client_auth",
+        "@maven_kmp//:ktor_client_core",
+    ],
+    deps = [
+        "//utils/httpclient",
+        "@maven_kmp//:atomicfu",
+        "@maven_kmp//:cryptography_random",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_io_core",
+        "@maven_kmp//:kotlinx_serialization_json",
+        "@maven_kmp//:ktor_http",
+        "@maven_kmp//:ktor_io",
+        "@maven_kmp//:ktor_network",
+        "@maven_kmp//:ktor_utils",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":googledrive",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    linux_deps = [
+        "//utils/files",
+        "@maven_kmp//:kotlinx_io_core",
+    ],
+    linux_srcs = glob(["src/linuxTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["serialization"],
+    deps = [
+        "//app/remotestorage/core",
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/utils/credentialvault",
+        "//utils/httpclient",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:ktor_client_core",
+        "@maven_kmp//:ktor_http",
+    ],
+)

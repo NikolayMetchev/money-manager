@@ -1,0 +1,31 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export //app/di/params
+# gazelle:kmp_export //app/importfilesource/core
+# gazelle:kmp_export //utils/credentialvault
+
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+kmp_library(
+    name = "di",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/di/params",
+        "//app/importfilesource/core",
+        "//utils/credentialvault",
+    ],
+    deps = [
+        "//app/importfilesource/localfolder",
+        "//app/model/importdirectory",
+        "//app/remotestorage/googledrive",
+    ],
+)

@@ -1,0 +1,69 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_plugins serialization
+# gazelle:kmp_sqldelight_package com.moneymanager.database.sql.write
+# gazelle:kmp_sqldelight_dep //app/db/schema:sqldelight
+# gazelle:kmp_export //app/db/read
+# gazelle:kmp_export //app/db/repository
+# gazelle:kmp_export //app/db/schema
+# gazelle:kmp_export //app/model/accountmapping
+# gazelle:kmp_export //app/model/apistrategy
+# gazelle:kmp_export //app/model/core
+# gazelle:kmp_export //app/model/csv
+# gazelle:kmp_export //app/model/csvstrategy
+# gazelle:kmp_export //app/model/importdirectory
+# gazelle:kmp_export //app/model/passthrough
+# gazelle:kmp_export //app/model/qif
+# gazelle:kmp_export //app/model/reconciliation
+# gazelle:kmp_export //app/model/repository/read
+# gazelle:kmp_export //app/model/repository/write
+# gazelle:kmp_export @maven_kmp//:kotlinx_coroutines_core
+# gazelle:kmp_export @maven_kmp//:sqldelight_runtime
+
+load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp/sqldelight:sqldelight.bzl", "sqldelight_library")
+
+sqldelight_library(
+    name = "sqldelight",
+    srcs = glob(["src/commonMain/sqldelight/**/*.sq"]),
+    module_name = "write",
+    package = "com.moneymanager.database.sql.write",
+    visibility = ["//visibility:public"],
+    deps = ["//app/db/schema:sqldelight"],
+)
+
+kmp_library(
+    name = "write",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["serialization"],
+    sqldelight = ":sqldelight",
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/db/read",
+        "//app/db/repository",
+        "//app/db/schema",
+        "//app/model/accountmapping",
+        "//app/model/apistrategy",
+        "//app/model/core",
+        "//app/model/csv",
+        "//app/model/csvstrategy",
+        "//app/model/importdirectory",
+        "//app/model/passthrough",
+        "//app/model/qif",
+        "//app/model/reconciliation",
+        "//app/model/repository/read",
+        "//app/model/repository/write",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:sqldelight_runtime",
+    ],
+    deps = [
+        "@maven_kmp//:kotlinx_serialization_json",
+        "@maven_kmp//:sqldelight_coroutines_extensions",
+    ],
+)
