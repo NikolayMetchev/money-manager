@@ -1,5 +1,6 @@
 # The Gazelle language extension that generates every Kotlin Multiplatform module's BUILD.bazel (#1004).
 # Gazelle extensions can't be Starlark, so it's Go, built into //:gazelle.
+load("@gazelle//:def.bzl", "gazelle_generation_test")
 load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
@@ -27,4 +28,13 @@ go_test(
     size = "small",
     srcs = ["kmp_test.go"],
     embed = [":kmp"],
+)
+
+# Golden tests: each testdata/<case> is a workspace whose BUILD.in files Gazelle must turn into BUILD.out.
+# Refresh after an intended change: UPDATE_SNAPSHOTS=true bazel run //bazel/gazelle/kmp:generation_test
+gazelle_generation_test(
+    name = "generation_test",
+    size = "small",
+    gazelle_binary = "//:gazelle_bin",
+    test_data = glob(["testdata/**"]),
 )

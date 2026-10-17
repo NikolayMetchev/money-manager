@@ -1,0 +1,18 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp/sqldelight:sqldelight.bzl", "sqldelight_library")
+
+# gazelle:kmp_sqldelight_package com.example.sql
+
+sqldelight_library(
+    name = "sqldelight",
+    srcs = glob(["src/commonMain/sqldelight/**/*.sq"]),
+    module_name = "schema",
+    package = "com.example.sql",
+    visibility = ["//visibility:public"],
+)
+
+kmp_library(
+    name = "schema",
+    sqldelight = ":sqldelight",
+    visibility = ["//visibility:public"],
+)

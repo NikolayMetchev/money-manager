@@ -56,12 +56,16 @@ func (*kmpLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 		return
 	}
 	kc := getConfig(c)
+	exported := kc.exported()
 	// The module itself and, for tests, the module under test, written as moduleLabel writes them.
 	self := map[string]bool{moduleLabel(from, from): true}
 	if imp.associate != "" {
 		self[moduleLabel(label.New("", from.Pkg, imp.associate), from)] = true
 	}
-	deps := map[string]map[string]bool{"": {}, "jvm": {}, "native": {}}
+	deps := map[string]map[string]bool{}
+	for _, platform := range platforms {
+		deps[platform.name] = map[string]bool{}
+	}
 	for platform, names := range imp.byPlatform {
 		for _, name := range names {
 			dep, found := resolveImport(c, ix, kc, name, from)
@@ -74,23 +78,51 @@ func (*kmpLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 			}
 		}
 	}
-	// A dependency common code needs already reaches every platform.
-	for _, platform := range []string{"jvm", "native"} {
-		for dep := range deps[platform] {
-			if deps[""][dep] {
-				delete(deps[platform], dep)
+	for platform, labels := range imp.keep {
+		for _, dep := range labels {
+			deps[platform][dep] = true
+		}
+	}
+	// A dependency a source set's parent needs already reaches it.
+	for _, platform := range platforms {
+		for parent := platform.parent; parent != nil; parent = parent.parent {
+			for dep := range deps[platform.name] {
+				if deps[parent.name][dep] {
+					delete(deps[platform.name], dep)
+				}
 			}
 		}
 	}
-	setDeps(r, "deps", "exports", deps[""], kc, imp.test)
-	setDeps(r, "jvm_deps", "jvm_exports", deps["jvm"], kc, imp.test)
-	setDeps(r, "native_deps", "", deps["native"], kc, imp.test)
+	for _, platform := range platforms {
+		setDeps(r, platform.depsAttr, platform.exportsAttr, deps[platform.name], exported, imp.test)
+	}
 }
 
-func setDeps(r *rule.Rule, depsAttr, exportsAttr string, deps map[string]bool, kc *kmpConfig, test bool) {
+// platform is a group of source sets with one deps attribute; parent is the group every one of its
+// compilations also sees.
+type platform struct {
+	name, depsAttr, exportsAttr string
+	parent                      *platform
+}
+
+var (
+	commonPlatform = &platform{"", "deps", "exports", nil}
+	nativePlatform = &platform{"native", "native_deps", "", commonPlatform}
+	platforms      = []*platform{
+		commonPlatform,
+		{"jvm", "jvm_deps", "jvm_exports", commonPlatform},
+		nativePlatform,
+		// On native every klib dependency is transitive anyway, so the family source sets need no exports.
+		{"linux", "linux_deps", "", nativePlatform},
+		{"apple", "apple_deps", "", nativePlatform},
+		{"mingw", "mingw_deps", "", nativePlatform},
+	}
+)
+
+func setDeps(r *rule.Rule, depsAttr, exportsAttr string, deps, exports map[string]bool, test bool) {
 	var plain, exported []string
 	for dep := range deps {
-		if !test && exportsAttr != "" && kc.exports[dep] {
+		if !test && exportsAttr != "" && exports[dep] {
 			exported = append(exported, dep)
 		} else {
 			plain = append(plain, dep)

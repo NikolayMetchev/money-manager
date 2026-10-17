@@ -18,7 +18,7 @@ import (
 type sourceSet struct {
 	dir      string // commonMain
 	srcsAttr string // common_srcs
-	platform string // which deps attribute its imports go to: "" (common), "jvm" or "native"
+	platform string // which deps attribute its imports go to: "" (common), "jvm", "native" or a family
 }
 
 var mainSets = []sourceSet{
@@ -26,9 +26,9 @@ var mainSets = []sourceSet{
 	{"jvmAndroidMain", "jvm_android_srcs", "jvm"},
 	{"jvmMain", "jvm_srcs", "jvm"},
 	{"nativeMain", "native_srcs", "native"},
-	{"linuxMain", "linux_srcs", "native"},
-	{"appleMain", "apple_srcs", "native"},
-	{"mingwMain", "mingw_srcs", "native"},
+	{"linuxMain", "linux_srcs", "linux"},
+	{"appleMain", "apple_srcs", "apple"},
+	{"mingwMain", "mingw_srcs", "mingw"},
 }
 
 var testSets = []sourceSet{
@@ -36,14 +36,15 @@ var testSets = []sourceSet{
 	{"jvmAndroidTest", "jvm_android_srcs", "jvm"},
 	{"jvmTest", "jvm_srcs", "jvm"},
 	{"nativeTest", "native_srcs", "native"},
-	{"linuxTest", "linux_srcs", "native"},
-	{"appleTest", "apple_srcs", "native"},
-	{"mingwTest", "mingw_srcs", "native"},
+	{"linuxTest", "linux_srcs", "linux"},
+	{"appleTest", "apple_srcs", "apple"},
+	{"mingwTest", "mingw_srcs", "mingw"},
 }
 
 // imports is what GenerateRules hands Resolve for one rule: the imported names per platform.
 type imports struct {
-	byPlatform map[string][]string // "" | jvm | native → imported names
+	byPlatform map[string][]string // "" | jvm | native | linux | apple | mingw → imported names
+	keep       map[string][]string // platform → labels kept by kmp_keep_dep
 	packages   []string            // the module's own packages (not dependencies)
 	test       bool
 	associate  string // the kmp_library under test, for a kmp_test
@@ -179,7 +180,7 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	}
 	lib.SetPrivateAttr(packagesKey, ownPackages)
 	res.Gen = append(res.Gen, lib)
-	res.Imports = append(res.Imports, imports{byPlatform: keys(main.imports), packages: ownPackages})
+	res.Imports = append(res.Imports, imports{byPlatform: keys(main.imports), keep: kc.kept(false), packages: ownPackages})
 
 	tests, testSetsPresent := scan(args.Dir, testSets)
 	if len(testSetsPresent) > 0 {
@@ -199,7 +200,7 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 			t.SetAttr("plugins", sorted(testPlugins))
 		}
 		res.Gen = append(res.Gen, t)
-		res.Imports = append(res.Imports, imports{byPlatform: keys(tests.imports), test: true, associate: name})
+		res.Imports = append(res.Imports, imports{byPlatform: keys(tests.imports), keep: kc.kept(true), test: true, associate: name})
 	}
 	return res
 }
@@ -249,3 +250,27 @@ func union(a map[string]bool, b []string) map[string]bool {
 }
 
 func sorted(m map[string]bool) []string { return sortedKeys(m) }
+
+// kept is the dependencies directives add, import or not, per platform: kmp_keep_dep's and (for a library)
+// kmp_export's.
+func (c *kmpConfig) kept(test bool) map[string][]string {
+	out := map[string][]string{}
+	all := c.keepDeps
+	if !test {
+		all = append(append([]keepDep(nil), all...), c.exports...)
+	}
+	for _, d := range all {
+		if d.test == test {
+			out[d.platform] = append(out[d.platform], d.label)
+		}
+	}
+	return out
+}
+
+func (c *kmpConfig) exported() map[string]bool {
+	out := map[string]bool{}
+	for _, d := range c.exports {
+		out[d.label] = true
+	}
+	return out
+}

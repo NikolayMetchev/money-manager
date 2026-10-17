@@ -1,0 +1,4 @@
+Source sets per platform: commonMain's imports go to `deps`, jvmMain's to `jvm_deps`, nativeMain's to
+`native_deps` and each native family's to its own attribute; a dependency a parent source set already has
+isn't repeated. `kmp_export` moves a dependency to `exports`, `# keep` keeps one no import explains, a test
+fixture module resolves from its package, and plugins are inferred from the sources.
