@@ -86,7 +86,7 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   over every fragment (`commonMain ← jvmAndroidMain ← jvmMain`; `commonMain ← nativeMain ← linuxMain|appleMain|mingwMain`),
   empty ones left out, so expect/actual and common code are checked per fragment. A module emits `:<name>_jvm` and
   `:<name>_<target>` per `native_targets` entry (`_linuxX64`, …); deps are written once, as module labels
-  (`//utils/files:files`), and each platform gets that label's `_<platform>` target, `//bazel/kmp/deps` included.
+  (`//utils/files:files`), and each platform gets that label's `_<platform>` target, Maven libraries included.
   `exports` is Gradle's `api` (also on the module's own classpath; on native every klib dep is transitive anyway).
   Klibs are uniquely named after the full path (`utils.bigdecimal:utils-bigdecimal`) and compiled `-g -Werror`, as
   KGP does. JVM tests run through `KmpJUnitRunner` (JUnit 4), named `:test_jvm`; native tests link with konan's test
@@ -107,10 +107,15 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   through `run_konan` (`toolchain.bzl`), which passes `airplaneMode=true`, so nothing is fetched at build time. One
   toolchain per exec host carries every target it builds (Linux and Windows hosts: linuxX64, linuxArm64,
   mingwX64; macOS adds macosArm64), picked by name rather than by platform.
-- **Maven**: `maven.install` in `MODULE.bazel` takes the explicit `-jvm` artifacts until KMP variant resolution
-  (#1000), with versions copied from `gradle/libs.versions.toml`, and the lockfile `bazel/kmp/deps/maven_install.json`.
-  After changing them, run `bazel run @maven//:pin`. Modules name external libraries through `//bazel/kmp/deps`
-  labels, never `@maven//` directly.
+- **Maven** (`maven_kmp`, #1000): rules_jvm_external reads POMs, which name no KMP platform's files, so
+  `//bazel/kmp/resolver` (Go) follows each library's Gradle Module Metadata to its per-platform variant (`-jvm` jar,
+  `-linuxx64` klib plus any cinterop klibs) the way Gradle does: highest version wins, except the modules
+  `maven_kmp.install(forces = …)` pins (moneymanager.kotlin-convention's substitutions), and the Kotlin stdlib comes
+  from the toolchain. Versions come from the catalog; `MODULE.bazel` lists the catalog aliases, platforms and
+  repositories. It writes `bazel/kmp/deps/maven_kmp.lock.json` (every file with its sha256); after changing either,
+  run `bazel run @maven_kmp//:pin`. `//bazel/kmp/deps:maven_kmp_lock_test` fails while the lock is stale. Modules
+  name a library by its catalog alias, `@maven_kmp//:kotlinx_io_core` (the `_jvm`/`_<target>` suffix is added per
+  platform); `//bazel/kmp/deps` only holds `kotlin_test` and the compiler plugins.
 
 ## Project Structure
 

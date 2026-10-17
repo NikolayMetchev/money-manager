@@ -14,7 +14,7 @@ java_library(
     srcs = ["src/com/moneymanager/bazel/kmp/testing/KmpJUnitRunner.java"],
     deps = [
         ":junit_xml",
-        "@maven//:junit_junit",
+        "@maven_kmp//:junit_jvm",
     ],
 )
 
