@@ -40,13 +40,8 @@ jobs:
       - name: BUILD files are up to date
         run: bazel run //:gazelle -- --mode=diff
 
-      # app/db/core's tests read source files and fixtures they don't have yet, and outrun the default timeout;
-      # app/tui's footer test needs a shorter temp path (#1009), which removes these.
-      - name: Packages not yet buildable with Bazel
-        run: echo "BLOCKED=-//app/db/core/... -//app/tui/..." >> "$GITHUB_ENV"
-
       - name: Build
-        run: bazel build -- //... $BLOCKED
+        run: bazel build //...
 
       - name: Test
-        run: bazel test -- //... $BLOCKED
+        run: bazel test //...

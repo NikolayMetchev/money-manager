@@ -1,5 +1,7 @@
 # gazelle:kmp_targets linuxX64
 # gazelle:kmp_cinterops :clib_interop
+# gazelle:kmp_test_data src/nativeInterop/cinterop/clib.def
+# gazelle:kmp_test_size large
 load("//bazel/kmp:defs.bzl", "kmp_cinterop", "kmp_library", "kmp_test")
 
 kmp_cinterop(
@@ -17,7 +19,9 @@ kmp_library(
 
 kmp_test(
     name = "test",
+    size = "large",
     associate = ":cbind",
+    data = ["src/nativeInterop/cinterop/clib.def"],
     native_deps = ["//bazel/kmp/deps:kotlin_test"],
     native_srcs = glob(["src/nativeTest/kotlin/**/*.kt"]),
     native_targets = ["linuxX64"],
