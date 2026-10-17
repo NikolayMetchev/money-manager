@@ -12,12 +12,16 @@
       "kotlinx-datetime": "org.jetbrains.kotlinx:kotlinx-datetime:0.8.0",
       "kotlinx-io-core": "org.jetbrains.kotlinx:kotlinx-io-core:0.9.1",
       "kotlinx-serialization-core": "org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0",
+      "kotlinx-serialization-json": "org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0",
       "mappie-api": "tech.mappie:mappie-api:2.4.21-2.4.5",
       "mappie-compiler-plugin": "tech.mappie:mappie-compiler-plugin:2.4.21-2.4.5",
       "metro-compiler": "dev.zacsweers.metro:compiler:1.4.5",
       "metro-runtime": "dev.zacsweers.metro:runtime:1.4.5",
       "mokkery-plugin": "dev.mokkery:mokkery-plugin:3.5.1",
       "mokkery-runtime": "dev.mokkery:mokkery-runtime:3.5.1",
+      "sqldelight-compiler-env": "app.cash.sqldelight:compiler-env:2.4.1",
+      "sqldelight-dialect-sqlite": "app.cash.sqldelight:sqlite-3-25-dialect:2.4.1",
+      "sqldelight-gradle-plugin": "app.cash.sqldelight:gradle-plugin:2.4.1",
       "sqldelight-runtime": "app.cash.sqldelight:runtime:2.4.1"
     },
     "forces": {
@@ -61,6 +65,9 @@
       "linuxX64",
       "macosArm64",
       "mingwX64"
+    ],
+    "excludes": [
+      "org.jetbrains.kotlin:kotlin-gradle-plugin"
     ]
   },
   "names": {
@@ -68,17 +75,30 @@
     "androidx.collection:collection": "androidx_collection_collection",
     "androidx.compose.runtime:runtime": "androidx_compose_runtime",
     "androidx.compose.runtime:runtime-annotation": "androidx_compose_runtime_runtime_annotation",
+    "app.cash.sqldelight:compiler-env": "sqldelight_compiler_env",
+    "app.cash.sqldelight:core": "app_cash_sqldelight_core",
+    "app.cash.sqldelight:dialect-api": "app_cash_sqldelight_dialect_api",
+    "app.cash.sqldelight:gradle-plugin": "sqldelight_gradle_plugin",
+    "app.cash.sqldelight:migrations": "app_cash_sqldelight_migrations",
     "app.cash.sqldelight:runtime": "sqldelight_runtime",
+    "app.cash.sqldelight:sqlite-3-18-dialect": "app_cash_sqldelight_sqlite_3_18_dialect",
+    "app.cash.sqldelight:sqlite-3-24-dialect": "app_cash_sqldelight_sqlite_3_24_dialect",
+    "app.cash.sqldelight:sqlite-3-25-dialect": "sqldelight_dialect_sqlite",
     "com.ionspin.kotlin:bignum": "bignum",
+    "com.squareup:kotlinpoet": "com_squareup_kotlinpoet",
     "dev.drewhamilton.poko:poko-annotations": "dev_drewhamilton_poko_poko_annotations",
+    "dev.lysine.sql-psi:core": "dev_lysine_sql_psi_core",
+    "dev.lysine.sql-psi:environment": "dev_lysine_sql_psi_environment",
     "dev.mokkery:mokkery-core": "dev_mokkery_mokkery_core",
     "dev.mokkery:mokkery-plugin": "mokkery_plugin",
     "dev.mokkery:mokkery-runtime": "mokkery_runtime",
     "dev.zacsweers.metro:compiler": "metro_compiler",
     "dev.zacsweers.metro:runtime": "metro_runtime",
     "junit:junit": "junit",
+    "org.apfloat:apfloat": "org_apfloat_apfloat",
     "org.hamcrest:hamcrest-core": "org_hamcrest_hamcrest_core",
     "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable": "kotlin_compose_compiler_plugin_embeddable",
+    "org.jetbrains.kotlin:kotlin-reflect": "org_jetbrains_kotlin_kotlin_reflect",
     "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable": "kotlin_serialization_compiler_plugin_embeddable",
     "org.jetbrains.kotlinx:atomicfu": "org_jetbrains_kotlinx_atomicfu",
     "org.jetbrains.kotlinx:kotlinx-coroutines-core": "kotlinx_coroutines_core",
@@ -87,12 +107,18 @@
     "org.jetbrains.kotlinx:kotlinx-io-bytestring": "org_jetbrains_kotlinx_kotlinx_io_bytestring",
     "org.jetbrains.kotlinx:kotlinx-io-core": "kotlinx_io_core",
     "org.jetbrains.kotlinx:kotlinx-serialization-core": "kotlinx_serialization_core",
+    "org.jetbrains.kotlinx:kotlinx-serialization-json": "kotlinx_serialization_json",
     "org.jetbrains:annotations": "org_jetbrains_annotations",
+    "org.jgrapht:jgrapht-core": "org_jgrapht_jgrapht_core",
+    "org.jheaps:jheaps": "org_jheaps_jheaps",
     "tech.mappie:mappie-api": "mappie_api",
     "tech.mappie:mappie-compiler-plugin": "mappie_compiler_plugin"
   },
   "skipped": {
     "linuxArm64": [
+      "app.cash.sqldelight:compiler-env",
+      "app.cash.sqldelight:gradle-plugin",
+      "app.cash.sqldelight:sqlite-3-25-dialect",
       "dev.mokkery:mokkery-plugin",
       "dev.zacsweers.metro:compiler",
       "junit:junit",
@@ -101,6 +127,9 @@
       "tech.mappie:mappie-compiler-plugin"
     ],
     "linuxX64": [
+      "app.cash.sqldelight:compiler-env",
+      "app.cash.sqldelight:gradle-plugin",
+      "app.cash.sqldelight:sqlite-3-25-dialect",
       "dev.mokkery:mokkery-plugin",
       "dev.zacsweers.metro:compiler",
       "junit:junit",
@@ -109,6 +138,9 @@
       "tech.mappie:mappie-compiler-plugin"
     ],
     "macosArm64": [
+      "app.cash.sqldelight:compiler-env",
+      "app.cash.sqldelight:gradle-plugin",
+      "app.cash.sqldelight:sqlite-3-25-dialect",
       "dev.mokkery:mokkery-plugin",
       "dev.zacsweers.metro:compiler",
       "junit:junit",
@@ -117,6 +149,9 @@
       "tech.mappie:mappie-compiler-plugin"
     ],
     "mingwX64": [
+      "app.cash.sqldelight:compiler-env",
+      "app.cash.sqldelight:gradle-plugin",
+      "app.cash.sqldelight:sqlite-3-25-dialect",
       "dev.mokkery:mokkery-plugin",
       "dev.zacsweers.metro:compiler",
       "junit:junit",
@@ -380,6 +415,83 @@
         ]
       }
     },
+    "app.cash.sqldelight:compiler-env": {
+      "jvm": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "compiler-env-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/compiler-env/2.4.1/compiler-env-2.4.1.jar",
+            "sha256": "5a4d5f8485ace1654678a9240deaa25a46fc48ff070c8a1235ad3576111ce8ab"
+          }
+        ]
+      }
+    },
+    "app.cash.sqldelight:core": {
+      "jvm": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "core-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/core/2.4.1/core-2.4.1.jar",
+            "sha256": "987267dd56ceeba7e3e058d138d34e41afef6eff1a8b5078a62c89333568f045"
+          }
+        ],
+        "deps": [
+          "app.cash.sqldelight:dialect-api"
+        ],
+        "runtime_deps": [
+          "org.jgrapht:jgrapht-core"
+        ]
+      }
+    },
+    "app.cash.sqldelight:dialect-api": {
+      "jvm": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "dialect-api-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/dialect-api/2.4.1/dialect-api-2.4.1.jar",
+            "sha256": "ee4b5e69b7e8906a715771f9da3e880258c42e219ed43baa4a0cd1587d7560f0"
+          }
+        ],
+        "deps": [
+          "com.squareup:kotlinpoet",
+          "dev.lysine.sql-psi:core"
+        ]
+      }
+    },
+    "app.cash.sqldelight:gradle-plugin": {
+      "jvm": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "gradle-plugin-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/gradle-plugin/2.4.1/gradle-plugin-2.4.1.jar",
+            "sha256": "5c6183e17d1b3d3bd53962279fb82364f4da4d64ec0d62b80c9d71988ad0f5a2"
+          }
+        ],
+        "deps": [
+          "app.cash.sqldelight:core"
+        ],
+        "runtime_deps": [
+          "app.cash.sqldelight:migrations",
+          "dev.lysine.sql-psi:environment"
+        ]
+      }
+    },
+    "app.cash.sqldelight:migrations": {
+      "jvm": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "migrations-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/migrations/2.4.1/migrations-2.4.1.jar",
+            "sha256": "bd96a593c5acb88a7c106480f1bb00b8dc17f72bf7e373bdfd867d40884d542f"
+          }
+        ]
+      }
+    },
     "app.cash.sqldelight:runtime": {
       "jvm": {
         "version": "2.4.1",
@@ -429,6 +541,51 @@
             "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/runtime-mingwx64/2.4.1/runtime-mingwx64-2.4.1.klib",
             "sha256": "7a57d9929f04f4343608934f684cc7aef83e8e5ed41bec73ec864a0ab253babd"
           }
+        ]
+      }
+    },
+    "app.cash.sqldelight:sqlite-3-18-dialect": {
+      "jvm": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "sqlite-3-18-dialect-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/sqlite-3-18-dialect/2.4.1/sqlite-3-18-dialect-2.4.1.jar",
+            "sha256": "9f4ee903457495dab295ce7342526438ffd1507ffe5632d9aae689853e643c7c"
+          }
+        ],
+        "deps": [
+          "app.cash.sqldelight:dialect-api"
+        ]
+      }
+    },
+    "app.cash.sqldelight:sqlite-3-24-dialect": {
+      "jvm": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "sqlite-3-24-dialect-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/sqlite-3-24-dialect/2.4.1/sqlite-3-24-dialect-2.4.1.jar",
+            "sha256": "7dabc76b23a19f1781704526362814fcf76f59f0bbf3489836c63d0f245f5c34"
+          }
+        ],
+        "deps": [
+          "app.cash.sqldelight:sqlite-3-18-dialect"
+        ]
+      }
+    },
+    "app.cash.sqldelight:sqlite-3-25-dialect": {
+      "jvm": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "sqlite-3-25-dialect-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/sqlite-3-25-dialect/2.4.1/sqlite-3-25-dialect-2.4.1.jar",
+            "sha256": "39490142c7b00b725114429f9d3006ac642b77be796a58b6344e984252581f94"
+          }
+        ],
+        "deps": [
+          "app.cash.sqldelight:sqlite-3-24-dialect"
         ]
       }
     },
@@ -484,6 +641,21 @@
         ]
       }
     },
+    "com.squareup:kotlinpoet": {
+      "jvm": {
+        "version": "2.4.0",
+        "files": [
+          {
+            "name": "kotlinpoet-jvm-2.4.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/squareup/kotlinpoet-jvm/2.4.0/kotlinpoet-jvm-2.4.0.jar",
+            "sha256": "e953c425aa2887b54dfa29b474915f7a50bf9f5d8cd243209dc9a039a8ab3af0"
+          }
+        ],
+        "runtime_deps": [
+          "org.jetbrains.kotlin:kotlin-reflect"
+        ]
+      }
+    },
     "dev.drewhamilton.poko:poko-annotations": {
       "jvm": {
         "version": "0.23.1",
@@ -533,6 +705,33 @@
             "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-mingwx64/0.23.1/poko-annotations-mingwx64-0.23.1.klib",
             "sha256": "1373c346e9d5399e297a52e19439b7ae6bd1006da94bbde93c826ab46ea1a4e3"
           }
+        ]
+      }
+    },
+    "dev.lysine.sql-psi:core": {
+      "jvm": {
+        "version": "0.8.1",
+        "files": [
+          {
+            "name": "core-0.8.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/lysine/sql-psi/core/0.8.1/core-0.8.1.jar",
+            "sha256": "92e742d8d0d22ca85278e4944496ec524231dc8bcffb235c510f48cab9a7b6ce"
+          }
+        ]
+      }
+    },
+    "dev.lysine.sql-psi:environment": {
+      "jvm": {
+        "version": "0.8.1",
+        "files": [
+          {
+            "name": "environment-0.8.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/lysine/sql-psi/environment/0.8.1/environment-0.8.1.jar",
+            "sha256": "af801d4d6aa914360b4a741436601625dfd85f2925ec11afed32043f11de61f2"
+          }
+        ],
+        "runtime_deps": [
+          "dev.lysine.sql-psi:core"
         ]
       }
     },
@@ -757,6 +956,18 @@
         ]
       }
     },
+    "org.apfloat:apfloat": {
+      "jvm": {
+        "version": "1.14.0",
+        "files": [
+          {
+            "name": "apfloat-1.14.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/apfloat/apfloat/1.14.0/apfloat-1.14.0.jar",
+            "sha256": "14fa3dee487b9d8de6d0ff7c39526159405c0879a65c817f959c9575e4b14820"
+          }
+        ]
+      }
+    },
     "org.hamcrest:hamcrest-core": {
       "jvm": {
         "version": "1.3",
@@ -777,6 +988,18 @@
             "name": "kotlin-compose-compiler-plugin-embeddable-2.4.21.jar",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-compose-compiler-plugin-embeddable/2.4.21/kotlin-compose-compiler-plugin-embeddable-2.4.21.jar",
             "sha256": "634f5c17bed5854548208f2901071f2ead5993ffad25b34fea1668ee9e314b53"
+          }
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-reflect": {
+      "jvm": {
+        "version": "2.4.20",
+        "files": [
+          {
+            "name": "kotlin-reflect-2.4.20.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-reflect/2.4.20/kotlin-reflect-2.4.20.jar",
+            "sha256": "b4aac2a4686ffdc110602ce153e4a90ffd7f37fa86fcca9d3b3aa39c08f8c2fc"
           }
         ]
       }
@@ -1229,6 +1452,73 @@
         ]
       }
     },
+    "org.jetbrains.kotlinx:kotlinx-serialization-json": {
+      "jvm": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-json-jvm-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.11.0/kotlinx-serialization-json-jvm-1.11.0.jar",
+            "sha256": "563a25b4eb5c9128ae9c2479f3d1a5c44dcd176112b91cf03682e906eba5c935"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "linuxArm64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-json-linuxArm64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-linuxarm64/1.11.0/kotlinx-serialization-json-linuxarm64-1.11.0.klib",
+            "sha256": "45b67ebe7b16b7cc62b6d9be4484e1d6fd7a763659059ba7ae8fd8a218cd0d6f"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "linuxX64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-json-linuxX64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-linuxx64/1.11.0/kotlinx-serialization-json-linuxx64-1.11.0.klib",
+            "sha256": "30bf33b05d5543583d3e860607b5c00c35cbcdee99dc735a4ff1a48856f01240"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "macosArm64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-json-macosArm64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-macosarm64/1.11.0/kotlinx-serialization-json-macosarm64-1.11.0.klib",
+            "sha256": "422eb1c46ccf299e35575cbca2227d23e8873d2da9ce86c5e968a7a3ddedcb2b"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "mingwX64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-json-mingwX64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-mingwx64/1.11.0/kotlinx-serialization-json-mingwx64-1.11.0.klib",
+            "sha256": "3df8871c181fdcda08cf7144ee715a415c060d00c7db05a9da89895c1889c0b6"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      }
+    },
     "org.jetbrains:annotations": {
       "jvm": {
         "version": "23.0.0",
@@ -1237,6 +1527,34 @@
             "name": "annotations-23.0.0.jar",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/23.0.0/annotations-23.0.0.jar",
             "sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05"
+          }
+        ]
+      }
+    },
+    "org.jgrapht:jgrapht-core": {
+      "jvm": {
+        "version": "1.5.3",
+        "files": [
+          {
+            "name": "jgrapht-core-1.5.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/jgrapht/jgrapht-core/1.5.3/jgrapht-core-1.5.3.jar",
+            "sha256": "a026a34523286e1bf510e4bd4625935e3c97ce0fc40e1891f4262309f3b64c3e"
+          }
+        ],
+        "deps": [
+          "org.apfloat:apfloat",
+          "org.jheaps:jheaps"
+        ]
+      }
+    },
+    "org.jheaps:jheaps": {
+      "jvm": {
+        "version": "0.14",
+        "files": [
+          {
+            "name": "jheaps-0.14.jar",
+            "url": "https://repo1.maven.org/maven2/org/jheaps/jheaps/0.14/jheaps-0.14.jar",
+            "sha256": "49a9898da3758659388f1333c53ccadb6fbd142a7d18aa7b1a33577090684279"
           }
         ]
       }

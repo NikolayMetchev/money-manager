@@ -23,6 +23,12 @@ kt_jvm_library(
     ],
 )
 
+# kotlin("reflect"), at the compiler's version (JVM only).
+kt_jvm_library(
+    name = "kotlin_reflect_jvm",
+    exports = ["@rules_kotlin//kotlin/compiler:kotlin-reflect"],
+)
+
 # On native, kotlin.test is part of the distribution's stdlib.
 [
     kt_native_group(

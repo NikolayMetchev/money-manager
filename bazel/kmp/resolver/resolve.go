@@ -41,10 +41,14 @@ type Resolved struct {
 	Runtime []string `json:"runtime_deps,omitempty"` // runtime only (JVM)
 }
 
-// excluded modules come from the Kotlin toolchain instead, at the compiler's own version, as KGP does.
-func excluded(module string) bool {
+// fromToolchain modules come from the Kotlin toolchain instead, at the compiler's own version, as KGP does.
+func fromToolchain(module string) bool {
 	return strings.HasPrefix(module, "org.jetbrains.kotlin:kotlin-stdlib") ||
 		strings.HasPrefix(module, "org.jetbrains.kotlin:kotlin-test")
+}
+
+func (r *Resolver) excluded(module string) bool {
+	return fromToolchain(module) || r.excludes[module]
 }
 
 type attrs map[string]any
@@ -123,14 +127,19 @@ type node struct {
 }
 
 type Resolver struct {
-	fetch  *Fetcher
-	forces map[string]string // module → version
+	fetch    *Fetcher
+	forces   map[string]string // module → version
+	excludes map[string]bool
 	mu     sync.Mutex
 	nodes  map[string]*node // platform|coordinate → node
 }
 
-func NewResolver(f *Fetcher, forces map[string]string) *Resolver {
-	return &Resolver{fetch: f, forces: forces, nodes: map[string]*node{}}
+func NewResolver(f *Fetcher, forces map[string]string, excludes []string) *Resolver {
+	r := &Resolver{fetch: f, forces: forces, excludes: map[string]bool{}, nodes: map[string]*node{}}
+	for _, e := range excludes {
+		r.excludes[e] = true
+	}
+	return r
 }
 
 func (r *Resolver) node(p Platform, c Coordinate) (*node, error) {
@@ -187,13 +196,13 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 	for _, f := range api.Files {
 		n.files = append(n.files, File{Name: f.Name, URL: dir + "/" + f.URL, Sha256: f.Sha256})
 	}
-	n.api = dependencies(api.Dependencies)
+	n.api = r.dependencies(api.Dependencies)
 	if runtime != nil {
 		apiSet := map[string]bool{}
 		for _, d := range n.api {
 			apiSet[d.Module()] = true
 		}
-		for _, d := range dependencies(runtime.Dependencies) {
+		for _, d := range r.dependencies(runtime.Dependencies) {
 			if !apiSet[d.Module()] {
 				n.runtime = append(n.runtime, d)
 			}
@@ -202,14 +211,14 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 	return n, nil
 }
 
-func dependencies(deps []Dependency) []Coordinate {
+func (r *Resolver) dependencies(deps []Dependency) []Coordinate {
 	var out []Coordinate
 	for _, d := range deps {
 		// A platform/BOM dependency only aligns versions; the highest-version rule already does that.
 		if v, _ := attrs(d.Attributes).str("org.gradle.category"); v == "platform" || v == "enforced-platform" {
 			continue
 		}
-		if excluded(d.Group+":"+d.Module) || d.version() == "" {
+		if r.excluded(d.Group+":"+d.Module) || d.version() == "" {
 			continue
 		}
 		out = append(out, Coordinate{d.Group, d.Module, d.version()})
@@ -240,7 +249,7 @@ func (r *Resolver) loadPom(c Coordinate, dir string) (*node, error) {
 		if dep.Version == "" {
 			dep.Version = pom.managed[dep.Module()]
 		}
-		if excluded(dep.Module()) {
+		if r.excluded(dep.Module()) {
 			continue
 		}
 		if dep.Version == "" || strings.Contains(dep.Version, "${") {

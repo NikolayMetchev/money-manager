@@ -34,6 +34,7 @@ type Lock struct {
 		Libraries map[string]string `json:"libraries"` // alias → group:artifact:version
 		Forces    map[string]string `json:"forces"`    // module → version
 		Platforms []string          `json:"platforms"`
+		Excludes  []string          `json:"excludes"`
 	} `json:"inputs"`
 	// Names are the Bazel target names, without the platform suffix: a catalog library by its alias
 	// (kotlinx-coroutines-core → kotlinx_coroutines_core), anything else by its coordinate.
@@ -46,21 +47,22 @@ type Lock struct {
 var nonIdent = regexp.MustCompile(`[^A-Za-z0-9_]`)
 
 func main() {
-	var libraries, platformNames, forces, repos multi
+	var libraries, platformNames, forces, repos, excludes multi
 	toml := flag.String("toml", "gradle/libs.versions.toml", "the version catalog")
 	out := flag.String("lock", "bazel/kmp/deps/maven_kmp.lock.json", "the lockfile to write")
 	flag.Var(&libraries, "library", "a catalog library alias to resolve (repeatable)")
 	flag.Var(&platformNames, "platform", "a platform to resolve for: jvm, linuxX64, … (repeatable)")
 	flag.Var(&forces, "force", "module=version-ref: pin a module to a catalog version, as Gradle's substitutions do (repeatable)")
 	flag.Var(&repos, "repository", "url[=group-regex,…]: a repository, in order, optionally limited to groups (repeatable)")
+	flag.Var(&excludes, "exclude", "group:artifact never to resolve, whoever depends on it (repeatable)")
 	flag.Parse()
-	if err := run(*toml, *out, libraries, platformNames, forces, repos); err != nil {
+	if err := run(*toml, *out, libraries, platformNames, forces, repos, excludes); err != nil {
 		fmt.Fprintln(os.Stderr, "resolver:", err)
 		os.Exit(1)
 	}
 }
 
-func run(tomlPath, out string, libraries, platformNames, forceSpecs, repoSpecs []string) error {
+func run(tomlPath, out string, libraries, platformNames, forceSpecs, repoSpecs, excludes []string) error {
 	cat, err := ReadCatalog(tomlPath)
 	if err != nil {
 		return err
@@ -90,6 +92,7 @@ func run(tomlPath, out string, libraries, platformNames, forceSpecs, repoSpecs [
 	lock.Inputs.Libraries = map[string]string{}
 	lock.Inputs.Forces = forced
 	lock.Inputs.Platforms = platformNames
+	lock.Inputs.Excludes = excludes
 	var roots []Coordinate
 	for _, alias := range libraries {
 		c, ok := cat.Libraries[alias]
@@ -101,7 +104,7 @@ func run(tomlPath, out string, libraries, platformNames, forceSpecs, repoSpecs [
 		lock.Names[c.Module()] = nonIdent.ReplaceAllString(alias, "_")
 	}
 
-	resolver := NewResolver(NewFetcher(repos), forced)
+	resolver := NewResolver(NewFetcher(repos), forced, excludes)
 	type result struct {
 		platform string
 		resolved map[string]Resolved
