@@ -12,7 +12,7 @@ load("//bazel/kmp/plugins:plugins.bzl", "NativePluginInfo", "native_plugin_args"
 KlibInfo = provider(
     doc = "A Kotlin/Native library for one konan target.",
     fields = {
-        "klib": "The .klib file.",
+        "klib": "The .klib file, or None for a module with no Kotlin of its own (only cinterops).",
         "target": "konan's target name (`linux_x64`).",
         "transitive_klibs": "depset of this klib and every klib it needs, for -library.",
     },
@@ -58,8 +58,9 @@ def _compile_klib(ctx, kgp_target, out, chain, fragment_suffix, deps, friends, m
     # konanc names fragments by source set (commonMain, linuxX64Test, …), as KGP does.
     srcs = _fragment_args(args, [(f + fragment_suffix, files) for f, files in chain])
     args.add_all(transitive, before_each = "-library")
-    if friends:
-        args.add_joined("-friend-modules", [f[KlibInfo].klib for f in friends], join_with = ctx.configuration.host_path_separator)
+    friend_klibs = [f[KlibInfo].klib for f in friends if f[KlibInfo].klib]
+    if friend_klibs:
+        args.add_joined("-friend-modules", friend_klibs, join_with = ctx.configuration.host_path_separator)
     run_konan(
         ctx,
         tool = "konanc",
@@ -91,12 +92,20 @@ def _unique_name(label, suffix):
     return "%s:%s%s" % (package.replace("/", "."), package.replace("/", "-"), suffix)
 
 def _klib_impl(ctx):
+    chain = _chain(ctx, ctx.attr.target)
+    if not [f for _, files in chain for f in files]:
+        # No Kotlin of its own (only a cinterop): KGP's compile is NO-SOURCE and the module is its dependencies.
+        return [DefaultInfo(), KlibInfo(
+            klib = None,
+            target = KONAN_TARGETS[ctx.attr.target],
+            transitive_klibs = depset(transitive = [d[KlibInfo].transitive_klibs for d in ctx.attr.deps]),
+        )]
     out = ctx.actions.declare_file(ctx.label.name + ".klib")
     info = _compile_klib(
         ctx,
         kgp_target = ctx.attr.target,
         out = out,
-        chain = _chain(ctx, ctx.attr.target),
+        chain = chain,
         fragment_suffix = "Main",
         deps = ctx.attr.deps,
         friends = [],
@@ -148,7 +157,8 @@ def _test_impl(ctx):
     args = ctx.actions.args()
     args.add_all(["-target", target, "-produce", "program", "-o", exe])
     args.add_all(["-g", "-enable-assertions", "-Werror", "-generate-test-runner"])
-    args.add("-friend-modules", associate.klib)
+    if associate.klib:
+        args.add("-friend-modules", associate.klib)
     args.add("-Xinclude=" + test_klib.path)
 
     # Every library the tests need except the test klib itself, which -Xinclude names.
@@ -233,3 +243,96 @@ RUNS_ON = {
     "macosArm64": ["@platforms//os:macos", "@platforms//cpu:aarch64"],
     "mingwX64": ["@platforms//os:windows", "@platforms//cpu:x86_64"],
 }
+
+def _static_library_impl(ctx):
+    target = KONAN_TARGETS[ctx.attr.target]
+    out = ctx.actions.declare_file("%s/lib%s.a" % (ctx.label.name, ctx.attr.library_name or ctx.label.name))
+    objects = []
+    for src in ctx.files.srcs:
+        obj = ctx.actions.declare_file("%s/_objs/%s.o" % (ctx.label.name, src.basename))
+        args = ctx.actions.args()
+        args.add_all(["clang", target, "-c", "-O2"])
+        args.add_all(ctx.attr.defines, format_each = "-D%s")
+        args.add_all(depset([h.dirname for h in ctx.files.hdrs]), format_each = "-I%s")
+        args.add_all([src, "-o", obj])
+        run_konan(
+            ctx,
+            tool = "clang",
+            target = target,
+            arguments = [args],
+            inputs = [src] + ctx.files.hdrs,
+            outputs = [obj],
+            mnemonic = "KonanClang",
+            progress_message = "Compiling %s for %s" % (src.short_path, ctx.attr.target),
+            konan_options = False,
+        )
+        objects.append(obj)
+    args = ctx.actions.args()
+    args.add_all(["llvm-ar", "rcs", out])
+    args.add_all(objects)
+    run_konan(
+        ctx,
+        tool = "llvm",
+        target = target,
+        arguments = [args],
+        inputs = objects,
+        outputs = [out],
+        mnemonic = "KonanArchive",
+        progress_message = "Archiving %{output}",
+        konan_options = False,
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+konan_static_library = rule(
+    implementation = _static_library_impl,
+    doc = """A C static library for one Kotlin/Native target, compiled with the distribution's own clang and
+sysroot (`run_konan clang`), so it links into that target's binaries like the klibs beside it.""",
+    attrs = {
+        "defines": attr.string_list(doc = "`NAME=VALUE` preprocessor definitions."),
+        "hdrs": attr.label_list(allow_files = [".h"], doc = "Headers; their directories are on the include path."),
+        "library_name": attr.string(doc = "The archive is `lib<library_name>.a` (default: the target name)."),
+        "srcs": attr.label_list(allow_files = [".c"], mandatory = True),
+        "target": attr.string(mandatory = True, values = KONAN_TARGETS.keys()),
+    },
+    toolchains = [TOOLCHAIN_TYPE],
+)
+
+def _cinterop_impl(ctx):
+    target = KONAN_TARGETS[ctx.attr.target]
+    out = ctx.actions.declare_file(ctx.label.name + ".klib")
+    deps = depset(transitive = [d[KlibInfo].transitive_klibs for d in ctx.attr.deps])
+    args = ctx.actions.args()
+    args.add_all(["-target", target, "-def", ctx.file.def_file, "-o", out])
+    args.add_all(["-Xmodule-name", _unique_name(ctx.label, "-cinterop-" + ctx.attr.interop)])
+    for lib in ctx.files.static_libraries:
+        # cinterop embeds each -staticLibrary it finds on -libraryPath into the klib, which every binary then links.
+        args.add_all(["-libraryPath", lib.dirname, "-staticLibrary", lib.basename])
+    args.add_all(deps, before_each = "-library")
+    run_konan(
+        ctx,
+        tool = "cinterop",
+        target = target,
+        arguments = [args],
+        inputs = depset([ctx.file.def_file] + ctx.files.static_libraries, transitive = [deps]),
+        outputs = [out],
+        mnemonic = "KotlinNativeCinterop",
+        progress_message = "Generating cinterop %{label} for " + ctx.attr.target,
+    )
+    return [
+        DefaultInfo(files = depset([out])),
+        KlibInfo(klib = out, target = target, transitive_klibs = depset([out], transitive = [deps])),
+    ]
+
+kt_native_cinterop = rule(
+    implementation = _cinterop_impl,
+    doc = "A cinterop klib for one Kotlin/Native target: KGP's `cinterops.create(<interop>)` on a compilation.",
+    attrs = {
+        "def_file": attr.label(mandatory = True, allow_single_file = [".def"]),
+        "deps": attr.label_list(providers = [KlibInfo]),
+        "interop": attr.string(mandatory = True, doc = "The interop's name, as KGP's `cinterops.create` names it."),
+        "static_libraries": attr.label_list(allow_files = [".a", ".lib"], doc = "Static libraries the klib embeds."),
+        "target": attr.string(mandatory = True, values = KONAN_TARGETS.keys()),
+    },
+    provides = [KlibInfo],
+    toolchains = [TOOLCHAIN_TYPE],
+)

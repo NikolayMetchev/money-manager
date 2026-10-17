@@ -132,6 +132,11 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   The OAuth client is XOR-obfuscated in the `@google_oauth` repository (from `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`, else
   `secrets/google-oauth.properties`), so the plaintext is never an action input. `.bazelrc` sets rules_kotlin's
   strict associates: a test's friend is only its module's jar, as in KGP (otherwise K2 smart-casts the exports').
+- **Bundled SQLite** (`utils/sqlite3`, #1012): `@sqlite_amalgamation` (`//bazel/kmp/sqlite`) downloads the
+  amalgamation `sqlite-amalgamation-*` pins in the catalog, `kmp_static_library` compiles it per target with konan's
+  own clang and `llvm-ar` (`CompileBundledSqliteTask`'s defines), and `kmp_cinterop` embeds the archive in a klib
+  (`-staticLibrary`). `kmp_library(cinterops = …)`, set by `# gazelle:kmp_cinterops`, compiles a module with it, even
+  one with no Kotlin of its own. `app/db/core` keeps the dep with `kmp_keep_dep`: nothing imports SQLite, it's linked.
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.
