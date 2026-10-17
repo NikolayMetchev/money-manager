@@ -30,6 +30,26 @@ import kotlin.time.Instant
 
 class AccountsScreenTest {
     @Test
+    fun keysThatArriveTogetherEachSeeTheOneBefore() {
+        val location = createTestDatabaseLocation()
+        try {
+            tui(location, DEFAULT_SCREENS) { _, controller ->
+                screen { it.contains("o open another database") }
+                val engine = checkNotNull(controller.session).importEngine
+                listOf("Bank fees", "Current", "Shop").forEach { engine.createAccount(account(it), Source.Manual) }
+                press("2")
+                screen { it.contains("Accounts · 3 of 3") }
+
+                // Enter must open the account ArrowDown moved to, even before the list redraws in between.
+                pressTogether("ArrowDown", "ArrowDown", "Enter")
+                screen { it.contains("Transactions · Shop") }
+            }
+        } finally {
+            deleteTestDatabase(location)
+        }
+    }
+
+    @Test
     fun listsAccountsLiveAndFiltersThemThroughTheSharedPresenter() {
         val location = createTestDatabaseLocation()
         try {

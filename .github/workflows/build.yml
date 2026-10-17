@@ -81,14 +81,14 @@ jobs:
           # unit-coverage XMLs. db:core's tests run here too: the dedicated `db-core-test` job was
           # removed once parallel test forks + minimal test currency seeding cut its ~12 min
           # jvmTest down to ~1-2 min.
-          # `build` also runs linuxX64Test natively.
-          command: build koverXmlReport --stacktrace
+          # -PskipNative=true: no Kotlin/Native compile, link or test here. Linking the native test
+          # binaries beside the JVM build ran this job out of memory; linuxX64 has its own job below.
+          command: build koverXmlReport -PskipNative=true --stacktrace
           # The only Linux job that saves Gradle User Home (from main). Every other Linux job is
           # read-only and restores this entry, so they don't each save their own dependency and
           # transform entries and evict it from the 10 GB Actions cache.
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
-          kotlin-native: 'true'
 
       - name: Upload coverage and test results to Codecov
         uses: $/.github/actions/codecov-upload
@@ -99,6 +99,33 @@ jobs:
   # Kotlin/Native: each target's common tests run natively on a host of that platform. Apple targets
   # only link on macOS and mingwX64 only runs on Windows. There is no Kotlin/Native compiler for Linux
   # arm64 hosts, so linuxArm64 test binaries are cross-linked on x64 and run on an arm64 runner.
+  native-linux-x64:
+    name: Native Tests (linuxX64)
+    runs-on: ubuntu-latest
+    needs: changes
+    if: >-
+      needs.changes.outputs.code == 'true' &&
+      (github.event_name == 'pull_request' ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # read-only job, no git push
+
+      - name: Run linuxX64 tests and link the CLI with Gradle
+        uses: $/.github/actions/gradle-run
+        with:
+          # The release `mm` link is the one a Linux `build` does locally; it catches link-only failures
+          # (such as the disabled native compiler caches) before the release workflow does.
+          command: linuxX64Test :app:main:cli:linkReleaseExecutableLinuxX64 --stacktrace
+          # Gradle User Home stays read-only (restored from the build job), but ~/.konan is saved from
+          # main: the build job no longer downloads the Kotlin/Native toolchain.
+          kotlin-native-cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          kotlin-native: 'true'
+
   native-linux-arm64-link:
     name: Native Link (linuxArm64)
     runs-on: ubuntu-latest
