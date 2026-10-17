@@ -12,7 +12,6 @@ bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_kotlin", version = "2.4.21")
-bazel_dep(name = "rules_jvm_external", version = "7.2")
 bazel_dep(name = "rules_shell", version = "0.6.1")
 
 # rules_go only hosts the Gazelle language extension (//bazel/gazelle/kmp): Gazelle extensions are Go.
@@ -38,34 +37,71 @@ use_repo(kotlin_native, "kotlin_native", "kotlin_native_repin")
 
 register_toolchains("//bazel/kmp/native:all")
 
-# Maven libraries, by their -jvm artifact until KMP variant resolution lands (#1000). Versions move with
-# gradle/libs.versions.toml. After a change, repin: bazel run @maven//:pin
-maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
-maven.install(
-    artifacts = [
-        "junit:junit:4.13.2",
-        "org.jetbrains.kotlinx:kotlinx-io-core-jvm:0.9.1",
-        "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.11.0",
+# Maven libraries, resolved per platform (jar, klib) from Gradle Module Metadata into
+# bazel/kmp/deps/maven_kmp.lock.json (#1000). Versions come from the catalog. After changing this or the
+# catalog, re-pin: bazel run @maven_kmp//:pin
+maven_kmp = use_extension("//bazel/kmp/deps:extensions.bzl", "maven_kmp")
+maven_kmp.install(
+    catalog = "//gradle:libs.versions.toml",
+    # moneymanager.kotlin-convention's dependency substitutions: these modules always resolve to the
+    # catalog version, whoever asks for them.
+    forces = {
+        "androidx.activity:activity": "androidx-activity-compose",
+        "androidx.annotation:annotation": "androidx-annotation",
+        "androidx.annotation:annotation-jvm": "androidx-annotation",
+        "androidx.collection:collection": "androidx-collection",
+        "androidx.concurrent:concurrent-futures": "androidx-concurrent-futures",
+        "androidx.lifecycle:lifecycle-common": "androidx-lifecycle",
+        "androidx.lifecycle:lifecycle-common-jvm": "androidx-lifecycle",
+        "androidx.lifecycle:lifecycle-runtime": "androidx-lifecycle",
+        "androidx.lifecycle:lifecycle-runtime-android": "androidx-lifecycle",
+        "androidx.lifecycle:lifecycle-runtime-compose": "androidx-lifecycle",
+        "androidx.lifecycle:lifecycle-runtime-compose-android": "androidx-lifecycle",
+        "androidx.lifecycle:lifecycle-runtime-ktx": "androidx-lifecycle",
+        "androidx.lifecycle:lifecycle-runtime-ktx-android": "androidx-lifecycle",
+        "androidx.navigationevent:navigationevent": "androidx-navigationevent",
+        "androidx.navigationevent:navigationevent-compose": "androidx-navigationevent",
+        "androidx.savedstate:savedstate": "androidx-savedstate",
+        "androidx.savedstate:savedstate-compose": "androidx-savedstate",
+        "androidx.test.services:storage": "androidx-test-services-storage",
+        "androidx.test:runner": "androidx-test-runner",
+        "androidx.tracing:tracing": "androidx-tracing",
+        "org.jetbrains.kotlinx:atomicfu": "atomicfu",
+        "org.jetbrains.kotlinx:atomicfu-jvm": "atomicfu",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-android": "kotlinx-coroutines",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-bom": "kotlinx-coroutines",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-core": "kotlinx-coroutines",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": "kotlinx-coroutines",
+        "org.jetbrains.kotlinx:kotlinx-serialization-bom": "kotlinx-serialization",
+        "org.jetbrains.kotlinx:kotlinx-serialization-core": "kotlinx-serialization",
+        "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm": "kotlinx-serialization",
+        "org.jetbrains.kotlinx:kotlinx-serialization-json": "kotlinx-serialization",
+        "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": "kotlinx-serialization",
+        "org.jetbrains:annotations": "jetbrains-annotations",
+        "org.slf4j:slf4j-api": "slf4j",
+    },
+    libraries = [
+        "bignum",
+        "junit",
+        "kotlinx-coroutines-core",
+        "kotlinx-coroutines-test",
+        "kotlinx-datetime",
+        "kotlinx-io-core",
+        "kotlinx-serialization-core",
+        "sqldelight-runtime",
     ],
-    # The Kotlin toolchain provides the standard library (as KGP does), at the compiler's own version.
-    excluded_artifacts = [
-        "org.jetbrains.kotlin:kotlin-stdlib",
-        "org.jetbrains.kotlin:kotlin-stdlib-common",
+    lock_file = "//bazel/kmp/deps:maven_kmp.lock.json",
+    platforms = [
+        "jvm",
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
     ],
-    # protobuf (through rules_java) adds its own artifacts to this repository.
-    known_contributing_modules = ["protobuf"],
-    lock_file = "//bazel/kmp/deps:maven_install.json",
-    repositories = ["https://repo1.maven.org/maven2"],
+    # settings.gradle.kts: Google's repository only for these groups, Maven Central for everything.
+    repositories = [
+        "https://dl.google.com/dl/android/maven2=androidx[.].*,com[.]android[.].*,com[.]google[.].*",
+        "https://repo1.maven.org/maven2",
+    ],
 )
-use_repo(maven, "maven")
-
-# The one native Maven library the native spike needs (utils/bigdecimal's nativeMain), until KMP variant
-# resolution (#1000) resolves klibs from Gradle Module Metadata.
-http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
-
-http_file(
-    name = "bignum_linuxx64_klib",
-    downloaded_file_path = "bignum-linuxx64-0.3.10.klib",
-    sha256 = "c2bbdde1370838ae12fa806317826b2ac65d181f29189af7226fc3377dbaf1eb",
-    urls = ["https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-linuxx64/0.3.10/bignum-linuxx64-0.3.10.klib"],
-)
+use_repo(maven_kmp, "maven_kmp")
