@@ -1,16 +1,19 @@
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
-NATIVE_TARGETS = [
-    "linuxArm64",
-    "linuxX64",
-    "macosArm64",
-    "mingwX64",
-]
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export //app/model/core
+# gazelle:kmp_export @maven_kmp//:kotlinx_serialization_core
 
 kmp_library(
     name = "rules",
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
-    native_targets = NATIVE_TARGETS,
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
     plugins = ["serialization"],
     visibility = ["//visibility:public"],
     exports = [
@@ -23,7 +26,12 @@ kmp_test(
     name = "test",
     associate = ":rules",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
-    native_targets = NATIVE_TARGETS,
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
     plugins = ["serialization"],
     deps = ["//bazel/kmp/deps:kotlin_test"],
 )
