@@ -1,0 +1,24 @@
+# Metro merges contributions across modules on the JVM and natively (#1002).
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "graph",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = ["linuxX64"],
+    plugins = ["metro"],
+    deps = [
+        # No source imports the contributor; Metro reads its hint from the compile classpath. `# keep` stops
+        # Gazelle from dropping a dep no import explains, as app/di/core's feature DI modules need.
+        "//bazel/kmp/plugins/tests/metro/contributor",  # keep
+        "//bazel/kmp/plugins/tests/metro/scope",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":graph",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = ["linuxX64"],
+    plugins = ["metro"],
+    deps = ["//bazel/kmp/deps:kotlin_test"],
+)
