@@ -6,12 +6,19 @@ import androidx.compose.runtime.setValue
 import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.session.DatabaseSession
+import com.moneymanager.session.SessionImports
+import com.moneymanager.tasks.TaskManager
 import com.moneymanager.terminal.TasksInterruptedException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 
 private val logger = Logger.withTag("TuiController")
@@ -30,11 +37,27 @@ interface TuiSessionHost {
     /** Closes [session], asking what to do with a changed cloud-backed copy. */
     suspend fun close(session: DatabaseSession)
 
+    /** The imports [session] runs: its directory and API services, sharing one write lock. */
+    fun imports(session: DatabaseSession): SessionImports
+
     /** Answers the credential vault's unlock requests until cancelled. */
     suspend fun answerVaultRequests()
 
     /** The database a new choice starts from: the last one opened, if any. */
     fun suggestedDatabase(): String?
+}
+
+/**
+ * What runs in the background on an open database: its [imports] and the [tasks] they report, on a scope that's
+ * cancelled (and waited for) before the database closes, so nothing writes to a closing database.
+ */
+class SessionWork(
+    val imports: SessionImports,
+    val scope: CoroutineScope,
+) {
+    val tasks = TaskManager(scope)
+
+    suspend fun stop() = scope.coroutineContext.job.cancelAndJoin()
 }
 
 /** The database chooser: a path to type, and whether Escape can go back to an open database. */
@@ -75,6 +98,10 @@ class TuiController(
 
     /** The open database, or null while there's none. */
     var session: DatabaseSession? by mutableStateOf(null)
+        private set
+
+    /** The open database's background work, or null while there's none. */
+    var work: SessionWork? by mutableStateOf(null)
         private set
 
     /** What the TUI is busy doing (opening, closing), or null. */
@@ -139,7 +166,7 @@ class TuiController(
         }
 
     private suspend fun loop() {
-        session = attempt("Opening the database") { host.openStartup() }
+        use(attempt("Opening the database") { host.openStartup() })
         if (session == null) showChoice()
         for (command in commands) {
             when (command) {
@@ -152,9 +179,10 @@ class TuiController(
         session?.let { open ->
             busy = "Closing ${open.location}"
             try {
+                work?.stop()
                 host.close(open)
             } finally {
-                session = null
+                use(null)
                 busy = null
             }
         }
@@ -166,12 +194,23 @@ class TuiController(
         session?.let { current ->
             if (current.location == location) return
             attempt("Closing ${current.location}", onFailure = { if (switchCloseFailure == null) switchCloseFailure = it }) {
+                work?.stop()
                 host.close(current)
             }
-            session = null
+            use(null)
         }
-        session = attempt("Opening $location") { host.open(location) }
+        use(attempt("Opening $location") { host.open(location) })
         if (session == null) showChoice()
+    }
+
+    // The work first, so a screen never sees an open database without it.
+    private suspend fun use(opened: DatabaseSession?) {
+        work =
+            opened?.let {
+                val context = currentCoroutineContext()
+                SessionWork(host.imports(it), CoroutineScope(context + SupervisorJob(context.job)))
+            }
+        session = opened
     }
 
     private fun showChoice() {

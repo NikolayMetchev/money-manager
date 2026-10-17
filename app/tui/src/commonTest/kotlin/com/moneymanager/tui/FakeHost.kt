@@ -8,8 +8,13 @@ import com.jakewharton.mosaic.testing.runMosaicTest
 import com.moneymanager.credentialvault.testing.InMemoryLocalSettings
 import com.moneymanager.credentialvault.testing.inMemoryCredentialVault
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.importfilesource.ImportFileSource
+import com.moneymanager.importfilesource.ImportFileSourceFactory
+import com.moneymanager.importfilesource.localfolder.LocalFolderImportFileSource
 import com.moneymanager.session.DatabaseSession
 import com.moneymanager.session.DatabaseSessions
+import com.moneymanager.session.SessionImports
 import com.moneymanager.test.database.createTestDatabaseManager
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.awaitCancellation
@@ -40,9 +45,16 @@ internal class FakeHost(
         if (session.location == refuseClosing) throw IllegalStateException("Didn't upload")
     }
 
+    override fun imports(session: DatabaseSession): SessionImports = SessionImports(session.services, vault, LocalFolders)
+
     override suspend fun answerVaultRequests() = awaitCancellation()
 
     override fun suggestedDatabase(): String? = null
+}
+
+/** Opens local import folders, the only kind a test adds. */
+internal object LocalFolders : ImportFileSourceFactory {
+    override suspend fun create(directory: ImportDirectory): ImportFileSource = LocalFolderImportFileSource(directory.folderRef)
 }
 
 internal fun tui(

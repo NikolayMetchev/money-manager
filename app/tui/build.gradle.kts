@@ -18,6 +18,7 @@ kotlin {
 
                 implementation(projects.app.presenter.accounts)
                 implementation(projects.app.presenter.core)
+                implementation(projects.app.presenter.imports)
                 implementation(projects.app.presenter.transactions)
                 implementation(projects.app.query)
                 implementation(projects.utils.files)
@@ -33,6 +34,7 @@ kotlin {
         jvmMain {
             dependencies {
                 api(projects.app.model.core)
+                api(projects.app.tasks)
                 api(projects.utils.credentialvault)
                 api(libs.androidx.compose.runtime.desktop)
 
@@ -47,10 +49,14 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(projects.app.importengineapi)
+                implementation(projects.app.importfilesource.core)
+                implementation(projects.app.importfilesource.localfolder)
+                implementation(projects.app.model.importdirectory)
                 implementation(projects.test.app.db)
                 implementation(projects.test.utils.credentialvault)
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.kotlinx.io.core)
                 implementation(libs.mosaic.testing)
             }
         }
@@ -61,6 +67,7 @@ kotlin {
                 implementation(projects.app.db.write)
                 implementation(projects.app.remotestorage.sync)
                 implementation(projects.utils.localsettings)
+                implementation(libs.ktor.client.core)
             }
         }
     }

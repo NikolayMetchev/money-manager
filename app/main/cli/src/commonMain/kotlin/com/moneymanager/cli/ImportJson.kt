@@ -5,14 +5,11 @@ import com.moneymanager.apiimport.ApiDownloadAndImportAllResult
 import com.moneymanager.apiimport.ApiDownloadOutcome
 import com.moneymanager.apiimport.ApiSessionImport
 import com.moneymanager.apiimport.ApiSessionImportStatus
-import com.moneymanager.apiimport.ApiSessionNeedsAttention
 import com.moneymanager.csvimporter.BulkFileOutcome
 import com.moneymanager.csvimporter.BulkFileStatus
 import com.moneymanager.csvimporter.DirectoryRedownloadResult
 import com.moneymanager.importdirectory.ImportAllResult
-import com.moneymanager.importdirectory.NeedsAttentionReason
 import kotlinx.serialization.Serializable
-import com.moneymanager.importdirectory.NeedsAttention as DirectoryNeedsAttention
 
 /**
  * What `mm import dirs|apis|all` did (see `docs/cli-json.md`). A section is null when the command didn't
@@ -179,20 +176,6 @@ private fun BulkFileOutcome.toJson(format: String) =
         error = error,
     )
 
-internal fun DirectoryNeedsAttention.toJson() =
-    NeedsAttentionJson(
-        kind =
-            when (reason) {
-                NeedsAttentionReason.NO_STRATEGY -> "noStrategy"
-                NeedsAttentionReason.NEEDS_SOURCE_ACCOUNT -> "needsSourceAccount"
-                NeedsAttentionReason.REDOWNLOAD_BLOCKED -> "redownloadBlocked"
-                NeedsAttentionReason.REIMPORT_SUGGESTED -> "reimportSuggested"
-                NeedsAttentionReason.UNASSIGNED_CARD -> "unassignedCard"
-            },
-        subject = subject,
-        reason = reason.description,
-    )
-
 internal fun ApiDownloadAndImportAllResult.toJson(): ApisImportJson =
     ApisImportJson(
         connections = credentials.map { it.toJson() },
@@ -234,13 +217,4 @@ private fun ApiSessionImport.toJson() =
         duplicates = result?.duplicateCount ?: 0,
         errors = result?.errorCount ?: 0,
         error = error,
-    )
-
-internal fun ApiSessionNeedsAttention.toJson() =
-    NeedsAttentionJson(
-        kind = "counterparties",
-        subject = "${strategy.name} session #${session.id}",
-        reason =
-            "${counterparties.size} counterparty account name(s) to confirm: " +
-                counterparties.joinToString { it.suggestedAccountName },
     )

@@ -64,8 +64,7 @@ import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.remotestorage.sync.SyncState
 import com.moneymanager.remotestorage.sync.SyncStatus
-import com.moneymanager.session.apiImportService
-import com.moneymanager.session.importDirectoryService
+import com.moneymanager.session.SessionImports
 import com.moneymanager.strategycatalog.StrategyCatalogController
 import com.moneymanager.ui.components.DefaultCurrencyInitDialog
 import com.moneymanager.ui.foundation.LocalCredentialVault
@@ -115,7 +114,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -137,13 +135,15 @@ fun MoneyManagerApp(
     ProvideSchemaAwareScope {
         val scope = rememberSchemaAwareCoroutineScope()
         val taskManager = rememberTaskManager(scope)
-        // One write lock per database, shared by both services: directory and API runs (which outlive any
-        // screen) can run at once, and the engine doesn't serialize their writes itself.
-        val writeLock = remember(services) { Mutex() }
-        val importDirectoryService =
-            remember(services, importFileSourceFactory) { services.importDirectoryService(importFileSourceFactory, writeLock) }
+        // One per database: its two services share a write lock, since directory and API runs (which outlive any
+        // screen) can run at once and the engine doesn't serialize their writes itself.
         val credentialVault = LocalCredentialVault.current
-        val apiImportService = remember(services, credentialVault) { services.apiImportService(credentialVault, writeLock) }
+        val sessionImports =
+            remember(services, importFileSourceFactory, credentialVault) {
+                SessionImports(services, credentialVault, importFileSourceFactory)
+            }
+        val importDirectoryService = sessionImports.directories
+        val apiImportService = sessionImports.apis
         val backStack = rememberNavBackStack(ScreenSavedStateConfiguration, Screen.Accounts())
         val navigationHistory = remember(backStack) { NavigationHistory(backStack) }
         val currentScreen = navigationHistory.currentScreen

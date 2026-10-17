@@ -39,6 +39,7 @@ kotlin {
                 api(projects.app.importengineapi)
                 api(projects.app.importfilesource.core)
                 api(projects.app.model.core)
+                api(projects.app.model.importdirectory)
                 api(projects.app.remotestorage.sync)
                 api(projects.app.tasks)
                 api(projects.utils.credentialvault)
@@ -47,6 +48,8 @@ kotlin {
                 api(libs.kotlinx.coroutines.core)
                 api(libs.ktor.client.core)
 
+                implementation(projects.app.apiimporter)
+                implementation(projects.app.model.apistrategy)
                 implementation(projects.app.model.repository.read)
                 implementation(libs.kermit.core)
             }
@@ -54,9 +57,12 @@ kotlin {
         getByName("androidMain") {
             dependencies {
                 api(projects.app.db.write)
+                api(projects.app.model.importdirectory)
                 api(libs.kotlinx.coroutines.core)
                 api(libs.ktor.client.core)
 
+                implementation(projects.app.apiimporter)
+                implementation(projects.app.model.apistrategy)
                 implementation(libs.kermit.core)
             }
         }

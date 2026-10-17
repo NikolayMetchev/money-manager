@@ -57,6 +57,7 @@ fun TuiApp(
     var selected by remember { mutableIntStateOf(0) }
     var help by remember { mutableStateOf(false) }
     val session = controller.session
+    val work = controller.work
     // Kept by the shell so the Accounts tab can open an account in the Transactions tab; another database forgets it.
     var browsedAccount by remember(session) { mutableStateOf<AccountId?>(null) }
     val prompter = controller.prompter
@@ -110,9 +111,9 @@ fun TuiApp(
         Column {
             TabBar(screens, selected, width)
             Box(modifier = Modifier.size(width, bodyHeight)) {
-                if (session != null) {
+                if (session != null && work != null) {
                     val scope =
-                        TuiScreenScope(session, prompter, width, bodyHeight, browsedAccount) { account ->
+                        TuiScreenScope(session, work, prompter, width, bodyHeight, browsedAccount) { account ->
                             browsedAccount = account
                             screens.indexOf(TransactionsScreen).takeIf { it >= 0 }?.let { selected = it }
                         }
@@ -125,6 +126,7 @@ fun TuiApp(
         val request = prompter.request
         when {
             request != null -> PromptDialog(request, prompter.notice, dialogWidth)
+            prompter.info != null -> InfoDialog(checkNotNull(prompter.info), dialogWidth)
             help -> HelpOverlay(screens.getOrNull(selected), dialogWidth)
             busy != null -> Panel(dialogWidth) { Text(fit("$busy…", dialogWidth - PANEL_INSET)) }
             choice != null -> ChoiceDialog(choice, prompter.notice, dialogWidth)
@@ -214,6 +216,45 @@ private fun PromptDialog(
             is PromptRequest.Confirm ->
                 Text(fit(if (request.default) "[Y/n]" else "[y/N]", inner), textStyle = TextStyle.Dim)
         }
+    }
+}
+
+@Composable
+private fun InfoDialog(
+    info: Info,
+    width: Int,
+) {
+    val inner = width - PANEL_INSET
+    Panel(width) {
+        Text(fit(info.title, inner), textStyle = TextStyle.Bold)
+        for (line in wrap(info.text, inner)) Text(line)
+        Text(fit("Enter or Esc to close", inner), textStyle = TextStyle.Dim)
+    }
+}
+
+/** [text] in lines of at most [width] columns, broken at spaces where it can be and mid-word (a URL) where it can't. */
+internal fun wrap(
+    text: String,
+    width: Int,
+): List<String> {
+    if (width <= 0) return emptyList()
+    return text.lines().flatMap { paragraph ->
+        val lines = mutableListOf<String>()
+        var line = ""
+        for (word in paragraph.split(' ')) {
+            val candidate = if (line.isEmpty()) word else "$line $word"
+            if (candidate.length <= width) {
+                line = candidate
+                continue
+            }
+            if (line.isNotEmpty()) lines += line
+            line = word
+            while (line.length > width) {
+                lines += line.take(width)
+                line = line.drop(width)
+            }
+        }
+        lines + line
     }
 }
 

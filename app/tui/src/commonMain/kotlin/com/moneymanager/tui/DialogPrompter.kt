@@ -36,6 +36,12 @@ data class Notice(
     val error: Boolean,
 )
 
+/** Something to read at leisure, such as a sign-in URL: it stays in a dialog until dismissed, and nothing waits on it. */
+data class Info(
+    val title: String,
+    val text: String,
+)
+
 /**
  * The TUI's [Prompter]: each question opens a dialog and waits for its answer, so the code that asks (the vault
  * unlocker, the cloud close prompts) is the same code the CLI runs. Questions from concurrent callers queue up,
@@ -51,7 +57,18 @@ class DialogPrompter : Prompter {
     /** The latest message, until the person dismisses it. */
     var notice: Notice? by mutableStateOf(null)
 
+    /** The [Info] on screen, until the person dismisses it. */
+    var info: Info? by mutableStateOf(null)
+
     override val interactive: Boolean get() = true
+
+    /** Shows [text] under [title] in a dialog, without waiting for the person to read it. */
+    fun inform(
+        title: String,
+        text: String,
+    ) {
+        info = Info(title, text)
+    }
 
     override fun error(message: String) {
         notice = Notice(message, error = true)
@@ -87,9 +104,18 @@ class DialogPrompter : Prompter {
             }
         }
 
-    /** Answers the open dialog from [event]; false when no dialog is open. Every key goes to an open dialog. */
+    /**
+     * Answers the open dialog from [event], or dismisses the [info] (Enter or Escape); false when neither is open.
+     * Every key goes to an open dialog.
+     */
     fun handleKey(event: KeyEvent): Boolean {
-        when (val current = request ?: return false) {
+        val current = request
+        if (current == null) {
+            if (info == null) return false
+            if (event.key == "Enter" || event.key == "Escape") info = null
+            return true
+        }
+        when (current) {
             is PromptRequest.Line ->
                 when (event.key) {
                     "Enter" -> current.answer.complete(current.editor.text)

@@ -39,6 +39,8 @@ internal class CliRuntime(
     val silenceStderrLogs: () -> Unit,
     /** Runs the TUI full screen (see [CliPlatform.runTui]). */
     val runTui: suspend (TuiController, CredentialVault) -> Unit,
+    /** Where the services' Google sign-in URLs go. */
+    val signIn: SignInRelay,
     servicesFactory: () -> CliServices,
 ) {
     val services: CliServices by lazy(servicesFactory)
@@ -109,6 +111,8 @@ internal class MmCommand(
         installCliLogging(stderr, verbose, quiet, platform.logFile)
         val console = Console(terminal, currentContext.readEnvvar, vaultPasswordStdin, quiet, stderr)
         val resolvedFormat = format ?: if (terminal.terminalInfo.outputInteractive) OutputFormat.TABLE else OutputFormat.JSON
+        val browser = platform.browser(noBrowser, console::error)
+        val signIn = SignInRelay(default = browser, system = browser.takeUnless { noBrowser })
         val progressMode = ProgressMode.of(quiet, platform.stderrIsTerminal(), currentContext.readEnvvar)
         currentContext.obj =
             CliRuntime(
@@ -123,7 +127,8 @@ internal class MmCommand(
                     ),
                 silenceStderrLogs = { installCliLogging(stderr, verbose = false, quiet = true, platform.logFile) },
                 runTui = platform.runTui,
-                servicesFactory = { platform.services(platform.browser(noBrowser, console::error)) },
+                signIn = signIn,
+                servicesFactory = { platform.services(signIn) },
             )
     }
 
