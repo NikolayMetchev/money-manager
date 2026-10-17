@@ -4,6 +4,9 @@ kmp_library(
     name = "bigdecimal",
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     jvm_android_srcs = glob(["src/jvmAndroidMain/kotlin/**/*.kt"]),
+    native_deps = ["//bazel/kmp/deps:bignum"],
+    native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
+    native_targets = ["linuxX64"],
     visibility = ["//visibility:public"],
 )
 
@@ -11,5 +14,6 @@ kmp_test(
     name = "test",
     associate = ":bigdecimal",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = ["linuxX64"],
     deps = ["//bazel/kmp/deps:kotlin_test"],
 )
