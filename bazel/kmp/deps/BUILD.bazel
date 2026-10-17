@@ -1,0 +1,32 @@
+# The external libraries module BUILD files name, behind stable labels so KMP variant resolution (#1000) and
+# compiler-plugin support (#1001) can repoint them without touching any module.
+load("@rules_kotlin//kotlin:core.bzl", "kt_compiler_plugin")
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# kotlin("test") on the JVM: kotlin-test plus its JUnit 4 binding, as KGP infers for a JUnit 4 test task.
+kt_jvm_library(
+    name = "kotlin_test",
+    exports = [
+        "@maven//:junit_junit",
+        "@rules_kotlin//kotlin/compiler:kotlin-test",
+        "@rules_kotlin//kotlin/compiler:kotlin-test-junit",
+    ],
+)
+
+alias(
+    name = "kotlinx_io_core",
+    actual = "@maven//:org_jetbrains_kotlinx_kotlinx_io_core_jvm",
+)
+
+alias(
+    name = "kotlinx_serialization_core",
+    actual = "@maven//:org_jetbrains_kotlinx_kotlinx_serialization_core_jvm",
+)
+
+kt_compiler_plugin(
+    name = "serialization_plugin",
+    id = "org.jetbrains.kotlinx.serialization",
+    deps = ["@rules_kotlin//kotlin/compiler:kotlinx-serialization-compiler-plugin"],
+)

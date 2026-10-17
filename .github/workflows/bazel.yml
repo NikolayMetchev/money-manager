@@ -40,6 +40,5 @@ jobs:
       - name: Build
         run: bazel build //...
 
-      # Exit code 4 means "no test targets", which holds until the first kmp_test lands.
       - name: Test
-        run: bazel test //... || [ $? -eq 4 ]
+        run: bazel test //...

@@ -1,0 +1,86 @@
+diff --git a/kotlin/internal/jvm/compile.bzl b/kotlin/internal/jvm/compile.bzl
+--- a/kotlin/internal/jvm/compile.bzl
++++ b/kotlin/internal/jvm/compile.bzl
+@@ -651,6 +651,29 @@
+ def _plugins_payload_to_json(payload):
+     return _plugin_payload.plugins_payload_json(payload.plugins)
+ 
++def _fragment_flags(ctx, srcs):
++    """Kotlin Multiplatform fragment flags for a target that sets `fragment_srcs`, or none."""
++    fragment_srcs = getattr(ctx.attr, "fragment_srcs", None)
++    if not fragment_srcs:
++        return []
++    fragments = []
++    sources = []
++    for target, fragment in fragment_srcs.items():
++        if fragment not in fragments:
++            fragments.append(fragment)
++        for f in target.files.to_list():
++            if f not in srcs.kt:
++                fail("fragment_srcs: %s is not in srcs" % f.short_path)
++            sources.append("-Xfragment-sources=%s:%s" % (fragment, f.path))
++    refines = getattr(ctx.attr, "fragment_refines", {})
++    for child, parent in refines.items():
++        if child not in fragments or parent not in fragments:
++            fail("fragment_refines: %s:%s names a fragment with no sources" % (child, parent))
++    return ["-Xmulti-platform", "-Xfragments=" + ",".join(fragments)] + [
++        "-Xfragment-refines=%s:%s" % (child, parent)
++        for child, parent in refines.items()
++    ] + sources
++
+ def _run_kt_builder_action(
+         ctx,
+         mnemonic,
+@@ -707,6 +730,7 @@
+ 
+     # Unwrap kotlinc_options/javac_options options or default to the ones being provided by the toolchain
+     args.add_all("--kotlin_passthrough_flags", kotlinc_options_to_flags(kotlinc_options))
++    args.add_all("--kotlin_passthrough_flags", _fragment_flags(ctx, srcs))
+     args.add_all("--javacopts", javac_options_to_flags(javac_options))
+ 
+     # Associates contribute their own jars to the classpath, and which flavor (compile jar or class
+diff --git a/kotlin/internal/jvm/jvm.bzl b/kotlin/internal/jvm/jvm.bzl
+--- a/kotlin/internal/jvm/jvm.bzl
++++ b/kotlin/internal/jvm/jvm.bzl
+@@ -218,6 +218,20 @@
+             ],
+             allow_files = False,
+         ),
++        "fragment_refines": attr.string_dict(
++            doc = """Kotlin Multiplatform: the refines (dependsOn) edges between the fragments named in
++            `fragment_srcs`, child fragment to parent fragment, passed as `-Xfragment-refines`.""",
++            default = {},
++        ),
++        "fragment_srcs": attr.label_keyed_string_dict(
++            doc = """Kotlin Multiplatform: the fragment (source set) each Kotlin source belongs to. When set,
++            the target compiles as one multiplatform compilation over every fragment (`-Xmulti-platform`,
++            `-Xfragments`, `-Xfragment-sources`), like the Kotlin Gradle plugin's platform compilations, so
++            expect/actual declarations match across fragments and common code is checked as common code.
++            Every key must also be in `srcs`.""",
++            allow_files = [".kt"],
++            default = {},
++        ),
+         "javac_opts": attr.label(
+             doc = """Javac options to be used when compiling this target. These opts if provided will
+             be used instead of the ones provided to the toolchain.""",
+diff --git a/src/main/starlark/core/options/opts.kotlinc.bzl b/src/main/starlark/core/options/opts.kotlinc.bzl
+--- a/src/main/starlark/core/options/opts.kotlinc.bzl
++++ b/src/main/starlark/core/options/opts.kotlinc.bzl
+@@ -338,6 +338,17 @@
+             True: ["-Xenable-incremental-compilation"],
+         },
+     ),
++    "x_expect_actual_classes": struct(
++        flag = "-Xexpect-actual-classes",
++        args = dict(
++            default = False,
++            doc = "Enable expect/actual classes, interfaces and objects (still Beta in Kotlin 2.x).",
++        ),
++        type = attr.bool,
++        value_to_flag = {
++            True: ["-Xexpect-actual-classes"],
++        },
++    ),
+     "x_explicit_api_mode": struct(
+         flag = "-Xexplicit-api",
+         args = dict(

@@ -1,7 +1,29 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("@rules_kotlin//kotlin:core.bzl", "define_kt_toolchain", "kt_kotlinc_options")
 
 bzl_library(
     name = "defs",
     srcs = ["defs.bzl"],
     visibility = ["//visibility:public"],
+)
+
+# The flags moneymanager.kotlin-convention and moneymanager.kotlin-multiplatform-convention set on every
+# Gradle compile.
+kt_kotlinc_options(
+    name = "kotlinc_options",
+    # allWarningsAsErrors.
+    warn = "error",
+    x_expect_actual_classes = True,
+    # Gradle's default; rules_kotlin's is "class".
+    x_lambdas = "indy",
+)
+
+define_kt_toolchain(
+    name = "kotlin_toolchain",
+    # Never strip downstream compile jars to ABI jars: Metro's contribution hints (#1002) and Compose's
+    # stability metadata live in what an ABI jar drops.
+    experimental_use_abi_jars = False,
+    # jvm-target in gradle/libs.versions.toml.
+    jvm_target = "25",
+    kotlinc_options = ":kotlinc_options",
 )
