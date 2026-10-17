@@ -4,8 +4,10 @@ import com.github.ajalt.clikt.command.SuspendingCliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.clikt.core.requireObject
+import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.localsettings.KEY_LAST_DATABASE
+import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.session.DatabaseSession
 import com.moneymanager.session.SessionImports
 import com.moneymanager.tui.DialogPrompter
@@ -55,6 +57,12 @@ private class CliTuiHost(
     override suspend fun open(location: DbLocation): DatabaseSession = session.open(location)
 
     override suspend fun close(session: DatabaseSession) = this.session.close(session)
+
+    override suspend fun reload(session: DatabaseSession): DatabaseSession = this.session.reload(session)
+
+    override val remote: RemoteDatabaseController? = services.remoteController
+
+    override val appVersion: AppVersion = services.appVersion
 
     override fun imports(session: DatabaseSession): SessionImports =
         SessionImports(session.services, services.credentialVault, services.importFileSources, services.httpEngine)

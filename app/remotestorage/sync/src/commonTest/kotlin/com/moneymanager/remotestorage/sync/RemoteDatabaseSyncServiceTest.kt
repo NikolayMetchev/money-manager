@@ -1,6 +1,7 @@
 package com.moneymanager.remotestorage.sync
 
 import com.moneymanager.archive.ArchiveDecryptionException
+import com.moneymanager.remotestorage.testing.InMemoryStorageProvider
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase

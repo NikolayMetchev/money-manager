@@ -7,6 +7,8 @@ import com.moneymanager.credentialvault.bundleOrNull
 import com.moneymanager.credentialvault.testing.TEST_VAULT_PASSWORD
 import com.moneymanager.credentialvault.testing.inMemoryCredentialVault
 import com.moneymanager.credentialvault.testing.unlockedCredentialVault
+import com.moneymanager.remotestorage.testing.InMemoryStorageProvider
+import com.moneymanager.remotestorage.testing.SingleProviderFactory
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals

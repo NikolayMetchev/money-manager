@@ -26,7 +26,7 @@ class ImportsScreenTest {
         writeText(Path(folder, "unknown.csv"), "Foo,Bar\n1,2\n")
         try {
             tui(location, DEFAULT_SCREENS) { _, controller ->
-                screen { it.contains("Press o to open") }
+                screen { it.contains("o open another database") }
                 val session = checkNotNull(controller.session)
                 val now = Clock.System.now()
                 session.importEngine.createImportDirectory(
@@ -67,7 +67,7 @@ class ImportsScreenTest {
         val location = createTestDatabaseLocation()
         try {
             tui(location, DEFAULT_SCREENS) { _, controller ->
-                screen { it.contains("Press o to open") }
+                screen { it.contains("o open another database") }
                 controller.prompter.inform("Sign in to Google", "Open this URL:\nhttps://accounts.example.com/o/oauth2/auth?client_id=abc")
                 assertContains(screen { it.contains("Sign in to Google") }, "https://accounts.example.com/o/oauth2/auth?client_id=abc")
                 // Every key goes to the dialog until it's closed.

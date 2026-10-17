@@ -12,6 +12,8 @@ import com.moneymanager.domain.strategy.StrategyParseResult
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageException
 import com.moneymanager.remotestorage.RemoteStorageProvider
+import com.moneymanager.remotestorage.testing.InMemoryStorageProvider
+import com.moneymanager.remotestorage.testing.SingleProviderFactory
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

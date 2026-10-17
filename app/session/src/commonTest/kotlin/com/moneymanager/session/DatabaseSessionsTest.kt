@@ -11,12 +11,11 @@ import com.moneymanager.importengineapi.createCurrency
 import com.moneymanager.localsettings.KEY_LAST_DATABASE
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageProvider
-import com.moneymanager.remotestorage.RemoteStorageProviderFactory
-import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.sync.RemoteDatabaseBinding
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.RemoteDatabaseSyncService
 import com.moneymanager.remotestorage.sync.SyncResult
+import com.moneymanager.remotestorage.testing.SingleProviderFactory
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
@@ -270,16 +269,4 @@ private class OneFileProvider : RemoteStorageProvider {
         const val ID = "one-file"
         const val FILE_ID = "file-0"
     }
-}
-
-private class SingleProviderFactory(
-    private val provider: RemoteStorageProvider,
-) : RemoteStorageProviderFactory {
-    override fun types(): List<RemoteStorageType> = listOf(RemoteStorageType(provider.id, provider.displayName))
-
-    override fun create(
-        providerId: String,
-        config: String?,
-        subfolder: String?,
-    ): RemoteStorageProvider = provider
 }

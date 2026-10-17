@@ -33,8 +33,8 @@ class AccountsScreenTest {
     fun listsAccountsLiveAndFiltersThemThroughTheSharedPresenter() {
         val location = createTestDatabaseLocation()
         try {
-            tui(location, listOf(DatabaseScreen, AccountsScreen)) { _, controller ->
-                screen { it.contains("Press o to open") }
+            tui(location, listOf(StatusScreen, AccountsScreen)) { _, controller ->
+                screen { it.contains("o open another database") }
                 press("2")
                 screen { it.contains("Accounts · 0 of 0") }
 
@@ -81,8 +81,8 @@ class AccountsScreenTest {
     fun picksOwnersAndAssetsAndGroupsByOwner() {
         val location = createTestDatabaseLocation()
         try {
-            tui(location, listOf(DatabaseScreen, AccountsScreen)) { _, controller ->
-                screen { it.contains("Press o to open") }
+            tui(location, listOf(StatusScreen, AccountsScreen)) { _, controller ->
+                screen { it.contains("o open another database") }
                 val engine = checkNotNull(controller.session).importEngine
                 val gbp =
                     Currency(
