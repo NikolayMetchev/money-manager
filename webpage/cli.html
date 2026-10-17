@@ -358,6 +358,16 @@ mm import dirs | jq '.data.needsAttention'</code></pre>
         </table>
       </div>
       <p>
+        The <b>Status</b> tab shows the version, the open database, its cloud copy and the credential vault. For a
+        cloud-backed database it shows whether the copies are in sync, this copy has changes to upload, or another device
+        uploaded changes (then writes are refused, on every tab, until you download them; the footer says
+        <i>editing locked</i>). Press <code>c</code> to connect with the cloud password (unless
+        <code>MM_REMOTE_PASSWORD</code> already did), then <code>s</code> to upload this copy, <code>r</code> to check for
+        other devices' changes and <code>D</code> to download the cloud copy over this one. Uploading over another
+        device's changes, or downloading over local ones, asks first. <code>l</code> locks or unlocks the vault (or
+        creates it), and <code>o</code> opens another database.
+      </p>
+      <p>
         The <b>Accounts</b> tab lists accounts with their owners and per-asset balances, keeps the same accounts as the
         desktop Accounts screen for the same filter, and follows the database as it changes, for example while an
         import runs. Press <code>/</code> to type a name filter (<code>Enter</code> or <code>Esc</code> to stop),

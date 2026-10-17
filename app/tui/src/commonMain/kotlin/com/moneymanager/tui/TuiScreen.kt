@@ -1,6 +1,7 @@
 package com.moneymanager.tui
 
 import androidx.compose.runtime.Composable
+import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.session.DatabaseSession
 
@@ -34,4 +35,7 @@ class TuiScreenScope(
     val browsedAccount: AccountId?,
     /** Shows an account's transactions, wherever the shell keeps them. */
     val openAccount: (AccountId) -> Unit,
+    /** The open database's cloud sync and the app's lifecycle actions on it. */
+    val controller: TuiController,
+    val vault: CredentialVault,
 )

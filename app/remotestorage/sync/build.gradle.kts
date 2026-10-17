@@ -53,6 +53,7 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(projects.test.app.db)
+                implementation(projects.test.app.remotestorage)
                 implementation(projects.test.utils.credentialvault)
                 implementation(projects.utils.archive)
                 implementation(kotlin("test"))

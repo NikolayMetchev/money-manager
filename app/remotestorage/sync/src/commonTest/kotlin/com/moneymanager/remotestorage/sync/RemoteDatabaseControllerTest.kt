@@ -2,6 +2,8 @@ package com.moneymanager.remotestorage.sync
 
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.remotestorage.testing.InMemoryStorageProvider
+import com.moneymanager.remotestorage.testing.SingleProviderFactory
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase

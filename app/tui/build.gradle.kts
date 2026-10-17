@@ -19,6 +19,7 @@ kotlin {
                 implementation(projects.app.presenter.accounts)
                 implementation(projects.app.presenter.core)
                 implementation(projects.app.presenter.imports)
+                implementation(projects.app.presenter.status)
                 implementation(projects.app.presenter.transactions)
                 implementation(projects.app.query)
                 implementation(projects.utils.files)
@@ -34,6 +35,7 @@ kotlin {
         jvmMain {
             dependencies {
                 api(projects.app.model.core)
+                api(projects.app.remotestorage.sync)
                 api(projects.app.tasks)
                 api(projects.utils.credentialvault)
                 api(libs.androidx.compose.runtime.desktop)
