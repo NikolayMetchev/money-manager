@@ -8,11 +8,11 @@ kmp_library(
     visibility = ["//visibility:public"],
     deps = [
         "//bazel/kmp/deps:kotlinx_io_core",
-        "//utils/files:files_jvm",
+        "//utils/files:files",
     ],
     exports = [
         "//bazel/kmp/deps:kotlinx_serialization_core",
-        "//utils/bigdecimal:bigdecimal_jvm",
+        "//utils/bigdecimal:bigdecimal",
     ],
 )
 

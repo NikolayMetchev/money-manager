@@ -6,6 +6,7 @@ the same module for linuxX64 and mingwX64 side by side, as KGP does, with no pla
 """
 
 load("@rules_java//java/common:java_common.bzl", "java_common")
+load("@rules_java//java/common:java_info.bzl", "JavaInfo")
 
 KotlinNativeToolchainInfo = provider(
     doc = "A Kotlin/Native distribution with its konan dependencies, and the JVM that runs it.",
@@ -15,6 +16,7 @@ KotlinNativeToolchainInfo = provider(
         "dist_files": "depset of the distribution files every invocation reads.",
         "host": "konan's name for the exec host (`linux_x64`, `macos_arm64`, `mingw_x64`).",
         "java_runtime": "JavaRuntimeInfo konan runs on.",
+        "launcher": "The KonanLauncher jar, run in front of konan's main class.",
         "targets": "dict: konan target name → depset of that target's platform klibs and dependencies.",
         "version": "The Kotlin/Native version.",
     },
@@ -29,6 +31,7 @@ def _toolchain_impl(ctx):
         data_dir = root + "/" + ctx.attr.data_dir,
         dist_files = depset(ctx.files.dist),
         java_runtime = ctx.attr._java_runtime[java_common.JavaRuntimeInfo],
+        launcher = ctx.attr._launcher[JavaInfo].runtime_output_jars[0],
         targets = {
             target: files[DefaultInfo].files
             for files, target in ctx.attr.targets.items()
@@ -45,6 +48,11 @@ kotlin_native_toolchain = rule(
         "host": attr.string(mandatory = True),
         "targets": attr.label_keyed_string_dict(mandatory = True),
         "version": attr.string(mandatory = True),
+        "_launcher": attr.label(
+            default = "//bazel/kmp/native/launcher",
+            cfg = "exec",
+            providers = [JavaInfo],
+        ),
         "_java_runtime": attr.label(
             default = "@bazel_tools//tools/jdk:current_java_runtime",
             cfg = "exec",
@@ -76,7 +84,7 @@ def run_konan(ctx, tool, target, arguments, inputs, outputs, mnemonic, progress_
     """Runs a konan tool (`konanc`, `cinterop`, `klib`, …) for one konan target.
 
     Mirrors the distribution's `bin/run_konan` launcher without its shell script, so it runs the same on
-    every exec OS: the JVM comes from the Java toolchain and konan's data directory is inside the
+    every exec OS (`KonanLauncher` fixes up the one path konan needs absolute): the JVM comes from the Java toolchain and konan's data directory is inside the
     toolchain's repository. `airplaneMode=true` makes a missing dependency an error rather than a download.
 
     Args:
@@ -103,15 +111,18 @@ def run_konan(ctx, tool, target, arguments, inputs, outputs, mnemonic, progress_
         "-Dkonan.home=" + kn.dist_dir,
         "-Dkonan.data.dir=" + kn.data_dir,
         "-cp",
-        kn.dist_dir + "/konan/lib/kotlin-native-compiler-embeddable.jar",
-        "org.jetbrains.kotlin.cli.utilities.MainKt",
+        ctx.configuration.host_path_separator.join([
+            kn.launcher.path,
+            kn.dist_dir + "/konan/lib/kotlin-native-compiler-embeddable.jar",
+        ]),
+        "com.moneymanager.bazel.kmp.nativelauncher.KonanLauncher",
         tool,
     ])
     ctx.actions.run(
         executable = java.java_executable_exec_path,
         arguments = [launcher] + arguments + ["-Xoverride-konan-properties=airplaneMode=true"],
         inputs = depset(
-            direct = inputs if type(inputs) == "list" else [],
+            direct = (inputs if type(inputs) == "list" else []) + [kn.launcher],
             transitive = [kn.dist_files, kn.targets[target], java.files] +
                          ([inputs] if type(inputs) == "depset" else []),
         ),

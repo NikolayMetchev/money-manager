@@ -82,11 +82,17 @@ committed `MODULE.bazel.lock`), on the same JDK 25 (`.bazelrc`). The KMP rules l
 extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output). CI runs it in the non-required
 `bazel.yml` workflow (`bazel build //...` and `bazel test //...`).
 
-- **`kmp_library` / `kmp_test`** (`//bazel/kmp:defs.bzl`) compile a module's JVM target the way KGP does: one K2 call
-  over every fragment (`commonMain ← jvmAndroidMain ← jvmMain`, empty ones left out), so expect/actual and common
-  code are checked per fragment. `exports` is Gradle's `api` (also on the module's own classpath). Tests run through
-  `KmpJUnitRunner` (JUnit 4), named `:test_jvm`. Their `test.xml` matches Gradle's `jvmTest` results case for case,
-  apart from KGP's `[jvm]` name suffix.
+- **`kmp_library` / `kmp_test`** (`//bazel/kmp:defs.bzl`) compile a module the way KGP does: one K2 call per platform
+  over every fragment (`commonMain ← jvmAndroidMain ← jvmMain`; `commonMain ← nativeMain ← linuxMain|appleMain|mingwMain`),
+  empty ones left out, so expect/actual and common code are checked per fragment. A module emits `:<name>_jvm` and
+  `:<name>_<target>` per `native_targets` entry (`_linuxX64`, …); deps are written once, as module labels
+  (`//utils/files:files`), and each platform gets that label's `_<platform>` target, `//bazel/kmp/deps` included.
+  `exports` is Gradle's `api` (also on the module's own classpath; on native every klib dep is transitive anyway).
+  Klibs are uniquely named after the full path (`utils.bigdecimal:utils-bigdecimal`) and compiled `-g -Werror`, as
+  KGP does. JVM tests run through `KmpJUnitRunner` (JUnit 4), named `:test_jvm`; native tests link with konan's test
+  runner and run through `KnTestLauncher`, which turns its TeamCity output into `test.xml`, named `:test_<target>`
+  and only run where the binary does (on Linux x64, `_linuxX64`). Both match Gradle's results case for case, apart
+  from KGP's `[jvm]`/`[linuxX64]` suffixes.
 - **The compile is rules_kotlin's `kt_jvm_library`, patched**: rules_kotlin has no fragment flags, so
   `bazel/third_party/rules_kotlin/fragments.patch` (via `single_version_override`) adds `fragment_srcs` /
   `fragment_refines` and an `x_expect_actual_classes` option. It is Starlark only. Rebase it on every rules_kotlin
