@@ -92,7 +92,10 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   KGP does. JVM tests run through `KmpJUnitRunner` (JUnit 4), named `:test_jvm`; native tests link with konan's test
   runner and run through `KnTestLauncher`, which turns its TeamCity output into `test.xml`, named `:test_<target>`
   and only run where the binary does (on Linux x64, `_linuxX64`). Both match Gradle's results case for case, apart
-  from KGP's `[jvm]`/`[linuxX64]` suffixes.
+  from KGP's `[jvm]`/`[linuxX64]` suffixes. Gradle has no test timeout, so tests default to `medium`; a slower suite
+  sets `# gazelle:kmp_test_size`, and one that reads files from the tree at run time `# gazelle:kmp_test_data`
+  (paths are relative to the workspace root, the runfiles' working directory). Test JVMs use `/tmp`, as Gradle's do.
+  Every module's JVM runtime carries `kotlinx-coroutines-swing`, as the KMP convention does.
 - **The compile is rules_kotlin's `kt_jvm_library`, patched**: rules_kotlin has no fragment flags, so
   `bazel/third_party/rules_kotlin/fragments.patch` (via `single_version_override`) adds `fragment_srcs` /
   `fragment_refines` and an `x_expect_actual_classes` option. It is Starlark only. Rebase it on every rules_kotlin

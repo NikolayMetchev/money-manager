@@ -2,6 +2,9 @@
 # gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
 # gazelle:kmp_plugins serialization
 # gazelle:kmp_keep_dep //utils/sqlite3 nativeMain
+# SqlFileNamingConventionTest scans every .sq file; the suite takes about three minutes.
+# gazelle:kmp_test_data //app/db/write:sqldelight_sq
+# gazelle:kmp_test_size large
 # gazelle:kmp_export //app/db/read
 # gazelle:kmp_export //app/db/write
 # gazelle:kmp_export //app/importengineapi
@@ -84,8 +87,10 @@ kmp_library(
 
 kmp_test(
     name = "test",
+    size = "large",
     associate = ":core",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    data = ["//app/db/write:sqldelight_sq"],
     jvm_deps = [
         "@maven_kmp//:kotlinx_serialization_core",
         "@maven_kmp//:kotlinx_serialization_json",

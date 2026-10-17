@@ -39,7 +39,10 @@ def _impl(ctx):
     )
     return [
         DefaultInfo(files = depset([srcjar])),
-        OutputGroupInfo(kt = depset([out_dir])),
+        OutputGroupInfo(
+            kt = depset([out_dir]),
+            sq = depset(ctx.files.srcs, transitive = [u.srcs for u in upstream]),
+        ),
         SqlDelightInfo(
             database = "%s:%s" % (ctx.attr.package, ctx.attr.class_name),
             folders = depset([folder], transitive = [u.folders for u in upstream]),
@@ -70,7 +73,8 @@ _sqldelight_library = rule(
 )
 
 def sqldelight_library(name, visibility = None, **kwargs):
-    """A SQLDelight database. Emits `:<name>` (srcjar + SqlDelightInfo) and `:<name>_kt` (the sources' directory).
+    """A SQLDelight database. Emits `:<name>` (srcjar + SqlDelightInfo), `:<name>_kt` (the sources' directory) and
+    `:<name>_sq` (this and every upstream database's `.sq` files, for tests that read them).
 
     Args:
         name: the target name; `kmp_library(sqldelight = ":<name>")` takes it.
@@ -82,5 +86,11 @@ def sqldelight_library(name, visibility = None, **kwargs):
         name = name + "_kt",
         srcs = [":" + name],
         output_group = "kt",
+        visibility = visibility,
+    )
+    native.filegroup(
+        name = name + "_sq",
+        srcs = [":" + name],
+        output_group = "sq",
         visibility = visibility,
     )

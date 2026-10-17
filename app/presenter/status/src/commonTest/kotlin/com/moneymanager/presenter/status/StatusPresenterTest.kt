@@ -23,6 +23,7 @@ import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.filterNotNull
@@ -137,7 +138,10 @@ class StatusPresenterTest {
         val settings = InMemoryLocalSettings()
         val remote = RemoteDatabaseController(RemoteDatabaseSyncService(manager, settings), SingleProviderFactory(provider))
         val session = DatabaseSessions(manager, settings, inMemoryCredentialVault(), remote).open(location)
-        val scope = CoroutineScope(SupervisorJob())
+        // Actions run on the test's own thread. On a pool thread their state writes would race the composition's
+        // cancellation: under Turbine's Unconfined collector, Molecule sends a frame inline from the global snapshot
+        // lock's write observer while the cancelling thread holds the Recomposer's lock and wants the snapshot's.
+        val scope = CoroutineScope(SupervisorJob() + coroutineContext.minusKey(Job))
         try {
             // A hang fails the test rather than the whole CI job.
             withTimeout(WHOLE_TEST_TIMEOUT) {
