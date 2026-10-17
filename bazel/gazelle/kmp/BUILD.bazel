@@ -1,2 +1,30 @@
-# The Gazelle language extension that generates every BUILD.bazel for Kotlin Multiplatform modules (#995).
-# Gazelle extensions can't be Starlark, so it will be a go_library here.
+# The Gazelle language extension that generates every Kotlin Multiplatform module's BUILD.bazel (#1004).
+# Gazelle extensions can't be Starlark, so it's Go, built into //:gazelle.
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "kmp",
+    srcs = [
+        "config.go",
+        "generate.go",
+        "lang.go",
+        "resolve.go",
+    ],
+    importpath = "github.com/NikolayMetchev/money-manager/bazel/gazelle/kmp",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@gazelle//config",
+        "@gazelle//label",
+        "@gazelle//language",
+        "@gazelle//repo",
+        "@gazelle//resolve",
+        "@gazelle//rule",
+    ],
+)
+
+go_test(
+    name = "kmp_test",
+    size = "small",
+    srcs = ["kmp_test.go"],
+    embed = [":kmp"],
+)

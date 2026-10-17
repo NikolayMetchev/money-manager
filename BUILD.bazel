@@ -1,0 +1,13 @@
+# Generates every Kotlin Multiplatform module's BUILD.bazel (//bazel/gazelle/kmp): bazel run //:gazelle
+# Check that none is stale: bazel run //:gazelle -- --mode=diff
+load("@gazelle//:def.bzl", "gazelle", "gazelle_binary")
+
+gazelle_binary(
+    name = "gazelle_bin",
+    languages = ["//bazel/gazelle/kmp"],
+)
+
+gazelle(
+    name = "gazelle",
+    gazelle = ":gazelle_bin",
+)
