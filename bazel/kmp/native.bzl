@@ -140,7 +140,14 @@ def _test_impl(ctx):
     args.add_all(["-g", "-enable-assertions", "-Werror", "-generate-test-runner"])
     args.add("-friend-modules", associate.klib)
     args.add("-Xinclude=" + test_klib.path)
-    args.add_all(associate.transitive_klibs, before_each = "-library")
+
+    # Every library the tests need except the test klib itself, which -Xinclude names.
+    libraries = depset(transitive = [d[KlibInfo].transitive_klibs for d in ctx.attr.deps] + [associate.transitive_klibs])
+    args.add_all(libraries, before_each = "-library")
+
+    # A library missing from the link would otherwise only fail when the test reaches it (partial linkage
+    # turns unlinked symbols into runtime errors); our rules, not KGP, decide what's linked, so fail here.
+    args.add("-Xpartial-linkage-loglevel=ERROR")
     run_konan(
         ctx,
         tool = "konanc",
