@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.command.SuspendingCliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.requireObject
 import com.moneymanager.credentialvault.VaultState
+import com.moneymanager.session.bindingFor
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -41,7 +42,7 @@ internal class StatusCommand : SuspendingCliktCommand(name = "status") {
         val status =
             runtime.withSession { session ->
                 val controller = services.remoteController
-                val binding = controller?.activeBinding()?.takeIf { it.localCachePath == session.location.path }
+                val binding = controller?.bindingFor(session.location)
                 StatusJson(
                     version = services.appVersion.value,
                     database = session.location.path,

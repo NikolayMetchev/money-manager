@@ -4,7 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import co.touchlab.kermit.Logger
+import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.session.DatabaseSession
 import com.moneymanager.session.SessionImports
 import com.moneymanager.tasks.TaskManager
@@ -36,6 +38,14 @@ interface TuiSessionHost {
 
     /** Closes [session], asking what to do with a changed cloud-backed copy. */
     suspend fun close(session: DatabaseSession)
+
+    /** Downloads the cloud copy over [session]'s working copy, closing it first, and opens the result. */
+    suspend fun reload(session: DatabaseSession): DatabaseSession
+
+    /** The cloud sync of a cloud-backed database, or null where there's no cloud storage. */
+    val remote: RemoteDatabaseController?
+
+    val appVersion: AppVersion
 
     /** The imports [session] runs: its directory and API services, sharing one write lock. */
     fun imports(session: DatabaseSession): SessionImports
@@ -83,6 +93,8 @@ class TuiController(
         data object Choose : Command
 
         data object CancelChoice : Command
+
+        data object Reload : Command
 
         data class Open(
             val location: DbLocation,
@@ -145,6 +157,15 @@ class TuiController(
         commands.trySend(Command.Open(location))
     }
 
+    /** Replaces the open cloud-backed database with the cloud copy, discarding local changes not uploaded. */
+    fun reloadFromRemote() {
+        commands.trySend(Command.Reload)
+    }
+
+    val remote: RemoteDatabaseController? get() = host.remote
+
+    val appVersion: AppVersion get() = host.appVersion
+
     /**
      * Runs until the person quits, then closes the open database. A failed close (a refused cloud upload),
      * whether on quitting or earlier when switching databases, is rethrown once everything is shut, so `mm`
@@ -174,6 +195,7 @@ class TuiController(
                 Command.Choose -> showChoice()
                 Command.CancelChoice -> if (session != null) choice = null
                 is Command.Open -> switchTo(command.location)
+                Command.Reload -> reload()
             }
         }
         session?.let { open ->
@@ -200,6 +222,14 @@ class TuiController(
             use(null)
         }
         use(attempt("Opening $location") { host.open(location) })
+        if (session == null) showChoice()
+    }
+
+    private suspend fun reload() {
+        val current = session ?: return
+        work?.stop()
+        // The download closes the old handle first, so a failure leaves no database open.
+        use(attempt("Downloading the cloud copy") { host.reload(current) })
         if (session == null) showChoice()
     }
 

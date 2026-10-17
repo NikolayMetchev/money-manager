@@ -28,7 +28,10 @@ import com.moneymanager.credentialvault.VaultState
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.files.expandTilde
+import com.moneymanager.remotestorage.sync.SyncState
+import com.moneymanager.session.bindingFor
 import com.moneymanager.terminal.fit
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /** The keys that work everywhere, as the help overlay lists them. */
 val GLOBAL_BINDINGS: List<KeyBinding> =
@@ -54,10 +57,12 @@ fun TuiApp(
 ) {
     val size = LocalTerminalState.current.size
     val vaultState by vault.state.collectAsState()
+    val syncState by (controller.remote?.syncState ?: NO_REMOTE).collectAsState()
     var selected by remember { mutableIntStateOf(0) }
     var help by remember { mutableStateOf(false) }
     val session = controller.session
     val work = controller.work
+    val editingLocked = session != null && controller.remote?.bindingFor(session.location) != null && syncState.editingLocked
     // Kept by the shell so the Accounts tab can open an account in the Transactions tab; another database forgets it.
     var browsedAccount by remember(session) { mutableStateOf<AccountId?>(null) }
     val prompter = controller.prompter
@@ -113,14 +118,24 @@ fun TuiApp(
             Box(modifier = Modifier.size(width, bodyHeight)) {
                 if (session != null && work != null) {
                     val scope =
-                        TuiScreenScope(session, work, prompter, width, bodyHeight, browsedAccount) { account ->
-                            browsedAccount = account
-                            screens.indexOf(TransactionsScreen).takeIf { it >= 0 }?.let { selected = it }
-                        }
+                        TuiScreenScope(
+                            session,
+                            work,
+                            prompter,
+                            width,
+                            bodyHeight,
+                            browsedAccount,
+                            openAccount = { account ->
+                                browsedAccount = account
+                                screens.indexOf(TransactionsScreen).takeIf { it >= 0 }?.let { selected = it }
+                            },
+                            controller = controller,
+                            vault = vault,
+                        )
                     screens[selected].content(scope)
                 }
             }
-            Footer(controller, vaultState, width)
+            Footer(controller, vaultState, editingLocked, width)
         }
         val dialogWidth = (width - 4).coerceIn(1, MAX_DIALOG_WIDTH)
         val request = prompter.request
@@ -177,6 +192,7 @@ private fun TabBar(
 private fun Footer(
     controller: TuiController,
     vaultState: VaultState,
+    editingLocked: Boolean,
     width: Int,
 ) {
     val notice = controller.prompter.notice
@@ -193,7 +209,8 @@ private fun Footer(
         }
     // The keys stay visible however long the path: it's the path that gets cut.
     val keys = " · ? help · q quit"
-    val status = "$database · $vault"
+    // Writes fail on every tab while it lasts, so it's shown wherever the person is.
+    val status = "$database · " + (if (editingLocked) "editing locked · " else "") + vault
     val line = if (width > keys.length * 2) fit(status, width - keys.length) + keys else fit(status + keys, width)
     Text(line, textStyle = TextStyle.Dim)
 }
@@ -284,19 +301,23 @@ private fun HelpOverlay(
     val inner = width - PANEL_INSET
     val keysWidth = (GLOBAL_BINDINGS + screen?.bindings.orEmpty()).maxOf { it.keys.length } + 2
 
-    @Composable
-    fun Bindings(bindings: List<KeyBinding>) {
-        for (binding in bindings) {
-            Text(fit(binding.keys.padEnd(keysWidth) + binding.description, inner))
-        }
-    }
+    fun bindings(bindings: List<KeyBinding>) = bindings.map { fit(it.keys.padEnd(keysWidth) + it.description, inner) to false }
 
+    val lines =
+        buildList {
+            add("Keys" to true)
+            addAll(bindings(GLOBAL_BINDINGS))
+            if (screen != null && screen.bindings.isNotEmpty()) {
+                add(screen.title to true)
+                addAll(bindings(screen.bindings))
+            }
+        }
+    // The border takes two rows and the closing hint one; a short terminal cuts the list rather than the panel.
+    val rows = (LocalTerminalState.current.size.rows - 3).coerceAtLeast(0)
     Panel(width) {
-        Text(fit("Keys", inner), textStyle = TextStyle.Bold)
-        Bindings(GLOBAL_BINDINGS)
-        if (screen != null && screen.bindings.isNotEmpty()) {
-            Text(fit(screen.title, inner), textStyle = TextStyle.Bold)
-            Bindings(screen.bindings)
+        val shown = if (lines.size > rows) lines.take((rows - 1).coerceAtLeast(0)) + ("…" to false) else lines
+        for ((line, title) in shown.take(rows)) {
+            Text(fit(line, inner), textStyle = if (title) TextStyle.Bold else TextStyle.Unspecified)
         }
         Text(fit("? or Esc to close", inner), textStyle = TextStyle.Dim)
     }
@@ -340,6 +361,8 @@ internal fun Panel(
         }
     }
 }
+
+private val NO_REMOTE = MutableStateFlow(SyncState())
 
 /** Columns a panel's border and padding take from its width. */
 internal const val PANEL_INSET = 4

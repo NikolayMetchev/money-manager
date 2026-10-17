@@ -7,11 +7,13 @@ import com.jakewharton.mosaic.testing.TestMosaic
 import com.jakewharton.mosaic.testing.runMosaicTest
 import com.moneymanager.credentialvault.testing.InMemoryLocalSettings
 import com.moneymanager.credentialvault.testing.inMemoryCredentialVault
+import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.importfilesource.localfolder.LocalFolderImportFileSource
+import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.session.DatabaseSession
 import com.moneymanager.session.DatabaseSessions
 import com.moneymanager.session.SessionImports
@@ -44,6 +46,12 @@ internal class FakeHost(
         closed += session.location
         if (session.location == refuseClosing) throw IllegalStateException("Didn't upload")
     }
+
+    override suspend fun reload(session: DatabaseSession): DatabaseSession = error("No cloud copy in these tests")
+
+    override val remote: RemoteDatabaseController? = null
+
+    override val appVersion = AppVersion("9.9.9-test")
 
     override fun imports(session: DatabaseSession): SessionImports = SessionImports(session.services, vault, LocalFolders)
 
