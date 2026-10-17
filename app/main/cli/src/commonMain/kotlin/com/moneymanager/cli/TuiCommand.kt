@@ -7,6 +7,7 @@ import com.github.ajalt.clikt.core.requireObject
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.localsettings.KEY_LAST_DATABASE
 import com.moneymanager.session.DatabaseSession
+import com.moneymanager.session.SessionImports
 import com.moneymanager.tui.DialogPrompter
 import com.moneymanager.tui.NotATerminalException
 import com.moneymanager.tui.TuiController
@@ -34,7 +35,11 @@ internal class TuiCommand : SuspendingCliktCommand(name = "tui") {
         // A log line on stderr would land in the middle of the screen; the log file still gets everything.
         runtime.silenceStderrLogs()
         try {
-            runtime.runTui(controller, services.credentialVault)
+            runtime.signIn.during(show = { url ->
+                prompter.inform("Sign in to Google", "Open this URL in a browser to finish signing in:\n$url")
+            }) {
+                runtime.runTui(controller, services.credentialVault)
+            }
         } catch (notATerminal: NotATerminalException) {
             throw UsageError("mm tui needs a terminal: run it without redirecting stdin or stdout")
         }
@@ -50,6 +55,9 @@ private class CliTuiHost(
     override suspend fun open(location: DbLocation): DatabaseSession = session.open(location)
 
     override suspend fun close(session: DatabaseSession) = this.session.close(session)
+
+    override fun imports(session: DatabaseSession): SessionImports =
+        SessionImports(session.services, services.credentialVault, services.importFileSources, services.httpEngine)
 
     override suspend fun answerVaultRequests() = session.answerVaultRequests()
 

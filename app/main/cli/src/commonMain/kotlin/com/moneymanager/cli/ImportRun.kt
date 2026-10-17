@@ -3,29 +3,16 @@ package com.moneymanager.cli
 import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.mordant.rendering.Widget
 import com.github.ajalt.mordant.table.table
-import com.moneymanager.apiimport.API_DOWNLOAD_IMPORT_ALL_TASK_KEY
-import com.moneymanager.apiimport.ApiDownloadAndImportAllResult
-import com.moneymanager.apiimport.ApiImportService
-import com.moneymanager.credentialvault.CredentialVaultLockedException
-import com.moneymanager.credentialvault.VaultState
-import com.moneymanager.domain.model.ApiCredential
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
-import com.moneymanager.importdirectory.IMPORT_ALL_TASK_KEY
-import com.moneymanager.importdirectory.ImportAllResult
-import com.moneymanager.importdirectory.ImportDirectoryService
+import com.moneymanager.session.ApiImport
 import com.moneymanager.session.DatabaseSession
-import com.moneymanager.session.apiImportService
-import com.moneymanager.session.importDirectoryService
+import com.moneymanager.session.DirectoryImport
+import com.moneymanager.session.ImportRequest
+import com.moneymanager.session.ImportRunOutcome
+import com.moneymanager.session.SessionImports
 import com.moneymanager.tasks.TaskManager
-import com.moneymanager.tasks.TaskScope
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.withContext
 
 /** What to do with import directories: [names] limits it to those folders (all when empty). */
 internal data class DirectoriesRequest(
@@ -78,130 +65,38 @@ internal class ImportRun(
         apis: ApisRequest?,
     ): ImportJson {
         val services = session.services
-        // One lock for both: the engine doesn't serialize writes, and `import all` runs the two at once.
-        val writeLock = Mutex()
-        val directoryService = services.importDirectoryService(runtime.services.importFileSources, writeLock)
-        val apiService = services.apiImportService(runtime.services.credentialVault, writeLock, runtime.services.httpEngine)
-
-        val allDirectories =
-            services.imports.importDirectoryRepository
-                .getAllDirectories()
-                .first()
-        val folders = directories?.let { resolveDirectories(allDirectories, it.names) }
-        val needsAttention = mutableListOf<NeedsAttentionJson>()
-        val targets =
+        val imports =
+            SessionImports(services, runtime.services.credentialVault, runtime.services.importFileSources, runtime.services.httpEngine)
+        // Names resolve before anything downloads or prompts, so a typo is a usage error up front.
+        val folders =
+            directories?.let {
+                resolveDirectories(
+                    services.imports.importDirectoryRepository
+                        .getAllDirectories()
+                        .first(),
+                    it.names,
+                )
+            }
+        val strategyIds =
             apis?.let { request ->
-                try {
-                    apiTargets(apiService, session, request)
-                } catch (locked: CredentialVaultLockedException) {
-                    if (!request.optional) throw locked
-                    needsAttention += NeedsAttentionJson("vaultLocked", "APIs", "the credential vault is locked: ${locked.message}")
-                    null
-                }
+                val strategies =
+                    services.imports.apiImportStrategyRepository
+                        .getAllStrategies()
+                        .first()
+                resolveByName(strategies, request.strategies, "API strategy") { it.name }?.mapTo(mutableSetOf()) { it.id }
             }
-
+        val request =
+            ImportRequest(
+                directories = directories?.let { DirectoryImport(folders, it.apply, it.redownload) },
+                apis = apis?.let { ApiImport(strategyIds, it.forceFull, it.apply, it.optional) },
+            )
         val outcome =
-            try {
-                coroutineScope {
-                    val manager = TaskManager(this)
-                    runtime.withProgress(manager) {
-                        val apiRun = targets?.let { list -> list to apis }
-                        when {
-                            directories != null && apiRun != null ->
-                                manager.await("import-all", "Import all", ImportOutcome::summary) {
-                                    importBoth(directoryService, folders, directories, apiService, apiRun.first, apiRun.second)
-                                }
-                            directories != null ->
-                                manager.await(IMPORT_ALL_TASK_KEY, "Import directories", ImportOutcome::summary) {
-                                    ImportOutcome(directories = importDirectories(directoryService, folders, directories))
-                                }
-                            apiRun != null ->
-                                manager.await(API_DOWNLOAD_IMPORT_ALL_TASK_KEY, "Import APIs", ImportOutcome::summary) {
-                                    ImportOutcome(apis = importApis(apiService, apiRun.first, apiRun.second))
-                                }
-                            else -> ImportOutcome()
-                        }
-                    }
-                }
-            } finally {
-                // Once for the whole run, since every import above was told not to; also when one failed or
-                // the run was cancelled, so whatever it wrote shows up.
-                if (directories?.apply == true || apis?.apply == true) {
-                    withContext(NonCancellable) { services.imports.maintenance.refreshMaterializedViews() }
-                }
+            coroutineScope {
+                val manager = TaskManager(this)
+                runtime.withProgress(manager) { imports.run(manager, request) }
             }
-        return outcome.toJson(needsAttention)
+        return outcome.toJson()
     }
-
-    // The APIs a run downloads: unlocks the vault (prompting if it must), gives every installed strategy with
-    // secrets its connection row, then picks the connections of [request]'s strategies. Null: nothing to do.
-    private suspend fun apiTargets(
-        apiService: ApiImportService,
-        session: DatabaseSession,
-        request: ApisRequest,
-    ): List<ApiCredential>? {
-        val imports = session.services.imports
-        val strategies = imports.apiImportStrategyRepository.getAllStrategies().first()
-        val vault = runtime.services.credentialVault
-        // `import all` on a database nobody connected an API in: there are no secrets to unlock.
-        val nothingConnected =
-            strategies.isEmpty() ||
-                (imports.apiSessionRepository.getAllCredentials().isEmpty() && vault.state.value is VaultState.NoFile)
-        if (request.optional && nothingConnected) return null
-        val selected = resolveByName(strategies, request.strategies, "API strategy") { it.name }
-        vault.requireUnlocked("Import from APIs")
-        apiService.ensureConnections()
-        val selectedIds = selected?.mapTo(mutableSetOf()) { it.id }
-        val credentials = imports.apiSessionRepository.getAllCredentials()
-        return credentials.filter { selectedIds == null || it.strategyId in selectedIds }
-    }
-
-    private suspend fun TaskScope.importBoth(
-        directoryService: ImportDirectoryService,
-        folders: List<ImportDirectory>?,
-        directories: DirectoriesRequest,
-        apiService: ApiImportService,
-        targets: List<ApiCredential>,
-        apis: ApisRequest,
-    ): ImportOutcome =
-        coroutineScope {
-            // Each side fails on its own: a broken Drive sign-in mustn't stop the API imports, or the reverse.
-            val dirs =
-                async {
-                    isolated("Import directories") {
-                        child(IMPORT_ALL_TASK_KEY, "Import directories", "Listing folders…") {
-                            importDirectories(directoryService, folders, directories)
-                        }
-                    }
-                }
-            val api =
-                async {
-                    isolated("Import APIs") {
-                        child(API_DOWNLOAD_IMPORT_ALL_TASK_KEY, "Import APIs", "Connecting…") { importApis(apiService, targets, apis) }
-                    }
-                }
-            val (dirResult, dirError) = dirs.await()
-            val (apiResult, apiError) = api.await()
-            ImportOutcome(dirResult, apiResult, listOfNotNull(dirError, apiError))
-        }
-
-    private suspend fun TaskScope.importDirectories(
-        service: ImportDirectoryService,
-        folders: List<ImportDirectory>?,
-        request: DirectoriesRequest,
-    ) = service.importAll(this, folders, apply = request.apply, redownloadFirst = request.redownload, refreshViews = false)
-
-    private suspend fun TaskScope.importApis(
-        service: ApiImportService,
-        targets: List<ApiCredential>,
-        request: ApisRequest,
-    ) = service.downloadAndImportAll(
-        task = this,
-        targets = targets,
-        forceFullIds = if (request.forceFull) targets.mapTo(mutableSetOf()) { it.id } else emptySet(),
-        importSessions = request.apply,
-        refreshViews = false,
-    )
 }
 
 /** The folders [names] pick, each with its subfolders (null: every folder). */
@@ -231,63 +126,13 @@ internal fun <T> resolveByName(
     }
 }
 
-// Runs [block] as this manager's top-level task and returns what it returned, or rethrows what it threw:
-// the manager records a task's outcome but doesn't hand it back. Waits for the task to settle so the
-// progress display ends on its final state.
-private suspend fun <T> TaskManager.await(
-    key: String,
-    title: String,
-    detail: (T) -> String,
-    block: suspend TaskScope.() -> T,
-): T {
-    val result = CompletableDeferred<T>()
-    val id =
-        start(key, title, "Starting…") {
-            try {
-                block().also { result.complete(it) }.let(detail)
-            } catch (expected: Exception) {
-                // Cancellation included, so the caller never waits on a task that has stopped.
-                result.completeExceptionally(expected)
-                throw expected
-            }
-        }
-    checkNotNull(id) { "$title is already running" }
-    val value = result.await()
-    tasks.first { all -> all.none { it.id == id && it.isRunning } }
-    return value
-}
-
-// [block]'s result, or the message it failed with.
-private suspend fun <T> isolated(
-    what: String,
-    block: suspend () -> T,
-): Pair<T?, String?> =
-    try {
-        block() to null
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (expected: Exception) {
-        null to "$what failed: ${expected.message ?: expected::class.simpleName}"
-    }
-
-private data class ImportOutcome(
-    val directories: ImportAllResult? = null,
-    val apis: ApiDownloadAndImportAllResult? = null,
-    val errors: List<String> = emptyList(),
-) {
-    fun summary(): String = listOfNotNull(directories?.summary(), apis?.summary(), *errors.toTypedArray()).joinToString(" ")
-
-    fun toJson(extraAttention: List<NeedsAttentionJson>) =
-        ImportJson(
-            directories = directories?.toJson(),
-            apis = apis?.toJson(),
-            needsAttention =
-                directories?.needsAttention.orEmpty().map { it.toJson() } +
-                    apis?.needsAttention.orEmpty().map { it.toJson() } +
-                    extraAttention,
-            errors = errors,
-        )
-}
+private fun ImportRunOutcome.toJson() =
+    ImportJson(
+        directories = directories?.toJson(),
+        apis = apis?.toJson(),
+        needsAttention = needsAttention.map { NeedsAttentionJson(it.kind, it.subject, it.reason) },
+        errors = errors,
+    )
 
 private fun summaryTable(summary: ImportJson): Widget =
     table {

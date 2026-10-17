@@ -24,6 +24,8 @@ class TuiScreen(
 /** What a screen can use. */
 class TuiScreenScope(
     val session: DatabaseSession,
+    /** The open database's imports and background tasks. */
+    val work: SessionWork,
     val prompter: DialogPrompter,
     val width: Int,
     /** The body's rows, between the tab bar and the footer. */

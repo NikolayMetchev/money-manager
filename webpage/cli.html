@@ -381,6 +381,16 @@ mm import dirs | jq '.data.needsAttention'</code></pre>
         opening its account when it isn't this one. The tab is read-only.
       </p>
       <p>
+        The <b>Imports</b> tab runs the same imports as <code>mm import</code>: <code>d</code> imports the directories,
+        <code>a</code> the APIs, <code>f</code> the APIs downloading everything again (like <code>--force-full</code>),
+        and <code>i</code> both at once (like <code>import all</code>). The run's tasks show live, and <code>c</code>
+        cancels it. A run keeps going while you look at another tab, and one runs at a time. When it finishes, the tab lists
+        what needs a person (a file no strategy matches, a folder needing a source account, counterparties to confirm, an
+        unassigned card, a locked vault), to be resolved in the desktop app for now. If a Google Drive folder needs you to
+        sign in, the sign-in URL is shown in a dialog (and written to the log file), and the browser opens unless
+        <code>--no-browser</code> is given.
+      </p>
+      <p>
         Keys outside ASCII, such as <code>é</code> or <code>£</code>, can't be typed into the TUI's prompts yet, and a
         paste of more than about 64 characters at once can lose some of them. Use the environment variables for passwords
         that contain such keys, and <code>--db</code> for a long database path.
