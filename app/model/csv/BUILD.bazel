@@ -1,0 +1,19 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+NATIVE_TARGETS = [
+    "linuxArm64",
+    "linuxX64",
+    "macosArm64",
+    "mingwX64",
+]
+
+kmp_library(
+    name = "csv",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = NATIVE_TARGETS,
+    plugins = ["serialization"],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/model/core",
+    ],
+)

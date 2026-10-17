@@ -109,6 +109,14 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   `deps`, in jars and klibs alike, because ABI jars stay off. A dep that exists only so Metro sees it (app/di/core's
   feature DI modules) is a plain dep marked `# keep`, so Gazelle (and the Gazelle-diff check, #1016) keeps it
   though no import explains it.
+- **SQLDelight** (`//bazel/kmp/sqldelight`, #1003): `sqldelight_library` runs the SQLDelight compiler (the
+  `SqlDelightEnvironment` the Gradle task drives, with its defaults) over a module's `.sq` files, upstream databases'
+  folders as dependencies, and `kmp_library(sqldelight = …)` compiles the result as `commonMain` (plus the runtime as
+  `api`). Output matches Gradle's `build/generated/sqldelight` byte for byte. konanc gets the sources in the module's
+  own compile; on the JVM they compile as `<name>_sqldelight_jvm`, exported, because rules_kotlin can't put srcjar
+  sources in a fragment. The compiler API is internal: `//bazel/kmp/sqldelight/tests:golden_test` pins its output
+  (refresh with `:update_golden` after checking a bump). Fragments: like KGP, `commonMain` and the leaf are always
+  named, empty or not (K2 takes a lone common fragment for the platform's own).
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.

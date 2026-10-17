@@ -43,6 +43,9 @@ register_toolchains("//bazel/kmp/native:all")
 maven_kmp = use_extension("//bazel/kmp/deps:extensions.bzl", "maven_kmp")
 maven_kmp.install(
     catalog = "//gradle:libs.versions.toml",
+    # SQLDelight's Gradle plugin jar carries the compiler environment //bazel/kmp/sqldelight runs, but none
+    # of its Gradle API.
+    excludes = ["org.jetbrains.kotlin:kotlin-gradle-plugin"],
     # moneymanager.kotlin-convention's dependency substitutions: these modules always resolve to the
     # catalog version, whoever asks for them.
     forces = {
@@ -91,12 +94,16 @@ maven_kmp.install(
         "kotlinx-datetime",
         "kotlinx-io-core",
         "kotlinx-serialization-core",
+        "kotlinx-serialization-json",
         "mappie-api",
         "mappie-compiler-plugin",
         "metro-compiler",
         "metro-runtime",
         "mokkery-plugin",
         "mokkery-runtime",
+        "sqldelight-compiler-env",
+        "sqldelight-dialect-sqlite",
+        "sqldelight-gradle-plugin",
         "sqldelight-runtime",
     ],
     lock_file = "//bazel/kmp/deps:maven_kmp.lock.json",

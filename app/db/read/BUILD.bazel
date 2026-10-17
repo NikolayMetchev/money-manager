@@ -1,0 +1,59 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+load("//bazel/kmp/sqldelight:sqldelight.bzl", "sqldelight_library")
+
+NATIVE_TARGETS = [
+    "linuxArm64",
+    "linuxX64",
+    "macosArm64",
+    "mingwX64",
+]
+
+sqldelight_library(
+    name = "sqldelight",
+    srcs = glob(["src/commonMain/sqldelight/**/*.sq"]),
+    module_name = "read",
+    package = "com.moneymanager.database.sql.read",
+    deps = ["//app/db/schema:sqldelight"],
+)
+
+kmp_library(
+    name = "read",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = NATIVE_TARGETS,
+    plugins = [
+        "mappie",
+        "serialization",
+    ],
+    sqldelight = ":sqldelight",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/bigdecimal",
+        "@maven_kmp//:kotlinx_serialization_json",
+    ],
+    exports = [
+        "//app/db/schema",
+        "//app/model/accountmapping",
+        "//app/model/apistrategy",
+        "//app/model/core",
+        "//app/model/csvstrategy",
+        "//app/model/passthrough",
+        "@maven_kmp//:kotlinx_serialization_core",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":read",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    jvm_deps = [
+        "//app/model/rules",
+        "//bazel/kmp/deps:kotlin_reflect",
+    ],
+    jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
+    native_targets = NATIVE_TARGETS,
+    plugins = [
+        "mappie",
+        "serialization",
+    ],
+    deps = ["//bazel/kmp/deps:kotlin_test"],
+)

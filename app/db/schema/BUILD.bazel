@@ -1,0 +1,24 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp/sqldelight:sqldelight.bzl", "sqldelight_library")
+
+NATIVE_TARGETS = [
+    "linuxArm64",
+    "linuxX64",
+    "macosArm64",
+    "mingwX64",
+]
+
+sqldelight_library(
+    name = "sqldelight",
+    srcs = glob(["src/commonMain/sqldelight/**/*.sq"]),
+    module_name = "schema",
+    package = "com.moneymanager.database.sql",
+    visibility = ["//visibility:public"],
+)
+
+kmp_library(
+    name = "schema",
+    native_targets = NATIVE_TARGETS,
+    sqldelight = ":sqldelight",
+    visibility = ["//visibility:public"],
+)
