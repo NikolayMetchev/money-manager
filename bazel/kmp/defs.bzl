@@ -91,6 +91,7 @@ def kmp_library(
         jvm_exports = [],
         plugins = [],
         sqldelight = None,
+        generated_srcs = [],
         visibility = None):
     """A Kotlin Multiplatform module. Emits `:<name>_jvm` and `:<name>_<target>` per native target.
 
@@ -117,8 +118,11 @@ def kmp_library(
             //bazel/kmp/plugins:plugins.bzl), applied on every platform with the runtime they bring.
         sqldelight: a `sqldelight_library` whose generated Kotlin joins `commonMain`. The SQLDelight runtime
             becomes an `api` dependency, as the SQLDelight Gradle plugin makes it.
+        generated_srcs: generated `.kt` files (`kotlin_constants`) that join `commonMain`, as Gradle's
+            `kotlin.srcDir(task)` does.
         visibility: the targets' visibility.
     """
+    common_srcs = common_srcs + generated_srcs
     fragments = _jvm_fragments("Main", common_srcs, jvm_android_srcs, jvm_srcs)
     brought = plugin_deps(plugins)
     generated_native = []

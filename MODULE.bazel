@@ -35,6 +35,10 @@ register_toolchains("//bazel/kmp:kotlin_toolchain")
 kotlin_native = use_extension("//bazel/kmp/native:extensions.bzl", "kotlin_native")
 use_repo(kotlin_native, "kotlin_native", "kotlin_native_repin")
 
+# The default desktop Google OAuth client, obfuscated from CI's secrets or secrets/google-oauth.properties (#1011).
+google_oauth = use_extension("//bazel/kmp/constants:google_oauth.bzl", "google_oauth")
+use_repo(google_oauth, "google_oauth")
+
 register_toolchains("//bazel/kmp/native:all")
 
 # Maven libraries, resolved per platform (jar, klib) from Gradle Module Metadata into

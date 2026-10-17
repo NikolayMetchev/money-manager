@@ -15,11 +15,24 @@
 # gazelle:kmp_export //utils/localsettings
 # gazelle:kmp_export //utils/localsettings/di
 
+# gazelle:kmp_generated_srcs :generated_app_version
 load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp/constants:constants.bzl", "kotlin_constants")
+
+# GenerateKotlinConstantsTask in the Gradle build, which generated_by names until the cutover (#1031).
+kotlin_constants(
+    name = "generated_app_version",
+    constants = {"//:VERSION": "VERSION"},
+    generated_by = ":app:di:core:generateAppVersion",
+    object = "GeneratedAppVersion",
+    package = "com.moneymanager.di",
+    trim = ["VERSION"],
+)
 
 kmp_library(
     name = "core",
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    generated_srcs = [":generated_app_version"],
     native_targets = [
         "linuxArm64",
         "linuxX64",

@@ -127,6 +127,11 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   contributors, runtime-only libraries), `kmp_plugins`, `kmp_sqldelight_package`, `kmp_sqldelight_dep`. Directives
   are per module, not inherited. `# keep` on a dep keeps it too. `//bazel/gazelle/kmp:generation_test` holds golden
   workspaces (`testdata/<case>`, `BUILD.in` → `BUILD.out`; refresh with `UPDATE_SNAPSHOTS=true bazel run` on it).
+- **Generated constants** (`//bazel/kmp/constants`, #1011): `kotlin_constants` is `GenerateKotlinConstantsTask`
+  (same generator logic, byte-identical output), joined to commonMain with `# gazelle:kmp_generated_srcs :<target>`.
+  The OAuth client is XOR-obfuscated in the `@google_oauth` repository (from `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`, else
+  `secrets/google-oauth.properties`), so the plaintext is never an action input. `.bazelrc` sets rules_kotlin's
+  strict associates: a test's friend is only its module's jar, as in KGP (otherwise K2 smart-casts the exports').
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.

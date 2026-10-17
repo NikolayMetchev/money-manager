@@ -40,10 +40,11 @@ jobs:
       - name: BUILD files are up to date
         run: bazel run //:gazelle -- --mode=diff
 
-      # app/cryptodata and app/remotestorage/googledrive compile generated constants (#1011); these are they and
-      # everything that depends on them. Each issue that unblocks a package removes it here.
-      - name: Packages waiting on generated constants
-        run: echo "BLOCKED=-//app/cryptodata/... -//app/db/core/... -//app/db/di/... -//app/di/core/... -//app/di/params/... -//app/importfilesource/di/... -//app/main/cli/... -//app/presenter/imports/... -//app/presenter/status/... -//app/remotestorage/di/... -//app/remotestorage/googledrive/... -//app/remotestorage/sync/... -//app/session/... -//app/tui/... -//test/app/db/... -//utils/credentialvault/di/... -//utils/localsettings/di/..." >> "$GITHUB_ENV"
+      # Native tests that open a database need the bundled SQLite linked (#1012); app/db/core's JVM tests read
+      # source files and fixtures they don't have yet (#1009). These are they and their dependents; each issue
+      # removes what it unblocks.
+      - name: Packages not yet buildable with Bazel
+        run: echo "BLOCKED=-//app/db/core/... -//app/main/cli/... -//app/presenter/imports/... -//app/presenter/status/... -//app/remotestorage/sync/... -//app/session/... -//app/tui/..." >> "$GITHUB_ENV"
 
       - name: Build
         run: bazel build -- //... $BLOCKED

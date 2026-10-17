@@ -10,6 +10,10 @@ common --tool_java_runtime_version=remotejdk_25
 # Keep the host's PATH and environment out of action keys, so caches hit across machines.
 common --incompatible_strict_action_env
 
+# A test's friend is its module's own jar, as in KGP, not everything that module exports: K2 treats a friend's
+# properties as the test's own and smart-casts them, so a `!!` Gradle needs reads as redundant (#1011).
+common --@rules_kotlin//kotlin/settings:experimental_strict_associate_dependencies=true
+
 test --test_output=errors
 
 # Personal overrides (disk cache, jobs, …), not checked in.
