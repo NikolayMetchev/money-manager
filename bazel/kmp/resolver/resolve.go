@@ -130,8 +130,8 @@ type Resolver struct {
 	fetch    *Fetcher
 	forces   map[string]string // module → version
 	excludes map[string]bool
-	mu     sync.Mutex
-	nodes  map[string]*node // platform|coordinate → node
+	mu       sync.Mutex
+	nodes    map[string]*node // platform|coordinate → node
 }
 
 func NewResolver(f *Fetcher, forces map[string]string, excludes []string) *Resolver {

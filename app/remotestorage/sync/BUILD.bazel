@@ -1,0 +1,64 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export //app/db/core
+# gazelle:kmp_export //app/model/core
+# gazelle:kmp_export //app/model/csvstrategy
+# gazelle:kmp_export //app/remotestorage/core
+# gazelle:kmp_export //utils/credentialvault
+# gazelle:kmp_export //utils/localsettings
+# gazelle:kmp_export //app/db/write jvmMain
+# gazelle:kmp_export //app/tasks jvmMain
+# gazelle:kmp_export @maven_kmp//:kotlinx_coroutines_core jvmMain
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "sync",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/db/core",
+        "//app/db/write",
+        "//app/model/core",
+        "//app/model/csvstrategy",
+        "//app/remotestorage/core",
+        "//app/tasks",
+        "//utils/credentialvault",
+        "//utils/localsettings",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+    deps = ["//utils/archive"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":sync",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    deps = [
+        "//app/db/write",
+        "//app/model/core",
+        "//app/model/csvstrategy",
+        "//app/remotestorage/core",
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/app/db",
+        "//test/app/remotestorage",
+        "//test/utils/credentialvault",
+        "//utils/archive",
+        "//utils/credentialvault",
+        "//utils/localsettings",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:sqldelight_runtime",
+    ],
+)

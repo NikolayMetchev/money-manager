@@ -87,10 +87,30 @@ sh_test(
 def _labels(names, modules, platform):
     return ['":%s_%s"' % (names[m], platform) for m in modules]
 
-def _target(name, platform, resolved, names):
-    deps = _labels(names, resolved.get("deps", []), platform)
+def _through_redirects(artifacts, modules, platform):
+    """`modules`, with each that has no files on `platform` replaced by what it redirects to, transitively:
+    kt_jvm_import's exports only take Kotlin targets."""
+    out = []
+    queue = list(modules)
+    seen = {}
+    for _ in range(10000):
+        if not queue:
+            break
+        module = queue.pop(0)
+        if module in seen:
+            continue
+        seen[module] = True
+        resolved = artifacts.get(module, {}).get(platform)
+        if resolved and not resolved["files"]:
+            queue.extend(resolved.get("deps", []))
+        else:
+            out.append(module)
+    return out
+
+def _target(name, platform, resolved, names, artifacts):
+    deps = _labels(names, _through_redirects(artifacts, resolved.get("deps", []), platform), platform)
     runtime = _labels(names, resolved.get("runtime_deps", []), platform)
-    files = ['"@%s//file"' % _file_repo(f) for f in resolved["files"]]
+    files = ['"@%s//file"' % _file_repo(f) for f in resolved["files"] or []]
     full = "%s_%s" % (name, platform)
     if platform == "jvm":
         if not files:
@@ -158,9 +178,10 @@ def _maven_kmp_impl(module_ctx):
     for module in sorted(lock["artifacts"]):
         for platform in sorted(lock["artifacts"][module]):
             resolved = lock["artifacts"][module][platform]
-            for f in resolved["files"]:
+            # A module that only redirects (a JetBrains fork naming the AndroidX original) has no files.
+            for f in resolved["files"] or []:
                 files[_file_repo(f)] = f
-            targets.append(_target(names[module], platform, resolved, names))
+            targets.append(_target(names[module], platform, resolved, names, lock["artifacts"]))
     for repo, f in files.items():
         http_file(name = repo, urls = [f["url"]], sha256 = f["sha256"], downloaded_file_path = f["name"])
 

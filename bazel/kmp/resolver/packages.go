@@ -20,6 +20,9 @@ func (f *Fetcher) packagesOf(file File) ([]string, error) {
 		return nil, fmt.Errorf("%s: %w", file.Name, err)
 	}
 	set := map[string]bool{}
+	// cinterop writes a near-empty fragment for every package enclosing its own (`dev`, `dev.whyoleg`, …); they
+	// declare nothing, and listing them would map another library's package to this klib.
+	klibBytes := map[string]uint64{}
 	for _, entry := range archive.File {
 		name := entry.Name
 		switch {
@@ -33,7 +36,13 @@ func (f *Fetcher) packagesOf(file File) ([]string, error) {
 			pkg = strings.TrimSuffix(pkg[:strings.IndexByte(pkg+"/", '/')], "/")
 			if pkg != "" {
 				set[pkg] = true
+				klibBytes[pkg] += entry.UncompressedSize64
 			}
+		}
+	}
+	for pkg, size := range klibBytes {
+		if size < emptyFragment && enclosesAnother(pkg, set) {
+			delete(set, pkg)
 		}
 	}
 	var out []string
@@ -42,4 +51,16 @@ func (f *Fetcher) packagesOf(file File) ([]string, error) {
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+// emptyFragment bounds a package fragment with no declarations: its header and name, nothing else.
+const emptyFragment = 64
+
+func enclosesAnother(pkg string, set map[string]bool) bool {
+	for other := range set {
+		if strings.HasPrefix(other, pkg+".") {
+			return true
+		}
+	}
+	return false
 }

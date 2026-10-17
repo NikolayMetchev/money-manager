@@ -1,0 +1,47 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_plugins metro
+# gazelle:kmp_export //app/db/core
+# gazelle:kmp_export //app/db/di
+# gazelle:kmp_export //app/di/params
+# gazelle:kmp_export //app/di/scope
+# gazelle:kmp_export //app/model/core
+# gazelle:kmp_export //app/remotestorage/di
+# gazelle:kmp_export //app/remotestorage/sync
+# gazelle:kmp_export //app/strategycatalog
+# gazelle:kmp_export //app/strategycatalog/di
+# gazelle:kmp_export //utils/credentialvault
+# gazelle:kmp_export //utils/credentialvault/di
+# gazelle:kmp_export //utils/localsettings
+# gazelle:kmp_export //utils/localsettings/di
+
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+kmp_library(
+    name = "core",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["metro"],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/db/core",
+        "//app/db/di",
+        "//app/di/params",
+        "//app/di/scope",
+        "//app/model/core",
+        "//app/remotestorage/di",
+        "//app/remotestorage/sync",
+        "//app/strategycatalog",
+        "//app/strategycatalog/di",
+        "//utils/credentialvault",
+        "//utils/credentialvault/di",
+        "//utils/localsettings",
+        "//utils/localsettings/di",
+    ],
+    deps = ["@maven_kmp//:metro_runtime"],
+)

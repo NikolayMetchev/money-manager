@@ -1,0 +1,56 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export //app/importengineapi
+# gazelle:kmp_export //app/model/core
+# gazelle:kmp_export //app/model/csv
+# gazelle:kmp_export //app/model/passthrough
+# gazelle:kmp_export //app/model/repository/read
+# gazelle:kmp_export //app/model/repository/write
+# gazelle:kmp_export //app/tasks jvmMain
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "importer",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/importengineapi",
+        "//app/model/core",
+        "//app/model/csv",
+        "//app/model/passthrough",
+        "//app/model/repository/read",
+        "//app/model/repository/write",
+        "//app/tasks",
+    ],
+    deps = [
+        "//utils/bigdecimal",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":importer",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    deps = [
+        "//app/importengineapi",
+        "//app/model/core",
+        "//app/model/csv",
+        "//app/model/passthrough",
+        "//bazel/kmp/deps:kotlin_test",
+        "//utils/bigdecimal",
+    ],
+)
