@@ -111,12 +111,15 @@ fun presentStatus(
                 message = null
                 scope.launch {
                     try {
-                        message = block()
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (expected: Exception) {
-                        // Offline, signed out, a wrong vault password: the person is told and can try again.
-                        message = StatusMessage("$label failed: ${expected.message ?: expected::class.simpleName}", error = true)
+                        message =
+                            try {
+                                block()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (expected: Exception) {
+                                // Offline, signed out, a wrong vault password: the person is told and can try again.
+                                StatusMessage("$label failed: ${expected.message ?: expected::class.simpleName}", error = true)
+                            }
                     } finally {
                         busy = null
                         revision++
