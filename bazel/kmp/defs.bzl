@@ -157,6 +157,8 @@ def kmp_library(
         deps = _on("jvm", deps + jvm_deps + exports + jvm_exports) if fragments.srcs else [],
         exports = jvm_exported,
         plugins = plugin_labels(plugins, "jvm"),
+        # moneymanager.kotlin-multiplatform-convention puts Dispatchers.Main on every JVM runtime classpath.
+        runtime_deps = [Label("@maven_kmp//:kotlinx_coroutines_swing_jvm")],
         visibility = visibility,
     )
     for target in native_targets:
@@ -193,7 +195,8 @@ def kmp_test(
         apple_deps = [],
         mingw_deps = [],
         plugins = [],
-        size = "small"):
+        data = [],
+        size = "medium"):
     """A module's tests. Emits `:<name>_jvm` and `:<name>_<target>` per native target.
 
     JVM tests are JUnit 4, run by `//bazel/kmp/testing:KmpJUnitRunner`. Native tests are linked with konan's
@@ -218,7 +221,9 @@ def kmp_test(
         apple_deps: `appleTest` dependencies.
         mingw_deps: `mingwTest` dependencies.
         plugins: compiler plugins by name, as for kmp_library, plus `mokkery`.
-        size: the Bazel test size. Unit tests are small; give slower suites a bigger size.
+        data: files the tests read at run time, from the workspace root (the runfiles' working directory).
+        size: the Bazel test size. Gradle has no test timeout, so the default is medium (300 s); give a slower
+            suite a bigger one.
     """
     fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, jvm_srcs)
     brought = plugin_deps(plugins)
@@ -246,7 +251,13 @@ def kmp_test(
                 "-Dkmp.test.jar=%s.jar" % lib,
                 # java.util.prefs writes under ~/.java, which the sandbox keeps read-only; tests get their own.
                 "-Djava.util.prefs.userRoot=$${TEST_TMPDIR}/prefs",
-            ],
+            ] + select({
+                "@platforms//os:windows": [],
+                # Gradle's test JVMs use /tmp, and terminal tests lay out paths under it within a fixed width
+                # (app/tui's footer). The sandbox's /tmp is hermetic, so this stays per test.
+                "//conditions:default": ["-Djava.io.tmpdir=/tmp"],
+            }),
+            data = data,
             runtime_deps = [
                 ":" + lib,
                 Label("//bazel/kmp/testing:runner"),
@@ -274,7 +285,7 @@ def kmp_test(
             main_class = "com.moneymanager.bazel.kmp.testing.KnTestLauncher",
             use_testrunner = False,
             args = ["$(rootpath :%s)" % binary],
-            data = [":" + binary],
+            data = [":" + binary] + data,
             target_compatible_with = RUNS_ON[target],
             runtime_deps = [Label("//bazel/kmp/testing:native_launcher_lib")],
         )
