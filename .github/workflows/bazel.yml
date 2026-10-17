@@ -40,8 +40,13 @@ jobs:
       - name: BUILD files are up to date
         run: bazel run //:gazelle -- --mode=diff
 
+      # app/cryptodata and app/remotestorage/googledrive compile generated constants (#1011); these are they and
+      # everything that depends on them. Each issue that unblocks a package removes it here.
+      - name: Packages waiting on generated constants
+        run: echo "BLOCKED=-//app/cryptodata/... -//app/db/core/... -//app/db/di/... -//app/di/core/... -//app/di/params/... -//app/importfilesource/di/... -//app/main/cli/... -//app/presenter/imports/... -//app/presenter/status/... -//app/remotestorage/di/... -//app/remotestorage/googledrive/... -//app/remotestorage/sync/... -//app/session/... -//app/tui/... -//test/app/db/... -//utils/credentialvault/di/... -//utils/localsettings/di/..." >> "$GITHUB_ENV"
+
       - name: Build
-        run: bazel build //...
+        run: bazel build -- //... $BLOCKED
 
       - name: Test
-        run: bazel test //...
+        run: bazel test -- //... $BLOCKED

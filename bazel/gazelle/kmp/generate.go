@@ -189,7 +189,9 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		for _, set := range testSetsPresent {
 			t.SetAttr(set.srcsAttr, glob(set.dir))
 		}
-		if len(kc.targets) > 0 {
+		// Tests that are all JVM (jvmTest only) have no native test binary, as KGP's native test tasks find no
+		// sources.
+		if len(kc.targets) > 0 && runsOnNative(testSetsPresent) {
 			t.SetAttr("native_targets", kc.targets)
 		}
 		testPlugins := union(plugins, nil)
@@ -273,4 +275,13 @@ func (c *kmpConfig) exported() map[string]bool {
 		out[d.label] = true
 	}
 	return out
+}
+
+func runsOnNative(sets []sourceSet) bool {
+	for _, set := range sets {
+		if set.platform != "jvm" {
+			return true
+		}
+	}
+	return false
 }

@@ -1,0 +1,35 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export //utils/parsers/csv
+# gazelle:kmp_keep_dep @maven_kmp//:poi_ooxml jvmMain
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "xlsx",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_deps = [
+        "@maven_kmp//:poi",
+        "@maven_kmp//:poi_ooxml",
+    ],
+    jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+    exports = ["//utils/parsers/csv"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":xlsx",
+    jvm_deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:poi_ooxml",
+    ],
+    jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
+)

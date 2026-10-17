@@ -1,0 +1,46 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export //app/db/core
+# gazelle:kmp_export //app/db/di
+# gazelle:kmp_export //app/model/core
+# gazelle:kmp_export //app/model/repository/write
+# gazelle:kmp_export //app/strategies
+# gazelle:kmp_export //bazel/kmp/deps:kotlin_test
+# gazelle:kmp_export //app/db/write jvmMain
+
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+kmp_library(
+    name = "db",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    native_deps = [
+        "//utils/files",
+        "@maven_kmp//:kotlinx_io_core",
+    ],
+    native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/db/core",
+        "//app/db/di",
+        "//app/db/write",
+        "//app/model/core",
+        "//app/model/repository/write",
+        "//app/strategies",
+        "//bazel/kmp/deps:kotlin_test",
+    ],
+    deps = [
+        "//app/db/schema",
+        "//app/importengineapi",
+        "//utils/bigdecimal",
+        "//utils/currency",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+    ],
+)

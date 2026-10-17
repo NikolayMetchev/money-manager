@@ -1,0 +1,40 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_plugins metro
+# gazelle:kmp_export //app/db/core
+# gazelle:kmp_export //app/di/params
+# gazelle:kmp_export //app/di/scope
+# gazelle:kmp_export //app/remotestorage/core
+# gazelle:kmp_export //app/remotestorage/sync
+# gazelle:kmp_export //utils/credentialvault
+# gazelle:kmp_export //utils/localsettings
+
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+kmp_library(
+    name = "di",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["metro"],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/db/core",
+        "//app/di/params",
+        "//app/di/scope",
+        "//app/remotestorage/core",
+        "//app/remotestorage/sync",
+        "//utils/credentialvault",
+        "//utils/localsettings",
+    ],
+    deps = [
+        "//app/remotestorage/googledrive",
+        "@maven_kmp//:metro_runtime",
+    ],
+)

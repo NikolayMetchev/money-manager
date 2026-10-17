@@ -1,0 +1,62 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_plugins serialization
+# gazelle:kmp_export //app/model/apistrategy
+# gazelle:kmp_export //app/model/core
+# gazelle:kmp_export //app/model/csvstrategy
+# gazelle:kmp_export //app/model/importdirectory
+# gazelle:kmp_export //app/model/repository/read
+# gazelle:kmp_export @maven_kmp//:kotlinx_coroutines_core
+# gazelle:kmp_export @maven_kmp//:kotlinx_datetime
+# gazelle:kmp_export @maven_kmp//:kotlinx_serialization_core
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "query",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["serialization"],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/model/apistrategy",
+        "//app/model/core",
+        "//app/model/csvstrategy",
+        "//app/model/importdirectory",
+        "//app/model/repository/read",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_datetime",
+        "@maven_kmp//:kotlinx_serialization_core",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":query",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = [
+        "mokkery",
+        "serialization",
+    ],
+    deps = [
+        "//app/model/core",
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:kotlinx_datetime",
+        "@maven_kmp//:kotlinx_serialization_json",
+        "@maven_kmp//:mokkery_core",
+        "@maven_kmp//:mokkery_runtime",
+    ],
+)
