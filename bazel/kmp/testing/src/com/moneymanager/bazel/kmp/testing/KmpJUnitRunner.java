@@ -2,16 +2,12 @@ package com.moneymanager.bazel.kmp.testing;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.StringWriter;
-import java.io.Writer;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.jar.JarEntry;
@@ -152,45 +148,34 @@ public final class KmpJUnitRunner {
     }
   }
 
-  /** Collects one testsuite element per class. */
+  /** Records each case into the shared {@link JUnitXml} report. */
   private static final class XmlListener extends RunListener {
-    private static final class Case {
-      final String name;
-      long startNanos;
-      double seconds;
-      Failure failure;
-      boolean skipped;
+    private final JUnitXml report = new JUnitXml();
+    private final Map<JUnitXml.Case, Long> startNanos = new HashMap<>();
 
-      Case(String name) {
-        this.name = name;
-      }
-    }
-
-    private final Map<String, Map<String, Case>> suites = new LinkedHashMap<>();
-
-    private Case caseFor(Description description) {
+    private JUnitXml.Case caseFor(Description description) {
       // A @BeforeClass/@AfterClass failure is reported on the class itself, with no method name. Gradle's
       // reports call that case "classMethod".
       String method = description.getMethodName() != null ? description.getMethodName() : "classMethod";
-      return suites
-          .computeIfAbsent(description.getClassName(), k -> new LinkedHashMap<>())
-          .computeIfAbsent(method, Case::new);
+      return report.caseFor(description.getClassName(), method);
     }
 
     @Override
     public void testStarted(Description description) {
-      caseFor(description).startNanos = System.nanoTime();
+      startNanos.put(caseFor(description), System.nanoTime());
     }
 
     @Override
     public void testFinished(Description description) {
-      Case c = caseFor(description);
-      c.seconds = (System.nanoTime() - c.startNanos) / 1e9;
+      JUnitXml.Case c = caseFor(description);
+      c.seconds = (System.nanoTime() - startNanos.getOrDefault(c, System.nanoTime())) / 1e9;
     }
 
     @Override
     public void testFailure(Failure failure) {
-      caseFor(failure.getDescription()).failure = failure;
+      JUnitXml.Case c = caseFor(failure.getDescription());
+      c.failureMessage = String.valueOf(failure.getMessage());
+      c.failureDetails = failure.getTrace();
     }
 
     @Override
@@ -204,64 +189,7 @@ public final class KmpJUnitRunner {
     }
 
     void write(Path path) throws IOException {
-      StringWriter out = new StringWriter();
-      out.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<testsuites>\n");
-      for (Map.Entry<String, Map<String, Case>> suite : suites.entrySet()) {
-        int failures = 0;
-        int skipped = 0;
-        double seconds = 0;
-        for (Case c : suite.getValue().values()) {
-          failures += c.failure != null ? 1 : 0;
-          skipped += c.skipped ? 1 : 0;
-          seconds += c.seconds;
-        }
-        out.write(
-            String.format(
-                "  <testsuite name=\"%s\" tests=\"%d\" failures=\"%d\" errors=\"0\" skipped=\"%d\" time=\"%.3f\">\n",
-                escape(suite.getKey()), suite.getValue().size(), failures, skipped, seconds));
-        for (Case c : suite.getValue().values()) {
-          out.write(
-              String.format(
-                  "    <testcase classname=\"%s\" name=\"%s\" time=\"%.3f\"",
-                  escape(suite.getKey()), escape(c.name), c.seconds));
-          if (c.failure != null) {
-            out.write(">\n      <failure message=\"");
-            out.write(escape(String.valueOf(c.failure.getMessage())));
-            out.write("\">");
-            out.write(escape(c.failure.getTrace()));
-            out.write("</failure>\n    </testcase>\n");
-          } else if (c.skipped) {
-            out.write(">\n      <skipped/>\n    </testcase>\n");
-          } else {
-            out.write("/>\n");
-          }
-        }
-        out.write("  </testsuite>\n");
-      }
-      out.write("</testsuites>\n");
-      try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
-        writer.write(out.toString());
-      }
-    }
-
-    private static String escape(String text) {
-      StringBuilder sb = new StringBuilder(text.length());
-      for (char ch : text.toCharArray()) {
-        switch (ch) {
-          case '<' -> sb.append("&lt;");
-          case '>' -> sb.append("&gt;");
-          case '&' -> sb.append("&amp;");
-          case '"' -> sb.append("&quot;");
-          default -> {
-            if (ch < 0x20 && ch != '\n' && ch != '\t' && ch != '\r') {
-              sb.append(' ');
-            } else {
-              sb.append(ch);
-            }
-          }
-        }
-      }
-      return sb.toString();
+      report.write(path);
     }
   }
 }
