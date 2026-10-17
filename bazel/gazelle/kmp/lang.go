@@ -4,7 +4,8 @@
 //
 // A directory with `src/<sourceSet>/kotlin` sources is one module, named after the directory. Its source
 // sets decide the `*_srcs` attributes; imports decide `deps` per platform (commonMain's for every platform,
-// jvmAndroidMain/jvmMain's for the JVM, nativeMain/linuxMain/appleMain/mingwMain's for native). An import
+// jvmAndroidMain/jvmMain's for the JVM, nativeMain's for native, and linuxMain/appleMain/mingwMain's for that
+// family's targets), each written once, at the highest source set that needs it. An import
 // resolves to the module that declares its package (one package per module), else to the @maven_kmp
 // library whose jar or klib declares it (the lockfile records each library's packages). Compiler plugins
 // are inferred from what the sources use. What sources can't say comes from directives (config.go).
@@ -34,6 +35,9 @@ var resolvedAttrs = map[string]bool{
 	"jvm_deps":    true,
 	"jvm_exports": true,
 	"native_deps": true,
+	"linux_deps":  true,
+	"apple_deps":  true,
+	"mingw_deps":  true,
 }
 
 // The `*_srcs` globs aren't mergeable: each is fixed for its source set, Gazelle can't merge every glob

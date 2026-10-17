@@ -108,7 +108,7 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
 - **Metro across modules** (#1002): contribution hints (`metro/hints`) reach the graph's compile through ordinary
   `deps`, in jars and klibs alike, because ABI jars stay off. A dep that exists only so Metro sees it (app/di/core's
   feature DI modules) is a plain dep marked `# keep`, so Gazelle (and the Gazelle-diff check, #1016) keeps it
-  though no import explains it.
+  though no import explains it (or name it with `# gazelle:kmp_keep_dep`).
 - **SQLDelight** (`//bazel/kmp/sqldelight`, #1003): `sqldelight_library` runs the SQLDelight compiler (the
   `SqlDelightEnvironment` the Gradle task drives, with its defaults) over a module's `.sq` files, upstream databases'
   folders as dependencies, and `kmp_library(sqldelight = …)` compiles the result as `commonMain` (plus the runtime as
@@ -122,8 +122,11 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   its directory's `src/<sourceSet>/kotlin` dirs (plus `src/commonMain/sqldelight`); imports become `deps` per platform,
   resolved by package to a module or to the `@maven_kmp` library whose files declare it (the lockfile lists each
   library's packages); plugins are inferred (`@Serializable`, `@Composable`, Metro/Mappie/Mokkery imports). Directives
-  for what sources can't say: `kmp_generate true` (opt-in until #1008), `kmp_targets`, `kmp_export <label>` (Gradle
-  `api`), `kmp_plugins`, `kmp_sqldelight_package`, `kmp_sqldelight_dep`. `# keep` on a dep keeps it.
+  for what sources can't say: `kmp_generate true` (opt-in until #1008), `kmp_targets`, `kmp_export <label> [sourceSet]`
+  (Gradle `api`: always a dep, and exported), `kmp_keep_dep <label> [sourceSet]` (a dep no import explains: Metro
+  contributors, runtime-only libraries), `kmp_plugins`, `kmp_sqldelight_package`, `kmp_sqldelight_dep`. Directives
+  are per module, not inherited. `# keep` on a dep keeps it too. `//bazel/gazelle/kmp:generation_test` holds golden
+  workspaces (`testdata/<case>`, `BUILD.in` → `BUILD.out`; refresh with `UPDATE_SNAPSHOTS=true bazel run` on it).
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.

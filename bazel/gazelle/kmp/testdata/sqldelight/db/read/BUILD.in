@@ -1,0 +1,2 @@
+# gazelle:kmp_sqldelight_package com.example.sql.read
+# gazelle:kmp_sqldelight_dep //db/schema:sqldelight

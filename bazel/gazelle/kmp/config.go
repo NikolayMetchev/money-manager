@@ -3,6 +3,7 @@ package kmp
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -22,7 +23,8 @@ const (
 	targetsDirective = "kmp_targets"
 	// kmp_plugins name …: compiler plugins to apply besides the ones inferred from the sources.
 	pluginsDirective = "kmp_plugins"
-	// kmp_export label: a dependency that is Gradle `api`, so it goes to `exports` (repeatable).
+	// kmp_export label [sourceSet]: a Gradle `api` dependency of the source set (default commonMain). It is
+	// always a dependency, import or not, and goes to `exports` (repeatable).
 	exportDirective = "kmp_export"
 	// kmp_sqldelight_package com.example.sql: the package of the module's SQLDelight database.
 	sqldelightPackageDirective = "kmp_sqldelight_package"
@@ -30,15 +32,27 @@ const (
 	sqldelightDepDirective = "kmp_sqldelight_dep"
 	// kmp_lock_file path: the maven_kmp lockfile, for resolving library imports.
 	lockFileDirective = "kmp_lock_file"
+	// kmp_keep_dep label [sourceSet]: a dependency no import explains (a Metro contributor the graph merges, a
+	// runtime-only library), added to the source set's deps (default commonMain; commonTest for the tests).
+	// Repeatable; `kmp_export` still makes it an export.
+	keepDepDirective = "kmp_keep_dep"
 )
+
+// keepDep is one kmp_keep_dep or kmp_export: the label, the platform whose deps it joins, and whether it's
+// the tests'.
+type keepDep struct {
+	label, platform string
+	test            bool
+}
 
 type kmpConfig struct {
 	generate          bool
 	targets           []string
 	plugins           []string
-	exports           map[string]bool
+	exports           []keepDep
 	sqldelightPackage string
 	sqldelightDeps    []string
+	keepDeps          []keepDep
 	lockFile          string
 	maven             *mavenIndex
 }
@@ -47,13 +61,11 @@ func (c *kmpConfig) clone() *kmpConfig {
 	out := *c
 	out.targets = append([]string(nil), c.targets...)
 	out.plugins = append([]string(nil), c.plugins...)
-	out.exports = map[string]bool{}
-	for k := range c.exports {
-		out.exports[k] = true
-	}
 	// Per-module settings don't carry into subdirectories.
+	out.exports = nil
 	out.sqldelightPackage = ""
 	out.sqldelightDeps = nil
+	out.keepDeps = nil
 	return &out
 }
 
@@ -62,13 +74,13 @@ func getConfig(c *config.Config) *kmpConfig {
 }
 
 func (*kmpLang) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
-	c.Exts[languageName] = &kmpConfig{exports: map[string]bool{}, lockFile: "bazel/kmp/deps/maven_kmp.lock.json"}
+	c.Exts[languageName] = &kmpConfig{lockFile: "bazel/kmp/deps/maven_kmp.lock.json"}
 }
 
 func (*kmpLang) CheckFlags(fs *flag.FlagSet, c *config.Config) error { return nil }
 
 func (*kmpLang) KnownDirectives() []string {
-	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective}
+	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective}
 }
 
 func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
@@ -84,13 +96,23 @@ func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
 			case pluginsDirective:
 				kc.plugins = strings.Fields(d.Value)
 			case exportDirective:
-				kc.exports[d.Value] = true
+				if dep, err := parseKeepDep(d.Key, d.Value); err != nil {
+					log.Printf("%s: %v", rel, err)
+				} else {
+					kc.exports = append(kc.exports, dep)
+				}
 			case sqldelightPackageDirective:
 				kc.sqldelightPackage = d.Value
 			case sqldelightDepDirective:
 				kc.sqldelightDeps = append(kc.sqldelightDeps, d.Value)
 			case lockFileDirective:
 				kc.lockFile = d.Value
+			case keepDepDirective:
+				if dep, err := parseKeepDep(d.Key, d.Value); err != nil {
+					log.Printf("%s: %v", rel, err)
+				} else {
+					kc.keepDeps = append(kc.keepDeps, dep)
+				}
 			}
 		}
 	}
@@ -150,4 +172,24 @@ func (m *mavenIndex) find(pkg string) (string, bool) {
 		return "", false
 	}
 	return libs[0].name, true
+}
+
+// parseKeepDep reads a directive's `label [sourceSet]`.
+func parseKeepDep(directive, value string) (keepDep, error) {
+	fields := strings.Fields(value)
+	if len(fields) == 0 || len(fields) > 2 {
+		return keepDep{}, fmt.Errorf("%s wants `label [sourceSet]`, got %q", directive, value)
+	}
+	setName := "commonMain"
+	if len(fields) == 2 {
+		setName = fields[1]
+	}
+	for _, sets := range [][]sourceSet{mainSets, testSets} {
+		for _, set := range sets {
+			if set.dir == setName {
+				return keepDep{label: fields[0], platform: set.platform, test: strings.HasSuffix(setName, "Test")}, nil
+			}
+		}
+	}
+	return keepDep{}, fmt.Errorf("%s: unknown source set %s", directive, setName)
 }

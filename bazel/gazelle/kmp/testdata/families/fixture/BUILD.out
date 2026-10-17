@@ -1,0 +1,18 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_keep_dep @maven_kmp//:kotlinx_coroutines_core jvmMain
+
+kmp_library(
+    name = "fixture",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_deps = ["@maven_kmp//:kotlinx_coroutines_core"],
+    native_targets = [
+        "linuxX64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//lib/core",  # keep
+        "@maven_kmp//:ktor_client_core",
+    ],
+)

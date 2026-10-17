@@ -1,0 +1,10 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_keep_dep @maven_kmp//:kotlinx_coroutines_core jvmMain
+
+kmp_library(
+    name = "fixture",
+    deps = [
+        "//lib/core",  # keep
+    ],
+)
