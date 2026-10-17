@@ -18,7 +18,7 @@ The native compile is `native.bzl`, on the toolchain in `//bazel/kmp/native`.
 
 load("@rules_java//java:java_test.bzl", "java_test")
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
-load(":native.bzl", "BUILDS_ON", "FAMILIES", "RUNS_ON", "kt_native_klib", "kt_native_test_binary")
+load(":native.bzl", "BUILDS_ON", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_klib", "kt_native_test_binary")
 load("//bazel/kmp/plugins:plugins.bzl", "plugin_deps", "plugin_labels")
 
 def _fragments(chain):
@@ -92,6 +92,7 @@ def kmp_library(
         plugins = [],
         sqldelight = None,
         generated_srcs = [],
+        cinterops = [],
         visibility = None):
     """A Kotlin Multiplatform module. Emits `:<name>_jvm` and `:<name>_<target>` per native target.
 
@@ -120,9 +121,11 @@ def kmp_library(
             becomes an `api` dependency, as the SQLDelight Gradle plugin makes it.
         generated_srcs: generated `.kt` files (`kotlin_constants`) that join `commonMain`, as Gradle's
             `kotlin.srcDir(task)` does.
+        cinterops: `kmp_cinterop` targets of the main compilation; their klibs travel with the module's.
         visibility: the targets' visibility.
     """
     common_srcs = common_srcs + generated_srcs
+    native_deps = native_deps + cinterops
     fragments = _jvm_fragments("Main", common_srcs, jvm_android_srcs, jvm_srcs)
     brought = plugin_deps(plugins)
     generated_native = []
@@ -220,33 +223,35 @@ def kmp_test(
     fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, jvm_srcs)
     brought = plugin_deps(plugins)
     deps = deps + brought.deps + brought.exports
-    lib = name + "_jvm_lib"
-    kt_jvm_library(
-        name = lib,
-        testonly = True,
-        srcs = fragments.srcs,
-        fragment_srcs = fragments.fragment_srcs,
-        fragment_refines = fragments.fragment_refines,
-        associates = [platform_label(associate, "jvm")],
-        deps = _on("jvm", deps + jvm_deps),
-        plugins = plugin_labels(plugins, "jvm"),
-    )
-    java_test(
-        name = name + "_jvm",
-        size = size,
-        main_class = "com.moneymanager.bazel.kmp.testing.KmpJUnitRunner",
-        use_testrunner = False,
-        jvm_flags = [
-            # The runner finds this jar on its classpath by file name.
-            "-Dkmp.test.jar=%s.jar" % lib,
-            # java.util.prefs writes under ~/.java, which the sandbox keeps read-only; tests get their own.
-            "-Djava.util.prefs.userRoot=$${TEST_TMPDIR}/prefs",
-        ],
-        runtime_deps = [
-            ":" + lib,
-            Label("//bazel/kmp/testing:runner"),
-        ],
-    )
+    # Tests with only native sources have no JVM test, as KGP's jvmTest finds no sources (utils/sqlite3).
+    if fragments.srcs:
+        lib = name + "_jvm_lib"
+        kt_jvm_library(
+            name = lib,
+            testonly = True,
+            srcs = fragments.srcs,
+            fragment_srcs = fragments.fragment_srcs,
+            fragment_refines = fragments.fragment_refines,
+            associates = [platform_label(associate, "jvm")],
+            deps = _on("jvm", deps + jvm_deps),
+            plugins = plugin_labels(plugins, "jvm"),
+        )
+        java_test(
+            name = name + "_jvm",
+            size = size,
+            main_class = "com.moneymanager.bazel.kmp.testing.KmpJUnitRunner",
+            use_testrunner = False,
+            jvm_flags = [
+                # The runner finds this jar on its classpath by file name.
+                "-Dkmp.test.jar=%s.jar" % lib,
+                # java.util.prefs writes under ~/.java, which the sandbox keeps read-only; tests get their own.
+                "-Djava.util.prefs.userRoot=$${TEST_TMPDIR}/prefs",
+            ],
+            runtime_deps = [
+                ":" + lib,
+                Label("//bazel/kmp/testing:runner"),
+            ],
+        )
     module = associate.rpartition(":")[2] if ":" in associate else associate.rpartition("/")[2]
     for target in native_targets:
         binary = "%s_%s_bin" % (name, target)
@@ -272,4 +277,51 @@ def kmp_test(
             data = [":" + binary],
             target_compatible_with = RUNS_ON[target],
             runtime_deps = [Label("//bazel/kmp/testing:native_launcher_lib")],
+        )
+
+def kmp_static_library(name, srcs, native_targets, hdrs = [], defines = [], library_name = None, visibility = None):
+    """A C static library per Kotlin/Native target (`:<name>_<target>`), built with that target's konan clang.
+
+    Args:
+        name: the target name.
+        srcs: the C sources.
+        native_targets: the Kotlin/Native targets, by KGP's names.
+        hdrs: headers, whose directories go on the include path.
+        defines: `NAME=VALUE` preprocessor definitions.
+        library_name: the archives are `lib<library_name>.a` (default: the name).
+        visibility: the targets' visibility.
+    """
+    for target in native_targets:
+        konan_static_library(
+            name = name + "_" + target,
+            srcs = srcs,
+            hdrs = hdrs,
+            defines = defines,
+            library_name = library_name or name,
+            target = target,
+            target_compatible_with = BUILDS_ON.get(target, []),
+            visibility = visibility,
+        )
+
+def kmp_cinterop(name, def_file, native_targets, static_libraries = [], deps = [], visibility = None):
+    """A cinterop per Kotlin/Native target (`:<name>_<target>`), for `kmp_library(cinterops = …)`.
+
+    Args:
+        name: the interop's name (KGP's `cinterops.create(name)`).
+        def_file: the `.def` file (KGP's default is `src/nativeInterop/cinterop/<name>.def`).
+        native_targets: the Kotlin/Native targets, by KGP's names.
+        static_libraries: `kmp_static_library` targets the klib embeds (cinterop's `-staticLibrary`).
+        deps: klibs the interop's declarations use, by module label.
+        visibility: the targets' visibility.
+    """
+    for target in native_targets:
+        kt_native_cinterop(
+            name = name + "_" + target,
+            def_file = def_file,
+            interop = name,
+            static_libraries = _on(target, static_libraries),
+            deps = _on(target, deps),
+            target = target,
+            target_compatible_with = BUILDS_ON.get(target, []),
+            visibility = visibility,
         )

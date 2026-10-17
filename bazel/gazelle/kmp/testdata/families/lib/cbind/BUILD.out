@@ -1,0 +1,24 @@
+# gazelle:kmp_targets linuxX64
+# gazelle:kmp_cinterops :clib_interop
+load("//bazel/kmp:defs.bzl", "kmp_cinterop", "kmp_library", "kmp_test")
+
+kmp_cinterop(
+    name = "clib_interop",
+    def_file = "src/nativeInterop/cinterop/clib.def",
+    native_targets = ["linuxX64"],
+)
+
+kmp_library(
+    name = "cbind",
+    cinterops = [":clib_interop"],
+    native_targets = ["linuxX64"],
+    visibility = ["//visibility:public"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":cbind",
+    native_deps = ["//bazel/kmp/deps:kotlin_test"],
+    native_srcs = glob(["src/nativeTest/kotlin/**/*.kt"]),
+    native_targets = ["linuxX64"],
+)

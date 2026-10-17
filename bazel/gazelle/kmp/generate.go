@@ -139,7 +139,7 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	main, mainSetsPresent := scan(args.Dir, mainSets)
 	sqldelightRoot := filepath.Join(args.Dir, "src", "commonMain", "sqldelight")
 	hasSqldelight := dirHasFiles(sqldelightRoot, ".sq")
-	if len(mainSetsPresent) == 0 && !hasSqldelight {
+	if len(mainSetsPresent) == 0 && !hasSqldelight && len(kc.cinterops) == 0 {
 		return res
 	}
 
@@ -152,6 +152,9 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	}
 	if len(kc.generatedSrcs) > 0 {
 		lib.SetAttr("generated_srcs", kc.generatedSrcs)
+	}
+	if len(kc.cinterops) > 0 {
+		lib.SetAttr("cinterops", kc.cinterops)
 	}
 	if len(kc.targets) > 0 {
 		lib.SetAttr("native_targets", kc.targets)

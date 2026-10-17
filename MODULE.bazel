@@ -36,6 +36,10 @@ kotlin_native = use_extension("//bazel/kmp/native:extensions.bzl", "kotlin_nativ
 use_repo(kotlin_native, "kotlin_native", "kotlin_native_repin")
 
 # The default desktop Google OAuth client, obfuscated from CI's secrets or secrets/google-oauth.properties (#1011).
+# The SQLite amalgamation utils/sqlite3 builds, pinned by sqlite-amalgamation-* in the catalog (#1012).
+sqlite_amalgamation = use_extension("//bazel/kmp/sqlite:extensions.bzl", "sqlite_amalgamation")
+use_repo(sqlite_amalgamation, "sqlite_amalgamation")
+
 google_oauth = use_extension("//bazel/kmp/constants:google_oauth.bzl", "google_oauth")
 use_repo(google_oauth, "google_oauth")
 

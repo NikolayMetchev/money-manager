@@ -1,6 +1,7 @@
 # gazelle:kmp_generate true
 # gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
 # gazelle:kmp_plugins serialization
+# gazelle:kmp_keep_dep //utils/sqlite3 nativeMain
 # gazelle:kmp_export //app/db/read
 # gazelle:kmp_export //app/db/write
 # gazelle:kmp_export //app/importengineapi
@@ -40,6 +41,7 @@ kmp_library(
     native_deps = [
         "@maven_kmp//:co_touchlab_sqliter_driver",
         "@maven_kmp//:sqldelight_native_driver",
+        "//utils/sqlite3",
     ],
     native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
     native_targets = [

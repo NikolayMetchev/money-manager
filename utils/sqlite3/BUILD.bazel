@@ -1,2 +1,67 @@
 # gazelle:kmp_generate true
 # gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_cinterops :sqlite3_interop
+load("//bazel/kmp:defs.bzl", "kmp_cinterop", "kmp_library", "kmp_static_library", "kmp_test")
+
+TARGETS = [
+    "linuxArm64",
+    "linuxX64",
+    "macosArm64",
+    "mingwX64",
+]
+
+# CompileBundledSqliteTask in the Gradle build: the amalgamation, compiled for each target with its konan clang.
+# The feature set the desktop app's sqlite-jdbc build has and the app relies on (dbstat backs the Settings size
+# breakdown). URI filenames are how SQLiter opens in-memory databases; without them it creates a file literally
+# named "file:...?mode=memory". Nothing loads extensions, and allowing it would pull in libdl.
+kmp_static_library(
+    name = "libsqlite3",
+    srcs = ["@sqlite_amalgamation//:sqlite3.c"],
+    hdrs = ["@sqlite_amalgamation//:sqlite3.h"],
+    defines = [
+        "SQLITE_THREADSAFE=1",
+        "SQLITE_USE_URI=1",
+        "SQLITE_ENABLE_DBSTAT_VTAB=1",
+        "SQLITE_ENABLE_MATH_FUNCTIONS=1",
+        "SQLITE_OMIT_LOAD_EXTENSION=1",
+    ],
+    library_name = "sqlite3",
+    native_targets = TARGETS,
+)
+
+# Embeds the library in a klib, so every native binary that depends on //utils/sqlite3 carries SQLite statically.
+kmp_cinterop(
+    name = "sqlite3_interop",
+    def_file = "src/nativeInterop/cinterop/sqlite3.def",
+    native_targets = TARGETS,
+    static_libraries = [":libsqlite3"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":sqlite3",
+    native_deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:sqldelight_native_driver",
+        "@maven_kmp//:sqldelight_runtime",
+    ],
+    native_srcs = glob(["src/nativeTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+)
+
+kmp_library(
+    name = "sqlite3",
+    cinterops = [":sqlite3_interop"],
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+)
