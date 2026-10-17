@@ -1,0 +1,22 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp/sqldelight:sqldelight.bzl", "sqldelight_library")
+
+# gazelle:kmp_sqldelight_package com.example.sql.read
+# gazelle:kmp_sqldelight_dep //db/schema:sqldelight
+
+sqldelight_library(
+    name = "sqldelight",
+    srcs = glob(["src/commonMain/sqldelight/**/*.sq"]),
+    module_name = "read",
+    package = "com.example.sql.read",
+    visibility = ["//visibility:public"],
+    deps = ["//db/schema:sqldelight"],
+)
+
+kmp_library(
+    name = "read",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    sqldelight = ":sqldelight",
+    visibility = ["//visibility:public"],
+    deps = ["@maven_kmp//:sqldelight_runtime"],
+)

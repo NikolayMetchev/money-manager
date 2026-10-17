@@ -1,0 +1,15 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_export @maven_kmp//:kotlinx_serialization_core
+
+kmp_library(
+    name = "core",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxX64",
+        "mingwX64",
+    ],
+    plugins = ["serialization"],
+    visibility = ["//visibility:public"],
+    exports = ["@maven_kmp//:kotlinx_serialization_core"],
+)

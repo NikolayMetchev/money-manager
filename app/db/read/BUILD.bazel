@@ -42,6 +42,7 @@ kmp_library(
         "//app/model/core",
         "//app/model/csvstrategy",
         "//app/model/passthrough",
+        "@maven_kmp//:kotlinx_serialization_core",
         "@maven_kmp//:mappie_api",
     ],
     deps = [

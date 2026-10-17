@@ -2,9 +2,12 @@
 # Check that none is stale: bazel run //:gazelle -- --mode=diff
 load("@gazelle//:def.bzl", "gazelle", "gazelle_binary")
 
+# gazelle:exclude bazel/gazelle/kmp/testdata
+
 gazelle_binary(
     name = "gazelle_bin",
     languages = ["//bazel/gazelle/kmp"],
+    visibility = ["//bazel/gazelle/kmp:__pkg__"],
 )
 
 gazelle(

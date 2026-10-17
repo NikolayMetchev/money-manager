@@ -61,8 +61,9 @@ def platform_label(dep, platform):
 def _on(platform, labels):
     return [platform_label(dep, platform) for dep in labels]
 
-def _family_srcs(target, linux_srcs, apple_srcs, mingw_srcs):
-    return {"apple": apple_srcs, "linux": linux_srcs, "mingw": mingw_srcs}[FAMILIES[target]]
+def _family(target, linux, apple, mingw):
+    """What a target's family source set (linuxMain, appleMain, mingwMain) has: its sources or its deps."""
+    return {"apple": apple, "linux": linux, "mingw": mingw}[FAMILIES[target]]
 
 def kmp_library(
         name,
@@ -77,6 +78,9 @@ def kmp_library(
         deps = [],
         jvm_deps = [],
         native_deps = [],
+        linux_deps = [],
+        apple_deps = [],
+        mingw_deps = [],
         exports = [],
         jvm_exports = [],
         plugins = [],
@@ -98,6 +102,9 @@ def kmp_library(
             classpath, as in KGP.
         jvm_deps: `jvmAndroidMain`/`jvmMain` dependencies.
         native_deps: `nativeMain` dependencies.
+        linux_deps: `linuxMain` dependencies (only on Linux targets).
+        apple_deps: `appleMain` dependencies.
+        mingw_deps: `mingwMain` dependencies.
         exports: `commonMain` `api` dependencies: on the classpath of everything that depends on this module.
         jvm_exports: `jvmAndroidMain`/`jvmMain` `api` dependencies.
         plugins: compiler plugins by name (`serialization`, `compose`, `metro`, `mappie`; see
@@ -148,8 +155,8 @@ def kmp_library(
             common_srcs = common_srcs,
             common_generated = generated_native,
             native_srcs = native_srcs,
-            family_srcs = _family_srcs(target, linux_srcs, apple_srcs, mingw_srcs),
-            deps = _on(target, deps + native_deps + exports),
+            family_srcs = _family(target, linux_srcs, apple_srcs, mingw_srcs),
+            deps = _on(target, deps + native_deps + _family(target, linux_deps, apple_deps, mingw_deps) + exports),
             plugins = plugin_labels(plugins, "native"),
             target_compatible_with = BUILDS_ON.get(target, []),
             visibility = visibility,
@@ -169,6 +176,9 @@ def kmp_test(
         deps = [],
         jvm_deps = [],
         native_deps = [],
+        linux_deps = [],
+        apple_deps = [],
+        mingw_deps = [],
         plugins = [],
         size = "small"):
     """A module's tests. Emits `:<name>_jvm` and `:<name>_<target>` per native target.
@@ -191,6 +201,9 @@ def kmp_test(
         deps: test dependencies (Gradle `implementation` on `commonTest`), by module label.
         jvm_deps: `jvmAndroidTest`/`jvmTest` dependencies.
         native_deps: `nativeTest` dependencies.
+        linux_deps: `linuxTest` dependencies.
+        apple_deps: `appleTest` dependencies.
+        mingw_deps: `mingwTest` dependencies.
         plugins: compiler plugins by name, as for kmp_library, plus `mokkery`.
         size: the Bazel test size. Unit tests are small; give slower suites a bigger size.
     """
@@ -231,8 +244,8 @@ def kmp_test(
             associate = platform_label(associate, target),
             common_srcs = common_srcs,
             native_srcs = native_srcs,
-            family_srcs = _family_srcs(target, linux_srcs, apple_srcs, mingw_srcs),
-            deps = _on(target, deps + native_deps),
+            family_srcs = _family(target, linux_srcs, apple_srcs, mingw_srcs),
+            deps = _on(target, deps + native_deps + _family(target, linux_deps, apple_deps, mingw_deps)),
             plugins = plugin_labels(plugins, "native"),
             target_compatible_with = RUNS_ON[target],
         )
