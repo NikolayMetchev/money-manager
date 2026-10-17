@@ -87,7 +87,7 @@ public final class KmpJUnitRunner {
       Enumeration<JarEntry> entries = file.entries();
       while (entries.hasMoreElements()) {
         String entry = entries.nextElement().getName();
-        if (!entry.endsWith(".class") || entry.contains("$") || entry.startsWith("META-INF/")) {
+        if (!entry.endsWith(".class") || entry.startsWith("META-INF/")) {
           continue;
         }
         String className = entry.substring(0, entry.length() - ".class".length()).replace('/', '.');
@@ -102,7 +102,12 @@ public final class KmpJUnitRunner {
   }
 
   private static boolean isTestClass(Class<?> type) {
-    if (Modifier.isAbstract(type.getModifiers()) || !Modifier.isPublic(type.getModifiers())) {
+    int modifiers = type.getModifiers();
+    if (Modifier.isAbstract(modifiers) || !Modifier.isPublic(modifiers) || type.isSynthetic()) {
+      return false;
+    }
+    // Nested test classes count, but JUnit 4 can only construct static ones.
+    if (type.isAnonymousClass() || type.isLocalClass() || (type.isMemberClass() && !Modifier.isStatic(modifiers))) {
       return false;
     }
     for (Method method : type.getMethods()) {
@@ -164,9 +169,12 @@ public final class KmpJUnitRunner {
     private final Map<String, Map<String, Case>> suites = new LinkedHashMap<>();
 
     private Case caseFor(Description description) {
+      // A @BeforeClass/@AfterClass failure is reported on the class itself, with no method name. Gradle's
+      // reports call that case "classMethod".
+      String method = description.getMethodName() != null ? description.getMethodName() : "classMethod";
       return suites
           .computeIfAbsent(description.getClassName(), k -> new LinkedHashMap<>())
-          .computeIfAbsent(description.getMethodName(), Case::new);
+          .computeIfAbsent(method, Case::new);
     }
 
     @Override
