@@ -64,6 +64,8 @@ timeout; use at least 20 minutes.
 Build-speed flags (off by default): the Android release variant (R8/minified) only exists with
 `-PbuildRelease=true` (CI main/release workflows pass it), and `build` only compiles Android
 device-test sources with `-PcompileDeviceTests=true` (the CI emulator job compiles them anyway).
+`-PskipNative=true` keeps the Kotlin/Native targets declared but runs none of their tasks (no compile, cinterop,
+link or test): CI's Build and Test job passes it, and each native target has its own job (linuxX64 included).
 `-PtestMaxParallelForks=N` overrides the parallel test-fork default (e.g. `=1` to serialize), and
 `-PandroidCoverage=true` enables JaCoCo coverage for instrumented tests (main-branch CI passes it).
 `-PproguardOptimize=false` skips ProGuard's optimizer in desktop release builds (the CI "Desktop ProGuard"
@@ -571,7 +573,7 @@ set of writes.
 - **Kotlin/Native** (`linuxX64`, `linuxArm64`, `macosArm64`, `mingwX64`): a module joins by applying
   `moneymanager.native-convention`. Only the CLI's dependency closure does, never `app/ui/*`. Once a module has
   a native target, JVM-only APIs in its `commonMain` (`java.*`, `System.*`, implicit `kotlin.jvm` imports) fail the
-  build. Common tests run natively on CI, one runner per OS (`<target>Test`). The Apple target only links on macOS.
+  build. Common tests run natively on CI, one job per target (`<target>Test`), never in Build and Test. The Apple target only links on macOS.
   Backticked test names can't contain `,` or `()` on native (or `'` on Android). Native klibs are named after the
   full project path (`app-db-core`), since same-named modules (`core`, `read`, `write`) would otherwise clash.
   Because native shares `commonMain` with JVM and Android, a native module declares what common code uses in

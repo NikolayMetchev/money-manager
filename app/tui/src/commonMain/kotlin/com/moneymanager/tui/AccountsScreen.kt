@@ -101,18 +101,29 @@ private fun AccountsView(
     LaunchedEffect(editor.text) { model.eventSink(AccountsEvent.SetName(editor.text)) }
     // The list can shrink under the selection (a filter, a deleted account), so clamp what's drawn.
     val last = (entryLines.size - 1).coerceAtLeast(0)
-    val current = followSelection(entryIds, selectedId, selected)
-    val currentLine = entryLines.getOrElse(current) { 0 }
-    val first = top.coerceIn((currentLine - visibleRows + 1).coerceAtLeast(0), currentLine)
+
+    // Read from the state each time, never kept from the last composition: keys that arrive together (fast typing, a
+    // paste) are handled before the screen recomposes, and each must see where the one before it moved.
+    fun currentIndex() = followSelection(entryIds, selectedId, selected)
+
+    fun lineOf(index: Int) = entryLines.getOrElse(index) { 0 }
+
+    fun firstShown(line: Int) = top.coerceIn((line - visibleRows + 1).coerceAtLeast(0), line)
+
+    val current = currentIndex()
+    val currentLine = lineOf(current)
+    val first = firstShown(currentLine)
 
     fun select(index: Int) {
+        val shownFrom = firstShown(lineOf(currentIndex()))
         selected = index.coerceIn(0, last)
         selectedId = entryIds.getOrNull(selected)
-        val line = entryLines.getOrElse(selected) { 0 }
-        top = first.coerceIn((line - visibleRows + 1).coerceAtLeast(0), line)
+        val line = lineOf(selected)
+        top = shownFrom.coerceIn((line - visibleRows + 1).coerceAtLeast(0), line)
     }
 
     fun key(event: KeyEvent): Boolean {
+        val at = currentIndex()
         val open = picker
         if (open != null) {
             if (!open.handle(event, multiSelectRows(height))) picker = null
@@ -140,11 +151,11 @@ private fun AccountsView(
             "s" -> model.eventSink(AccountsEvent.SetIncludeShadow(!model.filter.includeShadow))
             "z" -> model.eventSink(AccountsEvent.SetNonZeroOnly(!model.filter.nonZeroOnly))
             "g" -> grouped = !grouped
-            "Enter" -> (lines.getOrNull(currentLine) as? ListLine.Entry)?.let { openAccount(it.account.account.id) }
-            "ArrowUp" -> select(current - 1)
-            "ArrowDown" -> select(current + 1)
-            "PageUp" -> select(current - visibleRows)
-            "PageDown" -> select(current + visibleRows)
+            "Enter" -> (lines.getOrNull(lineOf(at)) as? ListLine.Entry)?.let { openAccount(it.account.account.id) }
+            "ArrowUp" -> select(at - 1)
+            "ArrowDown" -> select(at + 1)
+            "PageUp" -> select(at - visibleRows)
+            "PageDown" -> select(at + visibleRows)
             else -> return false
         }
         return true

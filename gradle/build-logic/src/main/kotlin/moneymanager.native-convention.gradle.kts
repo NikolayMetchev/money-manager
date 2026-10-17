@@ -1,5 +1,9 @@
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
+import org.jetbrains.kotlin.gradle.tasks.CInteropProcess
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
+import org.jetbrains.kotlin.gradle.tasks.KotlinNativeCompile
+import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
 
 /**
  * Adds the Kotlin/Native targets the `mm` CLI ships for (#917).
@@ -28,6 +32,25 @@ configure<KotlinMultiplatformExtension> {
     linuxArm64()
     macosArm64()
     mingwX64()
+}
+
+// -PskipNative=true keeps the targets declared, so build scripts and the source-set hierarchy resolve as
+// always, but runs no native work: no compile, cinterop, link or test, and no Kotlin/Native toolchain download.
+// CI's Build and Test job passes it, since linking every native test binary beside the JVM build ran it out of
+// memory; each native target has its own job.
+if (providers.gradleProperty("skipNative").map(String::toBoolean).getOrElse(false)) {
+    val nativeToolchainTask = Regex("commonize.*|.*KotlinNativeDistribution")
+    tasks.configureEach {
+        val native =
+            this is KotlinNativeCompile ||
+                this is KotlinNativeLink ||
+                this is KotlinNativeTest ||
+                this is CInteropProcess ||
+                this is CompileBundledSqliteTask ||
+                this is DownloadSqliteAmalgamationTask ||
+                nativeToolchainTask.matches(name)
+        if (native) enabled = false
+    }
 }
 
 // Metro's and SQLDelight's runtimes both publish a klib uniquely named `runtime`, so compiling a native
