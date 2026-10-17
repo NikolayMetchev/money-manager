@@ -124,8 +124,8 @@ def kmp_library(
             visibility = ["//visibility:private"],
         )
         jvm_exports = jvm_exports + [":" + name + "_sqldelight"]
-    deps = deps + brought.deps
     exports = exports + brought.exports
+    deps = [d for d in deps + brought.deps if d not in exports]
     jvm_exported = _on("jvm", exports + jvm_exports)
     kt_jvm_library(
         name = name + "_jvm",

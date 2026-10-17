@@ -1,12 +1,9 @@
 load("//bazel/kmp:defs.bzl", "kmp_library")
 load("//bazel/kmp/sqldelight:sqldelight.bzl", "sqldelight_library")
 
-NATIVE_TARGETS = [
-    "linuxArm64",
-    "linuxX64",
-    "macosArm64",
-    "mingwX64",
-]
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_sqldelight_package com.moneymanager.database.sql
 
 sqldelight_library(
     name = "sqldelight",
@@ -18,7 +15,12 @@ sqldelight_library(
 
 kmp_library(
     name = "schema",
-    native_targets = NATIVE_TARGETS,
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
     sqldelight = ":sqldelight",
     visibility = ["//visibility:public"],
 )

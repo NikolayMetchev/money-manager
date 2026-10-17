@@ -117,6 +117,13 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   sources in a fragment. The compiler API is internal: `//bazel/kmp/sqldelight/tests:golden_test` pins its output
   (refresh with `:update_golden` after checking a bump). Fragments: like KGP, `commonMain` and the leaf are always
   named, empty or not (K2 takes a lone common fragment for the platform's own).
+- **Gazelle** (`//bazel/gazelle/kmp`, Go, #1004): `bazel run //:gazelle` writes every opted-in module's BUILD file;
+  CI fails on `--mode=diff`. Never edit a generated rule by hand: change the sources or a directive. A module is
+  its directory's `src/<sourceSet>/kotlin` dirs (plus `src/commonMain/sqldelight`); imports become `deps` per platform,
+  resolved by package to a module or to the `@maven_kmp` library whose files declare it (the lockfile lists each
+  library's packages); plugins are inferred (`@Serializable`, `@Composable`, Metro/Mappie/Mokkery imports). Directives
+  for what sources can't say: `kmp_generate true` (opt-in until #1008), `kmp_targets`, `kmp_export <label>` (Gradle
+  `api`), `kmp_plugins`, `kmp_sqldelight_package`, `kmp_sqldelight_dep`. `# keep` on a dep keeps it.
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.

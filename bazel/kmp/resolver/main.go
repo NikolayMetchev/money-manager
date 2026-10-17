@@ -39,6 +39,8 @@ type Lock struct {
 	// Names are the Bazel target names, without the platform suffix: a catalog library by its alias
 	// (kotlinx-coroutines-core → kotlinx_coroutines_core), anything else by its coordinate.
 	Names map[string]string `json:"names"`
+	// Packages are what each module's files declare, for Gazelle's import resolution.
+	Packages map[string][]string `json:"packages"`
 	// Skipped are catalog libraries with no variant for a platform (JVM-only libraries on native).
 	Skipped   map[string][]string            `json:"skipped,omitempty"`
 	Artifacts map[string]map[string]Resolved `json:"artifacts"` // module → platform → resolution
@@ -88,7 +90,7 @@ func run(tomlPath, out string, libraries, platformNames, forceSpecs, repoSpecs, 
 		forced[module] = v
 	}
 
-	lock := Lock{Version: 1, Names: map[string]string{}, Artifacts: map[string]map[string]Resolved{}}
+	lock := Lock{Version: 1, Names: map[string]string{}, Packages: map[string][]string{}, Artifacts: map[string]map[string]Resolved{}}
 	lock.Inputs.Libraries = map[string]string{}
 	lock.Inputs.Forces = forced
 	lock.Inputs.Platforms = platformNames
@@ -146,6 +148,27 @@ func run(tomlPath, out string, libraries, platformNames, forceSpecs, repoSpecs, 
 			sort.Strings(r.skipped)
 			lock.Skipped[r.platform] = r.skipped
 		}
+	}
+	fetcher := resolver.fetch
+	for module, byPlatform := range lock.Artifacts {
+		set := map[string]bool{}
+		for _, res := range byPlatform {
+			for _, file := range res.Files {
+				pkgs, err := fetcher.packagesOf(file)
+				if err != nil {
+					return err
+				}
+				for _, p := range pkgs {
+					set[p] = true
+				}
+			}
+		}
+		var pkgs []string
+		for p := range set {
+			pkgs = append(pkgs, p)
+		}
+		sort.Strings(pkgs)
+		lock.Packages[module] = pkgs
 	}
 	if err := checkNames(lock.Names); err != nil {
 		return err
