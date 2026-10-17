@@ -4,6 +4,9 @@ load("@gazelle//:def.bzl", "gazelle", "gazelle_binary")
 
 # gazelle:exclude bazel/gazelle/kmp/testdata
 
+# The app version, compiled into app/di/core (#1011).
+exports_files(["VERSION"])
+
 gazelle_binary(
     name = "gazelle_bin",
     languages = ["//bazel/gazelle/kmp"],

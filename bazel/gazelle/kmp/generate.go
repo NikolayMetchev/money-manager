@@ -150,6 +150,9 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	for _, set := range mainSetsPresent {
 		lib.SetAttr(set.srcsAttr, glob(set.dir))
 	}
+	if len(kc.generatedSrcs) > 0 {
+		lib.SetAttr("generated_srcs", kc.generatedSrcs)
+	}
 	if len(kc.targets) > 0 {
 		lib.SetAttr("native_targets", kc.targets)
 	}

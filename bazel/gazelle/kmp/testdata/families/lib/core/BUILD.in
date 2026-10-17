@@ -1,1 +1,11 @@
 # gazelle:kmp_export @maven_kmp//:kotlinx_serialization_core
+# gazelle:kmp_generated_srcs :version
+load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp/constants:constants.bzl", "kotlin_constants")
+
+kotlin_constants(
+    name = "version",
+    constants = {"//:VERSION": "VERSION"},
+    object = "GeneratedVersion",
+    package = "com.example.core",
+)
