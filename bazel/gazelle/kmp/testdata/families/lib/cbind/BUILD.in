@@ -1,0 +1,9 @@
+# gazelle:kmp_targets linuxX64
+# gazelle:kmp_cinterops :clib_interop
+load("//bazel/kmp:defs.bzl", "kmp_cinterop")
+
+kmp_cinterop(
+    name = "clib_interop",
+    def_file = "src/nativeInterop/cinterop/clib.def",
+    native_targets = ["linuxX64"],
+)

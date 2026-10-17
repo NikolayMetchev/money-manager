@@ -10,43 +10,7 @@ the lockfile, and `//bazel/kmp/deps:maven_kmp_lock_test` fails with the command 
 """
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
-
-def _strip_comment(line):
-    quoted = False
-    for i in range(len(line)):
-        c = line[i]
-        if c == '"':
-            quoted = not quoted
-        elif c == "#" and not quoted:
-            return line[:i].strip()
-    return line.strip()
-
-def _catalog(text):
-    """The catalog's [versions] and [libraries] (`module` + `version.ref`), as the resolver reads them."""
-    versions = {}
-    libraries = {}
-    table = ""
-    for raw in text.splitlines():
-        line = _strip_comment(raw)
-        if not line:
-            continue
-        if line.startswith("[") and line.endswith("]"):
-            table = line[1:-1]
-            continue
-        key, sep, value = line.partition("=")
-        if not sep:
-            continue
-        key = key.strip()
-        value = value.strip()
-        if table == "versions" and value.startswith('"'):
-            versions[key] = value.strip('"')
-        elif table == "libraries" and value.startswith("{"):
-            fields = {}
-            for field in value.strip("{} ").split(","):
-                k, _, v = field.partition("=")
-                fields[k.strip()] = v.strip().strip('"')
-            libraries[key] = fields
-    return versions, libraries
+load("//bazel/kmp/deps:catalog.bzl", "catalog")
 
 def _expected_inputs(versions, libraries, install):
     libs = {}
@@ -165,7 +129,7 @@ def _maven_kmp_impl(module_ctx):
         fail("maven_kmp: expected one install tag in the root module, got %d" % len(installs))
     install = installs[0]
     lock = json.decode(module_ctx.read(install.lock_file))
-    versions, libraries = _catalog(module_ctx.read(install.catalog))
+    versions, libraries = catalog(module_ctx.read(install.catalog))
     expected = _expected_inputs(versions, libraries, install)
     stale = ""
     if lock["inputs"] != expected:
