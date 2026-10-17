@@ -13,6 +13,7 @@ bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_kotlin", version = "2.4.21")
 bazel_dep(name = "rules_jvm_external", version = "7.2")
+bazel_dep(name = "rules_shell", version = "0.6.1")
 
 # rules_go only hosts the Gazelle language extension (//bazel/gazelle/kmp): Gazelle extensions are Go.
 bazel_dep(name = "rules_go", version = "0.64.2")
@@ -29,6 +30,13 @@ single_version_override(
 )
 
 register_toolchains("//bazel/kmp:kotlin_toolchain")
+
+# Kotlin/Native for the exec host, at rules_kotlin's Kotlin version, with every konan dependency pinned in
+# bazel/kmp/native/pins.bzl (#998). After a Kotlin bump: bazel run @kotlin_native_repin//:repin
+kotlin_native = use_extension("//bazel/kmp/native:extensions.bzl", "kotlin_native")
+use_repo(kotlin_native, "kotlin_native", "kotlin_native_repin")
+
+register_toolchains("//bazel/kmp/native:all")
 
 # Maven libraries, by their -jvm artifact until KMP variant resolution lands (#1000). Versions move with
 # gradle/libs.versions.toml. After a change, repin: bazel run @maven//:pin
