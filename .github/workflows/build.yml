@@ -470,10 +470,14 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0  # a full history is required for pull request analysis
           persist-credentials: false  # read-only job, no git push
-      - name: Generate SQLDelight and Mappie sources
+      # commonizeNativeDistribution puts the Kotlin/Native stdlib, platform and commonized klibs in
+      # ~/.konan, which the scan mounts at the container's /root/.konan. A scan that reuses the cached
+      # project model skips the IDE's Gradle import, which is what otherwise fills /root/.konan, and
+      # with the klibs missing every native-target module turns unresolved (thousands of findings).
+      - name: Generate SQLDelight and Mappie sources, provision Kotlin/Native klibs
         uses: $/.github/actions/gradle-run
         with:
-          command: jvmMainClasses
+          command: jvmMainClasses commonizeNativeDistribution
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
       - name: Restore Qodana cache (read-only on non-main branches)
         if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/releases/')
@@ -496,6 +500,7 @@ jobs:
           # accepted findings, so with a fail threshold of 0 a PR fails exactly when main would.
           pr-mode: false
           use-caches: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/releases/') }}
+          args: --volume,/home/runner/.konan:/root/.konan
       - name: Upload SARIF as artifact
         if: always()
         uses: actions/upload-artifact@v7
