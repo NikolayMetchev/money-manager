@@ -1,0 +1,9 @@
+# Keep `//...` and Gazelle out of Gradle's output trees and other non-source directories.
+ignore_directories([
+    "**/build",
+    "**/.gradle",
+    "**/.kotlin",
+    ".claude",
+    ".idea",
+    "webpage",
+])

@@ -45,7 +45,11 @@ tasks.register("verifyUniquePackages") {
 
         repositoryRoot
             .walkTopDown()
-            .onEnter { it.name !in setOf("build", ".git", ".gradle", ".idea", ".claude") }
+            // `bazel-*` are Bazel's convenience symlinks: the execroot links back to every module, which would
+            // otherwise make each package look split between `app/x` and `bazel-…/app/x`.
+            .onEnter {
+                it.name !in setOf("build", ".git", ".gradle", ".idea", ".claude") && !it.name.startsWith("bazel-")
+            }
             .filter { it.isFile && it.extension == "kt" }
             .forEach { file ->
                 val relativePath = file.relativeTo(repositoryRoot).invariantSeparatorsPath

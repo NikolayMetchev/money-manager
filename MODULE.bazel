@@ -1,0 +1,22 @@
+"""Money Manager's Bazel module.
+
+Bazel is being brought up beside Gradle (#995). Until the cutover, Gradle stays the source of truth.
+"""
+
+module(
+    name = "money_manager",
+    version = "1.0.12",
+)
+
+bazel_dep(name = "bazel_skylib", version = "1.9.2")
+bazel_dep(name = "platforms", version = "1.1.0")
+bazel_dep(name = "rules_java", version = "9.9.0")
+bazel_dep(name = "rules_kotlin", version = "2.4.21")
+bazel_dep(name = "rules_jvm_external", version = "7.2")
+
+# rules_go only hosts the Gazelle language extension (//bazel/gazelle/kmp): Gazelle extensions are Go.
+bazel_dep(name = "rules_go", version = "0.64.2")
+bazel_dep(name = "gazelle", version = "0.54.0")
+
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.download(version = "1.27.2")
