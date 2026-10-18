@@ -1,5 +1,6 @@
 # gazelle:kmp_generate true
 # gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_forbid_deps //app/db/core //app/di/core //app/ui/core
 # gazelle:kmp_export //app/importengineapi
 # gazelle:kmp_export //app/model/apistrategy
 # gazelle:kmp_export //app/model/core
@@ -15,6 +16,11 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 kmp_library(
     name = "apiimporter",
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    forbidden_deps = [
+        "//app/db/core",
+        "//app/di/core",
+        "//app/ui/core",
+    ],
     native_targets = [
         "linuxArm64",
         "linuxX64",
@@ -47,6 +53,11 @@ kmp_test(
     name = "test",
     associate = ":apiimporter",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    forbidden_deps = [
+        "//app/db/core",
+        "//app/di/core",
+        "//app/ui/core",
+    ],
     native_targets = [
         "linuxArm64",
         "linuxX64",

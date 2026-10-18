@@ -1,0 +1,5 @@
+A Kotlin package must belong to exactly one module (CLAUDE.md, "Packages"), but these are split:
+  shared
+      a
+      b
+Give each module its own package (e.g. append the module name as a sub-package).

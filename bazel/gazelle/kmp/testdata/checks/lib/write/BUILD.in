@@ -1,0 +1,1 @@
+# gazelle:kmp_visibility //lib/engine:__pkg__ //lib/fixtures:__pkg__

@@ -23,6 +23,7 @@ load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load(":metadata.bzl", "kt_metadata_library")
+load("//bazel/kmp/checks:checks.bzl", "kmp_forbidden_deps", "kmp_reference_check")
 load(":native.bzl", "BUILDS_ON", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_executable", "kt_native_klib", "kt_native_test_binary")
 load("//bazel/kmp/plugins:plugins.bzl", "plugin_deps", "plugin_labels")
 
@@ -76,6 +77,18 @@ def _family(target, linux, apple, mingw):
     """What a target's family source set (linuxMain, appleMain, mingwMain) has: its sources or its deps."""
     return {"apple": apple, "linux": linux, "mingw": mingw}[FAMILIES[target]]
 
+def _forbidden_deps(name, forbidden, jvm, natives, compatible):
+    module = "//" + native.package_name()
+    for platform, target in jvm.items() + natives.items():
+        kmp_forbidden_deps(
+            name = "%s_forbidden_deps_%s" % (name, platform),
+            module = module,
+            forbidden = forbidden,
+            targets = [":" + target],
+            testonly = True,
+            target_compatible_with = compatible.get(platform, []),
+        )
+
 def kmp_library(
         name,
         common_srcs = [],
@@ -98,6 +111,10 @@ def kmp_library(
         sqldelight = None,
         generated_srcs = [],
         cinterops = [],
+        forbidden_deps = [],
+        forbidden_reference = None,
+        forbidden_reference_reason = "",
+        forbidden_reference_allowed = [],
         visibility = None):
     """A Kotlin Multiplatform module. Emits `:<name>_jvm` and `:<name>_<target>` per native target.
 
@@ -127,8 +144,24 @@ def kmp_library(
         generated_srcs: generated `.kt` files (`kotlin_constants`) that join `commonMain`, as Gradle's
             `kotlin.srcDir(task)` does.
         cinterops: `kmp_cinterop` targets of the main compilation; their klibs travel with the module's.
+        forbidden_deps: modules this one must never reach, even transitively (`kmp_forbidden_deps`, checked per
+            platform as `:<name>_forbidden_deps_<platform>`).
+        forbidden_reference: a regular expression the hand-written sources must not match outside comments
+            (`:<name>_references`).
+        forbidden_reference_reason: why, for the error message.
+        forbidden_reference_allowed: module-relative files exempt from `forbidden_reference`.
         visibility: the targets' visibility.
     """
+    if forbidden_reference:
+        kmp_reference_check(
+            name = name + "_references",
+            srcs = common_srcs + jvm_android_srcs + jvm_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs,
+            regex = forbidden_reference,
+            reason = forbidden_reference_reason,
+            allowed = forbidden_reference_allowed,
+        )
+    if forbidden_deps:
+        _forbidden_deps(name, forbidden_deps, {"jvm": name + "_jvm"}, {t: name + "_" + t for t in native_targets}, BUILDS_ON)
     common_srcs = common_srcs + generated_srcs
     native_deps = native_deps + cinterops
     fragments = _jvm_fragments("Main", common_srcs, jvm_android_srcs, jvm_srcs)
@@ -212,7 +245,8 @@ def kmp_test(
         mingw_deps = [],
         plugins = [],
         data = [],
-        size = "medium"):
+        size = "medium",
+        forbidden_deps = []):
     """A module's tests. Emits `:<name>_jvm` and `:<name>_<target>` per native target.
 
     JVM tests are JUnit 4, run by `//bazel/kmp/testing:KmpJUnitRunner`. Native tests are linked with konan's
@@ -240,6 +274,7 @@ def kmp_test(
         data: files the tests read at run time, from the workspace root (the runfiles' working directory).
         size: the Bazel test size. Gradle has no test timeout, so the default is medium (300 s); give a slower
             suite a bigger one.
+        forbidden_deps: modules the tests must never reach either (`:<name>_forbidden_deps_<platform>`).
     """
     fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, jvm_srcs)
     brought = plugin_deps(plugins)
@@ -278,6 +313,14 @@ def kmp_test(
                 ":" + lib,
                 Label("//bazel/kmp/testing:runner"),
             ],
+        )
+    if forbidden_deps:
+        _forbidden_deps(
+            name,
+            forbidden_deps,
+            {"jvm": name + "_jvm_lib"} if fragments.srcs else {},
+            {t: "%s_%s_bin" % (name, t) for t in native_targets},
+            RUNS_ON,
         )
     module = associate.rpartition(":")[2] if ":" in associate else associate.rpartition("/")[2]
     for target in native_targets:
