@@ -37,6 +37,9 @@ type Lock struct {
 		// only match `*CompileClasspath`/`*RuntimeClasspath`/`*DependenciesMetadata`, not native klibraries.
 		ClasspathForces map[string]string `json:"classpath_forces,omitempty"`
 		Platforms       []string          `json:"platforms"`
+		// LibraryPlatforms limit a library to some platforms (alias → platforms), as Gradle only resolves a
+		// library for the source sets that declare it: the desktop Compose jars are no Android library.
+		LibraryPlatforms map[string][]string `json:"library_platforms,omitempty"`
 		Excludes        []string          `json:"excludes"`
 		// ResolveStdlib: the Kotlin stdlib is resolved like any library, for a tool run on its own classpath.
 		ResolveStdlib bool `json:"resolve_stdlib,omitempty"`
@@ -54,10 +57,11 @@ type Lock struct {
 var nonIdent = regexp.MustCompile(`[^A-Za-z0-9_]`)
 
 func main() {
-	var libraries, platformNames, forces, classpathForces, repos, excludes multi
+	var libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes multi
 	toml := flag.String("toml", "gradle/libs.versions.toml", "the version catalog")
 	out := flag.String("lock", "bazel/kmp/deps/maven_kmp.lock.json", "the lockfile to write")
 	flag.Var(&libraries, "library", "a catalog library alias to resolve (repeatable)")
+	flag.Var(&libraryPlatforms, "library-platforms", "alias=platform,…: resolve a library for these platforms only (repeatable)")
 	flag.Var(&platformNames, "platform", "a platform to resolve for: jvm, linuxX64, … (repeatable)")
 	flag.Var(&forces, "force", "module=version-ref: pin a module to a catalog version on every platform (repeatable)")
 	flag.Var(&classpathForces, "classpath-force", "module=version-ref: pin a module on the JVM and in common metadata only (repeatable)")
@@ -65,13 +69,13 @@ func main() {
 	flag.Var(&excludes, "exclude", "group:artifact never to resolve, whoever depends on it (repeatable)")
 	stdlib := flag.Bool("resolve-stdlib", false, "resolve the Kotlin stdlib too, for a tool (JVM only); else it comes from the toolchain")
 	flag.Parse()
-	if err := run(*toml, *out, libraries, platformNames, forces, classpathForces, repos, excludes, *stdlib); err != nil {
+	if err := run(*toml, *out, libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes, *stdlib); err != nil {
 		fmt.Fprintln(os.Stderr, "resolver:", err)
 		os.Exit(1)
 	}
 }
 
-func run(tomlPath, out string, libraries, platformNames, forceSpecs, classpathForceSpecs, repoSpecs, excludes []string, resolveStdlib bool) error {
+func run(tomlPath, out string, libraries, libraryPlatformSpecs, platformNames, forceSpecs, classpathForceSpecs, repoSpecs, excludes []string, resolveStdlib bool) error {
 	cat, err := ReadCatalog(tomlPath)
 	if err != nil {
 		return err
@@ -118,13 +122,33 @@ func run(tomlPath, out string, libraries, platformNames, forceSpecs, classpathFo
 	// Never null: MODULE.bazel's empty list must read back as one.
 	lock.Inputs.Excludes = append([]string{}, excludes...)
 	lock.Inputs.ResolveStdlib = resolveStdlib
+	only := map[string]map[string]bool{}
+	for _, spec := range libraryPlatformSpecs {
+		alias, names, ok := strings.Cut(spec, "=")
+		if !ok || names == "" {
+			return fmt.Errorf("--library-platforms %s: want alias=platform,…", spec)
+		}
+		only[alias] = map[string]bool{}
+		for _, name := range strings.Split(names, ",") {
+			if _, known := platforms[name]; !known {
+				return fmt.Errorf("--library-platforms %s: unknown platform %s", spec, name)
+			}
+			only[alias][name] = true
+		}
+		if lock.Inputs.LibraryPlatforms == nil {
+			lock.Inputs.LibraryPlatforms = map[string][]string{}
+		}
+		lock.Inputs.LibraryPlatforms[alias] = strings.Split(names, ",")
+	}
 	var roots []Coordinate
+	var rootAliases []string
 	for _, alias := range libraries {
 		c, ok := cat.Libraries[alias]
 		if !ok {
 			return fmt.Errorf("--library %s: not in %s", alias, tomlPath)
 		}
 		roots = append(roots, c)
+		rootAliases = append(rootAliases, alias)
 		lock.Inputs.Libraries[alias] = c.String()
 		lock.Names[c.Module()] = nonIdent.ReplaceAllString(alias, "_")
 	}
@@ -159,9 +183,14 @@ func run(tomlPath, out string, libraries, platformNames, forceSpecs, classpathFo
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			platformRoots := roots
+			var platformRoots []Coordinate
+			for j, c := range roots {
+				if limit, ok := only[rootAliases[j]]; !ok || limit[name] {
+					platformRoots = append(platformRoots, c)
+				}
+			}
 			if p.Common {
-				platformRoots = append(append([]Coordinate{}, roots...), toolchain...)
+				platformRoots = append(platformRoots, toolchain...)
 			}
 			resolved, skipped, err := resolver.Resolve(p, platformRoots)
 			results[i] = result{name, resolved, skipped, err}

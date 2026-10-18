@@ -4,8 +4,8 @@ KGP compiles each platform as one K2 invocation that sees every fragment (source
 `-Xmulti-platform -Xfragments=… -Xfragment-refines=… -Xfragment-sources=…`. That keeps expect and actual in
 separate fragments and checks common code as common code. These macros do the same.
 
-A module emits one target per platform: `:<name>_jvm`, and `:<name>_<target>` (`_linuxX64`, …) for each of
-its `native_targets`. A module with native targets also gets `:<name>_metadata`, commonMain compiled on its
+A module emits one target per platform: `:<name>_jvm`, `:<name>_android` for an Android module, and
+`:<name>_<target>` (`_linuxX64`, …) for each of its `native_targets`. A module with native targets also gets `:<name>_metadata`, commonMain compiled on its
 own against its dependencies' common metadata, as Gradle's `compileCommonMainKotlinMetadata` (metadata.bzl). Dependencies are named once, by their module label (`//utils/files:files`), and each
 platform's compile gets that label's platform target (`//utils/files:files_jvm`, `…:files_linuxX64`).
 Maven libraries in `//bazel/kmp/deps` follow the same naming.
@@ -51,11 +51,11 @@ def _fragments(chain):
         fragment_refines = fragment_refines,
     )
 
-def _jvm_fragments(prefix, common_srcs, jvm_android_srcs, jvm_srcs):
+def _jvm_fragments(prefix, common_srcs, jvm_android_srcs, leaf_srcs, leaf = "jvm"):
     return _fragments([
         ("common" + prefix, common_srcs, True),
         ("jvmAndroid" + prefix, jvm_android_srcs, False),
-        ("jvm" + prefix, jvm_srcs, True),
+        (leaf + prefix, leaf_srcs, True),
     ])
 
 def platform_label(dep, platform):
@@ -110,6 +110,7 @@ def _family(target, linux, apple, mingw):
     return {"apple": apple, "linux": linux, "mingw": mingw}[FAMILIES[target]]
 
 def _forbidden_deps(name, forbidden, jvm, natives, compatible):
+    """`jvm` holds the JVM-bytecode compiles (`jvm`, `android`), `natives` the native ones, by platform."""
     module = "//" + native.package_name()
     for platform, target in jvm.items() + natives.items():
         kmp_forbidden_deps(
@@ -126,19 +127,25 @@ def kmp_library(
         common_srcs = [],
         jvm_android_srcs = [],
         jvm_srcs = [],
+        android_srcs = [],
         native_srcs = [],
         linux_srcs = [],
         apple_srcs = [],
         mingw_srcs = [],
+        android = False,
         native_targets = [],
         deps = [],
+        jvm_android_deps = [],
         jvm_deps = [],
+        android_deps = [],
         native_deps = [],
         linux_deps = [],
         apple_deps = [],
         mingw_deps = [],
         exports = [],
+        jvm_android_exports = [],
         jvm_exports = [],
+        android_exports = [],
         plugins = [],
         sqldelight = None,
         generated_srcs = [],
@@ -150,27 +157,38 @@ def kmp_library(
         keep_deps = [],
         resources = [],
         visibility = None):
-    """A Kotlin Multiplatform module. Emits `:<name>_jvm` and `:<name>_<target>` per native target.
+    """A Kotlin Multiplatform module. Emits `:<name>_jvm`, `:<name>_android` and `:<name>_<target>` per native target.
+
+    The Android compile is AGP's Kotlin compile of an Android library (moneymanager.android-convention):
+    `commonMain ← jvmAndroidMain ← androidMain` against the SDK's `android.jar` (`//bazel/kmp/android`), on the
+    same Kotlin toolchain as the JVM, as the convention gives both the catalog's `jvm-target`. Its resources,
+    manifest and dexing are the app's (#1023).
 
     Args:
         name: the module name.
         common_srcs: `src/commonMain/kotlin` sources.
         jvm_android_srcs: `src/jvmAndroidMain/kotlin` sources.
         jvm_srcs: `src/jvmMain/kotlin` sources.
+        android_srcs: `src/androidMain/kotlin` sources.
         native_srcs: `src/nativeMain/kotlin` sources.
         linux_srcs: `src/linuxMain/kotlin` sources.
         apple_srcs: `src/appleMain/kotlin` sources.
         mingw_srcs: `src/mingwMain/kotlin` sources.
+        android: whether the module has an Android target (`:<name>_android`).
         native_targets: the Kotlin/Native targets, by KGP's names (`linuxX64`, …).
         deps: `commonMain` `implementation` dependencies, by module label. A compilation has one
             classpath, as in KGP.
-        jvm_deps: `jvmAndroidMain`/`jvmMain` dependencies.
+        jvm_android_deps: `jvmAndroidMain` dependencies (the JVM's and Android's).
+        jvm_deps: `jvmMain` dependencies.
+        android_deps: `androidMain` dependencies.
         native_deps: `nativeMain` dependencies.
         linux_deps: `linuxMain` dependencies (only on Linux targets).
         apple_deps: `appleMain` dependencies.
         mingw_deps: `mingwMain` dependencies.
         exports: `commonMain` `api` dependencies: on the classpath of everything that depends on this module.
-        jvm_exports: `jvmAndroidMain`/`jvmMain` `api` dependencies.
+        jvm_android_exports: `jvmAndroidMain` `api` dependencies.
+        jvm_exports: `jvmMain` `api` dependencies.
+        android_exports: `androidMain` `api` dependencies.
         plugins: compiler plugins by name (`serialization`, `compose`, `metro`, `mappie`; see
             //bazel/kmp/plugins:plugins.bzl), applied on every platform with the runtime they bring.
         sqldelight: a `sqldelight_library` whose generated Kotlin joins `commonMain`. The SQLDelight runtime
@@ -190,7 +208,7 @@ def kmp_library(
         visibility: the targets' visibility. A restricted module also gets `:<name>_for_tests`, testonly and
             public, which every module's tests use instead.
     """
-    hand_written = common_srcs + jvm_android_srcs + jvm_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs
+    hand_written = common_srcs + jvm_android_srcs + jvm_srcs + android_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs
     kmp_lint(name, hand_written)
     if forbidden_reference:
         kmp_reference_check(
@@ -201,10 +219,11 @@ def kmp_library(
             allowed = forbidden_reference_allowed,
         )
     if forbidden_deps:
-        _forbidden_deps(name, forbidden_deps, {"jvm": name + "_jvm"}, {t: name + "_" + t for t in native_targets}, BUILDS_ON)
+        bytecode = {p: name + "_" + p for p in ["jvm"] + (["android"] if android else [])}
+        _forbidden_deps(name, forbidden_deps, bytecode, {t: name + "_" + t for t in native_targets}, BUILDS_ON)
     # Exports are kmp_export directives, a person's say-so (some only generated code uses: Metro's graph,
     # SQLDelight's queries), so only what imports brought is checked.
-    declared = deps + jvm_deps
+    declared = deps + jvm_android_deps + jvm_deps
     common_srcs = common_srcs + generated_srcs
     native_deps = native_deps + cinterops
     fragments = _jvm_fragments("Main", common_srcs, jvm_android_srcs, jvm_srcs)
@@ -217,17 +236,18 @@ def kmp_library(
         # rules_kotlin can't put a srcjar's sources in a fragment, and K2 rejects sources in none, so on the JVM
         # the generated code (which uses nothing of the module's own) compiles on its own and is exported.
         # konanc gets it as commonMain, beside the module's sources, as KGP compiles it.
-        kt_jvm_library(
-            name = name + "_sqldelight_jvm",
-            srcs = [sqldelight],
-            deps = _on("jvm", exports),
-            exports = _on("jvm", exports),
-            visibility = ["//visibility:private"],
-        )
-        jvm_exports = jvm_exports + [":" + name + "_sqldelight"]
+        for platform in ["jvm"] + (["android"] if android else []):
+            kt_jvm_library(
+                name = "%s_sqldelight_%s" % (name, platform),
+                srcs = [sqldelight],
+                deps = _on(platform, exports),
+                exports = _on(platform, exports),
+                visibility = ["//visibility:private"],
+            )
+        jvm_android_exports = jvm_android_exports + [":" + name + "_sqldelight"]
     exports = exports + brought.exports
     deps = [d for d in deps + brought.deps if d not in exports]
-    jvm_exported = _on("jvm", exports + jvm_exports)
+    jvm_exported = _on("jvm", exports + jvm_android_exports + jvm_exports)
     kt_jvm_library(
         name = name + "_jvm",
         srcs = fragments.srcs,
@@ -235,7 +255,7 @@ def kmp_library(
         fragment_refines = fragments.fragment_refines,
         # Gradle's api is on the module's own classpath too; Bazel's exports are only on its dependents'. A
         # module with no sources of its own (only generated ones) just exports.
-        deps = _on("jvm", deps + jvm_deps + exports + jvm_exports) if fragments.srcs else [],
+        deps = _on("jvm", deps + jvm_android_deps + jvm_deps + exports + jvm_android_exports + jvm_exports) if fragments.srcs else [],
         exports = jvm_exported,
         plugins = plugin_labels(plugins, "jvm"),
         resource_jars = _resource_jars(name, "Main", resources),
@@ -245,6 +265,19 @@ def kmp_library(
     )
     if fragments.srcs:
         _unused_deps(name, name + "_jvm", declared, keep_deps)
+    if android:
+        android_fragments = _jvm_fragments("Main", common_srcs, jvm_android_srcs, android_srcs, "android")
+        kt_jvm_library(
+            name = name + "_android",
+            srcs = android_fragments.srcs,
+            fragment_srcs = android_fragments.fragment_srcs,
+            fragment_refines = android_fragments.fragment_refines,
+            deps = _on("android", deps + jvm_android_deps + android_deps + exports + jvm_android_exports + android_exports) +
+                   [Label("//bazel/kmp/android:android_jar")] if android_fragments.srcs else [],
+            exports = _on("android", exports + jvm_android_exports + android_exports),
+            plugins = plugin_labels(plugins, "jvm"),
+            visibility = visibility,
+        )
     if native_targets:
         package = native.package_name()
         kt_metadata_library(
@@ -274,7 +307,7 @@ def kmp_library(
     if visibility and "//visibility:public" not in visibility:
         # `visibility` keeps main code out (verifyNoWriteRepositoryUsage), but Gradle's check only reads main
         # sources: any module's tests may use the module. `:<name>_for_tests` is testonly, so only tests can.
-        for platform in ["jvm"] + (["metadata"] + native_targets if native_targets else []):
+        for platform in ["jvm"] + (["android"] if android else []) + (["metadata"] + native_targets if native_targets else []):
             native.alias(
                 name = "%s_for_tests_%s" % (name, platform),
                 actual = ":%s_%s" % (name, platform),
@@ -294,6 +327,7 @@ def kmp_test(
         mingw_srcs = [],
         native_targets = [],
         deps = [],
+        jvm_android_deps = [],
         jvm_deps = [],
         native_deps = [],
         linux_deps = [],
@@ -326,7 +360,8 @@ def kmp_test(
         mingw_srcs: `src/mingwTest/kotlin` sources.
         native_targets: the Kotlin/Native targets to test on, by KGP's names.
         deps: test dependencies (Gradle `implementation` on `commonTest`), by module label.
-        jvm_deps: `jvmAndroidTest`/`jvmTest` dependencies.
+        jvm_android_deps: `jvmAndroidTest` dependencies.
+        jvm_deps: `jvmTest` dependencies.
         native_deps: `nativeTest` dependencies.
         linux_deps: `linuxTest` dependencies.
         apple_deps: `appleTest` dependencies.
@@ -347,7 +382,8 @@ def kmp_test(
     kmp_lint(name, common_srcs + jvm_android_srcs + jvm_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs)
     fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, jvm_srcs)
     brought = plugin_deps(plugins)
-    declared = deps + jvm_deps
+    declared = deps + jvm_android_deps + jvm_deps
+    jvm_deps = jvm_android_deps + jvm_deps
     deps = deps + brought.deps + brought.exports
     # Tests with only native sources have no JVM test, as KGP's jvmTest finds no sources (utils/sqlite3).
     if fragments.srcs:

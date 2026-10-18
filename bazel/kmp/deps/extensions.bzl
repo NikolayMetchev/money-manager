@@ -44,6 +44,8 @@ def _expected_inputs(versions, libraries, forces, classpath_forces, install):
     inputs = {"excludes": install.excludes, "forces": pinned, "libraries": libs, "platforms": install.platforms}
     if classpath_forces:
         inputs["classpath_forces"] = {module: versions.get(ref, "?" + ref) for module, ref in classpath_forces.items()}
+    if install.library_platforms:
+        inputs["library_platforms"] = install.library_platforms
     if install.resolve_stdlib:
         inputs["resolve_stdlib"] = True
     return inputs
@@ -108,6 +110,34 @@ def _metadata_build(source_sets):
         for s in source_sets
     ]) + "\n"
 
+_ANDROID = "android"
+
+# An AAR's code: its classes.jar, merged with the jars it bundles (`libs/`) when it has any, as kt_jvm_import
+# takes one jar. Its resources and manifest are the app's (#1023).
+_AAR_BUILD = """\
+LIBS = glob(["libs/*.jar"], allow_empty = True)
+
+[genrule(
+    name = "merged",
+    srcs = ["classes.jar"] + LIBS,
+    outs = ["merged.jar"],
+    cmd = "$(execpath @bazel_tools//tools/jdk:singlejar) --output $@ --sources $(SRCS)",
+    tools = ["@bazel_tools//tools/jdk:singlejar"],
+) for _ in LIBS[:1]]
+
+alias(
+    name = "jar",
+    actual = ":merged" if LIBS else "classes.jar",
+    visibility = ["//visibility:public"],
+)
+"""
+
+def _is_aar(file):
+    return file["name"].endswith(".aar")
+
+def _file_label(file):
+    return '"@%s//%s"' % (_file_repo(file), ":jar" if _is_aar(file) else "file")
+
 def _target(name, platform, resolved, names, artifacts):
     deps = _labels(names, _through_redirects(artifacts, resolved.get("deps", []), platform), platform)
     compile_only = [
@@ -115,14 +145,15 @@ def _target(name, platform, resolved, names, artifacts):
         for label in _labels(names, _through_redirects(artifacts, resolved.get("compile_only_deps", []), platform), platform)
     ]
     runtime = _labels(names, resolved.get("runtime_deps", []), platform)
-    files = ['"@%s//file"' % _file_repo(f) for f in resolved["files"] or []]
+    files = [_file_label(f) for f in resolved["files"] or []]
     full = "%s_%s" % (name, platform)
     if platform == _METADATA:
         if not resolved.get("source_sets"):
             return 'kt_metadata_group(name = "%s", deps = [%s])\n' % (full, ", ".join(deps))
         source_sets = ['"@%s//:%s"' % (_file_repo(f), s) for f in resolved["files"] for s in resolved["source_sets"]]
         return 'kt_metadata_import(name = "%s", source_sets = [%s], deps = [%s])\n' % (full, ", ".join(source_sets), ", ".join(deps))
-    if platform == "jvm":
+    # Android libraries compile like JVM ones, against the SDK's android.jar.
+    if platform in ("jvm", _ANDROID):
         if not files:
             return 'java_library(name = "%s", exports = [%s], runtime_deps = [%s])\n' % (full, ", ".join(deps + compile_only), ", ".join(runtime))
 
@@ -194,7 +225,9 @@ def _install(module_ctx, install, files, archives):
             for f in resolved["files"] or []:
                 if platform == _METADATA:
                     if resolved.get("source_sets"):
-                        archives[_file_repo(f)] = (f, resolved["source_sets"])
+                        archives[_file_repo(f)] = (f, _metadata_build(resolved["source_sets"]))
+                elif _is_aar(f):
+                    archives[_file_repo(f)] = (f, _AAR_BUILD)
                 else:
                     files[_file_repo(f)] = f
             targets.append(_target(names[module], platform, resolved, names, lock["artifacts"]))
@@ -202,6 +235,7 @@ def _install(module_ctx, install, files, archives):
     pin_args = ["$(rootpath @money_manager//bazel/kmp/resolver)", "--lock", lock_path]
     pin_args += ["--toml", "gradle/libs.versions.toml"]
     pin_args += ["--library=" + alias for alias in install.libraries]
+    pin_args += ["--library-platforms=%s=%s" % (a, ",".join(p)) for a, p in sorted(install.library_platforms.items())]
     pin_args += ["--platform=" + p for p in install.platforms]
     pin_args += ["--force=%s=%s" % (m, ref) for m, ref in sorted(forces.items())]
     pin_args += ["--classpath-force=%s=%s" % (m, ref) for m, ref in sorted(classpath_forces.items())]
@@ -223,13 +257,13 @@ def _maven_kmp_impl(module_ctx):
         _hub(name = install.name, build_file_content = content, stale = stale)
     for repo, f in files.items():
         http_file(name = repo, urls = [f["url"]], sha256 = f["sha256"], downloaded_file_path = f["name"])
-    for repo, (f, source_sets) in archives.items():
+    for repo, (f, build) in archives.items():
         http_archive(
             name = repo,
             urls = [f["url"]],
             sha256 = f["sha256"],
             type = "zip",
-            build_file_content = _metadata_build(source_sets),
+            build_file_content = build,
         )
     return module_ctx.extension_metadata(reproducible = True)
 
@@ -244,13 +278,17 @@ maven_kmp = module_extension(
                 doc = "module → catalog [versions] key: Gradle's classpath substitutions, so JVM and metadata only.",
             ),
             "libraries": attr.string_list(doc = "Catalog library aliases to resolve."),
+            "library_platforms": attr.string_list_dict(
+                doc = """alias → the platforms it resolves for (default: all), as Gradle only resolves a library for
+                the source sets declaring it: the desktop Compose jars are no Android library.""",
+            ),
             "lock_file": attr.label(mandatory = True),
             "name": attr.string(
                 default = "maven_kmp",
                 doc = "The hub repository. Each install resolves on its own, as each Gradle configuration does " +
                       "(a tool's classpath never meets the app's), into its own lockfile.",
             ),
-            "platforms": attr.string_list(doc = "jvm, linuxX64, linuxArm64, macosArm64, mingwX64."),
+            "platforms": attr.string_list(doc = "android, jvm, metadata, linuxX64, linuxArm64, macosArm64, mingwX64."),
             "repositories": attr.string_list(doc = "url[=group-regex,…], in order, as in settings.gradle.kts."),
             "resolve_stdlib": attr.bool(
                 doc = "Resolve the Kotlin stdlib like any library, for a tool's own classpath (else the toolchain's).",

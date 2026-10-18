@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
 # gazelle:kmp_export @maven_kmp//:cryptography_core
 # gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_jdk jvmMain
 # gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_openssl3_prebuilt nativeMain
@@ -8,6 +8,7 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 kmp_library(
     name = "archive",
+    android = True,
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     jvm_android_srcs = glob(["src/jvmAndroidMain/kotlin/**/*.kt"]),
     jvm_deps = ["@maven_kmp//:cryptography_provider_jdk"],

@@ -1,0 +1,18 @@
+{
+  "inputs": {"libraries": {"ui-desktop": "g:ui-desktop:1", "ui-android": "g:ui-android:1", "sqlite": "g:sqlite:1", "jdbc": "g:jdbc:1"}},
+  "names": {"g:ui-desktop": "ui_desktop", "g:ui-android": "ui_android", "g:ui": "g_ui", "g:sqlite": "sqlite", "g:jdbc": "jdbc"},
+  "packages": {
+    "g:ui-desktop": ["ui"],
+    "g:ui-android": ["ui"],
+    "g:ui": ["ui", "ui.layout"],
+    "g:sqlite": ["sqlite"],
+    "g:jdbc": ["jdbc"]
+  },
+  "artifacts": {
+    "g:ui-desktop": {"jvm": {}},
+    "g:ui-android": {"android": {}},
+    "g:ui": {"jvm": {}, "android": {}},
+    "g:sqlite": {"android": {}},
+    "g:jdbc": {"jvm": {}}
+  }
+}

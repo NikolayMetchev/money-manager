@@ -2,13 +2,32 @@
   "version": 1,
   "inputs": {
     "libraries": {
+      "androidx-activity": "androidx.activity:activity:1.13.0",
+      "androidx-activity-compose": "androidx.activity:activity-compose:1.13.0",
+      "androidx-compose-animation": "androidx.compose.animation:animation:1.12.1",
+      "androidx-compose-animation-core": "androidx.compose.animation:animation-core:1.12.1",
+      "androidx-compose-foundation": "androidx.compose.foundation:foundation:1.12.1",
+      "androidx-compose-foundation-layout": "androidx.compose.foundation:foundation-layout:1.12.1",
+      "androidx-compose-material-icons-core": "androidx.compose.material:material-icons-core:1.7.8",
+      "androidx-compose-material3": "androidx.compose.material3:material3:1.4.0",
       "androidx-compose-runtime": "androidx.compose.runtime:runtime:1.12.1",
       "androidx-compose-runtime-annotation": "androidx.compose.runtime:runtime-annotation:1.12.1",
       "androidx-compose-runtime-desktop": "androidx.compose.runtime:runtime-desktop:1.12.1",
+      "androidx-compose-ui": "androidx.compose.ui:ui:1.12.1",
+      "androidx-compose-ui-geometry": "androidx.compose.ui:ui-geometry:1.12.1",
+      "androidx-compose-ui-graphics": "androidx.compose.ui:ui-graphics:1.12.1",
+      "androidx-compose-ui-test": "androidx.compose.ui:ui-test:1.12.1",
+      "androidx-compose-ui-text": "androidx.compose.ui:ui-text:1.12.1",
+      "androidx-compose-ui-unit": "androidx.compose.ui:ui-unit:1.12.1",
       "androidx-navigation3-runtime": "androidx.navigation3:navigation3-runtime:1.2.0",
       "androidx-navigation3-runtime-desktop": "androidx.navigation3:navigation3-runtime-desktop:1.2.0",
+      "androidx-navigation3-ui": "androidx.navigation3:navigation3-ui:1.2.0",
       "androidx-savedstate": "androidx.savedstate:savedstate:1.5.0",
       "androidx-savedstate-desktop": "androidx.savedstate:savedstate-desktop:1.5.0",
+      "androidx-sqlite": "androidx.sqlite:sqlite:2.7.1",
+      "androidx-test-monitor": "androidx.test:monitor:1.8.0",
+      "androidx-test-runner": "androidx.test:runner:1.7.0",
+      "androidx-test-uiautomator": "androidx.test.uiautomator:uiautomator:2.4.0",
       "atomicfu": "org.jetbrains.kotlinx:atomicfu:0.33.0",
       "bignum": "com.ionspin.kotlin:bignum:0.3.10",
       "clikt": "com.github.ajalt.clikt:clikt:5.1.0",
@@ -45,6 +64,7 @@
       "kermit-core": "co.touchlab:kermit-core:2.2.0",
       "kotlin-compose-compiler-plugin-embeddable": "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable:2.4.21",
       "kotlin-serialization-compiler-plugin-embeddable": "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable:2.4.21",
+      "kotlinx-coroutines-android": "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0",
       "kotlinx-coroutines-core": "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0",
       "kotlinx-coroutines-swing": "org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0",
       "kotlinx-coroutines-test": "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0",
@@ -76,8 +96,10 @@
       "mosaic-testing": "com.jakewharton.mosaic:mosaic-testing:0.18.0",
       "mosaic-tty": "com.jakewharton.mosaic:mosaic-tty:0.18.0",
       "mosaic-tty-terminal": "com.jakewharton.mosaic:mosaic-tty-terminal:0.18.0",
+      "play-services-auth": "com.google.android.gms:play-services-auth:22.0.0",
       "poi": "org.apache.poi:poi:5.5.1",
       "poi-ooxml": "org.apache.poi:poi-ooxml:5.5.1",
+      "sqldelight-android-driver": "app.cash.sqldelight:android-driver:2.4.1",
       "sqldelight-compiler-env": "app.cash.sqldelight:compiler-env:2.4.1",
       "sqldelight-coroutines-extensions": "app.cash.sqldelight:coroutines-extensions:2.4.1",
       "sqldelight-dialect-sqlite": "app.cash.sqldelight:sqlite-3-25-dialect:2.4.1",
@@ -171,6 +193,7 @@
       "org.slf4j:slf4j-api": "2.0.20"
     },
     "platforms": [
+      "android",
       "jvm",
       "linuxArm64",
       "linuxX64",
@@ -178,34 +201,269 @@
       "metadata",
       "mingwX64"
     ],
+    "library_platforms": {
+      "androidx-activity": [
+        "android"
+      ],
+      "androidx-activity-compose": [
+        "android"
+      ],
+      "androidx-compose-animation": [
+        "android"
+      ],
+      "androidx-compose-animation-core": [
+        "android"
+      ],
+      "androidx-compose-foundation": [
+        "android"
+      ],
+      "androidx-compose-foundation-layout": [
+        "android"
+      ],
+      "androidx-compose-material-icons-core": [
+        "android"
+      ],
+      "androidx-compose-material3": [
+        "android"
+      ],
+      "androidx-compose-runtime-desktop": [
+        "jvm"
+      ],
+      "androidx-compose-ui": [
+        "android"
+      ],
+      "androidx-compose-ui-geometry": [
+        "android"
+      ],
+      "androidx-compose-ui-graphics": [
+        "android"
+      ],
+      "androidx-compose-ui-test": [
+        "android"
+      ],
+      "androidx-compose-ui-text": [
+        "android"
+      ],
+      "androidx-compose-ui-unit": [
+        "android"
+      ],
+      "androidx-navigation3-runtime-desktop": [
+        "jvm"
+      ],
+      "androidx-navigation3-ui": [
+        "android"
+      ],
+      "androidx-savedstate-desktop": [
+        "jvm"
+      ],
+      "androidx-sqlite": [
+        "android"
+      ],
+      "androidx-test-monitor": [
+        "android"
+      ],
+      "androidx-test-runner": [
+        "android"
+      ],
+      "androidx-test-uiautomator": [
+        "android"
+      ],
+      "compose-animation-core-desktop": [
+        "jvm"
+      ],
+      "compose-animation-desktop": [
+        "jvm"
+      ],
+      "compose-charts-desktop": [
+        "jvm"
+      ],
+      "compose-desktop-linux-arm64": [
+        "jvm"
+      ],
+      "compose-desktop-linux-x64": [
+        "jvm"
+      ],
+      "compose-desktop-macos-arm64": [
+        "jvm"
+      ],
+      "compose-desktop-macos-x64": [
+        "jvm"
+      ],
+      "compose-desktop-windows-x64": [
+        "jvm"
+      ],
+      "compose-foundation-desktop": [
+        "jvm"
+      ],
+      "compose-foundation-layout-desktop": [
+        "jvm"
+      ],
+      "compose-material-icons-core-desktop": [
+        "jvm"
+      ],
+      "compose-material3-desktop": [
+        "jvm"
+      ],
+      "compose-ui-desktop": [
+        "jvm"
+      ],
+      "compose-ui-geometry-desktop": [
+        "jvm"
+      ],
+      "compose-ui-graphics-desktop": [
+        "jvm"
+      ],
+      "compose-ui-test-desktop": [
+        "jvm"
+      ],
+      "compose-ui-text-desktop": [
+        "jvm"
+      ],
+      "compose-ui-unit-desktop": [
+        "jvm"
+      ],
+      "compose-ui-util-desktop": [
+        "jvm"
+      ],
+      "jetbrains-navigation3-ui-desktop": [
+        "jvm"
+      ],
+      "kotlin-compose-compiler-plugin-embeddable": [
+        "jvm"
+      ],
+      "kotlin-serialization-compiler-plugin-embeddable": [
+        "jvm"
+      ],
+      "kotlinx-coroutines-android": [
+        "android"
+      ],
+      "kotlinx-coroutines-swing": [
+        "jvm"
+      ],
+      "log4j-core": [
+        "jvm"
+      ],
+      "log4j-slf4j2-impl": [
+        "jvm"
+      ],
+      "mappie-compiler-plugin": [
+        "jvm"
+      ],
+      "metro-compiler": [
+        "jvm"
+      ],
+      "mokkery-plugin": [
+        "jvm"
+      ],
+      "play-services-auth": [
+        "android"
+      ],
+      "sqldelight-android-driver": [
+        "android"
+      ],
+      "sqldelight-compiler-env": [
+        "jvm"
+      ],
+      "sqldelight-dialect-sqlite": [
+        "jvm"
+      ],
+      "sqldelight-gradle-plugin": [
+        "jvm"
+      ],
+      "sqldelight-jdbc-driver": [
+        "jvm"
+      ],
+      "sqldelight-sqlite-driver": [
+        "jvm"
+      ]
+    },
     "excludes": [
       "org.jetbrains.compose.runtime:runtime-desktop",
       "org.jetbrains.kotlin:kotlin-gradle-plugin"
     ]
   },
   "names": {
+    "androidx.activity:activity": "androidx_activity",
+    "androidx.activity:activity-compose": "androidx_activity_compose",
+    "androidx.activity:activity-ktx": "androidx_activity_activity_ktx",
     "androidx.annotation:annotation": "androidx_annotation_annotation",
+    "androidx.annotation:annotation-experimental": "androidx_annotation_annotation_experimental",
     "androidx.arch.core:core-common": "androidx_arch_core_core_common",
+    "androidx.arch.core:core-runtime": "androidx_arch_core_core_runtime",
+    "androidx.autofill:autofill": "androidx_autofill_autofill",
     "androidx.collection:collection": "androidx_collection_collection",
+    "androidx.collection:collection-ktx": "androidx_collection_collection_ktx",
+    "androidx.compose.animation:animation": "androidx_compose_animation",
+    "androidx.compose.animation:animation-core": "androidx_compose_animation_core",
+    "androidx.compose.foundation:foundation": "androidx_compose_foundation",
+    "androidx.compose.foundation:foundation-layout": "androidx_compose_foundation_layout",
+    "androidx.compose.material3:material3": "androidx_compose_material3",
+    "androidx.compose.material:material-icons-core": "androidx_compose_material_icons_core",
+    "androidx.compose.material:material-ripple": "androidx_compose_material_material_ripple",
     "androidx.compose.runtime:runtime": "androidx_compose_runtime",
     "androidx.compose.runtime:runtime-annotation": "androidx_compose_runtime_annotation",
     "androidx.compose.runtime:runtime-desktop": "androidx_compose_runtime_desktop",
     "androidx.compose.runtime:runtime-retain": "androidx_compose_runtime_runtime_retain",
     "androidx.compose.runtime:runtime-saveable": "androidx_compose_runtime_runtime_saveable",
+    "androidx.compose.ui:ui": "androidx_compose_ui",
+    "androidx.compose.ui:ui-geometry": "androidx_compose_ui_geometry",
+    "androidx.compose.ui:ui-graphics": "androidx_compose_ui_graphics",
+    "androidx.compose.ui:ui-test": "androidx_compose_ui_test",
+    "androidx.compose.ui:ui-text": "androidx_compose_ui_text",
+    "androidx.compose.ui:ui-unit": "androidx_compose_ui_unit",
+    "androidx.compose.ui:ui-util": "androidx_compose_ui_ui_util",
+    "androidx.concurrent:concurrent-futures": "androidx_concurrent_concurrent_futures",
+    "androidx.concurrent:concurrent-futures-ktx": "androidx_concurrent_concurrent_futures_ktx",
+    "androidx.core:core": "androidx_core_core",
+    "androidx.core:core-ktx": "androidx_core_core_ktx",
+    "androidx.core:core-viewtree": "androidx_core_core_viewtree",
+    "androidx.customview:customview": "androidx_customview_customview",
+    "androidx.customview:customview-poolingcontainer": "androidx_customview_customview_poolingcontainer",
+    "androidx.emoji2:emoji2": "androidx_emoji2_emoji2",
+    "androidx.fragment:fragment": "androidx_fragment_fragment",
+    "androidx.graphics:graphics-path": "androidx_graphics_graphics_path",
+    "androidx.interpolator:interpolator": "androidx_interpolator_interpolator",
     "androidx.lifecycle:lifecycle-common": "androidx_lifecycle_lifecycle_common",
+    "androidx.lifecycle:lifecycle-common-java8": "androidx_lifecycle_lifecycle_common_java8",
+    "androidx.lifecycle:lifecycle-livedata-core": "androidx_lifecycle_lifecycle_livedata_core",
+    "androidx.lifecycle:lifecycle-process": "androidx_lifecycle_lifecycle_process",
     "androidx.lifecycle:lifecycle-runtime": "androidx_lifecycle_lifecycle_runtime",
     "androidx.lifecycle:lifecycle-runtime-compose": "androidx_lifecycle_lifecycle_runtime_compose",
+    "androidx.lifecycle:lifecycle-runtime-ktx": "androidx_lifecycle_lifecycle_runtime_ktx",
     "androidx.lifecycle:lifecycle-viewmodel": "androidx_lifecycle_lifecycle_viewmodel",
     "androidx.lifecycle:lifecycle-viewmodel-compose": "androidx_lifecycle_lifecycle_viewmodel_compose",
+    "androidx.lifecycle:lifecycle-viewmodel-ktx": "androidx_lifecycle_lifecycle_viewmodel_ktx",
     "androidx.lifecycle:lifecycle-viewmodel-savedstate": "androidx_lifecycle_lifecycle_viewmodel_savedstate",
+    "androidx.loader:loader": "androidx_loader_loader",
     "androidx.navigation3:navigation3-runtime": "androidx_navigation3_runtime",
     "androidx.navigation3:navigation3-runtime-desktop": "androidx_navigation3_runtime_desktop",
+    "androidx.navigation3:navigation3-ui": "androidx_navigation3_ui",
     "androidx.navigationevent:navigationevent": "androidx_navigationevent_navigationevent",
     "androidx.navigationevent:navigationevent-compose": "androidx_navigationevent_navigationevent_compose",
+    "androidx.profileinstaller:profileinstaller": "androidx_profileinstaller_profileinstaller",
     "androidx.savedstate:savedstate": "androidx_savedstate",
     "androidx.savedstate:savedstate-compose": "androidx_savedstate_savedstate_compose",
     "androidx.savedstate:savedstate-desktop": "androidx_savedstate_desktop",
+    "androidx.savedstate:savedstate-ktx": "androidx_savedstate_savedstate_ktx",
+    "androidx.sqlite:sqlite": "androidx_sqlite",
+    "androidx.sqlite:sqlite-framework": "androidx_sqlite_sqlite_framework",
+    "androidx.startup:startup-runtime": "androidx_startup_startup_runtime",
+    "androidx.test.espresso:espresso-core": "androidx_test_espresso_espresso_core",
+    "androidx.test.espresso:espresso-idling-resource": "androidx_test_espresso_espresso_idling_resource",
+    "androidx.test.services:storage": "androidx_test_services_storage",
+    "androidx.test.uiautomator:uiautomator": "androidx_test_uiautomator",
+    "androidx.test.uiautomator:uiautomator-shell": "androidx_test_uiautomator_uiautomator_shell",
+    "androidx.test:annotation": "androidx_test_annotation",
+    "androidx.test:core": "androidx_test_core",
+    "androidx.test:monitor": "androidx_test_monitor",
+    "androidx.test:runner": "androidx_test_runner",
+    "androidx.tracing:tracing": "androidx_tracing_tracing",
+    "androidx.versionedparcelable:versionedparcelable": "androidx_versionedparcelable_versionedparcelable",
+    "androidx.viewpager:viewpager": "androidx_viewpager_viewpager",
+    "androidx.window:window": "androidx_window_window",
+    "androidx.window:window-core": "androidx_window_window_core",
     "app.cash.molecule:molecule-runtime": "molecule_runtime",
+    "app.cash.sqldelight:android-driver": "sqldelight_android_driver",
     "app.cash.sqldelight:async-extensions": "app_cash_sqldelight_async_extensions",
     "app.cash.sqldelight:compiler-env": "sqldelight_compiler_env",
     "app.cash.sqldelight:core": "app_cash_sqldelight_core",
@@ -236,7 +494,16 @@
     "com.github.ajalt.mordant:mordant-jvm-graal-ffi": "com_github_ajalt_mordant_mordant_jvm_graal_ffi",
     "com.github.ajalt.mordant:mordant-jvm-jna": "com_github_ajalt_mordant_mordant_jvm_jna",
     "com.github.virtuald:curvesapi": "com_github_virtuald_curvesapi",
+    "com.google.android.gms:play-services-auth": "play_services_auth",
+    "com.google.android.gms:play-services-auth-api-phone": "com_google_android_gms_play_services_auth_api_phone",
+    "com.google.android.gms:play-services-auth-base": "com_google_android_gms_play_services_auth_base",
+    "com.google.android.gms:play-services-base": "com_google_android_gms_play_services_base",
+    "com.google.android.gms:play-services-basement": "com_google_android_gms_play_services_basement",
+    "com.google.android.gms:play-services-fido": "com_google_android_gms_play_services_fido",
+    "com.google.android.gms:play-services-tasks": "com_google_android_gms_play_services_tasks",
+    "com.google.code.findbugs:jsr305": "com_google_code_findbugs_jsr305",
     "com.google.errorprone:error_prone_annotations": "com_google_errorprone_error_prone_annotations",
+    "com.google.guava:listenablefuture": "com_google_guava_listenablefuture",
     "com.ionspin.kotlin:bignum": "bignum",
     "com.jakewharton.cite:cite-api": "com_jakewharton_cite_cite_api",
     "com.jakewharton.finalization:finalization-hook": "com_jakewharton_finalization_finalization_hook",
@@ -247,6 +514,7 @@
     "com.jakewharton.mosaic:mosaic-tty-terminal": "mosaic_tty_terminal",
     "com.squareup.okhttp3:okhttp": "com_squareup_okhttp3_okhttp",
     "com.squareup.okio:okio": "com_squareup_okio_okio",
+    "com.squareup:javawriter": "com_squareup_javawriter",
     "com.squareup:kotlinpoet": "com_squareup_kotlinpoet",
     "com.zaxxer:SparseBitSet": "com_zaxxer_SparseBitSet",
     "commons-codec:commons-codec": "commons_codec_commons_codec",
@@ -291,6 +559,7 @@
     "io.ktor:ktor-utils": "ktor_utils",
     "io.ktor:ktor-websocket-serialization": "io_ktor_ktor_websocket_serialization",
     "io.ktor:ktor-websockets": "io_ktor_ktor_websockets",
+    "javax.inject:javax.inject": "javax_inject_javax_inject",
     "junit:junit": "junit",
     "net.java.dev.jna:jna": "net_java_dev_jna_jna",
     "org.apache.commons:commons-collections4": "org_apache_commons_commons_collections4",
@@ -306,6 +575,8 @@
     "org.apache.xmlbeans:xmlbeans": "org_apache_xmlbeans_xmlbeans",
     "org.apfloat:apfloat": "org_apfloat_apfloat",
     "org.hamcrest:hamcrest-core": "org_hamcrest_hamcrest_core",
+    "org.hamcrest:hamcrest-integration": "org_hamcrest_hamcrest_integration",
+    "org.hamcrest:hamcrest-library": "org_hamcrest_hamcrest_library",
     "org.jetbrains.androidx.lifecycle:lifecycle-common": "org_jetbrains_androidx_lifecycle_lifecycle_common",
     "org.jetbrains.androidx.lifecycle:lifecycle-runtime": "org_jetbrains_androidx_lifecycle_lifecycle_runtime",
     "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose": "org_jetbrains_androidx_lifecycle_lifecycle_runtime_compose",
@@ -358,8 +629,10 @@
     "org.jetbrains.kotlin:kotlin-stdlib": "org_jetbrains_kotlin_kotlin_stdlib",
     "org.jetbrains.kotlin:kotlin-test": "org_jetbrains_kotlin_kotlin_test",
     "org.jetbrains.kotlinx:atomicfu": "atomicfu",
+    "org.jetbrains.kotlinx:kotlinx-coroutines-android": "kotlinx_coroutines_android",
     "org.jetbrains.kotlinx:kotlinx-coroutines-core": "kotlinx_coroutines_core",
     "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": "org_jetbrains_kotlinx_kotlinx_coroutines_core_jvm",
+    "org.jetbrains.kotlinx:kotlinx-coroutines-play-services": "org_jetbrains_kotlinx_kotlinx_coroutines_play_services",
     "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j": "org_jetbrains_kotlinx_kotlinx_coroutines_slf4j",
     "org.jetbrains.kotlinx:kotlinx-coroutines-swing": "kotlinx_coroutines_swing",
     "org.jetbrains.kotlinx:kotlinx-coroutines-test": "kotlinx_coroutines_test",
@@ -390,16 +663,111 @@
     "tech.mappie:mappie-compiler-plugin": "mappie_compiler_plugin"
   },
   "packages": {
+    "androidx.activity:activity": [
+      "androidx.activity",
+      "androidx.activity.contextaware",
+      "androidx.activity.result",
+      "androidx.activity.result.contract"
+    ],
+    "androidx.activity:activity-compose": [
+      "androidx.activity.compose",
+      "androidx.activity.compose.internal"
+    ],
+    "androidx.activity:activity-ktx": null,
     "androidx.annotation:annotation": [
       "androidx.annotation"
+    ],
+    "androidx.annotation:annotation-experimental": [
+      "androidx.annotation",
+      "androidx.annotation.experimental"
     ],
     "androidx.arch.core:core-common": [
       "androidx.arch.core.internal",
       "androidx.arch.core.util"
     ],
+    "androidx.arch.core:core-runtime": [
+      "androidx.arch.core.executor"
+    ],
+    "androidx.autofill:autofill": [
+      "androidx.autofill"
+    ],
     "androidx.collection:collection": [
       "androidx.collection",
       "androidx.collection.internal"
+    ],
+    "androidx.collection:collection-ktx": null,
+    "androidx.compose.animation:animation": [
+      "androidx.compose.animation",
+      "androidx.compose.animation.internal"
+    ],
+    "androidx.compose.animation:animation-core": [
+      "androidx.compose.animation.core",
+      "androidx.compose.animation.core.internal"
+    ],
+    "androidx.compose.foundation:foundation": [
+      "androidx.compose.foundation",
+      "androidx.compose.foundation.border",
+      "androidx.compose.foundation.content",
+      "androidx.compose.foundation.content.internal",
+      "androidx.compose.foundation.contextmenu",
+      "androidx.compose.foundation.draganddrop",
+      "androidx.compose.foundation.gestures",
+      "androidx.compose.foundation.gestures.snapping",
+      "androidx.compose.foundation.interaction",
+      "androidx.compose.foundation.internal",
+      "androidx.compose.foundation.lazy",
+      "androidx.compose.foundation.lazy.grid",
+      "androidx.compose.foundation.lazy.layout",
+      "androidx.compose.foundation.lazy.staggeredgrid",
+      "androidx.compose.foundation.pager",
+      "androidx.compose.foundation.platform",
+      "androidx.compose.foundation.relocation",
+      "androidx.compose.foundation.selection",
+      "androidx.compose.foundation.shape",
+      "androidx.compose.foundation.style",
+      "androidx.compose.foundation.text",
+      "androidx.compose.foundation.text.contextmenu",
+      "androidx.compose.foundation.text.contextmenu.builder",
+      "androidx.compose.foundation.text.contextmenu.data",
+      "androidx.compose.foundation.text.contextmenu.gestures",
+      "androidx.compose.foundation.text.contextmenu.internal",
+      "androidx.compose.foundation.text.contextmenu.modifier",
+      "androidx.compose.foundation.text.contextmenu.provider",
+      "androidx.compose.foundation.text.handwriting",
+      "androidx.compose.foundation.text.input",
+      "androidx.compose.foundation.text.input.internal",
+      "androidx.compose.foundation.text.input.internal.selection",
+      "androidx.compose.foundation.text.input.internal.undo",
+      "androidx.compose.foundation.text.modifiers",
+      "androidx.compose.foundation.text.selection"
+    ],
+    "androidx.compose.foundation:foundation-layout": [
+      "androidx.compose.foundation.layout",
+      "androidx.compose.foundation.layout.internal"
+    ],
+    "androidx.compose.material3:material3": [
+      "androidx.compose.material3",
+      "androidx.compose.material3.carousel",
+      "androidx.compose.material3.internal",
+      "androidx.compose.material3.internal.colorUtil",
+      "androidx.compose.material3.pulltorefresh",
+      "androidx.compose.material3.tokens"
+    ],
+    "androidx.compose.material:material-icons-core": [
+      "androidx.compose.material.icons",
+      "androidx.compose.material.icons.automirrored.filled",
+      "androidx.compose.material.icons.automirrored.outlined",
+      "androidx.compose.material.icons.automirrored.rounded",
+      "androidx.compose.material.icons.automirrored.sharp",
+      "androidx.compose.material.icons.automirrored.twotone",
+      "androidx.compose.material.icons.filled",
+      "androidx.compose.material.icons.outlined",
+      "androidx.compose.material.icons.rounded",
+      "androidx.compose.material.icons.sharp",
+      "androidx.compose.material.icons.twotone"
+    ],
+    "androidx.compose.material:material-ripple": [
+      "androidx.compose.material.ripple"
     ],
     "androidx.compose.runtime:runtime": [
       "androidx.compose.runtime",
@@ -459,7 +827,185 @@
       "androidx.compose.runtime.saveable",
       "androidx.compose.runtime.saveable.serialization"
     ],
+    "androidx.compose.ui:ui": [
+      "androidx.compose.ui",
+      "androidx.compose.ui.adaptive",
+      "androidx.compose.ui.autofill",
+      "androidx.compose.ui.contentcapture",
+      "androidx.compose.ui.draganddrop",
+      "androidx.compose.ui.draw",
+      "androidx.compose.ui.focus",
+      "androidx.compose.ui.graphics",
+      "androidx.compose.ui.graphics.vector",
+      "androidx.compose.ui.graphics.vector.compat",
+      "androidx.compose.ui.hapticfeedback",
+      "androidx.compose.ui.input",
+      "androidx.compose.ui.input.indirect",
+      "androidx.compose.ui.input.key",
+      "androidx.compose.ui.input.nestedscroll",
+      "androidx.compose.ui.input.pointer",
+      "androidx.compose.ui.input.pointer.util",
+      "androidx.compose.ui.input.rotary",
+      "androidx.compose.ui.internal",
+      "androidx.compose.ui.layout",
+      "androidx.compose.ui.modifier",
+      "androidx.compose.ui.node",
+      "androidx.compose.ui.platform",
+      "androidx.compose.ui.platform.accessibility",
+      "androidx.compose.ui.platform.actionmodecallback",
+      "androidx.compose.ui.platform.coreshims",
+      "androidx.compose.ui.relocation",
+      "androidx.compose.ui.res",
+      "androidx.compose.ui.scrollcapture",
+      "androidx.compose.ui.semantics",
+      "androidx.compose.ui.spatial",
+      "androidx.compose.ui.state",
+      "androidx.compose.ui.text",
+      "androidx.compose.ui.text.input",
+      "androidx.compose.ui.viewinterop",
+      "androidx.compose.ui.window",
+      "androidx.inspection.compose.ui"
+    ],
+    "androidx.compose.ui:ui-geometry": [
+      "androidx.compose.ui.geometry"
+    ],
+    "androidx.compose.ui:ui-graphics": [
+      "androidx.compose.ui.graphics",
+      "androidx.compose.ui.graphics.colorspace",
+      "androidx.compose.ui.graphics.drawscope",
+      "androidx.compose.ui.graphics.internal",
+      "androidx.compose.ui.graphics.layer",
+      "androidx.compose.ui.graphics.layer.view",
+      "androidx.compose.ui.graphics.painter",
+      "androidx.compose.ui.graphics.shadow",
+      "androidx.compose.ui.graphics.vector"
+    ],
+    "androidx.compose.ui:ui-test": [
+      "androidx.compose.ui.test",
+      "androidx.compose.ui.test.android",
+      "androidx.compose.ui.test.internal",
+      "androidx.compose.ui.test.junit4.android",
+      "androidx.compose.ui.test.platform",
+      "androidx.compose.ui.test.v2"
+    ],
+    "androidx.compose.ui:ui-text": [
+      "androidx.compose.ui.text",
+      "androidx.compose.ui.text.android",
+      "androidx.compose.ui.text.android.selection",
+      "androidx.compose.ui.text.android.style",
+      "androidx.compose.ui.text.font",
+      "androidx.compose.ui.text.input",
+      "androidx.compose.ui.text.internal",
+      "androidx.compose.ui.text.intl",
+      "androidx.compose.ui.text.platform",
+      "androidx.compose.ui.text.platform.extensions",
+      "androidx.compose.ui.text.platform.style",
+      "androidx.compose.ui.text.style"
+    ],
+    "androidx.compose.ui:ui-unit": [
+      "androidx.compose.ui.unit",
+      "androidx.compose.ui.unit.fontscaling",
+      "androidx.compose.ui.unit.internal"
+    ],
+    "androidx.compose.ui:ui-util": [
+      "androidx.compose.ui",
+      "androidx.compose.ui.util"
+    ],
+    "androidx.concurrent:concurrent-futures": [
+      "androidx.concurrent.futures"
+    ],
+    "androidx.concurrent:concurrent-futures-ktx": [
+      "androidx.concurrent.futures"
+    ],
+    "androidx.core:core": [
+      "android.support.v4.app",
+      "android.support.v4.graphics.drawable",
+      "android.support.v4.os",
+      "androidx.core.accessibilityservice",
+      "androidx.core.app",
+      "androidx.core.app.unusedapprestrictions",
+      "androidx.core.content",
+      "androidx.core.content.pm",
+      "androidx.core.content.res",
+      "androidx.core.database",
+      "androidx.core.database.sqlite",
+      "androidx.core.flagging",
+      "androidx.core.graphics",
+      "androidx.core.graphics.drawable",
+      "androidx.core.hardware.display",
+      "androidx.core.hardware.fingerprint",
+      "androidx.core.internal",
+      "androidx.core.internal.view",
+      "androidx.core.location",
+      "androidx.core.math",
+      "androidx.core.net",
+      "androidx.core.os",
+      "androidx.core.provider",
+      "androidx.core.service.quicksettings",
+      "androidx.core.telephony",
+      "androidx.core.telephony.mbms",
+      "androidx.core.text",
+      "androidx.core.text.method",
+      "androidx.core.text.util",
+      "androidx.core.util",
+      "androidx.core.view",
+      "androidx.core.view.accessibility",
+      "androidx.core.view.animation",
+      "androidx.core.view.autofill",
+      "androidx.core.view.contentcapture",
+      "androidx.core.view.inputmethod",
+      "androidx.core.view.insets",
+      "androidx.core.widget"
+    ],
+    "androidx.core:core-ktx": [
+      "androidx.core.animation",
+      "androidx.core.content",
+      "androidx.core.content.res",
+      "androidx.core.database",
+      "androidx.core.database.sqlite",
+      "androidx.core.graphics",
+      "androidx.core.graphics.drawable",
+      "androidx.core.location",
+      "androidx.core.net",
+      "androidx.core.os",
+      "androidx.core.text",
+      "androidx.core.transition",
+      "androidx.core.util",
+      "androidx.core.view",
+      "androidx.core.widget"
+    ],
+    "androidx.core:core-viewtree": [
+      "androidx.core.viewtree"
+    ],
+    "androidx.customview:customview": [
+      "androidx.customview.view",
+      "androidx.customview.widget"
+    ],
+    "androidx.customview:customview-poolingcontainer": [
+      "androidx.customview.poolingcontainer"
+    ],
+    "androidx.emoji2:emoji2": [
+      "androidx.emoji2.text",
+      "androidx.emoji2.text.flatbuffer"
+    ],
+    "androidx.fragment:fragment": [
+      "androidx.fragment.app",
+      "androidx.fragment.app.strictmode"
+    ],
+    "androidx.graphics:graphics-path": [
+      "androidx.graphics.path"
+    ],
+    "androidx.interpolator:interpolator": [
+      "androidx.interpolator.view.animation"
+    ],
     "androidx.lifecycle:lifecycle-common": [
+      "androidx.lifecycle"
+    ],
+    "androidx.lifecycle:lifecycle-common-java8": null,
+    "androidx.lifecycle:lifecycle-livedata-core": [
+      "androidx.lifecycle"
+    ],
+    "androidx.lifecycle:lifecycle-process": [
       "androidx.lifecycle"
     ],
     "androidx.lifecycle:lifecycle-runtime": [
@@ -468,6 +1014,7 @@
     "androidx.lifecycle:lifecycle-runtime-compose": [
       "androidx.lifecycle.compose"
     ],
+    "androidx.lifecycle:lifecycle-runtime-ktx": null,
     "androidx.lifecycle:lifecycle-viewmodel": [
       "androidx.lifecycle",
       "androidx.lifecycle.viewmodel",
@@ -476,11 +1023,16 @@
     "androidx.lifecycle:lifecycle-viewmodel-compose": [
       "androidx.lifecycle.viewmodel.compose"
     ],
+    "androidx.lifecycle:lifecycle-viewmodel-ktx": null,
     "androidx.lifecycle:lifecycle-viewmodel-savedstate": [
       "androidx.lifecycle",
       "androidx.lifecycle.internal",
       "androidx.lifecycle.serialization",
       "androidx.lifecycle.viewmodel"
+    ],
+    "androidx.loader:loader": [
+      "androidx.loader.app",
+      "androidx.loader.content"
     ],
     "androidx.navigation3:navigation3-runtime": [
       "androidx.navigation3.runtime",
@@ -494,12 +1046,20 @@
       "androidx.navigation3.runtime.result",
       "androidx.navigation3.runtime.serialization"
     ],
+    "androidx.navigation3:navigation3-ui": [
+      "androidx.navigation3",
+      "androidx.navigation3.scene",
+      "androidx.navigation3.ui"
+    ],
     "androidx.navigationevent:navigationevent": [
       "androidx.navigationevent",
       "androidx.navigationevent.internal"
     ],
     "androidx.navigationevent:navigationevent-compose": [
       "androidx.navigationevent.compose"
+    ],
+    "androidx.profileinstaller:profileinstaller": [
+      "androidx.profileinstaller"
     ],
     "androidx.savedstate:savedstate": [
       "androidx.savedstate",
@@ -517,8 +1077,163 @@
       "androidx.savedstate.serialization",
       "androidx.savedstate.serialization.serializers"
     ],
+    "androidx.savedstate:savedstate-ktx": null,
+    "androidx.sqlite:sqlite": [
+      "androidx.sqlite",
+      "androidx.sqlite.db",
+      "androidx.sqlite.util"
+    ],
+    "androidx.sqlite:sqlite-framework": [
+      "androidx.sqlite.db.framework",
+      "androidx.sqlite.driver",
+      "androidx.sqlite.util"
+    ],
+    "androidx.startup:startup-runtime": [
+      "androidx.startup"
+    ],
+    "androidx.test.espresso:espresso-core": [
+      "androidx.test.espresso",
+      "androidx.test.espresso.action",
+      "androidx.test.espresso.assertion",
+      "androidx.test.espresso.base",
+      "androidx.test.espresso.core.internal.deps.aidl",
+      "androidx.test.espresso.core.internal.deps.dagger.internal",
+      "androidx.test.espresso.core.internal.deps.guava.base",
+      "androidx.test.espresso.core.internal.deps.guava.cache",
+      "androidx.test.espresso.core.internal.deps.guava.collect",
+      "androidx.test.espresso.core.internal.deps.guava.primitives",
+      "androidx.test.espresso.core.internal.deps.guava.util.concurrent",
+      "androidx.test.espresso.core.internal.deps.guava.util.concurrent.internal",
+      "androidx.test.espresso.internal.data",
+      "androidx.test.espresso.internal.data.model",
+      "androidx.test.espresso.internal.inject",
+      "androidx.test.espresso.matcher",
+      "androidx.test.espresso.remote",
+      "androidx.test.espresso.remote.annotation",
+      "androidx.test.espresso.screenshot",
+      "androidx.test.espresso.util"
+    ],
+    "androidx.test.espresso:espresso-idling-resource": [
+      "androidx.test.espresso",
+      "androidx.test.espresso.idling"
+    ],
+    "androidx.test.services:storage": [
+      "androidx.test.services.storage",
+      "androidx.test.services.storage.file",
+      "androidx.test.services.storage.internal"
+    ],
+    "androidx.test.uiautomator:uiautomator": [
+      "androidx.test.uiautomator",
+      "androidx.test.uiautomator.internal",
+      "androidx.test.uiautomator.util",
+      "androidx.test.uiautomator.watcher"
+    ],
+    "androidx.test.uiautomator:uiautomator-shell": [
+      "androidx.test.shell",
+      "androidx.test.shell.command",
+      "androidx.test.shell.internal"
+    ],
+    "androidx.test:annotation": [
+      "androidx.test.annotation"
+    ],
+    "androidx.test:core": [
+      "androidx.test.core.app",
+      "androidx.test.core.content.pm",
+      "androidx.test.core.graphics",
+      "androidx.test.core.internal.os",
+      "androidx.test.core.os",
+      "androidx.test.core.view"
+    ],
+    "androidx.test:monitor": [
+      "androidx.test",
+      "androidx.test.annotation",
+      "androidx.test.internal.platform",
+      "androidx.test.internal.platform.app",
+      "androidx.test.internal.platform.content",
+      "androidx.test.internal.platform.os",
+      "androidx.test.internal.platform.reflect",
+      "androidx.test.internal.platform.util",
+      "androidx.test.internal.runner",
+      "androidx.test.internal.runner.hidden",
+      "androidx.test.internal.runner.intent",
+      "androidx.test.internal.runner.intercepting",
+      "androidx.test.internal.runner.lifecycle",
+      "androidx.test.internal.util",
+      "androidx.test.platform",
+      "androidx.test.platform.app",
+      "androidx.test.platform.concurrent",
+      "androidx.test.platform.device",
+      "androidx.test.platform.graphics",
+      "androidx.test.platform.io",
+      "androidx.test.platform.tracing",
+      "androidx.test.platform.ui",
+      "androidx.test.platform.view.inspector",
+      "androidx.test.runner",
+      "androidx.test.runner.intent",
+      "androidx.test.runner.intercepting",
+      "androidx.test.runner.lifecycle"
+    ],
+    "androidx.test:runner": [
+      "androidx.test.filters",
+      "androidx.test.internal.events",
+      "androidx.test.internal.events.client",
+      "androidx.test.internal.runner",
+      "androidx.test.internal.runner.coverage",
+      "androidx.test.internal.runner.filters",
+      "androidx.test.internal.runner.junit3",
+      "androidx.test.internal.runner.junit4",
+      "androidx.test.internal.runner.junit4.statement",
+      "androidx.test.internal.runner.listener",
+      "androidx.test.internal.runner.tracker",
+      "androidx.test.internal.util",
+      "androidx.test.orchestrator.callback",
+      "androidx.test.orchestrator.junit",
+      "androidx.test.orchestrator.listeners",
+      "androidx.test.orchestrator.listeners.result",
+      "androidx.test.runner",
+      "androidx.test.runner.intercepting",
+      "androidx.test.runner.permission",
+      "androidx.test.runner.screenshot",
+      "androidx.test.runner.suites",
+      "androidx.test.services.events",
+      "androidx.test.services.events.discovery",
+      "androidx.test.services.events.internal",
+      "androidx.test.services.events.platform",
+      "androidx.test.services.events.run"
+    ],
+    "androidx.tracing:tracing": [
+      "androidx.tracing"
+    ],
+    "androidx.versionedparcelable:versionedparcelable": [
+      "androidx.versionedparcelable"
+    ],
+    "androidx.viewpager:viewpager": [
+      "androidx.viewpager.widget"
+    ],
+    "androidx.window:window": [
+      "androidx.window",
+      "androidx.window.area",
+      "androidx.window.area.adapter",
+      "androidx.window.area.reflectionguard",
+      "androidx.window.area.utils",
+      "androidx.window.core",
+      "androidx.window.embedding",
+      "androidx.window.layout",
+      "androidx.window.layout.adapter",
+      "androidx.window.layout.adapter.extensions",
+      "androidx.window.layout.adapter.sidecar",
+      "androidx.window.layout.util",
+      "androidx.window.reflection"
+    ],
+    "androidx.window:window-core": [
+      "androidx.window.core",
+      "androidx.window.core.layout"
+    ],
     "app.cash.molecule:molecule-runtime": [
       "app.cash.molecule"
+    ],
+    "app.cash.sqldelight:android-driver": [
+      "app.cash.sqldelight.driver.android"
     ],
     "app.cash.sqldelight:async-extensions": [
       "app.cash.sqldelight.async.coroutines"
@@ -1670,9 +2385,94 @@
       "com.graphbuilder.org.apache.harmony.awt.gl",
       "com.graphbuilder.struc"
     ],
+    "com.google.android.gms:play-services-auth": [
+      "com.google.android.gms.auth.api",
+      "com.google.android.gms.auth.api.identity",
+      "com.google.android.gms.auth.api.signin",
+      "com.google.android.gms.auth.api.signin.internal",
+      "com.google.android.gms.internal.auth-api"
+    ],
+    "com.google.android.gms:play-services-auth-api-phone": [
+      "com.google.android.gms.auth.api.phone",
+      "com.google.android.gms.internal.auth-api-phone"
+    ],
+    "com.google.android.gms:play-services-auth-base": [
+      "com.google.android.gms.auth",
+      "com.google.android.gms.auth.account",
+      "com.google.android.gms.auth.api",
+      "com.google.android.gms.auth.api.accounttransfer",
+      "com.google.android.gms.auth.api.proxy",
+      "com.google.android.gms.internal.auth"
+    ],
+    "com.google.android.gms:play-services-base": [
+      "com.google.android.gms.auth.api.signin",
+      "com.google.android.gms.auth.api.signin.internal",
+      "com.google.android.gms.common",
+      "com.google.android.gms.common.api",
+      "com.google.android.gms.common.api.internal",
+      "com.google.android.gms.common.data",
+      "com.google.android.gms.common.images",
+      "com.google.android.gms.common.internal",
+      "com.google.android.gms.common.internal.service",
+      "com.google.android.gms.common.moduleinstall",
+      "com.google.android.gms.common.moduleinstall.internal",
+      "com.google.android.gms.common.server",
+      "com.google.android.gms.common.server.converter",
+      "com.google.android.gms.common.server.response",
+      "com.google.android.gms.dynamic",
+      "com.google.android.gms.internal.base",
+      "com.google.android.gms.signin",
+      "com.google.android.gms.signin.internal"
+    ],
+    "com.google.android.gms:play-services-basement": [
+      "com.google.android.gms.actions",
+      "com.google.android.gms.common",
+      "com.google.android.gms.common.annotation",
+      "com.google.android.gms.common.api",
+      "com.google.android.gms.common.api.internal",
+      "com.google.android.gms.common.config",
+      "com.google.android.gms.common.internal",
+      "com.google.android.gms.common.internal.constants",
+      "com.google.android.gms.common.internal.safeparcel",
+      "com.google.android.gms.common.logging",
+      "com.google.android.gms.common.providers",
+      "com.google.android.gms.common.signatureverification",
+      "com.google.android.gms.common.sqlite",
+      "com.google.android.gms.common.stats",
+      "com.google.android.gms.common.util",
+      "com.google.android.gms.common.util.concurrent",
+      "com.google.android.gms.common.wrappers",
+      "com.google.android.gms.dynamic",
+      "com.google.android.gms.dynamite",
+      "com.google.android.gms.internal.common",
+      "com.google.android.gms.security",
+      "com.google.firebase"
+    ],
+    "com.google.android.gms:play-services-fido": [
+      "com.google.android.gms.fido",
+      "com.google.android.gms.fido.common",
+      "com.google.android.gms.fido.fido2",
+      "com.google.android.gms.fido.fido2.api.common",
+      "com.google.android.gms.fido.u2f",
+      "com.google.android.gms.fido.u2f.api.common",
+      "com.google.android.gms.fido.u2f.api.messagebased",
+      "com.google.android.gms.internal.fido"
+    ],
+    "com.google.android.gms:play-services-tasks": [
+      "com.google.android.gms.internal.tasks",
+      "com.google.android.gms.tasks"
+    ],
+    "com.google.code.findbugs:jsr305": [
+      "javax.annotation",
+      "javax.annotation.concurrent",
+      "javax.annotation.meta"
+    ],
     "com.google.errorprone:error_prone_annotations": [
       "com.google.errorprone.annotations",
       "com.google.errorprone.annotations.concurrent"
+    ],
+    "com.google.guava:listenablefuture": [
+      "com.google.common.util.concurrent"
     ],
     "com.ionspin.kotlin:bignum": [
       "com.ionspin.kotlin.bignum",
@@ -1713,6 +2513,7 @@
     ],
     "com.squareup.okhttp3:okhttp": [
       "okhttp3",
+      "okhttp3.android",
       "okhttp3.internal",
       "okhttp3.internal.authenticator",
       "okhttp3.internal.cache",
@@ -1727,6 +2528,7 @@
       "okhttp3.internal.http2.flowcontrol",
       "okhttp3.internal.idn",
       "okhttp3.internal.platform",
+      "okhttp3.internal.platform.android",
       "okhttp3.internal.proxy",
       "okhttp3.internal.publicsuffix",
       "okhttp3.internal.tls",
@@ -1736,6 +2538,9 @@
     "com.squareup.okio:okio": [
       "okio",
       "okio.internal"
+    ],
+    "com.squareup:javawriter": [
+      "com.squareup.javawriter"
     ],
     "com.squareup:kotlinpoet": [
       "com.squareup.kotlinpoet",
@@ -2138,6 +2943,9 @@
     "io.ktor:ktor-websockets": [
       "io.ktor.websocket",
       "io.ktor.websocket.internals"
+    ],
+    "javax.inject:javax.inject": [
+      "javax.inject"
     ],
     "junit:junit": [
       "junit.extensions",
@@ -2641,6 +3449,19 @@
       "org.hamcrest.core",
       "org.hamcrest.internal"
     ],
+    "org.hamcrest:hamcrest-integration": [
+      "org.hamcrest",
+      "org.hamcrest.integration"
+    ],
+    "org.hamcrest:hamcrest-library": [
+      "org.hamcrest",
+      "org.hamcrest.beans",
+      "org.hamcrest.collection",
+      "org.hamcrest.number",
+      "org.hamcrest.object",
+      "org.hamcrest.text",
+      "org.hamcrest.xml"
+    ],
     "org.jetbrains.androidx.lifecycle:lifecycle-common": null,
     "org.jetbrains.androidx.lifecycle:lifecycle-runtime": null,
     "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose": null,
@@ -3060,6 +3881,9 @@
       "kotlinx.atomicfu",
       "kotlinx.atomicfu.locks"
     ],
+    "org.jetbrains.kotlinx:kotlinx-coroutines-android": [
+      "kotlinx.coroutines.android"
+    ],
     "org.jetbrains.kotlinx:kotlinx-coroutines-core": [
       "_COROUTINE",
       "kotlinx.coroutines",
@@ -3091,6 +3915,9 @@
       "kotlinx.coroutines.stream",
       "kotlinx.coroutines.sync",
       "kotlinx.coroutines.time"
+    ],
+    "org.jetbrains.kotlinx:kotlinx-coroutines-play-services": [
+      "kotlinx.coroutines.tasks"
     ],
     "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j": [
       "kotlinx.coroutines.slf4j"
@@ -3306,230 +4133,138 @@
     ]
   },
   "skipped": {
+    "android": [
+      "app.cash.sqldelight:native-driver",
+      "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt"
+    ],
     "jvm": [
       "app.cash.sqldelight:native-driver",
       "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt"
     ],
     "linuxArm64": [
-      "androidx.compose.runtime:runtime-desktop",
-      "androidx.navigation3:navigation3-runtime-desktop",
-      "androidx.savedstate:savedstate-desktop",
-      "app.cash.sqldelight:compiler-env",
-      "app.cash.sqldelight:gradle-plugin",
-      "app.cash.sqldelight:jdbc-driver",
-      "app.cash.sqldelight:sqlite-3-25-dialect",
-      "app.cash.sqldelight:sqlite-driver",
-      "dev.mokkery:mokkery-plugin",
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
-      "dev.zacsweers.metro:compiler",
       "io.github.ehsannarmani:compose-charts",
-      "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
-      "org.apache.logging.log4j:log4j-core",
-      "org.apache.logging.log4j:log4j-slf4j2-impl",
       "org.apache.poi:poi",
-      "org.apache.poi:poi-ooxml",
-      "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
-      "org.jetbrains.compose.animation:animation-core-desktop",
-      "org.jetbrains.compose.animation:animation-desktop",
-      "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64",
-      "org.jetbrains.compose.desktop:desktop-jvm-linux-x64",
-      "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64",
-      "org.jetbrains.compose.desktop:desktop-jvm-macos-x64",
-      "org.jetbrains.compose.desktop:desktop-jvm-windows-x64",
-      "org.jetbrains.compose.foundation:foundation-desktop",
-      "org.jetbrains.compose.foundation:foundation-layout-desktop",
-      "org.jetbrains.compose.material3:material3-desktop",
-      "org.jetbrains.compose.material:material-icons-core-desktop",
-      "org.jetbrains.compose.ui:ui-desktop",
-      "org.jetbrains.compose.ui:ui-geometry-desktop",
-      "org.jetbrains.compose.ui:ui-graphics-desktop",
-      "org.jetbrains.compose.ui:ui-test-desktop",
-      "org.jetbrains.compose.ui:ui-text-desktop",
-      "org.jetbrains.compose.ui:ui-unit-desktop",
-      "org.jetbrains.compose.ui:ui-util-desktop",
-      "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
-      "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
-      "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
-      "tech.mappie:mappie-compiler-plugin"
+      "org.apache.poi:poi-ooxml"
     ],
     "linuxX64": [
-      "androidx.compose.runtime:runtime-desktop",
-      "androidx.navigation3:navigation3-runtime-desktop",
-      "androidx.savedstate:savedstate-desktop",
-      "app.cash.sqldelight:compiler-env",
-      "app.cash.sqldelight:gradle-plugin",
-      "app.cash.sqldelight:jdbc-driver",
-      "app.cash.sqldelight:sqlite-3-25-dialect",
-      "app.cash.sqldelight:sqlite-driver",
-      "dev.mokkery:mokkery-plugin",
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
-      "dev.zacsweers.metro:compiler",
       "io.github.ehsannarmani:compose-charts",
-      "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
-      "org.apache.logging.log4j:log4j-core",
-      "org.apache.logging.log4j:log4j-slf4j2-impl",
       "org.apache.poi:poi",
-      "org.apache.poi:poi-ooxml",
-      "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
-      "org.jetbrains.compose.animation:animation-core-desktop",
-      "org.jetbrains.compose.animation:animation-desktop",
-      "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64",
-      "org.jetbrains.compose.desktop:desktop-jvm-linux-x64",
-      "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64",
-      "org.jetbrains.compose.desktop:desktop-jvm-macos-x64",
-      "org.jetbrains.compose.desktop:desktop-jvm-windows-x64",
-      "org.jetbrains.compose.foundation:foundation-desktop",
-      "org.jetbrains.compose.foundation:foundation-layout-desktop",
-      "org.jetbrains.compose.material3:material3-desktop",
-      "org.jetbrains.compose.material:material-icons-core-desktop",
-      "org.jetbrains.compose.ui:ui-desktop",
-      "org.jetbrains.compose.ui:ui-geometry-desktop",
-      "org.jetbrains.compose.ui:ui-graphics-desktop",
-      "org.jetbrains.compose.ui:ui-test-desktop",
-      "org.jetbrains.compose.ui:ui-text-desktop",
-      "org.jetbrains.compose.ui:ui-unit-desktop",
-      "org.jetbrains.compose.ui:ui-util-desktop",
-      "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
-      "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
-      "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
-      "tech.mappie:mappie-compiler-plugin"
+      "org.apache.poi:poi-ooxml"
     ],
     "macosArm64": [
-      "androidx.compose.runtime:runtime-desktop",
-      "androidx.navigation3:navigation3-runtime-desktop",
-      "androidx.savedstate:savedstate-desktop",
-      "app.cash.sqldelight:compiler-env",
-      "app.cash.sqldelight:gradle-plugin",
-      "app.cash.sqldelight:jdbc-driver",
-      "app.cash.sqldelight:sqlite-3-25-dialect",
-      "app.cash.sqldelight:sqlite-driver",
-      "dev.mokkery:mokkery-plugin",
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
-      "dev.zacsweers.metro:compiler",
       "io.github.ehsannarmani:compose-charts",
-      "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
-      "org.apache.logging.log4j:log4j-core",
-      "org.apache.logging.log4j:log4j-slf4j2-impl",
       "org.apache.poi:poi",
-      "org.apache.poi:poi-ooxml",
-      "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
-      "org.jetbrains.compose.animation:animation-core-desktop",
-      "org.jetbrains.compose.animation:animation-desktop",
-      "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64",
-      "org.jetbrains.compose.desktop:desktop-jvm-linux-x64",
-      "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64",
-      "org.jetbrains.compose.desktop:desktop-jvm-macos-x64",
-      "org.jetbrains.compose.desktop:desktop-jvm-windows-x64",
-      "org.jetbrains.compose.foundation:foundation-desktop",
-      "org.jetbrains.compose.foundation:foundation-layout-desktop",
-      "org.jetbrains.compose.material3:material3-desktop",
-      "org.jetbrains.compose.material:material-icons-core-desktop",
-      "org.jetbrains.compose.ui:ui-desktop",
-      "org.jetbrains.compose.ui:ui-geometry-desktop",
-      "org.jetbrains.compose.ui:ui-graphics-desktop",
-      "org.jetbrains.compose.ui:ui-test-desktop",
-      "org.jetbrains.compose.ui:ui-text-desktop",
-      "org.jetbrains.compose.ui:ui-unit-desktop",
-      "org.jetbrains.compose.ui:ui-util-desktop",
-      "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
-      "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
-      "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
-      "tech.mappie:mappie-compiler-plugin"
+      "org.apache.poi:poi-ooxml"
     ],
     "metadata": [
-      "androidx.compose.runtime:runtime-desktop",
-      "androidx.navigation3:navigation3-runtime-desktop",
-      "androidx.savedstate:savedstate-desktop",
-      "app.cash.sqldelight:compiler-env",
-      "app.cash.sqldelight:gradle-plugin",
-      "app.cash.sqldelight:jdbc-driver",
       "app.cash.sqldelight:native-driver",
-      "app.cash.sqldelight:sqlite-3-25-dialect",
-      "app.cash.sqldelight:sqlite-driver",
-      "dev.mokkery:mokkery-plugin",
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
       "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt",
-      "dev.zacsweers.metro:compiler",
       "io.github.ehsannarmani:compose-charts",
-      "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
-      "org.apache.logging.log4j:log4j-core",
-      "org.apache.logging.log4j:log4j-slf4j2-impl",
       "org.apache.poi:poi",
-      "org.apache.poi:poi-ooxml",
-      "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
-      "org.jetbrains.compose.animation:animation-core-desktop",
-      "org.jetbrains.compose.animation:animation-desktop",
-      "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64",
-      "org.jetbrains.compose.desktop:desktop-jvm-linux-x64",
-      "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64",
-      "org.jetbrains.compose.desktop:desktop-jvm-macos-x64",
-      "org.jetbrains.compose.desktop:desktop-jvm-windows-x64",
-      "org.jetbrains.compose.foundation:foundation-desktop",
-      "org.jetbrains.compose.foundation:foundation-layout-desktop",
-      "org.jetbrains.compose.material3:material3-desktop",
-      "org.jetbrains.compose.material:material-icons-core-desktop",
-      "org.jetbrains.compose.ui:ui-desktop",
-      "org.jetbrains.compose.ui:ui-geometry-desktop",
-      "org.jetbrains.compose.ui:ui-graphics-desktop",
-      "org.jetbrains.compose.ui:ui-test-desktop",
-      "org.jetbrains.compose.ui:ui-text-desktop",
-      "org.jetbrains.compose.ui:ui-unit-desktop",
-      "org.jetbrains.compose.ui:ui-util-desktop",
-      "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
-      "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
-      "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
-      "tech.mappie:mappie-compiler-plugin"
+      "org.apache.poi:poi-ooxml"
     ],
     "mingwX64": [
-      "androidx.compose.runtime:runtime-desktop",
-      "androidx.navigation3:navigation3-runtime-desktop",
-      "androidx.savedstate:savedstate-desktop",
-      "app.cash.sqldelight:compiler-env",
-      "app.cash.sqldelight:gradle-plugin",
-      "app.cash.sqldelight:jdbc-driver",
-      "app.cash.sqldelight:sqlite-3-25-dialect",
-      "app.cash.sqldelight:sqlite-driver",
-      "dev.mokkery:mokkery-plugin",
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
-      "dev.zacsweers.metro:compiler",
       "io.github.ehsannarmani:compose-charts",
-      "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
-      "org.apache.logging.log4j:log4j-core",
-      "org.apache.logging.log4j:log4j-slf4j2-impl",
       "org.apache.poi:poi",
-      "org.apache.poi:poi-ooxml",
-      "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
-      "org.jetbrains.compose.animation:animation-core-desktop",
-      "org.jetbrains.compose.animation:animation-desktop",
-      "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64",
-      "org.jetbrains.compose.desktop:desktop-jvm-linux-x64",
-      "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64",
-      "org.jetbrains.compose.desktop:desktop-jvm-macos-x64",
-      "org.jetbrains.compose.desktop:desktop-jvm-windows-x64",
-      "org.jetbrains.compose.foundation:foundation-desktop",
-      "org.jetbrains.compose.foundation:foundation-layout-desktop",
-      "org.jetbrains.compose.material3:material3-desktop",
-      "org.jetbrains.compose.material:material-icons-core-desktop",
-      "org.jetbrains.compose.ui:ui-desktop",
-      "org.jetbrains.compose.ui:ui-geometry-desktop",
-      "org.jetbrains.compose.ui:ui-graphics-desktop",
-      "org.jetbrains.compose.ui:ui-test-desktop",
-      "org.jetbrains.compose.ui:ui-text-desktop",
-      "org.jetbrains.compose.ui:ui-unit-desktop",
-      "org.jetbrains.compose.ui:ui-util-desktop",
-      "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
-      "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
-      "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
-      "tech.mappie:mappie-compiler-plugin"
+      "org.apache.poi:poi-ooxml"
     ]
   },
   "artifacts": {
+    "androidx.activity:activity": {
+      "android": {
+        "version": "1.13.0",
+        "files": [
+          {
+            "name": "activity-1.13.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/activity/activity/1.13.0/activity-1.13.0.aar",
+            "sha256": "bd4f19a5f00effed0eecad0a310b1f2169b9fc66236a3ba743a222eb77747ee1"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.core:core-ktx",
+          "androidx.core:core-viewtree",
+          "androidx.lifecycle:lifecycle-common",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.lifecycle:lifecycle-viewmodel",
+          "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "androidx.navigationevent:navigationevent",
+          "androidx.savedstate:savedstate"
+        ],
+        "runtime_deps": [
+          "androidx.profileinstaller:profileinstaller",
+          "androidx.tracing:tracing",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "androidx.activity:activity-compose": {
+      "android": {
+        "version": "1.13.0",
+        "files": [
+          {
+            "name": "activity-compose-1.13.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/activity/activity-compose/1.13.0/activity-compose-1.13.0.aar",
+            "sha256": "2b5da3033d4924e833868e140c3edfc0c03208710b6b9fb2c9d9a47560ba55fa"
+          }
+        ],
+        "deps": [
+          "androidx.activity:activity",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.compose.ui:ui",
+          "androidx.core:core-ktx",
+          "androidx.lifecycle:lifecycle-viewmodel",
+          "androidx.navigationevent:navigationevent-compose"
+        ],
+        "runtime_deps": [
+          "androidx.lifecycle:lifecycle-common",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.lifecycle:lifecycle-runtime-compose",
+          "androidx.savedstate:savedstate",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "androidx.activity:activity-ktx": {
+      "android": {
+        "version": "1.13.0",
+        "files": [
+          {
+            "name": "activity-ktx-1.13.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/activity/activity-ktx/1.13.0/activity-ktx-1.13.0.aar",
+            "sha256": "b5541dc5f74e35389f1e9fdca8b5770c49d2c1360de16f398ce5c1e07a003244"
+          }
+        ],
+        "deps": [
+          "androidx.activity:activity",
+          "androidx.lifecycle:lifecycle-runtime-ktx",
+          "androidx.lifecycle:lifecycle-viewmodel-ktx",
+          "androidx.savedstate:savedstate-ktx"
+        ]
+      }
+    },
     "androidx.annotation:annotation": {
+      "android": {
+        "version": "1.9.1",
+        "files": [
+          {
+            "name": "annotation-jvm-1.9.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-jvm/1.9.1/annotation-jvm-1.9.1.jar",
+            "sha256": "1e343917ebf27ba96fe4dc52b1cad7fd32b738fbc6355bb6cd5b3b305d7212d0"
+          }
+        ]
+      },
       "jvm": {
         "version": "1.9.1",
         "files": [
@@ -3594,7 +4329,32 @@
         ]
       }
     },
+    "androidx.annotation:annotation-experimental": {
+      "android": {
+        "version": "1.4.1",
+        "files": [
+          {
+            "name": "annotation-experimental-1.4.1.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-experimental/1.4.1/annotation-experimental-1.4.1.aar",
+            "sha256": "6bd4c7c7476f8260cd3bdbb81183583e93fc9f790c27dea7dc314181cbf87aa0"
+          }
+        ]
+      }
+    },
     "androidx.arch.core:core-common": {
+      "android": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "core-common-2.2.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/arch/core/core-common/2.2.0/core-common-2.2.0.jar",
+            "sha256": "65308a06b1c00ee186cb9e19321383f043b993813f1522c47f4a3e3303bdba41"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ]
+      },
       "jvm": {
         "version": "2.2.0",
         "files": [
@@ -3609,7 +4369,51 @@
         ]
       }
     },
+    "androidx.arch.core:core-runtime": {
+      "android": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "core-runtime-2.2.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/arch/core/core-runtime/2.2.0/core-runtime-2.2.0.aar",
+            "sha256": "a1be5e0caa2b07623862af6ae21b3ab0718123245184d0e30dea81b53f990a47"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.arch.core:core-common"
+        ]
+      }
+    },
+    "androidx.autofill:autofill": {
+      "android": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "autofill-1.0.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/autofill/autofill/1.0.0/autofill-1.0.0.aar",
+            "sha256": "c9468f56e05006ea151a426c54957cd0799b8b83a579d2846dd22061f33e5ecd"
+          }
+        ],
+        "deps": [
+          "androidx.core:core"
+        ]
+      }
+    },
     "androidx.collection:collection": {
+      "android": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "collection-jvm-1.5.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/collection/collection-jvm/1.5.0/collection-jvm-1.5.0.jar",
+            "sha256": "70b35924e4babcdffa37d0e575ee039c56a2d97123342624c48b603233704341"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ]
+      },
       "jvm": {
         "version": "1.5.0",
         "files": [
@@ -3692,7 +4496,208 @@
         ]
       }
     },
+    "androidx.collection:collection-ktx": {
+      "android": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "collection-ktx-1.5.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/collection/collection-ktx/1.5.0/collection-ktx-1.5.0.jar",
+            "sha256": "939b4a8697640e77d83e4e8b4c4a9d18f8130198c5961194af8dd9db9dc7c353"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection"
+        ]
+      }
+    },
+    "androidx.compose.animation:animation": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "animation.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/animation/animation-android/1.12.1/animation-android-1.12.1.aar",
+            "sha256": "4a619ca869b9724e9cf6127ead53d8fb7dd8601a931c4006b15caf5bb3bf19f8"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.annotation:annotation-experimental",
+          "androidx.compose.animation:animation-core",
+          "androidx.compose.foundation:foundation-layout",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.ui:ui-geometry"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.compose.ui:ui",
+          "androidx.compose.ui:ui-graphics",
+          "androidx.compose.ui:ui-util"
+        ]
+      }
+    },
+    "androidx.compose.animation:animation-core": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "animation-core.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/animation/animation-core-android/1.12.1/animation-core-android-1.12.1.aar",
+            "sha256": "29e26959b2c5645c53a42aa8302570bf8cc3644755d6ca97bf1028d08a665b97"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.ui:ui",
+          "androidx.compose.ui:ui-graphics",
+          "androidx.compose.ui:ui-unit",
+          "androidx.compose.ui:ui-util"
+        ]
+      }
+    },
+    "androidx.compose.foundation:foundation": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "foundation.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/foundation/foundation-android/1.12.1/foundation-android-1.12.1.aar",
+            "sha256": "444749ea7b5a563e530504b9035c87e47ed0fb62b9f7ba00e90af8aa81e6bfb8"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.annotation:annotation-experimental",
+          "androidx.collection:collection",
+          "androidx.compose.animation:animation",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.ui:ui"
+        ],
+        "runtime_deps": [
+          "androidx.compose.foundation:foundation-layout",
+          "androidx.compose.ui:ui-text",
+          "androidx.compose.ui:ui-util",
+          "androidx.core:core",
+          "androidx.emoji2:emoji2"
+        ]
+      }
+    },
+    "androidx.compose.foundation:foundation-layout": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "foundation-layout.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/foundation/foundation-layout-android/1.12.1/foundation-layout-android-1.12.1.aar",
+            "sha256": "274370a88621e001417e76c2d862ffad61ebc8ca2d9f151c7b60dd02d65ebe51"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.annotation:annotation-experimental",
+          "androidx.compose.ui:ui"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.compose.animation:animation-core",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.ui:ui-unit",
+          "androidx.compose.ui:ui-util",
+          "androidx.core:core"
+        ]
+      }
+    },
+    "androidx.compose.material3:material3": {
+      "android": {
+        "version": "1.4.0",
+        "files": [
+          {
+            "name": "material3.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3-android/1.4.0/material3-android-1.4.0.aar",
+            "sha256": "3a37e8b36df3822fe1e6059f0f9fafda8800388860477624ac1b9422c418a36e"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.annotation:annotation-experimental",
+          "androidx.compose.foundation:foundation",
+          "androidx.compose.foundation:foundation-layout",
+          "androidx.compose.material:material-ripple",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.ui:ui",
+          "androidx.compose.ui:ui-text"
+        ],
+        "runtime_deps": [
+          "androidx.activity:activity-compose",
+          "androidx.collection:collection",
+          "androidx.compose.animation:animation-core",
+          "androidx.compose.ui:ui-util",
+          "androidx.lifecycle:lifecycle-common-java8"
+        ]
+      }
+    },
+    "androidx.compose.material:material-icons-core": {
+      "android": {
+        "version": "1.7.8",
+        "files": [
+          {
+            "name": "material-icons-core-release.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/material/material-icons-core-android/1.7.8/material-icons-core-android-1.7.8.aar",
+            "sha256": "332c06b25e662cc417fb087e76b8faa5cb249f4992ffa3360084a3d4ab882284"
+          }
+        ],
+        "deps": [
+          "androidx.compose.ui:ui"
+        ]
+      }
+    },
+    "androidx.compose.material:material-ripple": {
+      "android": {
+        "version": "1.8.1",
+        "files": [
+          {
+            "name": "material-ripple-release.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/material/material-ripple-android/1.8.1/material-ripple-android-1.8.1.aar",
+            "sha256": "a6bc5eb03cd1d714e06339b8e48944462d9994a9e88eb7519af4cf3ec20e3afa"
+          }
+        ],
+        "deps": [
+          "androidx.compose.foundation:foundation",
+          "androidx.compose.runtime:runtime"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.compose.animation:animation",
+          "androidx.compose.ui:ui-util"
+        ]
+      }
+    },
     "androidx.compose.runtime:runtime": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-android/1.12.1/runtime-android-1.12.1.aar",
+            "sha256": "1701a61d06d2f6144f2cd8b015abbc5ad6952eacb70c24c208cdfd2bb188dde7"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation-experimental",
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-android",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection"
+        ]
+      },
       "jvm": {
         "version": "1.12.1",
         "files": [
@@ -3794,6 +4799,16 @@
       }
     },
     "androidx.compose.runtime:runtime-annotation": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-annotation.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-android/1.12.1/runtime-annotation-android-1.12.1.aar",
+            "sha256": "071d6200f5f34ffb5ce69cc19ee8db577c188832bb472779213d4633eca26565"
+          }
+        ]
+      },
       "jvm": {
         "version": "1.12.1",
         "files": [
@@ -3878,6 +4893,23 @@
       }
     },
     "androidx.compose.runtime:runtime-retain": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-retain.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-retain-android/1.12.1/runtime-retain-android-1.12.1.aar",
+            "sha256": "6e32111eed0f67ef2ae70c2d9c83cb6bfb54095fe2fb2fdc800febd14d0d7a61"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection"
+        ]
+      },
       "jvm": {
         "version": "1.12.1",
         "files": [
@@ -3897,6 +4929,25 @@
       }
     },
     "androidx.compose.runtime:runtime-saveable": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-saveable.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable-android/1.12.1/runtime-saveable-android-1.12.1.aar",
+            "sha256": "0c83d47820fbc8ffb6e3e49311ccd4755676d6f94bb8c6d8564ab4c799df8779"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.savedstate:savedstate-compose"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-runtime-compose"
+        ]
+      },
       "jvm": {
         "version": "1.12.1",
         "files": [
@@ -3999,7 +5050,403 @@
         ]
       }
     },
+    "androidx.compose.ui:ui": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "ui.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-android/1.12.1/ui-android-1.12.1.aar",
+            "sha256": "3f1ae17e237d9dc0a2a0f42cb04b85b8de6e12f67adc5f5c12173fe31e501cb2"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.annotation:annotation-experimental",
+          "androidx.compose.runtime:runtime-retain",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.compose.ui:ui-geometry",
+          "androidx.compose.ui:ui-graphics",
+          "androidx.compose.ui:ui-text",
+          "androidx.compose.ui:ui-unit",
+          "androidx.compose.ui:ui-util",
+          "androidx.lifecycle:lifecycle-runtime-compose",
+          "androidx.savedstate:savedstate-compose",
+          "org.jspecify:jspecify"
+        ],
+        "runtime_deps": [
+          "androidx.activity:activity-ktx",
+          "androidx.autofill:autofill",
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.core:core",
+          "androidx.customview:customview-poolingcontainer",
+          "androidx.emoji2:emoji2",
+          "androidx.lifecycle:lifecycle-viewmodel",
+          "androidx.lifecycle:lifecycle-viewmodel-ktx",
+          "androidx.profileinstaller:profileinstaller",
+          "androidx.savedstate:savedstate-ktx",
+          "androidx.window:window",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-android",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "androidx.compose.ui:ui-geometry": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "ui-geometry.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-geometry-android/1.12.1/ui-geometry-android-1.12.1.aar",
+            "sha256": "09a23c76f5d52ea5ec61d4a78d4876940f0f033c975e5c604246f89a63532754"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ],
+        "runtime_deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.ui:ui-util"
+        ]
+      }
+    },
+    "androidx.compose.ui:ui-graphics": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "ui-graphics.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-graphics-android/1.12.1/ui-graphics-android-1.12.1.aar",
+            "sha256": "1e6451f05ad569e306e7022b3c41d16aa75080bb2c99b59c4d67e7dbf6f428e7"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.annotation:annotation-experimental",
+          "androidx.compose.ui:ui-unit"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.ui:ui-util",
+          "androidx.core:core",
+          "androidx.graphics:graphics-path"
+        ]
+      }
+    },
+    "androidx.compose.ui:ui-test": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "ui-test.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-test-android/1.12.1/ui-test-android-1.12.1.aar",
+            "sha256": "2beafe8ba6c4ac2335159a7bdc08ac3eaac205f183d5d6b29b2eb87a2458b7ff"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.ui:ui",
+          "androidx.compose.ui:ui-graphics",
+          "androidx.compose.ui:ui-text",
+          "androidx.compose.ui:ui-unit",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-test"
+        ],
+        "runtime_deps": [
+          "androidx.activity:activity-compose",
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.compose.ui:ui-util",
+          "androidx.core:core-ktx",
+          "androidx.test.espresso:espresso-core",
+          "androidx.test.espresso:espresso-idling-resource",
+          "androidx.test:monitor"
+        ]
+      }
+    },
+    "androidx.compose.ui:ui-text": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "ui-text.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-text-android/1.12.1/ui-text-android-1.12.1.aar",
+            "sha256": "e710a5776966537df09a2e5c4ca1dacc14ca11d7b20a6af16c0e992ddd3aecd3"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.annotation:annotation-experimental",
+          "androidx.compose.ui:ui-graphics",
+          "androidx.compose.ui:ui-unit"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.compose.ui:ui-util",
+          "androidx.core:core",
+          "androidx.emoji2:emoji2",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "androidx.compose.ui:ui-unit": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "ui-unit.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-unit-android/1.12.1/ui-unit-android-1.12.1.aar",
+            "sha256": "97d2bf062395d981435bc8d571b1d5d75587a7f26f3444671b2287f233e18ae7"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.annotation:annotation-experimental",
+          "androidx.compose.ui:ui-geometry"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.collection:collection-ktx",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.ui:ui-util"
+        ]
+      }
+    },
+    "androidx.compose.ui:ui-util": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "ui-util.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-util-android/1.12.1/ui-util-android-1.12.1.aar",
+            "sha256": "cd47f06626c19a06086e16823a32e49e0a0c7d903451668da2f777d063507aa5"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation-experimental"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime"
+        ]
+      }
+    },
+    "androidx.concurrent:concurrent-futures": {
+      "android": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "concurrent-futures-1.2.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/concurrent/concurrent-futures/1.2.0/concurrent-futures-1.2.0.jar",
+            "sha256": "4810315a798690b5d3bb40c92bcd41c045fd2c36bbfc50b27cbac3d6a0eda190"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "com.google.guava:listenablefuture"
+        ]
+      }
+    },
+    "androidx.concurrent:concurrent-futures-ktx": {
+      "android": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "concurrent-futures-ktx-1.2.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/concurrent/concurrent-futures-ktx/1.2.0/concurrent-futures-ktx-1.2.0.jar",
+            "sha256": "e1f3e17bb4358ccd6c77ca45f70635c9aba237261f19eaa4f64a0218c00e2a3e"
+          }
+        ],
+        "deps": [
+          "androidx.concurrent:concurrent-futures",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "androidx.core:core": {
+      "android": {
+        "version": "1.18.0",
+        "files": [
+          {
+            "name": "core-1.18.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/core/core/1.18.0/core-1.18.0.aar",
+            "sha256": "311d83ac67d394076ec21d12ed2d10a44b59cb2929b7dce00e5a90a93842e37d"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.annotation:annotation-experimental",
+          "androidx.core:core-viewtree",
+          "androidx.lifecycle:lifecycle-common",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.versionedparcelable:versionedparcelable",
+          "com.google.guava:listenablefuture",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jspecify:jspecify"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.concurrent:concurrent-futures",
+          "androidx.interpolator:interpolator",
+          "androidx.tracing:tracing"
+        ]
+      }
+    },
+    "androidx.core:core-ktx": {
+      "android": {
+        "version": "1.18.0",
+        "files": [
+          {
+            "name": "core-ktx-1.18.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/core/core-ktx/1.18.0/core-ktx-1.18.0.aar",
+            "sha256": "c7c511e3df838fcbcb61ace36944de6bb7c10eb597be546974f001119939c85d"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.core:core"
+        ]
+      }
+    },
+    "androidx.core:core-viewtree": {
+      "android": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "core-viewtree-1.0.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/core/core-viewtree/1.0.0/core-viewtree-1.0.0.aar",
+            "sha256": "dc1b678d58ebcf2bfa1587be68ff826694ce3d221251b9ef30d4d4b36297e6de"
+          }
+        ]
+      }
+    },
+    "androidx.customview:customview": {
+      "android": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "customview-1.0.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/customview/customview/1.0.0/customview-1.0.0.aar",
+            "sha256": "20e5b8f6526a34595a604f56718da81167c0b40a7a94a57daa355663f2594df2"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.core:core"
+        ]
+      }
+    },
+    "androidx.customview:customview-poolingcontainer": {
+      "android": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "customview-poolingcontainer-1.0.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/customview/customview-poolingcontainer/1.0.0/customview-poolingcontainer-1.0.0.aar",
+            "sha256": "3584102fc49bf399c56e3b7be4bfe12000c46112320cd8cf85cc0a8f93f3e752"
+          }
+        ],
+        "runtime_deps": [
+          "androidx.core:core-ktx"
+        ]
+      }
+    },
+    "androidx.emoji2:emoji2": {
+      "android": {
+        "version": "1.4.0",
+        "files": [
+          {
+            "name": "emoji2-1.4.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/emoji2/emoji2/1.4.0/emoji2-1.4.0.aar",
+            "sha256": "433febd3434a45667176c76a64f3f205ca6335a6b544c5b5d57f25a38a375242"
+          }
+        ],
+        "deps": [
+          "androidx.core:core",
+          "androidx.startup:startup-runtime"
+        ],
+        "runtime_deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-process"
+        ]
+      }
+    },
+    "androidx.fragment:fragment": {
+      "android": {
+        "version": "1.5.7",
+        "files": [
+          {
+            "name": "fragment-1.5.7.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/fragment/fragment/1.5.7/fragment-1.5.7.aar",
+            "sha256": "59c74110b99378885ed06242f8a26da305ea4dca53ed60163540dd0e2e3c6675"
+          }
+        ],
+        "deps": [
+          "androidx.activity:activity",
+          "androidx.annotation:annotation",
+          "androidx.annotation:annotation-experimental",
+          "androidx.collection:collection",
+          "androidx.core:core-ktx",
+          "androidx.lifecycle:lifecycle-livedata-core",
+          "androidx.lifecycle:lifecycle-viewmodel",
+          "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "androidx.loader:loader",
+          "androidx.savedstate:savedstate",
+          "androidx.viewpager:viewpager"
+        ]
+      }
+    },
+    "androidx.graphics:graphics-path": {
+      "android": {
+        "version": "1.0.1",
+        "files": [
+          {
+            "name": "graphics-path-1.0.1.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/graphics/graphics-path/1.0.1/graphics-path-1.0.1.aar",
+            "sha256": "8ca4032b6d79b351f0b59ad4b580eddbb9423e1652f7c958830687f1eee2ec03"
+          }
+        ],
+        "runtime_deps": [
+          "androidx.core:core"
+        ]
+      }
+    },
+    "androidx.interpolator:interpolator": {
+      "android": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "interpolator-1.0.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/interpolator/interpolator/1.0.0/interpolator-1.0.0.aar",
+            "sha256": "33193135a64fe21fa2c35eec6688f1a76e512606c0fc83dc1b689e37add7732a"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ]
+      }
+    },
     "androidx.lifecycle:lifecycle-common": {
+      "android": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-common-jvm-2.10.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-jvm/2.10.0/lifecycle-common-jvm-2.10.0.jar",
+            "sha256": "15943082d87bcd78830398fa377f2c8b12643de290d0906ed8e49a2d335ddb54"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jspecify:jspecify"
+        ]
+      },
       "jvm": {
         "version": "2.10.0",
         "files": [
@@ -4093,7 +5540,82 @@
         ]
       }
     },
+    "androidx.lifecycle:lifecycle-common-java8": {
+      "android": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-common-java8-2.10.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-java8/2.10.0/lifecycle-common-java8-2.10.0.jar",
+            "sha256": "497dd84de9f2fd46324f25f9a3af032d3a23d087e87af515c4b19435f6d6a651"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.lifecycle:lifecycle-common"
+        ]
+      }
+    },
+    "androidx.lifecycle:lifecycle-livedata-core": {
+      "android": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-livedata-core-2.10.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-livedata-core/2.10.0/lifecycle-livedata-core-2.10.0.aar",
+            "sha256": "12dd61a9843ccebb4547d3ebe2f6d030ca8f6988d22f8fad19c0af93b4a97e95"
+          }
+        ],
+        "deps": [
+          "androidx.lifecycle:lifecycle-common",
+          "org.jspecify:jspecify"
+        ],
+        "runtime_deps": [
+          "androidx.arch.core:core-common",
+          "androidx.arch.core:core-runtime"
+        ]
+      }
+    },
+    "androidx.lifecycle:lifecycle-process": {
+      "android": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-process-2.10.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-process/2.10.0/lifecycle-process-2.10.0.aar",
+            "sha256": "10bb5bb12773dca11d8343c014cfd17dfb40967d6ece37e8f15d04d8ceb0775c"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.startup:startup-runtime"
+        ]
+      }
+    },
     "androidx.lifecycle:lifecycle-runtime": {
+      "android": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-runtime.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-android/2.10.0/lifecycle-runtime-android-2.10.0.aar",
+            "sha256": "2193a1573d623f37b20c7d27d1a8f903a72f651cc6f32e5794f85dda744fee75"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.arch.core:core-common",
+          "androidx.lifecycle:lifecycle-common",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-android",
+          "org.jspecify:jspecify"
+        ],
+        "runtime_deps": [
+          "androidx.arch.core:core-runtime",
+          "androidx.core:core-viewtree",
+          "androidx.profileinstaller:profileinstaller"
+        ]
+      },
       "jvm": {
         "version": "2.10.0",
         "files": [
@@ -4184,6 +5706,22 @@
       }
     },
     "androidx.lifecycle:lifecycle-runtime-compose": {
+      "android": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-runtime-compose.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-android/2.10.0/lifecycle-runtime-compose-android-2.10.0.aar",
+            "sha256": "46e996d526829596f6db4626169a967f056fde7103507ff596bcd177b73c3675"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.lifecycle:lifecycle-runtime-ktx"
+        ]
+      },
       "jvm": {
         "version": "2.10.0",
         "files": [
@@ -4278,7 +5816,42 @@
         ]
       }
     },
+    "androidx.lifecycle:lifecycle-runtime-ktx": {
+      "android": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-runtime-ktx.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-ktx-android/2.10.0/lifecycle-runtime-ktx-android-2.10.0.aar",
+            "sha256": "871883703339f87284d232cb436e317c6f4af5612d92b43f27c6b13b92109fa7"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.lifecycle:lifecycle-runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-android"
+        ]
+      }
+    },
     "androidx.lifecycle:lifecycle-viewmodel": {
+      "android": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-android/2.10.0/lifecycle-viewmodel-android-2.10.0.aar",
+            "sha256": "9303287030027ca0b8cf98a748ddeb121ec1bfa1312c0069428e4765bbabce78"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-android",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "androidx.core:core-viewtree"
+        ]
+      },
       "jvm": {
         "version": "2.11.0",
         "files": [
@@ -4321,7 +5894,46 @@
         ]
       }
     },
+    "androidx.lifecycle:lifecycle-viewmodel-ktx": {
+      "android": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel-ktx-2.10.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-ktx/2.10.0/lifecycle-viewmodel-ktx-2.10.0.aar",
+            "sha256": "54295ac86b67886dc0613e38f621c531995d0662005fc763e340e19a90994f84"
+          }
+        ],
+        "deps": [
+          "androidx.lifecycle:lifecycle-viewmodel",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-android"
+        ]
+      }
+    },
     "androidx.lifecycle:lifecycle-viewmodel-savedstate": {
+      "android": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel-savedstate.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate-android/2.10.0/lifecycle-viewmodel-savedstate-android-2.10.0.aar",
+            "sha256": "19404239fa584322c2f81e9659e162bc011b746d29dc950a11d260624d83225e"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.core:core-ktx",
+          "androidx.lifecycle:lifecycle-livedata-core",
+          "androidx.lifecycle:lifecycle-viewmodel",
+          "androidx.savedstate:savedstate",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-android",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "runtime_deps": [
+          "androidx.lifecycle:lifecycle-common"
+        ]
+      },
       "jvm": {
         "version": "2.11.0",
         "files": [
@@ -4344,7 +5956,49 @@
         ]
       }
     },
+    "androidx.loader:loader": {
+      "android": {
+        "version": "1.1.0",
+        "files": [
+          {
+            "name": "loader-1.1.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/loader/loader/1.1.0/loader-1.1.0.aar",
+            "sha256": "a83b597cd2409dc177f7f932f7c4082ef7b5508b69b6c4ba71607e75dbd99971"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.core:core",
+          "androidx.lifecycle:lifecycle-livedata-core",
+          "androidx.lifecycle:lifecycle-viewmodel"
+        ]
+      }
+    },
     "androidx.navigation3:navigation3-runtime": {
+      "android": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-runtime.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-android/1.2.0/navigation3-runtime-android-1.2.0.aar",
+            "sha256": "f48515e309202935758c709ae9bfbb09c26922d70cea77123683497ed6a833b9"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.navigationevent:navigationevent",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.core:core-ktx",
+          "androidx.lifecycle:lifecycle-runtime"
+        ]
+      },
       "jvm": {
         "version": "1.2.0",
         "files": [
@@ -4495,7 +6149,56 @@
         ]
       }
     },
+    "androidx.navigation3:navigation3-ui": {
+      "android": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-ui.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-ui-android/1.2.0/navigation3-ui-android-1.2.0.aar",
+            "sha256": "ce00086ea93af85e1adc332afae5b260707b8c6c75faa05f0fdc22995bad3173"
+          }
+        ],
+        "deps": [
+          "androidx.activity:activity-compose",
+          "androidx.compose.animation:animation",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.compose.ui:ui",
+          "androidx.navigation3:navigation3-runtime",
+          "androidx.navigationevent:navigationevent-compose",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose"
+        ],
+        "runtime_deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.lifecycle:lifecycle-runtime-compose"
+        ]
+      }
+    },
     "androidx.navigationevent:navigationevent": {
+      "android": {
+        "version": "1.1.2",
+        "files": [
+          {
+            "name": "navigationevent.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-android/1.1.2/navigationevent-android-1.1.2.aar",
+            "sha256": "40a357103ab703762bf434f424a8486be18652b4aa25110f0d635a4cef5dcd63"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime-annotation"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.core:core-viewtree",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-android",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
       "jvm": {
         "version": "1.1.2",
         "files": [
@@ -4603,6 +6306,24 @@
       }
     },
     "androidx.navigationevent:navigationevent-compose": {
+      "android": {
+        "version": "1.1.2",
+        "files": [
+          {
+            "name": "navigationevent-compose.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-compose-android/1.1.2/navigationevent-compose-android-1.1.2.aar",
+            "sha256": "ac9773dc9076d3b035ccf5494316d78a5f9abc18a8fa73fb211f92957286e1aa"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.navigationevent:navigationevent"
+        ],
+        "runtime_deps": [
+          "androidx.compose.ui:ui",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
       "jvm": {
         "version": "1.1.2",
         "files": [
@@ -4621,7 +6342,48 @@
         ]
       }
     },
+    "androidx.profileinstaller:profileinstaller": {
+      "android": {
+        "version": "1.4.0",
+        "files": [
+          {
+            "name": "profileinstaller-1.4.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/profileinstaller/profileinstaller/1.4.0/profileinstaller-1.4.0.aar",
+            "sha256": "d502141fcce902430f62b674c32aecd0f75262e7ee2cd15c74adb617cd13130a"
+          }
+        ],
+        "deps": [
+          "androidx.startup:startup-runtime",
+          "com.google.guava:listenablefuture"
+        ],
+        "runtime_deps": [
+          "androidx.annotation:annotation",
+          "androidx.concurrent:concurrent-futures"
+        ]
+      }
+    },
     "androidx.savedstate:savedstate": {
+      "android": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-android/1.5.0/savedstate-android-1.5.0.aar",
+            "sha256": "c191b2b0d3ed2f765743e634f213c0e8150825547810789fc13487332bfc9cd3"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.core:core-ktx",
+          "androidx.core:core-viewtree",
+          "androidx.lifecycle:lifecycle-common"
+        ]
+      },
       "jvm": {
         "version": "1.5.0",
         "files": [
@@ -4735,6 +6497,24 @@
       }
     },
     "androidx.savedstate:savedstate-compose": {
+      "android": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-compose.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-compose-android/1.5.0/savedstate-compose-android-1.5.0.aar",
+            "sha256": "01682c0de6796d31f9c7863bb18e65443e512e4dc95a13cc8c3d0d4931c2c10b"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.savedstate:savedstate"
+        ],
+        "runtime_deps": [
+          "androidx.core:core-ktx"
+        ]
+      },
       "jvm": {
         "version": "1.5.0",
         "files": [
@@ -4844,7 +6624,332 @@
         ]
       }
     },
+    "androidx.savedstate:savedstate-ktx": {
+      "android": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-ktx-1.5.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-ktx/1.5.0/savedstate-ktx-1.5.0.aar",
+            "sha256": "1de99f31e90d55828e1f00f856274410e6e3e997605a40d478e7065c38b3252e"
+          }
+        ],
+        "deps": [
+          "androidx.savedstate:savedstate"
+        ]
+      }
+    },
+    "androidx.sqlite:sqlite": {
+      "android": {
+        "version": "2.7.1",
+        "files": [
+          {
+            "name": "sqlite.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/sqlite/sqlite-android/2.7.1/sqlite-android-2.7.1.aar",
+            "sha256": "1f4c8887570a1cca255fd263ddb29a34c77eee64ada1cf8062de6aa23bf649b6"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ]
+      }
+    },
+    "androidx.sqlite:sqlite-framework": {
+      "android": {
+        "version": "2.7.1",
+        "files": [
+          {
+            "name": "sqlite-framework.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/sqlite/sqlite-framework-android/2.7.1/sqlite-framework-android-2.7.1.aar",
+            "sha256": "18ccafddeae782ee2dbf763190bc7b9ce8f46e95f2b9b88de16924019a4c1a5f"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.sqlite:sqlite"
+        ]
+      }
+    },
+    "androidx.startup:startup-runtime": {
+      "android": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "startup-runtime-1.2.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/startup/startup-runtime/1.2.0/startup-runtime-1.2.0.aar",
+            "sha256": "f51d361d17b30b09cfb9e2aebf301d113f99437cbf462a066092795fb60eddd2"
+          }
+        ],
+        "runtime_deps": [
+          "androidx.annotation:annotation",
+          "androidx.tracing:tracing"
+        ]
+      }
+    },
+    "androidx.test.espresso:espresso-core": {
+      "android": {
+        "version": "3.5.0",
+        "files": [
+          {
+            "name": "espresso-core-3.5.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/test/espresso/espresso-core/3.5.0/espresso-core-3.5.0.aar",
+            "sha256": "34b0493f4e002f205d961e562add0c0c31bb0acc657e89d89d4b188ac13f242c"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.test.espresso:espresso-idling-resource",
+          "androidx.test:annotation",
+          "androidx.test:core",
+          "androidx.test:runner",
+          "com.google.code.findbugs:jsr305",
+          "com.squareup:javawriter",
+          "javax.inject:javax.inject",
+          "org.hamcrest:hamcrest-integration",
+          "org.hamcrest:hamcrest-library"
+        ]
+      }
+    },
+    "androidx.test.espresso:espresso-idling-resource": {
+      "android": {
+        "version": "3.5.0",
+        "files": [
+          {
+            "name": "espresso-idling-resource-3.5.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/test/espresso/espresso-idling-resource/3.5.0/espresso-idling-resource-3.5.0.aar",
+            "sha256": "84fb8e2f5eda937771bee28582f5d2cfa61b0e9438d02041ca61b81e3dac3c87"
+          }
+        ]
+      }
+    },
+    "androidx.test.services:storage": {
+      "android": {
+        "version": "1.6.0",
+        "files": [
+          {
+            "name": "storage-1.6.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/test/services/storage/1.6.0/storage-1.6.0.aar",
+            "sha256": "f97e3cf6aaf4e3fb97ef219d37a9c0a0720183c1f6db87b37642521e26fb6d30"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.test:monitor"
+        ]
+      }
+    },
+    "androidx.test.uiautomator:uiautomator": {
+      "android": {
+        "version": "2.4.0",
+        "files": [
+          {
+            "name": "uiautomator-2.4.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator/2.4.0/uiautomator-2.4.0.aar",
+            "sha256": "e7c57391d8baa1435c242334f605c4a282d03695442032622438b23bf2c6c904"
+          }
+        ],
+        "deps": [
+          "org.jspecify:jspecify"
+        ],
+        "runtime_deps": [
+          "androidx.annotation:annotation",
+          "androidx.test.uiautomator:uiautomator-shell",
+          "androidx.test:core",
+          "androidx.tracing:tracing",
+          "junit:junit"
+        ]
+      }
+    },
+    "androidx.test.uiautomator:uiautomator-shell": {
+      "android": {
+        "version": "2.4.0",
+        "files": [
+          {
+            "name": "uiautomator-shell.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator-shell-android/2.4.0/uiautomator-shell-android-2.4.0.aar",
+            "sha256": "aa97c53f034c7ffed41975b2c37b82b02b23b3cd28be61a1281edd29014bbcc4"
+          }
+        ],
+        "runtime_deps": [
+          "androidx.test:core"
+        ]
+      }
+    },
+    "androidx.test:annotation": {
+      "android": {
+        "version": "1.0.1",
+        "files": [
+          {
+            "name": "annotation-1.0.1.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/test/annotation/1.0.1/annotation-1.0.1.aar",
+            "sha256": "c0754928effe1968c3a9a7b55d1dfc7ceb1e1e7c9f3f09f98afd42431f712492"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.annotation:annotation-experimental"
+        ]
+      }
+    },
+    "androidx.test:core": {
+      "android": {
+        "version": "1.7.0",
+        "files": [
+          {
+            "name": "core-1.7.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/test/core/1.7.0/core-1.7.0.aar",
+            "sha256": "f4dacd8edceeec48e0c76ecf28339b28f4b4f6b74f8e34e9e59b472c27d9eb81"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.concurrent:concurrent-futures-ktx",
+          "androidx.lifecycle:lifecycle-common",
+          "androidx.test:monitor",
+          "androidx.tracing:tracing",
+          "com.google.guava:listenablefuture",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm"
+        ]
+      }
+    },
+    "androidx.test:monitor": {
+      "android": {
+        "version": "1.8.0",
+        "files": [
+          {
+            "name": "monitor-1.8.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/test/monitor/1.8.0/monitor-1.8.0.aar",
+            "sha256": "56cb7496a06d9f2dca7d3ff76c50a8a30bd18e00a24a3b267d5a31437b278e67"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.tracing:tracing"
+        ]
+      }
+    },
+    "androidx.test:runner": {
+      "android": {
+        "version": "1.7.0",
+        "files": [
+          {
+            "name": "runner-1.7.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/test/runner/1.7.0/runner-1.7.0.aar",
+            "sha256": "970311c47119928a2e406a88892a3d270387cc5a49a181a1c44511105b41b818"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.test.services:storage",
+          "androidx.test:monitor",
+          "androidx.tracing:tracing",
+          "junit:junit"
+        ]
+      }
+    },
+    "androidx.tracing:tracing": {
+      "android": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "tracing-1.2.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/tracing/tracing/1.2.0/tracing-1.2.0.aar",
+            "sha256": "6faa90390d1fdbf0adb9a99bf99de67b94c6c6f35aea9510593a9d17973736a2"
+          }
+        ],
+        "runtime_deps": [
+          "androidx.annotation:annotation"
+        ]
+      }
+    },
+    "androidx.versionedparcelable:versionedparcelable": {
+      "android": {
+        "version": "1.1.1",
+        "files": [
+          {
+            "name": "versionedparcelable-1.1.1.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/versionedparcelable/versionedparcelable/1.1.1/versionedparcelable-1.1.1.aar",
+            "sha256": "57e8d93260d18d5b9007c9eed3c64ad159de90c8609ebfc74a347cbd514535a4"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection"
+        ]
+      }
+    },
+    "androidx.viewpager:viewpager": {
+      "android": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "viewpager-1.0.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/viewpager/viewpager/1.0.0/viewpager-1.0.0.aar",
+            "sha256": "147af4e14a1984010d8f155e5e19d781f03c1d70dfed02a8e0d18428b8fc8682"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.core:core",
+          "androidx.customview:customview"
+        ]
+      }
+    },
+    "androidx.window:window": {
+      "android": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "window-1.5.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/window/window/1.5.0/window-1.5.0.aar",
+            "sha256": "5de2d48aa578402f46deb5294a955cee62f0c7d8c1840ef626fc7afb8abe22f9"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-android",
+          "org.jspecify:jspecify"
+        ],
+        "runtime_deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.core:core",
+          "androidx.window:window-core"
+        ]
+      }
+    },
+    "androidx.window:window-core": {
+      "android": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "window-core.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/window/window-core-android/1.5.0/window-core-android-1.5.0.aar",
+            "sha256": "d0d50db0756194a6d49a66ad8dafd17b24b4c5fbd8379375056e2eb9bdfeaf22"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ]
+      }
+    },
     "app.cash.molecule:molecule-runtime": {
+      "android": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "molecule-runtime-release.aar",
+            "url": "https://repo1.maven.org/maven2/app/cash/molecule/molecule-runtime-android/2.2.0/molecule-runtime-android-2.2.0.aar",
+            "sha256": "4feb9da44b60aecc2f1ec78204d43dbf0554a2c850b0ffad51a43d90171b77ac"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "androidx.core:core-ktx"
+        ]
+      },
       "jvm": {
         "version": "2.2.0",
         "files": [
@@ -4933,7 +7038,42 @@
         ]
       }
     },
+    "app.cash.sqldelight:android-driver": {
+      "android": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "android-driver-2.4.1.aar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/android-driver/2.4.1/android-driver-2.4.1.aar",
+            "sha256": "50c92e248d48f85a67390469254261a3bcd2295bf4f031f442396610b012ffeb"
+          }
+        ],
+        "deps": [
+          "androidx.sqlite:sqlite",
+          "app.cash.sqldelight:runtime"
+        ],
+        "runtime_deps": [
+          "androidx.sqlite:sqlite-framework"
+        ]
+      }
+    },
     "app.cash.sqldelight:async-extensions": {
+      "android": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "sqldelight-async-extensions-jvm-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/async-extensions-jvm/2.4.1/async-extensions-jvm-2.4.1.jar",
+            "sha256": "6c111a0149aa60e1ff5ee247c9af1604cc8fa47fcfeec2eef5cd50287b8e202d"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "app.cash.sqldelight:runtime"
+        ]
+      },
       "jvm": {
         "version": "2.4.1",
         "files": [
@@ -5056,6 +7196,23 @@
       }
     },
     "app.cash.sqldelight:coroutines-extensions": {
+      "android": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "sqldelight-coroutines-extensions-jvm-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/coroutines-extensions-jvm/2.4.1/coroutines-extensions-jvm-2.4.1.jar",
+            "sha256": "d3fe1181a7689f124d1cac9e4dca315369e606d915a61754f95a5b2d84f8a7fd"
+          }
+        ],
+        "deps": [
+          "app.cash.sqldelight:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "app.cash.sqldelight:async-extensions"
+        ]
+      },
       "jvm": {
         "version": "2.4.1",
         "files": [
@@ -5277,6 +7434,16 @@
       }
     },
     "app.cash.sqldelight:runtime": {
+      "android": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "runtime-jvm-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/runtime-jvm/2.4.1/runtime-jvm-2.4.1.jar",
+            "sha256": "9b01bc44676db299fd22440f3261569f6d8659bfbd3bd4da374ee38cbd4ab4b6"
+          }
+        ]
+      },
       "jvm": {
         "version": "2.4.1",
         "files": [
@@ -5405,6 +7572,22 @@
       }
     },
     "app.cash.turbine:turbine": {
+      "android": {
+        "version": "1.2.1",
+        "files": [
+          {
+            "name": "Turbine-jvm.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/turbine/turbine-jvm/1.2.1/turbine-jvm-1.2.1.jar",
+            "sha256": "d1a853be08d6c3562fdfef98ac25b7048e669d9cb1203a42fc36c56d17c037d5"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-test"
+        ]
+      },
       "jvm": {
         "version": "1.2.1",
         "files": [
@@ -5512,6 +7695,19 @@
       }
     },
     "co.touchlab:kermit": {
+      "android": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "kermit.aar",
+            "url": "https://repo1.maven.org/maven2/co/touchlab/kermit-android/2.2.0/kermit-android-2.2.0.aar",
+            "sha256": "9bde9722ea7157166008499ddfefd49bd8c56ebc72ab88fae3b2fe616a1682dc"
+          }
+        ],
+        "deps": [
+          "co.touchlab:kermit-core"
+        ]
+      },
       "jvm": {
         "version": "2.2.0",
         "files": [
@@ -5595,6 +7791,16 @@
       }
     },
     "co.touchlab:kermit-core": {
+      "android": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "kermit-core.aar",
+            "url": "https://repo1.maven.org/maven2/co/touchlab/kermit-core-android/2.2.0/kermit-core-android-2.2.0.aar",
+            "sha256": "4bb156659756633a2edf211fbe08b4cf8d124b899dfe6693e970f517d37d07bd"
+          }
+        ]
+      },
       "jvm": {
         "version": "2.2.0",
         "files": [
@@ -5823,6 +8029,20 @@
       }
     },
     "com.github.ajalt.clikt:clikt": {
+      "android": {
+        "version": "5.1.0",
+        "files": [
+          {
+            "name": "clikt-mordant-jvm.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-jvm/5.1.0/clikt-jvm-5.1.0.jar",
+            "sha256": "75c330967db15a5c591fba69fc3b18ffb68271d54f90f21c1c9c52e86faeb9d6"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.clikt:clikt-core",
+          "com.github.ajalt.mordant:mordant"
+        ]
+      },
       "jvm": {
         "version": "5.1.0",
         "files": [
@@ -5912,6 +8132,16 @@
       }
     },
     "com.github.ajalt.clikt:clikt-core": {
+      "android": {
+        "version": "5.1.0",
+        "files": [
+          {
+            "name": "clikt-jvm.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-jvm/5.1.0/clikt-core-jvm-5.1.0.jar",
+            "sha256": "7f78049fa8159bac05ce09ddef4313248d4cad0014a744214c1150d14e3661e7"
+          }
+        ]
+      },
       "jvm": {
         "version": "5.1.0",
         "files": [
@@ -5977,6 +8207,16 @@
       }
     },
     "com.github.ajalt.colormath:colormath": {
+      "android": {
+        "version": "3.7.0",
+        "files": [
+          {
+            "name": "colormath-jvm.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/colormath/colormath-jvm/3.7.0/colormath-jvm-3.7.0.jar",
+            "sha256": "e15f04f0ab6da0cbfa43326d12fc5e59d159200e28d72fdbf2a72b472277917d"
+          }
+        ]
+      },
       "jvm": {
         "version": "3.7.0",
         "files": [
@@ -6042,6 +8282,24 @@
       }
     },
     "com.github.ajalt.mordant:mordant": {
+      "android": {
+        "version": "3.0.2",
+        "files": [
+          {
+            "name": "mordant-omnibus-jvm.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm/3.0.2/mordant-jvm-3.0.2.jar",
+            "sha256": "9ed3b976fcccc78da746d49866fa8ebb8f10530a93c544ea0420259a607dd95e"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.mordant:mordant-core"
+        ],
+        "runtime_deps": [
+          "com.github.ajalt.mordant:mordant-jvm-ffm",
+          "com.github.ajalt.mordant:mordant-jvm-graal-ffi",
+          "com.github.ajalt.mordant:mordant-jvm-jna"
+        ]
+      },
       "jvm": {
         "version": "3.0.2",
         "files": [
@@ -6130,6 +8388,19 @@
       }
     },
     "com.github.ajalt.mordant:mordant-core": {
+      "android": {
+        "version": "3.1.0",
+        "files": [
+          {
+            "name": "mordant-jvm.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-jvm/3.1.0/mordant-core-jvm-3.1.0.jar",
+            "sha256": "5843731621b1f88f47cda4d7a4eb8ed8f35a66188bad845c34578dc0d925db47"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.colormath:colormath"
+        ]
+      },
       "jvm": {
         "version": "3.1.0",
         "files": [
@@ -6213,6 +8484,19 @@
       }
     },
     "com.github.ajalt.mordant:mordant-jvm-ffm": {
+      "android": {
+        "version": "3.0.2",
+        "files": [
+          {
+            "name": "mordant-jvm-ffm-jvm.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-ffm-jvm/3.0.2/mordant-jvm-ffm-jvm-3.0.2.jar",
+            "sha256": "10224784125c9f1782c1d4f1d38f3d54236fcc55c030a2ad00cbe4306e162ba4"
+          }
+        ],
+        "runtime_deps": [
+          "com.github.ajalt.mordant:mordant-core"
+        ]
+      },
       "jvm": {
         "version": "3.0.2",
         "files": [
@@ -6228,6 +8512,19 @@
       }
     },
     "com.github.ajalt.mordant:mordant-jvm-graal-ffi": {
+      "android": {
+        "version": "3.0.2",
+        "files": [
+          {
+            "name": "mordant-jvm-graal-ffi-jvm.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-graal-ffi-jvm/3.0.2/mordant-jvm-graal-ffi-jvm-3.0.2.jar",
+            "sha256": "6dd4bebc164aeacddacc8f98e8f871e00fd21ce7bc2eb0d18230ea83bddfc86a"
+          }
+        ],
+        "runtime_deps": [
+          "com.github.ajalt.mordant:mordant-core"
+        ]
+      },
       "jvm": {
         "version": "3.0.2",
         "files": [
@@ -6243,6 +8540,20 @@
       }
     },
     "com.github.ajalt.mordant:mordant-jvm-jna": {
+      "android": {
+        "version": "3.0.2",
+        "files": [
+          {
+            "name": "mordant-jvm-jna-jvm.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-jna-jvm/3.0.2/mordant-jvm-jna-jvm-3.0.2.jar",
+            "sha256": "41063442c8891b2774536a9b87a5062a7fd20e6f1949974c6da72f49472d6f4d"
+          }
+        ],
+        "runtime_deps": [
+          "com.github.ajalt.mordant:mordant-core",
+          "net.java.dev.jna:jna"
+        ]
+      },
       "jvm": {
         "version": "3.0.2",
         "files": [
@@ -6259,6 +8570,16 @@
       }
     },
     "com.github.virtuald:curvesapi": {
+      "android": {
+        "version": "1.08",
+        "files": [
+          {
+            "name": "curvesapi-1.08.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/virtuald/curvesapi/1.08/curvesapi-1.08.jar",
+            "sha256": "ad95b08b8bbf9d7d17e5e00814898fa23324f32bc5b62f1a37801e6a56ce0079"
+          }
+        ]
+      },
       "jvm": {
         "version": "1.08",
         "files": [
@@ -6266,6 +8587,146 @@
             "name": "curvesapi-1.08.jar",
             "url": "https://repo1.maven.org/maven2/com/github/virtuald/curvesapi/1.08/curvesapi-1.08.jar",
             "sha256": "ad95b08b8bbf9d7d17e5e00814898fa23324f32bc5b62f1a37801e6a56ce0079"
+          }
+        ]
+      }
+    },
+    "com.google.android.gms:play-services-auth": {
+      "android": {
+        "version": "22.0.0",
+        "files": [
+          {
+            "name": "play-services-auth-22.0.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/com/google/android/gms/play-services-auth/22.0.0/play-services-auth-22.0.0.aar",
+            "sha256": "0897c1ad398cae3f7a743a24d66373cc7440e63d11e7429ed9a17a77a61c96dc"
+          }
+        ],
+        "deps": [
+          "androidx.fragment:fragment",
+          "androidx.loader:loader",
+          "com.google.android.gms:play-services-auth-api-phone",
+          "com.google.android.gms:play-services-auth-base",
+          "com.google.android.gms:play-services-base",
+          "com.google.android.gms:play-services-basement",
+          "com.google.android.gms:play-services-fido",
+          "com.google.android.gms:play-services-tasks",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-android",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-play-services"
+        ]
+      }
+    },
+    "com.google.android.gms:play-services-auth-api-phone": {
+      "android": {
+        "version": "18.0.2",
+        "files": [
+          {
+            "name": "play-services-auth-api-phone-18.0.2.aar",
+            "url": "https://dl.google.com/dl/android/maven2/com/google/android/gms/play-services-auth-api-phone/18.0.2/play-services-auth-api-phone-18.0.2.aar",
+            "sha256": "bfdf380e7400a9d950cba4dedc152b1bce614a87353009e851087428927cc240"
+          }
+        ],
+        "deps": [
+          "com.google.android.gms:play-services-base",
+          "com.google.android.gms:play-services-basement",
+          "com.google.android.gms:play-services-tasks"
+        ]
+      }
+    },
+    "com.google.android.gms:play-services-auth-base": {
+      "android": {
+        "version": "18.0.10",
+        "files": [
+          {
+            "name": "play-services-auth-base-18.0.10.aar",
+            "url": "https://dl.google.com/dl/android/maven2/com/google/android/gms/play-services-auth-base/18.0.10/play-services-auth-base-18.0.10.aar",
+            "sha256": "d8bff2c98d239633fb550229e527779425bfb51ff04b96ac0f12d3acba0b1f42"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "com.google.android.gms:play-services-base",
+          "com.google.android.gms:play-services-basement",
+          "com.google.android.gms:play-services-tasks"
+        ]
+      }
+    },
+    "com.google.android.gms:play-services-base": {
+      "android": {
+        "version": "18.5.0",
+        "files": [
+          {
+            "name": "play-services-base-18.5.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/com/google/android/gms/play-services-base/18.5.0/play-services-base-18.5.0.aar",
+            "sha256": "59a5c0c2da12311d75d965ce1f419498536b1a167fb28ff7dfc2dfd9cefa4157"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.core:core",
+          "androidx.fragment:fragment",
+          "com.google.android.gms:play-services-basement",
+          "com.google.android.gms:play-services-tasks"
+        ]
+      }
+    },
+    "com.google.android.gms:play-services-basement": {
+      "android": {
+        "version": "18.9.0",
+        "files": [
+          {
+            "name": "play-services-basement-18.9.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/com/google/android/gms/play-services-basement/18.9.0/play-services-basement-18.9.0.aar",
+            "sha256": "c6ed7236b1b3ce0296b508a5c0a09108fd52d83559d35cad2639505cd04ab255"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.core:core",
+          "androidx.fragment:fragment"
+        ]
+      }
+    },
+    "com.google.android.gms:play-services-fido": {
+      "android": {
+        "version": "20.0.1",
+        "files": [
+          {
+            "name": "play-services-fido-20.0.1.aar",
+            "url": "https://dl.google.com/dl/android/maven2/com/google/android/gms/play-services-fido/20.0.1/play-services-fido-20.0.1.aar",
+            "sha256": "b3526f0caedaa96c526cc4c9ba94b229dad5afe31f32f46f6cd668a03624fd42"
+          }
+        ],
+        "deps": [
+          "com.google.android.gms:play-services-base",
+          "com.google.android.gms:play-services-basement",
+          "com.google.android.gms:play-services-tasks"
+        ]
+      }
+    },
+    "com.google.android.gms:play-services-tasks": {
+      "android": {
+        "version": "18.2.0",
+        "files": [
+          {
+            "name": "play-services-tasks-18.2.0.aar",
+            "url": "https://dl.google.com/dl/android/maven2/com/google/android/gms/play-services-tasks/18.2.0/play-services-tasks-18.2.0.aar",
+            "sha256": "7f2aaa8f502068eaf54356ca92aec04271d6e7c416c52c45c0d23440fcbd1654"
+          }
+        ],
+        "deps": [
+          "com.google.android.gms:play-services-basement"
+        ]
+      }
+    },
+    "com.google.code.findbugs:jsr305": {
+      "android": {
+        "version": "3.0.2",
+        "files": [
+          {
+            "name": "jsr305-3.0.2.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar",
+            "sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7"
           }
         ]
       }
@@ -6282,7 +8743,29 @@
         ]
       }
     },
+    "com.google.guava:listenablefuture": {
+      "android": {
+        "version": "1.0",
+        "files": [
+          {
+            "name": "listenablefuture-1.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/guava/listenablefuture/1.0/listenablefuture-1.0.jar",
+            "sha256": "e4ad7607e5c0477c6f890ef26a49cb8d1bb4dffb650bab4502afee64644e3069"
+          }
+        ]
+      }
+    },
     "com.ionspin.kotlin:bignum": {
+      "android": {
+        "version": "0.3.10",
+        "files": [
+          {
+            "name": "bignum-jvm-0.3.10.jar",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-jvm/0.3.10/bignum-jvm-0.3.10.jar",
+            "sha256": "c5c718466ef822290ed6ea2013dee788c468a993fa53f34d0e07acc8d6ef087d"
+          }
+        ]
+      },
       "jvm": {
         "version": "0.3.10",
         "files": [
@@ -6348,6 +8831,16 @@
       }
     },
     "com.jakewharton.cite:cite-api": {
+      "android": {
+        "version": "0.6.1",
+        "files": [
+          {
+            "name": "cite-api-jvm-0.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/cite/cite-api-jvm/0.6.1/cite-api-jvm-0.6.1.jar",
+            "sha256": "0cef6464c5ae03eacb34257dad314cb9a156ab65a24d21ce1f3f185bb976bf81"
+          }
+        ]
+      },
       "jvm": {
         "version": "0.6.1",
         "files": [
@@ -6413,6 +8906,19 @@
       }
     },
     "com.jakewharton.finalization:finalization-hook": {
+      "android": {
+        "version": "0.1.0",
+        "files": [
+          {
+            "name": "finalization-hook-jvm-0.1.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/finalization/finalization-hook-jvm/0.1.0/finalization-hook-jvm-0.1.0.jar",
+            "sha256": "e46a24b74b288986c5cc20fe9ab7bb75e71b278c5a7864c03f07ec04f3f838c6"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
       "jvm": {
         "version": "0.1.0",
         "files": [
@@ -6496,6 +9002,28 @@
       }
     },
     "com.jakewharton.mosaic:mosaic-runtime": {
+      "android": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-runtime-jvm-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-runtime-jvm/0.18.0/mosaic-runtime-jvm-0.18.0.jar",
+            "sha256": "1341b51ef06da99ba493c752df035ae38bab914ccaa226b0e6e71b99ea8ead41"
+          }
+        ],
+        "deps": [
+          "com.jakewharton.mosaic:mosaic-terminal",
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "com.jakewharton.mosaic:mosaic-tty-terminal",
+          "de.cketti.unicode:kotlin-codepoints",
+          "dev.drewhamilton.poko:poko-annotations",
+          "org.jetbrains.compose.collection-internal:collection"
+        ]
+      },
       "jvm": {
         "version": "0.18.0",
         "files": [
@@ -6623,6 +9151,23 @@
       }
     },
     "com.jakewharton.mosaic:mosaic-terminal": {
+      "android": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-terminal-jvm-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-terminal-jvm/0.18.0/mosaic-terminal-jvm-0.18.0.jar",
+            "sha256": "98e8dfc57785e0405b606c99d1ff9bb337fb83f66fa1773e957c28b4c90c1f9b"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "com.jakewharton.cite:cite-api",
+          "dev.drewhamilton.poko:poko-annotations"
+        ]
+      },
       "jvm": {
         "version": "0.18.0",
         "files": [
@@ -6720,6 +9265,24 @@
       }
     },
     "com.jakewharton.mosaic:mosaic-testing": {
+      "android": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-testing-jvm-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-testing-jvm/0.18.0/mosaic-testing-jvm-0.18.0.jar",
+            "sha256": "ee0985302c98c12265b34a7bc06c69fd5edb9aa3f3b6348cae0d48c6c108c2da"
+          }
+        ],
+        "deps": [
+          "com.jakewharton.mosaic:mosaic-runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "dev.drewhamilton.poko:poko-annotations",
+          "org.jetbrains.compose.collection-internal:collection"
+        ]
+      },
       "jvm": {
         "version": "0.18.0",
         "files": [
@@ -6823,6 +9386,16 @@
       }
     },
     "com.jakewharton.mosaic:mosaic-tty": {
+      "android": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-tty-jvm-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-tty-jvm/0.18.0/mosaic-tty-jvm-0.18.0.jar",
+            "sha256": "94ac4c1eedfd0c09218c83bfcaa70526c5362d0f3fbbe07cf23b166842e9a9de"
+          }
+        ]
+      },
       "jvm": {
         "version": "0.18.0",
         "files": [
@@ -6908,6 +9481,24 @@
       }
     },
     "com.jakewharton.mosaic:mosaic-tty-terminal": {
+      "android": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-tty-terminal-jvm-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-tty-terminal-jvm/0.18.0/mosaic-tty-terminal-jvm-0.18.0.jar",
+            "sha256": "04a375485cef15a896da07d84f02a94dda8106a3f3f27e394193645150811b99"
+          }
+        ],
+        "deps": [
+          "com.jakewharton.mosaic:mosaic-terminal",
+          "com.jakewharton.mosaic:mosaic-tty",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "com.jakewharton.finalization:finalization-hook"
+        ]
+      },
       "jvm": {
         "version": "0.18.0",
         "files": [
@@ -7011,6 +9602,23 @@
       }
     },
     "com.squareup.okhttp3:okhttp": {
+      "android": {
+        "version": "5.5.0",
+        "files": [
+          {
+            "name": "okhttp.aar",
+            "url": "https://repo1.maven.org/maven2/com/squareup/okhttp3/okhttp-android/5.5.0/okhttp-android-5.5.0.aar",
+            "sha256": "6c7fd12f092e64ca2eae0b8a8023900c0d7ffec57888cf8abc8085c6f42e1dcc"
+          }
+        ],
+        "deps": [
+          "com.squareup.okio:okio"
+        ],
+        "runtime_deps": [
+          "androidx.annotation:annotation",
+          "androidx.startup:startup-runtime"
+        ]
+      },
       "jvm": {
         "version": "5.5.0",
         "files": [
@@ -7026,6 +9634,16 @@
       }
     },
     "com.squareup.okio:okio": {
+      "android": {
+        "version": "3.18.2",
+        "files": [
+          {
+            "name": "okio-jvm-3.18.2.jar",
+            "url": "https://repo1.maven.org/maven2/com/squareup/okio/okio-jvm/3.18.2/okio-jvm-3.18.2.jar",
+            "sha256": "681fed549d1d2c63710f42c9eab433d642c71af778babd67035c50f8c425aaff"
+          }
+        ]
+      },
       "jvm": {
         "version": "3.18.2",
         "files": [
@@ -7033,6 +9651,18 @@
             "name": "okio-jvm-3.18.2.jar",
             "url": "https://repo1.maven.org/maven2/com/squareup/okio/okio-jvm/3.18.2/okio-jvm-3.18.2.jar",
             "sha256": "681fed549d1d2c63710f42c9eab433d642c71af778babd67035c50f8c425aaff"
+          }
+        ]
+      }
+    },
+    "com.squareup:javawriter": {
+      "android": {
+        "version": "2.5.1",
+        "files": [
+          {
+            "name": "javawriter-2.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/squareup/javawriter/2.5.1/javawriter-2.5.1.jar",
+            "sha256": "39b054910ff212d4379129a89070fb7dbb1f341371c925e9e99904f154a22d93"
           }
         ]
       }
@@ -7053,6 +9683,16 @@
       }
     },
     "com.zaxxer:SparseBitSet": {
+      "android": {
+        "version": "1.3",
+        "files": [
+          {
+            "name": "SparseBitSet-1.3.jar",
+            "url": "https://repo1.maven.org/maven2/com/zaxxer/SparseBitSet/1.3/SparseBitSet-1.3.jar",
+            "sha256": "f76b85adb0c00721ae267b7cfde4da7f71d3121cc2160c9fc00c0c89f8c53c8a"
+          }
+        ]
+      },
       "jvm": {
         "version": "1.3",
         "files": [
@@ -7065,6 +9705,16 @@
       }
     },
     "commons-codec:commons-codec": {
+      "android": {
+        "version": "1.20.0",
+        "files": [
+          {
+            "name": "commons-codec-1.20.0.jar",
+            "url": "https://repo1.maven.org/maven2/commons-codec/commons-codec/1.20.0/commons-codec-1.20.0.jar",
+            "sha256": "6af66595f9f6a7bb58ce66518d6888d40b547c366d2262f06676eee19528ff66"
+          }
+        ]
+      },
       "jvm": {
         "version": "1.20.0",
         "files": [
@@ -7077,6 +9727,16 @@
       }
     },
     "commons-io:commons-io": {
+      "android": {
+        "version": "2.22.0",
+        "files": [
+          {
+            "name": "commons-io-2.22.0.jar",
+            "url": "https://repo1.maven.org/maven2/commons-io/commons-io/2.22.0/commons-io-2.22.0.jar",
+            "sha256": "2b9a7b1f726fb86216dbd2c8321eabe0221dbd5b1be81c18e1cb53811b104758"
+          }
+        ]
+      },
       "jvm": {
         "version": "2.22.0",
         "files": [
@@ -7089,6 +9749,16 @@
       }
     },
     "de.cketti.unicode:kotlin-codepoints": {
+      "android": {
+        "version": "0.11.0",
+        "files": [
+          {
+            "name": "kotlin-codepoints-jvm.jar",
+            "url": "https://repo1.maven.org/maven2/de/cketti/unicode/kotlin-codepoints-jvm/0.11.0/kotlin-codepoints-jvm-0.11.0.jar",
+            "sha256": "919766131f60fc481183dde7dabb93ac403ac44f6c824f23da92e1af88c5279c"
+          }
+        ]
+      },
       "jvm": {
         "version": "0.11.0",
         "files": [
@@ -7154,6 +9824,16 @@
       }
     },
     "dev.drewhamilton.poko:poko-annotations": {
+      "android": {
+        "version": "0.23.2",
+        "files": [
+          {
+            "name": "poko-annotations-jvm-0.23.2.jar",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-jvm/0.23.2/poko-annotations-jvm-0.23.2.jar",
+            "sha256": "9042e6da375ffa8e201d349e7ac926d1bab7694a818102c3a6a2f7d6e014bcc8"
+          }
+        ]
+      },
       "jvm": {
         "version": "0.23.2",
         "files": [
@@ -7246,6 +9926,16 @@
       }
     },
     "dev.mokkery:mokkery-core": {
+      "android": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-core-jvm-3.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-jvm/3.5.1/mokkery-core-jvm-3.5.1.jar",
+            "sha256": "10e385c1467b8dcc795d024812c02c82c8d4da1d447114ee1cb592246316985e"
+          }
+        ]
+      },
       "jvm": {
         "version": "3.5.1",
         "files": [
@@ -7323,6 +10013,22 @@
       }
     },
     "dev.mokkery:mokkery-runtime": {
+      "android": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-runtime-jvm-3.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-jvm/3.5.1/mokkery-runtime-jvm-3.5.1.jar",
+            "sha256": "785134f73cdeeea0a8714e641ed80c07f90daf0243fdfd29ad9a5c301ec99ae0"
+          }
+        ],
+        "deps": [
+          "dev.mokkery:mokkery-core"
+        ],
+        "runtime_deps": [
+          "dev.drewhamilton.poko:poko-annotations"
+        ]
+      },
       "jvm": {
         "version": "3.5.1",
         "files": [
@@ -7418,6 +10124,16 @@
       }
     },
     "dev.whyoleg.cryptography:cryptography-bigint": {
+      "android": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-bigint-jvm-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-bigint-jvm/0.6.0/cryptography-bigint-jvm-0.6.0.jar",
+            "sha256": "a261719def5aff7e04b1b6d3970511bd21b2bccb8f3ee9c427e4f302cf46d625"
+          }
+        ]
+      },
       "jvm": {
         "version": "0.6.0",
         "files": [
@@ -7498,6 +10214,21 @@
       }
     },
     "dev.whyoleg.cryptography:cryptography-core": {
+      "android": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-core-jvm-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-core-jvm/0.6.0/cryptography-core-jvm-0.6.0.jar",
+            "sha256": "d548cfcef63d76043cf98e33f0804cc9120fe48f31e3f83289ed5b32c165f52c"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-bigint",
+          "dev.whyoleg.cryptography:cryptography-random",
+          "org.jetbrains.kotlinx:kotlinx-io-core"
+        ]
+      },
       "jvm": {
         "version": "0.6.0",
         "files": [
@@ -7593,6 +10324,25 @@
       }
     },
     "dev.whyoleg.cryptography:cryptography-provider-base": {
+      "android": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-base-jvm-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-base-jvm/0.6.0/cryptography-provider-base-jvm-0.6.0.jar",
+            "sha256": "67b2e74b2d96079887e0af15c50d54ccfd8dd2c1c37d3eb44c0a0628bd57f3ce"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-core",
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1",
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1-modules",
+          "dev.whyoleg.cryptography:cryptography-serialization-pem"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-json"
+        ]
+      },
       "jvm": {
         "version": "0.6.0",
         "files": [
@@ -7682,6 +10432,22 @@
       }
     },
     "dev.whyoleg.cryptography:cryptography-provider-jdk": {
+      "android": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-jdk-jvm-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-jdk-jvm/0.6.0/cryptography-provider-jdk-jvm-0.6.0.jar",
+            "sha256": "c843acb190edac1e2c0ea24f1b0c6d9899cf52f1fada8c07be91c9d48e014f51"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-core"
+        ],
+        "runtime_deps": [
+          "dev.whyoleg.cryptography:cryptography-provider-base"
+        ]
+      },
       "jvm": {
         "version": "0.6.0",
         "files": [
@@ -7852,6 +10618,16 @@
       }
     },
     "dev.whyoleg.cryptography:cryptography-random": {
+      "android": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-random-jvm-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-random-jvm/0.6.0/cryptography-random-jvm-0.6.0.jar",
+            "sha256": "b8a5b8ba483d6ac9a179397e3b97ea8d9d5074abac00093d0c2246ee18731401"
+          }
+        ]
+      },
       "jvm": {
         "version": "0.6.0",
         "files": [
@@ -7917,6 +10693,20 @@
       }
     },
     "dev.whyoleg.cryptography:cryptography-serialization-asn1": {
+      "android": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-asn1-jvm-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-asn1-jvm/0.6.0/cryptography-serialization-asn1-jvm-0.6.0.jar",
+            "sha256": "350127c2da523cfcec95d468252e9c5ab59aacd6513b436288509395d61f6be0"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-bigint",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
       "jvm": {
         "version": "0.6.0",
         "files": [
@@ -7989,6 +10779,19 @@
       }
     },
     "dev.whyoleg.cryptography:cryptography-serialization-asn1-modules": {
+      "android": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-asn1-modules-jvm-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-asn1-modules-jvm/0.6.0/cryptography-serialization-asn1-modules-jvm-0.6.0.jar",
+            "sha256": "28097cd87c8aba067d7ed1913704515b03a6d7b82ea653092a0c4fee46f4da9d"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1"
+        ]
+      },
       "jvm": {
         "version": "0.6.0",
         "files": [
@@ -8056,6 +10859,19 @@
       }
     },
     "dev.whyoleg.cryptography:cryptography-serialization-pem": {
+      "android": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-pem-jvm-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-pem-jvm/0.6.0/cryptography-serialization-pem-jvm-0.6.0.jar",
+            "sha256": "96b3215a19bbfe069296a06d0f1650f06468b2bf1bbe2793fe4be6e8120eba12"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-core"
+        ]
+      },
       "jvm": {
         "version": "0.6.0",
         "files": [
@@ -8135,6 +10951,16 @@
       }
     },
     "dev.zacsweers.metro:runtime": {
+      "android": {
+        "version": "1.4.5",
+        "files": [
+          {
+            "name": "runtime-jvm-1.4.5.jar",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-jvm/1.4.5/runtime-jvm-1.4.5.jar",
+            "sha256": "9ab8bf5adc89936ef8e7061231cfa2b03b796b22cf6e2eb0bf2cc7486c42fbcd"
+          }
+        ]
+      },
       "jvm": {
         "version": "1.4.5",
         "files": [
@@ -8200,6 +11026,19 @@
       }
     },
     "io.github.ehsannarmani:compose-charts": {
+      "android": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "compose-charts-debug.aar",
+            "url": "https://repo1.maven.org/maven2/io/github/ehsannarmani/compose-charts-android-debug/1.0.0/compose-charts-android-debug-1.0.0.aar",
+            "sha256": "a833691ea70c6be9ad17af76b11a9408b8630bb4b0aae56207190173053cfec9"
+          }
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.foundation:foundation"
+        ]
+      },
       "jvm": {
         "version": "1.0.0",
         "files": [
@@ -8230,6 +11069,21 @@
       }
     },
     "io.ktor:ktor-client-auth": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-auth-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-jvm/3.6.0/ktor-client-auth-jvm-3.6.0.jar",
+            "sha256": "dcf49420eaff0fe74c78d569c12251072fa2d6d7c254ba00cbc900e10b3da255"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -8324,6 +11178,28 @@
       }
     },
     "io.ktor:ktor-client-core": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-core-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-jvm/3.6.0/ktor-client-core-jvm-3.6.0.jar",
+            "sha256": "7dc9a3c76bf43f672e8331aad1ecb06864f69f464ab1517c24ed8a38c86f812f"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-events",
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-http-cio",
+          "io.ktor:ktor-sse",
+          "io.ktor:ktor-websocket-serialization",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.slf4j:slf4j-api"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -8508,6 +11384,22 @@
       }
     },
     "io.ktor:ktor-client-engine-defaults": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-engine-defaults-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-jvm/3.6.0/ktor-client-engine-defaults-jvm-3.6.0.jar",
+            "sha256": "00646db7f1e3528d9215fb55a636b79ba5f9dea7c0f5396812d6ecac1303af99"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "io.ktor:ktor-client-okhttp",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -8604,6 +11496,22 @@
       }
     },
     "io.ktor:ktor-client-mock": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-mock-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-jvm/3.6.0/ktor-client-mock-jvm-3.6.0.jar",
+            "sha256": "9a65b4e2f799451b380e87729132768802389d2f1c4ac11d2f3fc6de9925cb41"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "io.ktor:ktor-http",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -8704,6 +11612,23 @@
       }
     },
     "io.ktor:ktor-client-okhttp": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-okhttp-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-okhttp-jvm/3.6.0/ktor-client-okhttp-jvm-3.6.0.jar",
+            "sha256": "40ee72166eaf2c3cf868fc87bd78e83d79da0b3d0d43d16b389e21f2cd2c56c3"
+          }
+        ],
+        "deps": [
+          "com.squareup.okhttp3:okhttp",
+          "com.squareup.okio:okio",
+          "io.ktor:ktor-client-core",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -8746,6 +11671,21 @@
       }
     },
     "io.ktor:ktor-events": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-events-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-jvm/3.6.0/ktor-events-jvm-3.6.0.jar",
+            "sha256": "d3962f4a4244102d1ef8b84b21429ffc26be3512b5f1f96c607265ca1cec5c0b"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -8840,6 +11780,22 @@
       }
     },
     "io.ktor:ktor-http": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-http-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-jvm/3.6.0/ktor-http-jvm-3.6.0.jar",
+            "sha256": "2a14cb160436b134c10793727aeed3055ae7014ff170c79ffbcd90b26dd90de2"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -8940,6 +11896,23 @@
       }
     },
     "io.ktor:ktor-http-cio": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-http-cio-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-jvm/3.6.0/ktor-http-cio-jvm-3.6.0.jar",
+            "sha256": "4cabe83cb367e0a807f849f2d4313b9de563cffcec0d262844a783d51a47738d"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-io",
+          "io.ktor:ktor-network",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -9042,6 +12015,21 @@
       }
     },
     "io.ktor:ktor-io": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-io-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-jvm/3.6.0/ktor-io-jvm-3.6.0.jar",
+            "sha256": "7426ad1759833460507ee7065f17085410dc7b32081a1daee8c91cf6f40e257c"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-io-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -9157,6 +12145,21 @@
       }
     },
     "io.ktor:ktor-network": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-network-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-jvm/3.6.0/ktor-network-jvm-3.6.0.jar",
+            "sha256": "746a751146d61865f51d6dd56b18e3e0fa68b36587561ee123ff7ce730d8c590"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -9295,6 +12298,21 @@
       }
     },
     "io.ktor:ktor-serialization": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-serialization-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-jvm/3.6.0/ktor-serialization-jvm-3.6.0.jar",
+            "sha256": "d67f46cf64f8c97a2e14d4d5c0c1a4be315c8bc128bcc58370c0716363c258db"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-websockets",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -9389,6 +12407,21 @@
       }
     },
     "io.ktor:ktor-sse": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-sse-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-jvm/3.6.0/ktor-sse-jvm-3.6.0.jar",
+            "sha256": "9fcb5074b74d14b9f18ace4ee9acd6263176ae01b4e8e5c8f72b6aa978c279ea"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -9483,6 +12516,22 @@
       }
     },
     "io.ktor:ktor-utils": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-utils-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-jvm/3.6.0/ktor-utils-jvm-3.6.0.jar",
+            "sha256": "05698e23c0539c7042676a98557e3358e77e19efa9fa4fc2145f20ad8721aefc"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-io",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -9598,6 +12647,21 @@
       }
     },
     "io.ktor:ktor-websocket-serialization": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-websocket-serialization-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-jvm/3.6.0/ktor-websocket-serialization-jvm-3.6.0.jar",
+            "sha256": "c87fe370c17868dc8c101947452bf8a8622363cf4d83a342334666bb46fe627b"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-serialization",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -9692,6 +12756,22 @@
       }
     },
     "io.ktor:ktor-websockets": {
+      "android": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-websockets-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-jvm/3.6.0/ktor-websockets-jvm-3.6.0.jar",
+            "sha256": "3ef8b5d544dc7f9bd041a245bb8c2ff6647d0fd1e111a65b7be54977476a5464"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -9791,7 +12871,32 @@
         ]
       }
     },
+    "javax.inject:javax.inject": {
+      "android": {
+        "version": "1",
+        "files": [
+          {
+            "name": "javax.inject-1.jar",
+            "url": "https://repo1.maven.org/maven2/javax/inject/javax.inject/1/javax.inject-1.jar",
+            "sha256": "91c77044a50c481636c32d916fd89c9118a72195390452c81065080f957de7ff"
+          }
+        ]
+      }
+    },
     "junit:junit": {
+      "android": {
+        "version": "4.13.2",
+        "files": [
+          {
+            "name": "junit-4.13.2.jar",
+            "url": "https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar",
+            "sha256": "8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3"
+          }
+        ],
+        "deps": [
+          "org.hamcrest:hamcrest-core"
+        ]
+      },
       "jvm": {
         "version": "4.13.2",
         "files": [
@@ -9807,6 +12912,16 @@
       }
     },
     "net.java.dev.jna:jna": {
+      "android": {
+        "version": "5.14.0",
+        "files": [
+          {
+            "name": "jna-5.14.0.jar",
+            "url": "https://repo1.maven.org/maven2/net/java/dev/jna/jna/5.14.0/jna-5.14.0.jar",
+            "sha256": "34ed1e1f27fa896bca50dbc4e99cf3732967cec387a7a0d5e3486c09673fe8c6"
+          }
+        ]
+      },
       "jvm": {
         "version": "5.14.0",
         "files": [
@@ -9819,6 +12934,16 @@
       }
     },
     "org.apache.commons:commons-collections4": {
+      "android": {
+        "version": "4.5.0",
+        "files": [
+          {
+            "name": "commons-collections4-4.5.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-collections4/4.5.0/commons-collections4-4.5.0.jar",
+            "sha256": "00f93263c267be201b8ae521b44a7137271b16688435340bf629db1bac0a5845"
+          }
+        ]
+      },
       "jvm": {
         "version": "4.5.0",
         "files": [
@@ -9831,6 +12956,21 @@
       }
     },
     "org.apache.commons:commons-compress": {
+      "android": {
+        "version": "1.28.0",
+        "files": [
+          {
+            "name": "commons-compress-1.28.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-compress/1.28.0/commons-compress-1.28.0.jar",
+            "sha256": "e1522945218456f3649a39bc4afd70ce4bd466221519dba7d378f2141a4642ca"
+          }
+        ],
+        "deps": [
+          "commons-codec:commons-codec",
+          "commons-io:commons-io",
+          "org.apache.commons:commons-lang3"
+        ]
+      },
       "jvm": {
         "version": "1.28.0",
         "files": [
@@ -9848,6 +12988,16 @@
       }
     },
     "org.apache.commons:commons-lang3": {
+      "android": {
+        "version": "3.18.0",
+        "files": [
+          {
+            "name": "commons-lang3-3.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.18.0/commons-lang3-3.18.0.jar",
+            "sha256": "4eeeae8d20c078abb64b015ec158add383ac581571cddc45c68f0c9ae0230720"
+          }
+        ]
+      },
       "jvm": {
         "version": "3.18.0",
         "files": [
@@ -9860,6 +13010,16 @@
       }
     },
     "org.apache.commons:commons-math3": {
+      "android": {
+        "version": "3.6.1",
+        "files": [
+          {
+            "name": "commons-math3-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar",
+            "sha256": "1e56d7b058d28b65abd256b8458e3885b674c1d588fa43cd7d1cbb9c7ef2b308"
+          }
+        ]
+      },
       "jvm": {
         "version": "3.6.1",
         "files": [
@@ -9872,6 +13032,16 @@
       }
     },
     "org.apache.logging.log4j:log4j-api": {
+      "android": {
+        "version": "2.24.3",
+        "files": [
+          {
+            "name": "log4j-api-2.24.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-api/2.24.3/log4j-api-2.24.3.jar",
+            "sha256": "5b4a0a0cd0e751ded431c162442bdbdd53328d1f8bb2bae5fc1bbeee0f66d80f"
+          }
+        ]
+      },
       "jvm": {
         "version": "2.26.1",
         "files": [
@@ -9939,6 +13109,24 @@
       }
     },
     "org.apache.poi:poi": {
+      "android": {
+        "version": "5.5.1",
+        "files": [
+          {
+            "name": "poi-5.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi/5.5.1/poi-5.5.1.jar",
+            "sha256": "6c52e876ca75775a11b56e4b36a7541f682827f56406725fcd87560b792ee3d8"
+          }
+        ],
+        "deps": [
+          "com.zaxxer:SparseBitSet",
+          "commons-codec:commons-codec",
+          "commons-io:commons-io",
+          "org.apache.commons:commons-collections4",
+          "org.apache.commons:commons-math3",
+          "org.apache.logging.log4j:log4j-api"
+        ]
+      },
       "jvm": {
         "version": "5.5.1",
         "files": [
@@ -9959,6 +13147,26 @@
       }
     },
     "org.apache.poi:poi-ooxml": {
+      "android": {
+        "version": "5.5.1",
+        "files": [
+          {
+            "name": "poi-ooxml-5.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi-ooxml/5.5.1/poi-ooxml-5.5.1.jar",
+            "sha256": "bd7be2fdfe3fd2c1684fa813351c2798fd636b44f6236e0674500d4f8ff1c2f9"
+          }
+        ],
+        "deps": [
+          "com.github.virtuald:curvesapi",
+          "commons-io:commons-io",
+          "org.apache.commons:commons-collections4",
+          "org.apache.commons:commons-compress",
+          "org.apache.logging.log4j:log4j-api",
+          "org.apache.poi:poi",
+          "org.apache.poi:poi-ooxml-lite",
+          "org.apache.xmlbeans:xmlbeans"
+        ]
+      },
       "jvm": {
         "version": "5.5.1",
         "files": [
@@ -9981,6 +13189,19 @@
       }
     },
     "org.apache.poi:poi-ooxml-lite": {
+      "android": {
+        "version": "5.5.1",
+        "files": [
+          {
+            "name": "poi-ooxml-lite-5.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi-ooxml-lite/5.5.1/poi-ooxml-lite-5.5.1.jar",
+            "sha256": "e6e37adeb6d6ee8b40ec491ad955d934d8f99827ab050f105b18286e59b1d9e7"
+          }
+        ],
+        "deps": [
+          "org.apache.xmlbeans:xmlbeans"
+        ]
+      },
       "jvm": {
         "version": "5.5.1",
         "files": [
@@ -9996,6 +13217,19 @@
       }
     },
     "org.apache.xmlbeans:xmlbeans": {
+      "android": {
+        "version": "5.3.0",
+        "files": [
+          {
+            "name": "xmlbeans-5.3.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/xmlbeans/xmlbeans/5.3.0/xmlbeans-5.3.0.jar",
+            "sha256": "6cc69da3b4d35b83c5e477cd4daba204e44109833e34af2b9a8a2c8788289917"
+          }
+        ],
+        "deps": [
+          "org.apache.logging.log4j:log4j-api"
+        ]
+      },
       "jvm": {
         "version": "5.3.0",
         "files": [
@@ -10023,6 +13257,16 @@
       }
     },
     "org.hamcrest:hamcrest-core": {
+      "android": {
+        "version": "1.3",
+        "files": [
+          {
+            "name": "hamcrest-core-1.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar",
+            "sha256": "66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9"
+          }
+        ]
+      },
       "jvm": {
         "version": "1.3",
         "files": [
@@ -10034,7 +13278,44 @@
         ]
       }
     },
+    "org.hamcrest:hamcrest-integration": {
+      "android": {
+        "version": "1.3",
+        "files": [
+          {
+            "name": "hamcrest-integration-1.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/hamcrest/hamcrest-integration/1.3/hamcrest-integration-1.3.jar",
+            "sha256": "70f418efbb506c5155da5f9a5a33262ea08a9e4d7fea186aa9015c41a7224ac2"
+          }
+        ],
+        "deps": [
+          "org.hamcrest:hamcrest-library"
+        ]
+      }
+    },
+    "org.hamcrest:hamcrest-library": {
+      "android": {
+        "version": "1.3",
+        "files": [
+          {
+            "name": "hamcrest-library-1.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/hamcrest/hamcrest-library/1.3/hamcrest-library-1.3.jar",
+            "sha256": "711d64522f9ec410983bd310934296da134be4254a125080a0416ec178dfad1c"
+          }
+        ],
+        "deps": [
+          "org.hamcrest:hamcrest-core"
+        ]
+      }
+    },
     "org.jetbrains.androidx.lifecycle:lifecycle-common": {
+      "android": {
+        "version": "2.9.6",
+        "files": null,
+        "deps": [
+          "androidx.lifecycle:lifecycle-common"
+        ]
+      },
       "jvm": {
         "version": "2.9.6",
         "files": null,
@@ -10094,6 +13375,14 @@
       }
     },
     "org.jetbrains.androidx.lifecycle:lifecycle-runtime": {
+      "android": {
+        "version": "2.9.6",
+        "files": null,
+        "deps": [
+          "androidx.lifecycle:lifecycle-runtime",
+          "org.jetbrains.androidx.lifecycle:lifecycle-common"
+        ]
+      },
       "jvm": {
         "version": "2.9.6",
         "files": null,
@@ -10155,6 +13444,18 @@
       }
     },
     "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose": {
+      "android": {
+        "version": "2.9.6",
+        "files": null,
+        "deps": [
+          "androidx.lifecycle:lifecycle-runtime-compose",
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime",
+          "org.jetbrains.compose.runtime:runtime"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.androidx.lifecycle:lifecycle-common"
+        ]
+      },
       "jvm": {
         "version": "2.9.6",
         "files": [
@@ -10258,6 +13559,13 @@
       }
     },
     "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel": {
+      "android": {
+        "version": "2.9.6",
+        "files": null,
+        "deps": [
+          "androidx.lifecycle:lifecycle-viewmodel"
+        ]
+      },
       "jvm": {
         "version": "2.9.6",
         "files": null,
@@ -10267,6 +13575,15 @@
       }
     },
     "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate": {
+      "android": {
+        "version": "2.9.6",
+        "files": null,
+        "deps": [
+          "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel",
+          "org.jetbrains.androidx.savedstate:savedstate"
+        ]
+      },
       "jvm": {
         "version": "2.9.6",
         "files": null,
@@ -10322,6 +13639,13 @@
       }
     },
     "org.jetbrains.androidx.savedstate:savedstate": {
+      "android": {
+        "version": "1.3.6",
+        "files": null,
+        "deps": [
+          "androidx.savedstate:savedstate"
+        ]
+      },
       "jvm": {
         "version": "1.3.6",
         "files": null,
@@ -10331,6 +13655,15 @@
       }
     },
     "org.jetbrains.androidx.savedstate:savedstate-compose": {
+      "android": {
+        "version": "1.3.6",
+        "files": null,
+        "deps": [
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.androidx.savedstate:savedstate",
+          "org.jetbrains.compose.runtime:runtime"
+        ]
+      },
       "jvm": {
         "version": "1.3.6",
         "files": [
@@ -10348,6 +13681,22 @@
       }
     },
     "org.jetbrains.compose.animation:animation": {
+      "android": {
+        "version": "1.10.1",
+        "files": null,
+        "deps": [
+          "androidx.compose.animation:animation",
+          "org.jetbrains.compose.animation:animation-core",
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-geometry"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      },
       "jvm": {
         "version": "1.12.2",
         "files": [
@@ -10372,6 +13721,22 @@
       }
     },
     "org.jetbrains.compose.animation:animation-core": {
+      "android": {
+        "version": "1.10.1",
+        "files": null,
+        "deps": [
+          "androidx.compose.animation:animation-core",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      },
       "jvm": {
         "version": "1.12.2",
         "files": [
@@ -10442,6 +13807,13 @@
       }
     },
     "org.jetbrains.compose.annotation-internal:annotation": {
+      "android": {
+        "version": "1.10.1",
+        "files": null,
+        "deps": [
+          "androidx.annotation:annotation"
+        ]
+      },
       "jvm": {
         "version": "1.9.1",
         "files": null,
@@ -10451,6 +13823,13 @@
       }
     },
     "org.jetbrains.compose.collection-internal:collection": {
+      "android": {
+        "version": "1.10.1",
+        "files": null,
+        "deps": [
+          "androidx.collection:collection"
+        ]
+      },
       "jvm": {
         "version": "1.9.1",
         "files": null,
@@ -10599,6 +13978,23 @@
       }
     },
     "org.jetbrains.compose.foundation:foundation": {
+      "android": {
+        "version": "1.10.1",
+        "files": null,
+        "deps": [
+          "androidx.compose.foundation:foundation",
+          "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.ui:ui-text",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      },
       "jvm": {
         "version": "1.12.2",
         "files": [
@@ -10651,6 +14047,20 @@
       }
     },
     "org.jetbrains.compose.foundation:foundation-layout": {
+      "android": {
+        "version": "1.10.1",
+        "files": null,
+        "deps": [
+          "androidx.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.ui:ui"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      },
       "jvm": {
         "version": "1.12.2",
         "files": [
@@ -10788,6 +14198,19 @@
       }
     },
     "org.jetbrains.compose.runtime:runtime": {
+      "android": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "runtime.aar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/runtime/runtime-android/1.12.2/runtime-android-1.12.2.aar",
+            "sha256": "5732b59bc214b94c5a0c2c29410eda6ca8a28c52bc57ba20964f0259910bd9fe"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime"
+        ]
+      },
       "jvm": {
         "version": "1.12.2",
         "files": null
@@ -10862,6 +14285,24 @@
       }
     },
     "org.jetbrains.compose.runtime:runtime-saveable": {
+      "android": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "runtime-saveable.aar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/runtime/runtime-saveable-android/1.12.2/runtime-saveable-android-1.12.2.aar",
+            "sha256": "ac260d459f82f654b7336bc18c9f835c9f0d2b2adc5096dfc729aad386eac5c5"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime-saveable",
+          "org.jetbrains.androidx.savedstate:savedstate-compose",
+          "org.jetbrains.compose.runtime:runtime"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose"
+        ]
+      },
       "jvm": {
         "version": "1.12.2",
         "files": [
@@ -10882,6 +14323,31 @@
       }
     },
     "org.jetbrains.compose.ui:ui": {
+      "android": {
+        "version": "1.10.1",
+        "files": null,
+        "deps": [
+          "androidx.compose.runtime:runtime-retain",
+          "androidx.compose.ui:ui",
+          "org.jetbrains.androidx.lifecycle:lifecycle-common",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-text",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime",
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose",
+          "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel",
+          "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
       "jvm": {
         "version": "1.12.2",
         "files": [
@@ -10969,6 +14435,17 @@
       }
     },
     "org.jetbrains.compose.ui:ui-geometry": {
+      "android": {
+        "version": "1.10.1",
+        "files": null,
+        "deps": [
+          "androidx.compose.ui:ui-geometry"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      },
       "jvm": {
         "version": "1.12.2",
         "files": [
@@ -11001,6 +14478,21 @@
       }
     },
     "org.jetbrains.compose.ui:ui-graphics": {
+      "android": {
+        "version": "1.10.1",
+        "files": null,
+        "deps": [
+          "androidx.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-unit"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      },
       "jvm": {
         "version": "1.12.2",
         "files": [
@@ -11076,6 +14568,24 @@
       }
     },
     "org.jetbrains.compose.ui:ui-text": {
+      "android": {
+        "version": "1.10.1",
+        "files": null,
+        "deps": [
+          "androidx.compose.ui:ui-text",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-unit"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
       "jvm": {
         "version": "1.12.2",
         "files": [
@@ -11142,6 +14652,19 @@
       }
     },
     "org.jetbrains.compose.ui:ui-unit": {
+      "android": {
+        "version": "1.10.1",
+        "files": null,
+        "deps": [
+          "androidx.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-geometry"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      },
       "jvm": {
         "version": "1.12.2",
         "files": [
@@ -11184,6 +14707,16 @@
       }
     },
     "org.jetbrains.compose.ui:ui-util": {
+      "android": {
+        "version": "1.10.1",
+        "files": null,
+        "deps": [
+          "androidx.compose.ui:ui-util"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.collection-internal:collection"
+        ]
+      },
       "jvm": {
         "version": "1.12.2",
         "files": [
@@ -11283,6 +14816,16 @@
       }
     },
     "org.jetbrains.kotlinx:atomicfu": {
+      "android": {
+        "version": "0.33.0",
+        "files": [
+          {
+            "name": "atomicfu-jvm-0.33.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu-jvm/0.33.0/atomicfu-jvm-0.33.0.jar",
+            "sha256": "cdc94bfe4f739a0121860e61977d5c1e6a3d53c21f2471493393ba9e900d394e"
+          }
+        ]
+      },
       "jvm": {
         "version": "0.33.0",
         "files": [
@@ -11368,7 +14911,35 @@
         ]
       }
     },
+    "org.jetbrains.kotlinx:kotlinx-coroutines-android": {
+      "android": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-android-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-android/1.11.0/kotlinx-coroutines-android-1.11.0.jar",
+            "sha256": "c2cb206d27017c7d1bf5ff179787397543d13748dbabb0d7237e1585e0b29044"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
     "org.jetbrains.kotlinx:kotlinx-coroutines-core": {
+      "android": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-jvm-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0.jar",
+            "sha256": "d1d75aa01dffbb4d1c520e67e4c4e7f5f6174718e7cb4632412503f2f0e604fa"
+          }
+        ],
+        "deps": [
+          "org.jetbrains:annotations"
+        ]
+      },
       "jvm": {
         "version": "1.11.0",
         "files": [
@@ -11453,6 +15024,19 @@
       }
     },
     "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": {
+      "android": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-jvm-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0.jar",
+            "sha256": "d1d75aa01dffbb4d1c520e67e4c4e7f5f6174718e7cb4632412503f2f0e604fa"
+          }
+        ],
+        "deps": [
+          "org.jetbrains:annotations"
+        ]
+      },
       "jvm": {
         "version": "1.11.0",
         "files": [
@@ -11467,7 +15051,39 @@
         ]
       }
     },
+    "org.jetbrains.kotlinx:kotlinx-coroutines-play-services": {
+      "android": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-play-services-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-play-services/1.11.0/kotlinx-coroutines-play-services-1.11.0.jar",
+            "sha256": "f441579409a9befc7391ae5620de773590dd6536b979d4a5a2a6e05b5f81e4d4"
+          }
+        ],
+        "deps": [
+          "com.google.android.gms:play-services-tasks",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
     "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j": {
+      "android": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-slf4j-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-slf4j/1.11.0/kotlinx-coroutines-slf4j-1.11.0.jar",
+            "sha256": "1043471e7d5f99680df3a056cf766276e0fe339e48030dea503fc1c94c33743e"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "jvm": {
         "version": "1.11.0",
         "files": [
@@ -11501,6 +15117,20 @@
       }
     },
     "org.jetbrains.kotlinx:kotlinx-coroutines-test": {
+      "android": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-test-jvm-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-test-jvm/1.11.0/kotlinx-coroutines-test-jvm-1.11.0.jar",
+            "sha256": "d4f7ee71da708af4719dceb6d3200c8f9dc5146ea1a812cb628ed53c64196f96"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains:annotations"
+        ]
+      },
       "jvm": {
         "version": "1.11.0",
         "files": [
@@ -11590,6 +15220,16 @@
       }
     },
     "org.jetbrains.kotlinx:kotlinx-datetime": {
+      "android": {
+        "version": "0.8.0",
+        "files": [
+          {
+            "name": "kotlinx-datetime-jvm-0.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-datetime-jvm/0.8.0/kotlinx-datetime-jvm-0.8.0.jar",
+            "sha256": "ee44b51f8977c2f51d575299a4fc6782ab3700eba4cfc7fad548cced1543936a"
+          }
+        ]
+      },
       "jvm": {
         "version": "0.8.0",
         "files": [
@@ -11670,6 +15310,16 @@
       }
     },
     "org.jetbrains.kotlinx:kotlinx-io-bytestring": {
+      "android": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-bytestring-jvm-0.9.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-jvm/0.9.1/kotlinx-io-bytestring-jvm-0.9.1.jar",
+            "sha256": "8589de0b7c476bfdd02a24641685f609ade72f5e595cf2909c168acdba7e6ba4"
+          }
+        ]
+      },
       "jvm": {
         "version": "0.9.1",
         "files": [
@@ -11735,6 +15385,19 @@
       }
     },
     "org.jetbrains.kotlinx:kotlinx-io-core": {
+      "android": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-core-jvm-0.9.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-jvm/0.9.1/kotlinx-io-core-jvm-0.9.1.jar",
+            "sha256": "765d8851d8ca694706931331b92386844800867e041b720f1f193dbda874d370"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-bytestring"
+        ]
+      },
       "jvm": {
         "version": "0.9.1",
         "files": [
@@ -11818,6 +15481,16 @@
       }
     },
     "org.jetbrains.kotlinx:kotlinx-serialization-core": {
+      "android": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-core-jvm-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.11.0/kotlinx-serialization-core-jvm-1.11.0.jar",
+            "sha256": "f4a801c647d4351327cd9e1ac4113e2be9ea37a64ab0abae269c25a52e28f35d"
+          }
+        ]
+      },
       "jvm": {
         "version": "1.11.0",
         "files": [
@@ -11883,6 +15556,19 @@
       }
     },
     "org.jetbrains.kotlinx:kotlinx-serialization-json": {
+      "android": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-json-jvm-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.11.0/kotlinx-serialization-json-jvm-1.11.0.jar",
+            "sha256": "563a25b4eb5c9128ae9c2479f3d1a5c44dcd176112b91cf03682e906eba5c935"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
       "jvm": {
         "version": "1.11.0",
         "files": [
@@ -12087,6 +15773,16 @@
       }
     },
     "org.jetbrains:annotations": {
+      "android": {
+        "version": "23.0.0",
+        "files": [
+          {
+            "name": "annotations-23.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/23.0.0/annotations-23.0.0.jar",
+            "sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05"
+          }
+        ]
+      },
       "jvm": {
         "version": "23.0.0",
         "files": [
@@ -12127,6 +15823,16 @@
       }
     },
     "org.jspecify:jspecify": {
+      "android": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "jspecify-1.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar",
+            "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab"
+          }
+        ]
+      },
       "jvm": {
         "version": "1.0.0",
         "files": [
@@ -12190,6 +15896,16 @@
       }
     },
     "org.slf4j:slf4j-api": {
+      "android": {
+        "version": "2.0.20",
+        "files": [
+          {
+            "name": "slf4j-api-2.0.20.jar",
+            "url": "https://repo1.maven.org/maven2/org/slf4j/slf4j-api/2.0.20/slf4j-api-2.0.20.jar",
+            "sha256": "7e1446499b359675d8aabe6af2de86b85e72ae8a2a932c0b40d0e5ba57097439"
+          }
+        ]
+      },
       "jvm": {
         "version": "2.0.20",
         "files": [
@@ -12214,6 +15930,16 @@
       }
     },
     "tech.mappie:mappie-api": {
+      "android": {
+        "version": "2.4.21-2.4.5",
+        "files": [
+          {
+            "name": "mappie-api-jvm-2.4.21-2.4.5.jar",
+            "url": "https://repo1.maven.org/maven2/tech/mappie/mappie-api-jvm/2.4.21-2.4.5/mappie-api-jvm-2.4.21-2.4.5.jar",
+            "sha256": "62eec789f9e5dd0f990161e341c5b44d2d34cf8dc6b8ff95f1822725243ea673"
+          }
+        ]
+      },
       "jvm": {
         "version": "2.4.21-2.4.5",
         "files": [

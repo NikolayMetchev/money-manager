@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
 # gazelle:kmp_plugins compose
 # gazelle:kmp_export //app/model/core
 # gazelle:kmp_export //app/query
@@ -11,6 +11,7 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 kmp_library(
     name = "transactions",
+    android = True,
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     jvm_exports = ["@maven_kmp//:androidx_compose_runtime_desktop"],
     native_targets = [
@@ -51,7 +52,6 @@ kmp_test(
         "@maven_kmp//:androidx_compose_runtime",
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_coroutines_test",
-        "@maven_kmp//:mokkery_core",
         "@maven_kmp//:mokkery_runtime",
         "@maven_kmp//:molecule_runtime",
         "@maven_kmp//:turbine",

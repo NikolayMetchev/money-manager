@@ -1,0 +1,6 @@
+# The SDK's android.jar, which every Android compile has on its classpath (neverlink): extensions.bzl.
+alias(
+    name = "android_jar",
+    actual = "@android_sdk//:android_jar",
+    visibility = ["//visibility:public"],
+)

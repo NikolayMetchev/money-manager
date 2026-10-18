@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
 # gazelle:kmp_export //app/db/core
 # gazelle:kmp_export //app/db/di
 # gazelle:kmp_export //app/model/core
@@ -12,6 +12,9 @@ load("//bazel/kmp:defs.bzl", "kmp_library")
 
 kmp_library(
     name = "db",
+    android = True,
+    android_deps = ["@maven_kmp//:androidx_test_monitor"],
+    android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
     native_deps = [

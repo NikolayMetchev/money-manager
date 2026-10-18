@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
 # gazelle:kmp_sqldelight_package com.moneymanager.database.sql
 
 load("//bazel/kmp:defs.bzl", "kmp_library")
@@ -15,6 +15,7 @@ sqldelight_library(
 
 kmp_library(
     name = "schema",
+    android = True,
     native_targets = [
         "linuxArm64",
         "linuxX64",

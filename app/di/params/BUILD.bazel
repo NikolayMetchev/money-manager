@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
 # gazelle:kmp_export //app/remotestorage/googledrive jvmMain
 # gazelle:kmp_export //app/remotestorage/googledrive nativeMain
 
@@ -7,6 +7,9 @@ load("//bazel/kmp:defs.bzl", "kmp_library")
 
 kmp_library(
     name = "params",
+    android = True,
+    android_exports = ["//app/remotestorage/googledrive"],
+    android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     jvm_exports = ["//app/remotestorage/googledrive"],
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
