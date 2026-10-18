@@ -187,18 +187,18 @@ def _repin_impl(rctx):
         rctx.report_progress("Kotlin/Native %s for %s" % (version, host))
         dists[host] = _sha256(rctx, _dist_url(version, host), cache)
 
-    # konan.properties is the same file in every host's distribution.
-    rctx.download_and_extract(
-        url = _dist_url(version, "linux_x64"),
-        output = "props",
-        sha256 = dists["linux_x64"],
-        stripPrefix = _dist_prefix(version, "linux_x64"),
-    )
-    props = parse_properties(rctx.read("props/konan/konan.properties"))
-    rctx.delete("props")
-
     deps = {}
     for host in sorted(HOST_TARGETS):
+        # Each host's distribution has its own konan.properties: its own llvmHome is the `user` LLVM
+        # (essentials), every other host's the `dev` one, so one host's file pins the wrong LLVM for the rest.
+        rctx.download_and_extract(
+            url = _dist_url(version, host),
+            output = "props",
+            sha256 = dists[host],
+            stripPrefix = _dist_prefix(version, host),
+        )
+        props = parse_properties(rctx.read("props/konan/konan.properties"))
+        rctx.delete("props")
         deps[host] = {}
         for name in dependencies(props, host, HOST_TARGETS[host]):
             rctx.report_progress("%s for %s" % (name, host))

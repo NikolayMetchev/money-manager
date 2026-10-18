@@ -1,0 +1,6 @@
+# Personal overrides: copy this file to user.bazelrc (gitignored). BuildBuddy's remote cache for every command,
+# and builds (so tests and runs, which inherit build's options) on its executors. The API key goes in ~/.bazelrc:
+#   common --remote_header=x-buildbuddy-api-key=<your key>
+# Without a key, keep only `common --config=cache` (read-only cache; BuildBuddy's executors need one).
+common --config=cache
+build --config=rbe

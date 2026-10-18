@@ -161,6 +161,11 @@ def _launch(ctx, tool, arguments, inputs, tool_inputs, outputs, mnemonic, progre
         "com.moneymanager.bazel.kmp.nativelauncher.KonanLauncher",
         tool,
     ])
+    for args in arguments:
+        if type(args) == "Args":
+            # A module's command line can pass Windows' 32767-character limit; KonanLauncher reads these back.
+            args.use_param_file("@%s", use_always = True)
+            args.set_param_file_format("multiline")
     ctx.actions.run(
         executable = java.java_executable_exec_path,
         arguments = [launcher] + arguments,

@@ -20,13 +20,15 @@ def _argfile_impl(ctx):
     if ctx.attr.tool == "ktlint":
         lines = paths
     else:
-        lines = ["--input", ":".join(paths), "--config", ctx.file.config.short_path, "--build-upon-default-config"]
+        # One --input per path: detekt splits a single one on File.pathSeparatorChar, which is `;` on Windows.
+        lines = [arg for path in paths for arg in ["--input", path]]
+        lines += ["--config", ctx.file.config.short_path, "--build-upon-default-config"]
     out = ctx.actions.declare_file(ctx.label.name + ".args")
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(files = depset([out]))]
 
-# The tools' command lines go in an argument file (`@file`, which clikt and JCommander both read): detekt
-# wants its inputs in one `:`-joined argument, which `args` can't spell.
+# The tools' command lines go in an argument file (`@file`, which clikt and JCommander both read), as a module's
+# sources can pass Windows' command-line limit.
 _argfile = rule(
     implementation = _argfile_impl,
     attrs = {

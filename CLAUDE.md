@@ -80,7 +80,11 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 the cutover. Run it through bazelisk (`.bazelversion`): `bazel build //...`. It is bzlmod only (`MODULE.bazel`,
 committed `MODULE.bazel.lock`), on the same JDK 25 (`.bazelrc`). The KMP rules live in `//bazel/kmp` and the Gazelle
 extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output). CI runs it in the non-required
-`bazel.yml` workflow (`bazel build //...` and `bazel test //...`).
+`bazel.yml` workflow (`bazel build //...` and `bazel test //...`). CI uses BuildBuddy (#1017): the Linux job runs every action on its executors
+(`--config=rbe`), macOS and Windows build on their runners with its remote cache (`--config=cache`). To use it locally,
+copy `user.bazelrc.example` to `user.bazelrc` and put your API key in `~/.bazelrc`
+(`common --remote_header=x-buildbuddy-api-key=…`). Without a key, don't pass either config: invocations would still
+stream to BuildBuddy, anonymously.
 
 - **`kmp_library` / `kmp_test`** (`//bazel/kmp:defs.bzl`) compile a module the way KGP does: one K2 call per platform
   over every fragment (`commonMain ← jvmAndroidMain ← jvmMain`; `commonMain ← nativeMain ← linuxMain|appleMain|mingwMain`),

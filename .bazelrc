@@ -16,5 +16,37 @@ common --@rules_kotlin//kotlin/settings:experimental_strict_associate_dependenci
 
 test --test_output=errors
 
-# Personal overrides (disk cache, jobs, …), not checked in.
+# Platform-specific settings below (`common:linux`, `common:windows`, …) apply on their own host.
+common --enable_platform_specific_config
+# Tests read their data through runfiles, which Windows only lays out when asked.
+common:windows --enable_runfiles
+
+# BuildBuddy (#1017). CI adds the API key (`--remote_header=x-buildbuddy-api-key=…`) to user.bazelrc; without
+# one (a fork's PR) it runs on the restored disk cache alone.
+# `cache`: the remote cache, and every invocation's results streamed to app.buildbuddy.io.
+common:cache --bes_results_url=https://app.buildbuddy.io/invocation/
+common:cache --bes_backend=grpcs://remote.buildbuddy.io
+common:cache --remote_cache=grpcs://remote.buildbuddy.io
+common:cache --remote_timeout=10m
+# Download only what a person asked for; intermediate outputs stay in the cache.
+common:cache --remote_download_toplevel
+# A cache or BES hiccup slows a build down, it doesn't fail it.
+common:cache --bes_upload_mode=fully_async
+common:cache --remote_local_fallback
+# BuildBuddy's suggestions: compressed and chunked (SplitBlob/SpliceBlob) transfers for large blobs, and the
+# remote gRPC and compact execution logs of the last invocation, for troubleshooting a cache miss or a remote failure.
+common:cache --remote_cache_compression
+common:cache --experimental_remote_cache_chunking
+common:cache --remote_grpc_log=bazel-remote-grpc.log
+common:cache --execution_log_compact_file=execution_log.binpb.zst
+
+# `rbe`: the cache, and every action run on BuildBuddy's Linux x64 executors (the Linux job only: macOS and
+# Windows actions run on their GitHub runners, with the cache).
+common:rbe --config=cache
+common:rbe --remote_executor=grpcs://remote.buildbuddy.io
+common:rbe --host_platform=//bazel/platforms:rbe_linux_x64
+common:rbe --extra_execution_platforms=//bazel/platforms:rbe_linux_x64
+common:rbe --jobs=100
+
+# Personal overrides (disk cache, jobs, …), not checked in. user.bazelrc.example turns BuildBuddy on locally.
 try-import %workspace%/user.bazelrc
