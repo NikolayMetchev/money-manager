@@ -46,6 +46,10 @@ var testSets = []sourceSet{
 	{"test", "jvm_srcs", "jvm"},
 }
 
+// deviceSet is AGP's `androidDeviceTest`, compiled on its own (KMP won't let it depend on commonTest), so a module
+// shares other dirs with it through kmp_device_test_srcs.
+var deviceSet = sourceSet{"androidDeviceTest", "device_srcs", "androidDevice"}
+
 // imports is what GenerateRules hands Resolve for one rule: the imported names per platform.
 type imports struct {
 	byPlatform map[string][]string // "" | jvmAndroid | jvm | android | native | linux | apple | mingw → imported names
@@ -235,7 +239,11 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		tSets = withoutAndroid(tSets)
 	}
 	tests, testSetsPresent := scan(args.Dir, tSets)
-	if len(testSetsPresent) > 0 {
+	var deviceDirs []string
+	if kc.android {
+		deviceDirs = scanDirs(args.Dir, append([]string{"src/androidDeviceTest/kotlin"}, kc.deviceSrcs...), deviceSet.platform, tests)
+	}
+	if len(testSetsPresent) > 0 || len(deviceDirs) > 0 {
 		t := rule.NewRule("kmp_test", "test")
 		t.SetAttr("associate", ":"+name)
 		for _, set := range testSetsPresent {
@@ -275,6 +283,25 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		if res, ok := resourceGlob(args.Dir, "Test"); ok {
 			t.SetAttr("resources", res)
 		}
+		if len(deviceDirs) > 0 {
+			var patterns []string
+			for _, d := range deviceDirs {
+				patterns = append(patterns, d+"/**/*.kt")
+			}
+			t.SetAttr("device_srcs", rule.GlobValue{Patterns: patterns})
+			if _, err := os.Stat(filepath.Join(args.Dir, "src", "androidDeviceTest", "AndroidManifest.xml")); err == nil {
+				t.SetAttr("device_manifest", "src/androidDeviceTest/AndroidManifest.xml")
+			}
+			var resources []string
+			for _, d := range append([]string{"src/androidDeviceTest/resources"}, kc.deviceResources...) {
+				if dirHasFiles(filepath.Join(args.Dir, filepath.FromSlash(d)), "") {
+					resources = append(resources, d+"/**")
+				}
+			}
+			if len(resources) > 0 {
+				t.SetAttr("device_resources", rule.GlobValue{Patterns: resources})
+			}
+		}
 		if len(kc.forbidDeps) > 0 {
 			t.SetAttr("forbidden_deps", kc.forbidDeps)
 		}
@@ -289,6 +316,26 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		res.Imports = append(res.Imports, imports{byPlatform: keys(tests.imports), keep: kc.kept(true), test: true, associate: name, leaves: testLeaves})
 	}
 	return res
+}
+
+// scanDirs scans the module-relative Kotlin dirs that have sources into s, as `platform`'s, and returns them.
+func scanDirs(dir string, rels []string, platform string, s *scanned) []string {
+	var found []string
+	for _, rel := range rels {
+		any := false
+		_ = filepath.WalkDir(filepath.Join(dir, filepath.FromSlash(rel)), func(p string, d os.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(p, ".kt") {
+				return nil
+			}
+			any = true
+			scanFile(p, platform, s)
+			return nil
+		})
+		if any {
+			found = append(found, rel)
+		}
+	}
+	return found
 }
 
 func glob(set string) rule.GlobValue {

@@ -2,6 +2,9 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 # gazelle:kmp_targets android
 # gazelle:kmp_android_host_tests false
+# gazelle:kmp_device_test_srcs src/commonTest/kotlin
+# gazelle:kmp_device_test_resources src/commonTest/resources
+# gazelle:kmp_keep_dep @maven_kmp//:ui_android androidDeviceTest
 
 kmp_library(
     name = "dev",
@@ -14,5 +17,19 @@ kmp_test(
     name = "test",
     associate = ":dev",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    device_deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:g_ui",
+        "@maven_kmp//:sqlite",
+        "@maven_kmp//:ui_android",
+    ],
+    device_manifest = "src/androidDeviceTest/AndroidManifest.xml",
+    device_resources = glob(["src/commonTest/resources/**"]),
+    device_srcs = glob([
+        "src/androidDeviceTest/kotlin/**/*.kt",
+        "src/commonTest/kotlin/**/*.kt",
+    ]),
+    keep_deps = ["@maven_kmp//:ui_android"],
+    resources = glob(["src/commonTest/resources/**"]),
     deps = ["//bazel/kmp/deps:kotlin_test"],
 )

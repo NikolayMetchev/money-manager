@@ -72,6 +72,11 @@ const (
 	forbidReferenceDirective = "kmp_forbid_reference"
 	// kmp_allow_reference path …: module-relative files exempt from kmp_forbid_reference (exact paths).
 	allowReferenceDirective = "kmp_allow_reference"
+	// kmp_device_test_srcs dir …: module-relative Kotlin dirs Gradle adds to `androidDeviceTest` with
+	// `kotlin.srcDir` (the Compose UI modules' `src/commonTest/kotlin`), beside `src/androidDeviceTest/kotlin`.
+	deviceTestSrcsDirective = "kmp_device_test_srcs"
+	// kmp_device_test_resources dir …: the same for `resources.srcDir`, beside `src/androidDeviceTest/resources`.
+	deviceTestResourcesDirective = "kmp_device_test_resources"
 )
 
 const androidTarget = "android"
@@ -106,6 +111,8 @@ type kmpConfig struct {
 	forbidReference   string
 	referenceReason   string
 	allowReference    []string
+	deviceSrcs        []string
+	deviceResources   []string
 	lockFile          string
 	maven             *mavenIndex
 }
@@ -133,6 +140,8 @@ func (c *kmpConfig) clone() *kmpConfig {
 	out.forbidReference = ""
 	out.referenceReason = ""
 	out.allowReference = nil
+	out.deviceSrcs = nil
+	out.deviceResources = nil
 	return &out
 }
 
@@ -147,7 +156,7 @@ func (*kmpLang) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
 func (*kmpLang) CheckFlags(fs *flag.FlagSet, c *config.Config) error { return nil }
 
 func (*kmpLang) KnownDirectives() []string {
-	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective, generatedSrcsDirective, cinteropsDirective, testDataDirective, testSizeDirective, testJvmFlagsDirective, testFlakyDirective, testJvmTagsDirective, androidHostTestsDirective, mainPlatformDirective, visibilityDirective, forbidDepsDirective, forbidReferenceDirective, allowReferenceDirective}
+	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective, generatedSrcsDirective, cinteropsDirective, testDataDirective, testSizeDirective, testJvmFlagsDirective, testFlakyDirective, testJvmTagsDirective, androidHostTestsDirective, mainPlatformDirective, visibilityDirective, forbidDepsDirective, forbidReferenceDirective, allowReferenceDirective, deviceTestSrcsDirective, deviceTestResourcesDirective}
 }
 
 func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
@@ -214,6 +223,10 @@ func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
 				kc.referenceReason = strings.TrimSpace(reason)
 			case allowReferenceDirective:
 				kc.allowReference = append(kc.allowReference, strings.Fields(d.Value)...)
+			case deviceTestSrcsDirective:
+				kc.deviceSrcs = append(kc.deviceSrcs, strings.Fields(d.Value)...)
+			case deviceTestResourcesDirective:
+				kc.deviceResources = append(kc.deviceResources, strings.Fields(d.Value)...)
 			case lockFileDirective:
 				kc.lockFile = d.Value
 			case keepDepDirective:
@@ -429,7 +442,7 @@ func parseKeepDep(directive, value string) (keepDep, error) {
 	if len(fields) == 2 {
 		setName = fields[1]
 	}
-	for _, sets := range [][]sourceSet{mainSets, testSets} {
+	for _, sets := range [][]sourceSet{mainSets, testSets, {deviceSet}} {
 		for _, set := range sets {
 			if set.dir == setName {
 				return keepDep{label: fields[0], platform: set.platform, test: strings.HasSuffix(setName, "Test")}, nil

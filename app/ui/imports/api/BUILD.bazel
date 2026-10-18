@@ -6,6 +6,9 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 # gazelle:kmp_test_jvm_flags -Djava.awt.headless=true -Dskiko.test.harness=true
 # gazelle:kmp_test_flaky true
 # gazelle:kmp_test_jvm_tags no-remote-exec
+# gazelle:kmp_device_test_srcs src/commonTest/kotlin
+# gazelle:kmp_device_test_resources src/commonTest/resources
+# gazelle:kmp_keep_dep @maven_kmp//:androidx_test_runner androidDeviceTest
 
 kmp_library(
     name = "api",
@@ -56,12 +59,21 @@ kmp_test(
     name = "test",
     associate = ":api",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    device_deps = [
+        "//app/model/apistrategy",
+        "//app/model/core",
+        "//app/model/rules",
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:androidx_test_runner",
+    ],
+    device_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     flaky = True,
     jvm_flags = [
         "-Djava.awt.headless=true",
         "-Dskiko.test.harness=true",
     ],
     jvm_tags = ["no-remote-exec"],
+    keep_deps = ["@maven_kmp//:androidx_test_runner"],
     plugins = ["compose"],
     deps = [
         "//app/model/apistrategy",

@@ -242,6 +242,23 @@ stream to BuildBuddy, anonymously.
   matches Gradle's entry for entry, `classes.dex` and the profile byte for byte; only the merged manifest's element
   order differs (libraries in Bazel's dependency order). `--stamp` adds `META-INF/version-control-info.textproto`
   (`bazel/stamp`, `STABLE_GIT_COMMIT`), which AGP always writes. aapt2 is downloaded as AGP does (`pins.bzl`).
+- **Android device tests** (`//bazel/kmp/android:device_test.bzl`, #1024): AGP's `connectedAndroidDeviceTest` is
+  `kmp_test`'s `:<name>_device`: `androidDeviceTest` is its own compilation (commonTest's deps don't reach it), so
+  `device_srcs` are `src/androidDeviceTest/kotlin` plus what `# gazelle:kmp_device_test_srcs` shares (Gradle's
+  `kotlin.srcDir`), with `device_deps`, `device_manifest` and `device_resources` (`kmp_device_test_resources`); a
+  `runtimeOnly(androidx.test.runner)` is `kmp_keep_dep … androidDeviceTest`. `android_apk(test_runner = …)` builds
+  AGP's test APK (`com.moneymanager.<module path>.test`, self-instrumenting, targetSdk = compileSdk as for a library,
+  no `app-metadata.properties`), and `android_device_test` runs it with `adb install` and `am instrument -w -r`
+  (`DeviceTestRunner`, which writes `test.xml`) on the device adb picks (`ANDROID_SERIAL` among several). They're
+  `manual`, `local` and `exclusive`, tagged `android_device`: `bazel test //...` leaves them out and `bazel.yml`'s
+  device job runs `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')` on build.yml's emulator
+  (rules_android's emulator rules can't take APKs built outside it, and need their own system images). The release
+  smoke test is `//app/main/android-smoketest:smoketest_test` (hand-written: a `com.android.test` module, its release
+  variant not debuggable), installing `//app/main/android:release_debug_signed` first. The same 12 modules and 430
+  cases as Gradle, plus the smoke test; run them on an API 36 image (Espresso 3.5.0 fails on API 37 for both builds).
+  Known differences: the device compile is named after its module (rules_kotlin takes an associate's name, so only
+  Mokkery's `MokkeryModuleScope_<hash>` class names differ), its classpath has androidx.test:core 1.7.0 where Gradle's
+  per-module resolution has 1.5.0, and D8's synthetic class names differ (one dex action, not one per class).
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.
@@ -733,7 +750,7 @@ set of writes.
   device emulator. **Android emulator API level sync**: change the level here and you must change it
   in `gradle/libs.versions.toml` (`android-targetSdk`), the Gradle managed device
   (`moneymanager.android-convention.gradle.kts` and `app/main/android-smoketest/build.gradle.kts`),
-  the CI emulator (`.github/workflows/build.yml` and `.github/workflows/android-release-smoke-test.yml`) and the IntelliJ run configuration
+  the CI emulator (`.github/workflows/build.yml`, `.github/workflows/android-release-smoke-test.yml` and `bazel.yml`'s device job) and the IntelliJ run configuration
   (`.idea/runConfigurations/Android_Tests.xml`) too.
 - **Test Stability**: Always call `waitForIdle()` after `waitUntilDoesNotExist()` to ensure recompositions complete before test ends
 

@@ -3,6 +3,7 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android
 # gazelle:kmp_test_flaky true
+# gazelle:kmp_keep_dep @maven_kmp//:androidx_test_runner androidDeviceTest
 
 kmp_library(
     name = "filePicker",
@@ -29,8 +30,14 @@ kmp_test(
     android = True,
     associate = ":filePicker",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    device_deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:androidx_test_runner",
+    ],
+    device_srcs = glob(["src/androidDeviceTest/kotlin/**/*.kt"]),
     flaky = True,
     jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
+    keep_deps = ["@maven_kmp//:androidx_test_runner"],
     plugins = ["compose"],
     deps = ["//bazel/kmp/deps:kotlin_test"],
 )

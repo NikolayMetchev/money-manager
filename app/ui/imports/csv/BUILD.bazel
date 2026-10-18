@@ -7,6 +7,8 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 # gazelle:kmp_test_jvm_flags -Djava.awt.headless=true -Dskiko.test.harness=true
 # gazelle:kmp_test_flaky true
 # gazelle:kmp_test_jvm_tags no-remote-exec
+# gazelle:kmp_device_test_srcs src/commonTest/kotlin
+# gazelle:kmp_device_test_resources src/commonTest/resources
 
 kmp_library(
     name = "csv",
@@ -63,6 +65,23 @@ kmp_test(
     name = "test",
     associate = ":csv",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    device_deps = [
+        "//app/model/core",
+        "//app/model/csv",
+        "//app/model/csvstrategy",
+        "//app/model/importdirectory",
+        "//app/model/rules",
+        "//app/strategies",
+        "//app/ui/components",
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/app/ui",
+        "@maven_kmp//:androidx_compose_material3",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:androidx_compose_ui_test",
+        "@maven_kmp//:kotlinx_coroutines_test",
+    ],
+    device_manifest = "src/androidDeviceTest/AndroidManifest.xml",
+    device_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     flaky = True,
     jvm_deps = ["//bazel/kmp/deps:compose_desktop_current_os"],
     jvm_flags = [

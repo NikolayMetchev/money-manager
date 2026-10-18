@@ -38,6 +38,7 @@ var resolvedAttrs = map[string]bool{
 	"jvm_exports":         true,
 	"android_deps":        true,
 	"android_exports":     true,
+	"device_deps":         true,
 	"native_deps":         true,
 	"linux_deps":          true,
 	"apple_deps":          true,
@@ -63,7 +64,7 @@ func (*kmpLang) Kinds() map[string]rule.KindInfo {
 		},
 		"kmp_test": {
 			NonEmptyAttrs:  map[string]bool{"associate": true},
-			MergeableAttrs: mergeable("associate", "data", "size", "forbidden_deps", "keep_deps", "jvm_flags", "flaky", "jvm_tags"),
+			MergeableAttrs: mergeable("associate", "data", "size", "forbidden_deps", "keep_deps", "jvm_flags", "flaky", "jvm_tags", "device_manifest"),
 			ResolveAttrs:   resolvedAttrs,
 		},
 		"sqldelight_library": {
@@ -89,6 +90,8 @@ func (*kmpLang) Fix(c *config.Config, f *rule.File) {
 	for _, r := range f.Rules {
 		if (r.Kind() == "kmp_library" || r.Kind() == "kmp_test") && !r.ShouldKeep() {
 			r.DelAttr("resources")
+			r.DelAttr("device_resources")
+			r.DelAttr("device_srcs")
 		}
 	}
 }
