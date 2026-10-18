@@ -58,7 +58,7 @@ var nonIdent = regexp.MustCompile(`[^A-Za-z0-9_]`)
 
 func main() {
 	var libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes multi
-	toml := flag.String("toml", "gradle/libs.versions.toml", "the version catalog")
+	toml := flag.String("toml", "libs.versions.toml", "the version catalog")
 	out := flag.String("lock", "bazel/kmp/deps/maven_kmp.lock.json", "the lockfile to write")
 	flag.Var(&libraries, "library", "a catalog library alias to resolve (repeatable)")
 	flag.Var(&libraryPlatforms, "library-platforms", "alias=platform,…: resolve a library for these platforms only (repeatable)")

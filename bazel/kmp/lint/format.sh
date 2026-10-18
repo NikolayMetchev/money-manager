@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # `bazel run //:format`: Gazelle writes every module's BUILD file (as `bazel run //:gazelle`), then ktlint -F
-# formats the sources the `_ktlint` tests check, what `./gradlew lintFormat` runs ktlint for. Build scripts,
+# formats the sources the `_ktlint` tests check. Build scripts,
 # Bazel's own tools and generated or golden files are left alone.
 set -euo pipefail
 gazelle="$(pwd)/$1"

@@ -93,19 +93,16 @@ class BuiltInApiStrategyInstallTest : DbTest() {
     @Test
     fun `the Coinbase strategy survives an export file round trip`() =
         runTest {
-            val now = kotlin.time.Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val original =
-                com.moneymanager.builtin.BuiltInApiStrategies
-                    .coinbase(now)
+                BuiltInApiStrategies.coinbase(now)
             val json =
-                com.moneymanager.database.json.ApiStrategyExportCodec.encode(
-                    ApiStrategyExportMapper
-                        .toExport(original, "test"),
+                ApiStrategyExportCodec.encode(
+                    ApiStrategyExportMapper.toExport(original, "test"),
                 )
             val rebuilt =
                 ApiStrategyExportMapper.fromExport(
-                    com.moneymanager.database.json.ApiStrategyExportCodec
-                        .decode(json),
+                    ApiStrategyExportCodec.decode(json),
                     original.id,
                     now,
                 )
@@ -204,10 +201,9 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             assertNotNull(exchange.config.requestSigning, "signing recipe persisted")
             assertEquals("Crypto.com Exchange", assertIs<ApiAccountsSource.Single>(exchange.config.accounts).name)
             assertTrue(exchange.config.dataEndpoints.isNotEmpty(), "data endpoints persisted")
-            assertNotNull(exchange.config.internalTransferReconcile, "internal-transfer reconciliation persisted")
             assertEquals(
                 "Crypto.com",
-                exchange.config.internalTransferReconcile!!
+                assertNotNull(exchange.config.internalTransferReconcile, "internal-transfer reconciliation persisted")
                     .bridges
                     .single()
                     .otherAccountName,
@@ -219,19 +215,16 @@ class BuiltInApiStrategyInstallTest : DbTest() {
         runTest {
             // The distribution format used by the catalog and by the API-strategies "Import file" button:
             // toExport -> JSON encode/decode -> fromExport must reproduce the full signed-exchange config.
-            val now = kotlin.time.Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val original =
-                com.moneymanager.builtin.BuiltInApiStrategies
-                    .cryptoComExchange(now)
+                BuiltInApiStrategies.cryptoComExchange(now)
             val json =
-                com.moneymanager.database.json.ApiStrategyExportCodec.encode(
-                    ApiStrategyExportMapper
-                        .toExport(original, "test"),
+                ApiStrategyExportCodec.encode(
+                    ApiStrategyExportMapper.toExport(original, "test"),
                 )
             val rebuilt =
                 ApiStrategyExportMapper.fromExport(
-                    com.moneymanager.database.json.ApiStrategyExportCodec
-                        .decode(json),
+                    ApiStrategyExportCodec.decode(json),
                     original.id,
                     now,
                 )

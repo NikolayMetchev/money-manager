@@ -1,9 +1,7 @@
 [versions]
-# Android API level sync: keep target SDK, the Gradle managed device, CI emulator, and IntelliJ
-# Android Tests run configuration aligned. Compile SDK runs ahead: androidx Compose 1.12 requires
+# Android API level sync: keep target SDK and the CI emulators aligned. Compile SDK runs ahead: androidx Compose 1.12 requires
 # compiling against API 37, which is only a compile-time floor and needs no emulator/runtime move.
 android-compileSdk = "37"
-develocity = "4.6.0"
 android-gradle-plugin = "9.4.1"
 # The lint AGP runs (com.android.tools.lint:lint-gradle), whose version is always AGP's + 23: Bazel's Android lint (#1025).
 android-lint = "32.4.1"
@@ -12,7 +10,7 @@ android-targetSdk = "36"
 play-services-auth = "22.0.0"
 androidx-activity-compose = "1.13.0"
 # Transitive-alignment versions: pin divergent androidx/kotlinx transitive deps to the
-# version the assembled app already resolves to (see moneymanager.kotlin-convention).
+# version the assembled app resolves to (MODULE.bazel's maven_kmp `forces`).
 androidx-annotation = "1.9.1"
 androidx-collection = "1.5.0"
 androidx-concurrent-futures = "1.2.0"
@@ -29,7 +27,6 @@ androidx-compose-material3 = "1.4.0"
 androidx-navigation3 = "1.2.0"
 jetbrains-navigation3 = "1.1.2"
 androidx-sqlite = "2.7.1"
-androidx-test-core = "1.7.0"
 androidx-test-monitor = "1.8.0"
 androidx-test-runner = "1.7.0"
 androidx-test-uiautomator = "2.4.0"
@@ -40,30 +37,22 @@ compose-plugin = "1.12.2"
 compose-material-icons-desktop = "1.7.3"
 compose-material3-desktop = "1.9.0"
 cryptography = "0.6.0"
-dependency-analysis = "3.19.2"
 detekt = "2.0.0-alpha.6"
 dokka = "2.2.0"
-gradle-doctor = "0.12.1"
-# JVM version sync: keep jvm-target and jvm-toolchain aligned with .bazelrc, .github/actions/gradle-setup/action.yml
-# and CLAUDE.md.
-jvm-target = "25"
-jvm-toolchain = "25"
 kermit = "2.2.0"
 kotlin = "2.4.21"
 kotlinx-coroutines = "1.11.0"
 kotlinx-datetime = "0.8.0"
 kotlinx-io = "0.9.1"
 kotlinx-serialization = "1.11.0"
-kover = "0.9.11"
 ktlint = "14.2.0"
-# The ktlint engine the ktlint Gradle plugin runs and Bazel's `@ktlint_cli` resolves (#1015).
+# The ktlint engine Bazel's `@ktlint_cli` resolves (#1015).
 ktlint-engine = "1.5.0"
 ktor = "3.6.0"
 log4j = "2.26.1"
 mappie = "2.4.21-2.4.5"
 mordant = "3.1.0"
 mosaic = "0.18.0"
-module-graph = "0.15.0"
 poi = "5.5.1"
 proguard = "7.8.2"
 junit = "4.13.2"
@@ -72,7 +61,6 @@ mokkery = "3.5.1"
 molecule = "2.2.0"
 schemaspy = "7.0.2"
 slf4j = "2.0.20"
-sort-dependencies = "0.21.0"
 sqldelight = "2.4.1"
 # The SQLite the native targets link statically (utils/sqlite3). The release number in sqlite.org's
 # download naming (3.54.0 = 3540000), its year directory, and the zip's SHA-256 move together.
@@ -81,9 +69,8 @@ sqlite-amalgamation-year = "2026"
 sqlite-amalgamation-sha256 = "68e913b0fe8ec6b4e5f391c594a28872884e80d6cd042a1e50c957be46b5aa4d"
 test-retry = "1.6.6"
 turbine = "1.2.1"
-# Build-tool transitive-alignment versions: pin tooling transitives (Gradle plugins, annotation
-# processors, AGP test platform) to one version across all build classpaths. Consumed via the
-# build-tool-pins bundle in moneymanager.kotlin-convention and gradle/build-logic/build.gradle.kts.
+# Build-tool transitive-alignment versions: pin tooling transitives (compiler plugins, AGP's tools) to
+# one version in every resolution. Consumed via the build-tool-pins bundle (maven_kmp's `force_bundles`).
 buildtool-animal-sniffer = "1.28"
 buildtool-asm = "9.11.1"
 buildtool-checker-qual = "4.3.1"
@@ -129,6 +116,7 @@ androidx-compose-ui-geometry = { module = "androidx.compose.ui:ui-geometry", ver
 androidx-compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics", version.ref = "androidx-compose" }
 androidx-compose-ui-test = { module = "androidx.compose.ui:ui-test", version.ref = "androidx-compose" }
 androidx-compose-ui-text = { module = "androidx.compose.ui:ui-text", version.ref = "androidx-compose" }
+androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling", version.ref = "androidx-compose" }
 androidx-compose-ui-unit = { module = "androidx.compose.ui:ui-unit", version.ref = "androidx-compose" }
 androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "androidx-navigation3" }
 androidx-savedstate = { module = "androidx.savedstate:savedstate", version.ref = "androidx-savedstate" }
@@ -137,7 +125,6 @@ androidx-navigation3-runtime-desktop = { module = "androidx.navigation3:navigati
 androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "androidx-navigation3" }
 jetbrains-navigation3-ui-desktop = { module = "org.jetbrains.androidx.navigation3:navigation3-ui-desktop", version.ref = "jetbrains-navigation3" }
 androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "androidx-sqlite" }
-androidx-test-core = { module = "androidx.test:core", version.ref = "androidx-test-core" }
 androidx-test-monitor = { module = "androidx.test:monitor", version.ref = "androidx-test-monitor" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "androidx-test-uiautomator" }
@@ -154,21 +141,16 @@ compose-desktop-linux-x64 = { module = "org.jetbrains.compose.desktop:desktop-jv
 compose-desktop-macos-arm64 = { module = "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64", version.ref = "compose-plugin" }
 compose-desktop-macos-x64 = { module = "org.jetbrains.compose.desktop:desktop-jvm-macos-x64", version.ref = "compose-plugin" }
 compose-desktop-windows-x64 = { module = "org.jetbrains.compose.desktop:desktop-jvm-windows-x64", version.ref = "compose-plugin" }
-compose-components-resources-desktop = { module = "org.jetbrains.compose.components:components-resources-desktop", version.ref = "compose-plugin" }
-compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose-plugin" }
 compose-foundation-desktop = { module = "org.jetbrains.compose.foundation:foundation-desktop", version.ref = "compose-plugin" }
 compose-foundation-layout-desktop = { module = "org.jetbrains.compose.foundation:foundation-layout-desktop", version.ref = "compose-plugin" }
 compose-gradle-plugin = { module = "org.jetbrains.compose:compose-gradle-plugin", version.ref = "compose-plugin" }
 compose-material-icons-core-desktop = { module = "org.jetbrains.compose.material:material-icons-core-desktop", version.ref = "compose-material-icons-desktop" }
 compose-material3-desktop = { module = "org.jetbrains.compose.material3:material3-desktop", version.ref = "compose-material3-desktop" }
-compose-material-desktop = { module = "org.jetbrains.compose.material:material-desktop", version.ref = "compose-plugin" }
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-plugin" }
-compose-runtime-desktop = { module = "org.jetbrains.compose.runtime:runtime-desktop", version.ref = "compose-plugin" }
 compose-ui-desktop = { module = "org.jetbrains.compose.ui:ui-desktop", version.ref = "compose-plugin" }
 compose-ui-geometry-desktop = { module = "org.jetbrains.compose.ui:ui-geometry-desktop", version.ref = "compose-plugin" }
 compose-ui-graphics-desktop = { module = "org.jetbrains.compose.ui:ui-graphics-desktop", version.ref = "compose-plugin" }
 compose-ui-text-desktop = { module = "org.jetbrains.compose.ui:ui-text-desktop", version.ref = "compose-plugin" }
-compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose-plugin" }
 compose-ui-test-desktop = { module = "org.jetbrains.compose.ui:ui-test-desktop", version.ref = "compose-plugin" }
 compose-ui-unit-desktop = { module = "org.jetbrains.compose.ui:ui-unit-desktop", version.ref = "compose-plugin" }
 compose-ui-util-desktop = { module = "org.jetbrains.compose.ui:ui-util-desktop", version.ref = "compose-plugin" }
@@ -177,22 +159,17 @@ cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", ver
 cryptography-provider-jdk = { module = "dev.whyoleg.cryptography:cryptography-provider-jdk", version.ref = "cryptography" }
 cryptography-provider-openssl3-prebuilt = { module = "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt", version.ref = "cryptography" }
 cryptography-random = { module = "dev.whyoleg.cryptography:cryptography-random", version.ref = "cryptography" }
-dependency-analysis-gradle-plugin = { module = "com.autonomousapps:dependency-analysis-gradle-plugin", version.ref = "dependency-analysis" }
 detekt-cli = { module = "dev.detekt:detekt-cli", version.ref = "detekt" }
 dokka-all-modules-page-plugin = { module = "org.jetbrains.dokka:all-modules-page-plugin", version.ref = "dokka" }
 dokka-analysis-kotlin-symbols = { module = "org.jetbrains.dokka:analysis-kotlin-symbols", version.ref = "dokka" }
 dokka-base = { module = "org.jetbrains.dokka:dokka-base", version.ref = "dokka" }
 dokka-cli = { module = "org.jetbrains.dokka:dokka-cli", version.ref = "dokka" }
 dokka-templating-plugin = { module = "org.jetbrains.dokka:templating-plugin", version.ref = "dokka" }
-detekt-gradle-plugin = { module = "dev.detekt:dev.detekt.gradle.plugin", version.ref = "detekt" }
-develocity-gradle-plugin = { module = "com.gradle:develocity-gradle-plugin", version.ref = "develocity" }
 junit = { module = "junit:junit", version.ref = "junit" }
 kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 kermit-core = { module = "co.touchlab:kermit-core", version.ref = "kermit" }
-kotlin-compose-compiler-gradle-plugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
-# Compiler plugins as Bazel applies them (//bazel/kmp:plugins.bzl); Gradle gets them through the plugins block.
+# Compiler plugins as Bazel applies them (//bazel/kmp:plugins.bzl).
 kotlin-compose-compiler-plugin-embeddable = { module = "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable", version.ref = "kotlin" }
-kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlin-serialization-compiler-plugin-embeddable = { module = "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
@@ -202,9 +179,7 @@ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinx-io" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
-kover-gradle-plugin = { module = "org.jetbrains.kotlinx:kover-gradle-plugin", version.ref = "kover" }
 ktlint-cli = { module = "com.pinterest.ktlint:ktlint-cli", version.ref = "ktlint-engine" }
-ktlint-gradle-plugin = { module = "org.jlleitschuh.gradle:ktlint-gradle", version.ref = "ktlint" }
 ktor-client-auth = { module = "io.ktor:ktor-client-auth", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
@@ -214,7 +189,6 @@ ktor-http = { module = "io.ktor:ktor-http", version.ref = "ktor" }
 ktor-io = { module = "io.ktor:ktor-io", version.ref = "ktor" }
 ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
 ktor-utils = { module = "io.ktor:ktor-utils", version.ref = "ktor" }
-mordant = { module = "com.github.ajalt.mordant:mordant", version.ref = "mordant" }
 mordant-core = { module = "com.github.ajalt.mordant:mordant-core", version.ref = "mordant" }
 mosaic-runtime = { module = "com.jakewharton.mosaic:mosaic-runtime", version.ref = "mosaic" }
 mosaic-terminal = { module = "com.jakewharton.mosaic:mosaic-terminal", version.ref = "mosaic" }
@@ -225,8 +199,6 @@ log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "lo
 log4j-slf4j2-impl = { module = "org.apache.logging.log4j:log4j-slf4j2-impl", version.ref = "log4j" }
 mappie-api = { module = "tech.mappie:mappie-api", version.ref = "mappie" }
 mappie-compiler-plugin = { module = "tech.mappie:mappie-compiler-plugin", version.ref = "mappie" }
-mappie-gradle-plugin = { module = "tech.mappie.plugin:tech.mappie.plugin.gradle.plugin", version.ref = "mappie" }
-metro-gradle-plugin = { module = "dev.zacsweers.metro:dev.zacsweers.metro.gradle.plugin", version.ref = "metro" }
 metro-compiler = { module = "dev.zacsweers.metro:compiler", version.ref = "metro" }
 metro-runtime = { module = "dev.zacsweers.metro:runtime", version.ref = "metro" }
 mokkery-core = { module = "dev.mokkery:mokkery-core", version.ref = "mokkery" }
@@ -235,11 +207,9 @@ mokkery-runtime = { module = "dev.mokkery:mokkery-runtime", version.ref = "mokke
 molecule-runtime = { module = "app.cash.molecule:molecule-runtime", version.ref = "molecule" }
 poi = { module = "org.apache.poi:poi", version.ref = "poi" }
 poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "poi" }
-# Bazel's ProGuard (//bazel/kmp/proguard); Gradle's comes through the Compose plugin, at the same version.
+# Bazel's ProGuard (//bazel/kmp/proguard), the version the Compose plugin uses.
 proguard-base = { module = "com.guardsquare:proguard-base", version.ref = "proguard" }
 schemaspy = { module = "org.schemaspy:schemaspy", version.ref = "schemaspy" }
-slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
-sort-dependencies-gradle-plugin = { module = "com.squareup.sort-dependencies:com.squareup.sort-dependencies.gradle.plugin", version.ref = "sort-dependencies" }
 sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
 sqldelight-compiler-env = { module = "app.cash.sqldelight:compiler-env", version.ref = "sqldelight" }
 sqldelight-coroutines-extensions = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
@@ -300,8 +270,7 @@ buildtool-protobuf-java-util = { module = "com.google.protobuf:protobuf-java-uti
 buildtool-tink = { module = "com.google.crypto.tink:tink", version.ref = "buildtool-tink" }
 
 [bundles]
-# Tooling transitive deps pinned to one version across all build classpaths via dependency
-# substitution. NOTE: compose-internal annotation/collection are deliberately NOT pinned — forcing
+# Tooling transitive deps pinned to one version in every resolution (maven_kmp's `force_bundles`). NOTE: compose-internal annotation/collection are deliberately NOT pinned — forcing
 # them desyncs the Compose runtime and breaks Compose UI tests. Kotlin compiler/stdlib/reflect and
 # dagger are also excluded (each plugin needs its own compatible version).
 build-tool-pins = [
@@ -351,26 +320,3 @@ build-tool-pins = [
     "buildtool-protobuf-java-util",
     "buildtool-tink",
 ]
-
-[plugins]
-android-application = { id = "com.android.application", version.ref = "android-gradle-plugin" }
-android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "android-gradle-plugin" }
-build-health = { id = "com.autonomousapps.build-health", version.ref = "dependency-analysis" }
-compose = { id = "org.jetbrains.compose", version.ref = "compose-plugin" }
-compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-dependency-analysis = { id = "com.autonomousapps.dependency-analysis", version.ref = "dependency-analysis" }
-detekt = { id = "dev.detekt", version.ref = "detekt" }
-dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
-gradle-doctor = { id = "com.osacky.doctor", version.ref = "gradle-doctor" }
-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
-kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
-kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
-ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
-mappie = { id = "tech.mappie.plugin", version.ref = "mappie" }
-metro = { id = "dev.zacsweers.metro", version.ref = "metro" }
-module-graph = { id = "dev.iurysouza.modulegraph", version.ref = "module-graph" }
-mokkery = { id = "dev.mokkery", version.ref = "mokkery" }
-sort-dependencies = { id = "com.squareup.sort-dependencies", version.ref = "sort-dependencies" }
-sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
-test-retry = { id = "org.gradle.test-retry", version.ref = "test-retry" }

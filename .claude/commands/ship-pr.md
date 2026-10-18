@@ -27,11 +27,11 @@ poll loop and a completion notification rather than blocking; CI takes 10–25 m
 - If a check fails, read its logs (`gh run view <run-id> --log-failed`), fix the cause, run the
   relevant `bazel test` target locally, commit, push, and go back to polling.
 - Known flakes in this repo (from project memory):
-  - `qodana` sometimes fails with a "languageLevel null" Gradle-import crash and no SARIF — just
-    re-run it (`gh run rerun <run-id> --failed`), don't debug it.
-  - Jacoco "Stream closed" coverage failures — re-run.
+  - `qodana` reporting masses of "unused" or "unresolved" findings means the IDE didn't open the
+    project through Bazel (`.qodana/open-as-bazel.sh`), not that the code changed — check its log
+    before fixing anything.
   - `codecov` is NOT a required check; don't block on it.
-  - app:ui:core jvmTest ComposeTimeoutException under load is flaky — re-run before investigating.
+  - `//app/ui/core:test_jvm` ComposeTimeoutException under load is flaky — re-run before investigating.
 - Repeat until every required check is green.
 
 ## Phase 3 — Ready for review

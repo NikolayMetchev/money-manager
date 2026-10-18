@@ -200,7 +200,7 @@ class DatabaseSessionsTest {
                     upload = true,
                     keepLocal = false,
                     password = null,
-                    decision.localChanged,
+                    localChanged = true,
                 )
             assertEquals(SyncResult.UPLOADED, outcome.syncResult)
             assertFalse(outcome.keptLocal)

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Catalog is the part of gradle/libs.versions.toml the resolver reads: [versions] and [libraries].
+// Catalog is the part of libs.versions.toml the resolver reads: [versions] and [libraries].
 type Catalog struct {
 	Versions  map[string]string
 	Libraries map[string]Coordinate // alias (kotlinx-coroutines-core) → coordinate

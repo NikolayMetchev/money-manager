@@ -1,5 +1,5 @@
 """`sqlite_amalgamation` (#1012): the SQLite amalgamation utils/sqlite3 compiles for every native target, at the
-release, year and SHA-256 that `sqlite-amalgamation-*` pins in gradle/libs.versions.toml."""
+release, year and SHA-256 that `sqlite-amalgamation-*` pins in libs.versions.toml."""
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("//bazel/kmp/deps:catalog.bzl", "catalog")
@@ -9,7 +9,7 @@ exports_files(["sqlite3.c", "sqlite3.h"], visibility = ["//visibility:public"])
 """
 
 def _impl(mctx):
-    versions, _, _ = catalog(mctx.read(Label("//gradle:libs.versions.toml")))
+    versions, _, _ = catalog(mctx.read(Label("//:libs.versions.toml")))
     release = versions["sqlite-amalgamation-release"]
     http_archive(
         name = "sqlite_amalgamation",

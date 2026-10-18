@@ -233,7 +233,7 @@ class PayPalImportE2ETest : DbTest() {
             val fee = gbpTransfers.single { it.amount.hasDisplayValue("1.59") }
             assertEquals(gbp.id, fee.sourceAccountId)
             assertEquals(fees.id, fee.targetAccountId)
-            val sent = gbpTransfers.filter { it.amount.hasDisplayValue("8.00") }.single()
+            val sent = gbpTransfers.single { it.amount.hasDisplayValue("8.00") }
             assertEquals(gbp.id, sent.sourceAccountId)
             assertEquals(coffee.id, sent.targetAccountId)
             val conversionOut = gbpTransfers.single { it.amount.hasDisplayValue("10.00") }

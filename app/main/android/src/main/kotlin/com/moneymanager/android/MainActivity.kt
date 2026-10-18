@@ -42,14 +42,14 @@ class MainActivity : ComponentActivity() {
     private fun ensureRemoteUpToDate(): Boolean {
         val controller = remoteController ?: return false
         val database = openDatabase ?: return false
-        if (!controller.hasActiveSession()) return false
-        return runCatching {
-            runBlocking {
-                // Guarded push: a BLOCKED result (another device pushed) means the remote is NOT up to
-                // date from our side, so the local copy must be kept rather than deleted.
-                !controller.hasUnsyncedChanges(database) || controller.syncNow(database) == SyncResult.UPLOADED
-            }
-        }.onFailure { logger.e(it) { "Failed to sync database" } }.getOrDefault(false)
+        return controller.hasActiveSession() &&
+            runCatching {
+                runBlocking {
+                    // Guarded push: a BLOCKED result (another device pushed) means the remote is NOT up to
+                    // date from our side, so the local copy must be kept rather than deleted.
+                    !controller.hasUnsyncedChanges(database) || controller.syncNow(database) == SyncResult.UPLOADED
+                }
+            }.onFailure { logger.e(it) { "Failed to sync database" } }.getOrDefault(false)
     }
 
     override fun onStop() {

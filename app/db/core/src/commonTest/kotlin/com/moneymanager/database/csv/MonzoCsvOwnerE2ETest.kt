@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.AttributeAccountMatcher
@@ -69,19 +67,18 @@ class MonzoCsvOwnerE2ETest : DbTest() {
             "Money In",
         )
 
+    /** One row of a payment to or from Olga Zakharenko. */
     private fun row(
-        transactionId: String,
         type: String,
-        name: String,
         amount: String,
         description: String,
     ): List<String> =
         listOf(
-            transactionId,
+            "tx_1",
             "19/11/2023",
             "21:15:00",
             type,
-            name,
+            "Olga Zakharenko",
             "",
             "Transfers",
             amount,
@@ -97,16 +94,13 @@ class MonzoCsvOwnerE2ETest : DbTest() {
             "",
         )
 
-    private suspend fun stage(
-        fileName: String,
-        rows: List<List<String>>,
-    ): CsvImport {
+    private suspend fun stage(rows: List<List<String>>): CsvImport {
         val id =
             repositories.csvImportRepository.createImport(
-                fileName = fileName,
+                fileName = "MonzoDataExport.csv",
                 headers = headers,
                 rows = rows,
-                fileChecksum = "checksum-$fileName",
+                fileChecksum = "checksum-MonzoDataExport.csv",
                 fileLastModified = now,
             )
         return repositories.csvImportRepository.getImport(id).first()!!
@@ -145,10 +139,7 @@ class MonzoCsvOwnerE2ETest : DbTest() {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
 
             val export =
-                stage(
-                    "MonzoDataExport.csv",
-                    listOf(row("tx_1", "Monzo-to-Monzo", "Olga Zakharenko", "6.00", "Olga Zakharenko")),
-                )
+                stage(listOf(row("Monzo-to-Monzo", "6.00", "Olga Zakharenko")))
             val result = applyAll(listOf(export))
             assertEquals(1, result.filesImported)
             assertEquals(1, result.transfersCreated)
@@ -177,10 +168,7 @@ class MonzoCsvOwnerE2ETest : DbTest() {
             // Same name, but an ordinary payment (not Monzo-to-Monzo) — must resolve the plain-name
             // account and create no Person/ownership, exactly like today's behaviour.
             val export =
-                stage(
-                    "MonzoDataExport.csv",
-                    listOf(row("tx_1", "Faster payment", "Olga Zakharenko", "-6.00", "To Olga")),
-                )
+                stage(listOf(row("Faster payment", "-6.00", "To Olga")))
             val result = applyAll(listOf(export))
             assertEquals(1, result.filesImported)
 

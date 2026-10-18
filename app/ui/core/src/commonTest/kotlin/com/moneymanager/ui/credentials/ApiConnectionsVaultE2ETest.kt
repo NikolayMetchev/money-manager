@@ -1,6 +1,7 @@
 package com.moneymanager.ui.credentials
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -48,7 +49,7 @@ class ApiConnectionsVaultE2ETest : DbTest() {
             repositories.apiSessionRepository.getAllCredentials().singleOrNull { it.strategyId == strategy.id }
         }
 
-    private fun androidx.compose.ui.test.ComposeUiTest.showConnections(vault: CredentialVault) {
+    private fun ComposeUiTest.showConnections(vault: CredentialVault) {
         setContent {
             CompositionLocalProvider(
                 LocalImportEngine provides repositories.importEngine,

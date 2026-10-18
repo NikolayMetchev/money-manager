@@ -7,6 +7,9 @@ load("@gazelle//:def.bzl", "gazelle", "gazelle_binary")
 # The app version, compiled into app/di/core (#1011).
 exports_files(["VERSION"])
 
+# The version catalog, read by the maven_kmp, android_sdk and sqlite module extensions (MODULE.bazel).
+exports_files(["libs.versions.toml"])
+
 # detekt's configuration, over its defaults (//bazel/kmp/lint, #1015).
 exports_files(["detekt.yml"])
 
@@ -26,7 +29,7 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-# Gazelle, then ktlint -F over the tree, as `./gradlew lintFormat` (#1015).
+# Gazelle, then ktlint -F over the tree (#1015).
 alias(
     name = "format",
     actual = "//bazel/kmp/lint:format",

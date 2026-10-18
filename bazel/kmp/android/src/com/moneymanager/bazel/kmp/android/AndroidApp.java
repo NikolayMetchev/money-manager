@@ -56,6 +56,7 @@ import java.security.cert.X509Certificate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,7 +64,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
@@ -87,7 +87,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 public final class AndroidApp {
   private AndroidApp() {}
 
-  public static void main(String[] args) throws Exception {
+  static void main(String[] args) throws Exception {
     Map<String, List<String>> flags = parse(Arrays.copyOfRange(args, 1, args.length));
     switch (args[0]) {
       case "manifest" -> manifest(flags);
@@ -127,7 +127,7 @@ public final class AndroidApp {
     if (values == null || values.size() != 1) {
       throw new IllegalArgumentException("expected one --" + name);
     }
-    return values.get(0);
+    return values.getFirst();
   }
 
   /** An app whose libraries ship no baseline profile has none to rewrite. */
@@ -185,7 +185,7 @@ public final class AndroidApp {
         Integer.valueOf(one(flags, "compile-sdk")),
         false);
     if (report.getResult().isError()) {
-      report.getLoggingRecords().forEach(r -> System.err.println(r));
+      report.getLoggingRecords().forEach(System.err::println);
       throw new IllegalStateException("manifest merge failed");
     }
   }
@@ -251,10 +251,14 @@ public final class AndroidApp {
 
   private static void writeMerged(MergingReport report, File out) throws IOException {
     if (report.getResult().isError()) {
-      report.getLoggingRecords().forEach(r -> System.err.println(r));
+      report.getLoggingRecords().forEach(System.err::println);
       throw new IllegalStateException("manifest merge failed");
     }
-    Files.writeString(out.toPath(), report.getMergedDocument(MergingReport.MergedManifestKind.MERGED));
+    String merged = report.getMergedDocument(MergingReport.MergedManifestKind.MERGED);
+    if (merged == null) {
+      throw new IllegalStateException("manifest merge produced no merged document");
+    }
+    Files.writeString(out.toPath(), merged);
   }
 
   /**
@@ -305,7 +309,7 @@ public final class AndroidApp {
       try (ZipFile zip = new ZipFile(jar)) {
         List<ZipEntry> r8 = new ArrayList<>();
         List<ZipEntry> proguard = new ArrayList<>();
-        for (ZipEntry e : zip.stream().sorted((a, b) -> a.getName().compareTo(b.getName())).toList()) {
+        for (ZipEntry e : zip.stream().sorted(Comparator.comparing(ZipEntry::getName)).toList()) {
           String name = e.getName();
           if (e.isDirectory()) {
             continue;
@@ -665,16 +669,16 @@ public final class AndroidApp {
   }
 
   private static int deflatedSize(byte[] bytes) {
-    Deflater deflater = new Deflater(Deflater.DEFAULT_COMPRESSION, true);
-    deflater.setInput(bytes);
-    deflater.finish();
-    byte[] buffer = new byte[8192];
-    int size = 0;
-    while (!deflater.finished()) {
-      size += deflater.deflate(buffer);
+    try (Deflater deflater = new Deflater(Deflater.DEFAULT_COMPRESSION, true)) {
+      deflater.setInput(bytes);
+      deflater.finish();
+      byte[] buffer = new byte[8192];
+      int size = 0;
+      while (!deflater.finished()) {
+        size += deflater.deflate(buffer);
+      }
+      return size;
     }
-    deflater.end();
-    return size;
   }
 
   private static Map<String, byte[]> mergeJavaRes(List<String> jars) throws IOException {
@@ -720,7 +724,7 @@ public final class AndroidApp {
       return;
     }
     try (Stream<Path> walk = Files.walk(dir)) {
-      for (Path p : walk.filter(Files::isRegularFile).sorted().collect(Collectors.toList())) {
+      for (Path p : walk.filter(Files::isRegularFile).sorted().toList()) {
         String path = prefix + dir.relativize(p).toString().replace(File.separatorChar, '/');
         into.putIfAbsent(path, p.toFile());
       }

@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.qif
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ExistingTransferInfo

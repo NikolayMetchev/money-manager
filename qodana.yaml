@@ -8,16 +8,25 @@
 # .qodana/profile.xml, not excluded here.
 #
 # The recurring defects, referenced by number below:
-#   [1] QD-14665 — Metro DI annotations (@Provides/@ContributesTo/@DependencyGraph) are marked as
-#       entry points in .idea/misc.xml, but the linter still reports some identically-annotated
-#       providers/graph members as unused (e.g. every provide*WriteRepository in RepositoryModule).
-#   [2] Per-module KMP import — the linter resolves each Gradle module in isolation, so symbols
+#   [1] Metro DI — @Provides/@ContributesTo/@DependencyGraph members are only reached through the
+#       graph Metro generates, so the linter reports the providers, binding containers and graph members
+#       as unused. (.idea/misc.xml marks them as entry points, but a Bazel-model scan opens the checkout
+#       without .idea — see .qodana/open-as-bazel.sh — so the containers are excluded by path.)
+#   [2] Per-module KMP import — the linter resolves each module in isolation, so symbols
 #       consumed from another module (expect/actual counterparts, platform impls wired from
 #       app/main, test fixtures in test/*, parameters whose non-constant callers live elsewhere)
 #       are reported unused/constant.
 #   [3] EAP KotlinUnreachableCode — everything after `?: throw`/`?: error(...)` inside a lambda or
 #       `use {}` block is flagged unreachable, once per column; the flagged code demonstrably runs
 #       (the files execute in production/CI).
+#   [5] The Bazel project model has no Kotlin Multiplatform: each module's `_jvm` target holds its
+#       commonMain, jvmAndroidMain and jvmMain sources as one JVM module, and the native-only modules
+#       (the CLI) are in no module at all. So expect/actual pairs aren't linked (jvm/android actuals look
+#       unused), common-only extensions don't resolve (`Dispatchers.IO`'s common import, LazyListScope's
+#       `items`/`item`, so their imports and receivers look unused), what only the CLI consumes looks
+#       unused, and SQLDelight's generated Kotlin reaches the model as compiled classes (platform types,
+#       unresolved KDoc links, receivers whose columns resolve to nothing). Every entry was checked against
+#       its users; the build compiles every target with -Werror.
 #   [4] Interface-mandated members — override parameters of test fakes and intentional constant
 #       returns/no-op bodies of capability methods are design, not defects; the linter has no way
 #       to know (and for override params even contradicts its own Java-side exemption).
@@ -25,7 +34,21 @@
 version: "1.0"
 linter: jetbrains/qodana-jvm-community:2026.2
 plugins:
-  - id: com.squareup.sqldelight
+  # The IDE's project model comes from a Bazel sync (the JetBrains Bazel plugin, as JetBrains' own Qodana run of
+  # that plugin's repository does): each module's `_jvm` target is a module holding its commonMain, jvmAndroidMain
+  # and jvmMain sources, so native-only source sets belong to no module and aren't analysed.
+  - id: org.jetbrains.bazel
+# The sync runs Bazel inside the container (the Qodana job mounts the runner's Android SDK and passes the BuildBuddy
+# RBE settings in user.bazelrc). Bazel downloads the JDK, Kotlin and every library itself; it needs only bazelisk and a C
+# compiler for the host toolchain's autodetection.
+bootstrap: >-
+  apt-get update -qq &&
+  apt-get install -y -qq --no-install-recommends ca-certificates curl gcc g++ python3 > /dev/null &&
+  mkdir -p /usr/local/bin &&
+  curl -fsSL -o /usr/local/bin/bazel
+  https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 &&
+  chmod +x /usr/local/bin/bazel &&
+  sh .qodana/open-as-bazel.sh
 profile:
   path: .qodana/profile.xml
 exclude:
@@ -81,6 +104,37 @@ exclude:
   - name: KotlinUnusedImport
     paths:
       - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/navigation/ScreenSerialization.kt
+      # [5] — `import kotlinx.coroutines.IO` (common Dispatchers.IO), used by withContext(Dispatchers.IO).
+      - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/ImportDirectoryDiscovery.kt
+      - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/ImportDirectoryScanner.kt
+      - app/importdirectory/src/commonMain/kotlin/com/moneymanager/importdirectory/ImportDirectoryService.kt
+      - app/importfilesource/localfolder/src/commonMain/kotlin/com/moneymanager/importfilesource/localfolder/LocalFolderImportFileSource.kt
+      - app/remotestorage/googledrive/src/commonMain/kotlin/com/moneymanager/remotestorage/googledrive/DriveImportFileSource.kt
+      - app/remotestorage/googledrive/src/commonMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProvider.kt
+      - app/remotestorage/googledrive/src/commonMain/kotlin/com/moneymanager/remotestorage/googledrive/LoopbackGoogleAccessTokenSource.kt
+      - app/remotestorage/googledrive/src/commonMain/kotlin/com/moneymanager/remotestorage/googledrive/LoopbackRedirectReceiver.kt
+      - app/strategycatalog/src/commonMain/kotlin/com/moneymanager/strategycatalog/LocalDirectoryStrategyCatalogSource.kt
+      # [5] — `import androidx.compose.foundation.lazy.items`, used by the LazyColumn's items(...) calls.
+      - app/ui/accounts/src/commonMain/kotlin/com/moneymanager/ui/screens/accounts/AccountsScreen.kt
+      - app/ui/audit/src/commonMain/kotlin/com/moneymanager/ui/audit/AuditScreen.kt
+      - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/screens/PassThroughAccountsScreen.kt
+      - app/ui/currencies/src/commonMain/kotlin/com/moneymanager/ui/screens/currencies/AssetListTab.kt
+      - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/ApiConnectionsScreen.kt
+      - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/ApiSessionsScreen.kt
+      - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/ApiStrategiesScreen.kt
+      - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/editor/ApiEditorComponents.kt
+      - app/ui/imports/csv/src/commonMain/kotlin/com/moneymanager/ui/screens/accountmapping/AccountMappingsScreen.kt
+      - app/ui/imports/csv/src/commonMain/kotlin/com/moneymanager/ui/screens/csv/CsvImportsScreen.kt
+      - app/ui/imports/csv/src/commonMain/kotlin/com/moneymanager/ui/screens/csvstrategy/CsvStrategiesScreen.kt
+      - app/ui/imports/csv/src/commonMain/kotlin/com/moneymanager/ui/screens/csvstrategy/StrategyDialogs.kt
+      - app/ui/imports/importDirectory/src/commonMain/kotlin/com/moneymanager/ui/screens/importdirectory/DriveFolderPickerDialog.kt
+      - app/ui/imports/qif/src/commonMain/kotlin/com/moneymanager/ui/components/qif/QifRecordList.kt
+      - app/ui/imports/qif/src/commonMain/kotlin/com/moneymanager/ui/screens/qif/QifImportsScreen.kt
+      - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/CardLast4Screen.kt
+      - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/ReconciliationScreen.kt
+      - app/ui/people/src/commonMain/kotlin/com/moneymanager/ui/screens/people/PeopleScreen.kt
+      - app/ui/settings/src/commonMain/kotlin/com/moneymanager/ui/screens/settings/StrategyCatalogScreen.kt
+      - app/ui/transactions/src/commonMain/kotlin/com/moneymanager/ui/screens/transactions/ManualEntriesScreen.kt
 
   # Mokkery `calls { (code) -> ... it.code == code }` — the lambda parameter comes from the mock
   # invocation at runtime; the condition is not constant.
@@ -100,6 +154,56 @@ exclude:
       - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/ImportDirectoryScanner.kt
       - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/QifStagingConversion.kt
       - app/importfilesource/localfolder/src/androidMain/kotlin/com/moneymanager/importfilesource/localfolder/SafFolderImportFileSource.kt
+      # [5] — the receivers are SQLDelight row/query types whose columns and queries the bodies read.
+      - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/AccountBalanceMapper.kt
+      - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/EntitySourceMapper.kt
+      - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/TradeAuditEntryMapper.kt
+      - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/TransferAuditEntryMapper.kt
+      - app/db/repository/src/commonMain/kotlin/com/moneymanager/database/repository/ApiSessionReadRepositoryImpl.kt
+      - app/db/repository/src/commonMain/kotlin/com/moneymanager/database/repository/QifImportReadRepositoryImpl.kt
+      - app/db/write/src/commonMain/kotlin/com/moneymanager/database/write/CsvImportStrategyInsert.kt
+      # [5] — legGroups calls LazyListScope.item; showConnections calls ComposeUiTest.setContent.
+      - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/ReconciliationScreen.kt
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/credentials/ApiConnectionsVaultE2ETest.kt
+
+  # KonanLauncher loads the Kotlin/Native compiler reflectively: the KotlinMetadataCompiler it passes IS a
+  # CLICompiler, but only at run time, so the linter sees an Object.
+  - name: JavaReflectionInvocation
+    paths:
+      - bazel/kmp/native/launcher/src/com/moneymanager/bazel/kmp/nativelauncher/KonanLauncher.java
+
+  # Java 25 launches a non-public main, but `bazel coverage` starts the test runner through JaCoCo's
+  # JacocoCoverageRunner, which finds main with Class.getMethod: public methods only.
+  - name: UnnecessaryModifier
+    paths:
+      - bazel/kmp/testing/src/com/moneymanager/bazel/kmp/testing/KmpJUnitRunner.java
+
+  # [5] — the wrapper's query properties are typed by SQLDelight's generated Kotlin (not platform types),
+  # and its KDoc links that generated MoneyManagerDatabase.
+  - name: HasPlatformType
+    paths:
+      - app/db/write/src/commonMain/kotlin/com/moneymanager/database/write/MoneyManagerDatabaseWrapper.kt
+  - name: KDocUnresolvedReference
+    paths:
+      - app/db/write/src/commonMain/kotlin/com/moneymanager/database/write/MoneyManagerDatabaseWrapper.kt
+
+  # The Starlark plugin reports rules and module extensions other files load (`aar_import = rule(...)`)
+  # and locals that are reassigned and then read (`line = line.strip()`, `quoted = not quoted`) as
+  # "never used". Bazel evaluates every one of these files on each build.
+  - name: Annotator
+    paths:
+      - bazel/kmp/android/aar.bzl
+      - bazel/kmp/android/extensions.bzl
+      - bazel/kmp/checks/checks.bzl
+      - bazel/kmp/constants/google_oauth.bzl
+      - bazel/kmp/deps/catalog.bzl
+      - bazel/kmp/deps/extensions.bzl
+      - bazel/kmp/metadata.bzl
+      - bazel/kmp/native.bzl
+      - bazel/kmp/native/extensions.bzl
+      - bazel/kmp/native/properties.bzl
+      - bazel/kmp/native/toolchain.bzl
+      - bazel/kmp/sqlite/extensions.bzl
 
   # [2] — refreshViews/sourceAccountOverride/engineBatchSize are passed other values by callers in
   # the UI modules (and one Poi-typed test builder the linter can't resolve).
@@ -125,6 +229,8 @@ exclude:
       - test/app/db/src/androidMain/kotlin/com/moneymanager/test/database/TestDatabaseHelper.kt
       # The JVM can't switch console modes, so its VT-enable actual is always true (Windows' actual isn't).
       - app/terminal/src/jvmMain/kotlin/com/moneymanager/terminal/TerminalFacts.jvm.kt
+      # [1] — the Metro plugin test's fixture provides a constant so the test can assert the graph built it.
+      - bazel/kmp/plugins/tests/src/commonMain/kotlin/com/moneymanager/bazel/plugins/Plugins.kt
 
   # [4] — deliberate no-op bodies: the Android onCreate-for-existing-DB branch and the Android
   # scrollbar actuals (Android has no desktop-style scrollbars).
@@ -233,8 +339,47 @@ exclude:
       - app/terminal/src/jvmMain/kotlin/com/moneymanager/terminal/Interrupts.jvm.kt
       # CliRuntime.withProgress has no caller until the import commands (#939) land; drop this entry then.
       - app/main/cli/src/commonMain/kotlin/com/moneymanager/cli/MmCommand.kt
+      # [5] — Screen's constructor properties are read by MoneyManagerApp's navigation entries (app/ui/core).
+      - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/navigation/Screen.kt
   - name: UnusedSymbol
     paths:
+      # [1] — Metro binding containers (and the Metro plugin test's fixtures).
+      - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/DatabaseManagerModule.kt
+      - app/remotestorage/di/src/commonMain/kotlin/com/moneymanager/remotestorage/di/RemoteStorageModule.kt
+      - app/strategycatalog/di/src/commonMain/kotlin/com/moneymanager/strategycatalog/di/StrategyCatalogModule.kt
+      - utils/credentialvault/di/src/commonMain/kotlin/com/moneymanager/credentialvault/di/CredentialVaultModule.kt
+      - utils/localsettings/di/src/commonMain/kotlin/com/moneymanager/localsettings/di/LocalSettingsModule.kt
+      - bazel/kmp/plugins/tests/metro/contributor/src/commonMain/kotlin/com/moneymanager/bazel/metro/contributor/GreetingModule.kt
+      - bazel/kmp/plugins/tests/src/commonMain/kotlin/com/moneymanager/bazel/plugins/Plugins.kt
+      # [5] — actuals of common expects (BigDecimal/BigInteger, Currency, the file pickers, the vault path
+      # resolver, the crypto catalog file, the remote cache location, the test database loader) and
+      # MainActivity, which the Android manifest names.
+      - utils/bigdecimal/src/jvmAndroidMain/kotlin/com/moneymanager/bigdecimal/BigDecimal.kt
+      - utils/bigdecimal/src/jvmAndroidMain/kotlin/com/moneymanager/bigdecimal/BigInteger.kt
+      - utils/currency/src/jvmAndroidMain/kotlin/com/moneymanager/currency/Currency.kt
+      - utils/compose/filePicker/src/androidMain/kotlin/com/moneymanager/compose/filepicker/FileSaver.kt
+      - utils/compose/filePicker/src/androidMain/kotlin/com/moneymanager/compose/filepicker/FolderPickerLauncher.kt
+      - utils/compose/filePicker/src/jvmMain/kotlin/com/moneymanager/compose/filepicker/FilePicker.kt
+      - utils/compose/filePicker/src/jvmMain/kotlin/com/moneymanager/compose/filepicker/FileSaver.kt
+      - utils/credentialvault/di/src/jvmMain/kotlin/com/moneymanager/credentialvault/di/CreateVaultPathResolver.jvm.kt
+      - app/cryptodata/src/jvmMain/kotlin/com/moneymanager/cryptodata/CryptoCatalogStore.jvm.kt
+      - app/model/core/src/androidMain/kotlin/com/moneymanager/domain/model/RemoteCacheLocation.kt
+      - test/app/ui/src/androidMain/kotlin/com/moneymanager/ui/test/TestDatabaseLoader.kt
+      - app/main/android/src/main/kotlin/com/moneymanager/android/MainActivity.kt
+      # [5] — used from platform source sets: FileDatabaseManager by the JVM and native managers,
+      # fileRemoteCacheLocation and defaultLocalSettingsPath by the JVM and native actuals, isSupported by
+      # the settings and vault screens through the platform launchers.
+      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/FileDatabaseManager.kt
+      - app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/RemoteArchive.kt
+      - utils/localsettings/src/commonMain/kotlin/com/moneymanager/localsettings/FileLocalSettings.kt
+      - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/foundation/CredentialFileLocationPicker.kt
+      # [5] — the CLI's query DTOs and helpers (Envelope, toJson, toBalanceRows, ImportDirectoryQuery, …).
+      - app/query/src/commonMain/kotlin/com/moneymanager/query/QueryJson.kt
+      - app/query/src/commonMain/kotlin/com/moneymanager/query/ImportDirectoryQuery.kt
+      # [5] — every constructor property is read in the class body (importEngine.ensureApiCredentials, …).
+      - app/apiimport/src/commonMain/kotlin/com/moneymanager/apiimport/ApiImportService.kt
+      # [4] — FakeTrafficRecorder's ids are returned by its ApiTrafficRecorder overrides.
+      - utils/rest/src/commonTest/kotlin/com/moneymanager/rest/ApiClientTest.kt
       # CliRuntime.withProgress has no caller until the import commands (#939) land; drop this entry then.
       - app/main/cli/src/commonMain/kotlin/com/moneymanager/cli/MmCommand.kt
       - app/db/core/src/androidMain/kotlin/com/moneymanager/database/AndroidDatabaseManager.kt
@@ -265,28 +410,20 @@ exclude:
       - utils/credentialvault/di/src/androidMain
       - test/utils/credentialvault/src
 
-  # Generated sources (SQLDelight/Mappie/Compose codegen) live under build/ — not hand-written
-  # code, so findings there are not actionable. Only literal paths are honoured by the linter
-  # (wildcard globs silently don't match), so every module whose codegen produces findings
-  # needs a literal entry.
+  # Bazel's output trees (generated SQLDelight sources, kotlin_constants output) are not hand-written code, and
+  # user.bazelrc carries the CI's BuildBuddy key. Only literal paths are honoured by the linter (wildcard globs
+  # silently don't match).
   - name: All
     paths:
-      - build
-      - app/db/read/build
-      - app/db/write/build
-      - app/db/schema/build
-      - app/db/seed/build
-      - app/db/repository/build
-      - app/db/di/build
-      - app/model/repository/read/build
-      - app/model/repository/write/build
-      - gradle/build-logic/build
-      - app/db/core/build
-      - app/ui/core/build
-      # GenerateKotlinConstantsTask output (build-time data: version, crypto catalog, OAuth client).
-      - app/cryptodata/build
-      - app/di/core/build
-      - app/remotestorage/googledrive/build
+      - bazel-bin
+      - bazel-out
+      - bazel-testlogs
+      - bazel-money-manager
+      - user.bazelrc
+      # The Bazel plugin's sync state and the logs a Bazel run leaves in the workspace.
+      - .bazelbsp
+      - bazel-remote-grpc.log
+      - execution_log.binpb.zst
 
 include:
   - name: CheckDependencyLicenses

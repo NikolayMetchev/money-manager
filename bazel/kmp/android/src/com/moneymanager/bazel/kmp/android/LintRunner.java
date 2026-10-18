@@ -16,7 +16,7 @@ import java.util.List;
 public final class LintRunner {
   private LintRunner() {}
 
-  public static void main(String[] args) throws Exception {
+  static void main(String[] args) throws Exception {
     Path root = Path.of("").toAbsolutePath();
     Path tmp = Path.of(System.getenv().getOrDefault("TEST_TMPDIR", System.getProperty("java.io.tmpdir")))
         .toAbsolutePath();

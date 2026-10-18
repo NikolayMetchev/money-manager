@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.database.api
 
 import com.moneymanager.apiimporter.importApiSessionExchange
@@ -215,16 +213,16 @@ class BybitCsvApiE2ETest : DbTest() {
         )
     }
 
-    private suspend fun accountByName(name: String) =
+    private suspend fun bybitAccount() =
         repositories.accountRepository
             .getAllAccounts()
             .first()
-            .firstOrNull { it.name == name }
+            .firstOrNull { it.name == "Bybit" }
 
     /** Bybit's counted balance per asset, zero balances dropped. */
     private suspend fun bybitBalances(): Map<String, String> {
         repositories.maintenanceService.refreshMaterializedViews()
-        val bybit = assertNotNull(accountByName("Bybit"))
+        val bybit = assertNotNull(bybitAccount())
         return repositories.transactionRepository
             .getAccountBalances()
             .first()
@@ -233,7 +231,7 @@ class BybitCsvApiE2ETest : DbTest() {
     }
 
     private suspend fun reconciledLinkCount(): Int {
-        val bybit = assertNotNull(accountByName("Bybit"))
+        val bybit = assertNotNull(bybitAccount())
         val transfers = repositories.transactionRepository.getTransactionsByAccount(bybit.id).first()
         return repositories.transferRelationshipRepository
             .getByTransfers(transfers.map { it.id })
@@ -241,7 +239,7 @@ class BybitCsvApiE2ETest : DbTest() {
     }
 
     private suspend fun countedDepositTimestamps(): List<String> {
-        val bybit = assertNotNull(accountByName("Bybit"))
+        val bybit = assertNotNull(bybitAccount())
         return repositories.transactionRepository
             .getTransactionsByAccount(bybit.id)
             .first()
@@ -262,7 +260,7 @@ class BybitCsvApiE2ETest : DbTest() {
             importCsv()
 
             assertEquals(exportBalances, bybitBalances())
-            val bybit = assertNotNull(accountByName("Bybit"))
+            val bybit = assertNotNull(bybitAccount())
             assertEquals(
                 3,
                 repositories.tradeRepository

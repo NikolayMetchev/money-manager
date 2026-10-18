@@ -226,7 +226,7 @@ def _install(module_ctx, install, files, archives):
     stale = ""
     if lock["inputs"] != expected:
         stale = ("%s is out of date with MODULE.bazel's maven_kmp.install(name = %r) or " % (lock_path, install.name) +
-                 "gradle/libs.versions.toml. Re-pin with `bazel run @%s//:pin`." % install.name)
+                 "%s. Re-pin with `bazel run @%s//:pin`." % (_lock_path(install.catalog), install.name))
 
     names = lock["names"]
     targets = []
@@ -245,7 +245,7 @@ def _install(module_ctx, install, files, archives):
             targets.append(_target(names[module], platform, resolved, names, lock["artifacts"]))
 
     pin_args = ["$(rootpath @money_manager//bazel/kmp/resolver)", "--lock", lock_path]
-    pin_args += ["--toml", "gradle/libs.versions.toml"]
+    pin_args += ["--toml", _lock_path(install.catalog)]
     pin_args += ["--library=" + alias for alias in install.libraries]
     pin_args += ["--library-platforms=%s=%s" % (a, ",".join(p)) for a, p in sorted(install.library_platforms.items())]
     pin_args += ["--platform=" + p for p in install.platforms]
@@ -255,6 +255,8 @@ def _install(module_ctx, install, files, archives):
     pin_args += ["--exclude=" + e for e in install.excludes]
     if install.resolve_stdlib:
         pin_args.append("--resolve-stdlib")
+    for alias, actual in sorted(install.aliases.items()):
+        targets.append('alias(name = "%s", actual = ":%s")\n' % (alias, actual))
     return _HEADER.format(pin_args = repr(pin_args)) + "\n" + "\n".join(targets), stale
 
 def _maven_kmp_impl(module_ctx):
@@ -283,7 +285,10 @@ maven_kmp = module_extension(
     implementation = _maven_kmp_impl,
     tag_classes = {
         "install": tag_class(attrs = {
-            "catalog": attr.label(mandatory = True, doc = "gradle/libs.versions.toml."),
+            "aliases": attr.string_dict(
+                doc = "name → one of the hub's targets, for a tool that expects another name for it (rules_jvm_external's).",
+            ),
+            "catalog": attr.label(mandatory = True, doc = "The version catalog (libs.versions.toml)."),
             "excludes": attr.string_list(doc = "group:artifact never resolved, whoever depends on it."),
             "force_bundles": attr.string_list(doc = "Catalog bundles whose every library is forced to its version."),
             "forces": attr.string_dict(
@@ -301,7 +306,7 @@ maven_kmp = module_extension(
                       "(a tool's classpath never meets the app's), into its own lockfile.",
             ),
             "platforms": attr.string_list(doc = "android, jvm, metadata, linuxX64, linuxArm64, macosArm64, mingwX64."),
-            "repositories": attr.string_list(doc = "url[=group-regex,…], in order, as in settings.gradle.kts."),
+            "repositories": attr.string_list(doc = "url[=group-regex,…], in order."),
             "resolve_stdlib": attr.bool(
                 doc = "Resolve the Kotlin stdlib like any library, for a tool's own classpath (else the toolchain's).",
             ),

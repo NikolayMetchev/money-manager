@@ -35,9 +35,8 @@ suspend fun runFullScreen(
     body: suspend () -> Unit,
 ) = coroutineScope {
     val tty = Tty.tryBind() ?: throw NotATerminalException()
-    try {
-        val terminal = KeyFilterTerminal(tty.asTerminalIn(this), this)
-        try {
+    tty.use {
+        KeyFilterTerminal(tty.asTerminalIn(this), this).use { terminal ->
             val screen = ScreenWriter(terminal) { tty.writeFully(it) }
             // Leaving is in a finally that also covers entering: a write failing halfway through entering
             // must still switch the alternate screen back off.
@@ -68,11 +67,7 @@ suspend fun runFullScreen(
             } finally {
                 screen.leave()
             }
-        } finally {
-            terminal.close()
         }
-    } finally {
-        tty.close()
     }
 }
 

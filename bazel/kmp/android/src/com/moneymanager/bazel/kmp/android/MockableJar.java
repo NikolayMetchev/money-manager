@@ -11,7 +11,7 @@ import java.io.File;
 public final class MockableJar {
   private MockableJar() {}
 
-  public static void main(String[] args) throws Exception {
+  static void main(String[] args) throws Exception {
     if (args.length != 2) {
       throw new IllegalArgumentException("usage: MockableJar <android.jar> <out>");
     }

@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.database.csv
 
 import com.moneymanager.test.database.DbTest
@@ -12,7 +10,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 /**
- * Verifies the in-place re-staging of an Excel import: [restageImport] replaces the staged rows/columns
+ * Verifies the in-place re-staging of an Excel import: [restageImport][com.moneymanager.domain.repository.write.CsvImportWriteRepository.restageImport] replaces the staged rows/columns
  * with a different worksheet's data (keeping the import id and its stored workbook bytes), which is what
  * lets the applier switch to the sheet a matched strategy actually targets.
  */

@@ -1,4 +1,4 @@
-"""Reads gradle/libs.versions.toml, the one place versions live while Gradle and Bazel build side by side."""
+"""Reads libs.versions.toml, the one place versions live."""
 
 def _strip_comment(line):
     quoted = False

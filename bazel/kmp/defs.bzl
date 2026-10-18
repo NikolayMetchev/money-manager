@@ -176,9 +176,9 @@ def kmp_library(
         visibility = None):
     """A Kotlin Multiplatform module. Emits `:<name>_jvm`, `:<name>_android` and `:<name>_<target>` per native target.
 
-    The Android compile is AGP's Kotlin compile of an Android library (moneymanager.android-convention):
+    The Android compile is AGP's Kotlin compile of an Android library:
     `commonMain ← jvmAndroidMain ← androidMain` against the SDK's `android.jar` (`//bazel/kmp/android`), on the
-    same Kotlin toolchain as the JVM, as the convention gives both the catalog's `jvm-target`. Its resources,
+    same Kotlin toolchain (and `jvm_target`) as the JVM. Its resources,
     manifest and dexing are the app's (#1023).
 
     Args:
@@ -291,7 +291,7 @@ def kmp_library(
             module_name = module_name,
             plugins = plugin_labels(plugins, "jvm"),
             resource_jars = _resource_jars(name, "Main", resources),
-            # moneymanager.kotlin-multiplatform-convention puts Dispatchers.Main on every JVM runtime classpath.
+            # Dispatchers.Main on every JVM runtime classpath.
             runtime_deps = [Label("@maven_kmp//:kotlinx_coroutines_swing_jvm")],
             visibility = visibility,
         )

@@ -8,8 +8,7 @@ bzl_library(
     visibility = ["//visibility:public"],
 )
 
-# The flags moneymanager.kotlin-convention and moneymanager.kotlin-multiplatform-convention set on every
-# Gradle compile.
+# The flags every Kotlin compile gets.
 kt_kotlinc_options(
     name = "kotlinc_options",
     # allWarningsAsErrors.
@@ -28,7 +27,7 @@ define_kt_toolchain(
     # Never strip downstream compile jars to ABI jars: Metro's contribution hints (#1002) and Compose's
     # stability metadata live in what an ABI jar drops.
     experimental_use_abi_jars = False,
-    # jvm-target in gradle/libs.versions.toml.
+    # The JDK .bazelrc runs (java_language_version).
     jvm_target = "25",
     kotlinc_options = ":kotlinc_options",
 )

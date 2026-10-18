@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.database.csv
 
 import com.moneymanager.bigdecimal.BigDecimal
@@ -253,17 +251,14 @@ class CryptoComCsvE2ETest : DbTest() {
             assertEquals(cardRecord.id, reconciledLink.id2)
         }
 
-    /** Re-imports an already-imported file (plan + execute) with its built-in strategy. */
-    private suspend fun reimport(
-        importId: CsvImportId,
-        strategyName: String,
-    ): CsvReimportResult {
+    /** Re-imports an already-imported Crypto.com Fiat file (plan + execute) with its built-in strategy. */
+    private suspend fun reimportFiat(importId: CsvImportId): CsvReimportResult {
         val current = repositories.csvImportRepository.getImport(importId).first()!!
         val strategy =
             repositories.csvImportStrategyRepository
                 .getAllStrategies()
                 .first()
-                .first { it.name == strategyName }
+                .first { it.name == "Crypto.com Fiat" }
         val currencies = repositories.currencyRepository.getAllCurrencies().first()
         val plan =
             planCsvReimport(
@@ -350,7 +345,7 @@ class CryptoComCsvE2ETest : DbTest() {
                 ),
             )
 
-            val result = reimport(fiat.id, "Crypto.com Fiat")
+            val result = reimportFiat(fiat.id)
             assertEquals(1, result.counterpartyReconciledRows.size, "the deposit row is re-run")
             repositories.maintenanceService.refreshMaterializedViews()
 

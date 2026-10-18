@@ -2,13 +2,13 @@
 
 The values come from `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` (CI's secrets), else the
 gitignored `secrets/google-oauth.properties` (`clientId`, `clientSecret`), else empty, so a build without them
-still compiles and the feature reports "not configured". They're XOR-obfuscated here, at repository time, as
-build-logic's `xorObfuscate` does: the plaintext never becomes an action input or a cache key, and the
+still compiles and the feature reports "not configured". They're XOR-obfuscated here, at repository time, so
+the plaintext never becomes an action input or a cache key, and the
 `GOCSPX-…` literal never lands in an output for secret scanners to match. A speed bump, not protection: the
 real safeguards are the Cloud project's quota cap and rotating the client.
 """
 
-# Must match build-logic's XOR_BASE and the generator's.
+# Must match the generator's xorBase.
 _XOR_BASE = 0x3B
 _HEX = "0123456789abcdef"
 

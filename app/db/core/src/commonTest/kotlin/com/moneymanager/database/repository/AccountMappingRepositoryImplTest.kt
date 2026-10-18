@@ -64,7 +64,6 @@ class AccountMappingRepositoryImplTest : DbTest() {
             repositories.accountMappingRepository.createMapping(
                 valuePattern = Regex("global"),
                 accountId = account.id,
-                strategyId = null,
             )
             repositories.accountMappingRepository.createMapping(
                 valuePattern = Regex("scoped"),

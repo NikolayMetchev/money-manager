@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="//app/main/jvm:app" type="BazelRunConfigurationType">
+    <bsp-state handler-provider-id="JvmRunHandlerProvider" check-visibility="true">
+      <bsp-target>@//app/main/jvm:app</bsp-target>
+      <handler-state />
+    </bsp-state>
+    <method v="2">
+      <option name="KotlinCoroutineLibraryFinderBeforeRunTaskProvider" enabled="false" />
+      <option name="BuildScriptBeforeRunTaskProvider" enabled="false" />
+    </method>
+  </configuration>
+</component>

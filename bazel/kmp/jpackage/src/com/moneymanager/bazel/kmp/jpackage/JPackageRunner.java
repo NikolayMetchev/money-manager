@@ -52,7 +52,7 @@ public final class JPackageRunner {
 
   private JPackageRunner() {}
 
-  public static void main(String[] argv) throws Exception {
+  static void main(String[] argv) throws Exception {
     List<String> args = Files.readAllLines(Path.of(argv[0]));
     String mode = args.get(0);
     Path out = Path.of(args.get(1)).toAbsolutePath();
@@ -167,7 +167,7 @@ public final class JPackageRunner {
         } else {
           Files.copy(source, target, StandardCopyOption.COPY_ATTRIBUTES);
         }
-        target.toFile().setWritable(true, true);
+        makeWritable(target);
       }
     }
   }
@@ -181,7 +181,7 @@ public final class JPackageRunner {
   private static Path layOutLibs(Path libs, List<String> jars, Path work) throws Exception {
     Files.createDirectories(libs.resolve("resources"));
     String skikoJar = "skiko-awt-runtime-" + HOST_OS.id + "-" + HOST_ARCH;
-    Set<String> skikoNatives = HOST_OS.skikoNatives(HOST_ARCH);
+    Set<String> skikoNatives = HOST_OS.skikoNatives();
     for (String jar : jars) {
       Path source = Path.of(jar);
       Path target = libs.resolve(source.getFileName().toString());
@@ -190,7 +190,7 @@ public final class JPackageRunner {
       if (!skiko && !signDylibs) {
         Files.copy(source, target);
         // Bazel's inputs are read-only, and Windows won't delete a read-only copy.
-        target.toFile().setWritable(true, true);
+        makeWritable(target);
         continue;
       }
       try (ZipInputStream in = new ZipInputStream(Files.newInputStream(source));
@@ -345,7 +345,7 @@ public final class JPackageRunner {
     if (values == null || values.size() != 1) {
       throw new IllegalArgumentException("expected one " + name + ", got " + values);
     }
-    return values.get(0);
+    return values.getFirst();
   }
 
   private static void deleteRecursively(Path dir) throws IOException {
@@ -355,9 +355,16 @@ public final class JPackageRunner {
     try (Stream<Path> walk = Files.walk(dir)) {
       for (Path path : walk.sorted(Comparator.reverseOrder()).toList()) {
         // Windows won't delete a read-only file.
-        path.toFile().setWritable(true, true);
+        makeWritable(path);
         Files.delete(path);
       }
+    }
+  }
+
+  private static void makeWritable(Path path) throws IOException {
+    // Windows has no write bit on a directory (setWritable says false) and deletes it regardless.
+    if (!path.toFile().setWritable(true, true) && !Files.isDirectory(path)) {
+      throw new IOException("can't make " + path + " writable");
     }
   }
 
@@ -389,11 +396,11 @@ public final class JPackageRunner {
     }
 
     /** Compose's {@code unpackSkikoForCurrentOS}. */
-    Set<String> skikoNatives(String arch) {
+    Set<String> skikoNatives() {
       return switch (this) {
-        case MAC -> Set.of("libskiko-macos-" + arch + ".dylib");
-        case WINDOWS -> Set.of("skiko-windows-" + arch + ".dll", "icudtl.dat");
-        case LINUX -> Set.of("libskiko-linux-" + arch + ".so");
+        case MAC -> Set.of("libskiko-macos-" + HOST_ARCH + ".dylib");
+        case WINDOWS -> Set.of("skiko-windows-" + HOST_ARCH + ".dll", "icudtl.dat");
+        case LINUX -> Set.of("libskiko-linux-" + HOST_ARCH + ".so");
       };
     }
   }

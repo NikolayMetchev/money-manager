@@ -6,6 +6,7 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 
@@ -36,8 +37,9 @@ class DatabaseSizeBreakdownTest : DbTest() {
 
             val accountTable = breakdown.firstOrNull { it.objectName == "account" }
             if (accountTable != null) {
-                assertTrue(
-                    accountTable.objectType == "table",
+                assertEquals(
+                    "table",
+                    accountTable.objectType,
                     "the account object should be typed as a table",
                 )
                 assertTrue(

@@ -1,4 +1,4 @@
-// The Kotlin constants generator (#1011), a port of build-logic's GenerateKotlinConstantsTask: an
+// The Kotlin constants generator (#1011): an
 // `internal object` of string constants for a module's commonMain. Kotlin/Native has no classpath resources,
 // so data a module ships (the app version, the crypto catalog, the default OAuth client) is compiled in.
 //
@@ -15,7 +15,7 @@ import (
 	"unicode/utf16"
 )
 
-// xorBase must match build-logic's XOR_BASE and repository.bzl's obfuscation.
+// xorBase must match google_oauth.bzl's obfuscation.
 const xorBase = 0x3B
 
 // maxLiteralChars is the longest literal emitted in one piece: the JVM caps a constant-pool string at 65,535

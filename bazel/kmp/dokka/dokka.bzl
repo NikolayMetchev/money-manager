@@ -229,7 +229,7 @@ dokka_module = rule(
         "apple_srcs": attr.label_list(allow_files = [".kt"]),
         "common_srcs": attr.label_list(allow_files = [".kt"]),
         "generated": attr.label_list(allow_files = True, doc = "Generated commonMain sources: analysed, not documented."),
-        "jvm_android": attr.bool(doc = "Whether the module has jvmAndroidMain (moneymanager.jvm-android-shared-convention)."),
+        "jvm_android": attr.bool(doc = "Whether the module has jvmAndroidMain."),
         "jvm_android_srcs": attr.label_list(allow_files = [".kt"]),
         "jvm_deps": attr.label_list(providers = [JavaInfo]),
         "jvm_srcs": attr.label_list(allow_files = [".kt"]),

@@ -45,7 +45,7 @@ java_binary(
     runtime_deps = [":strategy-catalog_jvm"],
 )
 
-# generateBundledCurrencies: `bazel run //tools/strategy-catalog:generate_bundled_currencies` rewrites utils/currency's
+# `bazel run //tools/strategy-catalog:generate_bundled_currencies` rewrites utils/currency's
 # ISO 4217 table from the JDK's list.
 java_binary(
     name = "generate_bundled_currencies",
@@ -57,7 +57,7 @@ java_binary(
     runtime_deps = [":strategy-catalog_jvm"],
 )
 
-# generateCatalogSite: the strategy library, at strategy-library/ in this directory, for the Pages site.
+# The strategy library, at strategy-library/ in this directory, for the Pages site.
 tool_output_dir(
     name = "catalog_site",
     tool = ":tool",

@@ -112,7 +112,6 @@ kmp_test(
         "//app/model/core",
         "//app/model/csvstrategy",
         "//app/model/importdirectory",
-        "//app/model/qif",
         "//app/model/repository/read",
         "//app/model/repository/write:write_for_tests",
         "//app/model/timeline",

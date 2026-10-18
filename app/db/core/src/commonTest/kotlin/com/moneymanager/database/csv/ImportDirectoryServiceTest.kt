@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.BulkFileStatus
@@ -34,6 +32,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -348,12 +347,12 @@ class ImportDirectoryServiceTest : DbTest() {
 
             assertEquals(1, result.download.filesDownloaded)
             assertEquals(emptyList(), result.csv.files)
-            assertTrue(
+            assertNull(
                 repositories.csvImportRepository
                     .getAllImports()
                     .first()
                     .single()
-                    .lastAppliedAt == null,
+                    .lastAppliedAt,
                 "the file is staged, not imported",
             )
         }

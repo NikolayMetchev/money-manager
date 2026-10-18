@@ -92,8 +92,6 @@ class ApiStrategyEditorStateTest {
                                 kind = ApiEndpointKind.DEPOSITS,
                                 transactionMappings =
                                     ApiTransactionMappings(
-                                        amountField = "amount",
-                                        currencyField = "currency",
                                         joinKeyField = "refid",
                                         counterpartyAliasField = "address",
                                         counterpartyAccountAliases = mapOf("INTERNAL_DEPOSIT" to "Crypto.com"),
@@ -137,7 +135,6 @@ class ApiStrategyEditorStateTest {
                     connectInstructions = listOf("Sign in.", "Create a token.", "Paste it below."),
                     rateLimitMillis = 3_100L,
                     rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Throttled"),
-                    rateLimitBackoffMillis = 5_000L,
                     maxRateLimitRetries = 6,
                     assetCodes =
                         AssetCodeRules(

@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.scanImportDirectory
@@ -282,7 +280,7 @@ class ImportDirectoryScannerTest : DbTest() {
             assertEquals(1, source.downloadCount)
 
             // Content and its server hash change.
-            file.content = csvV1 + "\n03/01/2024,Dinner,20.00"
+            file.content = "$csvV1\n03/01/2024,Dinner,20.00"
             file.remoteContentHash = "md5-bbb"
 
             val rescan = scan(engine, directory, source)
@@ -305,7 +303,7 @@ class ImportDirectoryScannerTest : DbTest() {
             val firstStaging = repositories.importDirectoryRepository.getTrackedFile(directory.id, "jan.csv")!!.csvImportId
 
             // Add a row and bump the timestamp.
-            file.content = csvV1 + "\n03/01/2024,Dinner,20.00"
+            file.content = "$csvV1\n03/01/2024,Dinner,20.00"
             file.lastModifiedEpochMs = 2_000
 
             val rescan = scan(engine, directory, source)

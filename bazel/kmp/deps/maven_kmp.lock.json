@@ -18,6 +18,7 @@
       "androidx-compose-ui-graphics": "androidx.compose.ui:ui-graphics:1.12.1",
       "androidx-compose-ui-test": "androidx.compose.ui:ui-test:1.12.1",
       "androidx-compose-ui-text": "androidx.compose.ui:ui-text:1.12.1",
+      "androidx-compose-ui-tooling": "androidx.compose.ui:ui-tooling:1.12.1",
       "androidx-compose-ui-unit": "androidx.compose.ui:ui-unit:1.12.1",
       "androidx-navigation3-runtime": "androidx.navigation3:navigation3-runtime:1.2.0",
       "androidx-navigation3-runtime-desktop": "androidx.navigation3:navigation3-runtime-desktop:1.2.0",
@@ -245,6 +246,9 @@
       "androidx-compose-ui-text": [
         "android"
       ],
+      "androidx-compose-ui-tooling": [
+        "android"
+      ],
       "androidx-compose-ui-unit": [
         "android"
       ],
@@ -414,6 +418,9 @@
     "androidx.compose.ui:ui-graphics": "androidx_compose_ui_graphics",
     "androidx.compose.ui:ui-test": "androidx_compose_ui_test",
     "androidx.compose.ui:ui-text": "androidx_compose_ui_text",
+    "androidx.compose.ui:ui-tooling": "androidx_compose_ui_tooling",
+    "androidx.compose.ui:ui-tooling-data": "androidx_compose_ui_ui_tooling_data",
+    "androidx.compose.ui:ui-tooling-preview": "androidx_compose_ui_ui_tooling_preview",
     "androidx.compose.ui:ui-unit": "androidx_compose_ui_unit",
     "androidx.compose.ui:ui-util": "androidx_compose_ui_ui_util",
     "androidx.concurrent:concurrent-futures": "androidx_concurrent_concurrent_futures",
@@ -906,6 +913,21 @@
       "androidx.compose.ui.text.platform.extensions",
       "androidx.compose.ui.text.platform.style",
       "androidx.compose.ui.text.style"
+    ],
+    "androidx.compose.ui:ui-tooling": [
+      "androidx.compose.ui.tooling",
+      "androidx.compose.ui.tooling.animation",
+      "androidx.compose.ui.tooling.animation.clock",
+      "androidx.compose.ui.tooling.animation.search",
+      "androidx.compose.ui.tooling.animation.states"
+    ],
+    "androidx.compose.ui:ui-tooling-data": [
+      "androidx.compose.ui.tooling.data"
+    ],
+    "androidx.compose.ui:ui-tooling-preview": [
+      "androidx.compose.ui.tooling.preview",
+      "androidx.compose.ui.tooling.preview.datasource",
+      "androidx.compose.ui.tooling.preview.internal"
     ],
     "androidx.compose.ui:ui-unit": [
       "androidx.compose.ui.unit",
@@ -5201,6 +5223,64 @@
           "androidx.core:core",
           "androidx.emoji2:emoji2",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "androidx.compose.ui:ui-tooling": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "ui-tooling.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-tooling-android/1.12.1/ui-tooling-android-1.12.1.aar",
+            "sha256": "49584245c4dcba25b0edad0b770c193a6e8fe79da15c2f5be653db5552969bc5"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.ui:ui",
+          "androidx.compose.ui:ui-tooling-data",
+          "androidx.compose.ui:ui-tooling-preview"
+        ],
+        "runtime_deps": [
+          "androidx.activity:activity-compose",
+          "androidx.compose.animation:animation",
+          "androidx.compose.material3:material3",
+          "androidx.lifecycle:lifecycle-common",
+          "androidx.savedstate:savedstate-ktx"
+        ]
+      }
+    },
+    "androidx.compose.ui:ui-tooling-data": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "ui-tooling-data.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-tooling-data-android/1.12.1/ui-tooling-data-android-1.12.1.aar",
+            "sha256": "2b664eb063aedc3c07af2bdd912c8afa097abe323d4b43ee7f03657cd1ca5d22"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.ui:ui"
+        ]
+      }
+    },
+    "androidx.compose.ui:ui-tooling-preview": {
+      "android": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "ui-tooling-preview.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-tooling-preview-android/1.12.1/ui-tooling-preview-android-1.12.1.aar",
+            "sha256": "e5d8e697fcfda732734e01168296682682d31e085b77ec8245e72badbc673686"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime"
         ]
       }
     },

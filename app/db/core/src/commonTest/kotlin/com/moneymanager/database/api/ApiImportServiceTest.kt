@@ -105,7 +105,7 @@ class ApiImportServiceTest : DbTest() {
             }
         }
 
-    private suspend fun service(
+    private fun service(
         vault: CredentialVault,
         countryCode: String? = "GB",
     ): ApiImportService =
@@ -125,7 +125,7 @@ class ApiImportServiceTest : DbTest() {
             countryCode = { countryCode },
         )
 
-    private suspend fun deviceId(): DeviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+    private fun deviceId(): DeviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
 
     private suspend fun strategy(name: String): ApiImportStrategy =
         repositories.apiImportStrategyRepository
@@ -309,7 +309,7 @@ class ApiImportServiceTest : DbTest() {
             val vault = unlockedCredentialVault()
 
             assertNull(service(vault, countryCode = "US").transactionsBlockReason(wise))
-            val blocked = assertNotNull(service(vault, countryCode = "GB").transactionsBlockReason(wise))
+            val blocked = assertNotNull(service(vault).transactionsBlockReason(wise))
             assertTrue("(GB)" in blocked && "AU, CA, MY, NZ, SG, US" in blocked, blocked)
             assertNull(service(vault).transactionsBlockReason(strategy("Monzo")))
         }

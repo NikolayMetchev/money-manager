@@ -1,9 +1,9 @@
-# Project view for the JetBrains Bazel plugin (#1005): the Phase 0 spike modules. Open the repository root
-# with File → Open and pick "Bazel project". See docs/bazel/ide-evaluation.md.
-targets:
-  //utils/bigdecimal/...
-  //utils/files/...
-  //app/model/...
-  //app/db/...
+# Project view for the JetBrains Bazel plugin (#1005): open the repository root with File → Open and pick
+# "Bazel project". See docs/bazel/ide-evaluation.md.
+# .bazelbsp is where the plugin rewrites its sync aspect, BUILD files included, at the start of every sync: inside
+# the project those BUILD files would mark it changed again, so the sync icon would never clear.
+directories:
+  .
+  -.bazelbsp
 
-derive_targets_from_directories: false
+derive_targets_from_directories: true

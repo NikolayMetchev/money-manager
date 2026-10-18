@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.bulkApplyCsv
@@ -190,12 +188,10 @@ class CryptoComCryptoE2ETest : DbTest() {
             .first()
             .firstOrNull { it.name == name }
 
-    private suspend fun balanceOf(
-        accountName: String,
-        assetCode: String,
-    ): String {
+    /** The Crypto.com wallet's counted balance in [assetCode]. */
+    private suspend fun walletBalanceOf(assetCode: String): String {
         repositories.maintenanceService.refreshMaterializedViews()
-        val account = assertNotNull(accountByName(accountName))
+        val account = assertNotNull(accountByName("Crypto.com"))
         return repositories.transactionRepository
             .getAccountBalances()
             .first()
@@ -243,8 +239,8 @@ class CryptoComCryptoE2ETest : DbTest() {
             assertEquals("4965.5", trade.to.toDisplayValue().toString())
 
             // Both per-asset balances move inside the one account.
-            assertEquals("-1499.936259", balanceOf("Crypto.com", "TGBP"))
-            assertEquals("4965.5", balanceOf("Crypto.com", "CRO"))
+            assertEquals("-1499.936259", walletBalanceOf("TGBP"))
+            assertEquals("4965.5", walletBalanceOf("CRO"))
 
             val staged =
                 repositories.csvImportRepository

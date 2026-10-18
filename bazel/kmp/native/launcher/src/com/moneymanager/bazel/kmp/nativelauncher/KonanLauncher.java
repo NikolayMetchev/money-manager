@@ -1,5 +1,7 @@
 package com.moneymanager.bazel.kmp.nativelauncher;
 
+import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -56,7 +58,7 @@ public final class KonanLauncher {
     return out.toArray(new String[0]);
   }
 
-  public static void main(String[] commandLine) throws Exception {
+  static void main(String[] commandLine) throws Exception {
     String[] args = expandParamsFiles(commandLine);
     Path temp = null;
     for (int i = 0; i < args.length; i++) {
@@ -75,7 +77,9 @@ public final class KonanLauncher {
         }
         Path dir = Files.createDirectories(temp.resolve("static" + i));
         Path copy = Files.copy(Path.of(args[i - 1], args[i + 1]), dir.resolve(args[i + 1]));
-        copy.toFile().setWritable(true);
+        if (!copy.toFile().setWritable(true)) {
+          throw new IOException("can't make " + copy + " writable");
+        }
         args[i - 1] = dir.toString();
       }
     }
@@ -90,10 +94,7 @@ public final class KonanLauncher {
     } finally {
       if (temp != null) {
         try (Stream<Path> paths = Files.walk(temp)) {
-          paths.sorted(Comparator.reverseOrder()).forEach(path -> {
-            path.toFile().setWritable(true);
-            path.toFile().delete();
-          });
+          paths.sorted(Comparator.reverseOrder()).forEach(KonanLauncher::deleteBestEffort);
         }
       }
     }
@@ -107,5 +108,13 @@ public final class KonanLauncher {
     Object compiler = Class.forName("org.jetbrains.kotlin.cli.metadata.KotlinMetadataCompiler").getConstructor().newInstance();
     Object exitCode = cliCompiler.getMethod("doMainNoExit", cliCompiler, String[].class).invoke(null, compiler, args);
     return (Integer) exitCode.getClass().getMethod("getCode").invoke(exitCode);
+  }
+
+  // The compile already succeeded, so a temp file left behind (Windows keeps read-only ones) only warns.
+  private static void deleteBestEffort(Path path) {
+    File file = path.toFile();
+    if (!file.delete() && !(file.setWritable(true) && file.delete())) {
+      System.err.println("warning: couldn't delete " + path);
+    }
   }
 }

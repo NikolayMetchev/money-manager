@@ -1,4 +1,4 @@
-# Re-pins a Renovate PR's lockfiles (#1029). Renovate bumps a version in gradle/libs.versions.toml or MODULE.bazel;
+# Re-pins a Renovate PR's lockfiles (#1029). Renovate bumps a version in libs.versions.toml or MODULE.bazel;
 # the maven_kmp lockfiles, MODULE.bazel.lock and (after a Kotlin bump) the Kotlin/Native pins then go stale, and the
 # lockfile tests fail. Renovate's hosted app can't run post-upgrade commands, so this job runs bazel/renovate/repin.sh
 # on the PR's branch and pushes what changed. The push uses the PAT so CI runs again on the re-pinned commit.
@@ -8,7 +8,7 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'gradle/libs.versions.toml'
+      - 'libs.versions.toml'
       - 'MODULE.bazel'
       - '.bazelversion'
 
