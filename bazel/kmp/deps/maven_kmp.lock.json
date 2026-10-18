@@ -9,7 +9,6 @@
       "clikt": "com.github.ajalt.clikt:clikt:5.1.0",
       "clikt-core": "com.github.ajalt.clikt:clikt-core:5.1.0",
       "compose-runtime": "org.jetbrains.compose.runtime:runtime:1.12.2",
-      "compose-runtime-desktop": "org.jetbrains.compose.runtime:runtime-desktop:1.12.2",
       "cryptography-bigint": "dev.whyoleg.cryptography:cryptography-bigint:0.6.0",
       "cryptography-core": "dev.whyoleg.cryptography:cryptography-core:0.6.0",
       "cryptography-provider-jdk": "dev.whyoleg.cryptography:cryptography-provider-jdk:0.6.0",
@@ -82,6 +81,46 @@
       "androidx.test.services:storage": "1.6.0",
       "androidx.test:runner": "1.7.0",
       "androidx.tracing:tracing": "1.2.0",
+      "ch.qos.logback:logback-classic": "1.6.5",
+      "ch.qos.logback:logback-core": "1.6.5",
+      "com.google.api.grpc:proto-google-common-protos": "2.78.0",
+      "com.google.code.findbugs:jsr305": "3.0.2",
+      "com.google.code.gson:gson": "2.14.0",
+      "com.google.crypto.tink:tink": "1.24.0",
+      "com.google.errorprone:error_prone_annotations": "2.50.0",
+      "com.google.guava:failureaccess": "1.0.3",
+      "com.google.guava:guava": "33.7.2-jre",
+      "com.google.j2objc:j2objc-annotations": "3.1",
+      "com.google.protobuf:protobuf-java": "4.36.2",
+      "com.google.protobuf:protobuf-java-util": "4.36.2",
+      "com.squareup:javawriter": "2.5.1",
+      "com.squareup:kotlinpoet": "2.4.0",
+      "com.squareup:kotlinpoet-jvm": "2.4.0",
+      "commons-io:commons-io": "2.22.0",
+      "dev.drewhamilton.poko:poko-annotations": "0.23.2",
+      "dev.drewhamilton.poko:poko-annotations-jvm": "0.23.2",
+      "io.grpc:grpc-api": "1.85.0",
+      "io.grpc:grpc-context": "1.85.0",
+      "io.grpc:grpc-core": "1.85.0",
+      "io.grpc:grpc-netty": "1.85.0",
+      "io.grpc:grpc-protobuf": "1.85.0",
+      "io.grpc:grpc-protobuf-lite": "1.85.0",
+      "io.grpc:grpc-stub": "1.85.0",
+      "io.netty:netty-buffer": "4.2.19.Final",
+      "io.netty:netty-codec": "4.2.19.Final",
+      "io.netty:netty-codec-http": "4.2.19.Final",
+      "io.netty:netty-codec-http2": "4.2.19.Final",
+      "io.netty:netty-codec-socks": "4.2.19.Final",
+      "io.netty:netty-common": "4.2.19.Final",
+      "io.netty:netty-handler": "4.2.19.Final",
+      "io.netty:netty-handler-proxy": "4.2.19.Final",
+      "io.netty:netty-resolver": "4.2.19.Final",
+      "io.netty:netty-transport": "4.2.19.Final",
+      "io.netty:netty-transport-native-unix-common": "4.2.19.Final",
+      "io.perfmark:perfmark-api": "0.27.0",
+      "org.apache.httpcomponents:httpclient": "4.5.14",
+      "org.checkerframework:checker-qual": "4.3.1",
+      "org.codehaus.mojo:animal-sniffer-annotations": "1.28",
       "org.jetbrains.kotlinx:atomicfu": "0.33.0",
       "org.jetbrains.kotlinx:atomicfu-jvm": "0.33.0",
       "org.jetbrains.kotlinx:kotlinx-coroutines-android": "1.11.0",
@@ -94,6 +133,11 @@
       "org.jetbrains.kotlinx:kotlinx-serialization-json": "1.11.0",
       "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": "1.11.0",
       "org.jetbrains:annotations": "23.0.0",
+      "org.ow2.asm:asm": "9.11.1",
+      "org.ow2.asm:asm-analysis": "9.11.1",
+      "org.ow2.asm:asm-commons": "9.11.1",
+      "org.ow2.asm:asm-tree": "9.11.1",
+      "org.ow2.asm:asm-util": "9.11.1",
       "org.slf4j:slf4j-api": "2.0.20"
     },
     "platforms": [
@@ -105,6 +149,7 @@
       "mingwX64"
     ],
     "excludes": [
+      "org.jetbrains.compose.runtime:runtime-desktop",
       "org.jetbrains.kotlin:kotlin-gradle-plugin"
     ]
   },
@@ -218,7 +263,6 @@
     "org.jetbrains.compose.annotation-internal:annotation": "org_jetbrains_compose_annotation_internal_annotation",
     "org.jetbrains.compose.collection-internal:collection": "org_jetbrains_compose_collection_internal_collection",
     "org.jetbrains.compose.runtime:runtime": "compose_runtime",
-    "org.jetbrains.compose.runtime:runtime-desktop": "compose_runtime_desktop",
     "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable": "kotlin_compose_compiler_plugin_embeddable",
     "org.jetbrains.kotlin:kotlin-reflect": "org_jetbrains_kotlin_kotlin_reflect",
     "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable": "kotlin_serialization_compiler_plugin_embeddable",
@@ -2345,7 +2389,6 @@
     "org.jetbrains.compose.annotation-internal:annotation": null,
     "org.jetbrains.compose.collection-internal:collection": null,
     "org.jetbrains.compose.runtime:runtime": null,
-    "org.jetbrains.compose.runtime:runtime-desktop": null,
     "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable": [
       "androidx.compose.compiler.plugins.kotlin",
       "androidx.compose.compiler.plugins.kotlin.analysis",
@@ -2631,7 +2674,6 @@
       "junit:junit",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
-      "org.jetbrains.compose.runtime:runtime-desktop",
       "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
       "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
       "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
@@ -2650,7 +2692,6 @@
       "junit:junit",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
-      "org.jetbrains.compose.runtime:runtime-desktop",
       "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
       "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
       "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
@@ -2669,7 +2710,6 @@
       "junit:junit",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
-      "org.jetbrains.compose.runtime:runtime-desktop",
       "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
       "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
       "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
@@ -2690,7 +2730,6 @@
       "junit:junit",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
-      "org.jetbrains.compose.runtime:runtime-desktop",
       "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
       "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
       "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
@@ -2709,7 +2748,6 @@
       "junit:junit",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
-      "org.jetbrains.compose.runtime:runtime-desktop",
       "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
       "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
       "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
@@ -5455,12 +5493,12 @@
     },
     "commons-io:commons-io": {
       "jvm": {
-        "version": "2.21.0",
+        "version": "2.22.0",
         "files": [
           {
-            "name": "commons-io-2.21.0.jar",
-            "url": "https://repo1.maven.org/maven2/commons-io/commons-io/2.21.0/commons-io-2.21.0.jar",
-            "sha256": "7d643a2afea8b058b762aa6fb90e5b256f6c729739f8b3784c3370ddc609e88d"
+            "name": "commons-io-2.22.0.jar",
+            "url": "https://repo1.maven.org/maven2/commons-io/commons-io/2.22.0/commons-io-2.22.0.jar",
+            "sha256": "2b9a7b1f726fb86216dbd2c8321eabe0221dbd5b1be81c18e1cb53811b104758"
           }
         ]
       }
@@ -5532,52 +5570,52 @@
     },
     "dev.drewhamilton.poko:poko-annotations": {
       "jvm": {
-        "version": "0.23.1",
+        "version": "0.23.2",
         "files": [
           {
-            "name": "poko-annotations-jvm-0.23.1.jar",
-            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-jvm/0.23.1/poko-annotations-jvm-0.23.1.jar",
+            "name": "poko-annotations-jvm-0.23.2.jar",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-jvm/0.23.2/poko-annotations-jvm-0.23.2.jar",
             "sha256": "9042e6da375ffa8e201d349e7ac926d1bab7694a818102c3a6a2f7d6e014bcc8"
           }
         ]
       },
       "linuxArm64": {
-        "version": "0.23.1",
+        "version": "0.23.2",
         "files": [
           {
-            "name": "poko-annotations-linuxArm64Main-0.23.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-linuxarm64/0.23.1/poko-annotations-linuxarm64-0.23.1.klib",
-            "sha256": "5878947ec910e8c19c56e205da94f7fa1ee5acf3e8d17b74abc3f0c6370f390d"
+            "name": "poko-annotations-linuxArm64Main-0.23.2.klib",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-linuxarm64/0.23.2/poko-annotations-linuxarm64-0.23.2.klib",
+            "sha256": "ae1d79e3d6033eeb9e19453d92eb690529591d4f3c086752eb1d939a5af71911"
           }
         ]
       },
       "linuxX64": {
-        "version": "0.23.1",
+        "version": "0.23.2",
         "files": [
           {
-            "name": "poko-annotations-linuxX64Main-0.23.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-linuxx64/0.23.1/poko-annotations-linuxx64-0.23.1.klib",
-            "sha256": "dc12e87068087f6a6c3f80692843ae7db1d9d392d943068e18de92bb521451b9"
+            "name": "poko-annotations-linuxX64Main-0.23.2.klib",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-linuxx64/0.23.2/poko-annotations-linuxx64-0.23.2.klib",
+            "sha256": "a2c130aada32c2e398f5cad427465a66fe45b33c334966079dc0215e607d3ee6"
           }
         ]
       },
       "macosArm64": {
-        "version": "0.23.1",
+        "version": "0.23.2",
         "files": [
           {
-            "name": "poko-annotations-macosArm64Main-0.23.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-macosarm64/0.23.1/poko-annotations-macosarm64-0.23.1.klib",
-            "sha256": "005016751757f75a0c6d2f3a6bac979080c251b2c4f12c1ae569ae2a049aa2fe"
+            "name": "poko-annotations-macosArm64Main-0.23.2.klib",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-macosarm64/0.23.2/poko-annotations-macosarm64-0.23.2.klib",
+            "sha256": "b067eba4ffa10ac6b1155ccab465671f11f93ad0a657c8bc6bd5c9b58c707724"
           }
         ]
       },
       "metadata": {
-        "version": "0.23.1",
+        "version": "0.23.2",
         "files": [
           {
-            "name": "poko-annotations-metadata-0.23.1.jar",
-            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations/0.23.1/poko-annotations-0.23.1.jar",
-            "sha256": "b9b3145d01cb3acce87615bd626cf8a60018da3cdf2f39d86eb53ebbf16464fe"
+            "name": "poko-annotations-metadata-0.23.2.jar",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations/0.23.2/poko-annotations-0.23.2.jar",
+            "sha256": "ed932b2ad2688861b1a4f6c154af5b5327ab594e66326cb537d5a134c82508a3"
           }
         ],
         "source_sets": [
@@ -5585,12 +5623,12 @@
         ]
       },
       "mingwX64": {
-        "version": "0.23.1",
+        "version": "0.23.2",
         "files": [
           {
-            "name": "poko-annotations-mingwX64Main-0.23.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-mingwx64/0.23.1/poko-annotations-mingwx64-0.23.1.klib",
-            "sha256": "1373c346e9d5399e297a52e19439b7ae6bd1006da94bbde93c826ab46ea1a4e3"
+            "name": "poko-annotations-mingwX64Main-0.23.2.klib",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-mingwx64/0.23.2/poko-annotations-mingwx64-0.23.2.klib",
+            "sha256": "6b1d2c4346e3191c0b0defce2dcb66f545da083f5e527258e04e452e1108c3ff"
           }
         ]
       }
@@ -8681,16 +8719,7 @@
     "org.jetbrains.compose.runtime:runtime": {
       "jvm": {
         "version": "1.12.2",
-        "files": [
-          {
-            "name": "runtime-desktop-1.12.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/runtime/runtime-desktop/1.12.2/runtime-desktop-1.12.2.jar",
-            "sha256": "9a40fb9ac9b98a1b2d8be51ce57dbcf733e768fa06a9e4859a1775cb52bf6806"
-          }
-        ],
-        "deps": [
-          "androidx.compose.runtime:runtime"
-        ]
+        "files": null
       },
       "linuxArm64": {
         "version": "1.12.2",
@@ -8754,21 +8783,6 @@
             "name": "runtime-mingwX64Main-1.12.2.klib",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/runtime/runtime-mingwx64/1.12.2/runtime-mingwx64-1.12.2.klib",
             "sha256": "7b962c83bb7ceceb337b6f1c8823a17c7d9992db70dcb52a771f00a53ed103ef"
-          }
-        ],
-        "deps": [
-          "androidx.compose.runtime:runtime"
-        ]
-      }
-    },
-    "org.jetbrains.compose.runtime:runtime-desktop": {
-      "jvm": {
-        "version": "1.12.2",
-        "files": [
-          {
-            "name": "runtime-desktop-1.12.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/runtime/runtime-desktop/1.12.2/runtime-desktop-1.12.2.jar",
-            "sha256": "9a40fb9ac9b98a1b2d8be51ce57dbcf733e768fa06a9e4859a1775cb52bf6806"
           }
         ],
         "deps": [

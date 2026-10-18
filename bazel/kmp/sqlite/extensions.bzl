@@ -9,7 +9,7 @@ exports_files(["sqlite3.c", "sqlite3.h"], visibility = ["//visibility:public"])
 """
 
 def _impl(mctx):
-    versions, _ = catalog(mctx.read(Label("//gradle:libs.versions.toml")))
+    versions, _, _ = catalog(mctx.read(Label("//gradle:libs.versions.toml")))
     release = versions["sqlite-amalgamation-release"]
     http_archive(
         name = "sqlite_amalgamation",

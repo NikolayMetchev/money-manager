@@ -336,3 +336,41 @@ kt_native_cinterop = rule(
     provides = [KlibInfo],
     toolchains = [TOOLCHAIN_TYPE],
 )
+
+def _executable_impl(ctx):
+    library = ctx.attr.library[KlibInfo]
+    target = KONAN_TARGETS[ctx.attr.target]
+    exe = ctx.actions.declare_file("%s/%s.%s" % (ctx.label.name, ctx.attr.base_name, "exe" if target == "mingw_x64" else "kexe"))
+    args = ctx.actions.args()
+    args.add_all(["-target", target, "-produce", "program", "-o", exe, "-entry", ctx.attr.entry_point])
+
+    # KGP's release link: optimised, no debug info. It never uses the compiler caches (clikt and clikt-mordant
+    # both define a private Context.selfAndAncestors(), a duplicate symbol in a cached link).
+    args.add_all(["-opt", "-Werror", "-Xmulti-platform", "-Xexpect-actual-classes"])
+    args.add("-Xinclude=" + library.klib.path)
+    args.add_all([k for k in library.transitive_klibs.to_list() if k != library.klib], before_each = "-library")
+    args.add("-Xpartial-linkage-loglevel=ERROR")
+    run_konan(
+        ctx,
+        tool = "konanc",
+        target = target,
+        arguments = [args],
+        inputs = library.transitive_klibs,
+        outputs = [exe],
+        mnemonic = "KotlinNativeLink",
+        progress_message = "Linking %{output}",
+    )
+    return [DefaultInfo(files = depset([exe]), executable = exe)]
+
+kt_native_executable = rule(
+    implementation = _executable_impl,
+    doc = "A release executable for one Kotlin/Native target: KGP's `binaries.executable(RELEASE)`.",
+    attrs = {
+        "base_name": attr.string(mandatory = True, doc = "The file name, without `.kexe`/`.exe`."),
+        "entry_point": attr.string(mandatory = True, doc = "The fully qualified `main` function."),
+        "library": attr.label(mandatory = True, providers = [KlibInfo], doc = "The klib whose code is the program."),
+        "target": attr.string(mandatory = True, values = KONAN_TARGETS.keys()),
+    },
+    executable = True,
+    toolchains = [TOOLCHAIN_TYPE],
+)

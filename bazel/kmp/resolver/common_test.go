@@ -62,3 +62,21 @@ func TestCommonMetadataSeesSharedSourceSetsAndTheirDependencies(t *testing.T) {
 		t.Errorf("deps = %v, want %v", n.api, want)
 	}
 }
+
+func TestExcludingWhereAVariantPointsLeavesItEmpty(t *testing.T) {
+	path, body := pom("g", "lib", "1", "")
+	module := `{"variants": [
+		{"name": "jvmApiElements-published",
+		 "attributes": {"org.gradle.usage": "java-api", "org.jetbrains.kotlin.platform.type": "jvm"},
+		 "available-at": {"url": "../../lib-desktop/1/lib-desktop-1.module", "group": "g", "module": "lib-desktop", "version": "1"}}]}`
+	f := repository(t, map[string][]byte{path: body, "/g/lib/1/lib-1.module": []byte(module)})
+	r := NewResolver(f, nil, []string{"g:lib-desktop"})
+
+	n, err := r.node(platforms["jvm"], Coordinate{"g", "lib", "1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(n.files) != 0 || len(n.api) != 0 {
+		t.Errorf("node = %+v, want no files or deps", n)
+	}
+}
