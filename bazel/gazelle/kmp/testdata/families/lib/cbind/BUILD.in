@@ -1,5 +1,7 @@
 # gazelle:kmp_targets linuxX64
 # gazelle:kmp_cinterops :clib_interop
+# gazelle:kmp_test_data src/nativeInterop/cinterop/clib.def
+# gazelle:kmp_test_size large
 load("//bazel/kmp:defs.bzl", "kmp_cinterop")
 
 kmp_cinterop(

@@ -42,6 +42,10 @@ const (
 	// kmp_cinterops label …: kmp_cinterop targets of the main compilation (KGP's `cinterops.create`). A module
 	// with cinterops but no Kotlin of its own still gets a kmp_library.
 	cinteropsDirective = "kmp_cinterops"
+	// kmp_test_data label …: files the module's tests read at run time (a test that scans source files).
+	testDataDirective = "kmp_test_data"
+	// kmp_test_size small|medium|large|enormous: the kmp_test size, for a suite slower than the default allows.
+	testSizeDirective = "kmp_test_size"
 )
 
 // keepDep is one kmp_keep_dep or kmp_export: the label, the platform whose deps it joins, and whether it's
@@ -61,6 +65,8 @@ type kmpConfig struct {
 	keepDeps          []keepDep
 	generatedSrcs     []string
 	cinterops         []string
+	testData          []string
+	testSize          string
 	lockFile          string
 	maven             *mavenIndex
 }
@@ -76,6 +82,8 @@ func (c *kmpConfig) clone() *kmpConfig {
 	out.keepDeps = nil
 	out.generatedSrcs = nil
 	out.cinterops = nil
+	out.testData = nil
+	out.testSize = ""
 	return &out
 }
 
@@ -90,7 +98,7 @@ func (*kmpLang) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
 func (*kmpLang) CheckFlags(fs *flag.FlagSet, c *config.Config) error { return nil }
 
 func (*kmpLang) KnownDirectives() []string {
-	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective, generatedSrcsDirective, cinteropsDirective}
+	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective, generatedSrcsDirective, cinteropsDirective, testDataDirective, testSizeDirective}
 }
 
 func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
@@ -115,6 +123,10 @@ func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
 				kc.sqldelightPackage = d.Value
 			case sqldelightDepDirective:
 				kc.sqldelightDeps = append(kc.sqldelightDeps, d.Value)
+			case testDataDirective:
+				kc.testData = append(kc.testData, strings.Fields(d.Value)...)
+			case testSizeDirective:
+				kc.testSize = strings.TrimSpace(d.Value)
 			case cinteropsDirective:
 				kc.cinterops = append(kc.cinterops, strings.Fields(d.Value)...)
 			case generatedSrcsDirective:

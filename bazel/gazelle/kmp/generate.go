@@ -207,6 +207,12 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		if len(testPlugins) > 0 {
 			t.SetAttr("plugins", sorted(testPlugins))
 		}
+		if len(kc.testData) > 0 {
+			t.SetAttr("data", kc.testData)
+		}
+		if kc.testSize != "" {
+			t.SetAttr("size", kc.testSize)
+		}
 		res.Gen = append(res.Gen, t)
 		res.Imports = append(res.Imports, imports{byPlatform: keys(tests.imports), keep: kc.kept(true), test: true, associate: name})
 	}
