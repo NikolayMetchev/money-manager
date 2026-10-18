@@ -9,6 +9,7 @@ go_library(
         "config.go",
         "generate.go",
         "lang.go",
+        "packages.go",
         "resolve.go",
     ],
     importpath = "github.com/NikolayMetchev/money-manager/bazel/gazelle/kmp",

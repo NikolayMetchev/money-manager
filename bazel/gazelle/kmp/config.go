@@ -46,6 +46,17 @@ const (
 	testDataDirective = "kmp_test_data"
 	// kmp_test_size small|medium|large|enormous: the kmp_test size, for a suite slower than the default allows.
 	testSizeDirective = "kmp_test_size"
+	// kmp_visibility label …: who may depend on the module (default public). `//app/model/repository/write`
+	// lists the only modules that may take a write repository (CLAUDE.md, "Database Writes").
+	visibilityDirective = "kmp_visibility"
+	// kmp_forbid_deps label …: modules the module and its tests must never depend on, even transitively (the
+	// pure importers: no db, DI or UI). Checked per platform by `bazel build`.
+	forbidDepsDirective = "kmp_forbid_deps"
+	// kmp_forbid_reference regex reason…: main sources must not match regex outside comments; the reason is
+	// the error message. Checked by `bazel build`.
+	forbidReferenceDirective = "kmp_forbid_reference"
+	// kmp_allow_reference path …: module-relative files exempt from kmp_forbid_reference (exact paths).
+	allowReferenceDirective = "kmp_allow_reference"
 )
 
 // keepDep is one kmp_keep_dep or kmp_export: the label, the platform whose deps it joins, and whether it's
@@ -67,6 +78,11 @@ type kmpConfig struct {
 	cinterops         []string
 	testData          []string
 	testSize          string
+	visibility        []string
+	forbidDeps        []string
+	forbidReference   string
+	referenceReason   string
+	allowReference    []string
 	lockFile          string
 	maven             *mavenIndex
 }
@@ -84,6 +100,11 @@ func (c *kmpConfig) clone() *kmpConfig {
 	out.cinterops = nil
 	out.testData = nil
 	out.testSize = ""
+	out.visibility = nil
+	out.forbidDeps = nil
+	out.forbidReference = ""
+	out.referenceReason = ""
+	out.allowReference = nil
 	return &out
 }
 
@@ -98,7 +119,7 @@ func (*kmpLang) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
 func (*kmpLang) CheckFlags(fs *flag.FlagSet, c *config.Config) error { return nil }
 
 func (*kmpLang) KnownDirectives() []string {
-	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective, generatedSrcsDirective, cinteropsDirective, testDataDirective, testSizeDirective}
+	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective, generatedSrcsDirective, cinteropsDirective, testDataDirective, testSizeDirective, visibilityDirective, forbidDepsDirective, forbidReferenceDirective, allowReferenceDirective}
 }
 
 func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
@@ -131,6 +152,16 @@ func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
 				kc.cinterops = append(kc.cinterops, strings.Fields(d.Value)...)
 			case generatedSrcsDirective:
 				kc.generatedSrcs = append(kc.generatedSrcs, strings.Fields(d.Value)...)
+			case visibilityDirective:
+				kc.visibility = append(kc.visibility, strings.Fields(d.Value)...)
+			case forbidDepsDirective:
+				kc.forbidDeps = append(kc.forbidDeps, strings.Fields(d.Value)...)
+			case forbidReferenceDirective:
+				regex, reason, _ := strings.Cut(strings.TrimSpace(d.Value), " ")
+				kc.forbidReference = regex
+				kc.referenceReason = strings.TrimSpace(reason)
+			case allowReferenceDirective:
+				kc.allowReference = append(kc.allowReference, strings.Fields(d.Value)...)
 			case lockFileDirective:
 				kc.lockFile = d.Value
 			case keepDepDirective:
