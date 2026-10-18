@@ -152,6 +152,13 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   workflow's `mm-<os>-<arch>` (`pkg_tar` keeping the exec bit; a copied `.exe` on Windows). `jvm_distribution`
   (`//bazel/kmp:distribution.bzl`) is Gradle's `installDist`: `mm-jvm/bin/` start scripts and `mm-jvm/lib/`, module
   jars named after their path (`app-db-core-jvm.jar`).
+- **Module checks** (`//bazel/kmp/checks`, #1014): Gradle's custom checks, as Gazelle directives, fail `bazel build`.
+  `kmp_visibility` limits `app/model/repository/write` to the modules that may take a write repository (Bazel's
+  visibility error is `verifyNoWriteRepositoryUsage`), and `kmp_forbid_reference` / `kmp_allow_reference` keep the
+  engine's own module to `ImportEngineImpl.kt` (comment lines may name one). `kmp_forbid_deps` is
+  `verifyNoDbDependency`: an aspect fails analysis, per platform and for the tests too, when a pure importer reaches
+  `app/db/core`, `app/di/core` or `app/ui/core`, naming the path. Gazelle itself is `verifyUniquePackages`: a run fails
+  when two generated modules' main sources declare one package (so CI's Gazelle diff catches it).
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.
@@ -312,6 +319,7 @@ module that only reads never even has the write interfaces on its compile classp
 reference any `*WriteRepository`. Exempt: `:app:model:repository:write` (interfaces), `:app:db:core` +
 `:app:db:write` (impls), `:app:di:core` + `:app:db:di` (wiring), `:app:importer` (the engine),
 `:test:app:db` (fixtures).
+Bazel enforces the same through the write module's visibility (see **Bazel**, "Module checks", under Build Commands).
 
 **The one exception:** `DeviceWriteRepository` is injected directly in `DeviceIdModule` (di/core).
 `DeviceId` is a synchronous singleton that every write-repo impl — and therefore the engine — depends

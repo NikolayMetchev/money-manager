@@ -1,5 +1,8 @@
 # gazelle:kmp_generate true
 # gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# Only the ImportEngine may write (CLAUDE.md, "Database Writes"): these modules define, implement or inject the
+# write repositories, and app/importer is the engine.
+# gazelle:kmp_visibility //app/db/core:__pkg__ //app/db/di:__pkg__ //app/db/write:__pkg__ //app/di/core:__pkg__ //app/importer:__pkg__ //test/app/db:__pkg__
 # gazelle:kmp_export //app/model/accountmapping
 # gazelle:kmp_export //app/model/apistrategy
 # gazelle:kmp_export //app/model/core
@@ -21,7 +24,14 @@ kmp_library(
         "macosArm64",
         "mingwX64",
     ],
-    visibility = ["//visibility:public"],
+    visibility = [
+        "//app/db/core:__pkg__",
+        "//app/db/di:__pkg__",
+        "//app/db/write:__pkg__",
+        "//app/di/core:__pkg__",
+        "//app/importer:__pkg__",
+        "//test/app/db:__pkg__",
+    ],
     exports = [
         "//app/model/accountmapping",
         "//app/model/apistrategy",

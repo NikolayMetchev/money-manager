@@ -1,0 +1,3 @@
+# gazelle:kmp_forbid_deps //lib/db //lib/ui
+# gazelle:kmp_forbid_reference \b[A-Za-z]+WriteRepository\b route writes through the engine
+# gazelle:kmp_allow_reference src/commonMain/kotlin/Engine.kt

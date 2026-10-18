@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+# kmp_reference_check's tool (//bazel/kmp/checks:checks.bzl).
+go_library(
+    name = "reference_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/NikolayMetchev/money-manager/bazel/kmp/checks/reference",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "reference",
+    embed = [":reference_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "reference_test",
+    size = "small",
+    srcs = ["main_test.go"],
+    embed = [":reference_lib"],
+)

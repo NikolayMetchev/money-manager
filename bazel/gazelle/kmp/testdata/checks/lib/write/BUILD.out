@@ -1,0 +1,12 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_visibility //lib/engine:__pkg__ //lib/fixtures:__pkg__
+
+kmp_library(
+    name = "write",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    visibility = [
+        "//lib/engine:__pkg__",
+        "//lib/fixtures:__pkg__",
+    ],
+)
