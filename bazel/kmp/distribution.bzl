@@ -47,7 +47,7 @@ if %ERRORLEVEL% neq 0 exit /b %ERRORLEVEL%
 endlocal
 """
 
-def _jar_name(jar):
+def jar_name(jar):
     """Each jar's name in `lib/`: a Maven jar keeps its own; a module's is named after its path, as Gradle's are
     (`app/db/read:read_sqldelight_jvm` is `app-db-read-sqldelight-jvm.jar`)."""
     if jar.owner.workspace_name:
@@ -66,12 +66,12 @@ def _impl(ctx):
         if jar.owner.workspace_name == "rules_kotlin+" and jar.basename == "empty.jar":
             # rules_kotlin's placeholder in the toolchain's runtime libraries: no entries.
             continue
-        jar_name = _jar_name(jar)
-        if jar_name in seen:
-            fail("%s: %s and %s are both lib/%s" % (ctx.label, seen[jar_name].short_path, jar.short_path, jar_name))
-        seen[jar_name] = jar
-        names.append(jar_name)
-        out = ctx.actions.declare_file("%s/lib/%s" % (ctx.label.name, jar_name))
+        name = jar_name(jar)
+        if name in seen:
+            fail("%s: %s and %s are both lib/%s" % (ctx.label, seen[name].short_path, jar.short_path, name))
+        seen[name] = jar
+        names.append(name)
+        out = ctx.actions.declare_file("%s/lib/%s" % (ctx.label.name, name))
         ctx.actions.symlink(output = out, target_file = jar)
         outputs.append(out)
     values = {

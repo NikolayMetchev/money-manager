@@ -66,6 +66,25 @@ kt_jvm_library(
     }),
 )
 
+# rules_java's JDK for each desktop OS, as the toolchain's `.bazelrc` picks (remotejdk_25).
+_DESKTOP_JDK = {
+    "linux_arm64": "remotejdk25_linux_aarch64",
+    "linux_x64": "remotejdk25_linux",
+    "macos_arm64": "remotejdk25_macos_aarch64",
+    "macos_x64": "remotejdk25_macos",
+    "windows_x64": "remotejdk25_win",
+}
+
+# The target's JDK modules: ProGuard's library jars (#1019) and what jlink bundles. The runtime toolchain leaves
+# them out.
+alias(
+    name = "jdk_jmods",
+    actual = select({
+        ":desktop_" + os: "@%s//:jdk-jmods" % jdk
+        for os, jdk in _DESKTOP_JDK.items()
+    }),
+)
+
 # kotlin("reflect"), at the compiler's version (JVM only).
 kt_jvm_library(
     name = "kotlin_reflect_jvm",
@@ -94,5 +113,6 @@ test_suite(
         "@detekt_cli//:lock_test",
         "@ktlint_cli//:lock_test",
         "@maven_kmp//:lock_test",
+        "@proguard//:lock_test",
     ],
 )

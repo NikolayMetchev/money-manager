@@ -82,7 +82,9 @@ def _resource_jars(name, kind, resources):
     kmp_resource_jar(
         name = name + "_resources",
         srcs = resources,
-        roots = ["src/%s%s/resources" % (fragment, kind) for fragment in ["common", "jvmAndroid", "jvm"]],
+        # `src/main` is a kotlin("jvm") module's.
+        roots = ["src/%s%s/resources" % (fragment, kind) for fragment in ["common", "jvmAndroid", "jvm"]] +
+                ["src/%s/resources" % kind.lower()],
         testonly = kind == "Test",
         visibility = ["//visibility:private"],
     )

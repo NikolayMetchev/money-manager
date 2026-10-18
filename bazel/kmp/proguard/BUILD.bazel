@@ -1,0 +1,27 @@
+load("@rules_java//java:java_binary.bzl", "java_binary")
+load("@rules_java//java:java_library.bzl", "java_library")
+
+# `--define=proguard_optimize=false` skips ProGuard's optimizer (Gradle's -PproguardOptimize=false).
+config_setting(
+    name = "no_optimize",
+    define_values = {"proguard_optimize": "false"},
+    visibility = ["//visibility:public"],
+)
+
+# ProGuard, with the Compose Gradle plugin's jar for its default rules (see ProguardRunner.java).
+java_binary(
+    name = "runner",
+    srcs = ["src/com/moneymanager/bazel/kmp/proguard/ProguardRunner.java"],
+    main_class = "com.moneymanager.bazel.kmp.proguard.ProguardRunner",
+    visibility = ["//visibility:public"],
+    runtime_deps = ["@proguard//:compose_gradle_plugin_jvm"],
+    deps = ["@proguard//:proguard_base_jvm"],
+)
+
+# Gradle's verifyProguardServiceProviders: a java_test's main class (use_testrunner = False) over a
+# proguard_jars target's jars.
+java_library(
+    name = "service_provider_check",
+    srcs = ["src/com/moneymanager/bazel/kmp/proguard/ServiceProviderCheck.java"],
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,101 @@
+load("@rules_java//java:java_binary.bzl", "java_binary")
+load("@rules_java//java:java_test.bzl", "java_test")
+load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp/proguard:proguard.bzl", "proguard_jars")
+
+# gazelle:kmp_generate true
+
+kmp_library(
+    name = "jvm",
+    jvm_deps = [
+        "//app/cryptodata",
+        "//app/db/write",
+        "//app/di/core",
+        "//app/di/params",
+        "//app/importfilesource/di",
+        "//app/presenter/core",
+        "//app/session",
+        "//app/tasks",
+        "//app/ui/components",
+        "//app/ui/core",
+        "//app/ui/foundation",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:compose_ui_desktop",
+        "@maven_kmp//:kermit",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_swing",
+        "@maven_kmp//:org_slf4j_slf4j_api",
+    ],
+    jvm_srcs = glob(["src/main/kotlin/**/*.kt"]),
+    plugins = ["compose"],
+    resources = glob(["src/main/resources/**"]),
+    visibility = ["//visibility:public"],
+)
+
+# The app's runtime classpath: Gradle's runtimeOnly deps besides the module's own (the CLI rides along for the
+# installer's mm-jvm launcher).
+_RUNTIME = [
+    ":jvm_jvm",
+    "//app/main/cli:cli_jvm",
+    "//bazel/kmp/deps:compose_desktop_current_os_jvm",
+    "@maven_kmp//:log4j_core_jvm",
+    "@maven_kmp//:log4j_slf4j2_impl_jvm",
+]
+
+_MAIN_CLASS = "com.moneymanager.MainKt"
+
+_JVM_FLAGS = [
+    "--add-modules",
+    "java.sql",
+]
+
+# `bazel run //app/main/jvm:app` is Gradle's `:app:main:jvm:run`; `:app_deploy.jar` is the app in one jar.
+java_binary(
+    name = "app",
+    jvm_flags = _JVM_FLAGS,
+    main_class = _MAIN_CLASS,
+    runtime_deps = _RUNTIME,
+)
+
+# Compose's proguardReleaseJars: not part of `bazel build //...`, as it isn't of Gradle's `build`.
+# `--define=proguard_optimize=false` skips the optimizer, as CI's ProGuard check does.
+proguard_jars(
+    name = "release_jars",
+    # sqlite-jdbc carries its JNI library for ~24 OS/CPU pairs; the app only ever runs on its own.
+    jar_filters = select({
+        "//bazel/kmp/deps:desktop_linux_arm64": {"sqlite-jdbc-": "org/sqlite/native/Linux/aarch64/**,!org/sqlite/native/**"},
+        "//bazel/kmp/deps:desktop_linux_x64": {"sqlite-jdbc-": "org/sqlite/native/Linux/x86_64/**,!org/sqlite/native/**"},
+        "//bazel/kmp/deps:desktop_macos_arm64": {"sqlite-jdbc-": "org/sqlite/native/Mac/aarch64/**,!org/sqlite/native/**"},
+        "//bazel/kmp/deps:desktop_macos_x64": {"sqlite-jdbc-": "org/sqlite/native/Mac/x86_64/**,!org/sqlite/native/**"},
+        "//bazel/kmp/deps:desktop_windows_x64": {"sqlite-jdbc-": "org/sqlite/native/Windows/x86_64/**,!org/sqlite/native/**"},
+    }),
+    main_class = _MAIN_CLASS,
+    optimize = select({
+        "//bazel/kmp/proguard:no_optimize": False,
+        "//conditions:default": True,
+    }),
+    rules = ["proguard-rules.pro"],
+    tags = ["manual"],
+    deps = _RUNTIME,
+)
+
+# Gradle's `runRelease`: the shrunk app.
+java_binary(
+    name = "release",
+    jvm_flags = _JVM_FLAGS,
+    main_class = _MAIN_CLASS,
+    tags = ["manual"],
+    runtime_deps = [":release_jars"],
+)
+
+# Gradle's verifyProguardServiceProviders.
+java_test(
+    name = "release_service_providers_test",
+    size = "small",
+    args = ["$(rootpaths :release_jars)"],
+    data = [":release_jars"],
+    main_class = "com.moneymanager.bazel.kmp.proguard.ServiceProviderCheck",
+    tags = ["manual"],
+    use_testrunner = False,
+    runtime_deps = ["//bazel/kmp/proguard:service_provider_check"],
+)

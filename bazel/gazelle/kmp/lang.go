@@ -54,12 +54,12 @@ func (*kmpLang) Kinds() map[string]rule.KindInfo {
 	return map[string]rule.KindInfo{
 		"kmp_library": {
 			NonEmptyAttrs:  map[string]bool{"common_srcs": true, "sqldelight": true, "cinterops": true},
-			MergeableAttrs: mergeable("sqldelight", "generated_srcs", "cinterops", "visibility", "forbidden_deps", "forbidden_reference", "forbidden_reference_reason", "forbidden_reference_allowed", "keep_deps", "resources"),
+			MergeableAttrs: mergeable("sqldelight", "generated_srcs", "cinterops", "visibility", "forbidden_deps", "forbidden_reference", "forbidden_reference_reason", "forbidden_reference_allowed", "keep_deps"),
 			ResolveAttrs:   resolvedAttrs,
 		},
 		"kmp_test": {
 			NonEmptyAttrs:  map[string]bool{"associate": true},
-			MergeableAttrs: mergeable("associate", "data", "size", "forbidden_deps", "keep_deps", "resources", "jvm_flags", "flaky", "jvm_tags"),
+			MergeableAttrs: mergeable("associate", "data", "size", "forbidden_deps", "keep_deps", "jvm_flags", "flaky", "jvm_tags"),
 			ResolveAttrs:   resolvedAttrs,
 		},
 		"sqldelight_library": {
@@ -76,6 +76,17 @@ func (*kmpLang) Loads() []rule.LoadInfo {
 	}
 }
 
-func (*kmpLang) Fix(c *config.Config, f *rule.File) {}
+// Fix drops each generated rule's `resources` before the merge, so the generated glob always replaces it (or
+// it goes, with its dirs): Gazelle only merges string lists and selects, not globs.
+func (*kmpLang) Fix(c *config.Config, f *rule.File) {
+	if f == nil || !getConfig(c).generate {
+		return
+	}
+	for _, r := range f.Rules {
+		if (r.Kind() == "kmp_library" || r.Kind() == "kmp_test") && !r.ShouldKeep() {
+			r.DelAttr("resources")
+		}
+	}
+}
 
 var _ config.Configurer = (*kmpLang)(nil)

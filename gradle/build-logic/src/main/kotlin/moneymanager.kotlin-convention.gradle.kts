@@ -40,10 +40,11 @@ fun DependencySubstitutions.substitute(coordinate: String, version: Provider<Str
 // utils/compose/scrollbar via compose-ui) otherwise resolve older versions than the assembled app;
 // this pins them to the catalog version. Scoped to app classpaths/metadata so Gradle and test tooling
 // classpaths (kotlin compiler, detekt, kover, ktlint, unified-test-platform, compose hot reload,
-// schemaspy) are untouched. Add one substitute(...) line per dependency to align.
+// schemaspy) are untouched. Add one substitute(...) line per dependency to align. Case-insensitive, so a
+// kotlin("jvm") module's own compileClasspath/runtimeClasspath (the desktop app's) are pinned too.
 configurations.matching {
-    it.name.endsWith("CompileClasspath") ||
-        it.name.endsWith("RuntimeClasspath") ||
+    it.name.endsWith("CompileClasspath", ignoreCase = true) ||
+        it.name.endsWith("RuntimeClasspath", ignoreCase = true) ||
         it.name.endsWith("LintChecksClasspath") ||
         it.name.endsWith("DependenciesMetadata")
 }.all {

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -174,6 +175,58 @@ func TestPickVariantAcceptsOneNamingNoUsage(t *testing.T) {
 	withJvm := append([]Variant{{Name: "jvmRuntimeElements", Attributes: attrs{"org.gradle.usage": "java-runtime", "org.jetbrains.kotlin.platform.type": "jvm"}}}, common...)
 	if got := pick(platforms["jvm"], "java-runtime", withJvm); got == nil || got.Name != "jvmRuntimeElements" {
 		t.Errorf("picked %v over the variant naming the usage", got)
+	}
+}
+
+func TestRuntimeOnlyLibraryResolvesOnTheJvm(t *testing.T) {
+	// The Compose Gradle plugin publishes only a shadowed runtime jar; Gradle compiles against it too.
+	files := map[string][]byte{
+		"/g/plugin/1/plugin-1.module": []byte(`{"variants": [{"name": "shadowRuntimeElements",
+			"attributes": {"org.gradle.category": "library", "org.gradle.dependency.bundling": "shadowed",
+				"org.gradle.libraryelements": "jar", "org.gradle.usage": "java-runtime"},
+			"files": [{"name": "plugin-1.jar", "url": "plugin-1.jar"}]}]}`),
+		"/g/plugin/1/plugin-1.jar": []byte("jar"),
+	}
+	path, body := pom("g", "plugin", "1", "")
+	files[path] = body
+	r := NewResolver(repository(t, files), nil, nil)
+
+	got, _, err := r.Resolve(platforms["jvm"], []Coordinate{{"g", "plugin", "1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res, ok := got["g:plugin"]; !ok || len(res.Files) != 1 || res.Files[0].Name != "plugin-1.jar" {
+		t.Errorf("resolved %+v, want g:plugin with plugin-1.jar", got)
+	}
+}
+
+func TestApiOnlyDependencyIsCompileOnly(t *testing.T) {
+	// log4j-core's api variant names OSGi annotations its runtime variant leaves out.
+	files := map[string][]byte{
+		"/g/lib/1/lib-1.module": []byte(`{"variants": [
+			{"name": "apiElements", "attributes": {"org.gradle.usage": "java-api", "org.gradle.category": "library"},
+				"dependencies": [{"group": "g", "module": "api", "version": {"requires": "1"}},
+					{"group": "g", "module": "annotations", "version": {"requires": "1"}}]},
+			{"name": "runtimeElements", "attributes": {"org.gradle.usage": "java-runtime", "org.gradle.category": "library"},
+				"dependencies": [{"group": "g", "module": "api", "version": {"requires": "1"}}]}]}`),
+	}
+	for _, m := range []string{"lib", "api", "annotations"} {
+		path, body := pom("g", m, "1", "")
+		files[path] = body
+		files["/g/"+m+"/1/"+m+"-1.jar"] = []byte("jar")
+	}
+	r := NewResolver(repository(t, files), nil, nil)
+
+	got, _, err := r.Resolve(platforms["jvm"], []Coordinate{{"g", "lib", "1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lib := got["g:lib"]
+	if !reflect.DeepEqual(lib.Deps, []string{"g:api"}) || !reflect.DeepEqual(lib.CompileOnly, []string{"g:annotations"}) {
+		t.Errorf("deps %v, compile only %v; want [g:api], [g:annotations]", lib.Deps, lib.CompileOnly)
+	}
+	if _, ok := got["g:annotations"]; !ok {
+		t.Error("the compile-only dependency isn't resolved")
 	}
 }
 

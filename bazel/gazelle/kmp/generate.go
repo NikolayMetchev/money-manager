@@ -29,6 +29,8 @@ var mainSets = []sourceSet{
 	{"linuxMain", "linux_srcs", "linux"},
 	{"appleMain", "apple_srcs", "apple"},
 	{"mingwMain", "mingw_srcs", "mingw"},
+	// A kotlin("jvm") module's only compilation is the JVM leaf.
+	{"main", "jvm_srcs", "jvm"},
 }
 
 var testSets = []sourceSet{
@@ -39,6 +41,7 @@ var testSets = []sourceSet{
 	{"linuxTest", "linux_srcs", "linux"},
 	{"appleTest", "apple_srcs", "apple"},
 	{"mingwTest", "mingw_srcs", "mingw"},
+	{"test", "jvm_srcs", "jvm"},
 }
 
 // imports is what GenerateRules hands Resolve for one rule: the imported names per platform.
@@ -354,8 +357,8 @@ func runsOnNative(sets []sourceSet) bool {
 // classpath resources Gradle's processResources merges.
 func resourceGlob(dir, kind string) (rule.GlobValue, bool) {
 	var patterns []string
-	for _, set := range []string{"common", "jvmAndroid", "jvm"} {
-		rel := "src/" + set + kind + "/resources"
+	for _, set := range []string{"common" + kind, "jvmAndroid" + kind, "jvm" + kind, strings.ToLower(kind)} {
+		rel := "src/" + set + "/resources"
 		if dirHasFiles(filepath.Join(dir, filepath.FromSlash(rel)), "") {
 			patterns = append(patterns, rel+"/**")
 		}

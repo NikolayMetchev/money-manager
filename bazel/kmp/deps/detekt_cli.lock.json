@@ -1594,12 +1594,14 @@
           }
         ],
         "deps": [
-          "dev.detekt:detekt-kotlin-analysis-api",
           "org.jetbrains.kotlin:kotlin-compiler",
           "org.jetbrains.kotlin:kotlin-stdlib"
         ],
         "runtime_deps": [
           "dev.drewhamilton.poko:poko-annotations"
+        ],
+        "compile_only_deps": [
+          "dev.detekt:detekt-kotlin-analysis-api"
         ]
       }
     },

@@ -42,6 +42,9 @@ type Resolved struct {
 	Files   []File   `json:"files"`
 	Deps    []string `json:"deps,omitempty"`         // api: on dependents' compile classpath too
 	Runtime []string `json:"runtime_deps,omitempty"` // runtime only (JVM)
+	// CompileOnly are api dependencies its runtime variant leaves out (log4j-core's OSGi annotations): on
+	// dependents' compile classpath only, as Gradle's runtime classpath follows the runtime variant (JVM).
+	CompileOnly []string `json:"compile_only_deps,omitempty"`
 	// SourceSets are the klib directories of a `metadata` jar our common code sees.
 	SourceSets []string `json:"source_sets,omitempty"`
 }
@@ -140,9 +143,10 @@ var errNoVariant = errors.New("no variant for this platform")
 // node is what one library version contributes on a platform, before versions are settled.
 type node struct {
 	files      []File
-	api        []Coordinate
-	runtime    []Coordinate
-	sourceSets []string
+	api         []Coordinate
+	runtime     []Coordinate
+	compileOnly []Coordinate
+	sourceSets  []string
 	// platforms are the BOMs it depends on (`platform(…)`), and constraints its own dependencyConstraints and,
 	// on a BOM, the versions it aligns. Neither is a dependency: they only raise versions (Resolve).
 	platforms   []Coordinate
@@ -212,6 +216,11 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 		compileUsage, runtimeUsage = "kotlin-api", ""
 	}
 	api := pick(p, compileUsage, module.Variants)
+	if api == nil && runtimeUsage != "" {
+		// Gradle's Java ecosystem takes a runtime variant for a compile classpath when there's no api one: the
+		// Compose Gradle plugin publishes only its shadowed runtime jar.
+		api = pick(p, runtimeUsage, module.Variants)
+	}
 	if api == nil {
 		return nil, fmt.Errorf("%s: %w", c, errNoVariant)
 	}
@@ -242,10 +251,24 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 		for _, d := range n.api {
 			apiSet[d.Module()] = true
 		}
+		runtimeSet := map[string]bool{}
 		for _, d := range r.dependencies(runtime.Dependencies) {
+			runtimeSet[d.Module()] = true
 			if !apiSet[d.Module()] {
 				n.runtime = append(n.runtime, d)
 			}
+		}
+		// The variants are one when they're the same (a POM-only library, or the api variant Gradle falls back to).
+		if runtime != api {
+			var api []Coordinate
+			for _, d := range n.api {
+				if runtimeSet[d.Module()] {
+					api = append(api, d)
+				} else {
+					n.compileOnly = append(n.compileOnly, d)
+				}
+			}
+			n.api = api
 		}
 	}
 	return n, nil
@@ -455,7 +478,7 @@ func (r *Resolver) Resolve(p Platform, roots []Coordinate) (map[string]Resolved,
 				return nil, nil, err
 			}
 		}
-		for _, d := range append(append([]Coordinate{}, n.api...), n.runtime...) {
+		for _, d := range append(append(append([]Coordinate{}, n.api...), n.runtime...), n.compileOnly...) {
 			if request(d) {
 				queue = append(queue, d)
 			}
@@ -483,12 +506,17 @@ func (r *Resolver) Resolve(p Platform, roots []Coordinate) (map[string]Resolved,
 		for _, d := range n.runtime {
 			res.Runtime = append(res.Runtime, d.Module())
 		}
+		for _, d := range n.compileOnly {
+			res.CompileOnly = append(res.CompileOnly, d.Module())
+		}
 		sort.Strings(res.Deps)
 		sort.Strings(res.Runtime)
+		sort.Strings(res.CompileOnly)
 		res.Deps = dedupe(res.Deps)
 		res.Runtime = dedupe(res.Runtime)
+		res.CompileOnly = dedupe(res.CompileOnly)
 		out[module] = res
-		for _, d := range append(append([]string{}, res.Deps...), res.Runtime...) {
+		for _, d := range append(append(append([]string{}, res.Deps...), res.Runtime...), res.CompileOnly...) {
 			if err := walk(d); err != nil {
 				return fmt.Errorf("%w\n  needed by %s", err, c)
 			}
