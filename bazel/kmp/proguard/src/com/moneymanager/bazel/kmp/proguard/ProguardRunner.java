@@ -26,7 +26,7 @@ public final class ProguardRunner {
 
   private ProguardRunner() {}
 
-  public static void main(String[] args) throws Exception {
+  static void main(String[] args) throws Exception {
     Path composeRules = Files.createTempFile("compose-rules", ".pro");
     try {
       try (InputStream in = ProguardRunner.class.getClassLoader().getResourceAsStream(COMPOSE_RULES)) {

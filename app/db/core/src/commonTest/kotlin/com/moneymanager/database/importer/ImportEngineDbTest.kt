@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.database.importer
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.bigdecimal.BigInteger

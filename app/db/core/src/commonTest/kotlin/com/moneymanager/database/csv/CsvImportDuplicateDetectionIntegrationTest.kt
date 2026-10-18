@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.csv
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.CsvTransferMapper
@@ -8,7 +6,6 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
@@ -180,7 +177,6 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                 )
 
             // Insert transfer with attributes using repository
-            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test", "test"))
             repositories.transactionRepository.createTransfers(
                 transfers = listOf(existingTransfer),
                 newAttributes = mapOf(TransferId(0L) to attributes),
@@ -316,7 +312,6 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                     amount = Money.fromDisplayValue(BigDecimal("3.50"), testCurrency),
                 )
 
-            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test", "test"))
             repositories.transactionRepository.createTransfers(
                 transfers = listOf(existingTransfer),
                 newAttributes = emptyMap(),

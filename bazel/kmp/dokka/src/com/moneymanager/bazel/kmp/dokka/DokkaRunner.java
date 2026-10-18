@@ -16,7 +16,7 @@ import java.nio.file.Paths;
 public final class DokkaRunner {
     private DokkaRunner() {}
 
-    public static void main(String[] args) throws Exception {
+    static void main(String[] args) throws Exception {
         if (args.length != 2) {
             throw new IllegalArgumentException("usage: DokkaRunner <config> <VERSION file>");
         }

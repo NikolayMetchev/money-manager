@@ -22,11 +22,9 @@ import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ForeignAmount
 import com.moneymanager.domain.model.rules.ValueExpr
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -49,7 +47,7 @@ class StrategyConfigMigrationsTest {
     @Test
     fun `a config from a newer app is rejected rather than silently misread`() {
         val future = StrategyConfigMigrations.currentApiVersion + 1
-        val config = Json.parseToJsonElement("""{"${StrategyConfigMigrations.VERSION_KEY}": $future}""").jsonObject
+        val config = JsonObject(mapOf(StrategyConfigMigrations.VERSION_KEY to JsonPrimitive(future)))
         assertFailsWith<IllegalArgumentException> { StrategyConfigMigrations.upgradeApi(config) }
     }
 }

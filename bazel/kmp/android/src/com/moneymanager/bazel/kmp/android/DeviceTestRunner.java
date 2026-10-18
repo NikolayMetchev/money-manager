@@ -26,7 +26,7 @@ public final class DeviceTestRunner {
   /** One test's status blocks: its start (code 1) and its end (0 passed, -3 ignored, -4 assumption, else failed). */
   private record Result(String className, String name, int code, String stack, long millis) {}
 
-  public static void main(String[] args) throws Exception {
+  static void main(String[] args) throws Exception {
     String adb = Path.of(args[0]).toAbsolutePath().toString();
     String apk = Path.of(args[1]).toAbsolutePath().toString();
     String pkg = args[2];
@@ -40,7 +40,7 @@ public final class DeviceTestRunner {
       run(List.of(adb, "install", "-r", "-t", app), true);
     }
     run(List.of(adb, "install", "-r", "-t", apk), true);
-    List<Result> results = new ArrayList<>();
+    List<Result> results;
     Integer code;
     String failure;
     try {
@@ -99,7 +99,7 @@ public final class DeviceTestRunner {
     String failure = null;
     for (String line : lines) {
       if (line.startsWith("INSTRUMENTATION_STATUS: ") || line.startsWith("INSTRUMENTATION_RESULT: ")) {
-        String pair = line.substring(line.indexOf(": ") + 2);
+        String pair = afterColon(line);
         int eq = pair.indexOf('=');
         current = new StringBuilder(eq < 0 ? "" : pair.substring(eq + 1));
         status.put(eq < 0 ? pair : pair.substring(0, eq), current);
@@ -107,7 +107,7 @@ public final class DeviceTestRunner {
           failure = current.toString();
         }
       } else if (line.startsWith("INSTRUMENTATION_STATUS_CODE: ")) {
-        int statusCode = Integer.parseInt(line.substring(line.indexOf(": ") + 2).trim());
+        int statusCode = Integer.parseInt(afterColon(line).trim());
         String className = value(status, "class");
         String name = value(status, "test");
         if (statusCode == 1) {
@@ -119,7 +119,7 @@ public final class DeviceTestRunner {
         status.clear();
         current = null;
       } else if (line.startsWith("INSTRUMENTATION_CODE: ")) {
-        code = Integer.parseInt(line.substring(line.indexOf(": ") + 2).trim());
+        code = Integer.parseInt(afterColon(line).trim());
         current = null;
       } else if (line.startsWith("INSTRUMENTATION_FAILED: ") || line.startsWith("INSTRUMENTATION_ABORTED")) {
         failure = line;
@@ -129,6 +129,10 @@ public final class DeviceTestRunner {
       }
     }
     return new Parsed(results, code, failure);
+  }
+
+  private static String afterColon(String line) {
+    return line.substring(line.indexOf(": ") + 2);
   }
 
   private static String value(Map<String, StringBuilder> status, String key) {

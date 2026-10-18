@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.database.csv
 
 import com.moneymanager.bigdecimal.BigDecimal
@@ -147,13 +145,10 @@ class CurveCsvE2ETest : DbTest() {
         return result
     }
 
-    /** Registers a card last-4 (or space-separated list) on an account so Curve rows reconcile to it. */
-    private suspend fun registerCard(
-        accountName: String,
-        last4: String,
-    ) {
+    /** Registers a card last-4 (or space-separated list) on the Crypto.com Card account so Curve rows reconcile to it. */
+    private suspend fun registerCryptoComCard(last4: String) {
         val accounts = repositories.accountRepository.getAllAccounts().first()
-        val accountId = accounts.first { it.name == accountName }.id
+        val accountId = accounts.first { it.name == "Crypto.com Card" }.id
         repositories.accountAttributeRepository.insert(
             accountId,
             AttributeTypeId(WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_ID),
@@ -320,7 +315,7 @@ class CurveCsvE2ETest : DbTest() {
                 )
             assertEquals(1, applyAll(listOf(card)).filesImported)
             // Register the funding card's last-4 on the Crypto.com Card account (as a user would).
-            registerCard("Crypto.com Card", "7721")
+            registerCryptoComCard("7721")
 
             // A second row is funded by an unregistered card (1142) with no counterpart anywhere.
             val curve =
@@ -328,7 +323,7 @@ class CurveCsvE2ETest : DbTest() {
                     "Transaction History 2023-11-19.csv",
                     curveHeaders,
                     listOf(
-                        curveRow("1", "2023-11-19", "SAINSBURYS", "GBP", "22.93", fundingCard = "7721"),
+                        curveRow("1", "2023-11-19", "SAINSBURYS", "GBP", "22.93"),
                         curveRow("2", "2023-11-19", "ALDI", "GBP", "31.25", fundingCard = "1142"),
                     ),
                 )
@@ -366,7 +361,7 @@ class CurveCsvE2ETest : DbTest() {
                     "Transaction History 2023-11-19.csv",
                     curveHeaders,
                     listOf(
-                        curveRow("1", "2023-11-19", "SAINSBURYS", "GBP", "22.93", fundingCard = "7721"),
+                        curveRow("1", "2023-11-19", "SAINSBURYS", "GBP", "22.93"),
                         curveRow("2", "2023-11-19", "ALDI", "GBP", "31.25", fundingCard = "1142"),
                     ),
                 )
@@ -404,7 +399,7 @@ class CurveCsvE2ETest : DbTest() {
                 listOf(cardRow("2023-01-01 10:00:00", "Coffee", "-3.00")),
             )
         applyAll(listOf(warmup))
-        registerCard("Crypto.com Card", "7721")
+        registerCryptoComCard("7721")
     }
 
     private val transactionsHeaders =
@@ -509,7 +504,7 @@ class CurveCsvE2ETest : DbTest() {
             assertEquals(0, countedBalance("Curve Cash", "CURVECASH").compareTo(BigDecimal("-183")))
 
             // Assigning the card changes nothing more: the row is already reconciled.
-            registerCard("Crypto.com Card", "7721")
+            registerCryptoComCard("7721")
             reimport(first.id, strategyName = "Curve CSV (Transactions)")
             repositories.maintenanceService.refreshMaterializedViews()
             assertTrue(unmatchedFundingReferences().isEmpty())
@@ -529,14 +524,14 @@ class CurveCsvE2ETest : DbTest() {
                 )
             assertEquals(1, applyAll(listOf(card)).filesImported)
             // The card account already owns another card, which the assignment must keep.
-            registerCard("Crypto.com Card", "9999")
+            registerCryptoComCard("9999")
 
             val curve =
                 stage(
                     "Transaction History 2023-11-19.csv",
                     curveHeaders,
                     listOf(
-                        curveRow("1", "2023-11-19", "SAINSBURYS", "GBP", "22.93", fundingCard = "7721"),
+                        curveRow("1", "2023-11-19", "SAINSBURYS", "GBP", "22.93"),
                         curveRow("2", "2023-11-19", "ALDI", "GBP", "31.25", fundingCard = "1142"),
                         curveRow("3", "2023-11-20", "TESCO", "GBP", "4.10", fundingCard = "1142"),
                     ),
@@ -629,12 +624,12 @@ class CurveCsvE2ETest : DbTest() {
                 stage(
                     "Transaction History 2023-11-19.csv",
                     curveHeaders,
-                    listOf(curveRow("1", "2023-11-19", "SAINSBURYS", "GBP", "22.93", fundingCard = "7721")),
+                    listOf(curveRow("1", "2023-11-19", "SAINSBURYS", "GBP", "22.93")),
                 )
             applyAll(listOf(curve))
             assertTrue(transfersBetween("Curve card 7721", "Curve").single().isExcluded())
 
-            registerCard("Crypto.com Card", "7721")
+            registerCryptoComCard("7721")
             repeat(2) {
                 reimport(curve.id)
                 repositories.maintenanceService.refreshMaterializedViews()

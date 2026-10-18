@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.database.api
 
 import com.moneymanager.apiimporter.importApiSessionExchange
@@ -16,7 +14,7 @@ import kotlin.time.Instant
 
 /**
  * End-to-end test of the generic signed-exchange import against the built-in Binance config. Binance
- * exercises engine capabilities Kraken/Crypto.com don't: [PredicateOp][com.moneymanager.domain.model.apistrategy.PredicateOp]
+ * exercises engine capabilities Kraken/Crypto.com don't: [Condition][com.moneymanager.domain.model.rules.Condition]
  * item filters (status-gated deposits/withdrawals), a fixed trade side per endpoint (Convert, fiat
  * buy/sell), a custom [pattern timestamp][com.moneymanager.domain.model.apistrategy.TimestampFormat.PATTERN]
  * (withdrawal `applyTime`), two data endpoints sharing one path disambiguated only by a static query

@@ -29,7 +29,7 @@ public final class ServiceProviderCheck {
 
   private ServiceProviderCheck() {}
 
-  public static void main(String[] args) throws Exception {
+  static void main(String[] args) throws Exception {
     Set<String> classes = new HashSet<>();
     List<String[]> providers = new ArrayList<>();
     for (String arg : args) {

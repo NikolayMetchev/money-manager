@@ -37,7 +37,10 @@ secrets/google-oauth.properties
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 /hs_err_*.log
-.qodana
+# Qodana results and the .idea a local run moves aside; the profile and the bootstrap script are checked in.
+.qodana/*
+!.qodana/profile.xml
+!.qodana/open-as-bazel.sh
 # Monzo API session transcript fixtures
 app/db/core/src/commonTest/resources/monzo/sample-apis/
 

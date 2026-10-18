@@ -3,7 +3,6 @@ package com.moneymanager.database.audit
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -35,7 +34,7 @@ class QifImportAccountSourceTest : DbTest() {
             val importId =
                 repositories.qifImportRepository.createImport(
                     fileName = "statement.qif",
-                    records = emptyList<QifImportRecord>(),
+                    records = emptyList(),
                     accountType = "BANK",
                     fileChecksum = "abc",
                     fileLastModified = now,

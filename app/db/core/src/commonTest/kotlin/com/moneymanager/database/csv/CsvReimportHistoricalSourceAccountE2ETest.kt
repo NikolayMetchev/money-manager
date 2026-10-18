@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.AttributeAccountMatcher
@@ -26,7 +24,7 @@ import kotlin.time.Duration
  * Monzo CSV has no SOURCE_ACCOUNT mapping, so a fresh import needs a user-chosen source account. Once
  * a file has imported successfully, though, its source account is a recoverable fact — the account
  * appearing on every one of its created transfers — so re-import must derive it automatically rather
- * than asking again ([CsvImportReadRepository.historicalSourceAccounts]).
+ * than asking again ([historicalSourceAccounts][com.moneymanager.domain.repository.CsvImportReadRepository.historicalSourceAccounts]).
  */
 class CsvReimportHistoricalSourceAccountE2ETest : DbTest() {
     override val installBuiltInStrategies: Boolean = true

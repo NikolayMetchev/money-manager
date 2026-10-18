@@ -1,7 +1,6 @@
 package com.moneymanager.bazel.kmp.testing;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -24,7 +23,7 @@ public final class KnTestLauncher {
 
   private KnTestLauncher() {}
 
-  public static void main(String[] args) throws Exception {
+  static void main(String[] args) throws Exception {
     List<String> command = new ArrayList<>();
     command.add(Path.of(args[0]).toAbsolutePath().toString());
     command.add("--ktest_logger=TEAMCITY");

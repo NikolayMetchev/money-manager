@@ -1,14 +1,14 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.api
 
 import com.moneymanager.apiimporter.importApiSessionExchange
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.test.database.DbTest
@@ -191,8 +191,8 @@ class CryptoComExchangeApiE2ETest : DbTest() {
                     .first()
                     .source
             assertEquals(
-                "\$.result.deposit_list[0]",
-                (depositSource as com.moneymanager.domain.model.Source.Api).jsonPath?.value,
+                "$.result.deposit_list[0]",
+                (depositSource as Source.Api).jsonPath?.value,
             )
 
             // The deposit's counterparty is a per-wallet account keyed by the sender address (not the
@@ -411,12 +411,10 @@ class CryptoComExchangeApiE2ETest : DbTest() {
 }
 
 /** Creates a plain app account (name only) for test seeding, via the engine's create-account helper. */
-private suspend fun com.moneymanager.importengineapi.ImportEngine.createAppAccount(name: String) =
+private suspend fun ImportEngine.createAppAccount(name: String) =
     createAccount(
         Account(
-            id =
-                com.moneymanager.domain.model
-                    .AccountId(0),
+            id = AccountId(0),
             name = name,
             openingDate = Instant.fromEpochMilliseconds(1_600_000_000_000L),
         ),
