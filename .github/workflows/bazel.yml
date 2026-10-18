@@ -99,6 +99,60 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           done
 
+  coverage:
+    name: Bazel coverage
+    runs-on: ubuntu-latest
+    # Kover's replacement (#1026): `bazel coverage` over the Kotlin tests, with .bazelrc's JaCoCo filter, merged into
+    # one LCOV report. It credits code to every test that runs it, so it reads higher than Kover's per-module
+    # reports. The Codecov upload moves here with the workflows (#1028); until then the report is an artifact.
+    env:
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.19.1
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-coverage
+          repository-cache: true
+          cache-save: ${{ github.event_name == 'push' }}
+
+      - name: Use BuildBuddy
+        if: env.BUILDBUDDY_API_KEY != ''
+        run: |
+          {
+            echo "common --config=rbe"
+            echo "common --remote_header=x-buildbuddy-api-key=${BUILDBUDDY_API_KEY}"
+            echo "common --build_metadata=ROLE=CI"
+            echo "common --build_metadata=REPO_URL=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          } > user.bazelrc
+
+      - name: Install the Android SDK platform
+        run: |
+          level=$(sed -n 's/^android-compileSdk = "\(.*\)"/\1/p' gradle/libs.versions.toml)
+          (yes || true) | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-$level.0" > /dev/null
+
+      - name: Coverage
+        run: bazel coverage $(bazel query 'attr(name, "^test_(jvm|android)$", tests(//...))')
+
+      - name: Summary
+        run: |
+          cp bazel-out/_coverage/_coverage_report.dat coverage.lcov
+          awk -F: '/^SF:/{f++} /^LF:/{lf+=$2} /^LH:/{lh+=$2}
+            END{printf "### Bazel coverage\n%d files, %d of %d lines (%.1f%%)\n", f, lh, lf, 100*lh/lf}' \
+            coverage.lcov >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the report
+        uses: actions/upload-artifact@v7
+        with:
+          name: bazel-coverage
+          path: coverage.lcov
+          retention-days: 7
+
   android-device:
     name: Bazel Android device tests
     runs-on: ubuntu-latest

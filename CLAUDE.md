@@ -267,6 +267,12 @@ stream to BuildBuddy, anonymously.
   moneyManagerLintPolicy's options plus the module's `disable`. Not in its model: build-tools' `core-lambda-stubs.jar`
   and D8's backported-methods list (both only quiet NewApi on desugared calls). `@android_sdk//:lint_sdk` is the
   platform laid out as an SDK for lint's `--sdk-home`.
+- **Coverage** (#1026), Kover's replacement: `bazel coverage $(bazel query 'attr(name, "^test_(jvm|android)$",
+  tests(//...))')`. rules_kotlin instruments with JaCoCo; `.bazelrc`'s `coverage` lines filter it as Kover does (no
+  `test/` fixtures, tests or SQLDelight code) and merge it into one LCOV report, `bazel-out/_coverage/_coverage_report.dat`
+  (the `coverage` job in `bazel.yml`). It credits a module's code to every test that runs it, so it reads higher than
+  Kover's per-module reports. Not covered: the device tests (Gradle's `instrumented` flag) and Kover's generated-class
+  excludes, which are per class where LCOV is per line. The Go tests can't link under coverage, hence the query.
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.
