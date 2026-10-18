@@ -28,7 +28,7 @@ read what the upstream plugin passes, then pass the same.
 
 Kotlin has one version, and four things must agree on it:
 
-1. `kotlin` in `gradle/libs.versions.toml` (the catalog `maven_kmp` reads), with the Compose compiler, Metro and
+1. `kotlin` in `libs.versions.toml` (the catalog `maven_kmp` reads), with the Compose compiler, Metro and
    Mappie releases built for it.
 2. `bazel_dep(name = "rules_kotlin")` in `MODULE.bazel`: rules_kotlin bundles the compiler Bazel runs, so its
    version is the Kotlin release.

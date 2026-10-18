@@ -1,7 +1,7 @@
 """`kotlin_native` module extension: the hermetic Kotlin/Native toolchain for the exec host (#998).
 
 The Kotlin version has one source: rules_kotlin's compiler release, which the JVM compile already uses
-(and which must equal `kotlin` in gradle/libs.versions.toml). `pins.bzl` must have been generated for
+(and which must equal `kotlin` in libs.versions.toml). `pins.bzl` must have been generated for
 that version, so bumping rules_kotlin without repinning fails the first native build.
 """
 

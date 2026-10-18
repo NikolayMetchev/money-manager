@@ -262,10 +262,10 @@
   "moduleExtensions": {
     "//bazel/kmp/android:extensions.bzl%android_sdk": {
       "general": {
-        "bzlTransitiveDigest": "EccTZAbftEchwqh6hRZ6ISnTAmYU1vXRHfumTjUx+ig=",
+        "bzlTransitiveDigest": "1OrTILyUjUSJe6xnK/Nw46TQNayBz1hFAMMjrM0/Hb8=",
         "usagesDigest": "af/EB6S6Jhg08XPZPOFfwCev0bH7RX6CSnpYr6oaQG4=",
         "recordedInputs": [
-          "FILE:@@//gradle/libs.versions.toml 82007492b0b53697eb3463434d139eaf81d3bf4623f5abea014d1c6dfb35f5e9"
+          "FILE:@@//libs.versions.toml 07e4d61554a9489134bd667285c512bf65f191f8b2f96af3421d067c6f6d5167"
         ],
         "generatedRepoSpecs": {
           "android_sdk": {
@@ -289,7 +289,7 @@
     },
     "//bazel/kmp/constants:google_oauth.bzl%google_oauth": {
       "general": {
-        "bzlTransitiveDigest": "3WhDu7t3mlQy8UPYdkacQsstX/ytEEuNCU3fJcxx7/A=",
+        "bzlTransitiveDigest": "5tExqUU7Opnk7wni7jMEmFPH6s6S6p4hUY49Gb1vfbE=",
         "usagesDigest": "KnI9ddib7BMxIy5MBFlmouKInNdm480VDE3R00Zw+4I=",
         "recordedInputs": [],
         "generatedRepoSpecs": {

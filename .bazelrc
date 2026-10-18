@@ -1,7 +1,7 @@
 common --enable_bzlmod
 
-# JDK 25, matching jvm-toolchain in gradle/libs.versions.toml and .github/actions/gradle-setup/action.yml.
-# Move all three together.
+# JDK 25, matching jvm_target in bazel/kmp/BUILD.bazel (the Kotlin toolchain).
+# Move both together.
 common --java_language_version=25
 common --java_runtime_version=remotejdk_25
 common --tool_java_language_version=25

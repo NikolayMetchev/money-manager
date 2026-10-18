@@ -207,7 +207,7 @@ _aapt2 = repository_rule(
 )
 
 def _android_sdk_impl(module_ctx):
-    versions = catalog(module_ctx.read(Label("//gradle:libs.versions.toml")))[0]
+    versions = catalog(module_ctx.read(Label("//:libs.versions.toml")))[0]
     root = module_ctx.path(Label("//:MODULE.bazel")).dirname
     _platform(
         name = "android_sdk",

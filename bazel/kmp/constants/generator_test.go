@@ -8,7 +8,7 @@ import (
 	"unicode/utf16"
 )
 
-// The cases of build-logic's GenerateKotlinConstantsTaskTest, which this generator must agree with.
+// The generator's cases (ported from the Gradle build's GenerateKotlinConstantsTaskTest).
 
 func literal(s string) string { return kotlinStringLiteral(utf16.Encode([]rune(s))) }
 
@@ -55,7 +55,7 @@ func TestLongValuesAreSplitIntoLiteralsThatJoinBackToTheValue(t *testing.T) {
 	}
 }
 
-// xorObfuscate is build-logic's, which google_oauth.bzl ports to Starlark.
+// xorObfuscate is the obfuscation google_oauth.bzl does in Starlark.
 func xorObfuscate(value string) string {
 	var b strings.Builder
 	for i, c := range utf16.Encode([]rune(value)) {

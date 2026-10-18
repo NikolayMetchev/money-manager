@@ -3,7 +3,7 @@
   "extends": [
     "config:recommended"
   ],
-  "description": "Automerge every update, majors included, once the required CI checks pass (GitHub native auto-merge). Libraries are bumped in gradle/libs.versions.toml (the catalog MODULE.bazel reads) and Bazel modules in MODULE.bazel; renovate-pins.yml then re-pins the lockfiles on the PR's branch (bazel/renovate/repin.sh)",
+  "description": "Automerge every update, majors included, once the required CI checks pass (GitHub native auto-merge). Libraries are bumped in libs.versions.toml (the catalog MODULE.bazel reads) and Bazel modules in MODULE.bazel; renovate-pins.yml then re-pins the lockfiles on the PR's branch (bazel/renovate/repin.sh)",
   "automerge": true,
   "automergeType": "pr",
   "platformAutomerge": true,

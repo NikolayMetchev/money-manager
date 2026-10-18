@@ -20,7 +20,7 @@ const (
 	// every module builds with Bazel (#1008).
 	generateDirective = "kmp_generate"
 	// kmp_targets android linuxX64 linuxArm64 …: the module's targets besides the JVM: `android`
-	// (moneymanager.android-convention) and its Kotlin/Native targets (moneymanager.native-convention).
+	// and its Kotlin/Native targets.
 	targetsDirective = "kmp_targets"
 	// kmp_plugins name …: compiler plugins to apply besides the ones inferred from the sources.
 	pluginsDirective = "kmp_plugins"

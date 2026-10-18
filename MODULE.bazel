@@ -73,7 +73,7 @@ http_archive(
 # catalog, re-pin: bazel run @maven_kmp//:pin
 maven_kmp = use_extension("//bazel/kmp/deps:extensions.bzl", "maven_kmp")
 maven_kmp.install(
-    catalog = "//gradle:libs.versions.toml",
+    catalog = "//:libs.versions.toml",
     # SQLDelight's Gradle plugin jar carries the compiler environment //bazel/kmp/sqldelight runs, but none
     # of its Gradle API.
     # JetBrains' runtime-desktop is a LICENSE-only redirect with the same jar name as androidx's runtime-desktop;
@@ -82,8 +82,8 @@ maven_kmp.install(
         "org.jetbrains.compose.runtime:runtime-desktop",
         "org.jetbrains.kotlin:kotlin-gradle-plugin",
     ],
-    # moneymanager.kotlin-convention's dependency substitutions: these modules always resolve to the
-    # catalog version, whoever asks for them (and so does every library of the build-tool-pins bundle).
+    # These modules always resolve to the catalog version, whoever asks for them (and so does every library
+    # of the build-tool-pins bundle).
     force_bundles = ["build-tool-pins"],
     forces = {
         "androidx.activity:activity": "androidx-activity-compose",
@@ -304,7 +304,7 @@ maven_kmp.install(
         "metadata",
         "mingwX64",
     ],
-    # settings.gradle.kts: Google's repository only for these groups, Maven Central for everything.
+    # Google's repository only for these groups, Maven Central for everything.
     repositories = [
         "https://dl.google.com/dl/android/maven2=androidx[.].*,com[.]android[.].*,com[.]google[.].*",
         "https://repo1.maven.org/maven2",
@@ -312,10 +312,10 @@ maven_kmp.install(
 )
 
 # The lint tools (#1015), each resolved on its own like the Gradle configuration (`ktlint`, `detekt`) it matches:
-# only the build-tool-pins bundle applies to those (moneymanager.kotlin-convention's `configurations.all`).
+# only the build-tool-pins bundle applies to those.
 maven_kmp.install(
     name = "detekt_cli",
-    catalog = "//gradle:libs.versions.toml",
+    catalog = "//:libs.versions.toml",
     force_bundles = ["build-tool-pins"],
     libraries = ["detekt-cli"],
     lock_file = "//bazel/kmp/deps:detekt_cli.lock.json",
@@ -326,7 +326,7 @@ maven_kmp.install(
 
 maven_kmp.install(
     name = "ktlint_cli",
-    catalog = "//gradle:libs.versions.toml",
+    catalog = "//:libs.versions.toml",
     force_bundles = ["build-tool-pins"],
     libraries = ["ktlint-cli"],
     lock_file = "//bazel/kmp/deps:ktlint_cli.lock.json",
@@ -338,7 +338,7 @@ maven_kmp.install(
 # Dokka (#1027), the KDoc site: its CLI (a fat jar, with Dokka's core) and the plugins the Gradle plugin runs.
 maven_kmp.install(
     name = "dokka",
-    catalog = "//gradle:libs.versions.toml",
+    catalog = "//:libs.versions.toml",
     force_bundles = ["build-tool-pins"],
     libraries = [
         "dokka-all-modules-page-plugin",
@@ -357,7 +357,7 @@ maven_kmp.install(
 # SQLite JDBC driver it reads the schema through.
 maven_kmp.install(
     name = "schemaspy",
-    catalog = "//gradle:libs.versions.toml",
+    catalog = "//:libs.versions.toml",
     force_bundles = ["build-tool-pins"],
     libraries = [
         "schemaspy",
@@ -372,7 +372,7 @@ maven_kmp.install(
 # The desktop app's ProGuard (#1019), with the Compose Gradle plugin for the default rules it applies.
 maven_kmp.install(
     name = "proguard",
-    catalog = "//gradle:libs.versions.toml",
+    catalog = "//:libs.versions.toml",
     # Optional in the plugin's POM, and Gradle-only.
     excludes = ["org.jetbrains.compose.hot-reload:hot-reload-gradle-plugin"],
     force_bundles = ["build-tool-pins"],
@@ -393,7 +393,7 @@ maven_kmp.install(
 # build (#1023) runs their manifest merger, R class writer, ApkFlinger, R8 and profile compiler as AGP does.
 maven_kmp.install(
     name = "android_tools",
-    catalog = "//gradle:libs.versions.toml",
+    catalog = "//:libs.versions.toml",
     force_bundles = ["build-tool-pins"],
     libraries = [
         "android-builder",
@@ -411,7 +411,7 @@ maven_kmp.install(
 # Android lint (#1025): the lint-gradle AGP resolves to run lint, on its own classpath as AGP runs it.
 maven_kmp.install(
     name = "android_lint",
-    catalog = "//gradle:libs.versions.toml",
+    catalog = "//:libs.versions.toml",
     force_bundles = ["build-tool-pins"],
     libraries = ["android-lint-gradle"],
     lock_file = "//bazel/kmp/deps:android_lint.lock.json",

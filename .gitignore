@@ -1,9 +1,7 @@
-# Gradle
+# Output of the retired Gradle build, still in older checkouts
 .gradle/
 build/
 .kotlin/
-gradle-9.2.0-bin.zip
-gradle-9.2.0/
 
 # IntelliJ IDEA
 .idea/workspace.xml

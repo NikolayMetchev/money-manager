@@ -10,7 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-catalog_kotlin=$(sed -n 's/^kotlin = "\(.*\)"/\1/p' gradle/libs.versions.toml)
+catalog_kotlin=$(sed -n 's/^kotlin = "\(.*\)"/\1/p' libs.versions.toml)
 pinned_native=$(sed -n 's/^KOTLIN_NATIVE_VERSION = "\(.*\)"/\1/p' bazel/kmp/native/pins.bzl)
 if [ "$catalog_kotlin" != "$pinned_native" ]; then
   echo "Kotlin/Native is pinned at $pinned_native, the catalog's Kotlin is $catalog_kotlin: repinning"

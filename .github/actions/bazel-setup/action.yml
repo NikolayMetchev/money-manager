@@ -22,7 +22,7 @@ runs:
   using: 'composite'
   steps:
     # The JDK, Kotlin/Native and every Maven library are Bazel repositories (hermetic, sha256-pinned), so
-    # nothing else needs installing. The JVM version lives in .bazelrc and gradle/libs.versions.toml.
+    # nothing else needs installing. The JVM version lives in .bazelrc and libs.versions.toml.
     - name: Set up Bazel
       uses: bazel-contrib/setup-bazel@0.19.1
       with:
@@ -51,7 +51,7 @@ runs:
       if: inputs.android-sdk == 'true'
       shell: bash
       run: |
-        level=$(sed -n 's/^android-compileSdk = "\(.*\)"/\1/p' gradle/libs.versions.toml)
+        level=$(sed -n 's/^android-compileSdk = "\(.*\)"/\1/p' libs.versions.toml)
         sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
         [ -f "$sdkmanager" ] || sdkmanager="$sdkmanager.bat"
         (yes || true) | "$sdkmanager" --install "platforms;android-$level.0" > /dev/null

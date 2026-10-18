@@ -537,7 +537,7 @@ set of writes.
 
 ### Dependencies
 
-- A library's version lives in the catalog, `gradle/libs.versions.toml`, never in a BUILD file. A new library also
+- A library's version lives in the catalog, `libs.versions.toml`, never in a BUILD file. A new library also
   needs its alias in `MODULE.bazel`'s `maven_kmp.install(libraries = …)`, then `bazel run @maven_kmp//:pin`
 - Don't write `deps` by hand: import the type and run `bazel run //:gazelle`, which resolves each import to a module
   or a `@maven_kmp//:<alias>` library. What no import explains (a runtime-only library, a Metro contributor) is a
@@ -564,10 +564,9 @@ set of writes.
 - Share commonTest sources with a device test via `# gazelle:kmp_device_test_srcs`
 - **Android Device Tests**: `bazel test //app/ui/core:test_device` (or every one:
   `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')`) on a running API 36 emulator.
-  **Android emulator API level sync**: change the level here and you must change it in `gradle/libs.versions.toml`
+  **Android emulator API level sync**: change the level here and you must change it in `libs.versions.toml`
   (`android-targetSdk`), the CI emulator (`.github/workflows/build.yml` and
-  `.github/workflows/android-release-smoke-test.yml`) and the IntelliJ run configuration
-  (`.idea/runConfigurations/Android_Tests.xml`) too.
+  `.github/workflows/android-release-smoke-test.yml`) too.
 - **Test Stability**: Always call `waitForIdle()` after `waitUntilDoesNotExist()` to ensure recompositions complete before test ends
 
 ### Platform Support
@@ -590,10 +589,10 @@ set of writes.
 
 ### Common Issues
 
-1. **Java**: JDK 25, which Bazel downloads (`remotejdk_25`). **JVM version sync**: the version is pinned in places
-   that must move together — `gradle/libs.versions.toml` (`jvm-target`/`jvm-toolchain`) and `.bazelrc`
-   (`remotejdk_<n>` and the `java_language_version`s)
-2. **Metro**: Keep the Kotlin version compatible with Metro (both in `gradle/libs.versions.toml`; Renovate bumps
+1. **Java**: JDK 25, which Bazel downloads (`remotejdk_25`). **JVM version sync**: the version is pinned in two places
+   that must move together — `.bazelrc` (`remotejdk_<n>` and the `java_language_version`s) and the Kotlin
+   toolchain's `jvm_target` (`bazel/kmp/BUILD.bazel`)
+2. **Metro**: Keep the Kotlin version compatible with Metro (both in `libs.versions.toml`; Renovate bumps
    them together). Graphs must be `interface`; binding containers `object`
 3. **SQLDelight**: `execute()`/`update()`/`delete()` return `Long`, not `Unit`
 4. **Kotlin bumps**: Kotlin, `rules_kotlin` and the Kotlin/Native pins move together — see

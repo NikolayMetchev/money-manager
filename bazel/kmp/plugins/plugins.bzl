@@ -1,10 +1,9 @@
 """Compiler plugins by name, as `kmp_library(plugins = […])` and `kmp_test(plugins = […])` take them (#1001).
 
 A name stands for the plugin on every platform (`//bazel/kmp/plugins:<name>_jvm` for rules_kotlin,
-`…:<name>_native` for konanc) and for the runtime its Gradle convention adds with it: Metro's runtime as an
-`api` dependency (moneymanager.metro-convention), mappie-api (moneymanager.mappie-convention), and
-Mokkery's runtime for tests (the Mokkery Gradle plugin). Compose and serialization add none: modules declare
-their runtimes themselves, as in Gradle.
+`…:<name>_native` for konanc) and for the runtime it needs: Metro's runtime as an
+`api` dependency, mappie-api, and Mokkery's runtime for tests. Compose and serialization add none: modules
+declare their runtimes themselves.
 """
 
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")

@@ -14,7 +14,7 @@ class IsoCurrencyTableTest {
         assertEquals(
             jdkIsoCurrencies(),
             IsoCurrencies.all,
-            "utils/currency's IsoCurrencies.kt is stale: run ./gradlew :tools:strategy-catalog:generateBundledCurrencies",
+            "utils/currency's IsoCurrencies.kt is stale: run bazel run //tools/strategy-catalog:generate_bundled_currencies",
         )
     }
 

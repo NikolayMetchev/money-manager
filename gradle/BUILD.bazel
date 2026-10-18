@@ -1,2 +1,0 @@
-# The version catalog, read by the maven_kmp module extension (MODULE.bazel).
-exports_files(["libs.versions.toml"])

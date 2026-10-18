@@ -4,8 +4,8 @@ AGP hands lint a model of the variant (`--lint-model`), which this writes the sa
 (`generateDebugLintReportModel`): `module.xml` (the module, its boot classpath and lint options), `debug.xml` (namespace,
 SDK levels, merged manifest, sources, the classes and R.jar) and the variant's libraries, each AAR extracted so lint reads
 its manifest, resources, public resources, external annotations and lint checks (`lint.jar`, which AGP runs on every
-module that uses the AAR). The dependency graph is flat, as AGP writes it. The options are moneyManagerLintPolicy's
-(`gradle/build-logic`) plus the module's own `disable`: warnings are errors and fail the check, and only the module's
+module that uses the AAR). The dependency graph is flat, as AGP writes it. The options are the project's lint policy
+plus the module's own `disable`: warnings are errors and fail the check, and only the module's
 own main sources are analyzed (no test sources, no dependencies).
 
 Paths are written against `@ROOT@` (the runfiles' workspace directory), `@TMP@` (the test's temporary directory) and
