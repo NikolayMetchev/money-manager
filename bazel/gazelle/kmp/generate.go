@@ -147,6 +147,9 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		// Without the Android target Gradle compiles no androidMain.
 		sets = withoutAndroid(sets)
 	}
+	if kc.androidMain {
+		sets = androidApp(sets)
+	}
 	main, mainSetsPresent := scan(args.Dir, sets)
 	sqldelightRoot := filepath.Join(args.Dir, "src", "commonMain", "sqldelight")
 	hasSqldelight := dirHasFiles(sqldelightRoot, ".sq")
@@ -169,6 +172,9 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	}
 	if kc.android {
 		lib.SetAttr("android", true)
+	}
+	if kc.androidMain {
+		lib.SetAttr("jvm", false)
 	}
 	if len(kc.targets) > 0 {
 		lib.SetAttr("native_targets", kc.targets)
@@ -397,6 +403,18 @@ func resourceGlob(dir, kind string) (rule.GlobValue, bool) {
 		}
 	}
 	return rule.GlobValue{Patterns: patterns}, patterns != nil
+}
+
+// androidApp makes `src/main` the Android leaf, as an Android app's only compilation is.
+func androidApp(sets []sourceSet) []sourceSet {
+	var out []sourceSet
+	for _, set := range sets {
+		if set.dir == "main" {
+			set = sourceSet{"main", "android_srcs", "android"}
+		}
+		out = append(out, set)
+	}
+	return out
 }
 
 func withoutAndroid(sets []sourceSet) []sourceSet {

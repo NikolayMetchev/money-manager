@@ -15053,12 +15053,12 @@
     },
     "org.jetbrains.kotlinx:kotlinx-coroutines-play-services": {
       "android": {
-        "version": "1.11.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "kotlinx-coroutines-play-services-1.11.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-play-services/1.11.0/kotlinx-coroutines-play-services-1.11.0.jar",
-            "sha256": "f441579409a9befc7391ae5620de773590dd6536b979d4a5a2a6e05b5f81e4d4"
+            "name": "kotlinx-coroutines-play-services-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-play-services/1.8.0/kotlinx-coroutines-play-services-1.8.0.jar",
+            "sha256": "2d6e60b3db6300e20319f30c7c7736267f57b93324b32e94916e6f6028b5b9c5"
           }
         ],
         "deps": [

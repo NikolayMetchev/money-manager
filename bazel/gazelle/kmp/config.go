@@ -52,6 +52,9 @@ const (
 	testJvmFlagsDirective = "kmp_test_jvm_flags"
 	// kmp_test_flaky true: retry failing JVM tests, as the Compose modules' Gradle test-retry plugin does.
 	testFlakyDirective = "kmp_test_flaky"
+	// kmp_main_platform android: what a non-KMP module's `src/main` compiles for: the JVM (`kotlin("jvm")`, the
+	// default) or Android (`com.android.application`: the module then has no JVM compile).
+	mainPlatformDirective = "kmp_main_platform"
 	// kmp_android_host_tests false: an Android module whose tests don't run as host tests (Gradle's
 	// `testAndroidHostTest` disabled: the Compose UI feature convention, tests that need a device).
 	androidHostTestsDirective = "kmp_android_host_tests"
@@ -97,6 +100,7 @@ type kmpConfig struct {
 	testFlaky         bool
 	testJvmTags       []string
 	noHostTests       bool
+	androidMain       bool // src/main is the Android leaf (kmp_main_platform android)
 	visibility        []string
 	forbidDeps        []string
 	forbidReference   string
@@ -123,6 +127,7 @@ func (c *kmpConfig) clone() *kmpConfig {
 	out.testFlaky = false
 	out.testJvmTags = nil
 	out.noHostTests = false
+	out.androidMain = false
 	out.visibility = nil
 	out.forbidDeps = nil
 	out.forbidReference = ""
@@ -142,7 +147,7 @@ func (*kmpLang) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
 func (*kmpLang) CheckFlags(fs *flag.FlagSet, c *config.Config) error { return nil }
 
 func (*kmpLang) KnownDirectives() []string {
-	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective, generatedSrcsDirective, cinteropsDirective, testDataDirective, testSizeDirective, testJvmFlagsDirective, testFlakyDirective, testJvmTagsDirective, androidHostTestsDirective, visibilityDirective, forbidDepsDirective, forbidReferenceDirective, allowReferenceDirective}
+	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective, generatedSrcsDirective, cinteropsDirective, testDataDirective, testSizeDirective, testJvmFlagsDirective, testFlakyDirective, testJvmTagsDirective, androidHostTestsDirective, mainPlatformDirective, visibilityDirective, forbidDepsDirective, forbidReferenceDirective, allowReferenceDirective}
 }
 
 func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
@@ -184,6 +189,15 @@ func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
 				kc.testFlaky = strings.TrimSpace(d.Value) == "true"
 			case testJvmTagsDirective:
 				kc.testJvmTags = append(kc.testJvmTags, strings.Fields(d.Value)...)
+			case mainPlatformDirective:
+				switch v := strings.TrimSpace(d.Value); v {
+				case "android":
+					kc.androidMain = true
+				case "jvm":
+					kc.androidMain = false
+				default:
+					log.Printf("%s: %s wants jvm or android, got %q", rel, mainPlatformDirective, v)
+				}
 			case androidHostTestsDirective:
 				kc.noHostTests = strings.TrimSpace(d.Value) == "false"
 			case cinteropsDirective:

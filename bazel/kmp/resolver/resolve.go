@@ -500,6 +500,12 @@ func (r *Resolver) Resolve(p Platform, roots []Coordinate) (map[string]Resolved,
 	}
 	platformVersion := map[string]string{}
 	applyPlatform := func(c Coordinate) error {
+		// A BOM a substitution pins (the convention's kotlinx-coroutines-bom) loses the platform attribute the
+		// request carried, so Gradle resolves it as a library and applies none of its constraints: Android's
+		// classpath keeps play-services-auth's kotlinx-coroutines-play-services 1.8.0 beside coroutines 1.11.0.
+		if _, ok := r.forced(p, c.Module()); ok {
+			return nil
+		}
 		if cur, ok := platformVersion[c.Module()]; ok && CompareVersions(c.Version, cur) <= 0 {
 			return nil
 		}
@@ -599,7 +605,48 @@ func (r *Resolver) Resolve(p Platform, roots []Coordinate) (map[string]Resolved,
 			return nil, nil, err
 		}
 	}
+	breakCycles(out, roots, skipped)
 	return out, skipped, nil
+}
+
+// breakCycles drops each dependency that closes a cycle (AGP's gradle-api has a runtime dependency on gradle,
+// which depends on gradle-api). Gradle resolves a cycle as one graph; Bazel targets can't form one. Walking from
+// the roots, the edge back to a module still being walked goes, so everything the roots reached stays reached,
+// though a dependent of a later member no longer brings the earlier ones.
+func breakCycles(out map[string]Resolved, roots []Coordinate, skipped []string) {
+	const (
+		walking = 1
+		done    = 2
+	)
+	state := map[string]int{}
+	var visit func(module string)
+	visit = func(module string) {
+		state[module] = walking
+		res := out[module]
+		keep := func(deps []string) []string {
+			var kept []string
+			for _, d := range deps {
+				if state[d] == walking {
+					continue
+				}
+				if state[d] == 0 {
+					visit(d)
+				}
+				kept = append(kept, d)
+			}
+			return kept
+		}
+		res.Deps = keep(res.Deps)
+		res.Runtime = keep(res.Runtime)
+		res.CompileOnly = keep(res.CompileOnly)
+		out[module] = res
+		state[module] = done
+	}
+	for _, root := range roots {
+		if !contains(skipped, root.Module()) && state[root.Module()] == 0 {
+			visit(root.Module())
+		}
+	}
 }
 
 func dedupe(s []string) []string {

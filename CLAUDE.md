@@ -222,7 +222,7 @@ stream to BuildBuddy, anonymously.
   only those. Gazelle resolves an import to a library every compilation of its source set has, else per compilation
   (commonMain's Material 3 import is `compose_material3_desktop` on the JVM, `androidx_compose_material3` on
   Android; Compose UI's JetBrains root module has both), preferring catalog libraries over the modules they bring; `android.*` is the SDK. Resources, manifests and dexing are the app's
-  (#1023). A library's `androidMain` `runtimeOnly` deps are `kmp_keep_dep … androidMain` (the cryptography provider).
+  (`android_apk`). A library's `androidMain` `runtimeOnly` deps are `kmp_keep_dep … androidMain` (the cryptography provider).
 - **Android host tests** (#1022): AGP's `testAndroidHostTest` is `kmp_test(android = True)`'s `:<name>_android`:
   `commonTest ← jvmAndroidTest ← androidHostTest` compiled against the module's `_android` and `android.jar`, run by
   `KmpJUnitRunner` on AGP's mockable jar (`//bazel/kmp/android:mockable_android_jar`, which AGP's own
@@ -230,6 +230,18 @@ stream to BuildBuddy, anonymously.
   convention's `isReturnDefaultValues` asks). Gazelle sets it on every Android module with tests; one whose Gradle
   build disables `testAndroidHostTest` (the Compose UI feature convention, tests that need a device) says
   `# gazelle:kmp_android_host_tests false`. The same 29 modules and 862 cases as Gradle.
+- **Android app** (`//bazel/kmp/android:apk.bzl`, #1023): `app/main/android` is `kmp_main_platform android` (AGP's
+  `com.android.application`: only `:android_android`, Kotlin module `android`; every other module's JVM and Android
+  compiles take Gradle's module name, `app.ui.core_core`, which Compose's lambda names and `internal` members carry).
+  `android_apk` runs AGP's own tools over the runtime classpath's AARs (`aar_import`, `AarInfo`: `maven_kmp` writes one
+  per AAR): the manifest merger, `aapt2 compile`/`link`, the R class writer (non-final ids, `android.nonFinalResIds`),
+  D8 (debug) or R8 (release: the AARs' and jars' keep rules in classpath order, resource shrinking,
+  `aapt2 convert`/`optimize` with shortened paths, the AARs' baseline profiles expanded, rewritten and compiled to
+  `assets/dexopt/`), then ApkFlinger, with AGP's java-resource excludes/merges and 16K-aligned native libraries.
+  `:debug` is debug-signed, `:release` unsigned as in Gradle, `:release_debug_signed` the smoke test's. The release APK
+  matches Gradle's entry for entry, `classes.dex` and the profile byte for byte; only the merged manifest's element
+  order differs (libraries in Bazel's dependency order). `--stamp` adds `META-INF/version-control-info.textproto`
+  (`bazel/stamp`, `STABLE_GIT_COMMIT`), which AGP always writes. aapt2 is downloaded as AGP does (`pins.bzl`).
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.

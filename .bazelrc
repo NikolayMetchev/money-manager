@@ -21,6 +21,11 @@ common --enable_platform_specific_config
 # Tests read their data through runfiles, which Windows only lays out when asked.
 common:windows --enable_runfiles
 
+# STABLE_GIT_COMMIT, which only a stamped build (--stamp) reads: the release APK's VCS info (#1023).
+common:linux --workspace_status_command=bazel/stamp/workspace_status.sh
+common:macos --workspace_status_command=bazel/stamp/workspace_status.sh
+common:windows --workspace_status_command=bazel/stamp/workspace_status.bat
+
 # BuildBuddy (#1017). CI adds the API key (`--remote_header=x-buildbuddy-api-key=…`) to user.bazelrc; without
 # one (a fork's PR) it runs on the restored disk cache alone.
 # `cache`: the remote cache, and every invocation's results streamed to app.buildbuddy.io.
