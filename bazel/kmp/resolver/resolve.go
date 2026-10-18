@@ -201,6 +201,10 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 	// A KMP library's root module points at a per-platform module (`kotlinx-coroutines-core-jvm`).
 	if api.AvailableAt != nil {
 		at := api.AvailableAt
+		if r.excluded(at.Group + ":" + at.Module) {
+			// Excluding the module it points at leaves this one with nothing, as in Gradle.
+			return &node{}, nil
+		}
 		return r.node(p, Coordinate{at.Group, at.Module, at.Version})
 	}
 	n := &node{}

@@ -146,6 +146,12 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   (`java.util.regex`, `RegexOption.DOT_MATCHES_ALL`) fails even though every platform compile passes. `maven_kmp`'s
   `metadata` platform is each library's common metadata jar, limited to the source sets all our targets' variants
   include (and those source sets' dependencies), plus the stdlib's and kotlin-test's. `bazel build //...` runs it.
+- **Executables** (#1013): `kmp_native_executable` links KGP's release binary per target (`-opt`, the module's klib
+  `-Xinclude`d, no compiler caches) as `:<name>_<target>`, all `manual`, and `:<name>` is the build platform's own,
+  so `bazel build //...` links only the host's `mm`, as Gradle's `build` does. `release_assets` adds the release
+  workflow's `mm-<os>-<arch>` (`pkg_tar` keeping the exec bit; a copied `.exe` on Windows). `jvm_distribution`
+  (`//bazel/kmp:distribution.bzl`) is Gradle's `installDist`: `mm-jvm/bin/` start scripts and `mm-jvm/lib/`, module
+  jars named after their path (`app-db-core-jvm.jar`).
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.
@@ -157,7 +163,9 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
 - **Maven** (`maven_kmp`, #1000): rules_jvm_external reads POMs, which name no KMP platform's files, so
   `//bazel/kmp/resolver` (Go) follows each library's Gradle Module Metadata to its per-platform variant (`-jvm` jar,
   `-linuxx64` klib plus any cinterop klibs) the way Gradle does: highest version wins, except the modules
-  `maven_kmp.install(forces = …)` pins (moneymanager.kotlin-convention's substitutions), and the Kotlin stdlib comes
+  `maven_kmp.install(forces = …)` and its `force_bundles` (the catalog's `build-tool-pins`) pin, as
+  moneymanager.kotlin-convention's substitutions do; `excludes` drops a module everywhere, also where a variant
+  points (`available-at`) at it, and the Kotlin stdlib comes
   from the toolchain. Versions come from the catalog; `MODULE.bazel` lists the catalog aliases, platforms and
   repositories. It writes `bazel/kmp/deps/maven_kmp.lock.json` (every file with its sha256); after changing either,
   run `bazel run @maven_kmp//:pin`. `//bazel/kmp/deps:maven_kmp_lock_test` fails while the lock is stale. Modules

@@ -30,6 +30,32 @@ toolchain_type(name = "toolchain_type")
     }.items()
 ]
 
+# The Kotlin/Native target that is the build's own platform: `kmp_native_executable`'s host-only alias.
+[
+    config_setting(
+        name = "is_" + target,
+        constraint_values = constraints,
+    )
+    for target, constraints in {
+        "linuxArm64": [
+            "@platforms//os:linux",
+            "@platforms//cpu:aarch64",
+        ],
+        "linuxX64": [
+            "@platforms//os:linux",
+            "@platforms//cpu:x86_64",
+        ],
+        "macosArm64": [
+            "@platforms//os:macos",
+            "@platforms//cpu:aarch64",
+        ],
+        "mingwX64": [
+            "@platforms//os:windows",
+            "@platforms//cpu:x86_64",
+        ],
+    }.items()
+]
+
 bzl_library(
     name = "native",
     srcs = [
