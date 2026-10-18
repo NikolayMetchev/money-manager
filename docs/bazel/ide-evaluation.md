@@ -7,9 +7,11 @@ below and post it on #1005).
 
 - IntelliJ IDEA 2026.2 with the JetBrains Bazel plugin (`org.jetbrains.bazel` 2026.2.2.1, the one installed
   here).
-- Open the repository root as a Bazel project; `.bazelproject` syncs the whole repository. It excludes nothing:
-  the plugin turns each excluded directory into a negative target pattern, and one with no packages under it
-  (Gazelle's `testdata`, whose fixtures are `BUILD.in`/`BUILD.out`) fails the sync build on a pattern error.
+- Open the repository root as a Bazel project; `.bazelproject` syncs the whole repository except `.bazelbsp`.
+  The plugin rewrites its sync aspect there, BUILD files included, on every sync; inside the project those
+  BUILD files mark it changed again, so the sync icon never clears. Exclude only directories that hold packages:
+  the plugin turns each exclusion into a negative target pattern, and one with no packages under it (Gazelle's
+  `testdata`, whose fixtures are `BUILD.in`/`BUILD.out`) fails the sync build on a pattern error.
 - Close the Gradle project first: both builds on one checkout fight over `.idea`.
 
 ## What the build hands the IDE
