@@ -37,6 +37,9 @@ jobs:
           # Only main writes the caches, so PR runs don't evict the entries everyone restores.
           cache-save: ${{ github.event_name == 'push' }}
 
+      - name: BUILD files are up to date
+        run: bazel run //:gazelle -- --mode=diff
+
       - name: Build
         run: bazel build //...
 

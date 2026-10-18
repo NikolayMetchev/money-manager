@@ -1,11 +1,9 @@
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
-NATIVE_TARGETS = [
-    "linuxArm64",
-    "linuxX64",
-    "macosArm64",
-    "mingwX64",
-]
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export @maven_kmp//:kotlinx_serialization_core
+# gazelle:kmp_export //utils/bigdecimal
 
 kmp_library(
     name = "core",
@@ -15,16 +13,21 @@ kmp_library(
     linux_srcs = glob(["src/linuxMain/kotlin/**/*.kt"]),
     mingw_srcs = glob(["src/mingwMain/kotlin/**/*.kt"]),
     native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
-    native_targets = NATIVE_TARGETS,
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
     plugins = ["serialization"],
     visibility = ["//visibility:public"],
-    deps = [
-        "@maven_kmp//:kotlinx_io_core",
-        "//utils/files:files",
-    ],
     exports = [
+        "//utils/bigdecimal",
         "@maven_kmp//:kotlinx_serialization_core",
-        "//utils/bigdecimal:bigdecimal",
+    ],
+    deps = [
+        "//utils/files",
+        "@maven_kmp//:kotlinx_io_core",
     ],
 )
 
@@ -32,7 +35,15 @@ kmp_test(
     name = "test",
     associate = ":core",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
-    native_targets = NATIVE_TARGETS,
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
     plugins = ["serialization"],
-    deps = ["//bazel/kmp/deps:kotlin_test"],
+    deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "//utils/bigdecimal",
+    ],
 )

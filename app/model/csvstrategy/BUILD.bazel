@@ -1,16 +1,22 @@
 load("//bazel/kmp:defs.bzl", "kmp_library")
 
-NATIVE_TARGETS = [
-    "linuxArm64",
-    "linuxX64",
-    "macosArm64",
-    "mingwX64",
-]
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export //app/model/accountmapping
+# gazelle:kmp_export //app/model/core
+# gazelle:kmp_export //app/model/qif
+# gazelle:kmp_export //app/model/rules
+# gazelle:kmp_export @maven_kmp//:kotlinx_serialization_core
 
 kmp_library(
     name = "csvstrategy",
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
-    native_targets = NATIVE_TARGETS,
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
     plugins = ["serialization"],
     visibility = ["//visibility:public"],
     exports = [
