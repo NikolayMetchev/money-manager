@@ -304,7 +304,8 @@ def kmp_test(
         keep_deps = [],
         resources = [],
         jvm_flags = [],
-        flaky = False):
+        flaky = False,
+        jvm_tags = []):
     """A module's tests. Emits `:<name>_jvm` and `:<name>_<target>` per native target.
 
     JVM tests are JUnit 4, run by `//bazel/kmp/testing:KmpJUnitRunner`. Native tests are linked with konan's
@@ -339,6 +340,7 @@ def kmp_test(
         jvm_flags: more JVM flags for the JVM test (Gradle's `systemProperty`s: headless Compose Desktop tests).
         flaky: retry a failing JVM test up to twice more, as the Gradle test-retry plugin does for the Compose
             modules (`maxRetries = 2`).
+        jvm_tags: Bazel tags on the JVM test (`no-remote-exec` for Skiko, which needs the host's libGL).
     """
     kmp_lint(name, common_srcs + jvm_android_srcs + jvm_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs)
     fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, jvm_srcs)
@@ -364,6 +366,7 @@ def kmp_test(
             name = name + "_jvm",
             size = size,
             flaky = flaky,
+            tags = jvm_tags,
             main_class = "com.moneymanager.bazel.kmp.testing.KmpJUnitRunner",
             use_testrunner = False,
             jvm_flags = [

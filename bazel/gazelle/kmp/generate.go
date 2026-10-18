@@ -241,6 +241,9 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		if kc.testFlaky {
 			t.SetAttr("flaky", true)
 		}
+		if len(kc.testJvmTags) > 0 {
+			t.SetAttr("jvm_tags", kc.testJvmTags)
+		}
 		if res, ok := resourceGlob(args.Dir, "Test"); ok {
 			t.SetAttr("resources", res)
 		}

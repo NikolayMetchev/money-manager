@@ -1,2 +1,3 @@
 # gazelle:kmp_test_jvm_flags -Djava.awt.headless=true -Dskiko.test.harness=true
 # gazelle:kmp_test_flaky true
+# gazelle:kmp_test_jvm_tags no-remote-exec

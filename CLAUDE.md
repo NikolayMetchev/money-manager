@@ -176,7 +176,8 @@ stream to BuildBuddy, anonymously.
   compilation (`kmp_resource_jar`, `//bazel/kmp:resources.bzl`), `src/{common,jvmAndroid,jvm}{Main,Test}/resources`
   merged with the later source set winning a clash, as Gradle's `processResources` does (`app/ui/core`'s `money_manager.db`).
   `kmp_test_jvm_flags` is the Compose conventions' headless `systemProperty`s and `kmp_test_flaky true` their test-retry
-  (`maxRetries = 2`). `compose.desktop.currentOs` is `//bazel/kmp/deps:compose_desktop_current_os`, a `select` on the
+  (`maxRetries = 2`). `kmp_test_jvm_tags no-remote-exec` keeps their JVM tests off BuildBuddy: Skiko needs libGL, which
+  its executor image doesn't have. `compose.desktop.currentOs` is `//bazel/kmp/deps:compose_desktop_current_os`, a `select` on the
   target OS and CPU, kept on jvmTest with `kmp_keep_dep` (nothing imports Skiko's natives). Test JVMs set
   `skiko.data.path` under `TEST_TMPDIR`, since the sandbox keeps `~/.skiko` read-only. A module with `kmp_visibility`
   also gets a testonly, public `:<name>_for_tests`, which Gazelle gives every test that imports it: Gradle's
