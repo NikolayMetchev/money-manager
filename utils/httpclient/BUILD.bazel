@@ -10,6 +10,7 @@ kmp_library(
     name = "httpclient",
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     jvm_deps = ["@maven_kmp//:ktor_client_engine_defaults"],
+    keep_deps = ["@maven_kmp//:ktor_client_engine_defaults"],
     native_deps = ["@maven_kmp//:ktor_client_engine_defaults"],
     native_targets = [
         "linuxArm64",

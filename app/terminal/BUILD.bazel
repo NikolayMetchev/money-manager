@@ -34,10 +34,7 @@ kmp_library(
         "@maven_kmp//:mosaic_runtime",
         "@maven_kmp//:mosaic_terminal",
     ],
-    deps = [
-        "@maven_kmp//:androidx_compose_runtime_runtime_annotation",
-        "@maven_kmp//:atomicfu",
-    ],
+    deps = ["@maven_kmp//:atomicfu"],
 )
 
 kmp_test(
@@ -45,6 +42,7 @@ kmp_test(
     associate = ":terminal",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     jvm_deps = ["@maven_kmp//:androidx_compose_runtime_desktop"],
+    keep_deps = ["@maven_kmp//:androidx_compose_runtime_desktop"],
     native_targets = [
         "linuxArm64",
         "linuxX64",

@@ -15,6 +15,7 @@ kmp_library(
     name = "strategycatalog",
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     jvm_deps = ["@maven_kmp//:ktor_utils"],
+    keep_deps = ["@maven_kmp//:ktor_utils"],
     native_targets = [
         "linuxArm64",
         "linuxX64",

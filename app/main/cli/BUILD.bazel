@@ -12,6 +12,7 @@ kmp_library(
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     jvm_deps = ["@maven_kmp//:mosaic_terminal"],
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    keep_deps = ["@maven_kmp//:mosaic_terminal"],
     native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
     native_targets = [
         "linuxArm64",

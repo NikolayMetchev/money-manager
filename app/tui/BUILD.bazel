@@ -45,7 +45,6 @@ kmp_library(
         "//app/presenter/transactions",
         "//app/query",
         "//utils/files",
-        "@maven_kmp//:androidx_compose_runtime_runtime_annotation",
         "@maven_kmp//:kermit",
         "@maven_kmp//:kotlinx_datetime",
         "@maven_kmp//:mosaic_terminal",
@@ -59,6 +58,7 @@ kmp_test(
     associate = ":tui",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     jvm_deps = ["@maven_kmp//:ktor_client_core"],
+    keep_deps = ["@maven_kmp//:ktor_client_core"],
     native_targets = [
         "linuxArm64",
         "linuxX64",

@@ -41,6 +41,12 @@ kmp_library(
         "@maven_kmp//:sqldelight_jdbc_driver",
     ],
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    keep_deps = [
+        "//utils/sqlite3",
+        "@maven_kmp//:kotlinx_datetime",
+        "@maven_kmp//:kotlinx_serialization_json",
+        "@maven_kmp//:sqldelight_sqlite_driver",
+    ],
     native_deps = [
         "@maven_kmp//:co_touchlab_sqliter_driver",
         "@maven_kmp//:sqldelight_native_driver",

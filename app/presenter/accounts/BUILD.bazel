@@ -27,10 +27,7 @@ kmp_library(
         "@maven_kmp//:androidx_compose_runtime",
         "@maven_kmp//:kotlinx_coroutines_core",
     ],
-    deps = [
-        "//app/presenter/core",
-        "@maven_kmp//:androidx_compose_runtime_runtime_annotation",
-    ],
+    deps = ["//app/presenter/core"],
 )
 
 kmp_test(

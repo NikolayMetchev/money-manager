@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+# kmp_unused_deps's tool (//bazel/kmp/checks:checks.bzl).
+go_library(
+    name = "unuseddeps_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/NikolayMetchev/money-manager/bazel/kmp/checks/unuseddeps",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "unuseddeps",
+    embed = [":unuseddeps_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "unuseddeps_test",
+    size = "small",
+    srcs = ["main_test.go"],
+    embed = [":unuseddeps_lib"],
+)

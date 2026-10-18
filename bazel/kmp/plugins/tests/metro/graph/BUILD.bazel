@@ -4,6 +4,8 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 kmp_library(
     name = "graph",
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    # Metro's generated graph is all that uses it, which the unused-deps check can't see.
+    keep_deps = ["//bazel/kmp/plugins/tests/metro/contributor"],
     native_targets = ["linuxX64"],
     plugins = ["metro"],
     deps = [

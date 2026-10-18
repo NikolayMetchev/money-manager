@@ -170,6 +170,9 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	if len(kc.forbidDeps) > 0 {
 		lib.SetAttr("forbidden_deps", kc.forbidDeps)
 	}
+	if kept := kc.keptLabels(false); len(kept) > 0 {
+		lib.SetAttr("keep_deps", kept)
+	}
 	if kc.forbidReference != "" {
 		lib.SetAttr("forbidden_reference", kc.forbidReference)
 		lib.SetAttr("forbidden_reference_reason", kc.referenceReason)
@@ -230,6 +233,9 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		}
 		if len(kc.forbidDeps) > 0 {
 			t.SetAttr("forbidden_deps", kc.forbidDeps)
+		}
+		if kept := kc.keptLabels(true); len(kept) > 0 {
+			t.SetAttr("keep_deps", kept)
 		}
 		res.Gen = append(res.Gen, t)
 		res.Imports = append(res.Imports, imports{byPlatform: keys(tests.imports), keep: kc.kept(true), test: true, associate: name})
@@ -297,6 +303,18 @@ func (c *kmpConfig) kept(test bool) map[string][]string {
 		}
 	}
 	return out
+}
+
+// keptLabels is kmp_keep_dep's labels, once each, for the rule's keep_deps: no import explains them, so the
+// unused-deps check (//bazel/kmp/checks) leaves them alone.
+func (c *kmpConfig) keptLabels(test bool) []string {
+	labels := map[string]bool{}
+	for _, d := range c.keepDeps {
+		if d.test == test {
+			labels[d.label] = true
+		}
+	}
+	return sortedKeys(labels)
 }
 
 func (c *kmpConfig) exported() map[string]bool {

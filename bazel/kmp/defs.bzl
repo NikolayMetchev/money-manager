@@ -23,7 +23,7 @@ load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load(":metadata.bzl", "kt_metadata_library")
-load("//bazel/kmp/checks:checks.bzl", "kmp_forbidden_deps", "kmp_reference_check")
+load("//bazel/kmp/checks:checks.bzl", "kmp_forbidden_deps", "kmp_reference_check", "kmp_unused_deps")
 load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
 load(":native.bzl", "BUILDS_ON", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_executable", "kt_native_klib", "kt_native_test_binary")
 load("//bazel/kmp/plugins:plugins.bzl", "plugin_deps", "plugin_labels")
@@ -74,6 +74,21 @@ def _on(platform, labels):
             out.append(target)
     return out
 
+def _unused_deps(name, target, declared, keep_deps):
+    """`:<name>_unused_deps`: what the BUILD file declares, less what directives keep, against the JVM compile."""
+    names = []
+    for dep in declared:
+        if dep not in keep_deps and dep not in names:
+            names.append(dep)
+    kmp_unused_deps(
+        name = name + "_unused_deps",
+        target = ":" + target,
+        deps = _on("jvm", names),
+        names = names,
+        module = "//" + native.package_name(),
+        testonly = True,
+    )
+
 def _family(target, linux, apple, mingw):
     """What a target's family source set (linuxMain, appleMain, mingwMain) has: its sources or its deps."""
     return {"apple": apple, "linux": linux, "mingw": mingw}[FAMILIES[target]]
@@ -116,6 +131,7 @@ def kmp_library(
         forbidden_reference = None,
         forbidden_reference_reason = "",
         forbidden_reference_allowed = [],
+        keep_deps = [],
         visibility = None):
     """A Kotlin Multiplatform module. Emits `:<name>_jvm` and `:<name>_<target>` per native target.
 
@@ -151,6 +167,7 @@ def kmp_library(
             (`:<name>_references`).
         forbidden_reference_reason: why, for the error message.
         forbidden_reference_allowed: module-relative files exempt from `forbidden_reference`.
+        keep_deps: dependencies no source uses (`kmp_keep_dep`), which `:<name>_unused_deps` leaves alone.
         visibility: the targets' visibility.
     """
     hand_written = common_srcs + jvm_android_srcs + jvm_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs
@@ -165,6 +182,9 @@ def kmp_library(
         )
     if forbidden_deps:
         _forbidden_deps(name, forbidden_deps, {"jvm": name + "_jvm"}, {t: name + "_" + t for t in native_targets}, BUILDS_ON)
+    # Exports are kmp_export directives, a person's say-so (some only generated code uses: Metro's graph,
+    # SQLDelight's queries), so only what imports brought is checked.
+    declared = deps + jvm_deps
     common_srcs = common_srcs + generated_srcs
     native_deps = native_deps + cinterops
     fragments = _jvm_fragments("Main", common_srcs, jvm_android_srcs, jvm_srcs)
@@ -202,6 +222,8 @@ def kmp_library(
         runtime_deps = [Label("@maven_kmp//:kotlinx_coroutines_swing_jvm")],
         visibility = visibility,
     )
+    if fragments.srcs:
+        _unused_deps(name, name + "_jvm", declared, keep_deps)
     if native_targets:
         package = native.package_name()
         kt_metadata_library(
@@ -249,7 +271,8 @@ def kmp_test(
         plugins = [],
         data = [],
         size = "medium",
-        forbidden_deps = []):
+        forbidden_deps = [],
+        keep_deps = []):
     """A module's tests. Emits `:<name>_jvm` and `:<name>_<target>` per native target.
 
     JVM tests are JUnit 4, run by `//bazel/kmp/testing:KmpJUnitRunner`. Native tests are linked with konan's
@@ -278,10 +301,12 @@ def kmp_test(
         size: the Bazel test size. Gradle has no test timeout, so the default is medium (300 s); give a slower
             suite a bigger one.
         forbidden_deps: modules the tests must never reach either (`:<name>_forbidden_deps_<platform>`).
+        keep_deps: dependencies no test source uses (`kmp_keep_dep`), which `:<name>_unused_deps` leaves alone.
     """
     kmp_lint(name, common_srcs + jvm_android_srcs + jvm_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs)
     fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, jvm_srcs)
     brought = plugin_deps(plugins)
+    declared = deps + jvm_deps
     deps = deps + brought.deps + brought.exports
     # Tests with only native sources have no JVM test, as KGP's jvmTest finds no sources (utils/sqlite3).
     if fragments.srcs:
@@ -296,6 +321,7 @@ def kmp_test(
             deps = _on("jvm", deps + jvm_deps),
             plugins = plugin_labels(plugins, "jvm"),
         )
+        _unused_deps(name, lib, declared, keep_deps)
         java_test(
             name = name + "_jvm",
             size = size,

@@ -111,7 +111,7 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
 - **Metro across modules** (#1002): contribution hints (`metro/hints`) reach the graph's compile through ordinary
   `deps`, in jars and klibs alike, because ABI jars stay off. A dep that exists only so Metro sees it (app/di/core's
   feature DI modules) is a plain dep marked `# keep`, so Gazelle (and the Gazelle-diff check, #1016) keeps it
-  though no import explains it (or name it with `# gazelle:kmp_keep_dep`).
+  though no import explains it (or name it with `# gazelle:kmp_keep_dep`, which also exempts it from the unused-deps check).
 - **SQLDelight** (`//bazel/kmp/sqldelight`, #1003): `sqldelight_library` runs the SQLDelight compiler (the
   `SqlDelightEnvironment` the Gradle task drives, with its defaults) over a module's `.sq` files, upstream databases'
   folders as dependencies, and `kmp_library(sqldelight = …)` compiles the result as `commonMain` (plus the runtime as
@@ -159,6 +159,14 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   `verifyNoDbDependency`: an aspect fails analysis, per platform and for the tests too, when a pure importer reaches
   `app/db/core`, `app/di/core` or `app/ui/core`, naming the path. Gazelle itself is `verifyUniquePackages`: a run fails
   when two generated modules' main sources declare one package (so CI's Gazelle diff catches it).
+- **Dependency hygiene** (#1016), Gradle's `buildHealth`: the toolchain runs rules_kotlin's strict deps as an error (a
+  class used from a dep that isn't declared, or exported by one that is, fails the compile: Gradle's `api` is fine), and
+  every module and test gets `:<name>_unused_deps` (`//bazel/kmp/checks/unuseddeps`), which fails `bazel build` when its
+  JVM compile's jdeps used none of a declared dep's own jars (not what it re-exports, as rules_kotlin's own check
+  counts). Exports and `keep_deps` (written from `kmp_keep_dep`) are exempt: Metro graphs, SQLDelight and other
+  generated code use them where jdeps can't see. A package several libraries declare (`androidx.compose.runtime`)
+  resolves to one a directive names, to nothing when those already bring every candidate, then to the one whose api
+  brings the rest, and only then to the most specific. A stale BUILD file is CI's Gazelle diff.
 - **Lint** (`//bazel/kmp/lint`, #1015): every `kmp_library`/`kmp_test` gets `:<name>_ktlint` and `:<name>_detekt`,
   tests that run the tool's own `main` over the hand-written sources (generated ones are left out, as the Gradle
   plugins filter them), and report the same findings Gradle does. ktlint is the catalog's `ktlint-engine` (Gradle's

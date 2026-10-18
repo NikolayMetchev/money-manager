@@ -6,6 +6,7 @@ kmp_library(
     name = "fixture",
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     jvm_deps = ["@maven_kmp//:kotlinx_coroutines_core"],
+    keep_deps = ["@maven_kmp//:kotlinx_coroutines_core"],
     native_targets = [
         "linuxX64",
         "mingwX64",
