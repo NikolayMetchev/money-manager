@@ -8,7 +8,6 @@ on:
     branches: [ main ]
     paths-ignore: [ 'docs/**', 'webpage/**', '**/*.md' ]
   pull_request:
-    branches: [ main ]
     paths-ignore: [ 'docs/**', 'webpage/**', '**/*.md' ]
 
 concurrency:
@@ -20,8 +19,31 @@ permissions:
 
 jobs:
   bazel:
-    name: Bazel build
-    runs-on: ubuntu-latest
+    name: Bazel (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux runs every action on BuildBuddy's executors (#1017): JVM, linuxX64, linuxArm64 and mingwX64
+          # compile there, and the JVM and linuxX64 tests run there.
+          - name: Linux
+            os: ubuntu-latest
+            config: rbe
+          # macOS and Windows build on their own runners, sharing the remote cache: macosArm64 only builds on
+          # a Mac, and each runs its own native tests.
+          - name: macOS
+            os: macos-latest
+            config: cache
+          - name: Windows
+            os: windows-latest
+            config: cache
+    env:
+      # Empty on a fork's PR: the build then runs on the restored disk cache alone.
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -32,16 +54,38 @@ jobs:
         uses: bazel-contrib/setup-bazel@0.19.1
         with:
           bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}
+          disk-cache: ${{ github.workflow }}-${{ matrix.name }}
           repository-cache: true
           # Only main writes the caches, so PR runs don't evict the entries everyone restores.
           cache-save: ${{ github.event_name == 'push' }}
 
+      - name: Use BuildBuddy
+        if: env.BUILDBUDDY_API_KEY != ''
+        run: |
+          {
+            echo "common --config=${{ matrix.config }}"
+            echo "common --remote_header=x-buildbuddy-api-key=${BUILDBUDDY_API_KEY}"
+            echo "common --build_metadata=ROLE=CI"
+            echo "common --build_metadata=REPO_URL=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          } > user.bazelrc
+
       - name: BUILD files are up to date
+        if: matrix.name == 'Linux'
         run: bazel run //:gazelle -- --mode=diff
 
       - name: Build
-        run: bazel build //...
+        run: bazel build //... 2>&1 | tee build.log
 
       - name: Test
-        run: bazel test //...
+        run: bazel test //... 2>&1 | tee test.log
+
+      - name: Cache hits
+        if: always()
+        run: |
+          for step in build test; do
+            [ -f "$step.log" ] || continue
+            {
+              echo "### ${{ matrix.name }} $step"
+              grep -E "Streaming build results to|INFO: [0-9,]+ processes" "$step.log" | sed 's/^/    /'
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
