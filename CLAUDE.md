@@ -79,9 +79,13 @@ minified APK and drives first run. CI runs it only via the manual "Android Relea
 **Bazel (in progress, #995)**: Bazel is being brought up beside Gradle, which stays the source of truth until
 the cutover. Run it through bazelisk (`.bazelversion`): `bazel build //...`. It is bzlmod only (`MODULE.bazel`,
 committed `MODULE.bazel.lock`), on the same JDK 25 (`.bazelrc`). The KMP rules live in `//bazel/kmp` and the Gazelle
-extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output). CI runs it in the non-required
-`bazel.yml` workflow (`bazel build //...` and `bazel test //...`). CI uses BuildBuddy (#1017): the Linux job runs every action on its executors
-(`--config=rbe`), macOS and Windows build on their runners with its remote cache (`--config=cache`). To use it locally,
+extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output). Every CI workflow runs on Bazel
+(#1028; only the Qodana job still imports the Gradle build, for its IDE's project model): `build.yml`'s Build and Test
+is `bazel build //...` and `bazel test //...` plus the Gazelle diff, and each job sets Bazel up through
+`.github/actions/bazel-setup`. CI uses BuildBuddy (#1017): the Linux jobs run every action on its executors
+(`--config=rbe`), macOS and Windows build on their runners with its remote cache (`--config=cache`). The linuxArm64
+test binaries cross-link with `--platforms=//bazel/platforms:linux_arm64` and run on an arm64 runner. Dependency
+submission reads the lockfiles (`bazel/kmp/deps/dependency_snapshot.py`). To use it locally,
 copy `user.bazelrc.example` to `user.bazelrc` and put your API key in `~/.bazelrc`
 (`common --remote_header=x-buildbuddy-api-key=…`). Without a key, don't pass either config: invocations would still
 stream to BuildBuddy, anonymously.
@@ -197,7 +201,7 @@ stream to BuildBuddy, anonymously.
   jars, macOS's `Info.plist` and ad-hoc signing on Apple Silicon) and reads Compose's default icons and entitlements
   from the plugin jar. jpackage packages only for its host: `//app/main/jvm:installer` is a deb, dmg or msi by OS
   (WiX 3.11 is `@wix`, as Compose downloads it), and its action runs locally (dpkg-deb/fakeroot, hdiutil, WiX).
-  `--define=bundle_native_cli=true` is `-PbundleNativeCli=true`. The `installer` job in `bazel.yml` installs it on
+  `--define=bundle_native_cli=true` is `-PbundleNativeCli=true`. `build.yml`'s Desktop Installer jobs install it on
   each OS and starts the app, `mm-jvm` and `mm` (`install_smoke_test.sh`).
 - **Lint** (`//bazel/kmp/lint`, #1015): every `kmp_library`/`kmp_test` gets `:<name>_ktlint` and `:<name>_detekt`,
   tests that run the tool's own `main` over the hand-written sources (generated ones are left out, as the Gradle
@@ -250,8 +254,8 @@ stream to BuildBuddy, anonymously.
   AGP's test APK (`com.moneymanager.<module path>.test`, self-instrumenting, targetSdk = compileSdk as for a library,
   no `app-metadata.properties`), and `android_device_test` runs it with `adb install` and `am instrument -w -r`
   (`DeviceTestRunner`, which writes `test.xml`) on the device adb picks (`ANDROID_SERIAL` among several). They're
-  `manual`, `local` and `exclusive`, tagged `android_device`: `bazel test //...` leaves them out and `bazel.yml`'s
-  device job runs `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')` on build.yml's emulator
+  `manual`, `local` and `exclusive`, tagged `android_device`: `bazel test //...` leaves them out and `build.yml`'s
+  Android Instrumented Tests job runs `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')` on its emulator
   (rules_android's emulator rules can't take APKs built outside it, and need their own system images). The release
   smoke test is `//app/main/android-smoketest:smoketest_test` (hand-written: a `com.android.test` module, its release
   variant not debuggable), installing `//app/main/android:release_debug_signed` first. The same 12 modules and 430
@@ -270,7 +274,7 @@ stream to BuildBuddy, anonymously.
 - **Coverage** (#1026), Kover's replacement: `bazel coverage $(bazel query 'attr(name, "^test_(jvm|android)$",
   tests(//...))')`. rules_kotlin instruments with JaCoCo; `.bazelrc`'s `coverage` lines filter it as Kover does (no
   `test/` fixtures, tests or SQLDelight code) and merge it into one LCOV report, `bazel-out/_coverage/_coverage_report.dat`
-  (the `coverage` job in `bazel.yml`). It credits a module's code to every test that runs it, so it reads higher than
+  (`build.yml`'s Coverage job uploads it to Codecov). It credits a module's code to every test that runs it, so it reads higher than
   Kover's per-module reports. Not covered: the device tests (Gradle's `instrumented` flag) and Kover's generated-class
   excludes, which are per class where LCOV is per line. The Go tests can't link under coverage, hence the query.
 - **Tools and Pages** (#1027): `tools/*` and `app/db/schemaspy` are ordinary modules plus `java_binary`s:
@@ -779,7 +783,7 @@ set of writes.
   device emulator. **Android emulator API level sync**: change the level here and you must change it
   in `gradle/libs.versions.toml` (`android-targetSdk`), the Gradle managed device
   (`moneymanager.android-convention.gradle.kts` and `app/main/android-smoketest/build.gradle.kts`),
-  the CI emulator (`.github/workflows/build.yml`, `.github/workflows/android-release-smoke-test.yml` and `bazel.yml`'s device job) and the IntelliJ run configuration
+  the CI emulator (`.github/workflows/build.yml` and `.github/workflows/android-release-smoke-test.yml`) and the IntelliJ run configuration
   (`.idea/runConfigurations/Android_Tests.xml`) too.
 - **Test Stability**: Always call `waitForIdle()` after `waitUntilDoesNotExist()` to ensure recompositions complete before test ends
 
@@ -803,9 +807,10 @@ set of writes.
 
 ### Common Issues
 
-1. **Java**: Requires JDK 25 toolchain. **JVM version sync**: the version is pinned in two places
-   that must move together — `gradle/libs.versions.toml` (`jvm-target`/`jvm-toolchain`) and
-   `.github/actions/gradle-setup/action.yml`, which every CI job sets up Java through
+1. **Java**: Requires JDK 25 toolchain. **JVM version sync**: the version is pinned in places
+   that must move together — `gradle/libs.versions.toml` (`jvm-target`/`jvm-toolchain`), `.bazelrc`
+   (`remotejdk_<n>`, the JDK Bazel downloads; CI installs none) and `.github/actions/gradle-setup/action.yml`, which the
+   Qodana job's Gradle import sets up Java through
 2. **Metro**: Keep the Kotlin version compatible with Metro (both in `gradle/libs.versions.toml`). Graphs
    must be `interface`; binding containers `object`
 3. **SQLDelight**: `execute()`/`update()`/`delete()` return `Long`, not `Unit`

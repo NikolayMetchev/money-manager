@@ -44,7 +44,7 @@ dependency-analysis = "3.19.2"
 detekt = "2.0.0-alpha.6"
 dokka = "2.2.0"
 gradle-doctor = "0.12.1"
-# JVM version sync: keep jvm-target and jvm-toolchain aligned with .github/actions/gradle-setup/action.yml
+# JVM version sync: keep jvm-target and jvm-toolchain aligned with .bazelrc, .github/actions/gradle-setup/action.yml
 # and CLAUDE.md.
 jvm-target = "25"
 jvm-toolchain = "25"
