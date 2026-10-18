@@ -52,6 +52,25 @@ Read from the plugin's sync aspect (`intellij.libraries.bazel.aspect.sdk`), whic
 | 9 | `app/db/read`: `MoneyManagerDatabase` and the generated queries resolve, Go to declaration lands in the srcjar | | |
 | 10 | Mappie/Metro/serialization code highlights without false errors (plugins applied in the IDE) | | |
 
+## Android Studio (ASwB)
+
+Android Studio 2026.2.1's bundled Bazel plugin (ASwB, query sync) imports the project, but it can't build
+dependencies, so no file gets analysis:
+
+- **Its aspect needs Bazel 8 or older.** ASwB writes its aspect into `.aswb/` on every sync. The templates use
+  `JavaInfo`, `java_common`, `CcInfo`, `cc_common` and `android_common` as globals, without a `load`. Bazel 9
+  removed them, so every dependency build fails with `name 'JavaInfo' is not defined`.
+  `--incompatible_autoload_externally` doesn't bring them back for the aspect, and editing `.aswb/` doesn't help
+  either, because the next sync rewrites it. This needs an ASwB that supports Bazel 9.
+- **Compose tooling target (fixed).** After each sync of a Compose project, ASwB builds
+  `@maven_kmp//:androidx_compose_ui_ui_tooling`, the name rules_jvm_external uses, for previews. The hub now has
+  ui-tooling under that alias (`maven_kmp.install(aliases = …)`), so this build no longer fails on a missing
+  target. It still fails on the aspect, as above.
+- Our Android rules (`bazel/kmp/android`) aren't `rules_android`, so ASwB wouldn't see Android modules even with
+  a working aspect.
+
+Until then, use IntelliJ with the JetBrains Bazel plugin (above).
+
 ## Workarounds, if native and expect/actual fail as predicted
 
 1. **IDE-only JVM targets per native source set.** Gazelle could emit a `kt_jvm_library` per native family

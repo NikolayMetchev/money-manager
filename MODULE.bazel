@@ -73,6 +73,9 @@ http_archive(
 # catalog, re-pin: bazel run @maven_kmp//:pin
 maven_kmp = use_extension("//bazel/kmp/deps:extensions.bzl", "maven_kmp")
 maven_kmp.install(
+    # Android Studio renders Compose previews with the hub's `androidx_compose_ui_ui_tooling`, rules_jvm_external's
+    # name for it, and builds it after every sync of a Compose project: a missing target fails that build.
+    aliases = {"androidx_compose_ui_ui_tooling": "androidx_compose_ui_tooling_android"},
     catalog = "//:libs.versions.toml",
     # SQLDelight's Gradle plugin jar carries the compiler environment //bazel/kmp/sqldelight runs, but none
     # of its Gradle API.
@@ -138,6 +141,7 @@ maven_kmp.install(
         "androidx-compose-ui-graphics": ["android"],
         "androidx-compose-ui-test": ["android"],
         "androidx-compose-ui-text": ["android"],
+        "androidx-compose-ui-tooling": ["android"],
         "androidx-compose-ui-unit": ["android"],
         "androidx-navigation3-runtime-desktop": ["jvm"],
         "androidx-navigation3-ui": ["android"],
@@ -201,6 +205,7 @@ maven_kmp.install(
         "androidx-compose-ui-graphics",
         "androidx-compose-ui-test",
         "androidx-compose-ui-text",
+        "androidx-compose-ui-tooling",
         "androidx-compose-ui-unit",
         "androidx-navigation3-runtime",
         "androidx-navigation3-runtime-desktop",

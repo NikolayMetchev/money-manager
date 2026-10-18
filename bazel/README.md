@@ -170,6 +170,8 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
   fails while any lock is stale. Modules name a library by its catalog alias, `@maven_kmp//:kotlinx_io_core` (the
   `_jvm`/`_<target>` suffix is added per platform); `//bazel/kmp/deps` only holds `kotlin_test` and the compiler
   plugins. `dependency_snapshot.py` turns the lockfiles into GitHub's dependency graph.
+- `aliases` adds a hub target under a name some tool expects instead of ours: Android Studio builds
+  `@maven_kmp//:androidx_compose_ui_ui_tooling` (rules_jvm_external's name) after every sync of a Compose project.
 
 ## Kotlin/Native
 

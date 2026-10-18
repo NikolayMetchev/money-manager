@@ -255,6 +255,8 @@ def _install(module_ctx, install, files, archives):
     pin_args += ["--exclude=" + e for e in install.excludes]
     if install.resolve_stdlib:
         pin_args.append("--resolve-stdlib")
+    for alias, actual in sorted(install.aliases.items()):
+        targets.append('alias(name = "%s", actual = ":%s")\n' % (alias, actual))
     return _HEADER.format(pin_args = repr(pin_args)) + "\n" + "\n".join(targets), stale
 
 def _maven_kmp_impl(module_ctx):
@@ -283,6 +285,9 @@ maven_kmp = module_extension(
     implementation = _maven_kmp_impl,
     tag_classes = {
         "install": tag_class(attrs = {
+            "aliases": attr.string_dict(
+                doc = "name → one of the hub's targets, for a tool that expects another name for it (rules_jvm_external's).",
+            ),
             "catalog": attr.label(mandatory = True, doc = "The version catalog (libs.versions.toml)."),
             "excludes": attr.string_list(doc = "group:artifact never resolved, whoever depends on it."),
             "force_bundles": attr.string_list(doc = "Catalog bundles whose every library is forced to its version."),

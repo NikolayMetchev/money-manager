@@ -265,7 +265,7 @@
         "bzlTransitiveDigest": "1OrTILyUjUSJe6xnK/Nw46TQNayBz1hFAMMjrM0/Hb8=",
         "usagesDigest": "af/EB6S6Jhg08XPZPOFfwCev0bH7RX6CSnpYr6oaQG4=",
         "recordedInputs": [
-          "FILE:@@//libs.versions.toml 07e4d61554a9489134bd667285c512bf65f191f8b2f96af3421d067c6f6d5167"
+          "FILE:@@//libs.versions.toml 30d95028b411d3c290b358e2e388b1f4380e0ab7bec69b1c94df937addc1c4d5"
         ],
         "generatedRepoSpecs": {
           "android_sdk": {

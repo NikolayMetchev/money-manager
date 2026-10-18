@@ -37,6 +37,9 @@ secrets/google-oauth.properties
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 /hs_err_*.log
+# Android Studio's Bazel plugin writes its sync aspect here on every sync.
+.aswb/
+
 # Qodana results and the .idea a local run moves aside; the profile and the bootstrap script are checked in.
 .qodana/*
 !.qodana/profile.xml
