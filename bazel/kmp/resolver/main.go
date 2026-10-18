@@ -107,6 +107,17 @@ func run(tomlPath, out string, libraries, platformNames, forceSpecs, repoSpecs, 
 	}
 
 	resolver := NewResolver(NewFetcher(repos), forced, excludes)
+	for _, name := range platformNames {
+		if p, ok := platforms[name]; ok && !p.Common {
+			resolver.consumers = append(resolver.consumers, p)
+		}
+	}
+	// Every other platform's stdlib and kotlin-test come from the toolchain; common code compiles against
+	// their metadata jars.
+	toolchain := []Coordinate{
+		{"org.jetbrains.kotlin", "kotlin-stdlib", cat.Versions["kotlin"]},
+		{"org.jetbrains.kotlin", "kotlin-test", cat.Versions["kotlin"]},
+	}
 	type result struct {
 		platform string
 		resolved map[string]Resolved
@@ -123,7 +134,11 @@ func run(tomlPath, out string, libraries, platformNames, forceSpecs, repoSpecs, 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			resolved, skipped, err := resolver.Resolve(p, roots)
+			platformRoots := roots
+			if p.Common {
+				platformRoots = append(append([]Coordinate{}, roots...), toolchain...)
+			}
+			resolved, skipped, err := resolver.Resolve(p, platformRoots)
 			results[i] = result{name, resolved, skipped, err}
 		}()
 	}
@@ -152,7 +167,14 @@ func run(tomlPath, out string, libraries, platformNames, forceSpecs, repoSpecs, 
 	fetcher := resolver.fetch
 	for module, byPlatform := range lock.Artifacts {
 		set := map[string]bool{}
-		for _, res := range byPlatform {
+		// A metadata jar declares what the module's platform files do; the stdlib's is no import's library.
+		if _, ok := byPlatform[metadataPlatform]; ok && len(byPlatform) == 1 {
+			continue
+		}
+		for name, res := range byPlatform {
+			if name == metadataPlatform {
+				continue
+			}
 			for _, file := range res.Files {
 				pkgs, err := fetcher.packagesOf(file)
 				if err != nil {

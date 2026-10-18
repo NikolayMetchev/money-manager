@@ -105,6 +105,44 @@ def run_konan(ctx, tool, target, arguments, inputs, outputs, mnemonic, progress_
     kn = kotlin_native_toolchain_info(ctx)
     if target not in kn.targets:
         fail("Kotlin/Native target %s doesn't build on host %s" % (target, kn.host))
+    _launch(
+        ctx,
+        tool = tool,
+        arguments = arguments + (_AIRPLANE.get(tool, ["-Xoverride-konan-properties=airplaneMode=true"]) if konan_options else []),
+        inputs = inputs,
+        tool_inputs = [kn.dist_files, kn.targets[target]],
+        outputs = outputs,
+        mnemonic = mnemonic,
+        progress_message = progress_message,
+    )
+
+def run_kotlin_metadata(ctx, arguments, inputs, outputs, mnemonic, progress_message):
+    """Runs the common metadata compiler (Gradle's `compileCommonMainKotlinMetadata`) from konan's jar.
+
+    It needs none of a target's konan dependencies, so it runs on any exec host.
+
+    Args:
+        ctx: the rule context; its rule must list `TOOLCHAIN_TYPE` in `toolchains`.
+        arguments: the compiler's arguments (a list of `Args` or strings).
+        inputs: depset or list of the action's own inputs.
+        outputs: the action's outputs.
+        mnemonic: the action mnemonic.
+        progress_message: the action progress message.
+    """
+    kn = kotlin_native_toolchain_info(ctx)
+    _launch(
+        ctx,
+        tool = "kotlinc-metadata",
+        arguments = arguments,
+        inputs = inputs,
+        tool_inputs = [kn.dist_files],
+        outputs = outputs,
+        mnemonic = mnemonic,
+        progress_message = progress_message,
+    )
+
+def _launch(ctx, tool, arguments, inputs, tool_inputs, outputs, mnemonic, progress_message):
+    kn = kotlin_native_toolchain_info(ctx)
     java = kn.java_runtime
     launcher = ctx.actions.args()
     launcher.add_all([
@@ -125,10 +163,10 @@ def run_konan(ctx, tool, target, arguments, inputs, outputs, mnemonic, progress_
     ])
     ctx.actions.run(
         executable = java.java_executable_exec_path,
-        arguments = [launcher] + arguments + (_AIRPLANE.get(tool, ["-Xoverride-konan-properties=airplaneMode=true"]) if konan_options else []),
+        arguments = [launcher] + arguments,
         inputs = depset(
             direct = (inputs if type(inputs) == "list" else []) + [kn.launcher],
-            transitive = [kn.dist_files, kn.targets[target], java.files] +
+            transitive = tool_inputs + [java.files] +
                          ([inputs] if type(inputs) == "depset" else []),
         ),
         outputs = outputs,
