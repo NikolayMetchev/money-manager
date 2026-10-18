@@ -18,6 +18,10 @@ import java.util.stream.Stream;
  * rules_kotlin does for JVM plugin options: a plugin that keeps state between compiles (Mappie) then never
  * reads an earlier build's.
  *
+ * <p>cinterop copies each {@code -staticLibrary} into a temporary klib directory and deletes it afterwards. On
+ * Windows the copy keeps the read-only attribute Bazel gives its outputs, so the delete fails; cinterop gets a
+ * writable copy of each library instead.
+ *
  * <p>The tool {@code kotlinc-metadata} isn't konan's: it is the common metadata compiler, which konan's jar
  * carries too (Gradle's {@code compileCommonMainKotlinMetadata}), run with the same compiler plugins.
  */
@@ -29,6 +33,10 @@ public final class KonanLauncher {
   private static final String TEMP = "{temp}";
 
   private static final String METADATA = "kotlinc-metadata";
+
+  private static final String LIBRARY_PATH = "-libraryPath";
+
+  private static final String STATIC_LIBRARY = "-staticLibrary";
 
   public static void main(String[] args) throws Exception {
     Path temp = null;
@@ -42,6 +50,15 @@ public final class KonanLauncher {
         }
         args[i] = args[i].replace(TEMP, temp.toString());
       }
+      if (args[i].equals(STATIC_LIBRARY) && i >= 2 && i + 1 < args.length && args[i - 2].equals(LIBRARY_PATH)) {
+        if (temp == null) {
+          temp = Files.createTempDirectory("konan");
+        }
+        Path dir = Files.createDirectories(temp.resolve("static" + i));
+        Path copy = Files.copy(Path.of(args[i - 1], args[i + 1]), dir.resolve(args[i + 1]));
+        copy.toFile().setWritable(true);
+        args[i - 1] = dir.toString();
+      }
     }
     int exitCode = 0;
     try {
@@ -54,7 +71,10 @@ public final class KonanLauncher {
     } finally {
       if (temp != null) {
         try (Stream<Path> paths = Files.walk(temp)) {
-          paths.sorted(Comparator.reverseOrder()).forEach(path -> path.toFile().delete());
+          paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+            path.toFile().setWritable(true);
+            path.toFile().delete();
+          });
         }
       }
     }
