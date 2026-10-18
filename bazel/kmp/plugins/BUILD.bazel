@@ -1,0 +1,102 @@
+# Compiler plugins, one per name that kmp_library/kmp_test take in `plugins` (see plugins.bzl): `<name>_jvm` for
+# rules_kotlin and `<name>_native` for konanc, both from the same embeddable jar KGP uses. Options are the ones
+# each plugin's Gradle plugin passes (from KGP's logged compiler arguments), so a module compiles the same way.
+load("@rules_kotlin//kotlin:core.bzl", "kt_compiler_plugin")
+load(":plugins.bzl", "kt_native_plugin")
+
+package(default_visibility = ["//visibility:public"])
+
+COMPOSE_OPTIONS = {
+    "sourceInformation": "true",
+    "traceMarkersEnabled": "true",
+}
+
+# output-dir holds Mappie's state between incremental compiles, which it reads back on the next one. Each
+# compile gets a fresh `{temp}` (rules_kotlin's on the JVM, KonanLauncher's on native), so a build never
+# depends on an earlier one. The Gradle plugin's report-dir is only written when reports are enabled.
+MAPPIE_OPTIONS = {
+    "naming-convention": "LENIENT",
+    "output-dir": "{temp}",
+}
+
+METRO_OPTIONS = {
+        "contributes-as-inject": "true",
+        "debug": "false",
+        "desugared-provider-severity": "WARN",
+        "diagnostics-render-mode": "PLAIN",
+        "enable-circuit-codegen": "false",
+        "enable-dagger-anvil-interop": "false",
+        "enable-dagger-runtime-interop": "false",
+        "enable-function-providers": "true",
+        "enable-graph-sharding": "true",
+        "enable-guice-runtime-interop": "false",
+        "enable-kclass-to-class-interop": "false",
+        "enable-klib-params-check": "false",
+        "enable-private-provider-properties": "true",
+        "enable-runtime-tracing": "false",
+        "enable-suspend-providers": "false",
+        "enable-switching-providers": "false",
+        "enable-top-level-function-injection": "true",
+        "enabled": "true",
+        "force-enable-fir-in-ide": "false",
+        "generate-assisted-factories": "false",
+        "generate-classes-in-ir": "true",
+        "generate-contribution-hints": "true",
+        "generate-contribution-providers": "false",
+        "interop-annotations-named-arg-severity": "NONE",
+        "interop-include-anvil-annotations": "false",
+        "interop-include-dagger-annotations": "false",
+        "interop-include-guice-annotations": "false",
+        "interop-include-hilt-annotations": "false",
+        "interop-include-jakarta-annotations": "false",
+        "interop-include-javax-annotations": "false",
+        "interop-include-kotlin-inject-annotations": "false",
+        "interop-include-kotlin-inject-anvil-annotations": "false",
+        "keys-per-graph-shard": "2000",
+        "max-ir-errors-count": "20",
+        "non-public-contribution-severity": "NONE",
+        "optional-binding-behavior": "DEFAULT",
+        "patch-klib-params": "true",
+        "plugin-order-set": "true",
+        "public-scoped-provider-severity": "NONE",
+        "statements-per-init-fun": "25",
+        "unused-graph-inputs-severity": "WARN",
+        "warn-on-inject-annotation-placement": "true",
+}
+
+MOKKERY_OPTIONS = {
+    "annotations.copyToMock": "all",
+    "defaultMockMode": "strict",
+    "defaultVerifyMode": "soft",
+    "enableFirDiagnostics": "true",
+    "ignoreFinalMembers": "false",
+    "ignoreInlineMembers": "false",
+    "stubs.allowClassInheritance": "false",
+    "stubs.allowConcreteClassInstantiation": "false",
+}
+
+[
+    (
+        kt_compiler_plugin(
+            name = name + "_jvm",
+            id = id,
+            options = {key: [value] for key, value in options.items()},
+            # The embeddable compiler's shading, as KGP uses; rules_kotlin reshades it for its compiler.
+            target_embedded_compiler = True,
+            deps = [jar + "_jvm"],
+        ),
+        kt_native_plugin(
+            name = name + "_native",
+            id = id,
+            options = options,
+            deps = [jar + "_jvm"],
+        ),
+    )
+    for name, id, jar, options in [
+        ("compose", "androidx.compose.compiler.plugins.kotlin", "@maven_kmp//:kotlin_compose_compiler_plugin_embeddable", COMPOSE_OPTIONS),
+        ("mappie", "mappie", "@maven_kmp//:mappie_compiler_plugin", MAPPIE_OPTIONS),
+        ("metro", "dev.zacsweers.metro.compiler", "@maven_kmp//:metro_compiler", METRO_OPTIONS),
+        ("mokkery", "dev.mokkery", "@maven_kmp//:mokkery_plugin", MOKKERY_OPTIONS),
+        ("serialization", "org.jetbrains.kotlinx.serialization", "@maven_kmp//:kotlin_serialization_compiler_plugin_embeddable", {}),
+    ]
+]

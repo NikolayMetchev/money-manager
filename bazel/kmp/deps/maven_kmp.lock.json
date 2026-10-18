@@ -2,13 +2,22 @@
   "version": 1,
   "inputs": {
     "libraries": {
+      "androidx-compose-runtime": "androidx.compose.runtime:runtime:1.12.1",
       "bignum": "com.ionspin.kotlin:bignum:0.3.10",
       "junit": "junit:junit:4.13.2",
+      "kotlin-compose-compiler-plugin-embeddable": "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable:2.4.21",
+      "kotlin-serialization-compiler-plugin-embeddable": "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable:2.4.21",
       "kotlinx-coroutines-core": "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0",
       "kotlinx-coroutines-test": "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0",
       "kotlinx-datetime": "org.jetbrains.kotlinx:kotlinx-datetime:0.8.0",
       "kotlinx-io-core": "org.jetbrains.kotlinx:kotlinx-io-core:0.9.1",
       "kotlinx-serialization-core": "org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0",
+      "mappie-api": "tech.mappie:mappie-api:2.4.21-2.4.5",
+      "mappie-compiler-plugin": "tech.mappie:mappie-compiler-plugin:2.4.21-2.4.5",
+      "metro-compiler": "dev.zacsweers.metro:compiler:1.4.5",
+      "metro-runtime": "dev.zacsweers.metro:runtime:1.4.5",
+      "mokkery-plugin": "dev.mokkery:mokkery-plugin:3.5.1",
+      "mokkery-runtime": "dev.mokkery:mokkery-runtime:3.5.1",
       "sqldelight-runtime": "app.cash.sqldelight:runtime:2.4.1"
     },
     "forces": {
@@ -55,10 +64,22 @@
     ]
   },
   "names": {
+    "androidx.annotation:annotation": "androidx_annotation_annotation",
+    "androidx.collection:collection": "androidx_collection_collection",
+    "androidx.compose.runtime:runtime": "androidx_compose_runtime",
+    "androidx.compose.runtime:runtime-annotation": "androidx_compose_runtime_runtime_annotation",
     "app.cash.sqldelight:runtime": "sqldelight_runtime",
     "com.ionspin.kotlin:bignum": "bignum",
+    "dev.drewhamilton.poko:poko-annotations": "dev_drewhamilton_poko_poko_annotations",
+    "dev.mokkery:mokkery-core": "dev_mokkery_mokkery_core",
+    "dev.mokkery:mokkery-plugin": "mokkery_plugin",
+    "dev.mokkery:mokkery-runtime": "mokkery_runtime",
+    "dev.zacsweers.metro:compiler": "metro_compiler",
+    "dev.zacsweers.metro:runtime": "metro_runtime",
     "junit:junit": "junit",
     "org.hamcrest:hamcrest-core": "org_hamcrest_hamcrest_core",
+    "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable": "kotlin_compose_compiler_plugin_embeddable",
+    "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable": "kotlin_serialization_compiler_plugin_embeddable",
     "org.jetbrains.kotlinx:atomicfu": "org_jetbrains_kotlinx_atomicfu",
     "org.jetbrains.kotlinx:kotlinx-coroutines-core": "kotlinx_coroutines_core",
     "org.jetbrains.kotlinx:kotlinx-coroutines-test": "kotlinx_coroutines_test",
@@ -66,23 +87,299 @@
     "org.jetbrains.kotlinx:kotlinx-io-bytestring": "org_jetbrains_kotlinx_kotlinx_io_bytestring",
     "org.jetbrains.kotlinx:kotlinx-io-core": "kotlinx_io_core",
     "org.jetbrains.kotlinx:kotlinx-serialization-core": "kotlinx_serialization_core",
-    "org.jetbrains:annotations": "org_jetbrains_annotations"
+    "org.jetbrains:annotations": "org_jetbrains_annotations",
+    "tech.mappie:mappie-api": "mappie_api",
+    "tech.mappie:mappie-compiler-plugin": "mappie_compiler_plugin"
   },
   "skipped": {
     "linuxArm64": [
-      "junit:junit"
+      "dev.mokkery:mokkery-plugin",
+      "dev.zacsweers.metro:compiler",
+      "junit:junit",
+      "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
+      "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
+      "tech.mappie:mappie-compiler-plugin"
     ],
     "linuxX64": [
-      "junit:junit"
+      "dev.mokkery:mokkery-plugin",
+      "dev.zacsweers.metro:compiler",
+      "junit:junit",
+      "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
+      "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
+      "tech.mappie:mappie-compiler-plugin"
     ],
     "macosArm64": [
-      "junit:junit"
+      "dev.mokkery:mokkery-plugin",
+      "dev.zacsweers.metro:compiler",
+      "junit:junit",
+      "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
+      "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
+      "tech.mappie:mappie-compiler-plugin"
     ],
     "mingwX64": [
-      "junit:junit"
+      "dev.mokkery:mokkery-plugin",
+      "dev.zacsweers.metro:compiler",
+      "junit:junit",
+      "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
+      "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
+      "tech.mappie:mappie-compiler-plugin"
     ]
   },
   "artifacts": {
+    "androidx.annotation:annotation": {
+      "jvm": {
+        "version": "1.9.1",
+        "files": [
+          {
+            "name": "annotation-jvm-1.9.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-jvm/1.9.1/annotation-jvm-1.9.1.jar",
+            "sha256": "1e343917ebf27ba96fe4dc52b1cad7fd32b738fbc6355bb6cd5b3b305d7212d0"
+          }
+        ]
+      },
+      "linuxArm64": {
+        "version": "1.9.1",
+        "files": [
+          {
+            "name": "annotation.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-linuxarm64/1.9.1/annotation-linuxarm64-1.9.1.klib",
+            "sha256": "29028a15d7667878abd06b8ca13c3a4b4bdfeb6127267acef562ae22d80467df"
+          }
+        ]
+      },
+      "linuxX64": {
+        "version": "1.9.1",
+        "files": [
+          {
+            "name": "annotation.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-linuxx64/1.9.1/annotation-linuxx64-1.9.1.klib",
+            "sha256": "758b01fea9d505bff1c7caad4ccbf4a086faa423cec10275c2cac679cea2e5d8"
+          }
+        ]
+      },
+      "macosArm64": {
+        "version": "1.9.1",
+        "files": [
+          {
+            "name": "annotation.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-macosarm64/1.9.1/annotation-macosarm64-1.9.1.klib",
+            "sha256": "ebd2a63a5af25537b8d71bb953788fa0f720cf3c216f33587f1672aa66a372af"
+          }
+        ]
+      },
+      "mingwX64": {
+        "version": "1.9.1",
+        "files": [
+          {
+            "name": "annotation.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-mingwx64/1.9.1/annotation-mingwx64-1.9.1.klib",
+            "sha256": "6c3f8d14851b4c49cefa95f66475ff8b384ce03ce39ebf64b931530217141465"
+          }
+        ]
+      }
+    },
+    "androidx.collection:collection": {
+      "jvm": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "collection-jvm-1.5.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/collection/collection-jvm/1.5.0/collection-jvm-1.5.0.jar",
+            "sha256": "70b35924e4babcdffa37d0e575ee039c56a2d97123342624c48b603233704341"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ]
+      },
+      "linuxArm64": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "collection-linuxArm64Main-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/collection/collection-linuxarm64/1.5.0/collection-linuxarm64-1.5.0.klib",
+            "sha256": "555d5b64b771be8621bf817f6772c8c8d64a9fcb6e4165728b5123f548c9bd13"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ]
+      },
+      "linuxX64": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "collection-linuxX64Main-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/collection/collection-linuxx64/1.5.0/collection-linuxx64-1.5.0.klib",
+            "sha256": "86ae8d0f6d7b0f1e6af58b2bf527360a27c7252ac182dedbc2bddf9f6f348d5b"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ]
+      },
+      "macosArm64": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "collection-macosArm64Main-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/collection/collection-macosarm64/1.5.0/collection-macosarm64-1.5.0.klib",
+            "sha256": "f13709f150fc13c9e4118b4639d061cc29fb6b3f3ffa2d1ebe14a97d8b0e6968"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ]
+      },
+      "mingwX64": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "collection-mingwX64Main-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/collection/collection-mingwx64/1.5.0/collection-mingwx64-1.5.0.klib",
+            "sha256": "1626cfc522ac65ed1aa3918ab80c148a8b665076dfd391798250e467d6e34403"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ]
+      }
+    },
+    "androidx.compose.runtime:runtime": {
+      "jvm": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-desktop-1.12.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-desktop/1.12.1/runtime-desktop-1.12.1.jar",
+            "sha256": "ed390d7bf7bdba951359d127f4c1ddd223f535f5a6a63078c5c5ac6b6924eb08"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection"
+        ]
+      },
+      "linuxArm64": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-linuxArm64Main-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-linuxarm64/1.12.1/runtime-linuxarm64-1.12.1.klib",
+            "sha256": "157c23f256fc8f67a3d7bc555f7aba4c55cf0552ba538e77a4f94612f3bfb8ea"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "linuxX64": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-linuxX64Main-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-linuxx64/1.12.1/runtime-linuxx64-1.12.1.klib",
+            "sha256": "e7bd825590d6f47db38d0383d345b45a4e4d6d427bcc849f76004fcc7c3148c7"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "macosArm64": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-macosArm64Main-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-macosarm64/1.12.1/runtime-macosarm64-1.12.1.klib",
+            "sha256": "344deb8380265267460d1e8230a8d873e6abb88a0cfb0907bbaa0c8382ea66ae"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "mingwX64": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-mingwX64Main-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-mingwx64/1.12.1/runtime-mingwx64-1.12.1.klib",
+            "sha256": "92561bcf92009ab39251a5aaffa9a329b81e72bd6f7fdff1aa753460c6414d5c"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "androidx.compose.runtime:runtime-annotation": {
+      "jvm": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-annotation-jvm-1.12.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-jvm/1.12.1/runtime-annotation-jvm-1.12.1.jar",
+            "sha256": "e291a6ae01ab71a7f48a568ec9744c6bf9b3f46ef72fbcdeb28c3407ae531c5e"
+          }
+        ]
+      },
+      "linuxArm64": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-annotation-linuxArm64Main-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-linuxarm64/1.12.1/runtime-annotation-linuxarm64-1.12.1.klib",
+            "sha256": "82d4e69069016704e137b163718ca3c1cdcf1e08fa8280a8d6e13868c2430e9d"
+          }
+        ]
+      },
+      "linuxX64": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-annotation-linuxX64Main-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-linuxx64/1.12.1/runtime-annotation-linuxx64-1.12.1.klib",
+            "sha256": "fcfc652c25ca812b134c59bd50491c9500fa7fe002a16838a435b5d17bcd9461"
+          }
+        ]
+      },
+      "macosArm64": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-annotation-macosArm64Main-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-macosarm64/1.12.1/runtime-annotation-macosarm64-1.12.1.klib",
+            "sha256": "fdb144ffb59db5824cf416bab86c52e7d0d01d36c03db6d0f08d113ad318c9c1"
+          }
+        ]
+      },
+      "mingwX64": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-annotation-mingwX64Main-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-mingwx64/1.12.1/runtime-annotation-mingwx64-1.12.1.klib",
+            "sha256": "c9519efcfe908c9248dbfb1bb2e95ab6a010f9d8f2b0d728ea23e06d0ba7b954"
+          }
+        ]
+      }
+    },
     "app.cash.sqldelight:runtime": {
       "jvm": {
         "version": "2.4.1",
@@ -187,6 +484,264 @@
         ]
       }
     },
+    "dev.drewhamilton.poko:poko-annotations": {
+      "jvm": {
+        "version": "0.23.1",
+        "files": [
+          {
+            "name": "poko-annotations-jvm-0.23.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-jvm/0.23.1/poko-annotations-jvm-0.23.1.jar",
+            "sha256": "9042e6da375ffa8e201d349e7ac926d1bab7694a818102c3a6a2f7d6e014bcc8"
+          }
+        ]
+      },
+      "linuxArm64": {
+        "version": "0.23.1",
+        "files": [
+          {
+            "name": "poko-annotations-linuxArm64Main-0.23.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-linuxarm64/0.23.1/poko-annotations-linuxarm64-0.23.1.klib",
+            "sha256": "5878947ec910e8c19c56e205da94f7fa1ee5acf3e8d17b74abc3f0c6370f390d"
+          }
+        ]
+      },
+      "linuxX64": {
+        "version": "0.23.1",
+        "files": [
+          {
+            "name": "poko-annotations-linuxX64Main-0.23.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-linuxx64/0.23.1/poko-annotations-linuxx64-0.23.1.klib",
+            "sha256": "dc12e87068087f6a6c3f80692843ae7db1d9d392d943068e18de92bb521451b9"
+          }
+        ]
+      },
+      "macosArm64": {
+        "version": "0.23.1",
+        "files": [
+          {
+            "name": "poko-annotations-macosArm64Main-0.23.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-macosarm64/0.23.1/poko-annotations-macosarm64-0.23.1.klib",
+            "sha256": "005016751757f75a0c6d2f3a6bac979080c251b2c4f12c1ae569ae2a049aa2fe"
+          }
+        ]
+      },
+      "mingwX64": {
+        "version": "0.23.1",
+        "files": [
+          {
+            "name": "poko-annotations-mingwX64Main-0.23.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-mingwx64/0.23.1/poko-annotations-mingwx64-0.23.1.klib",
+            "sha256": "1373c346e9d5399e297a52e19439b7ae6bd1006da94bbde93c826ab46ea1a4e3"
+          }
+        ]
+      }
+    },
+    "dev.mokkery:mokkery-core": {
+      "jvm": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-core-jvm-3.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-jvm/3.5.1/mokkery-core-jvm-3.5.1.jar",
+            "sha256": "10e385c1467b8dcc795d024812c02c82c8d4da1d447114ee1cb592246316985e"
+          }
+        ]
+      },
+      "linuxArm64": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-core-linuxArm64Main-3.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-linuxarm64/3.5.1/mokkery-core-linuxarm64-3.5.1.klib",
+            "sha256": "d6cb8390d94e85c29b1bcf0521eb562a87811d4412fa0ce0eb76833aac318bea"
+          }
+        ]
+      },
+      "linuxX64": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-core-linuxX64Main-3.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-linuxx64/3.5.1/mokkery-core-linuxx64-3.5.1.klib",
+            "sha256": "03e3873b1e77d977098b66f3632e77667253e1eb025279686dae7222f0cf6123"
+          }
+        ]
+      },
+      "macosArm64": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-core-macosArm64Main-3.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-macosarm64/3.5.1/mokkery-core-macosarm64-3.5.1.klib",
+            "sha256": "b56bd676a2c4b02aa8b90dacce0d29b826183d1c1c3d9e3200480a63020a034e"
+          }
+        ]
+      },
+      "mingwX64": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-core-mingwX64Main-3.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-mingwx64/3.5.1/mokkery-core-mingwx64-3.5.1.klib",
+            "sha256": "9c83779b98b37368d6cd7d272a8270c65c5ac91cc0ebfed7c893a2a1ca9fd511"
+          }
+        ]
+      }
+    },
+    "dev.mokkery:mokkery-plugin": {
+      "jvm": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-plugin-3.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-plugin/3.5.1/mokkery-plugin-3.5.1.jar",
+            "sha256": "030984b4585eb35a26323be2b694ae3a1e74967d27f76be1b9fac5f96a8536ff"
+          }
+        ]
+      }
+    },
+    "dev.mokkery:mokkery-runtime": {
+      "jvm": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-runtime-jvm-3.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-jvm/3.5.1/mokkery-runtime-jvm-3.5.1.jar",
+            "sha256": "785134f73cdeeea0a8714e641ed80c07f90daf0243fdfd29ad9a5c301ec99ae0"
+          }
+        ],
+        "deps": [
+          "dev.mokkery:mokkery-core"
+        ],
+        "runtime_deps": [
+          "dev.drewhamilton.poko:poko-annotations"
+        ]
+      },
+      "linuxArm64": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-runtime-linuxArm64Main-3.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-linuxarm64/3.5.1/mokkery-runtime-linuxarm64-3.5.1.klib",
+            "sha256": "8cffdf46c4b864a34e57efabf2abc510d857710eba31b665e3f4b42fbf967e59"
+          }
+        ],
+        "deps": [
+          "dev.drewhamilton.poko:poko-annotations",
+          "dev.mokkery:mokkery-core",
+          "org.jetbrains.kotlinx:atomicfu"
+        ]
+      },
+      "linuxX64": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-runtime-linuxX64Main-3.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-linuxx64/3.5.1/mokkery-runtime-linuxx64-3.5.1.klib",
+            "sha256": "60efa4e6b89dba140f68aea281c65cda42b0e69f905c8ad145dd2c08362aec02"
+          }
+        ],
+        "deps": [
+          "dev.drewhamilton.poko:poko-annotations",
+          "dev.mokkery:mokkery-core",
+          "org.jetbrains.kotlinx:atomicfu"
+        ]
+      },
+      "macosArm64": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-runtime-macosArm64Main-3.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-macosarm64/3.5.1/mokkery-runtime-macosarm64-3.5.1.klib",
+            "sha256": "bddf423e239b1e335eed919ad2d07e95e9340fab0377ad6bf96d8dd358c3e473"
+          }
+        ],
+        "deps": [
+          "dev.drewhamilton.poko:poko-annotations",
+          "dev.mokkery:mokkery-core",
+          "org.jetbrains.kotlinx:atomicfu"
+        ]
+      },
+      "mingwX64": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-runtime-mingwX64Main-3.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-mingwx64/3.5.1/mokkery-runtime-mingwx64-3.5.1.klib",
+            "sha256": "150f881eae4e3bda0f449c749440609485a8b2545779d100f4c3bb5204f9bc01"
+          }
+        ],
+        "deps": [
+          "dev.drewhamilton.poko:poko-annotations",
+          "dev.mokkery:mokkery-core",
+          "org.jetbrains.kotlinx:atomicfu"
+        ]
+      }
+    },
+    "dev.zacsweers.metro:compiler": {
+      "jvm": {
+        "version": "1.4.5",
+        "files": [
+          {
+            "name": "compiler-1.4.5.jar",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/compiler/1.4.5/compiler-1.4.5.jar",
+            "sha256": "e94246f0f3af1f7e8b34d4238f5c95187abf69cb940bf96d239d4a731ebb824e"
+          }
+        ]
+      }
+    },
+    "dev.zacsweers.metro:runtime": {
+      "jvm": {
+        "version": "1.4.5",
+        "files": [
+          {
+            "name": "runtime-jvm-1.4.5.jar",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-jvm/1.4.5/runtime-jvm-1.4.5.jar",
+            "sha256": "9ab8bf5adc89936ef8e7061231cfa2b03b796b22cf6e2eb0bf2cc7486c42fbcd"
+          }
+        ]
+      },
+      "linuxArm64": {
+        "version": "1.4.5",
+        "files": [
+          {
+            "name": "runtime-linuxArm64Main-1.4.5.klib",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-linuxarm64/1.4.5/runtime-linuxarm64-1.4.5.klib",
+            "sha256": "83a5a82c5db730d5bb3c6ef4f8166ef2524aea8a5b012063aabc722ca915df87"
+          }
+        ]
+      },
+      "linuxX64": {
+        "version": "1.4.5",
+        "files": [
+          {
+            "name": "runtime-linuxX64Main-1.4.5.klib",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-linuxx64/1.4.5/runtime-linuxx64-1.4.5.klib",
+            "sha256": "849e6b2766d45aee31b5db7dd2fbbf1a2856ef32960ed2742c076527dbc0fd83"
+          }
+        ]
+      },
+      "macosArm64": {
+        "version": "1.4.5",
+        "files": [
+          {
+            "name": "runtime-macosArm64Main-1.4.5.klib",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-macosarm64/1.4.5/runtime-macosarm64-1.4.5.klib",
+            "sha256": "93105f2adff2ede5fc7f6d44f2086e974146ce1bd30fc192c5fb232080005dc5"
+          }
+        ]
+      },
+      "mingwX64": {
+        "version": "1.4.5",
+        "files": [
+          {
+            "name": "runtime-mingwX64Main-1.4.5.klib",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-mingwx64/1.4.5/runtime-mingwx64-1.4.5.klib",
+            "sha256": "77717dc67597ef91d0d5593d604839a63209ccc4d574f64795173e526343cc9b"
+          }
+        ]
+      }
+    },
     "junit:junit": {
       "jvm": {
         "version": "4.13.2",
@@ -210,6 +765,30 @@
             "name": "hamcrest-core-1.3.jar",
             "url": "https://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar",
             "sha256": "66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9"
+          }
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable": {
+      "jvm": {
+        "version": "2.4.21",
+        "files": [
+          {
+            "name": "kotlin-compose-compiler-plugin-embeddable-2.4.21.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-compose-compiler-plugin-embeddable/2.4.21/kotlin-compose-compiler-plugin-embeddable-2.4.21.jar",
+            "sha256": "634f5c17bed5854548208f2901071f2ead5993ffad25b34fea1668ee9e314b53"
+          }
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable": {
+      "jvm": {
+        "version": "2.4.21",
+        "files": [
+          {
+            "name": "kotlin-serialization-compiler-plugin-embeddable-2.4.21.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-serialization-compiler-plugin-embeddable/2.4.21/kotlin-serialization-compiler-plugin-embeddable-2.4.21.jar",
+            "sha256": "63b381018a7d45221795d18301150fb80a1d00f30aae7be0550ab86f9ddd0ce8"
           }
         ]
       }
@@ -658,6 +1237,70 @@
             "name": "annotations-23.0.0.jar",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/23.0.0/annotations-23.0.0.jar",
             "sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05"
+          }
+        ]
+      }
+    },
+    "tech.mappie:mappie-api": {
+      "jvm": {
+        "version": "2.4.21-2.4.5",
+        "files": [
+          {
+            "name": "mappie-api-jvm-2.4.21-2.4.5.jar",
+            "url": "https://repo1.maven.org/maven2/tech/mappie/mappie-api-jvm/2.4.21-2.4.5/mappie-api-jvm-2.4.21-2.4.5.jar",
+            "sha256": "62eec789f9e5dd0f990161e341c5b44d2d34cf8dc6b8ff95f1822725243ea673"
+          }
+        ]
+      },
+      "linuxArm64": {
+        "version": "2.4.21-2.4.5",
+        "files": [
+          {
+            "name": "mappie-api-linuxArm64Main-2.4.21-2.4.5.klib",
+            "url": "https://repo1.maven.org/maven2/tech/mappie/mappie-api-linuxarm64/2.4.21-2.4.5/mappie-api-linuxarm64-2.4.21-2.4.5.klib",
+            "sha256": "b02d86f26e67860dc06c68326dc478806647a2cbafc201b98735f0ad8c5761df"
+          }
+        ]
+      },
+      "linuxX64": {
+        "version": "2.4.21-2.4.5",
+        "files": [
+          {
+            "name": "mappie-api-linuxX64Main-2.4.21-2.4.5.klib",
+            "url": "https://repo1.maven.org/maven2/tech/mappie/mappie-api-linuxx64/2.4.21-2.4.5/mappie-api-linuxx64-2.4.21-2.4.5.klib",
+            "sha256": "2afcda94ab264c86db9b3e81d912615d62105c3e6eb830425a78df515fb90fa8"
+          }
+        ]
+      },
+      "macosArm64": {
+        "version": "2.4.21-2.4.5",
+        "files": [
+          {
+            "name": "mappie-api-macosArm64Main-2.4.21-2.4.5.klib",
+            "url": "https://repo1.maven.org/maven2/tech/mappie/mappie-api-macosarm64/2.4.21-2.4.5/mappie-api-macosarm64-2.4.21-2.4.5.klib",
+            "sha256": "0122d189cf60e0199e72e700e9fdda79bbe5bd218a918958c21c04ae7b2b19d7"
+          }
+        ]
+      },
+      "mingwX64": {
+        "version": "2.4.21-2.4.5",
+        "files": [
+          {
+            "name": "mappie-api-mingwX64Main-2.4.21-2.4.5.klib",
+            "url": "https://repo1.maven.org/maven2/tech/mappie/mappie-api-mingwx64/2.4.21-2.4.5/mappie-api-mingwx64-2.4.21-2.4.5.klib",
+            "sha256": "e49a697ca7324f3fafcbfe276acda604a1267c08a966b5073d5b210827c318c4"
+          }
+        ]
+      }
+    },
+    "tech.mappie:mappie-compiler-plugin": {
+      "jvm": {
+        "version": "2.4.21-2.4.5",
+        "files": [
+          {
+            "name": "mappie-compiler-plugin-2.4.21-2.4.5.jar",
+            "url": "https://repo1.maven.org/maven2/tech/mappie/mappie-compiler-plugin/2.4.21-2.4.5/mappie-compiler-plugin-2.4.21-2.4.5.jar",
+            "sha256": "7ddcc20a61e341a620267a6258f14cb02bc879902132cd989d933b72361443ee"
           }
         ]
       }

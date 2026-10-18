@@ -1,7 +1,6 @@
 # What modules depend on besides Maven libraries (those are `@maven_kmp//:<catalog alias>`, see
-# extensions.bzl): kotlin("test") and the compiler plugins. Like modules, each has one target per platform:
+# extensions.bzl): kotlin("test"). Compiler plugins are //bazel/kmp/plugins. Like modules, each has one target per platform:
 # `<name>_jvm`, `<name>_linuxX64`, …
-load("@rules_kotlin//kotlin:core.bzl", "kt_compiler_plugin")
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 load("//bazel/kmp:native.bzl", "kt_native_group")
 
@@ -32,12 +31,6 @@ kt_jvm_library(
     )
     for target in NATIVE_TARGETS
 ]
-
-kt_compiler_plugin(
-    name = "serialization_plugin",
-    id = "org.jetbrains.kotlinx.serialization",
-    deps = ["@rules_kotlin//kotlin/compiler:kotlinx-serialization-compiler-plugin"],
-)
 
 # Fails when maven_kmp.lock.json no longer matches MODULE.bazel's maven_kmp.install or the catalog.
 test_suite(
