@@ -6,6 +6,5 @@ import kotlin.test.assertEquals
 
 class TestGraphTest {
     @Test
-    fun mergesTheOtherModulesContribution() =
-        assertEquals("contributed from another module", createGraph<TestGraph>().greeting)
+    fun mergesTheOtherModulesContribution() = assertEquals("contributed from another module", createGraph<TestGraph>().greeting)
 }

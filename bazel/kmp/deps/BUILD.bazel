@@ -45,8 +45,12 @@ kt_metadata_group(
     deps = ["@maven_kmp//:org_jetbrains_kotlin_kotlin_test_metadata"],
 )
 
-# Fails when maven_kmp.lock.json no longer matches MODULE.bazel's maven_kmp.install or the catalog.
+# Fails when a lockfile no longer matches its MODULE.bazel maven_kmp.install or the catalog.
 test_suite(
     name = "maven_kmp_lock_test",
-    tests = ["@maven_kmp//:lock_test"],
+    tests = [
+        "@detekt_cli//:lock_test",
+        "@ktlint_cli//:lock_test",
+        "@maven_kmp//:lock_test",
+    ],
 )

@@ -61,26 +61,6 @@
       "turbine": "app.cash.turbine:turbine:1.2.1"
     },
     "forces": {
-      "androidx.activity:activity": "1.13.0",
-      "androidx.annotation:annotation": "1.9.1",
-      "androidx.annotation:annotation-jvm": "1.9.1",
-      "androidx.collection:collection": "1.5.0",
-      "androidx.concurrent:concurrent-futures": "1.2.0",
-      "androidx.lifecycle:lifecycle-common": "2.10.0",
-      "androidx.lifecycle:lifecycle-common-jvm": "2.10.0",
-      "androidx.lifecycle:lifecycle-runtime": "2.10.0",
-      "androidx.lifecycle:lifecycle-runtime-android": "2.10.0",
-      "androidx.lifecycle:lifecycle-runtime-compose": "2.10.0",
-      "androidx.lifecycle:lifecycle-runtime-compose-android": "2.10.0",
-      "androidx.lifecycle:lifecycle-runtime-ktx": "2.10.0",
-      "androidx.lifecycle:lifecycle-runtime-ktx-android": "2.10.0",
-      "androidx.navigationevent:navigationevent": "1.1.2",
-      "androidx.navigationevent:navigationevent-compose": "1.1.2",
-      "androidx.savedstate:savedstate": "1.5.0",
-      "androidx.savedstate:savedstate-compose": "1.5.0",
-      "androidx.test.services:storage": "1.6.0",
-      "androidx.test:runner": "1.7.0",
-      "androidx.tracing:tracing": "1.2.0",
       "ch.qos.logback:logback-classic": "1.6.5",
       "ch.qos.logback:logback-core": "1.6.5",
       "com.google.api.grpc:proto-google-common-protos": "2.78.0",
@@ -121,6 +101,33 @@
       "org.apache.httpcomponents:httpclient": "4.5.14",
       "org.checkerframework:checker-qual": "4.3.1",
       "org.codehaus.mojo:animal-sniffer-annotations": "1.28",
+      "org.ow2.asm:asm": "9.11.1",
+      "org.ow2.asm:asm-analysis": "9.11.1",
+      "org.ow2.asm:asm-commons": "9.11.1",
+      "org.ow2.asm:asm-tree": "9.11.1",
+      "org.ow2.asm:asm-util": "9.11.1"
+    },
+    "classpath_forces": {
+      "androidx.activity:activity": "1.13.0",
+      "androidx.annotation:annotation": "1.9.1",
+      "androidx.annotation:annotation-jvm": "1.9.1",
+      "androidx.collection:collection": "1.5.0",
+      "androidx.concurrent:concurrent-futures": "1.2.0",
+      "androidx.lifecycle:lifecycle-common": "2.10.0",
+      "androidx.lifecycle:lifecycle-common-jvm": "2.10.0",
+      "androidx.lifecycle:lifecycle-runtime": "2.10.0",
+      "androidx.lifecycle:lifecycle-runtime-android": "2.10.0",
+      "androidx.lifecycle:lifecycle-runtime-compose": "2.10.0",
+      "androidx.lifecycle:lifecycle-runtime-compose-android": "2.10.0",
+      "androidx.lifecycle:lifecycle-runtime-ktx": "2.10.0",
+      "androidx.lifecycle:lifecycle-runtime-ktx-android": "2.10.0",
+      "androidx.navigationevent:navigationevent": "1.1.2",
+      "androidx.navigationevent:navigationevent-compose": "1.1.2",
+      "androidx.savedstate:savedstate": "1.5.0",
+      "androidx.savedstate:savedstate-compose": "1.5.0",
+      "androidx.test.services:storage": "1.6.0",
+      "androidx.test:runner": "1.7.0",
+      "androidx.tracing:tracing": "1.2.0",
       "org.jetbrains.kotlinx:atomicfu": "0.33.0",
       "org.jetbrains.kotlinx:atomicfu-jvm": "0.33.0",
       "org.jetbrains.kotlinx:kotlinx-coroutines-android": "1.11.0",
@@ -133,11 +140,6 @@
       "org.jetbrains.kotlinx:kotlinx-serialization-json": "1.11.0",
       "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": "1.11.0",
       "org.jetbrains:annotations": "23.0.0",
-      "org.ow2.asm:asm": "9.11.1",
-      "org.ow2.asm:asm-analysis": "9.11.1",
-      "org.ow2.asm:asm-commons": "9.11.1",
-      "org.ow2.asm:asm-tree": "9.11.1",
-      "org.ow2.asm:asm-util": "9.11.1",
       "org.slf4j:slf4j-api": "2.0.20"
     },
     "platforms": [
@@ -3120,12 +3122,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "2.10.0",
+        "version": "2.9.2",
         "files": [
           {
-            "name": "lifecycle-common-linuxArm64Main-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-linuxarm64/2.10.0/lifecycle-common-linuxarm64-2.10.0.klib",
-            "sha256": "04bc36b2d8bbedf8339ba49ac14c2784e5b793c7dd88e805eb465d88d2198315"
+            "name": "lifecycle-common-linuxArm64Main-2.9.2.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-linuxarm64/2.9.2/lifecycle-common-linuxarm64-2.9.2.klib",
+            "sha256": "b08fcc948d7384237e57cf17086035e63837b99da79d10f6b87b9ccfbc291f02"
           }
         ],
         "deps": [
@@ -3135,12 +3137,12 @@
         ]
       },
       "linuxX64": {
-        "version": "2.10.0",
+        "version": "2.9.2",
         "files": [
           {
-            "name": "lifecycle-common-linuxX64Main-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-linuxx64/2.10.0/lifecycle-common-linuxx64-2.10.0.klib",
-            "sha256": "e21fdb3bbbef10f9624e65827ef9e5708d8237363fc030a522dd72f639815aed"
+            "name": "lifecycle-common-linuxX64Main-2.9.2.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-linuxx64/2.9.2/lifecycle-common-linuxx64-2.9.2.klib",
+            "sha256": "f4e5a68c33d97c112e4bafef656cb7ac651e493c4dc15de0443391b863da232c"
           }
         ],
         "deps": [
@@ -3150,12 +3152,12 @@
         ]
       },
       "macosArm64": {
-        "version": "2.10.0",
+        "version": "2.9.2",
         "files": [
           {
-            "name": "lifecycle-common-macosArm64Main-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-macosarm64/2.10.0/lifecycle-common-macosarm64-2.10.0.klib",
-            "sha256": "cbd0b6682c8e033cb10eeb4a30138c3892438756e814496941aedaf0ad3cb09c"
+            "name": "lifecycle-common-macosArm64Main-2.9.2.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-macosarm64/2.9.2/lifecycle-common-macosarm64-2.9.2.klib",
+            "sha256": "4deff4974e41c3754b63b7215bd5a62819c85d0ef874566dd4bda645459ca205"
           }
         ],
         "deps": [
@@ -3182,12 +3184,12 @@
         ]
       },
       "mingwX64": {
-        "version": "2.10.0",
+        "version": "2.9.2",
         "files": [
           {
-            "name": "lifecycle-common-mingwX64Main-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-mingwx64/2.10.0/lifecycle-common-mingwx64-2.10.0.klib",
-            "sha256": "a14643cc5203b98bde28da27fe0fb6c4e3ceea71ff1c71ca2bf407f203ae3429"
+            "name": "lifecycle-common-mingwX64Main-2.9.2.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-mingwx64/2.9.2/lifecycle-common-mingwx64-2.9.2.klib",
+            "sha256": "972be726d272cb37451c4ea6529e733d57ff7f5c4bbbf61003da13296fb0d73e"
           }
         ],
         "deps": [
@@ -3214,12 +3216,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "2.10.0",
+        "version": "2.9.2",
         "files": [
           {
-            "name": "lifecycle-runtime-linuxArm64Main-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-linuxarm64/2.10.0/lifecycle-runtime-linuxarm64-2.10.0.klib",
-            "sha256": "a40519a821de1aa0cb42edf513c028319b3bcb164cdffd2ee3ab52e8efa7d04b"
+            "name": "lifecycle-runtime-linuxArm64Main-2.9.2.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-linuxarm64/2.9.2/lifecycle-runtime-linuxarm64-2.9.2.klib",
+            "sha256": "933592b9bc42f6ffc33b2c42a4b9a1aea223bc3360f8b4dde5a22c31d6e29f2c"
           }
         ],
         "deps": [
@@ -3228,12 +3230,12 @@
         ]
       },
       "linuxX64": {
-        "version": "2.10.0",
+        "version": "2.9.2",
         "files": [
           {
-            "name": "lifecycle-runtime-linuxX64Main-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-linuxx64/2.10.0/lifecycle-runtime-linuxx64-2.10.0.klib",
-            "sha256": "206df3d8aaca102f16391f30dc4989ee5352188382131d2efec02ada1272ea92"
+            "name": "lifecycle-runtime-linuxX64Main-2.9.2.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-linuxx64/2.9.2/lifecycle-runtime-linuxx64-2.9.2.klib",
+            "sha256": "fdddafb1d8794ce4abde8eb4d033eaa854bf3b9370f225ab1cbf61a4adaf6157"
           }
         ],
         "deps": [
@@ -3242,12 +3244,12 @@
         ]
       },
       "macosArm64": {
-        "version": "2.10.0",
+        "version": "2.9.2",
         "files": [
           {
-            "name": "lifecycle-runtime-macosArm64Main-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-macosarm64/2.10.0/lifecycle-runtime-macosarm64-2.10.0.klib",
-            "sha256": "549eb6d6b29fefa5a7b6c8cad547902b4ef824b20a09ff12a126d0a2b8784139"
+            "name": "lifecycle-runtime-macosArm64Main-2.9.2.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-macosarm64/2.9.2/lifecycle-runtime-macosarm64-2.9.2.klib",
+            "sha256": "4eb9ae6a14da5627fb7b7b4a8e0588e190601024a24879e655c33481aacc676c"
           }
         ],
         "deps": [
@@ -3273,12 +3275,12 @@
         ]
       },
       "mingwX64": {
-        "version": "2.10.0",
+        "version": "2.9.2",
         "files": [
           {
-            "name": "lifecycle-runtime-mingwX64Main-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-mingwx64/2.10.0/lifecycle-runtime-mingwx64-2.10.0.klib",
-            "sha256": "2e219d245386b1ace43ac1e3ca9b2e47de8b90864b31710624b64a3b8fea86d1"
+            "name": "lifecycle-runtime-mingwX64Main-2.9.2.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-mingwx64/2.9.2/lifecycle-runtime-mingwx64-2.9.2.klib",
+            "sha256": "c6bbbf2941cd6ca3f91d267085f6d96a7b9e545f32ef94a6801aa2d519153ec1"
           }
         ],
         "deps": [
@@ -8366,7 +8368,7 @@
     },
     "org.jetbrains.androidx.lifecycle:lifecycle-common": {
       "jvm": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": null,
         "deps": [
           "androidx.lifecycle:lifecycle-common"
@@ -8425,7 +8427,7 @@
     },
     "org.jetbrains.androidx.lifecycle:lifecycle-runtime": {
       "jvm": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": null,
         "deps": [
           "androidx.lifecycle:lifecycle-runtime"
@@ -8453,12 +8455,12 @@
         ]
       },
       "metadata": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": [
           {
-            "name": "lifecycle-runtime-2.9.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime/2.9.2/lifecycle-runtime-2.9.2.jar",
-            "sha256": "a20c7995a4cdc2aa6e1b576bed232616fc77c9d84d2b9efcbb39cf2e54a55770"
+            "name": "lifecycle-runtime-2.9.5.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime/2.9.5/lifecycle-runtime-2.9.5.jar",
+            "sha256": "9dd583b709136e0aafe60e1b90249bf63bc80cd7ba6e0641ce74a1ab3613c64f"
           }
         ],
         "deps": [

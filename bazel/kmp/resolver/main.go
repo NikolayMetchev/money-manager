@@ -32,9 +32,14 @@ type Lock struct {
 	// the catalog to say when a re-pin is due.
 	Inputs struct {
 		Libraries map[string]string `json:"libraries"` // alias → group:artifact:version
-		Forces    map[string]string `json:"forces"`    // module → version
-		Platforms []string          `json:"platforms"`
-		Excludes  []string          `json:"excludes"`
+		Forces    map[string]string `json:"forces"`    // module → version, on every platform
+		// ClasspathForces only apply on the JVM and to common metadata, as Gradle's classpath substitutions
+		// only match `*CompileClasspath`/`*RuntimeClasspath`/`*DependenciesMetadata`, not native klibraries.
+		ClasspathForces map[string]string `json:"classpath_forces,omitempty"`
+		Platforms       []string          `json:"platforms"`
+		Excludes        []string          `json:"excludes"`
+		// ResolveStdlib: the Kotlin stdlib is resolved like any library, for a tool run on its own classpath.
+		ResolveStdlib bool `json:"resolve_stdlib,omitempty"`
 	} `json:"inputs"`
 	// Names are the Bazel target names, without the platform suffix: a catalog library by its alias
 	// (kotlinx-coroutines-core → kotlinx_coroutines_core), anything else by its coordinate.
@@ -49,22 +54,24 @@ type Lock struct {
 var nonIdent = regexp.MustCompile(`[^A-Za-z0-9_]`)
 
 func main() {
-	var libraries, platformNames, forces, repos, excludes multi
+	var libraries, platformNames, forces, classpathForces, repos, excludes multi
 	toml := flag.String("toml", "gradle/libs.versions.toml", "the version catalog")
 	out := flag.String("lock", "bazel/kmp/deps/maven_kmp.lock.json", "the lockfile to write")
 	flag.Var(&libraries, "library", "a catalog library alias to resolve (repeatable)")
 	flag.Var(&platformNames, "platform", "a platform to resolve for: jvm, linuxX64, … (repeatable)")
-	flag.Var(&forces, "force", "module=version-ref: pin a module to a catalog version, as Gradle's substitutions do (repeatable)")
+	flag.Var(&forces, "force", "module=version-ref: pin a module to a catalog version on every platform (repeatable)")
+	flag.Var(&classpathForces, "classpath-force", "module=version-ref: pin a module on the JVM and in common metadata only (repeatable)")
 	flag.Var(&repos, "repository", "url[=group-regex,…]: a repository, in order, optionally limited to groups (repeatable)")
 	flag.Var(&excludes, "exclude", "group:artifact never to resolve, whoever depends on it (repeatable)")
+	stdlib := flag.Bool("resolve-stdlib", false, "resolve the Kotlin stdlib too, for a tool (JVM only); else it comes from the toolchain")
 	flag.Parse()
-	if err := run(*toml, *out, libraries, platformNames, forces, repos, excludes); err != nil {
+	if err := run(*toml, *out, libraries, platformNames, forces, classpathForces, repos, excludes, *stdlib); err != nil {
 		fmt.Fprintln(os.Stderr, "resolver:", err)
 		os.Exit(1)
 	}
 }
 
-func run(tomlPath, out string, libraries, platformNames, forceSpecs, repoSpecs, excludes []string) error {
+func run(tomlPath, out string, libraries, platformNames, forceSpecs, classpathForceSpecs, repoSpecs, excludes []string, resolveStdlib bool) error {
 	cat, err := ReadCatalog(tomlPath)
 	if err != nil {
 		return err
@@ -80,21 +87,37 @@ func run(tomlPath, out string, libraries, platformNames, forceSpecs, repoSpecs, 
 		}
 		repos = append(repos, repo)
 	}
-	forced := map[string]string{}
-	for _, spec := range forceSpecs {
-		module, ref, ok := strings.Cut(spec, "=")
-		v, known := cat.Versions[ref]
-		if !ok || !known {
-			return fmt.Errorf("--force %s: want module=version-ref with a [versions] entry", spec)
+	parseForces := func(flag string, specs []string) (map[string]string, error) {
+		forced := map[string]string{}
+		for _, spec := range specs {
+			module, ref, ok := strings.Cut(spec, "=")
+			v, known := cat.Versions[ref]
+			if !ok || !known {
+				return nil, fmt.Errorf("--%s %s: want module=version-ref with a [versions] entry", flag, spec)
+			}
+			forced[module] = v
 		}
-		forced[module] = v
+		return forced, nil
+	}
+	forced, err := parseForces("force", forceSpecs)
+	if err != nil {
+		return err
+	}
+	classpathForced, err := parseForces("classpath-force", classpathForceSpecs)
+	if err != nil {
+		return err
 	}
 
 	lock := Lock{Version: 1, Names: map[string]string{}, Packages: map[string][]string{}, Artifacts: map[string]map[string]Resolved{}}
 	lock.Inputs.Libraries = map[string]string{}
 	lock.Inputs.Forces = forced
+	if len(classpathForced) > 0 {
+		lock.Inputs.ClasspathForces = classpathForced
+	}
 	lock.Inputs.Platforms = platformNames
-	lock.Inputs.Excludes = excludes
+	// Never null: MODULE.bazel's empty list must read back as one.
+	lock.Inputs.Excludes = append([]string{}, excludes...)
+	lock.Inputs.ResolveStdlib = resolveStdlib
 	var roots []Coordinate
 	for _, alias := range libraries {
 		c, ok := cat.Libraries[alias]
@@ -107,6 +130,8 @@ func run(tomlPath, out string, libraries, platformNames, forceSpecs, repoSpecs, 
 	}
 
 	resolver := NewResolver(NewFetcher(repos), forced, excludes)
+	resolver.resolveStdlib = resolveStdlib
+	resolver.classpathForces = classpathForced
 	for _, name := range platformNames {
 		if p, ok := platforms[name]; ok && !p.Common {
 			resolver.consumers = append(resolver.consumers, p)

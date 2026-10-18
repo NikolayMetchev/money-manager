@@ -1,0 +1,34 @@
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("@rules_java//java:java_binary.bzl", "java_binary")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
+# The lint tools Gradle's ktlint and detekt plugins run (#1015), at the catalog's versions, each on its own
+# classpath (MODULE.bazel's ktlint_cli and detekt_cli installs).
+java_binary(
+    name = "ktlint",
+    main_class = "com.pinterest.ktlint.Main",
+    visibility = ["//visibility:public"],
+    runtime_deps = ["@ktlint_cli//:ktlint_cli_jvm"],
+)
+
+java_binary(
+    name = "detekt",
+    main_class = "dev.detekt.cli.Main",
+    visibility = ["//visibility:public"],
+    runtime_deps = ["@detekt_cli//:detekt_cli_jvm"],
+)
+
+# Formats the tree in place (`bazel run //:format`).
+sh_binary(
+    name = "format",
+    srcs = ["format.sh"],
+    args = ["$(rootpath :ktlint)"],
+    data = [":ktlint"],
+    visibility = ["//:__pkg__"],
+)
+
+bzl_library(
+    name = "lint",
+    srcs = ["lint.bzl"],
+    visibility = ["//visibility:public"],
+)

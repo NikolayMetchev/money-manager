@@ -90,3 +90,89 @@ kotlin = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlinx-io"
 		}
 	}
 }
+
+// A BOM's constraints and a library's own dependencyConstraints raise the versions of what is depended on,
+// as Gradle's do, but neither brings a module in, and the BOM is no library.
+func TestConstraintsRaiseVersionsButAddNothing(t *testing.T) {
+	files := map[string][]byte{}
+	library := func(artifact, version, variant string) {
+		path, body := pom("g", artifact, version, "")
+		files[path] = body
+		files["/g/"+artifact+"/"+version+"/"+artifact+"-"+version+".module"] = []byte(`{"variants": [` + variant + `]}`)
+	}
+	jvm := func(deps, constraints string) string {
+		return `{"name": "jvmApiElements", "attributes": {"org.gradle.usage": "java-api", "org.jetbrains.kotlin.platform.type": "jvm"},
+			"dependencies": [` + deps + `], "dependencyConstraints": [` + constraints + `], "files": []}`
+	}
+	library("lib", "1", jvm(
+		`{"group": "g", "module": "dep", "version": {"requires": "1"}},
+		 {"group": "g", "module": "other", "version": {"requires": "1"}},
+		 {"group": "g", "module": "bom", "version": {"requires": "1"}, "attributes": {"org.gradle.category": "platform"}}`,
+		`{"group": "g", "module": "other", "version": {"requires": "3"}}, {"group": "g", "module": "absent", "version": {"requires": "1"}}`))
+	library("bom", "1", `{"name": "apiElements", "attributes": {"org.gradle.category": "platform"},
+		"dependencyConstraints": [{"group": "g", "module": "dep", "version": {"requires": "2"}}, {"group": "g", "module": "unused", "version": {"requires": "9"}}]}`)
+	for _, v := range []string{"1", "2"} {
+		library("dep", v, jvm("", ""))
+	}
+	for _, v := range []string{"1", "3"} {
+		library("other", v, jvm("", ""))
+	}
+	r := NewResolver(repository(t, files), nil, nil)
+
+	got, _, err := r.Resolve(platforms["jvm"], []Coordinate{{"g", "lib", "1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	versions := map[string]string{}
+	for m, res := range got {
+		versions[m] = res.Version
+	}
+	want := map[string]string{"g:lib": "1", "g:dep": "2", "g:other": "3"}
+	if len(versions) != len(want) {
+		t.Errorf("resolved %v, want %v", versions, want)
+	}
+	for m, v := range want {
+		if versions[m] != v {
+			t.Errorf("%s = %q, want %s (all: %v)", m, versions[m], v, versions)
+		}
+	}
+}
+
+func TestPomBomConstrainsItsManagedVersions(t *testing.T) {
+	files := map[string][]byte{}
+	path, body := pom("g", "bom", "1", `<packaging>pom</packaging>`+managed(
+		`<dependency><groupId>g</groupId><artifactId>dep</artifactId><version>2</version></dependency>`))
+	files[path] = body
+	path, body = pom("g", "lib", "1", "")
+	files[path] = body
+	files["/g/lib/1/lib-1.module"] = []byte(`{"variants": [{"name": "jvmApiElements",
+		"attributes": {"org.gradle.usage": "java-api", "org.jetbrains.kotlin.platform.type": "jvm"},
+		"dependencies": [{"group": "g", "module": "dep", "version": {"requires": "1"}},
+			{"group": "g", "module": "bom", "version": {"requires": "1"}, "attributes": {"org.gradle.category": "platform"}}]}]}`)
+	for _, v := range []string{"1", "2"} {
+		path, body = pom("g", "dep", v, "")
+		files[path] = body
+		files["/g/dep/"+v+"/dep-"+v+".jar"] = []byte("jar")
+	}
+	r := NewResolver(repository(t, files), nil, nil)
+
+	got, _, err := r.Resolve(platforms["jvm"], []Coordinate{{"g", "lib", "1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := got["g:dep"].Version; v != "2" {
+		t.Errorf("g:dep = %q, want 2", v)
+	}
+}
+
+func TestPickVariantAcceptsOneNamingNoUsage(t *testing.T) {
+	// kotlin-stdlib-common's only variant: no files, a dependency on kotlin-stdlib.
+	common := []Variant{{Name: "stdlibCommonElements", Attributes: attrs{"org.gradle.category": "library"}}}
+	if got := pick(platforms["jvm"], "java-runtime", common); got == nil {
+		t.Error("rejected a variant that names no usage")
+	}
+	withJvm := append([]Variant{{Name: "jvmRuntimeElements", Attributes: attrs{"org.gradle.usage": "java-runtime", "org.jetbrains.kotlin.platform.type": "jvm"}}}, common...)
+	if got := pick(platforms["jvm"], "java-runtime", withJvm); got == nil || got.Name != "jvmRuntimeElements" {
+		t.Errorf("picked %v over the variant naming the usage", got)
+	}
+}

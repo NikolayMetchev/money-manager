@@ -24,6 +24,7 @@ load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load(":metadata.bzl", "kt_metadata_library")
 load("//bazel/kmp/checks:checks.bzl", "kmp_forbidden_deps", "kmp_reference_check")
+load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
 load(":native.bzl", "BUILDS_ON", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_executable", "kt_native_klib", "kt_native_test_binary")
 load("//bazel/kmp/plugins:plugins.bzl", "plugin_deps", "plugin_labels")
 
@@ -152,10 +153,12 @@ def kmp_library(
         forbidden_reference_allowed: module-relative files exempt from `forbidden_reference`.
         visibility: the targets' visibility.
     """
+    hand_written = common_srcs + jvm_android_srcs + jvm_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs
+    kmp_lint(name, hand_written)
     if forbidden_reference:
         kmp_reference_check(
             name = name + "_references",
-            srcs = common_srcs + jvm_android_srcs + jvm_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs,
+            srcs = hand_written,
             regex = forbidden_reference,
             reason = forbidden_reference_reason,
             allowed = forbidden_reference_allowed,
@@ -276,6 +279,7 @@ def kmp_test(
             suite a bigger one.
         forbidden_deps: modules the tests must never reach either (`:<name>_forbidden_deps_<platform>`).
     """
+    kmp_lint(name, common_srcs + jvm_android_srcs + jvm_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs)
     fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, jvm_srcs)
     brought = plugin_deps(plugins)
     deps = deps + brought.deps + brought.exports

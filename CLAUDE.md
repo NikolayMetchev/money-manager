@@ -159,6 +159,16 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   `verifyNoDbDependency`: an aspect fails analysis, per platform and for the tests too, when a pure importer reaches
   `app/db/core`, `app/di/core` or `app/ui/core`, naming the path. Gazelle itself is `verifyUniquePackages`: a run fails
   when two generated modules' main sources declare one package (so CI's Gazelle diff catches it).
+- **Lint** (`//bazel/kmp/lint`, #1015): every `kmp_library`/`kmp_test` gets `:<name>_ktlint` and `:<name>_detekt`,
+  tests that run the tool's own `main` over the hand-written sources (generated ones are left out, as the Gradle
+  plugins filter them), and report the same findings Gradle does. ktlint is the catalog's `ktlint-engine` (Gradle's
+  ktlint plugin is pinned to it too), `ktlint_official` plus the tree's `.editorconfig` files: the sandbox isn't
+  under the repo, so each test carries its package's own and `//:editorconfigs` (those no module owns, such as
+  `app/presenter`'s) at their real paths. detekt reads `detekt.yml` over its defaults, without type resolution, as
+  Gradle's per-source-set detekt tasks do. `bazel run //:format` is `lintFormat`'s ktlint -F over the same sources.
+  The tools resolve on their own classpaths (`maven_kmp.install(name = "ktlint_cli"/"detekt_cli", resolve_stdlib =
+  True)`, pinned with `bazel run @ktlint_cli//:pin`). The `.kts` build scripts Gradle's ktlint also checks aren't
+  covered: they go at the cutover.
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.
@@ -169,11 +179,14 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   mingwX64; macOS adds macosArm64), picked by name rather than by platform.
 - **Maven** (`maven_kmp`, #1000): rules_jvm_external reads POMs, which name no KMP platform's files, so
   `//bazel/kmp/resolver` (Go) follows each library's Gradle Module Metadata to its per-platform variant (`-jvm` jar,
-  `-linuxx64` klib plus any cinterop klibs) the way Gradle does: highest version wins, except the modules
-  `maven_kmp.install(forces = …)` and its `force_bundles` (the catalog's `build-tool-pins`) pin, as
-  moneymanager.kotlin-convention's substitutions do; `excludes` drops a module everywhere, also where a variant
-  points (`available-at`) at it, and the Kotlin stdlib comes
-  from the toolchain. Versions come from the catalog; `MODULE.bazel` lists the catalog aliases, platforms and
+  `-linuxx64` klib plus any cinterop klibs) the way Gradle does: highest version wins, raised by
+  `dependencyConstraints` and BOMs (`platform(…)`, Gradle Module Metadata or POM) without bringing anything in,
+  except the modules `force_bundles` (the catalog's `build-tool-pins`, Gradle's `configurations.all`) pin
+  everywhere and `forces` pins on the JVM and in metadata only (moneymanager.kotlin-convention's substitutions only
+  match `*CompileClasspath`/`*RuntimeClasspath`/`*DependenciesMetadata`, never native klibraries); `excludes` drops a
+  module everywhere, also where a variant points (`available-at`) at it, and the Kotlin stdlib comes
+  from the toolchain (unless `resolve_stdlib`, for a tool). Each `maven_kmp.install(name = …)` is its own
+  resolution and hub repository, as each Gradle configuration resolves on its own. Versions come from the catalog; `MODULE.bazel` lists the catalog aliases, platforms and
   repositories. It writes `bazel/kmp/deps/maven_kmp.lock.json` (every file with its sha256); after changing either,
   run `bazel run @maven_kmp//:pin`. `//bazel/kmp/deps:maven_kmp_lock_test` fails while the lock is stale. Modules
   name a library by its catalog alias, `@maven_kmp//:kotlinx_io_core` (the `_jvm`/`_<target>` suffix is added per
