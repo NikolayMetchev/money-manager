@@ -1,0 +1,10 @@
+load("@rules_java//java:java_binary.bzl", "java_binary")
+
+# Dokka's CLI. The analysis and the plugins are dokka.bzl's pluginsClasspath.
+java_binary(
+    name = "runner",
+    srcs = ["src/com/moneymanager/bazel/kmp/dokka/DokkaRunner.java"],
+    main_class = "com.moneymanager.bazel.kmp.dokka.DokkaRunner",
+    visibility = ["//visibility:public"],
+    runtime_deps = ["@dokka//:dokka_cli_jvm"],
+)

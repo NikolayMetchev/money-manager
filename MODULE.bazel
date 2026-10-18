@@ -170,6 +170,7 @@ maven_kmp.install(
         "kotlin-serialization-compiler-plugin-embeddable": ["jvm"],
         "kotlinx-coroutines-android": ["android"],
         "kotlinx-coroutines-swing": ["jvm"],
+        "ktor-client-cio": ["jvm"],
         "log4j-core": ["jvm"],
         "log4j-slf4j2-impl": ["jvm"],
         "mappie-compiler-plugin": ["jvm"],
@@ -255,6 +256,7 @@ maven_kmp.install(
         "kotlinx-serialization-core",
         "kotlinx-serialization-json",
         "ktor-client-auth",
+        "ktor-client-cio",
         "ktor-client-core",
         "ktor-client-engine-defaults",
         "ktor-client-mock",
@@ -333,6 +335,40 @@ maven_kmp.install(
     resolve_stdlib = True,
 )
 
+# Dokka (#1027), the KDoc site: its CLI (a fat jar, with Dokka's core) and the plugins the Gradle plugin runs.
+maven_kmp.install(
+    name = "dokka",
+    catalog = "//gradle:libs.versions.toml",
+    force_bundles = ["build-tool-pins"],
+    libraries = [
+        "dokka-all-modules-page-plugin",
+        "dokka-analysis-kotlin-symbols",
+        "dokka-base",
+        "dokka-cli",
+        "dokka-templating-plugin",
+    ],
+    lock_file = "//bazel/kmp/deps:dokka.lock.json",
+    platforms = ["jvm"],
+    repositories = ["https://repo1.maven.org/maven2"],
+    resolve_stdlib = True,
+)
+
+# SchemaSpy (#1027), on its own classpath as in app/db/schemaspy's Gradle `schemaspy` configuration, with the
+# SQLite JDBC driver it reads the schema through.
+maven_kmp.install(
+    name = "schemaspy",
+    catalog = "//gradle:libs.versions.toml",
+    force_bundles = ["build-tool-pins"],
+    libraries = [
+        "schemaspy",
+        "sqldelight-sqlite-driver",
+    ],
+    lock_file = "//bazel/kmp/deps:schemaspy.lock.json",
+    platforms = ["jvm"],
+    repositories = ["https://repo1.maven.org/maven2"],
+    resolve_stdlib = True,
+)
+
 # The desktop app's ProGuard (#1019), with the Compose Gradle plugin for the default rules it applies.
 maven_kmp.install(
     name = "proguard",
@@ -387,7 +423,7 @@ maven_kmp.install(
     resolve_stdlib = True,
 )
 
-use_repo(maven_kmp, "android_lint", "android_tools", "detekt_cli", "ktlint_cli", "maven_kmp", "proguard")
+use_repo(maven_kmp, "android_lint", "android_tools", "detekt_cli", "dokka", "ktlint_cli", "maven_kmp", "proguard", "schemaspy")
 
 android_sdk = use_extension("//bazel/kmp/android:extensions.bzl", "android_sdk")
 use_repo(android_sdk, "aapt2", "android_sdk")

@@ -273,6 +273,21 @@ stream to BuildBuddy, anonymously.
   (the `coverage` job in `bazel.yml`). It credits a module's code to every test that runs it, so it reads higher than
   Kover's per-module reports. Not covered: the device tests (Gradle's `instrumented` flag) and Kover's generated-class
   excludes, which are per class where LCOV is per line. The Go tests can't link under coverage, hence the query.
+- **Tools and Pages** (#1027): `tools/*` and `app/db/schemaspy` are ordinary modules plus `java_binary`s:
+  `bazel run //tools/strategy-catalog:generate_bundled_currencies` (Gradle's `generateBundledCurrencies`) and
+  `bazel run //tools/crypto-dataset:generate` write into the workspace (`BUILD_WORKSPACE_DIRECTORY`). `//webpage:site`
+  (`//bazel/pages`) is the Pages artifact `static.yml` uploads: `webpage/*.html` with SchemaSpy's schema docs
+  (`database/`, its action runs locally: it needs the host's Graphviz), the strategy catalog and `kdoc/`;
+  `modules-graph.md` is written from `bazel query` (`bazel/pages/module_graph.py`). The KDoc is Dokka's
+  (`//bazel/kmp/dokka`): every `kmp_library` has a manual `:<name>_dokka`, Gradle's `dokkaGenerateModuleHtml` with
+  the Gradle plugin's own source-set IDs and settings, and `//webpage:kdoc` aggregates the modules
+  `webpage/kdoc_modules.bzl` lists (Gradle's: no schemaspy, `app/main/*`, `test/*` or `tools/*`), so a new module
+  joins there. The Kotlin analysis goes on Dokka's plugins classpath beside dokka-base (it reads the enum members'
+  docs from there), and Dokka loads every plugin its own classpath has, so the runner carries only the CLI.
+  Known differences from Gradle's site: Bazel analyses JVM+Android-only common code (`app/ui/*`, `utils/compose/*`)
+  and `jvmAndroidMain` against the JVM classpath, so types Gradle's pages show as `ERROR CLASS` resolve; a module
+  whose Gradle build declares an empty `jvmAndroidMain` (`app/ui/core`) has no such source set; empty directories
+  are dropped (tree artifacts); Apple source sets are analysed against the Linux klibs off macOS.
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.

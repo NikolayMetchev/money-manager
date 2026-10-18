@@ -73,6 +73,7 @@
       "kotlinx-serialization-core": "org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0",
       "kotlinx-serialization-json": "org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0",
       "ktor-client-auth": "io.ktor:ktor-client-auth:3.6.0",
+      "ktor-client-cio": "io.ktor:ktor-client-cio:3.6.0",
       "ktor-client-core": "io.ktor:ktor-client-core:3.6.0",
       "ktor-client-engine-defaults": "io.ktor:ktor-client-engine-defaults:3.6.0",
       "ktor-client-mock": "io.ktor:ktor-client-mock:3.6.0",
@@ -340,6 +341,9 @@
       "kotlinx-coroutines-swing": [
         "jvm"
       ],
+      "ktor-client-cio": [
+        "jvm"
+      ],
       "log4j-core": [
         "jvm"
       ],
@@ -541,6 +545,7 @@
     "io.github.ehsannarmani:compose-charts": "compose_charts",
     "io.github.ehsannarmani:compose-charts-desktop": "compose_charts_desktop",
     "io.ktor:ktor-client-auth": "ktor_client_auth",
+    "io.ktor:ktor-client-cio": "ktor_client_cio",
     "io.ktor:ktor-client-core": "ktor_client_core",
     "io.ktor:ktor-client-curl": "io_ktor_ktor_client_curl",
     "io.ktor:ktor-client-darwin": "io_ktor_ktor_client_darwin",
@@ -2829,6 +2834,10 @@
       "io.ktor.client.plugins.auth",
       "io.ktor.client.plugins.auth.providers"
     ],
+    "io.ktor:ktor-client-cio": [
+      "io.ktor.client.engine.cio",
+      "io.ktor.client.plugins.websocket.cio"
+    ],
     "io.ktor:ktor-client-core": [
       "io.ktor.client",
       "io.ktor.client.call",
@@ -2913,7 +2922,9 @@
     ],
     "io.ktor:ktor-network-tls": [
       "io.ktor.network.tls",
-      "io.ktor.network.tls.extensions"
+      "io.ktor.network.tls.cipher",
+      "io.ktor.network.tls.extensions",
+      "io.ktor.network.tls.platform"
     ],
     "io.ktor:ktor-serialization": [
       "io.ktor.serialization"
@@ -11177,6 +11188,26 @@
         ]
       }
     },
+    "io.ktor:ktor-client-cio": {
+      "jvm": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-cio-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-cio-jvm/3.6.0/ktor-client-cio-jvm-3.6.0.jar",
+            "sha256": "a12b3d94e140cc235a9b77f37f6946deee5e4d32cb8afa7b64b29746412c1dd0"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "io.ktor:ktor-http-cio",
+          "io.ktor:ktor-network-tls",
+          "io.ktor:ktor-websockets",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.slf4j:slf4j-api"
+        ]
+      }
+    },
     "io.ktor:ktor-client-core": {
       "android": {
         "version": "3.6.0",
@@ -12279,6 +12310,23 @@
       }
     },
     "io.ktor:ktor-network-tls": {
+      "jvm": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-network-tls-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-tls-jvm/3.6.0/ktor-network-tls-jvm-3.6.0.jar",
+            "sha256": "09ed94b6783aacd3bb7d19ce606230153762bf68d399cbff0474299a00407a41"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-network",
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.slf4j:slf4j-api"
+        ]
+      },
       "macosArm64": {
         "version": "3.6.0",
         "files": [

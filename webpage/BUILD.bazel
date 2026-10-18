@@ -1,0 +1,26 @@
+load("//bazel/kmp/dokka:dokka.bzl", "dokka_site")
+load("//bazel/pages:pages.bzl", "pages_site")
+load(":kdoc_modules.bzl", "KDOC_MODULES")
+
+# The GitHub Pages site (#1027), as static.yml deploys it: the checked-in pages plus what the build generates.
+# The module graph (modules-graph.md) is static.yml's own step: it comes from `bazel query`
+# (bazel/pages/module_graph.py), which no action can run.
+pages_site(
+    name = "site",
+    srcs = glob(["*.html"]),
+    generated = {
+        "//app/db/schemaspy:docs": "database",
+        ":kdoc": "kdoc",
+        "//tools/strategy-catalog:catalog_site": ".",
+    },
+    strip_prefix = "webpage",
+    tags = ["manual"],
+)
+
+# The root build's dokkaGeneratePublicationHtml.
+dokka_site(
+    name = "kdoc",
+    module_name = "Money Manager",
+    modules = KDOC_MODULES,
+    tags = ["manual"],
+)

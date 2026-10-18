@@ -66,3 +66,9 @@ kmp_test(
         "//bazel/kmp/deps:kotlin_test",
     ],
 )
+
+# The crypto-dataset tool's test reads the checked-in catalog (#1027).
+exports_files(
+    ["data/coins.tsv"],
+    visibility = ["//tools/crypto-dataset:__pkg__"],
+)

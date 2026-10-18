@@ -23,6 +23,8 @@ load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load(":metadata.bzl", "kt_metadata_library")
+load("@bazel_skylib//lib:structs.bzl", "structs")
+load("//bazel/kmp/dokka:dokka.bzl", "dokka_module")
 load("//bazel/kmp/checks:checks.bzl", "kmp_forbidden_deps", "kmp_reference_check", "kmp_unused_deps")
 load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
 load(":resources.bzl", "kmp_resource_jar")
@@ -242,6 +244,16 @@ def kmp_library(
     # Exports are kmp_export directives, a person's say-so (some only generated code uses: Metro's graph,
     # SQLDelight's queries), so only what imports brought is checked.
     declared = deps + jvm_android_deps + (jvm_deps if jvm else android_deps)
+    dokka_srcs = struct(
+        common_srcs = common_srcs,
+        jvm_android_srcs = jvm_android_srcs,
+        jvm_srcs = jvm_srcs,
+        android_srcs = android_srcs,
+        native_srcs = native_srcs,
+        linux_srcs = linux_srcs,
+        apple_srcs = apple_srcs,
+        mingw_srcs = mingw_srcs,
+    )
     common_srcs = common_srcs + generated_srcs
     native_deps = native_deps + cinterops
     fragments = _jvm_fragments("Main", common_srcs, jvm_android_srcs, jvm_srcs)
@@ -326,6 +338,26 @@ def kmp_library(
             plugins = plugin_labels(plugins, "native"),
             target_compatible_with = BUILDS_ON.get(target, []),
             visibility = visibility,
+        )
+    if jvm:
+        own_sqldelight = [":" + name + "_sqldelight"]
+        jvm_classpath = [d for d in deps + jvm_android_deps + exports + jvm_android_exports if d not in own_sqldelight]
+        native_dokka = "linuxX64" in native_targets and "mingwX64" in native_targets
+        dokka_module(
+            name = name + "_dokka",
+            module_name = native.package_name().split("/")[-1],
+            generated = generated_srcs + ([sqldelight + "_kt"] if sqldelight else []),
+            jvm_android = bool(jvm_android_srcs or jvm_android_deps or jvm_android_exports),
+            android = android,
+            native = native_dokka,
+            jvm_deps = _on("jvm", jvm_classpath + jvm_deps + jvm_exports),
+            android_deps = _on("android", jvm_classpath + android_deps + android_exports) if android else [],
+            metadata_deps = _on("metadata", deps + exports) + [Label("@maven_kmp//:org_jetbrains_kotlin_kotlin_stdlib_metadata")] if native_dokka else [],
+            native_deps = _on("linuxX64", deps + native_deps + linux_deps + exports) if native_dokka else [],
+            mingw_deps = _on("mingwX64", deps + native_deps + mingw_deps + exports) if native_dokka else [],
+            tags = ["manual"],
+            visibility = ["//visibility:public"],
+            **structs.to_dict(dokka_srcs)
         )
     if visibility and "//visibility:public" not in visibility:
         # `visibility` keeps main code out (verifyNoWriteRepositoryUsage), but Gradle's check only reads main

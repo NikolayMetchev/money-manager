@@ -5,5 +5,8 @@ ignore_directories([
     "**/.kotlin",
     ".claude",
     ".idea",
-    "webpage",
+    # The Pages site's generated parts, as Gradle writes them (//webpage:site builds its own).
+    "webpage/database",
+    "webpage/kdoc",
+    "webpage/strategy-library",
 ])

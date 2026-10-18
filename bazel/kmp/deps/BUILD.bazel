@@ -116,10 +116,13 @@ kt_metadata_group(
 test_suite(
     name = "maven_kmp_lock_test",
     tests = [
+        "@android_lint//:lock_test",
         "@android_tools//:lock_test",
         "@detekt_cli//:lock_test",
+        "@dokka//:lock_test",
         "@ktlint_cli//:lock_test",
         "@maven_kmp//:lock_test",
         "@proguard//:lock_test",
+        "@schemaspy//:lock_test",
     ],
 )
