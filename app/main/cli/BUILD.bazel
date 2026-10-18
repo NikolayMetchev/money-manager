@@ -3,7 +3,9 @@
 # gazelle:kmp_plugins serialization
 # gazelle:kmp_keep_dep @maven_kmp//:mosaic_terminal jvmMain
 
-load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_native_executable", "kmp_test")
+load("//bazel/kmp:distribution.bzl", "jvm_distribution")
 
 kmp_library(
     name = "cli",
@@ -99,4 +101,41 @@ kmp_test(
         "@maven_kmp//:mordant_core",
         "@maven_kmp//:mosaic_runtime",
     ],
+)
+
+# `mm`, release-linked for every native target (Gradle's `binaries.executable(RELEASE)`).
+kmp_native_executable(
+    name = "mm",
+    base_name = "mm",
+    entry_point = "com.moneymanager.cli.main",
+    library = ":cli",
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    # The release workflow's assets.
+    release_assets = {
+        "linuxArm64": "mm-linux-arm64",
+        "linuxX64": "mm-linux-x64",
+        "macosArm64": "mm-macos-arm64",
+        "mingwX64": "mm-windows-x64",
+    },
+)
+
+# `mm-jvm`: the CLI on the JVM, laid out as Gradle's `installDist` (bin/ scripts, lib/ jars); the desktop
+# installer bundles it.
+jvm_distribution(
+    name = "mm-jvm",
+    main_class = "com.moneymanager.cli.MainKt",
+    deps = [":cli_jvm"],
+)
+
+pkg_tar(
+    name = "mm-jvm_tar",
+    srcs = [":mm-jvm"],
+    extension = "tar.gz",
+    package_file_name = "mm-jvm.tar.gz",
+    strip_prefix = ".",
 )

@@ -19,8 +19,11 @@ The native compile is `native.bzl`, on the toolchain in `//bazel/kmp/native`.
 
 load("@rules_java//java:java_test.bzl", "java_test")
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load(":metadata.bzl", "kt_metadata_library")
-load(":native.bzl", "BUILDS_ON", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_klib", "kt_native_test_binary")
+load(":native.bzl", "BUILDS_ON", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_executable", "kt_native_klib", "kt_native_test_binary")
 load("//bazel/kmp/plugins:plugins.bzl", "plugin_deps", "plugin_labels")
 
 def _fragments(chain):
@@ -349,3 +352,69 @@ def kmp_cinterop(name, def_file, native_targets, static_libraries = [], deps = [
             target_compatible_with = BUILDS_ON.get(target, []),
             visibility = visibility,
         )
+
+def kmp_native_executable(name, library, entry_point, base_name, native_targets, release_assets = {}, visibility = None):
+    """A release executable per Kotlin/Native target, KGP's `binaries.executable(RELEASE)`.
+
+    `:<name>_<target>` links one target and `:<name>` the build platform's own, so `bazel build //...` links
+    only the host's, as Gradle's `build` does. A target with a `release_assets` name also gets
+    `:<asset>`: the program as a release asset, `<asset>.tar.gz` holding `<base_name>` with its executable bit
+    (release assets don't keep it), or a plain `<asset>.exe` on Windows.
+
+    Args:
+        name: the target name.
+        library: the `kmp_library` whose klib is the program, by module label.
+        entry_point: the fully qualified `main` function.
+        base_name: the file name, `<base_name>.kexe` (`.exe` on Windows).
+        native_targets: the Kotlin/Native targets, by KGP's names.
+        release_assets: target → release asset name (`mm-linux-x64`).
+        visibility: the targets' visibility.
+    """
+    for target in native_targets:
+        kt_native_executable(
+            name = name + "_" + target,
+            library = platform_label(library, target),
+            entry_point = entry_point,
+            base_name = base_name,
+            target = target,
+            tags = ["manual"],
+            target_compatible_with = BUILDS_ON.get(target, []),
+            visibility = visibility,
+        )
+        asset = release_assets.get(target)
+        if not asset:
+            continue
+        if target == "mingwX64":
+            copy_file(
+                name = asset,
+                src = name + "_" + target,
+                out = asset + ".exe",
+                tags = ["manual"],
+                target_compatible_with = BUILDS_ON.get(target, []),
+                visibility = visibility,
+            )
+        else:
+            pkg_files(
+                name = asset + "_files",
+                srcs = [name + "_" + target],
+                attributes = pkg_attributes(mode = "0755"),
+                renames = {name + "_" + target: base_name},
+                tags = ["manual"],
+                target_compatible_with = BUILDS_ON.get(target, []),
+            )
+            pkg_tar(
+                name = asset,
+                srcs = [asset + "_files"],
+                extension = "tar.gz",
+                tags = ["manual"],
+                target_compatible_with = BUILDS_ON.get(target, []),
+                visibility = visibility,
+            )
+    native.alias(
+        name = name,
+        actual = select(
+            {"//bazel/kmp/native:is_" + target: name + "_" + target for target in native_targets},
+            no_match_error = "%s: no Kotlin/Native target for this platform" % name,
+        ),
+        visibility = visibility,
+    )

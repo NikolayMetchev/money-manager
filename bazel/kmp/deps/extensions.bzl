@@ -14,15 +14,28 @@ the lockfile, and `//bazel/kmp/deps:maven_kmp_lock_test` fails with the command 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("//bazel/kmp/deps:catalog.bzl", "catalog")
 
-def _expected_inputs(versions, libraries, install):
+def _forces(libraries, bundles, install):
+    """module → catalog version key: `forces`, plus every library of each `force_bundles` bundle."""
+    forces = dict(install.forces)
+    for name in install.force_bundles:
+        if name not in bundles:
+            fail("maven_kmp.install: no bundle %s in the catalog" % name)
+        for alias in bundles[name]:
+            lib = libraries.get(alias, {})
+            if "module" not in lib or "version.ref" not in lib:
+                fail("maven_kmp.install: bundle %s's %s isn't a `module` + `version.ref` library" % (name, alias))
+            forces[lib["module"]] = lib["version.ref"]
+    return forces
+
+def _expected_inputs(versions, libraries, forces, install):
     libs = {}
     for alias in install.libraries:
         lib = libraries.get(alias)
         if not lib or "module" not in lib:
             fail("maven_kmp.install: %s isn't a `module = …` library in the catalog" % alias)
         libs[alias] = "%s:%s" % (lib["module"], versions.get(lib.get("version.ref"), lib.get("version", "")))
-    forces = {module: versions.get(ref, "?" + ref) for module, ref in install.forces.items()}
-    return {"excludes": install.excludes, "forces": forces, "libraries": libs, "platforms": install.platforms}
+    pinned = {module: versions.get(ref, "?" + ref) for module, ref in forces.items()}
+    return {"excludes": install.excludes, "forces": pinned, "libraries": libs, "platforms": install.platforms}
 
 def _file_repo(file):
     return "maven_kmp_%s_%s" % (file["sha256"][:12], "".join([c if c.isalnum() else "_" for c in file["name"].elems()]))
@@ -145,8 +158,9 @@ def _maven_kmp_impl(module_ctx):
         fail("maven_kmp: expected one install tag in the root module, got %d" % len(installs))
     install = installs[0]
     lock = json.decode(module_ctx.read(install.lock_file))
-    versions, libraries = catalog(module_ctx.read(install.catalog))
-    expected = _expected_inputs(versions, libraries, install)
+    versions, libraries, bundles = catalog(module_ctx.read(install.catalog))
+    forces = _forces(libraries, bundles, install)
+    expected = _expected_inputs(versions, libraries, forces, install)
     stale = ""
     if lock["inputs"] != expected:
         stale = ("bazel/kmp/deps/maven_kmp.lock.json is out of date with MODULE.bazel's maven_kmp.install or " +
@@ -182,7 +196,7 @@ def _maven_kmp_impl(module_ctx):
     pin_args += ["--toml", "gradle/libs.versions.toml"]
     pin_args += ["--library=" + alias for alias in install.libraries]
     pin_args += ["--platform=" + p for p in install.platforms]
-    pin_args += ["--force=%s=%s" % (m, ref) for m, ref in sorted(install.forces.items())]
+    pin_args += ["--force=%s=%s" % (m, ref) for m, ref in sorted(forces.items())]
     pin_args += ["--repository=" + r for r in install.repositories]
     pin_args += ["--exclude=" + e for e in install.excludes]
     _hub(
@@ -198,6 +212,7 @@ maven_kmp = module_extension(
         "install": tag_class(attrs = {
             "catalog": attr.label(mandatory = True, doc = "gradle/libs.versions.toml."),
             "excludes": attr.string_list(doc = "group:artifact never resolved, whoever depends on it."),
+            "force_bundles": attr.string_list(doc = "Catalog bundles whose every library is forced to its version."),
             "forces": attr.string_dict(doc = "module → catalog [versions] key: Gradle's dependency substitutions."),
             "libraries": attr.string_list(doc = "Catalog library aliases to resolve."),
             "lock_file": attr.label(mandatory = True),
