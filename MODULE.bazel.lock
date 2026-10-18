@@ -258,6 +258,19 @@
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
+    "//bazel/kmp/constants:google_oauth.bzl%google_oauth": {
+      "general": {
+        "bzlTransitiveDigest": "3WhDu7t3mlQy8UPYdkacQsstX/ytEEuNCU3fJcxx7/A=",
+        "usagesDigest": "KnI9ddib7BMxIy5MBFlmouKInNdm480VDE3R00Zw+4I=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {
+          "google_oauth": {
+            "repoRuleId": "@@//bazel/kmp/constants:google_oauth.bzl%_google_oauth_repo",
+            "attributes": {}
+          }
+        }
+      }
+    },
     "@@rules_android+//bzlmod_extensions:apksig.bzl%apksig_extension": {
       "general": {
         "bzlTransitiveDigest": "ZESI1GTm8zRsdU/InVvmpbo66PIBj41/6gPM33RrIns=",

@@ -36,6 +36,9 @@ const (
 	// runtime-only library), added to the source set's deps (default commonMain; commonTest for the tests).
 	// Repeatable; `kmp_export` still makes it an export.
 	keepDepDirective = "kmp_keep_dep"
+	// kmp_generated_srcs label …: generated sources (a kotlin_constants target) that join commonMain, as
+	// Gradle's `kotlin.srcDir(task)` does.
+	generatedSrcsDirective = "kmp_generated_srcs"
 )
 
 // keepDep is one kmp_keep_dep or kmp_export: the label, the platform whose deps it joins, and whether it's
@@ -53,6 +56,7 @@ type kmpConfig struct {
 	sqldelightPackage string
 	sqldelightDeps    []string
 	keepDeps          []keepDep
+	generatedSrcs     []string
 	lockFile          string
 	maven             *mavenIndex
 }
@@ -66,6 +70,7 @@ func (c *kmpConfig) clone() *kmpConfig {
 	out.sqldelightPackage = ""
 	out.sqldelightDeps = nil
 	out.keepDeps = nil
+	out.generatedSrcs = nil
 	return &out
 }
 
@@ -80,7 +85,7 @@ func (*kmpLang) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
 func (*kmpLang) CheckFlags(fs *flag.FlagSet, c *config.Config) error { return nil }
 
 func (*kmpLang) KnownDirectives() []string {
-	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective}
+	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective, generatedSrcsDirective}
 }
 
 func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
@@ -105,6 +110,8 @@ func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
 				kc.sqldelightPackage = d.Value
 			case sqldelightDepDirective:
 				kc.sqldelightDeps = append(kc.sqldelightDeps, d.Value)
+			case generatedSrcsDirective:
+				kc.generatedSrcs = append(kc.generatedSrcs, strings.Fields(d.Value)...)
 			case lockFileDirective:
 				kc.lockFile = d.Value
 			case keepDepDirective:
