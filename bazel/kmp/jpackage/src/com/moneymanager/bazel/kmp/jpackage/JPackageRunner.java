@@ -124,7 +124,10 @@ public final class JPackageRunner {
         command.add(values.get("{entitlements}"));
       }
       if (options.containsKey("--app-image")) {
-        Path image = Path.of(one(options, "--app-image")).toAbsolutePath();
+        // jpackage packages a copy: Bazel's outputs are read-only (codesign then can't re-sign the bundle) and,
+        // outside the sandbox, may be symlinks into its cache, which the package would carry as they are.
+        Path image = work.resolve("app-image");
+        copyWritable(Path.of(one(options, "--app-image")).toAbsolutePath(), image);
         command.add("--app-image");
         // jpackage 18+ wants the .app bundle itself on macOS (Compose passes it the same way).
         command.add((HOST_OS == OS.MAC ? image.resolve(one(options, "--name") + ".app") : image.resolve(
