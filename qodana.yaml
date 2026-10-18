@@ -172,6 +172,12 @@ exclude:
     paths:
       - bazel/kmp/native/launcher/src/com/moneymanager/bazel/kmp/nativelauncher/KonanLauncher.java
 
+  # Java 25 launches a non-public main, but `bazel coverage` starts the test runner through JaCoCo's
+  # JacocoCoverageRunner, which finds main with Class.getMethod: public methods only.
+  - name: UnnecessaryModifier
+    paths:
+      - bazel/kmp/testing/src/com/moneymanager/bazel/kmp/testing/KmpJUnitRunner.java
+
   # [5] — the wrapper's query properties are typed by SQLDelight's generated Kotlin (not platform types),
   # and its KDoc links that generated MoneyManagerDatabase.
   - name: HasPlatformType

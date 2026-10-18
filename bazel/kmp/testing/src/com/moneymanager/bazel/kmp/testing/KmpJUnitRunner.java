@@ -34,7 +34,8 @@ import org.junit.runner.notification.RunListener;
 public final class KmpJUnitRunner {
   private KmpJUnitRunner() {}
 
-  static void main(String[] args) throws Exception {
+  // Public although Java 25 doesn't need it: under `bazel coverage` JaCoCo's runner finds main with Class.getMethod.
+  public static void main(String[] args) throws Exception {
     File jar = findTestJar(System.getProperty("kmp.test.jar"));
     List<Class<?>> classes = testClasses(jar);
     if (classes.isEmpty()) {

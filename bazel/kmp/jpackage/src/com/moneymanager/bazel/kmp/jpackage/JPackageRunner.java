@@ -362,7 +362,8 @@ public final class JPackageRunner {
   }
 
   private static void makeWritable(Path path) throws IOException {
-    if (!path.toFile().setWritable(true, true)) {
+    // Windows has no write bit on a directory (setWritable says false) and deletes it regardless.
+    if (!path.toFile().setWritable(true, true) && !Files.isDirectory(path)) {
       throw new IOException("can't make " + path + " writable");
     }
   }
