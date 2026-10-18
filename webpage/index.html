@@ -217,11 +217,11 @@ mm --push import all</code></pre>
         <tr><td>Database</td><td>SQLite via SQLDelight</td></tr>
         <tr><td>Dependency injection</td><td>Metro (compile-time DI)</td></tr>
         <tr><td>Object mapping</td><td>Mappie</td></tr>
-        <tr><td>Build</td><td>Gradle (JDK 25 toolchain)</td></tr>
-        <tr><td>Code quality</td><td>Detekt, ktlint, dependency-analysis</td></tr>
+        <tr><td>Build</td><td>Bazel (JDK 25)</td></tr>
+        <tr><td>Code quality</td><td>Detekt, ktlint, strict and unused-dependency checks</td></tr>
       </table>
       <p>
-        The codebase is split into many focused Gradle modules. Explore how they
+        The codebase is split into many focused modules. Explore how they
         depend on each other in the <a href="modules.html">module dependency tree</a>, and browse
         the <a href="kdoc/index.html">KDoc API documentation</a> generated with Dokka.
       </p>
@@ -229,14 +229,16 @@ mm --push import all</code></pre>
 
     <section id="getting-started">
       <h2>Getting started</h2>
-      <p>Clone the repository and build (requires JDK 25):</p>
+      <p>Clone the repository and build with <a href="https://github.com/bazelbuild/bazelisk">bazelisk</a>
+        (installed as <code>bazel</code>; it downloads the JDK and Kotlin itself):</p>
       <pre><code>git clone https://github.com/NikolayMetchev/money-manager.git
 cd money-manager
-./gradlew build --console=plain</code></pre>
+bazel build //...</code></pre>
       <p>Run the desktop app:</p>
-      <pre><code>./gradlew :app:main:jvm:run --console=plain</code></pre>
-      <p>Install the Android debug build on a connected device or emulator:</p>
-      <pre><code>./gradlew :app:main:android:installDebug --console=plain</code></pre>
+      <pre><code>bazel run //app/main/jvm:app</code></pre>
+      <p>Build the Android debug APK and install it on a connected device or emulator:</p>
+      <pre><code>bazel build //app/main/android:debug
+adb install bazel-bin/app/main/android/debug.apk</code></pre>
     </section>
 
     <section id="status">

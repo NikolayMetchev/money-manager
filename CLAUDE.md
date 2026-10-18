@@ -40,284 +40,64 @@ nothing) and features that only built-ins could configure. Don't recreate that d
 
 ## Technology Stack
 
-- **Language**: Kotlin | **Build**: Gradle | **JVM**: 25
+- **Language**: Kotlin | **Build**: Bazel | **JVM**: 25
 - **Database**: SQLite via SQLDelight | **DI**: Metro 
 - **UI**: Compose Multiplatform with Material 3
 - **Object Mapping**: Mappie | **Code Quality**: Detekt, ktlint | **Logging**: Kermit
 
 ## Build Commands
 
-**Important**: Always use `--console=plain`. Don't use `--no-daemon`. On Windows, use `./gradlew.bat`
-directly. A full `./gradlew build` always takes longer than 2 minutes, so never run it with a short
+Bazel runs through bazelisk, at the version in `.bazelversion`; nothing else needs installing (it downloads the JDK,
+Kotlin and Kotlin/Native). Android targets need an SDK with the catalog's `android-compileSdk` platform (`ANDROID_HOME`
+or `local.properties`). How the build itself works (the KMP rules, Gazelle, the resolver, bumping Kotlin) is in
+[`bazel/README.md`](bazel/README.md). A cold `bazel build //...` takes well over 2 minutes, so never run it with a short
 timeout; use at least 20 minutes.
 
 | Command | Description |
 |---------|-------------|
-| `./gradlew build` | Build all and run tests (coverage/dependency health run as separate CI jobs) |
-| `./gradlew :app:main:jvm:run` | Run JVM application |
-| `./gradlew :app:main:android:installDebug` | Install Android debug APK |
-| `./gradlew :app:ui:core:pixel6api36AndroidDeviceTest` | Run Android UI tests on managed device |
-| `./gradlew lintFormat` | Format code (ktlint + sort dependencies) and regenerate the Bazel BUILD files (Gazelle) |
-| `./gradlew buildHealth` | Check dependency health |
-| `./gradlew detekt` | Static analysis |
+| `bazel build //...` | Build everything: every platform's compile, the commonMain metadata checks, the host's `mm`, the module and dependency checks |
+| `bazel test //...` | Every test the host can run: JVM, Android host, the host's native tests, ktlint, detekt, Android lint, the lockfile tests |
+| `bazel run //app/main/jvm:app` | Run the desktop app |
+| `bazel build //app/main/android:debug` | Debug APK (`bazel-bin/app/main/android/debug.apk`; `adb install` it) |
+| `bazel build //app/main/cli:mm` / `:mm-jvm` | The host's native `mm` / the JVM `mm-jvm` (`bazel-bin/app/main/cli/mm-jvm/bin/mm-jvm`) |
+| `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')` | Android device tests, on the device adb picks (an API 36 emulator) |
+| `bazel run //:format` | Regenerate the BUILD files (Gazelle), then ktlint -F |
+| `bazel run //:gazelle` | Regenerate the BUILD files only |
+| `bazel/renovate/repin.sh` | Re-pin every lockfile (after changing the catalog or `MODULE.bazel`) |
+| `bazel coverage $(bazel query 'attr(name, "^test_(jvm\|android)$", tests(//...))')` | Coverage, one LCOV report in `bazel-out/_coverage/_coverage_report.dat` |
 
-Build-speed flags (off by default): the Android release variant (R8/minified) only exists with
-`-PbuildRelease=true` (CI main/release workflows pass it), and `build` only compiles Android
-device-test sources with `-PcompileDeviceTests=true` (the CI emulator job compiles them anyway).
-`-PskipNative=true` keeps the Kotlin/Native targets declared but runs none of their tasks (no compile, cinterop,
-link or test): CI's Build and Test job passes it, and each native target has its own job (linuxX64 included).
-`-PtestMaxParallelForks=N` overrides the parallel test-fork default (e.g. `=1` to serialize), and
-`-PandroidCoverage=true` enables JaCoCo coverage for instrumented tests (main-branch CI passes it).
-`-PproguardOptimize=false` skips ProGuard's optimizer in desktop release builds (the CI "Desktop ProGuard"
-check passes it: shrinking alone checks the keep rules, and the optimizer is most of ProGuard's ~15 minutes).
-`-PreleaseSmokeTest=true` builds the release variant debug-signed and enables `app/main/android-smoketest`:
-`./gradlew :app:main:android-smoketest:pixel6api36ReleaseAndroidTest -PreleaseSmokeTest=true --console=plain` installs the
-minified APK and drives first run. CI runs it only via the manual "Android Release Smoke Test" workflow (dispatch it on main or a PR branch).
+Target naming: a module `//utils/files:files` builds as `:files_jvm`, `:files_android` and `:files_<target>`
+(`_linuxX64`, `_linuxArm64`, `_macosArm64`, `_mingwX64`); its tests are `:test_jvm`, `:test_android` (host),
+`:test_<target>` and `:test_device`, plus `:<name>_ktlint`, `:<name>_detekt` and `:<name>_unused_deps`. Narrow a run
+to one module with `bazel test //utils/files/...`.
 
-**Pre-push**: Always run `./gradlew build buildHealth` locally before pushing.
+Flags and configs:
+- `--config=rbe` runs every action on BuildBuddy (Linux), `--config=cache` only uses its cache (any OS). Copy
+  `user.bazelrc.example` to `user.bazelrc` and put your API key in `~/.bazelrc`
+  (`common --remote_header=x-buildbuddy-api-key=…`). Without a key pass neither: invocations would still stream to
+  BuildBuddy, anonymously. Go targets (`//:gazelle`, the resolver) don't link remotely; add `--remote_executor=`.
+- `--stamp` writes the git commit into the release APK (`META-INF/version-control-info.textproto`); releases pass it.
+- `--define=proguard_optimize=false` skips ProGuard's optimizer in `//app/main/jvm:release` (shrinking alone checks
+  the keep rules, and the optimizer is most of ProGuard's ~15 minutes); CI's Desktop ProGuard check passes it.
+- `--define=bundle_native_cli=true` puts the host's native `mm` into the desktop installer
+  (`//app/main/jvm:installer`: a deb, dmg or msi on its own OS only).
+- `--platforms=//bazel/platforms:linux_arm64` cross-links the linuxArm64 test binaries on a Linux x64 host.
 
-**Bazel (in progress, #995)**: Bazel is being brought up beside Gradle, which stays the source of truth until
-the cutover. Run it through bazelisk (`.bazelversion`): `bazel build //...`. It is bzlmod only (`MODULE.bazel`,
-committed `MODULE.bazel.lock`), on the same JDK 25 (`.bazelrc`). The KMP rules live in `//bazel/kmp` and the Gazelle
-extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output). Every CI workflow runs on Bazel
-(#1028; only the Qodana job still imports the Gradle build, for its IDE's project model): `build.yml`'s Build and Test
-is `bazel build //...` and `bazel test //...`, Auto-format PR regenerates and pushes the BUILD files, and each job sets Bazel up through
-`.github/actions/bazel-setup`. CI uses BuildBuddy (#1017): the Linux jobs run every action on its executors
-(`--config=rbe`), macOS and Windows build on their runners with its remote cache (`--config=cache`). The linuxArm64
-test binaries cross-link with `--platforms=//bazel/platforms:linux_arm64` and run on an arm64 runner. Dependency
-submission reads the lockfiles (`bazel/kmp/deps/dependency_snapshot.py`). To use it locally,
-copy `user.bazelrc.example` to `user.bazelrc` and put your API key in `~/.bazelrc`
-(`common --remote_header=x-buildbuddy-api-key=…`). Without a key, don't pass either config: invocations would still
-stream to BuildBuddy, anonymously.
+Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer`, and `//app/main/cli:mm-linux-x64`,
+`:mm-linux-arm64`, `:mm-windows-x64`, `:mm-macos-arm64` (the Apple one only on macOS). The release smoke test,
+`bazel test //app/main/android-smoketest:smoketest_test`, installs the debug-signed minified APK
+(`//app/main/android:release_debug_signed`) on a device and drives first run; CI runs it only via the manual "Android
+Release Smoke Test" workflow (dispatch it on main or a PR branch). Cut a release by pushing a `v*` tag.
 
-- **`kmp_library` / `kmp_test`** (`//bazel/kmp:defs.bzl`) compile a module the way KGP does: one K2 call per platform
-  over every fragment (`commonMain ← jvmAndroidMain ← jvmMain`; `commonMain ← nativeMain ← linuxMain|appleMain|mingwMain`),
-  empty ones left out, so expect/actual and common code are checked per fragment. A module emits `:<name>_jvm` and
-  `:<name>_<target>` per `native_targets` entry (`_linuxX64`, …); deps are written once, as module labels
-  (`//utils/files:files`), and each platform gets that label's `_<platform>` target, Maven libraries included.
-  `exports` is Gradle's `api` (also on the module's own classpath; on native every klib dep is transitive anyway).
-  Klibs are uniquely named after the full path (`utils.bigdecimal:utils-bigdecimal`) and compiled `-g -Werror`, as
-  KGP does. JVM tests run through `KmpJUnitRunner` (JUnit 4), named `:test_jvm`; native tests link with konan's test
-  runner and run through `KnTestLauncher`, which turns its TeamCity output into `test.xml`, named `:test_<target>`
-  and only run where the binary does (on Linux x64, `_linuxX64`). Both match Gradle's results case for case, apart
-  from KGP's `[jvm]`/`[linuxX64]` suffixes. Gradle has no test timeout, so tests default to `medium`; a slower suite
-  sets `# gazelle:kmp_test_size`, and one that reads files from the tree at run time `# gazelle:kmp_test_data`
-  (paths are relative to the workspace root, the runfiles' working directory). Test JVMs use `/tmp`, as Gradle's do.
-  Every module's JVM runtime carries `kotlinx-coroutines-swing`, as the KMP convention does.
-- **The compile is rules_kotlin's `kt_jvm_library`, patched**: rules_kotlin has no fragment flags, so
-  `bazel/third_party/rules_kotlin/fragments.patch` (via `single_version_override`) adds `fragment_srcs` /
-  `fragment_refines` and an `x_expect_actual_classes` option. It is Starlark only. Rebase it on every rules_kotlin
-  bump. rules_kotlin bundles its own Kotlin compiler, so `bazel_dep(rules_kotlin)` must match the catalog's
-  `kotlin`. The toolchain is `//bazel/kmp:kotlin_toolchain` (`-Werror`, JVM 25, indy lambdas). ABI jars stay off:
-  Metro and Compose metadata must reach downstream compiles.
-- **Compiler plugins** (`//bazel/kmp/plugins`, #1001): `kmp_library(plugins = ["serialization", "compose", "metro",
-  "mappie"])` and `kmp_test(plugins = [… "mokkery"])` name plugins, and each name applies the same embeddable jar KGP
-  uses on every platform (`kt_compiler_plugin` with `target_embedded_compiler` on the JVM, `-Xplugin`/`-P` on
-  konanc) with the options its Gradle plugin passes, plus the runtime its convention adds (Metro's as `api`,
-  mappie-api, mokkery-runtime for tests). Metro runs before Compose and serialization (`-Xcompiler-plugin-order`).
-  Plugin options may use `{temp}`, a directory of the compile's own (Mappie keeps state there).
-- **Metro across modules** (#1002): contribution hints (`metro/hints`) reach the graph's compile through ordinary
-  `deps`, in jars and klibs alike, because ABI jars stay off. A dep that exists only so Metro sees it (app/di/core's
-  feature DI modules) is a plain dep marked `# keep`, so Gazelle keeps it
-  though no import explains it (or name it with `# gazelle:kmp_keep_dep`, which also exempts it from the unused-deps check).
-- **SQLDelight** (`//bazel/kmp/sqldelight`, #1003): `sqldelight_library` runs the SQLDelight compiler (the
-  `SqlDelightEnvironment` the Gradle task drives, with its defaults) over a module's `.sq` files, upstream databases'
-  folders as dependencies, and `kmp_library(sqldelight = …)` compiles the result as `commonMain` (plus the runtime as
-  `api`). Output matches Gradle's `build/generated/sqldelight` byte for byte. konanc gets the sources in the module's
-  own compile; on the JVM they compile as `<name>_sqldelight_jvm`, exported, because rules_kotlin can't put srcjar
-  sources in a fragment. The compiler API is internal: `//bazel/kmp/sqldelight/tests:golden_test` pins its output
-  (refresh with `:update_golden` after checking a bump). Fragments: like KGP, `commonMain` and the leaf are always
-  named, empty or not (K2 takes a lone common fragment for the platform's own).
-- **Gazelle** (`//bazel/gazelle/kmp`, Go, #1004): `bazel run //:gazelle` writes every opted-in module's BUILD file;
-  CI's Auto-format PR job runs it and pushes what changed (and fails when Gazelle does). Never edit a generated rule by hand: change the sources or a directive. A module is
-  its directory's `src/<sourceSet>/kotlin` dirs (plus `src/commonMain/sqldelight`); imports become `deps` per platform,
-  resolved by package to a module or to the `@maven_kmp` library whose files declare it (the lockfile lists each
-  library's packages); plugins are inferred (`@Serializable`, `@Composable`, Metro/Mappie/Mokkery imports). Directives
-  for what sources can't say: `kmp_generate true` (every native-convention module has it since #1008; the rest join with their phase), `kmp_targets`, `kmp_export <label> [sourceSet]`
-  (Gradle `api`: always a dep, and exported), `kmp_keep_dep <label> [sourceSet]` (a dep no import explains: Metro
-  contributors, runtime-only libraries), `kmp_plugins`, `kmp_sqldelight_package`, `kmp_sqldelight_dep`. Directives
-  are per module, not inherited. `# keep` on a dep keeps it too. `//bazel/gazelle/kmp:generation_test` holds golden
-  workspaces (`testdata/<case>`, `BUILD.in` → `BUILD.out`; refresh with `UPDATE_SNAPSHOTS=true bazel run` on it).
-- **Generated constants** (`//bazel/kmp/constants`, #1011): `kotlin_constants` is `GenerateKotlinConstantsTask`
-  (same generator logic, byte-identical output), joined to commonMain with `# gazelle:kmp_generated_srcs :<target>`.
-  The OAuth client is XOR-obfuscated in the `@google_oauth` repository (from `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`, else
-  `secrets/google-oauth.properties`), so the plaintext is never an action input. `.bazelrc` sets rules_kotlin's
-  strict associates: a test's friend is only its module's jar, as in KGP (otherwise K2 smart-casts the exports').
-- **Bundled SQLite** (`utils/sqlite3`, #1012): `@sqlite_amalgamation` (`//bazel/kmp/sqlite`) downloads the
-  amalgamation `sqlite-amalgamation-*` pins in the catalog, `kmp_static_library` compiles it per target with konan's
-  own clang and `llvm-ar` (`CompileBundledSqliteTask`'s defines), and `kmp_cinterop` embeds the archive in a klib
-  (`-staticLibrary`). `kmp_library(cinterops = …)`, set by `# gazelle:kmp_cinterops`, compiles a module with it, even
-  one with no Kotlin of its own. `app/db/core` keeps the dep with `kmp_keep_dep`: nothing imports SQLite, it's linked.
-- **commonMain metadata check** (`//bazel/kmp:metadata.bzl`, #1010): every module with native targets gets
-  `:<name>_metadata`, Gradle's `compileCommonMainKotlinMetadata`: commonMain compiled alone (konan's metadata compiler,
-  the native plugins, `-Werror`) against its deps' common metadata, so an API only some platforms have
-  (`java.util.regex`, `RegexOption.DOT_MATCHES_ALL`) fails even though every platform compile passes. `maven_kmp`'s
-  `metadata` platform is each library's common metadata jar, limited to the source sets all our targets' variants
-  include (and those source sets' dependencies), plus the stdlib's and kotlin-test's. `bazel build //...` runs it.
-- **Executables** (#1013): `kmp_native_executable` links KGP's release binary per target (`-opt`, the module's klib
-  `-Xinclude`d, no compiler caches) as `:<name>_<target>`, all `manual`, and `:<name>` is the build platform's own,
-  so `bazel build //...` links only the host's `mm`, as Gradle's `build` does. `release_assets` adds the release
-  workflow's `mm-<os>-<arch>` (`pkg_tar` keeping the exec bit; a copied `.exe` on Windows). `jvm_distribution`
-  (`//bazel/kmp:distribution.bzl`) is Gradle's `installDist`: `mm-jvm/bin/` start scripts and `mm-jvm/lib/`, module
-  jars named after their path (`app-db-core-jvm.jar`).
-- **Module checks** (`//bazel/kmp/checks`, #1014): Gradle's custom checks, as Gazelle directives, fail `bazel build`.
-  `kmp_visibility` limits `app/model/repository/write` to the modules that may take a write repository (Bazel's
-  visibility error is `verifyNoWriteRepositoryUsage`), and `kmp_forbid_reference` / `kmp_allow_reference` keep the
-  engine's own module to `ImportEngineImpl.kt` (comment lines may name one). `kmp_forbid_deps` is
-  `verifyNoDbDependency`: an aspect fails analysis, per platform and for the tests too, when a pure importer reaches
-  `app/db/core`, `app/di/core` or `app/ui/core`, naming the path. Gazelle itself is `verifyUniquePackages`: a run fails
-  when two generated modules' main sources declare one package (so CI's Auto-format PR job fails).
-- **Dependency hygiene** (#1016), Gradle's `buildHealth`: the toolchain runs rules_kotlin's strict deps as an error (a
-  class used from a dep that isn't declared, or exported by one that is, fails the compile: Gradle's `api` is fine), and
-  every module and test gets `:<name>_unused_deps` (`//bazel/kmp/checks/unuseddeps`), which fails `bazel build` when its
-  JVM compile's jdeps used none of a declared dep's own jars (not what it re-exports, as rules_kotlin's own check
-  counts). Exports and `keep_deps` (written from `kmp_keep_dep`) are exempt: Metro graphs, SQLDelight and other
-  generated code use them where jdeps can't see. A package several libraries declare (`androidx.compose.runtime`)
-  resolves to one a directive names, to nothing when those already bring every candidate, then to the one whose api
-  brings the rest, and only then to the most specific. Auto-format PR regenerates a stale BUILD file.
-- **Compose Desktop UI** (#1018): `app/ui/*`, `utils/compose/*` and `test/app/ui` are JVM-only modules (no
-  native `kmp_targets`). Their JVM classpath resources are one jar per
-  compilation (`kmp_resource_jar`, `//bazel/kmp:resources.bzl`), `src/{common,jvmAndroid,jvm}{Main,Test}/resources`
-  merged with the later source set winning a clash, as Gradle's `processResources` does (`app/ui/core`'s `money_manager.db`).
-  `kmp_test_jvm_flags` is the Compose conventions' headless `systemProperty`s and `kmp_test_flaky true` their test-retry
-  (`maxRetries = 2`). `kmp_test_jvm_tags no-remote-exec` keeps their JVM tests off BuildBuddy: Skiko needs libGL, which
-  its executor image doesn't have. `compose.desktop.currentOs` is `//bazel/kmp/deps:compose_desktop_current_os`, a `select` on the
-  target OS and CPU, kept on jvmTest with `kmp_keep_dep` (nothing imports Skiko's natives). Test JVMs set
-  `skiko.data.path` under `TEST_TMPDIR`, since the sandbox keeps `~/.skiko` read-only. A module with `kmp_visibility`
-  also gets a testonly, public `:<name>_for_tests`, which Gazelle gives every test that imports it: Gradle's
-  `verifyNoWriteRepositoryUsage` only reads main sources, and only a testonly target can depend on it.
-- **Desktop app and ProGuard** (#1019): `app/main/jvm` is a `kotlin("jvm")` module, so Gazelle reads `src/main` and
-  `src/test` as its JVM leaf. `bazel run //app/main/jvm:app` is Gradle's `run` (a hand-written `java_binary` adding the
-  `runtimeOnly` deps: the CLI, `currentOs`, log4j). `proguard_jars` (`//bazel/kmp/proguard`) is Compose's
-  `proguardReleaseJars`: each runtime jar shrunk into its own (`-injars`/`-outjars` per jar), the target JDK's jmods
-  (`//bazel/kmp/deps:jdk_jmods`) as library jars, Compose's `default-compose-desktop-rules.pro` read from the catalog's
-  Compose Gradle plugin jar (the `@proguard` install), then `proguard-rules.pro`. `jar_filters` drops sqlite-jdbc's other
-  platforms' natives (Gradle's artifact transform). `:release` runs the shrunk app and
-  `:release_service_providers_test` is `verifyProguardServiceProviders`; both are `manual`, and
-  `--define=proguard_optimize=false` is `-PproguardOptimize=false`.
-- **Desktop installers** (`//bazel/kmp/jpackage`, #1020): `jlink_runtime`, `jpackage_app_image` and `jpackage_installer`
-  are Compose's `createRuntimeImage`, `createReleaseDistributable` and `packageRelease<Format>`, with the arguments
-  Compose passes. `JPackageRunner` lays out jpackage's input as Compose does (skiko's natives unpacked next to the
-  jars, macOS's `Info.plist` and ad-hoc signing on Apple Silicon) and reads Compose's default icons and entitlements
-  from the plugin jar. jpackage packages only for its host: `//app/main/jvm:installer` is a deb, dmg or msi by OS
-  (WiX 3.11 is `@wix`, as Compose downloads it), and its action runs locally (dpkg-deb/fakeroot, hdiutil, WiX).
-  `--define=bundle_native_cli=true` is `-PbundleNativeCli=true`. `build.yml`'s Desktop Installer jobs install it on
-  each OS and starts the app, `mm-jvm` and `mm` (`install_smoke_test.sh`).
-- **Lint** (`//bazel/kmp/lint`, #1015): every `kmp_library`/`kmp_test` gets `:<name>_ktlint` and `:<name>_detekt`,
-  tests that run the tool's own `main` over the hand-written sources (generated ones are left out, as the Gradle
-  plugins filter them), and report the same findings Gradle does. ktlint is the catalog's `ktlint-engine` (Gradle's
-  ktlint plugin is pinned to it too), `ktlint_official` plus the tree's `.editorconfig` files: the sandbox isn't
-  under the repo, so each test carries its package's own and `//:editorconfigs` (those no module owns, such as
-  `app/presenter`'s) at their real paths. detekt reads `detekt.yml` over its defaults, without type resolution, as
-  Gradle's per-source-set detekt tasks do. `bazel run //:format` is `lintFormat`: Gazelle, then ktlint -F over the
-  same sources (`./gradlew lintFormat` runs Gazelle too, through the root `gazelle` task, so `bazel` must be on the PATH).
-  The tools resolve on their own classpaths (`maven_kmp.install(name = "ktlint_cli"/"detekt_cli", resolve_stdlib =
-  True)`, pinned with `bazel run @ktlint_cli//:pin`). The `.kts` build scripts Gradle's ktlint also checks aren't
-  covered: they go at the cutover.
-- **Android libraries** (#1021): `# gazelle:kmp_targets android …` (every module an Android convention reaches) gives
-  a module `:<name>_android`, AGP's Kotlin compile of the library: `commonMain ← jvmAndroidMain ← androidMain` against
-  `@android_sdk//:android_jar` (neverlink), on the JVM's toolchain (the convention's `jvmTarget` is the same). The
-  `android_sdk` extension (`//bazel/kmp/android`) finds the SDK as AGP does (`ANDROID_HOME`, `ANDROID_SDK_ROOT`,
-  `local.properties`) and takes the catalog's `android-compileSdk` platform, never downloading it (CI runs
-  `sdkmanager`). `jvmAndroidMain`'s deps are `jvm_android_deps`/`jvm_android_exports`, which both compiles see.
-  `maven_kmp`'s `android` platform takes KGP's `androidJvm` variant (an AAR: `classes.jar`, merged with its `libs/`
-  jars), else a JVM one, never androidx's `*Stubs`; `library_platforms` limits a library to the platforms whose
-  source sets declare it in Gradle (the `-desktop` jars to `jvm`, the androidx roots to `android`), as Gradle resolves
-  only those. Gazelle resolves an import to a library every compilation of its source set has, else per compilation
-  (commonMain's Material 3 import is `compose_material3_desktop` on the JVM, `androidx_compose_material3` on
-  Android; Compose UI's JetBrains root module has both), preferring catalog libraries over the modules they bring; `android.*` is the SDK. Resources, manifests and dexing are the app's
-  (`android_apk`). A library's `androidMain` `runtimeOnly` deps are `kmp_keep_dep … androidMain` (the cryptography provider).
-- **Android host tests** (#1022): AGP's `testAndroidHostTest` is `kmp_test(android = True)`'s `:<name>_android`:
-  `commonTest ← jvmAndroidTest ← androidHostTest` compiled against the module's `_android` and `android.jar`, run by
-  `KmpJUnitRunner` on AGP's mockable jar (`//bazel/kmp/android:mockable_android_jar`, which AGP's own
-  `MockableJarGenerator`, from `@android_tools`, builds byte-identical to Gradle's, returning default values as the
-  convention's `isReturnDefaultValues` asks). Gazelle sets it on every Android module with tests; one whose Gradle
-  build disables `testAndroidHostTest` (the Compose UI feature convention, tests that need a device) says
-  `# gazelle:kmp_android_host_tests false`. The same 29 modules and 862 cases as Gradle.
-- **Android app** (`//bazel/kmp/android:apk.bzl`, #1023): `app/main/android` is `kmp_main_platform android` (AGP's
-  `com.android.application`: only `:android_android`, Kotlin module `android`; every other module's JVM and Android
-  compiles take Gradle's module name, `app.ui.core_core`, which Compose's lambda names and `internal` members carry).
-  `android_apk` runs AGP's own tools over the runtime classpath's AARs (`aar_import`, `AarInfo`: `maven_kmp` writes one
-  per AAR): the manifest merger, `aapt2 compile`/`link`, the R class writer (non-final ids, `android.nonFinalResIds`),
-  D8 (debug) or R8 (release: the AARs' and jars' keep rules in classpath order, resource shrinking,
-  `aapt2 convert`/`optimize` with shortened paths, the AARs' baseline profiles expanded, rewritten and compiled to
-  `assets/dexopt/`), then ApkFlinger, with AGP's java-resource excludes/merges and 16K-aligned native libraries.
-  `:debug` is debug-signed, `:release` unsigned as in Gradle, `:release_debug_signed` the smoke test's. The release APK
-  matches Gradle's entry for entry, `classes.dex` and the profile byte for byte; only the merged manifest's element
-  order differs (libraries in Bazel's dependency order). `--stamp` adds `META-INF/version-control-info.textproto`
-  (`bazel/stamp`, `STABLE_GIT_COMMIT`), which AGP always writes. aapt2 is downloaded as AGP does (`pins.bzl`).
-- **Android device tests** (`//bazel/kmp/android:device_test.bzl`, #1024): AGP's `connectedAndroidDeviceTest` is
-  `kmp_test`'s `:<name>_device`: `androidDeviceTest` is its own compilation (commonTest's deps don't reach it), so
-  `device_srcs` are `src/androidDeviceTest/kotlin` plus what `# gazelle:kmp_device_test_srcs` shares (Gradle's
-  `kotlin.srcDir`), with `device_deps`, `device_manifest` and `device_resources` (`kmp_device_test_resources`); a
-  `runtimeOnly(androidx.test.runner)` is `kmp_keep_dep … androidDeviceTest`. `android_apk(test_runner = …)` builds
-  AGP's test APK (`com.moneymanager.<module path>.test`, self-instrumenting, targetSdk = compileSdk as for a library,
-  no `app-metadata.properties`), and `android_device_test` runs it with `adb install` and `am instrument -w -r`
-  (`DeviceTestRunner`, which writes `test.xml`) on the device adb picks (`ANDROID_SERIAL` among several). They're
-  `manual`, `local` and `exclusive`, tagged `android_device`: `bazel test //...` leaves them out and `build.yml`'s
-  Android Instrumented Tests job runs `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')` on its emulator
-  (rules_android's emulator rules can't take APKs built outside it, and need their own system images). The release
-  smoke test is `//app/main/android-smoketest:smoketest_test` (hand-written: a `com.android.test` module, its release
-  variant not debuggable), installing `//app/main/android:release_debug_signed` first. The same 12 modules and 430
-  cases as Gradle, plus the smoke test; run them on an API 36 image (Espresso 3.5.0 fails on API 37 for both builds).
-  Known differences: the device compile is named after its module (rules_kotlin takes an associate's name, so only
-  Mokkery's `MokkeryModuleScope_<hash>` class names differ), its classpath has androidx.test:core 1.7.0 where Gradle's
-  per-module resolution has 1.5.0, and D8's synthetic class names differ (one dex action, not one per class).
-- **Android lint** (`//bazel/kmp/android:lint.bzl`, #1025): `android_lint` is AGP's `lintDebug`, the one Android
-  lint task Gradle has (only `app/main/android`; the KMP library modules have none). It runs the lint AGP does
-  (`android-lint-gradle` in the catalog, always AGP + 23, its own `maven_kmp.install(name = "android_lint")`) over the
-  lint model AGP's `generateDebugLintReportModel` writes, built from the APK's `AndroidAppInfo`: namespace, SDK levels,
-  merged manifest, classes and R.jar, and every AAR extracted (its `lint.jar`, `public.txt`, `annotations.zip`), under
-  moneyManagerLintPolicy's options plus the module's `disable`. Not in its model: build-tools' `core-lambda-stubs.jar`
-  and D8's backported-methods list (both only quiet NewApi on desugared calls). `@android_sdk//:lint_sdk` is the
-  platform laid out as an SDK for lint's `--sdk-home`.
-- **Coverage** (#1026), Kover's replacement: `bazel coverage $(bazel query 'attr(name, "^test_(jvm|android)$",
-  tests(//...))')`. rules_kotlin instruments with JaCoCo; `.bazelrc`'s `coverage` lines filter it as Kover does (no
-  `test/` fixtures, tests or SQLDelight code) and merge it into one LCOV report, `bazel-out/_coverage/_coverage_report.dat`
-  (`build.yml`'s Coverage job uploads it to Codecov). It credits a module's code to every test that runs it, so it reads higher than
-  Kover's per-module reports. Not covered: the device tests (Gradle's `instrumented` flag) and Kover's generated-class
-  excludes, which are per class where LCOV is per line. The Go tests can't link under coverage, hence the query.
-- **Tools and Pages** (#1027): `tools/*` and `app/db/schemaspy` are ordinary modules plus `java_binary`s:
-  `bazel run //tools/strategy-catalog:generate_bundled_currencies` (Gradle's `generateBundledCurrencies`) and
-  `bazel run //tools/crypto-dataset:generate` write into the workspace (`BUILD_WORKSPACE_DIRECTORY`). `//webpage:site`
-  (`//bazel/pages`) is the Pages artifact `static.yml` uploads: `webpage/*.html` with SchemaSpy's schema docs
-  (`database/`, its action runs locally: it needs the host's Graphviz), the strategy catalog and `kdoc/`;
-  `modules-graph.md` is written from `bazel query` (`bazel/pages/module_graph.py`). The KDoc is Dokka's
-  (`//bazel/kmp/dokka`): every `kmp_library` has a manual `:<name>_dokka`, Gradle's `dokkaGenerateModuleHtml` with
-  the Gradle plugin's own source-set IDs and settings, and `//webpage:kdoc` aggregates the modules
-  `webpage/kdoc_modules.bzl` lists (Gradle's: no schemaspy, `app/main/*`, `test/*` or `tools/*`), so a new module
-  joins there. The Kotlin analysis goes on Dokka's plugins classpath beside dokka-base (it reads the enum members'
-  docs from there), and Dokka loads every plugin its own classpath has, so the runner carries only the CLI.
-  Known differences from Gradle's site: Bazel analyses JVM+Android-only common code (`app/ui/*`, `utils/compose/*`)
-  and `jvmAndroidMain` against the JVM classpath, so types Gradle's pages show as `ERROR CLASS` resolve; a module
-  whose Gradle build declares an empty `jvmAndroidMain` (`app/ui/core`) has no such source set; empty directories
-  are dropped (tree artifacts); Apple source sets are analysed against the Linux klibs off macOS.
-- **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
-  `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
-  libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.
-  The version is rules_kotlin's Kotlin release; after a Kotlin bump run `bazel run @kotlin_native_repin//:repin`
-  (it downloads every archive: JetBrains' `.sha256` files all hold the same wrong checksum). Rules call konan
-  through `run_konan` (`toolchain.bzl`), which passes `airplaneMode=true`, so nothing is fetched at build time. One
-  toolchain per exec host carries every target it builds (Linux and Windows hosts: linuxX64, linuxArm64,
-  mingwX64; macOS adds macosArm64), picked by name rather than by platform.
-- **Maven** (`maven_kmp`, #1000): rules_jvm_external reads POMs, which name no KMP platform's files, so
-  `//bazel/kmp/resolver` (Go) follows each library's Gradle Module Metadata to its per-platform variant (`-jvm` jar,
-  `-linuxx64` klib plus any cinterop klibs) the way Gradle does: highest version wins, raised by
-  `dependencyConstraints` and BOMs (`platform(…)`, Gradle Module Metadata or POM) without bringing anything in,
-  except the modules `force_bundles` (the catalog's `build-tool-pins`, Gradle's `configurations.all`) pin
-  everywhere and `forces` pins on the JVM and in metadata only (moneymanager.kotlin-convention's substitutions only
-  match `*CompileClasspath`/`*RuntimeClasspath` (any case)/`*DependenciesMetadata`, never native klibraries); `excludes` drops a
-  module everywhere, also where a variant points (`available-at`) at it. An api-variant dependency the runtime variant
-  leaves out is compile-only (`compile_only_deps`, a neverlink twin), and a library with only a runtime variant (the
-  Compose Gradle plugin) compiles against that one, as in Gradle. The Kotlin stdlib comes
-  from the toolchain (unless `resolve_stdlib`, for a tool). Each `maven_kmp.install(name = …)` is its own
-  resolution and hub repository, as each Gradle configuration resolves on its own. Versions come from the catalog; `MODULE.bazel` lists the catalog aliases, platforms and
-  repositories. It writes `bazel/kmp/deps/maven_kmp.lock.json` (every file with its sha256); after changing either,
-  run `bazel run @maven_kmp//:pin`. `//bazel/kmp/deps:maven_kmp_lock_test` fails while the lock is stale. `bazel/renovate/repin.sh`
-  re-pins every lockfile, MODULE.bazel.lock and (after a Kotlin bump) Kotlin/Native at once; `renovate-pins.yml` runs it on
-  Renovate's PRs (#1029), whose `kotlin monorepo` group bumps Kotlin, rules_kotlin, Metro and Mappie together. Modules
-  name a library by its catalog alias, `@maven_kmp//:kotlinx_io_core` (the `_jvm`/`_<target>` suffix is added per
-  platform); `//bazel/kmp/deps` only holds `kotlin_test` and the compiler plugins.
+**CI**: every workflow sets Bazel up through `.github/actions/bazel-setup`. `build.yml`'s Build and Test is
+`bazel build //...` and `bazel test //...` on Linux (RBE); Native Tests run macOS and Windows (on their own runners,
+with the cache) and linuxArm64 (cross-linked, run on an arm64 runner); Coverage, Android Instrumented Tests (an API 36
+emulator), Desktop ProGuard and Desktop Installer (each OS: installs it and starts the app, `mm-jvm` and `mm`) are
+their own jobs. Auto-format PR runs `//:format` on every PR and pushes the fixes, so a stale BUILD file is regenerated,
+not reported. Dependency submission reads the lockfiles (`bazel/kmp/deps/dependency_snapshot.py`), and
+`renovate-pins.yml` re-pins Renovate's PRs.
+
+**Pre-push**: Always run `bazel build //... && bazel test //...` locally before pushing.
 
 ## Project Structure
 
@@ -325,9 +105,9 @@ stream to BuildBuddy, anonymously.
 
 | Module | Purpose |
 |--------|---------|
-| `gradle/build-logic/` | Convention plugins (kotlin, android, compose, metro, mappie, `jvm-android-shared`, `native`, `pure-importer`) plus the `verifyNoDbDependency`/`verifyNoWriteRepositoryUsage` tasks and `GenerateKotlinConstantsTask` (see **Platform Support**), with TestKit tests that the root `check` runs |
+| `bazel/` | The build: the Kotlin Multiplatform rules (`bazel/kmp`), the Gazelle extension that writes every `BUILD.bazel` (`bazel/gazelle/kmp`), the Maven resolver and its lockfiles, the module checks — see [`bazel/README.md`](bazel/README.md) |
 | `utils/bigdecimal/` | Arbitrary-precision decimal arithmetic: `java.math` on JVM/Android, a java.math-identical (unscaled, scale) pair over ionspin's `BigInteger` on native |
-| `utils/currency/` | Currency formatting (locale-aware on JVM/Android, plain decimal + code on native) and the bundled ISO 4217 table `IsoCurrencies`, generated by `:tools:strategy-catalog:generateBundledCurrencies` |
+| `utils/currency/` | Currency formatting (locale-aware on JVM/Android, plain decimal + code on native) and the bundled ISO 4217 table `IsoCurrencies`, generated by `bazel run //tools/strategy-catalog:generate_bundled_currencies` |
 | `utils/humanreadable/` | English file-size / duration / "time ago" formatting (replaces Human-Readable, whose localisation layer pulled ICU4J into the desktop build) |
 | `utils/archive/` | Compress + password-encrypt the DB archive (`ArchiveCodec`); shared by remote backends and the credential vault. zlib is `java.util.zip` on JVM/Android and the platform zlib on native; crypto is the JDK provider or openssl3. `ArchiveGoldenTest` checks each platform reads the others' archives |
 | `utils/sqlite3/` | The SQLite every native binary links statically: `CompileBundledSqliteTask` builds the pinned amalgamation (`sqlite-amalgamation-*` in the catalog, SHA-256 checked) with Kotlin/Native's own clang, and a cinterop klib embeds it. JVM and Android keep their own SQLite |
@@ -375,7 +155,7 @@ stream to BuildBuddy, anonymously.
 | `app/main/jvm/` | JVM Desktop entry point |
 | `app/main/android/` | Android entry point |
 | `app/main/cli/` | `mm`, the command-line client (Clikt): native executables for every native target, plus a JVM build the desktop installer starts as `mm-jvm` on its bundled runtime — see **CLI** |
-| `app/main/android-smoketest/` | Self-instrumenting UiAutomator smoke test of the R8-minified release APK (only included in the build with `-PreleaseSmokeTest=true`) |
+| `app/main/android-smoketest/` | Self-instrumenting UiAutomator smoke test of the R8-minified release APK (`bazel test //app/main/android-smoketest:smoketest_test`, on a device) |
 
 ### Domain Entities
 
@@ -400,7 +180,7 @@ platform). The strategy catalog also publishes the list as a `StrategyKind.CURRE
 from the Pages build's JDK, so an installed app can install codes it didn't ship with. Installing only adds
 missing codes and never renames or deletes. Only SYSTEM-created currencies (seeded or installed) count as
 the local copy, so user-created ones don't show up as a change. A JDK bump that adds codes fails
-`IsoCurrencyTableTest` until you rerun `generateBundledCurrencies`.
+`IsoCurrencyTableTest` until you rerun `bazel run //tools/strategy-catalog:generate_bundled_currencies`.
 
 **Key Classes**:
 - `Money`: Value class storing amount as `Long` with associated `Currency`
@@ -451,15 +231,14 @@ Both are built in `app/db/di` (`DatabaseComponent.toAppServices`, `DatabaseCompo
 and `DatabaseSessions` (`app/session`) wires them up for every front end. In Compose,
 reach it through `LocalImportEngine.current`.
 
-The interfaces live in two modules — `:app:model:repository:read` and `:app:model:repository:write` — so a
+The interfaces live in two modules — `app/model/repository/read` and `app/model/repository/write` — so a
 module that only reads never even has the write interfaces on its compile classpath.
 
-**Enforced in Gradle:** `moneymanager.kotlin-multiplatform-convention` registers a
-`verifyNoWriteRepositoryUsage` check (wired into `check`) that fails if a module's main sources
-reference any `*WriteRepository`. Exempt: `:app:model:repository:write` (interfaces), `:app:db:core` +
-`:app:db:write` (impls), `:app:di:core` + `:app:db:di` (wiring), `:app:importer` (the engine),
-`:test:app:db` (fixtures).
-Bazel enforces the same through the write module's visibility (see **Bazel**, "Module checks", under Build Commands).
+**Enforced by the build:** `app/model/repository/write` is visible only to the modules that define, implement or
+inject the write repositories (`# gazelle:kmp_visibility` in its BUILD file): `app/db/core` + `app/db/write` (impls),
+`app/di/core` + `app/db/di` (wiring), `app/importer` (the engine) and `test/app/db` (fixtures), so any other module
+that depends on it fails analysis. Within `app/importer`, `kmp_forbid_reference` keeps `*WriteRepository` to
+`ImportEngineImpl.kt`.
 
 **The one exception:** `DeviceWriteRepository` is injected directly in `DeviceIdModule` (di/core).
 `DeviceId` is a synchronous singleton that every write-repo impl — and therefore the engine — depends
@@ -634,16 +413,17 @@ graph module's compile classpath** — `AppComponent` names none of them.
 The consequence worth knowing: `app/di/core` depends on each feature DI module purely so Metro can
 *see* it. Nothing there imports them. Drop one and the graph loses its bindings. Because a binding
 container is *merged* into the generated `AppComponent` rather than made a supertype of it, those deps
-are plain `implementation` — let `buildHealth` decide, it flags any that should be `api`.
+are plain `deps` marked `# keep` (or `# gazelle:kmp_keep_dep`): nothing imports them, so Gazelle would
+otherwise drop them.
 
 To add a binding: put a `@ContributesTo(AppScope::class) @BindingContainer object` in *your* module
-(apply `moneymanager.metro-convention`, depend on `app/di/scope`), then add that module to
-`app/di/core`.
+(Gazelle adds the Metro plugin from its imports; depend on `app/di/scope`), then add that module to
+`app/di/core`'s deps with `# keep`.
 
 ## Packages
 
-**One package, one module** — no package may be declared by the main sources of two modules. A root
-`verifyUniquePackages` task (wired into `check`) enforces this. Split packages let `internal` leak across
+**One package, one module** — no package may be declared by the main sources of two modules. Gazelle
+enforces this: a run fails when two modules' main sources declare one package. Split packages let `internal` leak across
 a module boundary the compiler can no longer police, and hide which module owns a type. When splitting a
 module, give the new one its own package (typically the old package plus a segment). Test source sets are
 exempt: they compile separately, so sharing a package there costs nothing.
@@ -688,9 +468,9 @@ stdout carries only the result: prompts, warnings and errors go to stderr, and I
   so the edit gate refuses writes while it's ahead. On exit a changed copy gets the desktop close dialog's choices
   (`closeDecision`/`performClose` in `app/session`, shared with `Main.kt`) as prompts, or `--push/--no-push` and
   `--keep-local/--drop-local`. A refused or failed upload exits 3.
-- **Shipping**: `build` links only the host's release executable. The release workflow uploads `mm-<os>-<arch>` (`.tar.gz` on Unix, keeping the exec bit; `.exe` on Windows)
+- **Shipping**: `bazel build //...` links only the host's release executable (`//app/main/cli:mm`). The release workflow uploads `mm-<os>-<arch>` (`.tar.gz` on Unix, keeping the exec bit; `.exe` on Windows)
   for all four targets, and each desktop installer carries `mm-jvm` (jpackage `--add-launcher`) and, with
-  `-PbundleNativeCli=true`, the host's native `mm` under `lib/cli` (`--app-content`).
+  `--define=bundle_native_cli=true`, the host's native `mm` under `lib/cli` (`--app-content`).
 - **Prompts**: every question goes through `Prompter` (`app/terminal`). `Console` answers it line by line on stderr; `mm tui`'s
   `DialogPrompter` answers it with dialogs. `VaultUnlocker` and `CliSession` (open, switch and close, plus the cloud close
   prompts) take a `Prompter`, so the TUI reuses them unchanged. Passwords supplied up front (`MM_*`) still come from `Console`.
@@ -722,9 +502,8 @@ the presenter directly).
 - **View**: layout, scroll position, focus, dialogs, keys. Viewport-driven paging (page size from the viewport,
   near-edge triggers, scroll anchoring) stays in the view and reaches the presenter as events.
 - Queries and filtering stay in `app/query` and services: a presenter composes them, it doesn't replace them.
-- Module recipe: `android-convention` + `kotlin-multiplatform-convention` + `native-convention` + the Compose
-  compiler plugin; `androidx.compose.runtime` in `commonMain` (`androidx.compose.runtime.desktop` again on
-  `jvmMain` for `buildHealth`). `app/presenter/core` lifts Mosaic's JetBrains runtime so native binaries carry
+- Module recipe: `# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64`, importing only the
+  Compose runtime (`androidx.compose.runtime`); Gazelle adds the Compose compiler plugin from `@Composable`. `app/presenter/core` lifts Mosaic's JetBrains runtime so native binaries carry
   one runtime.
 - Migrated: Accounts. Transactions has its presenter (#944: a window of rows paged both ways around an anchor,
   capped at `MAX_PAGES`), which the TUI renders; the Compose transactions screen still pages by itself. Imports has
@@ -758,16 +537,18 @@ set of writes.
 
 ### Dependencies
 
-- **ALWAYS** add dependencies to `gradle/libs.versions.toml` first
-- Use `libs.*` references, never hardcode versions
-- Use `projects.*` for project dependencies (typesafe accessors)
+- A library's version lives in the catalog, `gradle/libs.versions.toml`, never in a BUILD file. A new library also
+  needs its alias in `MODULE.bazel`'s `maven_kmp.install(libraries = …)`, then `bazel run @maven_kmp//:pin`
+- Don't write `deps` by hand: import the type and run `bazel run //:gazelle`, which resolves each import to a module
+  or a `@maven_kmp//:<alias>` library. What no import explains (a runtime-only library, a Metro contributor) is a
+  `# gazelle:kmp_keep_dep` directive; an API dep other modules see is `# gazelle:kmp_export`
 
 ### Code Style
 
-- Run `./gradlew lintFormat` before committing
+- Run `bazel run //:format` before committing
 - Import types explicitly, never use fully qualified names in code
 - Comments should explain "why", not "what" - prefer self-documenting code
-- Never skip `buildHealth` checks
+- Never skip the dependency checks (strict deps, `:<name>_unused_deps`)
 - **Never use `@Suppress("DEPRECATION")`** to silence deprecated API warnings. Always migrate to the replacement API instead (e.g. use `LocalClipboard` instead of `LocalClipboardManager`).
 
 ### Testing
@@ -780,45 +561,42 @@ set of writes.
 - Tests in `commonTest` run on both JVM and Android
 - Use `runComposeUiTest` for UI tests
 - Android tests require manifest with `ComponentActivity` declaration
-- Share test sources via `kotlin.srcDir("src/commonTest/kotlin")`
-- **Android Device Tests**: Use `:app:ui:core:pixel6api36AndroidDeviceTest` for UI tests on managed
-  device emulator. **Android emulator API level sync**: change the level here and you must change it
-  in `gradle/libs.versions.toml` (`android-targetSdk`), the Gradle managed device
-  (`moneymanager.android-convention.gradle.kts` and `app/main/android-smoketest/build.gradle.kts`),
-  the CI emulator (`.github/workflows/build.yml` and `.github/workflows/android-release-smoke-test.yml`) and the IntelliJ run configuration
+- Share commonTest sources with a device test via `# gazelle:kmp_device_test_srcs`
+- **Android Device Tests**: `bazel test //app/ui/core:test_device` (or every one:
+  `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')`) on a running API 36 emulator.
+  **Android emulator API level sync**: change the level here and you must change it in `gradle/libs.versions.toml`
+  (`android-targetSdk`), the CI emulator (`.github/workflows/build.yml` and
+  `.github/workflows/android-release-smoke-test.yml`) and the IntelliJ run configuration
   (`.idea/runConfigurations/Android_Tests.xml`) too.
 - **Test Stability**: Always call `waitForIdle()` after `waitUntilDoesNotExist()` to ensure recompositions complete before test ends
 
 ### Platform Support
 
 - **JVM** ✅ | **Android** ✅ | **iOS** ⚠️ planned | **Web** ⚠️ planned | **Native** ⚠️ in progress (CLI `mm`, #917)
-- **Kotlin/Native** (`linuxX64`, `linuxArm64`, `macosArm64`, `mingwX64`): a module joins by applying
-  `moneymanager.native-convention`. Only the CLI's dependency closure does, never `app/ui/*`. Once a module has
+- **Kotlin/Native** (`linuxX64`, `linuxArm64`, `macosArm64`, `mingwX64`): a module joins with
+  `# gazelle:kmp_targets … linuxArm64 linuxX64 macosArm64 mingwX64` in its BUILD file. Only the CLI's dependency closure does, never `app/ui/*`. Once a module has
   a native target, JVM-only APIs in its `commonMain` (`java.*`, `System.*`, implicit `kotlin.jvm` imports) fail the
-  build. Common tests run natively on CI, one job per target (`<target>Test`), never in Build and Test. The Apple target only links on macOS.
+  build. `bazel test //...` runs the host's own (`:test_linuxX64` on Linux x64); CI's Native Tests jobs run the rest. The Apple target only links on macOS.
   Backticked test names can't contain `,` or `()` on native (or `'` on Android). Native klibs are named after the
   full project path (`app-db-core`), since same-named modules (`core`, `read`, `write`) would otherwise clash.
-  Because native shares `commonMain` with JVM and Android, a native module declares what common code uses in
-  `commonMain` (`buildHealth` then wants `api` ones repeated on `jvmMain`, but not on `androidMain`).
+  Every module also gets `:<name>_metadata`, commonMain compiled alone against its deps' common metadata, which
+  catches a JVM-only API in commonMain that each platform's compile accepts (`RegexOption.DOT_MATCHES_ALL`).
 - **No classpath resources** (native has none): data a module ships is compiled into `commonMain` by
-  `GenerateKotlinConstantsTask` (build-logic), wired with `kotlin.srcDir(task)`: the app version
+  `kotlin_constants` (`//bazel/kmp/constants`), wired with `# gazelle:kmp_generated_srcs`: the app version
   (`app/di/core`, from the root `VERSION`), the crypto catalog (`app/cryptodata/data/coins.tsv`) and the
-  default Google OAuth client (passed through `xorObfuscate`, so the plaintext is never a task input).
+  default Google OAuth client (passed through `xorObfuscate`, so the plaintext is never an action input).
 - **Never write `/*` inside a block comment** (e.g. `app/ui/*` in KDoc): Kotlin nests block comments, so the
   rest of the file silently becomes a comment.
 
 ### Common Issues
 
-1. **Java**: Requires JDK 25 toolchain. **JVM version sync**: the version is pinned in places
-   that must move together — `gradle/libs.versions.toml` (`jvm-target`/`jvm-toolchain`), `.bazelrc`
-   (`remotejdk_<n>`, the JDK Bazel downloads; CI installs none) and `.github/actions/gradle-setup/action.yml`, which the
-   Qodana job's Gradle import sets up Java through
-2. **Metro**: Keep the Kotlin version compatible with Metro (both in `gradle/libs.versions.toml`). Graphs
-   must be `interface`; binding containers `object`
+1. **Java**: JDK 25, which Bazel downloads (`remotejdk_25`). **JVM version sync**: the version is pinned in places
+   that must move together — `gradle/libs.versions.toml` (`jvm-target`/`jvm-toolchain`) and `.bazelrc`
+   (`remotejdk_<n>` and the `java_language_version`s)
+2. **Metro**: Keep the Kotlin version compatible with Metro (both in `gradle/libs.versions.toml`; Renovate bumps
+   them together). Graphs must be `interface`; binding containers `object`
 3. **SQLDelight**: `execute()`/`update()`/`delete()` return `Long`, not `Unit`
-4. **Configuration Cache**: Enabled for faster builds; invalidates on build file changes
-5. **Gradle wrapper**: `gradle-wrapper.properties` pins `distributionSha256Sum`. Update it with the
-   distribution URL when bumping Gradle. Build-script deprecations fail the build (warnings are errors)
-6. **`jvmAndroidMain`**: apply `moneymanager.jvm-android-shared-convention` for shared JVM+Android code. It
-   adds `jvmAndroidMain`/`jvmAndroidTest` to Kotlin's default hierarchy template. Never hand-wire
-   `dependsOn` between source sets, because that makes KGP fall back from the template
+4. **Kotlin bumps**: Kotlin, `rules_kotlin` and the Kotlin/Native pins move together — see
+   [`bazel/README.md`](bazel/README.md), "Bumping Kotlin"
+5. **`jvmAndroidMain`**: code shared by JVM and Android only goes in `src/jvmAndroidMain/kotlin` (tests in
+   `src/jvmAndroidTest/kotlin`); `kmp_library` compiles it into both the JVM and the Android fragments

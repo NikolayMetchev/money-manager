@@ -96,13 +96,13 @@ JSON contract that scripts can rely on is in [`docs/cli-json.md`](docs/cli-json.
 
 ## Technology Stack
 
-* **Language**: Kotlin (Multiplatform) · **Build**: Gradle · **JVM toolchain**: 25
+* **Language**: Kotlin (Multiplatform) · **Build**: [Bazel](https://bazel.build) · **JVM toolchain**: 25
 * **Database**: SQLite via [SQLDelight](https://github.com/sqldelight/sqldelight)
 * **DI**: [Metro](https://github.com/ZacSweers/metro) (compile-time)
 * **UI**: Compose Multiplatform with Material 3
 * **Object mapping**: [Mappie](https://github.com/Mr-Mappie/mappie)
 * **HTTP**: Ktor Client · **Serialization**: kotlinx.serialization
-* **Code quality**: Detekt, ktlint, dependency-analysis (buildHealth)
+* **Code quality**: Detekt, ktlint, strict and unused-dependency checks
 * **Money**: `BigDecimal`-only policy — never `Double`/`Float` for monetary values
 
 ## Project Structure
@@ -112,7 +112,7 @@ The main modules (see [`CLAUDE.md`](CLAUDE.md) for the full table and the
 
 | Module | Purpose |
 |--------|---------|
-| `gradle/build-logic/` | Convention plugins (Kotlin, Android, Compose, Metro, Mappie, native) and build checks |
+| `bazel/` | The build: Kotlin Multiplatform rules, the Gazelle extension that writes the BUILD files, the Maven resolver and the module checks ([how it works](bazel/README.md)) |
 | `utils/*` | Platform-neutral helpers: `bigdecimal`, `currency`, `archive`, `files`, `credentialvault`, `localsettings`, `rest`, `httpclient`, `sqlite3`, parsers (CSV, QIF, XLSX), Compose widgets |
 | `app/model/core/`, `app/model/*` | Domain model; the strategy vocabulary (`app/model/rules`) shared by CSV and API imports |
 | `app/model/repository/read/`, `app/model/repository/write/` | `*ReadRepository` / `*WriteRepository` interfaces |
@@ -133,26 +133,28 @@ The main modules (see [`CLAUDE.md`](CLAUDE.md) for the full table and the
 
 ## Building & Running
 
-> Always build with `--console=plain`. Requires a JDK 25 toolchain.
+> Install [bazelisk](https://github.com/bazelbuild/bazelisk) (as `bazel`); it runs the Bazel version in
+> `.bazelversion`, and Bazel downloads the JDK, Kotlin and Kotlin/Native itself. Android targets also need an
+> Android SDK (`ANDROID_HOME`) with the platform the catalog's `android-compileSdk` names.
 
 | Command | Description |
 |---------|-------------|
-| `./gradlew build` | Build everything and run tests |
-| `./gradlew :app:main:jvm:run` | Run the JVM desktop application |
-| `./gradlew :app:main:android:installDebug` | Install the Android debug APK |
-| `./gradlew :app:main:cli:installJvmDist` | Build the JVM `mm` into `app/main/cli/build/install/mm-jvm-jvm/bin/mm-jvm` |
-| `./gradlew :app:main:cli:linkReleaseExecutableLinuxX64` | Link the native `mm` (also `LinuxArm64`, `MacosArm64`, `MingwX64`) |
-| `./gradlew lintFormat` | Format code (ktlint + sort dependencies) and regenerate the Bazel BUILD files (Gazelle) |
-| `./gradlew detekt` | Static analysis |
-| `./gradlew buildHealth` | Check dependency health |
+| `bazel build //...` | Build everything |
+| `bazel test //...` | Run every test this machine can run (plus ktlint, detekt and Android lint) |
+| `bazel run //app/main/jvm:app` | Run the desktop application |
+| `bazel build //app/main/android:debug` | Build the Android debug APK (`bazel-bin/app/main/android/debug.apk`) |
+| `bazel build //app/main/cli:mm-jvm` | Build the JVM `mm` into `bazel-bin/app/main/cli/mm-jvm/bin/mm-jvm` |
+| `bazel build //app/main/cli:mm` | Link the native `mm` for this machine (`bazel-bin/app/main/cli/mm_<target>/mm.kexe`) |
+| `bazel build //app/main/jvm:installer` | Build this OS's desktop installer (deb, dmg or msi) |
+| `bazel run //:format` | Regenerate the BUILD files (Gazelle) and format the code (ktlint) |
 
 ## Development Notes
 
 * **Single write seam** — every database mutation goes through the `ImportEngine`: callers build an
   `ImportBatch` and call `importEngine.import(batch)`; they never use a `*WriteRepository` directly.
   Repositories are split into read/write pairs, only `app/importer` is injected with the write side, and
-  the UI gets a read-only view plus the engine. A Gradle `verifyNoWriteRepositoryUsage` check enforces
-  it. (The lone exception is device-id bootstrap.) See [`CLAUDE.md`](CLAUDE.md) for details.
+  the UI gets a read-only view plus the engine. The build enforces
+  it: only those modules can see the write interfaces. (The lone exception is device-id bootstrap.) See [`CLAUDE.md`](CLAUDE.md) for details.
 * **Database design**, **CI/CD** and the **data model** are designed and reviewed closely.
 * The **UI** and **unit tests** are partly AI-generated and will be reviewed/refactored over time.
 * See [`CLAUDE.md`](CLAUDE.md) for detailed contributor/AI-assistant guidance.

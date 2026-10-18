@@ -151,13 +151,14 @@ mm version</code></pre>
       <p>Both builds behave the same. The native one starts faster.</p>
 
       <h3>From source</h3>
-      <pre><code># Native binary for this machine (Linux x64 shown; also LinuxArm64, MacosArm64, MingwX64)
-./gradlew :app:main:cli:linkReleaseExecutableLinuxX64 --console=plain
-app/main/cli/build/bin/linuxX64/releaseExecutable/mm.kexe version
+      <p>The build is <a href="https://bazel.build">Bazel</a>: install <a href="https://github.com/bazelbuild/bazelisk">bazelisk</a> as <code>bazel</code>.</p>
+      <pre><code># Native binary for this machine (Linux x64 shown; the directory is mm_linuxArm64, mm_macosArm64 or mm_mingwX64 elsewhere)
+bazel build //app/main/cli:mm
+bazel-bin/app/main/cli/mm_linuxX64/mm.kexe version
 
 # JVM build, a quicker way to try a change
-./gradlew :app:main:cli:installJvmDist --console=plain
-app/main/cli/build/install/mm-jvm-jvm/bin/mm-jvm version</code></pre>
+bazel build //app/main/cli:mm-jvm
+bazel-bin/app/main/cli/mm-jvm/bin/mm-jvm version</code></pre>
     </section>
 
     <section id="databases">

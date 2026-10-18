@@ -9,7 +9,7 @@ comment that asks for a product-level choice). PR title/context hint (optional):
 ## Phase 0 — Branch, commit, push
 
 1. If on `main`, create a feature branch named after the change first.
-2. Run `./gradlew --console=plain build` locally and make sure it passes (pre-push rule from
+2. Run `bazel build //... && bazel test //...` locally and make sure it passes (pre-push rule from
    CLAUDE.md). If it fails, fix before continuing.
 3. Commit all pending work (end the message with the attribution trailer Claude Code gives for this
    session, which names the model actually in use) and push with `-u`.
@@ -25,7 +25,7 @@ Poll `gh pr checks <num> --json name,bucket,link` every ~4 minutes (long waits: 
 poll loop and a completion notification rather than blocking; CI takes 10–25 min).
 
 - If a check fails, read its logs (`gh run view <run-id> --log-failed`), fix the cause, run the
-  relevant gradle task locally, commit, push, and go back to polling.
+  relevant `bazel test` target locally, commit, push, and go back to polling.
 - Known flakes in this repo (from project memory):
   - `qodana` sometimes fails with a "languageLevel null" Gradle-import crash and no SARIF — just
     re-run it (`gh run rerun <run-id> --failed`), don't debug it.
@@ -60,7 +60,7 @@ For each CodeRabbit inline comment (including ones inside collapsed "Additional 
   (`gh api repos/{owner}/{repo}/pulls/<num>/comments/<id>/replies -f body=...`).
 - Never silently ignore a comment — every one gets either a code change or a reply.
 
-After implementing fixes: run the relevant tests plus `./gradlew --console=plain build`, commit
+After implementing fixes: run the relevant tests plus `bazel build //... && bazel test //...`, commit
 (same trailer), push. If CodeRabbit re-reviews and raises NEW substantive comments, repeat this
 phase (cap at 3 rounds; after that summarise what's still open instead of looping).
 
