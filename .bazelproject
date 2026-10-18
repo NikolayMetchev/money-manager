@@ -2,6 +2,5 @@
 # "Bazel project". See docs/bazel/ide-evaluation.md.
 directories:
   .
-  -bazel/gazelle/kmp/testdata
 
 derive_targets_from_directories: true
