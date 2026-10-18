@@ -5,3 +5,8 @@ compiles see. An import is resolved to a library every compilation of its source
 Android's), each compilation gets its own. A catalog library wins over a module one only brings (`g:ui` also
 declares `ui`). `android.*` is the SDK's `android.jar`. `desk` has no Android target, so its `androidMain` isn't
 compiled (and `ui` resolves to the JVM's library in commonMain).
+
+Android host tests (#1022): an Android module's tests also run as AGP's host tests (`android = True` on the
+`kmp_test`), with `androidHostTest`'s sources in `android_srcs` and their imports in `android_deps` (`sqlite`,
+which only `androidMain` names). `dev`'s host tests are off (`kmp_android_host_tests false`, Gradle's
+`testAndroidHostTest` disabled), so its tests stay JVM-only.

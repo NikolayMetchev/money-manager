@@ -58,6 +58,7 @@ kmp_library(
 
 kmp_test(
     name = "test",
+    android = True,
     associate = ":read",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     jvm_deps = [

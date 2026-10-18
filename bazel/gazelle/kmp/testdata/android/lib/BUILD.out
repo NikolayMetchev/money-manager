@@ -23,6 +23,9 @@ kmp_library(
 
 kmp_test(
     name = "test",
+    android = True,
+    android_deps = ["@maven_kmp//:sqlite"],
+    android_srcs = glob(["src/androidHostTest/kotlin/**/*.kt"]),
     associate = ":lib",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     deps = ["//bazel/kmp/deps:kotlin_test"],

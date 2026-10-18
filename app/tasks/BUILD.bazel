@@ -27,6 +27,7 @@ kmp_library(
 
 kmp_test(
     name = "test",
+    android = True,
     associate = ":tasks",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     forbidden_deps = [

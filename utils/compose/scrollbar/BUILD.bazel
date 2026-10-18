@@ -2,6 +2,7 @@ load("//bazel/kmp:defs.bzl", "kmp_library")
 
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android
+# gazelle:kmp_keep_dep @maven_kmp//:kotlinx_coroutines_android androidMain
 
 kmp_library(
     name = "scrollbar",
@@ -9,6 +10,7 @@ kmp_library(
     android_deps = [
         "@maven_kmp//:androidx_compose_foundation",
         "@maven_kmp//:androidx_compose_ui",
+        "@maven_kmp//:kotlinx_coroutines_android",
     ],
     android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
@@ -17,6 +19,7 @@ kmp_library(
         "@maven_kmp//:compose_ui_desktop",
     ],
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    keep_deps = ["@maven_kmp//:kotlinx_coroutines_android"],
     plugins = ["compose"],
     visibility = ["//visibility:public"],
     deps = [

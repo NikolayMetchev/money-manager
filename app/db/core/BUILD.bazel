@@ -1,5 +1,6 @@
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_android_host_tests false
 # gazelle:kmp_plugins serialization
 # gazelle:kmp_keep_dep //utils/sqlite3 nativeMain
 # SqlFileNamingConventionTest scans every .sq file; the suite takes about three minutes.

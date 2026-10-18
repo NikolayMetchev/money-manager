@@ -12,6 +12,8 @@ load("//bazel/kmp/deps:catalog.bzl", "catalog")
 _FOUND = """\
 load("@rules_java//java:java_import.bzl", "java_import")
 
+exports_files(["android.jar"])
+
 java_import(
     name = "android_jar",
     jars = ["android.jar"],
@@ -28,6 +30,7 @@ genrule(
     name = "missing",
     outs = ["android.jar"],
     cmd = {cmd},
+    visibility = ["//visibility:public"],
 )
 
 java_import(

@@ -28,6 +28,7 @@ kmp_library(
 
 kmp_test(
     name = "test",
+    android = True,
     associate = ":localsettings",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
