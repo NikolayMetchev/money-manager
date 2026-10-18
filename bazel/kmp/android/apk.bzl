@@ -26,6 +26,23 @@ load("//bazel/kmp/android:aar.bzl", "AarInfo")
 
 _AarsInfo = provider(doc = "The AARs a target reaches, in classpath order.", fields = ["aars"])
 
+AndroidAppInfo = provider(
+    doc = "What `android_lint` (lint.bzl) reads of an APK: AGP's lint model of the variant.",
+    fields = {
+        "java": "The app's Android compile (JavaInfo).",
+        "aars": "The AARs it reaches (AarInfo), in classpath order.",
+        "manifest": "The app's own manifest.",
+        "merged_manifest": "The merged manifest.",
+        "r_jar": "The R.jar the app compiles against.",
+        "namespace": "The namespace.",
+        "application_id": "The application id.",
+        "min_sdk": "minSdk.",
+        "target_sdk": "targetSdk.",
+        "compile_sdk": "compileSdk.",
+        "debuggable": "Whether the variant is debuggable.",
+    },
+)
+
 _StampInfo = provider(doc = "Whether the build is stamped (`--stamp`).", fields = ["stamped"])
 
 def _stamp_setting_impl(ctx):
@@ -49,6 +66,8 @@ def _aars_aspect_impl(target, ctx):
     return [_AarsInfo(aars = depset(direct, transitive = transitive, order = "preorder"))]
 
 _aars_aspect = aspect(implementation = _aars_aspect_impl, attr_aspects = _WALKED)
+
+
 
 def _run_tool(ctx, command, args, inputs, outputs, mnemonic):
     ctx.actions.run(
@@ -312,7 +331,23 @@ def _android_apk_impl(ctx):
         [apk],
         "PackageApk",
     )
-    return [DefaultInfo(files = depset([apk]), runfiles = ctx.runfiles([apk])), OutputGroupInfo(extra = extra)]
+    return [
+        DefaultInfo(files = depset([apk]), runfiles = ctx.runfiles([apk])),
+        OutputGroupInfo(extra = extra),
+        AndroidAppInfo(
+            java = ctx.attr.lib[JavaInfo],
+            aars = aars,
+            manifest = ctx.file.manifest,
+            merged_manifest = manifest,
+            r_jar = r_jar,
+            namespace = ctx.attr.namespace,
+            application_id = ctx.attr.application_id,
+            min_sdk = ctx.attr.min_sdk,
+            target_sdk = ctx.attr.target_sdk,
+            compile_sdk = ctx.attr.compile_sdk,
+            debuggable = not ctx.attr.release,
+        ),
+    ]
 
 android_apk = rule(
     implementation = _android_apk_impl,

@@ -137,6 +137,9 @@ aar_import(
     jni = glob(["jni/**"], allow_empty = True),
     proguard = glob(["proguard.txt"], allow_empty = True),
     art_profile = glob(["baseline-prof.txt"], allow_empty = True),
+    lint_jar = glob(["lint.jar"], allow_empty = True),
+    public_txt = glob(["public.txt"], allow_empty = True),
+    annotations = glob(["annotations.zip"], allow_empty = True),
     visibility = ["//visibility:public"],
 )
 """

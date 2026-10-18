@@ -25,6 +25,20 @@ java_import(
     neverlink = True,
     visibility = ["//visibility:public"],
 )
+
+# The platform as Android lint reads it (#1025): an SDK holding only this platform, its API database included.
+filegroup(
+    name = "lint_sdk",
+    srcs = glob([
+        "sdk/platforms/*/android.jar",
+        "sdk/platforms/*/build.prop",
+        "sdk/platforms/*/data/**",
+        "sdk/platforms/*/optional/**",
+        "sdk/platforms/*/package.xml",
+        "sdk/platforms/*/*.properties",
+    ]),
+    visibility = ["//visibility:public"],
+)
 """
 
 # Without the platform the jar is an action that fails saying so, so only what compiles for Android breaks.
@@ -42,6 +56,12 @@ java_import(
     name = "android_jar",
     jars = [":missing"],
     neverlink = True,
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "lint_sdk",
+    srcs = [":missing"],
     visibility = ["//visibility:public"],
 )
 """
@@ -142,6 +162,7 @@ def _platform_impl(rctx):
             rctx.watch(jar)
             if jar.exists:
                 rctx.symlink(jar, "android.jar")
+                rctx.symlink(jar.dirname, "sdk/platforms/" + candidate)
                 rctx.file("BUILD.bazel", _FOUND + tools)
                 return
     message = ("No Android SDK platform %s: set ANDROID_HOME (or sdk.dir in local.properties) and install it " +

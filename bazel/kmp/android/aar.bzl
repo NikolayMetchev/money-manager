@@ -18,6 +18,9 @@ AarInfo = provider(
         "files": "A depset of the assets and native libraries.",
         "proguard": "proguard.txt, or None.",
         "art_profile": "baseline-prof.txt, or None.",
+        "lint_jar": "lint.jar, the AAR's lint checks (AGP runs them on the modules that use it), or None.",
+        "public_txt": "public.txt, the resources it makes public (lint's PrivateResource), or None.",
+        "annotations": "annotations.zip, its external annotations (lint's typedef checks), or None.",
     },
 )
 
@@ -49,18 +52,24 @@ def _aar_import_impl(ctx):
             files = depset(ctx.files.assets + ctx.files.jni),
             proguard = _first(ctx.files.proguard),
             art_profile = _first(ctx.files.art_profile),
+            lint_jar = _first(ctx.files.lint_jar),
+            public_txt = _first(ctx.files.public_txt),
+            annotations = _first(ctx.files.annotations),
         ),
     ]
 
 aar_import = rule(
     implementation = _aar_import_impl,
     attrs = {
+        "annotations": attr.label_list(allow_files = True),
         "art_profile": attr.label_list(allow_files = True),
         "assets": attr.label_list(allow_files = True),
         "jar": attr.label(allow_single_file = [".jar"], mandatory = True),
         "jni": attr.label_list(allow_files = True),
+        "lint_jar": attr.label_list(allow_files = True),
         "manifest": attr.label(allow_single_file = True, mandatory = True),
         "proguard": attr.label_list(allow_files = True),
+        "public_txt": attr.label_list(allow_files = True),
         "r_txt": attr.label_list(allow_files = True),
         "res": attr.label_list(allow_files = True),
         "_aapt2": attr.label(default = Label("@aapt2"), executable = True, cfg = "exec", allow_single_file = True),
