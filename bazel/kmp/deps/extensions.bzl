@@ -56,7 +56,7 @@ def _expected_inputs(versions, libraries, install):
             fail("maven_kmp.install: %s isn't a `module = …` library in the catalog" % alias)
         libs[alias] = "%s:%s" % (lib["module"], versions.get(lib.get("version.ref"), lib.get("version", "")))
     forces = {module: versions.get(ref, "?" + ref) for module, ref in install.forces.items()}
-    return {"forces": forces, "libraries": libs, "platforms": install.platforms}
+    return {"excludes": install.excludes, "forces": forces, "libraries": libs, "platforms": install.platforms}
 
 def _file_repo(file):
     return "maven_kmp_%s_%s" % (file["sha256"][:12], "".join([c if c.isalnum() else "_" for c in file["name"].elems()]))
@@ -170,6 +170,7 @@ def _maven_kmp_impl(module_ctx):
     pin_args += ["--platform=" + p for p in install.platforms]
     pin_args += ["--force=%s=%s" % (m, ref) for m, ref in sorted(install.forces.items())]
     pin_args += ["--repository=" + r for r in install.repositories]
+    pin_args += ["--exclude=" + e for e in install.excludes]
     _hub(
         name = "maven_kmp",
         build_file_content = _HEADER.format(pin_args = repr(pin_args)) + "\n" + "\n".join(targets),
@@ -182,6 +183,7 @@ maven_kmp = module_extension(
     tag_classes = {
         "install": tag_class(attrs = {
             "catalog": attr.label(mandatory = True, doc = "gradle/libs.versions.toml."),
+            "excludes": attr.string_list(doc = "group:artifact never resolved, whoever depends on it."),
             "forces": attr.string_dict(doc = "module → catalog [versions] key: Gradle's dependency substitutions."),
             "libraries": attr.string_list(doc = "Catalog library aliases to resolve."),
             "lock_file": attr.label(mandatory = True),

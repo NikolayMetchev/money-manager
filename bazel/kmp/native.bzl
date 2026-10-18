@@ -26,17 +26,24 @@ FAMILIES = {
     "mingwX64": "mingw",
 }
 
-def _fragment_args(args, prefix, chain):
-    """Adds -Xmulti-platform fragment flags for a `[(fragment, files), …]` chain, root first."""
-    present = [(fragment, files) for fragment, files in chain if files]
+def _fragment_args(args, chain):
+    """Adds -Xmulti-platform fragment flags and the sources for the `[(fragment, files), …]` chain, root first.
+
+    A file may be a directory of generated sources (SQLDelight's), expanded when the action runs.
+    """
+    # Every source set of the default hierarchy, with sources or not, as KGP names them (see defs.bzl).
+    present = chain
     args.add("-Xmulti-platform")
-    args.add("-Xfragments=" + ",".join([prefix + f for f, _ in present]))
+    args.add("-Xfragments=" + ",".join([f for f, _ in present]))
     for i in range(1, len(present)):
-        args.add("-Xfragment-refines=%s%s:%s%s" % (prefix, present[i][0], prefix, present[i - 1][0]))
+        args.add("-Xfragment-refines=%s:%s" % (present[i][0], present[i - 1][0]))
     for fragment, files in present:
-        for f in files:
-            args.add("-Xfragment-sources=%s%s:%s" % (prefix, fragment, f.path))
-    return [f for _, files in present for f in files]
+        args.add_all(files, format_each = "-Xfragment-sources=" + fragment + ":%s", expand_directories = True)
+
+    # -Xfragment-sources only says which fragment a file is in; the file is compiled because it's listed.
+    srcs = [f for _, files in present for f in files]
+    args.add_all(srcs, expand_directories = True)
+    return srcs
 
 def _compile_klib(ctx, kgp_target, out, chain, fragment_suffix, deps, friends, module_name, short_name, plugins):
     target = KONAN_TARGETS[kgp_target]
@@ -49,10 +56,7 @@ def _compile_klib(ctx, kgp_target, out, chain, fragment_suffix, deps, friends, m
     plugin_jars = native_plugin_args(args, plugins)
 
     # konanc names fragments by source set (commonMain, linuxX64Test, …), as KGP does.
-    srcs = _fragment_args(args, "", [(f + fragment_suffix, files) for f, files in chain])
-
-    # -Xfragment-sources only says which fragment a file is in; the file is compiled because it's listed.
-    args.add_all(srcs)
+    srcs = _fragment_args(args, [(f + fragment_suffix, files) for f, files in chain])
     args.add_all(transitive, before_each = "-library")
     if friends:
         args.add_joined("-friend-modules", [f[KlibInfo].klib for f in friends], join_with = ctx.configuration.host_path_separator)
@@ -74,7 +78,7 @@ def _compile_klib(ctx, kgp_target, out, chain, fragment_suffix, deps, friends, m
 
 def _chain(ctx, kgp_target):
     return [
-        ("common", ctx.files.common_srcs),
+        ("common", ctx.files.common_srcs + ctx.files.common_generated),
         ("native", ctx.files.native_srcs),
         (FAMILIES[kgp_target], ctx.files.family_srcs),
         (kgp_target, ctx.files.target_srcs),
@@ -103,6 +107,7 @@ def _klib_impl(ctx):
     return [DefaultInfo(files = depset([out])), info]
 
 _SRC_ATTRS = {
+    "common_generated": attr.label_list(allow_files = True, doc = "Directories of generated commonMain sources."),
     "common_srcs": attr.label_list(allow_files = [".kt"]),
     "plugins": attr.label_list(providers = [NativePluginInfo], doc = "Compiler plugins, in the order they run."),
     "family_srcs": attr.label_list(allow_files = [".kt"], doc = "linuxMain, appleMain or mingwMain."),

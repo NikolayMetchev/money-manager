@@ -1,7 +1,7 @@
 diff --git a/kotlin/internal/jvm/compile.bzl b/kotlin/internal/jvm/compile.bzl
 --- a/kotlin/internal/jvm/compile.bzl
 +++ b/kotlin/internal/jvm/compile.bzl
-@@ -651,6 +651,29 @@
+@@ -651,6 +651,32 @@
  def _plugins_payload_to_json(payload):
      return _plugin_payload.plugins_payload_json(payload.plugins)
  
@@ -19,10 +19,13 @@ diff --git a/kotlin/internal/jvm/compile.bzl b/kotlin/internal/jvm/compile.bzl
 +            if f not in srcs.kt:
 +                fail("fragment_srcs: %s is not in srcs" % f.short_path)
 +            sources.append("-Xfragment-sources=%s:%s" % (fragment, f.path))
++    # A fragment may have no sources: KGP names every source set in the hierarchy, and K2 takes a lone
++    # common fragment for the platform's own.
 +    refines = getattr(ctx.attr, "fragment_refines", {})
 +    for child, parent in refines.items():
-+        if child not in fragments or parent not in fragments:
-+            fail("fragment_refines: %s:%s names a fragment with no sources" % (child, parent))
++        for fragment in [child, parent]:
++            if fragment not in fragments:
++                fragments.append(fragment)
 +    return ["-Xmulti-platform", "-Xfragments=" + ",".join(fragments)] + [
 +        "-Xfragment-refines=%s:%s" % (child, parent)
 +        for child, parent in refines.items()
@@ -31,7 +34,7 @@ diff --git a/kotlin/internal/jvm/compile.bzl b/kotlin/internal/jvm/compile.bzl
  def _run_kt_builder_action(
          ctx,
          mnemonic,
-@@ -707,6 +730,7 @@
+@@ -707,6 +733,7 @@
  
      # Unwrap kotlinc_options/javac_options options or default to the ones being provided by the toolchain
      args.add_all("--kotlin_passthrough_flags", kotlinc_options_to_flags(kotlinc_options))

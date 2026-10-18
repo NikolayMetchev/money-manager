@@ -1,0 +1,11 @@
+CREATE TABLE ledger (
+    id INTEGER NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    balance INTEGER NOT NULL DEFAULT 0
+);
+
+selectAll:
+SELECT * FROM ledger ORDER BY name;
+
+insert:
+INSERT INTO ledger (name, balance) VALUES (?, ?);

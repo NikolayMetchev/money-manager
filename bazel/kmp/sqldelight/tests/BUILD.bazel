@@ -1,0 +1,31 @@
+# SQLDelight's compiler API is internal: this pins what it generates for a small database (#1003).
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("//bazel/kmp/sqldelight:sqldelight.bzl", "sqldelight_library")
+
+sqldelight_library(
+    name = "ledger",
+    srcs = glob(["src/commonMain/sqldelight/**/*.sq"]),
+    module_name = "tests",
+    package = "com.moneymanager.bazel.sqldelight",
+)
+
+sh_test(
+    name = "golden_test",
+    size = "small",
+    srcs = ["golden_test.sh"],
+    args = [
+        "$(rootpath :ledger_kt)",
+        "bazel/kmp/sqldelight/tests/golden",
+    ],
+    data = [
+        ":ledger_kt",
+    ] + glob(["golden/**"]),
+)
+
+sh_binary(
+    name = "update_golden",
+    srcs = ["update_golden.sh"],
+    args = ["$(rootpath :ledger_kt)"],
+    data = [":ledger_kt"],
+)

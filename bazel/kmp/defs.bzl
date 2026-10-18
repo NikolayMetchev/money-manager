@@ -22,8 +22,13 @@ load(":native.bzl", "BUILDS_ON", "FAMILIES", "RUNS_ON", "kt_native_klib", "kt_na
 load("//bazel/kmp/plugins:plugins.bzl", "plugin_deps", "plugin_labels")
 
 def _fragments(chain):
-    """Fragment flags for a `[(fragment, srcs), …]` chain, root first, leaving out empty fragments."""
-    present = [(fragment, srcs) for fragment, srcs in chain if srcs]
+    """Fragment flags for a `[(fragment, srcs, always), …]` chain, root first.
+
+    KGP names every source set in a compilation's hierarchy, sources or not; K2 takes a lone common fragment
+    for the platform's own and rejects `@OptionalExpectation` there. So `commonMain` and the platform's leaf
+    are always named; an intermediate source set a module doesn't have (jvmAndroidMain) is left out.
+    """
+    present = [(fragment, srcs) for fragment, srcs, always in chain if srcs or always]
     fragment_srcs = {}
     for fragment, srcs in present:
         for src in srcs:
@@ -40,9 +45,9 @@ def _fragments(chain):
 
 def _jvm_fragments(prefix, common_srcs, jvm_android_srcs, jvm_srcs):
     return _fragments([
-        ("common" + prefix, common_srcs),
-        ("jvmAndroid" + prefix, jvm_android_srcs),
-        ("jvm" + prefix, jvm_srcs),
+        ("common" + prefix, common_srcs, True),
+        ("jvmAndroid" + prefix, jvm_android_srcs, False),
+        ("jvm" + prefix, jvm_srcs, True),
     ])
 
 def platform_label(dep, platform):
@@ -75,6 +80,7 @@ def kmp_library(
         exports = [],
         jvm_exports = [],
         plugins = [],
+        sqldelight = None,
         visibility = None):
     """A Kotlin Multiplatform module. Emits `:<name>_jvm` and `:<name>_<target>` per native target.
 
@@ -96,10 +102,28 @@ def kmp_library(
         jvm_exports: `jvmAndroidMain`/`jvmMain` `api` dependencies.
         plugins: compiler plugins by name (`serialization`, `compose`, `metro`, `mappie`; see
             //bazel/kmp/plugins:plugins.bzl), applied on every platform with the runtime they bring.
+        sqldelight: a `sqldelight_library` whose generated Kotlin joins `commonMain`. The SQLDelight runtime
+            becomes an `api` dependency, as the SQLDelight Gradle plugin makes it.
         visibility: the targets' visibility.
     """
     fragments = _jvm_fragments("Main", common_srcs, jvm_android_srcs, jvm_srcs)
     brought = plugin_deps(plugins)
+    generated_native = []
+    if sqldelight:
+        exports = exports + ["@maven_kmp//:sqldelight_runtime"]
+        generated_native = [sqldelight + "_kt"]
+
+        # rules_kotlin can't put a srcjar's sources in a fragment, and K2 rejects sources in none, so on the JVM
+        # the generated code (which uses nothing of the module's own) compiles on its own and is exported.
+        # konanc gets it as commonMain, beside the module's sources, as KGP compiles it.
+        kt_jvm_library(
+            name = name + "_sqldelight_jvm",
+            srcs = [sqldelight],
+            deps = _on("jvm", exports),
+            exports = _on("jvm", exports),
+            visibility = ["//visibility:private"],
+        )
+        jvm_exports = jvm_exports + [":" + name + "_sqldelight"]
     deps = deps + brought.deps
     exports = exports + brought.exports
     jvm_exported = _on("jvm", exports + jvm_exports)
@@ -108,8 +132,9 @@ def kmp_library(
         srcs = fragments.srcs,
         fragment_srcs = fragments.fragment_srcs,
         fragment_refines = fragments.fragment_refines,
-        # Gradle's api is on the module's own classpath too; Bazel's exports are only on its dependents'.
-        deps = _on("jvm", deps + jvm_deps) + jvm_exported,
+        # Gradle's api is on the module's own classpath too; Bazel's exports are only on its dependents'. A
+        # module with no sources of its own (only generated ones) just exports.
+        deps = _on("jvm", deps + jvm_deps) + jvm_exported if fragments.srcs else [],
         exports = jvm_exported,
         plugins = plugin_labels(plugins, "jvm"),
         visibility = visibility,
@@ -121,6 +146,7 @@ def kmp_library(
             module = name,
             target = target,
             common_srcs = common_srcs,
+            common_generated = generated_native,
             native_srcs = native_srcs,
             family_srcs = _family_srcs(target, linux_srcs, apple_srcs, mingw_srcs),
             deps = _on(target, deps + native_deps + exports),
