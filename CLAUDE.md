@@ -313,7 +313,9 @@ stream to BuildBuddy, anonymously.
   from the toolchain (unless `resolve_stdlib`, for a tool). Each `maven_kmp.install(name = …)` is its own
   resolution and hub repository, as each Gradle configuration resolves on its own. Versions come from the catalog; `MODULE.bazel` lists the catalog aliases, platforms and
   repositories. It writes `bazel/kmp/deps/maven_kmp.lock.json` (every file with its sha256); after changing either,
-  run `bazel run @maven_kmp//:pin`. `//bazel/kmp/deps:maven_kmp_lock_test` fails while the lock is stale. Modules
+  run `bazel run @maven_kmp//:pin`. `//bazel/kmp/deps:maven_kmp_lock_test` fails while the lock is stale. `bazel/renovate/repin.sh`
+  re-pins every lockfile, MODULE.bazel.lock and (after a Kotlin bump) Kotlin/Native at once; `renovate-pins.yml` runs it on
+  Renovate's PRs (#1029), whose `kotlin monorepo` group bumps Kotlin, rules_kotlin, Metro and Mappie together. Modules
   name a library by its catalog alias, `@maven_kmp//:kotlinx_io_core` (the `_jvm`/`_<target>` suffix is added per
   platform); `//bazel/kmp/deps` only holds `kotlin_test` and the compiler plugins.
 

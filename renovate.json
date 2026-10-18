@@ -3,7 +3,7 @@
   "extends": [
     "config:recommended"
   ],
-  "description": "Automerge every update, majors included, once the required CI checks pass (GitHub native auto-merge)",
+  "description": "Automerge every update, majors included, once the required CI checks pass (GitHub native auto-merge). Libraries are bumped in gradle/libs.versions.toml (the catalog MODULE.bazel reads) and Bazel modules in MODULE.bazel; renovate-pins.yml then re-pins the lockfiles on the PR's branch (bazel/renovate/repin.sh)",
   "automerge": true,
   "automergeType": "pr",
   "platformAutomerge": true,
@@ -14,14 +14,24 @@
       "allowedVersions": "!/-compat$/"
     },
     {
-      "description": "Kotlin's Gradle plugins all read the one catalog version; split groups open duplicate PRs that each fail alone",
-      "matchPackageNames": ["/^org\\.jetbrains\\.kotlin[.:]/"],
+      "description": "Kotlin and what's built for one Kotlin release move together: Kotlin's plugins (the Compose compiler among them), rules_kotlin (it bundles the compiler Bazel runs, which must equal the catalog's kotlin), and the Metro and Mappie compiler plugins. Split groups open PRs that each fail alone",
+      "matchPackageNames": ["/^org\\.jetbrains\\.kotlin[.:]/", "rules_kotlin", "/^dev\\.zacsweers\\.metro[.:]/", "/^tech\\.mappie[.:]/"],
       "groupName": "kotlin monorepo"
     },
     {
       "description": "AGP and the lint it runs release together (lint's version is AGP's + 23); Bazel's Android lint pins lint-gradle beside AGP",
       "matchPackageNames": ["com.android.tools.build:gradle", "com.android.tools.build:builder", "com.android.tools.lint:lint-gradle", "/^com\\.android\\.(application|kotlin\\.multiplatform\\.library)$/"],
       "groupName": "android gradle plugin"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The Go SDK rules_go downloads for the Gazelle extension (MODULE.bazel's go_sdk.download)",
+      "managerFilePatterns": ["/^MODULE\\.bazel$/"],
+      "matchStrings": ["go_sdk\\.download\\(version = \"(?<currentValue>[^\"]+)\"\\)"],
+      "depNameTemplate": "go",
+      "datasourceTemplate": "golang-version"
     }
   ]
 }
