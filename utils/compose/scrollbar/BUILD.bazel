@@ -1,0 +1,16 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_generate true
+
+kmp_library(
+    name = "scrollbar",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    plugins = ["compose"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:compose_foundation_desktop",
+        "@maven_kmp//:compose_ui_desktop",
+    ],
+)

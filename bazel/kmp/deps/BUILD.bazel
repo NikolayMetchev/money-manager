@@ -24,6 +24,48 @@ kt_jvm_library(
     ],
 )
 
+# compose.desktop.currentOs (#1018): Compose Desktop with the Skiko runtime of the platform the JVM runs on.
+# Gradle's plugin picks it from the build machine; here it's the target platform, the same thing outside
+# cross-compiles.
+_DESKTOP_OS = {
+    "linux_arm64": [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+    "linux_x64": [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+    "macos_arm64": [
+        "@platforms//os:macos",
+        "@platforms//cpu:aarch64",
+    ],
+    "macos_x64": [
+        "@platforms//os:macos",
+        "@platforms//cpu:x86_64",
+    ],
+    "windows_x64": [
+        "@platforms//os:windows",
+        "@platforms//cpu:x86_64",
+    ],
+}
+
+[
+    config_setting(
+        name = "desktop_" + os,
+        constraint_values = constraints,
+    )
+    for os, constraints in _DESKTOP_OS.items()
+]
+
+kt_jvm_library(
+    name = "compose_desktop_current_os_jvm",
+    exports = select({
+        ":desktop_" + os: ["@maven_kmp//:compose_desktop_%s_jvm" % os]
+        for os in _DESKTOP_OS
+    }),
+)
+
 # kotlin("reflect"), at the compiler's version (JVM only).
 kt_jvm_library(
     name = "kotlin_reflect_jvm",

@@ -46,6 +46,11 @@ const (
 	testDataDirective = "kmp_test_data"
 	// kmp_test_size small|medium|large|enormous: the kmp_test size, for a suite slower than the default allows.
 	testSizeDirective = "kmp_test_size"
+	// kmp_test_jvm_flags flag …: JVM flags for the JVM tests, Gradle's `systemProperty`s (headless Compose
+	// Desktop: -Djava.awt.headless=true -Dskiko.test.harness=true).
+	testJvmFlagsDirective = "kmp_test_jvm_flags"
+	// kmp_test_flaky true: retry failing JVM tests, as the Compose modules' Gradle test-retry plugin does.
+	testFlakyDirective = "kmp_test_flaky"
 	// kmp_visibility label …: who may depend on the module (default public). `//app/model/repository/write`
 	// lists the only modules that may take a write repository (CLAUDE.md, "Database Writes").
 	visibilityDirective = "kmp_visibility"
@@ -78,6 +83,8 @@ type kmpConfig struct {
 	cinterops         []string
 	testData          []string
 	testSize          string
+	testJvmFlags      []string
+	testFlaky         bool
 	visibility        []string
 	forbidDeps        []string
 	forbidReference   string
@@ -100,6 +107,8 @@ func (c *kmpConfig) clone() *kmpConfig {
 	out.cinterops = nil
 	out.testData = nil
 	out.testSize = ""
+	out.testJvmFlags = nil
+	out.testFlaky = false
 	out.visibility = nil
 	out.forbidDeps = nil
 	out.forbidReference = ""
@@ -119,7 +128,7 @@ func (*kmpLang) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
 func (*kmpLang) CheckFlags(fs *flag.FlagSet, c *config.Config) error { return nil }
 
 func (*kmpLang) KnownDirectives() []string {
-	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective, generatedSrcsDirective, cinteropsDirective, testDataDirective, testSizeDirective, visibilityDirective, forbidDepsDirective, forbidReferenceDirective, allowReferenceDirective}
+	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective, generatedSrcsDirective, cinteropsDirective, testDataDirective, testSizeDirective, testJvmFlagsDirective, testFlakyDirective, visibilityDirective, forbidDepsDirective, forbidReferenceDirective, allowReferenceDirective}
 }
 
 func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
@@ -148,6 +157,10 @@ func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
 				kc.testData = append(kc.testData, strings.Fields(d.Value)...)
 			case testSizeDirective:
 				kc.testSize = strings.TrimSpace(d.Value)
+			case testJvmFlagsDirective:
+				kc.testJvmFlags = append(kc.testJvmFlags, strings.Fields(d.Value)...)
+			case testFlakyDirective:
+				kc.testFlaky = strings.TrimSpace(d.Value) == "true"
 			case cinteropsDirective:
 				kc.cinterops = append(kc.cinterops, strings.Fields(d.Value)...)
 			case generatedSrcsDirective:

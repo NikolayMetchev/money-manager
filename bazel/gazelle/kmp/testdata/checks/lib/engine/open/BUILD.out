@@ -1,7 +1,17 @@
-load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 kmp_library(
     name = "open",
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     visibility = ["//visibility:public"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":open",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "//lib/write:write_for_tests",
+    ],
 )

@@ -1,0 +1,25 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_generate true
+
+kmp_library(
+    name = "people",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    plugins = ["compose"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//app/model/core",
+        "//app/model/repository/read",
+        "//app/presenter/core",
+        "//app/ui/audit",
+        "//app/ui/components",
+        "//utils/compose/scrollbar",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:compose_foundation_desktop",
+        "@maven_kmp//:compose_foundation_layout_desktop",
+        "@maven_kmp//:compose_material3_desktop",
+        "@maven_kmp//:compose_material_icons_core_desktop",
+        "@maven_kmp//:compose_ui_desktop",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+)

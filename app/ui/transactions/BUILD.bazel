@@ -1,0 +1,71 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_generate true
+# gazelle:kmp_keep_dep //bazel/kmp/deps:compose_desktop_current_os jvmTest
+# gazelle:kmp_test_jvm_flags -Djava.awt.headless=true -Dskiko.test.harness=true
+# gazelle:kmp_test_flaky true
+
+kmp_library(
+    name = "transactions",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    plugins = ["compose"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//app/importengineapi",
+        "//app/model/core",
+        "//app/model/csvstrategy",
+        "//app/model/repository/read",
+        "//app/presenter/core",
+        "//app/ui/audit",
+        "//app/ui/components",
+        "//app/ui/foundation",
+        "//utils/bigdecimal",
+        "//utils/compose/scrollbar",
+        "//utils/humanreadable",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:compose_foundation_desktop",
+        "@maven_kmp//:compose_foundation_layout_desktop",
+        "@maven_kmp//:compose_material3_desktop",
+        "@maven_kmp//:compose_material_icons_core_desktop",
+        "@maven_kmp//:compose_ui_desktop",
+        "@maven_kmp//:compose_ui_text_desktop",
+        "@maven_kmp//:kermit",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_datetime",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":transactions",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    flaky = True,
+    jvm_deps = ["//bazel/kmp/deps:compose_desktop_current_os"],
+    jvm_flags = [
+        "-Djava.awt.headless=true",
+        "-Dskiko.test.harness=true",
+    ],
+    keep_deps = ["//bazel/kmp/deps:compose_desktop_current_os"],
+    plugins = [
+        "compose",
+        "mokkery",
+    ],
+    deps = [
+        "//app/db/di",
+        "//app/db/write",
+        "//app/model/core",
+        "//app/model/repository/read",
+        "//app/model/repository/write:write_for_tests",
+        "//app/presenter/core",
+        "//app/ui/foundation",
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/app/db",
+        "//test/app/ui",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:compose_foundation_layout_desktop",
+        "@maven_kmp//:compose_ui_test_desktop",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:mokkery_core",
+        "@maven_kmp//:mokkery_runtime",
+    ],
+)

@@ -171,6 +171,16 @@ stream to BuildBuddy, anonymously.
   generated code use them where jdeps can't see. A package several libraries declare (`androidx.compose.runtime`)
   resolves to one a directive names, to nothing when those already bring every candidate, then to the one whose api
   brings the rest, and only then to the most specific. A stale BUILD file is CI's Gazelle diff.
+- **Compose Desktop UI** (#1018): `app/ui/*`, `utils/compose/*` and `test/app/ui` are JVM-only modules (no
+  `kmp_targets`; `android*` source sets are left for the Android phase). Their JVM classpath resources are one jar per
+  compilation (`kmp_resource_jar`, `//bazel/kmp:resources.bzl`), `src/{common,jvmAndroid,jvm}{Main,Test}/resources`
+  merged with the later source set winning a clash, as Gradle's `processResources` does (`app/ui/core`'s `money_manager.db`).
+  `kmp_test_jvm_flags` is the Compose conventions' headless `systemProperty`s and `kmp_test_flaky true` their test-retry
+  (`maxRetries = 2`). `compose.desktop.currentOs` is `//bazel/kmp/deps:compose_desktop_current_os`, a `select` on the
+  target OS and CPU, kept on jvmTest with `kmp_keep_dep` (nothing imports Skiko's natives). Test JVMs set
+  `skiko.data.path` under `TEST_TMPDIR`, since the sandbox keeps `~/.skiko` read-only. A module with `kmp_visibility`
+  also gets a testonly, public `:<name>_for_tests`, which Gazelle gives every test that imports it: Gradle's
+  `verifyNoWriteRepositoryUsage` only reads main sources, and only a testonly target can depend on it.
 - **Lint** (`//bazel/kmp/lint`, #1015): every `kmp_library`/`kmp_test` gets `:<name>_ktlint` and `:<name>_detekt`,
   tests that run the tool's own `main` over the hand-written sources (generated ones are left out, as the Gradle
   plugins filter them), and report the same findings Gradle does. ktlint is the catalog's `ktlint-engine` (Gradle's

@@ -1,0 +1,33 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_generate true
+
+kmp_library(
+    name = "components",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    plugins = ["compose"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//app/csvimporter",
+        "//app/importengineapi",
+        "//app/model/core",
+        "//app/model/csv",
+        "//app/model/csvstrategy",
+        "//app/model/repository/read",
+        "//app/model/rules",
+        "//app/model/timeline",
+        "//app/presenter/core",
+        "//app/tasks",
+        "//app/ui/foundation",
+        "//utils/currency",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:compose_foundation_desktop",
+        "@maven_kmp//:compose_foundation_layout_desktop",
+        "@maven_kmp//:compose_material3_desktop",
+        "@maven_kmp//:compose_material_icons_core_desktop",
+        "@maven_kmp//:compose_ui_desktop",
+        "@maven_kmp//:compose_ui_text_desktop",
+        "@maven_kmp//:kermit",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+)

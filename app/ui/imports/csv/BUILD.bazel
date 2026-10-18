@@ -1,0 +1,79 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_generate true
+# gazelle:kmp_keep_dep //bazel/kmp/deps:compose_desktop_current_os jvmTest
+# gazelle:kmp_test_jvm_flags -Djava.awt.headless=true -Dskiko.test.harness=true
+# gazelle:kmp_test_flaky true
+
+kmp_library(
+    name = "csv",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    plugins = ["compose"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//app/csvimporter",
+        "//app/db/core",
+        "//app/db/read",
+        "//app/importdirectory",
+        "//app/importengineapi",
+        "//app/model/accountmapping",
+        "//app/model/core",
+        "//app/model/csv",
+        "//app/model/csvstrategy",
+        "//app/model/importdirectory",
+        "//app/model/qif",
+        "//app/model/repository/read",
+        "//app/model/rules",
+        "//app/model/timeline",
+        "//app/presenter/core",
+        "//app/tasks",
+        "//app/ui/audit",
+        "//app/ui/components",
+        "//app/ui/foundation",
+        "//utils/compose/filePicker",
+        "//utils/compose/scrollbar",
+        "//utils/humanreadable",
+        "//utils/parsers/csv",
+        "//utils/parsers/xlsx",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:compose_animation_desktop",
+        "@maven_kmp//:compose_foundation_desktop",
+        "@maven_kmp//:compose_foundation_layout_desktop",
+        "@maven_kmp//:compose_material3_desktop",
+        "@maven_kmp//:compose_material_icons_core_desktop",
+        "@maven_kmp//:compose_ui_desktop",
+        "@maven_kmp//:compose_ui_text_desktop",
+        "@maven_kmp//:kermit",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_datetime",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":csv",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    flaky = True,
+    jvm_deps = ["//bazel/kmp/deps:compose_desktop_current_os"],
+    jvm_flags = [
+        "-Djava.awt.headless=true",
+        "-Dskiko.test.harness=true",
+    ],
+    keep_deps = ["//bazel/kmp/deps:compose_desktop_current_os"],
+    plugins = ["compose"],
+    deps = [
+        "//app/model/core",
+        "//app/model/csv",
+        "//app/model/csvstrategy",
+        "//app/model/importdirectory",
+        "//app/model/rules",
+        "//app/strategies",
+        "//app/ui/components",
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/app/ui",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:compose_material3_desktop",
+        "@maven_kmp//:compose_ui_test_desktop",
+        "@maven_kmp//:kotlinx_coroutines_test",
+    ],
+)

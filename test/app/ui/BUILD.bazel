@@ -1,0 +1,15 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_generate true
+
+kmp_library(
+    name = "ui",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//app/model/core",
+        "@maven_kmp//:compose_ui_test_desktop",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+)
