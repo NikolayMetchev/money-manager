@@ -97,10 +97,11 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y fakeroot xvfb
 
       # Also the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`, manual so local builds skip
-      # them), linked here for Native Tests to run on their own runners, and the Linux desktop installer.
+      # them) and the launcher that turns their output into JUnit XML, for Native Tests to run on their own
+      # runners, and the Linux desktop installer.
       - name: Build
         run: >-
-          bazel build $BAZEL_FLAGS //... //app/main/jvm:installer
+          bazel build $BAZEL_FLAGS //... //app/main/jvm:installer //bazel/kmp/testing:native_launcher_deploy.jar
           $(bazel query 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') 2>&1 | tee build.log
 
       # Every test but the Kotlin JVM and Android ones, which Coverage runs, plus the desktop ProGuard check:
@@ -156,6 +157,7 @@ jobs:
               dir="native-tests/$target/$(dirname "${binary#bazel-out/*/bin/}")"
               mkdir -p "$dir" && cp "$binary" "$dir/"
             done
+            cp bazel-bin/bazel/kmp/testing/native_launcher_deploy.jar "native-tests/$target/"
           done
           find native-tests -type f | sort
 
@@ -231,16 +233,48 @@ jobs:
           name: ${{ matrix.target }}-test-binaries
           path: ${{ runner.temp }}/native-tests
 
+      # For the launcher, which Bazel compiles for Java 25.
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # Through Bazel's own launcher (`//bazel/kmp/testing:native_launcher`), so each binary writes the JUnit XML a
+      # `bazel test` run would. Java on Windows needs Windows paths.
       - name: Run test binaries
         run: |
+          native_path() { if command -v cygpath > /dev/null; then cygpath -w "$1"; else echo "$1"; fi; }
+          tests="$RUNNER_TEMP/native-tests"
+          launcher="$(native_path "$tests/native_launcher_deploy.jar")"
           status=0
           while IFS= read -r -d '' binary; do
-            echo "::group::$binary"
+            rel="${binary#"$tests"/}"
+            echo "::group::$rel"
             chmod +x "$binary"
-            "$binary" || status=1
+            mkdir -p "native-test-results/$(dirname "$rel")"
+            XML_OUTPUT_FILE="$(native_path "$PWD/native-test-results/$(dirname "$rel")/test.xml")" \
+              java -jar "$launcher" "$(native_path "$binary")" || status=1
             echo "::endgroup::"
-          done < <(find "$RUNNER_TEMP/native-tests" -type f \( -name '*.kexe' -o -name '*.exe' \) -print0)
+          done < <(find "$tests" -type f \( -name '*.kexe' -o -name '*.exe' \) -print0)
           exit $status
+
+      - name: List test reports
+        id: test-reports
+        if: ${{ !cancelled() }}
+        run: echo "files=$(find native-test-results -name test.xml | paste -sd, -)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && steps.test-reports.outputs.files != '' }}
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: native
+          name: native-${{ matrix.target }}-test-results
+          report_type: test_results
+          files: ${{ steps.test-reports.outputs.files }}
+          disable_search: true
+          fail_ci_if_error: false
 
   # macOS: every compile a Mac builds (macosArm64 only builds there: it needs Xcode), its `mm`, and its native
   # tests. The JVM tests ran on Linux.
@@ -280,6 +314,24 @@ jobs:
         uses: ./.github/actions/bazel-summary
         with:
           title: macOS
+
+      # Codecov's `files` takes paths, not globs, so list the reports (bazel-testlogs is a symlink).
+      - name: List test reports
+        id: test-reports
+        if: ${{ !cancelled() }}
+        run: echo "files=$(find -L bazel-testlogs/ -name test.xml | paste -sd, -)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && steps.test-reports.outputs.files != '' }}
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: native
+          name: native-macosArm64-test-results
+          report_type: test_results
+          files: ${{ steps.test-reports.outputs.files }}
+          disable_search: true
+          fail_ci_if_error: false
 
   # The device tests (#1024): kmp_test's `:<name>_device` targets and the release smoke test, run through adb on
   # an emulator. They're `manual`, so `bazel test //...` leaves them out; this job runs everything tagged
