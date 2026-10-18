@@ -11,13 +11,22 @@ def _strip_comment(line):
     return line.strip()
 
 def catalog(text):
-    """The catalog's [versions] and [libraries] (`module` + `version.ref`), as the resolver reads them."""
+    """The catalog's [versions], [libraries] (`module` + `version.ref`) and [bundles] (alias lists)."""
     versions = {}
     libraries = {}
+    bundles = {}
+    bundle = None
     table = ""
     for raw in text.splitlines():
         line = _strip_comment(raw)
         if not line:
+            continue
+        if bundle != None:
+            # A bundle's array runs over several lines, one quoted alias per line.
+            done = line.endswith("]")
+            bundles[bundle].extend([a.strip().strip('"') for a in line.rstrip("]").split(",") if a.strip()])
+            if done:
+                bundle = None
             continue
         if line.startswith("[") and line.endswith("]"):
             table = line[1:-1]
@@ -35,4 +44,8 @@ def catalog(text):
                 k, _, v = field.partition("=")
                 fields[k.strip()] = v.strip().strip('"')
             libraries[key] = fields
-    return versions, libraries
+        elif table == "bundles" and value.startswith("["):
+            bundles[key] = [a.strip().strip('"') for a in value.strip("[]").split(",") if a.strip()]
+            if not value.endswith("]"):
+                bundle = key
+    return versions, libraries, bundles

@@ -11,6 +11,7 @@ module(
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "rules_java", version = "9.9.0")
+bazel_dep(name = "rules_pkg", version = "1.1.0")
 bazel_dep(name = "rules_kotlin", version = "2.4.21")
 bazel_dep(name = "rules_shell", version = "0.6.1")
 
@@ -53,9 +54,15 @@ maven_kmp.install(
     catalog = "//gradle:libs.versions.toml",
     # SQLDelight's Gradle plugin jar carries the compiler environment //bazel/kmp/sqldelight runs, but none
     # of its Gradle API.
-    excludes = ["org.jetbrains.kotlin:kotlin-gradle-plugin"],
+    # JetBrains' runtime-desktop is a LICENSE-only redirect with the same jar name as androidx's runtime-desktop;
+    # Gradle drops it from mm-jvm's runtime classpath, and nothing compiles against it.
+    excludes = [
+        "org.jetbrains.compose.runtime:runtime-desktop",
+        "org.jetbrains.kotlin:kotlin-gradle-plugin",
+    ],
     # moneymanager.kotlin-convention's dependency substitutions: these modules always resolve to the
-    # catalog version, whoever asks for them.
+    # catalog version, whoever asks for them (and so does every library of the build-tool-pins bundle).
+    force_bundles = ["build-tool-pins"],
     forces = {
         "androidx.activity:activity": "androidx-activity-compose",
         "androidx.annotation:annotation": "androidx-annotation",
@@ -99,7 +106,6 @@ maven_kmp.install(
         "clikt",
         "clikt-core",
         "compose-runtime",
-        "compose-runtime-desktop",
         "cryptography-bigint",
         "cryptography-core",
         "cryptography-provider-jdk",
