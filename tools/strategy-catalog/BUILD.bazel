@@ -1,0 +1,69 @@
+load("@rules_java//java:java_binary.bzl", "java_binary")
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+load("//bazel/pages:pages.bzl", "tool_output_dir")
+
+# gazelle:kmp_generate true
+
+kmp_library(
+    name = "strategy-catalog",
+    jvm_deps = [
+        "//app/db/read",
+        "//app/model/apistrategy",
+        "//app/model/core",
+        "//app/model/csvstrategy",
+        "//app/model/passthrough",
+        "//app/strategies",
+        "//app/strategycatalog",
+        "//utils/currency",
+    ],
+    jvm_srcs = glob(["src/main/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":strategy-catalog",
+    jvm_deps = [
+        "//app/db/read",
+        "//app/model/core",
+        "//app/model/csvstrategy",
+        "//app/model/rules",
+        "//app/strategies",
+        "//app/strategycatalog",
+        "//bazel/kmp/deps:kotlin_test",
+        "//utils/currency",
+    ],
+    jvm_srcs = glob(["src/test/kotlin/**/*.kt"]),
+    resources = glob(["src/test/resources/**"]),
+)
+
+_MAIN_CLASS = "com.moneymanager.tools.strategycatalog.StrategyCatalogToolKt"
+
+java_binary(
+    name = "tool",
+    main_class = _MAIN_CLASS,
+    runtime_deps = [":strategy-catalog_jvm"],
+)
+
+# generateBundledCurrencies: `bazel run //tools/strategy-catalog:generate_bundled_currencies` rewrites utils/currency's
+# ISO 4217 table from the JDK's list.
+java_binary(
+    name = "generate_bundled_currencies",
+    args = [
+        "currencies",
+        "utils/currency/src/commonMain/kotlin/com/moneymanager/currency/IsoCurrencies.kt",
+    ],
+    main_class = _MAIN_CLASS,
+    runtime_deps = [":strategy-catalog_jvm"],
+)
+
+# generateCatalogSite: the strategy library, at strategy-library/ in this directory, for the Pages site.
+tool_output_dir(
+    name = "catalog_site",
+    tool = ":tool",
+    tool_args = [
+        "generate",
+        "{out}",
+    ],
+    visibility = ["//webpage:__pkg__"],
+)

@@ -61,6 +61,10 @@ fun main(args: Array<String>) {
         }
 
     val tsv = renderCryptoDataset(entries)
-    File(outputPath).apply { parentFile?.mkdirs() }.writeText(tsv)
+    workspaceFile(outputPath).apply { parentFile?.mkdirs() }.writeText(tsv)
     println("Wrote ${tsv.lineSequence().count { it.isNotBlank() }} entries to $outputPath")
 }
+
+// `bazel run` starts a tool in its runfiles tree, so a relative path names a file in the workspace.
+private fun workspaceFile(path: String): File =
+    File(path).takeIf { it.isAbsolute } ?: File(System.getenv("BUILD_WORKSPACE_DIRECTORY") ?: ".", path)

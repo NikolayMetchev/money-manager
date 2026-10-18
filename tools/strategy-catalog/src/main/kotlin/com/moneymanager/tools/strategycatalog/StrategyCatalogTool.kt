@@ -44,11 +44,15 @@ fun main(args: Array<String>) {
     val usage = "usage: generate <webpageDir> | currencies <IsoCurrencies.kt>"
     require(args.size == 2) { usage }
     when (args[0]) {
-        "generate" -> generateCatalogSite(File(args[1]))
-        "currencies" -> File(args[1]).writeText(renderIsoCurrenciesSource(jdkIsoCurrencies()))
+        "generate" -> generateCatalogSite(workspaceFile(args[1]))
+        "currencies" -> workspaceFile(args[1]).writeText(renderIsoCurrenciesSource(jdkIsoCurrencies()))
         else -> error(usage)
     }
 }
+
+// `bazel run` starts a tool in its runfiles tree, so a relative path names a file in the workspace.
+private fun workspaceFile(path: String): File =
+    File(path).takeIf { it.isAbsolute } ?: File(System.getenv("BUILD_WORKSPACE_DIRECTORY") ?: ".", path)
 
 /**
  * Every built-in definition rendered to its portable artifact, keyed for StrategyFileNaming. [csvAsOf]

@@ -13,10 +13,11 @@ on:
       - 'tools/strategy-catalog/**'
       - 'app/db/core/src/commonMain/sqldelight/**'
       - '.github/workflows/static.yml'
-      - 'settings.gradle.kts'
       - 'app/**/src/**'
       - 'utils/**/src/**'
-      - '**/build.gradle.kts'
+      - '**/BUILD.bazel'
+      - 'MODULE.bazel'
+      - 'bazel/**'
       - 'gradle/libs.versions.toml'
 
   # Allows you to run this workflow manually from the Actions tab
@@ -46,47 +47,50 @@ jobs:
         uses: actions/checkout@v7
       - name: Setup Pages
         uses: actions/configure-pages@v6
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.19.1
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
+      - name: Use BuildBuddy
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        if: env.BUILDBUDDY_API_KEY != ''
+        run: |
+          {
+            echo "common --config=rbe"
+            echo "common --remote_header=x-buildbuddy-api-key=${BUILDBUDDY_API_KEY}"
+            echo "common --build_metadata=ROLE=CI"
+            echo "common --build_metadata=REPO_URL=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          } > user.bazelrc
       - name: Install Graphviz
-        # SchemaSpy needs the `dot` binary to render schema relationship diagrams
+        # SchemaSpy needs the `dot` binary to render schema relationship diagrams (its action runs here).
         run: sudo apt-get update && sudo apt-get install -y graphviz
-      - name: Generate database schema docs
-        uses: $/.github/actions/gradle-run
-        with:
-          command: ':app:db:schemaspy:publishSchemaSpyDocs --stacktrace'
-          cache-read-only: true
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+      - name: Install the Android SDK platform
+        # The KDoc of Android source sets reads the SDK's android.jar (//bazel/kmp/android).
+        run: |
+          level=$(sed -n 's/^android-compileSdk = "\(.*\)"/\1/p' gradle/libs.versions.toml)
+          (yes || true) | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-$level.0" > /dev/null
+      - name: Build the site
+        # //webpage:site is webpage/'s pages with the schema docs (database/), the strategy catalog
+        # (strategy-library/, which the app fetches from <pages-url>/strategy-library/index.json) and the
+        # KDoc (kdoc/) at their paths (#1027).
+        run: |
+          bazel build --remote_download_outputs=toplevel //webpage:site
+          mkdir -p site
+          cp -R bazel-bin/webpage/site/. site/
+          chmod -R u+w site
       - name: Generate module dependency graph
-        # The module-graph plugin reads the whole project via `allprojects`, which is
-        # incompatible with Isolated Projects / the configuration cache, so disable both
-        # for this single reporting task. It writes webpage/modules-graph.md.
-        uses: $/.github/actions/gradle-run
-        with:
-          command: 'createModuleGraph -Dorg.gradle.isolated-projects=false --no-configuration-cache --stacktrace'
-          cache-read-only: true
-      - name: Generate strategy catalog
-        # Renders the Kotlin built-in strategy definitions (app/strategies) into
-        # webpage/strategy-library/{index.json, *.json} — gitignored, generated per deploy;
-        # the app fetches <pages-url>/strategy-library/index.json.
-        uses: $/.github/actions/gradle-run
-        with:
-          command: ':tools:strategy-catalog:generateCatalogSite --stacktrace'
-          cache-read-only: true
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
-      - name: Generate KDoc API documentation
-        # Renders every module's KDoc into webpage/kdoc via Dokka's multi-module aggregation.
-        # `-PenableDokka=true` opts the root build into wiring the aggregation; that aggregation
-        # reads all subprojects, so — like the module graph above — Isolated Projects and the
-        # configuration cache must be disabled for this task. webpage/kdoc is gitignored, generated
-        # per deploy.
-        uses: $/.github/actions/gradle-run
-        with:
-          command: 'publishKdoc -PenableDokka=true -Dorg.gradle.isolated-projects=false --no-configuration-cache --stacktrace'
-          cache-read-only: true
+        # webpage/modules.html reads modules-graph.md: each module's dependencies per compilation, from the
+        # build graph.
+        run: |
+          bazel query '//app/... + //utils/... + //tools/... + //test/...' --output=streamed_jsonproto \
+            | python3 bazel/pages/module_graph.py > site/modules-graph.md
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          # Publish only the webpage content, not the whole repository
-          path: 'webpage'
+          path: 'site'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
