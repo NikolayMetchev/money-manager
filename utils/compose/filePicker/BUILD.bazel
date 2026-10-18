@@ -1,0 +1,27 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_generate true
+# gazelle:kmp_test_flaky true
+
+kmp_library(
+    name = "filePicker",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_deps = [
+        "//utils/localsettings",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+    jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    plugins = ["compose"],
+    visibility = ["//visibility:public"],
+    deps = ["@maven_kmp//:androidx_compose_runtime"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":filePicker",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    flaky = True,
+    jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
+    plugins = ["compose"],
+    deps = ["//bazel/kmp/deps:kotlin_test"],
+)

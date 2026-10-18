@@ -74,6 +74,9 @@ func (*kmpLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 				log.Printf("%s: can't resolve import %s", from, name)
 				continue
 			}
+			if imp.test {
+				dep = forTests(dep)
+			}
 			if dep != "" && !self[dep] {
 				deps[platform][dep] = true
 			}

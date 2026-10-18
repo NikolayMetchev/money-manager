@@ -163,6 +163,7 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		lib.SetAttr("plugins", sorted(plugins))
 	}
 	if len(kc.visibility) > 0 {
+		recordRestricted(args.Rel, name)
 		lib.SetAttr("visibility", kc.visibility)
 	} else {
 		lib.SetAttr("visibility", []string{"//visibility:public"})
@@ -172,6 +173,9 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	}
 	if kept := kc.keptLabels(false); len(kept) > 0 {
 		lib.SetAttr("keep_deps", kept)
+	}
+	if res, ok := resourceGlob(args.Dir, "Main"); ok {
+		lib.SetAttr("resources", res)
 	}
 	if kc.forbidReference != "" {
 		lib.SetAttr("forbidden_reference", kc.forbidReference)
@@ -230,6 +234,18 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		}
 		if kc.testSize != "" {
 			t.SetAttr("size", kc.testSize)
+		}
+		if len(kc.testJvmFlags) > 0 {
+			t.SetAttr("jvm_flags", kc.testJvmFlags)
+		}
+		if kc.testFlaky {
+			t.SetAttr("flaky", true)
+		}
+		if len(kc.testJvmTags) > 0 {
+			t.SetAttr("jvm_tags", kc.testJvmTags)
+		}
+		if res, ok := resourceGlob(args.Dir, "Test"); ok {
+			t.SetAttr("resources", res)
 		}
 		if len(kc.forbidDeps) > 0 {
 			t.SetAttr("forbidden_deps", kc.forbidDeps)
@@ -332,4 +348,17 @@ func runsOnNative(sets []sourceSet) bool {
 		}
 	}
 	return false
+}
+
+// resourceGlob is the JVM compilation's `resources` dirs that exist (`kind` is Main or Test), or nil: the
+// classpath resources Gradle's processResources merges.
+func resourceGlob(dir, kind string) (rule.GlobValue, bool) {
+	var patterns []string
+	for _, set := range []string{"common", "jvmAndroid", "jvm"} {
+		rel := "src/" + set + kind + "/resources"
+		if dirHasFiles(filepath.Join(dir, filepath.FromSlash(rel)), "") {
+			patterns = append(patterns, rel+"/**")
+		}
+	}
+	return rule.GlobValue{Patterns: patterns}, patterns != nil
 }

@@ -3,17 +3,43 @@
   "inputs": {
     "libraries": {
       "androidx-compose-runtime": "androidx.compose.runtime:runtime:1.12.1",
+      "androidx-compose-runtime-annotation": "androidx.compose.runtime:runtime-annotation:1.12.1",
       "androidx-compose-runtime-desktop": "androidx.compose.runtime:runtime-desktop:1.12.1",
+      "androidx-navigation3-runtime": "androidx.navigation3:navigation3-runtime:1.2.0",
+      "androidx-navigation3-runtime-desktop": "androidx.navigation3:navigation3-runtime-desktop:1.2.0",
+      "androidx-savedstate": "androidx.savedstate:savedstate:1.5.0",
+      "androidx-savedstate-desktop": "androidx.savedstate:savedstate-desktop:1.5.0",
       "atomicfu": "org.jetbrains.kotlinx:atomicfu:0.33.0",
       "bignum": "com.ionspin.kotlin:bignum:0.3.10",
       "clikt": "com.github.ajalt.clikt:clikt:5.1.0",
       "clikt-core": "com.github.ajalt.clikt:clikt-core:5.1.0",
+      "compose-animation-core-desktop": "org.jetbrains.compose.animation:animation-core-desktop:1.12.2",
+      "compose-animation-desktop": "org.jetbrains.compose.animation:animation-desktop:1.12.2",
+      "compose-charts": "io.github.ehsannarmani:compose-charts:1.0.0",
+      "compose-charts-desktop": "io.github.ehsannarmani:compose-charts-desktop:1.0.0",
+      "compose-desktop-linux-arm64": "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64:1.12.2",
+      "compose-desktop-linux-x64": "org.jetbrains.compose.desktop:desktop-jvm-linux-x64:1.12.2",
+      "compose-desktop-macos-arm64": "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64:1.12.2",
+      "compose-desktop-macos-x64": "org.jetbrains.compose.desktop:desktop-jvm-macos-x64:1.12.2",
+      "compose-desktop-windows-x64": "org.jetbrains.compose.desktop:desktop-jvm-windows-x64:1.12.2",
+      "compose-foundation-desktop": "org.jetbrains.compose.foundation:foundation-desktop:1.12.2",
+      "compose-foundation-layout-desktop": "org.jetbrains.compose.foundation:foundation-layout-desktop:1.12.2",
+      "compose-material-icons-core-desktop": "org.jetbrains.compose.material:material-icons-core-desktop:1.7.3",
+      "compose-material3-desktop": "org.jetbrains.compose.material3:material3-desktop:1.9.0",
       "compose-runtime": "org.jetbrains.compose.runtime:runtime:1.12.2",
+      "compose-ui-desktop": "org.jetbrains.compose.ui:ui-desktop:1.12.2",
+      "compose-ui-geometry-desktop": "org.jetbrains.compose.ui:ui-geometry-desktop:1.12.2",
+      "compose-ui-graphics-desktop": "org.jetbrains.compose.ui:ui-graphics-desktop:1.12.2",
+      "compose-ui-test-desktop": "org.jetbrains.compose.ui:ui-test-desktop:1.12.2",
+      "compose-ui-text-desktop": "org.jetbrains.compose.ui:ui-text-desktop:1.12.2",
+      "compose-ui-unit-desktop": "org.jetbrains.compose.ui:ui-unit-desktop:1.12.2",
+      "compose-ui-util-desktop": "org.jetbrains.compose.ui:ui-util-desktop:1.12.2",
       "cryptography-bigint": "dev.whyoleg.cryptography:cryptography-bigint:0.6.0",
       "cryptography-core": "dev.whyoleg.cryptography:cryptography-core:0.6.0",
       "cryptography-provider-jdk": "dev.whyoleg.cryptography:cryptography-provider-jdk:0.6.0",
       "cryptography-provider-openssl3-prebuilt": "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt:0.6.0",
       "cryptography-random": "dev.whyoleg.cryptography:cryptography-random:0.6.0",
+      "jetbrains-navigation3-ui-desktop": "org.jetbrains.androidx.navigation3:navigation3-ui-desktop:1.1.2",
       "junit": "junit:junit:4.13.2",
       "kermit": "co.touchlab:kermit:2.2.0",
       "kermit-core": "co.touchlab:kermit-core:2.2.0",
@@ -160,10 +186,23 @@
     "androidx.arch.core:core-common": "androidx_arch_core_core_common",
     "androidx.collection:collection": "androidx_collection_collection",
     "androidx.compose.runtime:runtime": "androidx_compose_runtime",
-    "androidx.compose.runtime:runtime-annotation": "androidx_compose_runtime_runtime_annotation",
+    "androidx.compose.runtime:runtime-annotation": "androidx_compose_runtime_annotation",
     "androidx.compose.runtime:runtime-desktop": "androidx_compose_runtime_desktop",
+    "androidx.compose.runtime:runtime-retain": "androidx_compose_runtime_runtime_retain",
+    "androidx.compose.runtime:runtime-saveable": "androidx_compose_runtime_runtime_saveable",
     "androidx.lifecycle:lifecycle-common": "androidx_lifecycle_lifecycle_common",
     "androidx.lifecycle:lifecycle-runtime": "androidx_lifecycle_lifecycle_runtime",
+    "androidx.lifecycle:lifecycle-runtime-compose": "androidx_lifecycle_lifecycle_runtime_compose",
+    "androidx.lifecycle:lifecycle-viewmodel": "androidx_lifecycle_lifecycle_viewmodel",
+    "androidx.lifecycle:lifecycle-viewmodel-compose": "androidx_lifecycle_lifecycle_viewmodel_compose",
+    "androidx.lifecycle:lifecycle-viewmodel-savedstate": "androidx_lifecycle_lifecycle_viewmodel_savedstate",
+    "androidx.navigation3:navigation3-runtime": "androidx_navigation3_runtime",
+    "androidx.navigation3:navigation3-runtime-desktop": "androidx_navigation3_runtime_desktop",
+    "androidx.navigationevent:navigationevent": "androidx_navigationevent_navigationevent",
+    "androidx.navigationevent:navigationevent-compose": "androidx_navigationevent_navigationevent_compose",
+    "androidx.savedstate:savedstate": "androidx_savedstate",
+    "androidx.savedstate:savedstate-compose": "androidx_savedstate_savedstate_compose",
+    "androidx.savedstate:savedstate-desktop": "androidx_savedstate_desktop",
     "app.cash.molecule:molecule-runtime": "molecule_runtime",
     "app.cash.sqldelight:async-extensions": "app_cash_sqldelight_async_extensions",
     "app.cash.sqldelight:compiler-env": "sqldelight_compiler_env",
@@ -227,6 +266,8 @@
     "dev.whyoleg.cryptography:cryptography-serialization-pem": "dev_whyoleg_cryptography_cryptography_serialization_pem",
     "dev.zacsweers.metro:compiler": "metro_compiler",
     "dev.zacsweers.metro:runtime": "metro_runtime",
+    "io.github.ehsannarmani:compose-charts": "compose_charts",
+    "io.github.ehsannarmani:compose-charts-desktop": "compose_charts_desktop",
     "io.ktor:ktor-client-auth": "ktor_client_auth",
     "io.ktor:ktor-client-core": "ktor_client_core",
     "io.ktor:ktor-client-curl": "io_ktor_ktor_client_curl",
@@ -262,9 +303,49 @@
     "org.jetbrains.androidx.lifecycle:lifecycle-common": "org_jetbrains_androidx_lifecycle_lifecycle_common",
     "org.jetbrains.androidx.lifecycle:lifecycle-runtime": "org_jetbrains_androidx_lifecycle_lifecycle_runtime",
     "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose": "org_jetbrains_androidx_lifecycle_lifecycle_runtime_compose",
+    "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel": "org_jetbrains_androidx_lifecycle_lifecycle_viewmodel",
+    "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate": "org_jetbrains_androidx_lifecycle_lifecycle_viewmodel_savedstate",
+    "org.jetbrains.androidx.navigation3:navigation3-ui-desktop": "jetbrains_navigation3_ui_desktop",
+    "org.jetbrains.androidx.navigationevent:navigationevent-compose": "org_jetbrains_androidx_navigationevent_navigationevent_compose",
+    "org.jetbrains.androidx.savedstate:savedstate": "org_jetbrains_androidx_savedstate_savedstate",
+    "org.jetbrains.androidx.savedstate:savedstate-compose": "org_jetbrains_androidx_savedstate_savedstate_compose",
+    "org.jetbrains.compose.animation:animation": "org_jetbrains_compose_animation_animation",
+    "org.jetbrains.compose.animation:animation-core": "org_jetbrains_compose_animation_animation_core",
+    "org.jetbrains.compose.animation:animation-core-desktop": "compose_animation_core_desktop",
+    "org.jetbrains.compose.animation:animation-desktop": "compose_animation_desktop",
     "org.jetbrains.compose.annotation-internal:annotation": "org_jetbrains_compose_annotation_internal_annotation",
     "org.jetbrains.compose.collection-internal:collection": "org_jetbrains_compose_collection_internal_collection",
+    "org.jetbrains.compose.desktop:desktop": "org_jetbrains_compose_desktop_desktop",
+    "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64": "compose_desktop_linux_arm64",
+    "org.jetbrains.compose.desktop:desktop-jvm-linux-x64": "compose_desktop_linux_x64",
+    "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64": "compose_desktop_macos_arm64",
+    "org.jetbrains.compose.desktop:desktop-jvm-macos-x64": "compose_desktop_macos_x64",
+    "org.jetbrains.compose.desktop:desktop-jvm-windows-x64": "compose_desktop_windows_x64",
+    "org.jetbrains.compose.foundation:foundation": "org_jetbrains_compose_foundation_foundation",
+    "org.jetbrains.compose.foundation:foundation-desktop": "compose_foundation_desktop",
+    "org.jetbrains.compose.foundation:foundation-layout": "org_jetbrains_compose_foundation_foundation_layout",
+    "org.jetbrains.compose.foundation:foundation-layout-desktop": "compose_foundation_layout_desktop",
+    "org.jetbrains.compose.material3:material3-desktop": "compose_material3_desktop",
+    "org.jetbrains.compose.material:material": "org_jetbrains_compose_material_material",
+    "org.jetbrains.compose.material:material-icons-core-desktop": "compose_material_icons_core_desktop",
+    "org.jetbrains.compose.material:material-ripple": "org_jetbrains_compose_material_material_ripple",
     "org.jetbrains.compose.runtime:runtime": "compose_runtime",
+    "org.jetbrains.compose.runtime:runtime-saveable": "org_jetbrains_compose_runtime_runtime_saveable",
+    "org.jetbrains.compose.ui:ui": "org_jetbrains_compose_ui_ui",
+    "org.jetbrains.compose.ui:ui-backhandler": "org_jetbrains_compose_ui_ui_backhandler",
+    "org.jetbrains.compose.ui:ui-desktop": "compose_ui_desktop",
+    "org.jetbrains.compose.ui:ui-geometry": "org_jetbrains_compose_ui_ui_geometry",
+    "org.jetbrains.compose.ui:ui-geometry-desktop": "compose_ui_geometry_desktop",
+    "org.jetbrains.compose.ui:ui-graphics": "org_jetbrains_compose_ui_ui_graphics",
+    "org.jetbrains.compose.ui:ui-graphics-desktop": "compose_ui_graphics_desktop",
+    "org.jetbrains.compose.ui:ui-test-desktop": "compose_ui_test_desktop",
+    "org.jetbrains.compose.ui:ui-text": "org_jetbrains_compose_ui_ui_text",
+    "org.jetbrains.compose.ui:ui-text-desktop": "compose_ui_text_desktop",
+    "org.jetbrains.compose.ui:ui-tooling-preview": "org_jetbrains_compose_ui_ui_tooling_preview",
+    "org.jetbrains.compose.ui:ui-unit": "org_jetbrains_compose_ui_ui_unit",
+    "org.jetbrains.compose.ui:ui-unit-desktop": "compose_ui_unit_desktop",
+    "org.jetbrains.compose.ui:ui-util": "org_jetbrains_compose_ui_ui_util",
+    "org.jetbrains.compose.ui:ui-util-desktop": "compose_ui_util_desktop",
     "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable": "kotlin_compose_compiler_plugin_embeddable",
     "org.jetbrains.kotlin:kotlin-reflect": "org_jetbrains_kotlin_kotlin_reflect",
     "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable": "kotlin_serialization_compiler_plugin_embeddable",
@@ -272,6 +353,7 @@
     "org.jetbrains.kotlin:kotlin-test": "org_jetbrains_kotlin_kotlin_test",
     "org.jetbrains.kotlinx:atomicfu": "atomicfu",
     "org.jetbrains.kotlinx:kotlinx-coroutines-core": "kotlinx_coroutines_core",
+    "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": "org_jetbrains_kotlinx_kotlinx_coroutines_core_jvm",
     "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j": "org_jetbrains_kotlinx_kotlinx_coroutines_slf4j",
     "org.jetbrains.kotlinx:kotlinx-coroutines-swing": "kotlinx_coroutines_swing",
     "org.jetbrains.kotlinx:kotlinx-coroutines-test": "kotlinx_coroutines_test",
@@ -280,6 +362,14 @@
     "org.jetbrains.kotlinx:kotlinx-io-core": "kotlinx_io_core",
     "org.jetbrains.kotlinx:kotlinx-serialization-core": "kotlinx_serialization_core",
     "org.jetbrains.kotlinx:kotlinx-serialization-json": "kotlinx_serialization_json",
+    "org.jetbrains.runtime:jbr-api": "org_jetbrains_runtime_jbr_api",
+    "org.jetbrains.skiko:skiko": "org_jetbrains_skiko_skiko",
+    "org.jetbrains.skiko:skiko-awt": "org_jetbrains_skiko_skiko_awt",
+    "org.jetbrains.skiko:skiko-awt-runtime-linux-arm64": "org_jetbrains_skiko_skiko_awt_runtime_linux_arm64",
+    "org.jetbrains.skiko:skiko-awt-runtime-linux-x64": "org_jetbrains_skiko_skiko_awt_runtime_linux_x64",
+    "org.jetbrains.skiko:skiko-awt-runtime-macos-arm64": "org_jetbrains_skiko_skiko_awt_runtime_macos_arm64",
+    "org.jetbrains.skiko:skiko-awt-runtime-macos-x64": "org_jetbrains_skiko_skiko_awt_runtime_macos_x64",
+    "org.jetbrains.skiko:skiko-awt-runtime-windows-x64": "org_jetbrains_skiko_skiko_awt_runtime_windows_x64",
     "org.jetbrains:annotations": "org_jetbrains_annotations",
     "org.jgrapht:jgrapht-core": "org_jgrapht_jgrapht_core",
     "org.jheaps:jheaps": "org_jheaps_jheaps",
@@ -351,11 +441,71 @@
       "androidx.compose.runtime.snapshots.tooling",
       "androidx.compose.runtime.tooling"
     ],
+    "androidx.compose.runtime:runtime-retain": [
+      "androidx.compose.runtime.retain",
+      "androidx.compose.runtime.retain.impl"
+    ],
+    "androidx.compose.runtime:runtime-saveable": [
+      "androidx.compose.runtime.saveable",
+      "androidx.compose.runtime.saveable.serialization"
+    ],
     "androidx.lifecycle:lifecycle-common": [
       "androidx.lifecycle"
     ],
     "androidx.lifecycle:lifecycle-runtime": [
       "androidx.lifecycle"
+    ],
+    "androidx.lifecycle:lifecycle-runtime-compose": [
+      "androidx.lifecycle.compose"
+    ],
+    "androidx.lifecycle:lifecycle-viewmodel": [
+      "androidx.lifecycle",
+      "androidx.lifecycle.viewmodel",
+      "androidx.lifecycle.viewmodel.internal"
+    ],
+    "androidx.lifecycle:lifecycle-viewmodel-compose": [
+      "androidx.lifecycle.viewmodel.compose"
+    ],
+    "androidx.lifecycle:lifecycle-viewmodel-savedstate": [
+      "androidx.lifecycle",
+      "androidx.lifecycle.internal",
+      "androidx.lifecycle.serialization",
+      "androidx.lifecycle.viewmodel"
+    ],
+    "androidx.navigation3:navigation3-runtime": [
+      "androidx.navigation3.runtime",
+      "androidx.navigation3.runtime.deeplink",
+      "androidx.navigation3.runtime.result",
+      "androidx.navigation3.runtime.serialization"
+    ],
+    "androidx.navigation3:navigation3-runtime-desktop": [
+      "androidx.navigation3.runtime",
+      "androidx.navigation3.runtime.deeplink",
+      "androidx.navigation3.runtime.result",
+      "androidx.navigation3.runtime.serialization"
+    ],
+    "androidx.navigationevent:navigationevent": [
+      "androidx.navigationevent",
+      "androidx.navigationevent.internal"
+    ],
+    "androidx.navigationevent:navigationevent-compose": [
+      "androidx.navigationevent.compose"
+    ],
+    "androidx.savedstate:savedstate": [
+      "androidx.savedstate",
+      "androidx.savedstate.internal",
+      "androidx.savedstate.serialization",
+      "androidx.savedstate.serialization.serializers"
+    ],
+    "androidx.savedstate:savedstate-compose": [
+      "androidx.savedstate.compose",
+      "androidx.savedstate.compose.serialization.serializers"
+    ],
+    "androidx.savedstate:savedstate-desktop": [
+      "androidx.savedstate",
+      "androidx.savedstate.internal",
+      "androidx.savedstate.serialization",
+      "androidx.savedstate.serialization.serializers"
     ],
     "app.cash.molecule:molecule-runtime": [
       "app.cash.molecule"
@@ -1828,6 +1978,22 @@
       "dev.zacsweers.metro",
       "dev.zacsweers.metro.internal"
     ],
+    "io.github.ehsannarmani:compose-charts": [
+      "ir.ehsannarmani.compose_charts",
+      "ir.ehsannarmani.compose_charts.components",
+      "ir.ehsannarmani.compose_charts.extensions",
+      "ir.ehsannarmani.compose_charts.extensions.line_chart",
+      "ir.ehsannarmani.compose_charts.models",
+      "ir.ehsannarmani.compose_charts.utils"
+    ],
+    "io.github.ehsannarmani:compose-charts-desktop": [
+      "ir.ehsannarmani.compose_charts",
+      "ir.ehsannarmani.compose_charts.components",
+      "ir.ehsannarmani.compose_charts.extensions",
+      "ir.ehsannarmani.compose_charts.extensions.line_chart",
+      "ir.ehsannarmani.compose_charts.models",
+      "ir.ehsannarmani.compose_charts.utils"
+    ],
     "io.ktor:ktor-client-auth": [
       "io.ktor.client.plugins.auth",
       "io.ktor.client.plugins.auth.providers"
@@ -2385,12 +2551,328 @@
     ],
     "org.jetbrains.androidx.lifecycle:lifecycle-common": null,
     "org.jetbrains.androidx.lifecycle:lifecycle-runtime": null,
-    "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose": [
-      "androidx.lifecycle.compose"
+    "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose": null,
+    "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel": null,
+    "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate": null,
+    "org.jetbrains.androidx.navigation3:navigation3-ui-desktop": [
+      "androidx.navigation3",
+      "androidx.navigation3.scene",
+      "androidx.navigation3.ui"
+    ],
+    "org.jetbrains.androidx.navigationevent:navigationevent-compose": null,
+    "org.jetbrains.androidx.savedstate:savedstate": null,
+    "org.jetbrains.androidx.savedstate:savedstate-compose": null,
+    "org.jetbrains.compose.animation:animation": [
+      "androidx.compose.animation",
+      "androidx.compose.animation.internal"
+    ],
+    "org.jetbrains.compose.animation:animation-core": [
+      "androidx.compose.animation.core",
+      "androidx.compose.animation.core.internal"
+    ],
+    "org.jetbrains.compose.animation:animation-core-desktop": [
+      "androidx.compose.animation.core",
+      "androidx.compose.animation.core.internal"
+    ],
+    "org.jetbrains.compose.animation:animation-desktop": [
+      "androidx.compose.animation",
+      "androidx.compose.animation.internal"
     ],
     "org.jetbrains.compose.annotation-internal:annotation": null,
     "org.jetbrains.compose.collection-internal:collection": null,
+    "org.jetbrains.compose.desktop:desktop": [
+      "androidx.compose.desktop"
+    ],
+    "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64": null,
+    "org.jetbrains.compose.desktop:desktop-jvm-linux-x64": null,
+    "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64": null,
+    "org.jetbrains.compose.desktop:desktop-jvm-macos-x64": null,
+    "org.jetbrains.compose.desktop:desktop-jvm-windows-x64": null,
+    "org.jetbrains.compose.foundation:foundation": [
+      "androidx.compose.foundation",
+      "androidx.compose.foundation.border",
+      "androidx.compose.foundation.content",
+      "androidx.compose.foundation.content.internal",
+      "androidx.compose.foundation.contextmenu",
+      "androidx.compose.foundation.draganddrop",
+      "androidx.compose.foundation.gestures",
+      "androidx.compose.foundation.gestures.cupertino",
+      "androidx.compose.foundation.gestures.snapping",
+      "androidx.compose.foundation.interaction",
+      "androidx.compose.foundation.internal",
+      "androidx.compose.foundation.lazy",
+      "androidx.compose.foundation.lazy.grid",
+      "androidx.compose.foundation.lazy.layout",
+      "androidx.compose.foundation.lazy.staggeredgrid",
+      "androidx.compose.foundation.pager",
+      "androidx.compose.foundation.platform",
+      "androidx.compose.foundation.relocation",
+      "androidx.compose.foundation.selection",
+      "androidx.compose.foundation.shape",
+      "androidx.compose.foundation.style",
+      "androidx.compose.foundation.text",
+      "androidx.compose.foundation.text.contextmenu.builder",
+      "androidx.compose.foundation.text.contextmenu.data",
+      "androidx.compose.foundation.text.contextmenu.gestures",
+      "androidx.compose.foundation.text.contextmenu.internal",
+      "androidx.compose.foundation.text.contextmenu.modifier",
+      "androidx.compose.foundation.text.contextmenu.provider",
+      "androidx.compose.foundation.text.handwriting",
+      "androidx.compose.foundation.text.input",
+      "androidx.compose.foundation.text.input.internal",
+      "androidx.compose.foundation.text.input.internal.selection",
+      "androidx.compose.foundation.text.input.internal.undo",
+      "androidx.compose.foundation.text.l10n",
+      "androidx.compose.foundation.text.modifiers",
+      "androidx.compose.foundation.text.selection",
+      "androidx.compose.foundation.v2",
+      "androidx.compose.foundation.window"
+    ],
+    "org.jetbrains.compose.foundation:foundation-desktop": [
+      "androidx.compose.foundation",
+      "androidx.compose.foundation.border",
+      "androidx.compose.foundation.content",
+      "androidx.compose.foundation.content.internal",
+      "androidx.compose.foundation.contextmenu",
+      "androidx.compose.foundation.draganddrop",
+      "androidx.compose.foundation.gestures",
+      "androidx.compose.foundation.gestures.cupertino",
+      "androidx.compose.foundation.gestures.snapping",
+      "androidx.compose.foundation.interaction",
+      "androidx.compose.foundation.internal",
+      "androidx.compose.foundation.lazy",
+      "androidx.compose.foundation.lazy.grid",
+      "androidx.compose.foundation.lazy.layout",
+      "androidx.compose.foundation.lazy.staggeredgrid",
+      "androidx.compose.foundation.pager",
+      "androidx.compose.foundation.platform",
+      "androidx.compose.foundation.relocation",
+      "androidx.compose.foundation.selection",
+      "androidx.compose.foundation.shape",
+      "androidx.compose.foundation.style",
+      "androidx.compose.foundation.text",
+      "androidx.compose.foundation.text.contextmenu.builder",
+      "androidx.compose.foundation.text.contextmenu.data",
+      "androidx.compose.foundation.text.contextmenu.gestures",
+      "androidx.compose.foundation.text.contextmenu.internal",
+      "androidx.compose.foundation.text.contextmenu.modifier",
+      "androidx.compose.foundation.text.contextmenu.provider",
+      "androidx.compose.foundation.text.handwriting",
+      "androidx.compose.foundation.text.input",
+      "androidx.compose.foundation.text.input.internal",
+      "androidx.compose.foundation.text.input.internal.selection",
+      "androidx.compose.foundation.text.input.internal.undo",
+      "androidx.compose.foundation.text.l10n",
+      "androidx.compose.foundation.text.modifiers",
+      "androidx.compose.foundation.text.selection",
+      "androidx.compose.foundation.v2",
+      "androidx.compose.foundation.window"
+    ],
+    "org.jetbrains.compose.foundation:foundation-layout": [
+      "androidx.compose.foundation.layout",
+      "androidx.compose.foundation.layout.internal"
+    ],
+    "org.jetbrains.compose.foundation:foundation-layout-desktop": [
+      "androidx.compose.foundation.layout",
+      "androidx.compose.foundation.layout.internal"
+    ],
+    "org.jetbrains.compose.material3:material3-desktop": [
+      "androidx.compose.material3",
+      "androidx.compose.material3.carousel",
+      "androidx.compose.material3.internal",
+      "androidx.compose.material3.l10n",
+      "androidx.compose.material3.pulltorefresh",
+      "androidx.compose.material3.tokens"
+    ],
+    "org.jetbrains.compose.material:material": [
+      "androidx.compose.material",
+      "androidx.compose.material.internal",
+      "androidx.compose.material.l10n",
+      "androidx.compose.material.pullrefresh"
+    ],
+    "org.jetbrains.compose.material:material-icons-core-desktop": [
+      "androidx.compose.material.icons",
+      "androidx.compose.material.icons.automirrored.filled",
+      "androidx.compose.material.icons.automirrored.outlined",
+      "androidx.compose.material.icons.automirrored.rounded",
+      "androidx.compose.material.icons.automirrored.sharp",
+      "androidx.compose.material.icons.automirrored.twotone",
+      "androidx.compose.material.icons.filled",
+      "androidx.compose.material.icons.outlined",
+      "androidx.compose.material.icons.rounded",
+      "androidx.compose.material.icons.sharp",
+      "androidx.compose.material.icons.twotone"
+    ],
+    "org.jetbrains.compose.material:material-ripple": [
+      "androidx.compose.material.ripple"
+    ],
     "org.jetbrains.compose.runtime:runtime": null,
+    "org.jetbrains.compose.runtime:runtime-saveable": null,
+    "org.jetbrains.compose.ui:ui": [
+      "androidx.compose.ui",
+      "androidx.compose.ui.animation",
+      "androidx.compose.ui.autofill",
+      "androidx.compose.ui.awt",
+      "androidx.compose.ui.awt.v2",
+      "androidx.compose.ui.draganddrop",
+      "androidx.compose.ui.draw",
+      "androidx.compose.ui.focus",
+      "androidx.compose.ui.graphics",
+      "androidx.compose.ui.graphics.vector",
+      "androidx.compose.ui.hapticfeedback",
+      "androidx.compose.ui.input",
+      "androidx.compose.ui.input.indirect",
+      "androidx.compose.ui.input.key",
+      "androidx.compose.ui.input.mouse",
+      "androidx.compose.ui.input.nestedscroll",
+      "androidx.compose.ui.input.pointer",
+      "androidx.compose.ui.input.pointer.util",
+      "androidx.compose.ui.input.rotary",
+      "androidx.compose.ui.internal",
+      "androidx.compose.ui.layout",
+      "androidx.compose.ui.modifier",
+      "androidx.compose.ui.navigationevent",
+      "androidx.compose.ui.node",
+      "androidx.compose.ui.platform",
+      "androidx.compose.ui.platform.a11y",
+      "androidx.compose.ui.platform.l10n",
+      "androidx.compose.ui.relocation",
+      "androidx.compose.ui.res",
+      "androidx.compose.ui.res.vector",
+      "androidx.compose.ui.scene",
+      "androidx.compose.ui.scene.skia",
+      "androidx.compose.ui.semantics",
+      "androidx.compose.ui.skiko",
+      "androidx.compose.ui.spatial",
+      "androidx.compose.ui.state",
+      "androidx.compose.ui.text",
+      "androidx.compose.ui.unit",
+      "androidx.compose.ui.util",
+      "androidx.compose.ui.viewinterop",
+      "androidx.compose.ui.window",
+      "androidx.compose.ui.window.v2"
+    ],
+    "org.jetbrains.compose.ui:ui-backhandler": [
+      "androidx.compose.ui.backhandler"
+    ],
+    "org.jetbrains.compose.ui:ui-desktop": [
+      "androidx.compose.ui",
+      "androidx.compose.ui.animation",
+      "androidx.compose.ui.autofill",
+      "androidx.compose.ui.awt",
+      "androidx.compose.ui.awt.v2",
+      "androidx.compose.ui.draganddrop",
+      "androidx.compose.ui.draw",
+      "androidx.compose.ui.focus",
+      "androidx.compose.ui.graphics",
+      "androidx.compose.ui.graphics.vector",
+      "androidx.compose.ui.hapticfeedback",
+      "androidx.compose.ui.input",
+      "androidx.compose.ui.input.indirect",
+      "androidx.compose.ui.input.key",
+      "androidx.compose.ui.input.mouse",
+      "androidx.compose.ui.input.nestedscroll",
+      "androidx.compose.ui.input.pointer",
+      "androidx.compose.ui.input.pointer.util",
+      "androidx.compose.ui.input.rotary",
+      "androidx.compose.ui.internal",
+      "androidx.compose.ui.layout",
+      "androidx.compose.ui.modifier",
+      "androidx.compose.ui.navigationevent",
+      "androidx.compose.ui.node",
+      "androidx.compose.ui.platform",
+      "androidx.compose.ui.platform.a11y",
+      "androidx.compose.ui.platform.l10n",
+      "androidx.compose.ui.relocation",
+      "androidx.compose.ui.res",
+      "androidx.compose.ui.res.vector",
+      "androidx.compose.ui.scene",
+      "androidx.compose.ui.scene.skia",
+      "androidx.compose.ui.semantics",
+      "androidx.compose.ui.skiko",
+      "androidx.compose.ui.spatial",
+      "androidx.compose.ui.state",
+      "androidx.compose.ui.text",
+      "androidx.compose.ui.unit",
+      "androidx.compose.ui.util",
+      "androidx.compose.ui.viewinterop",
+      "androidx.compose.ui.window",
+      "androidx.compose.ui.window.v2"
+    ],
+    "org.jetbrains.compose.ui:ui-geometry": [
+      "androidx.compose.ui.geometry"
+    ],
+    "org.jetbrains.compose.ui:ui-geometry-desktop": [
+      "androidx.compose.ui.geometry"
+    ],
+    "org.jetbrains.compose.ui:ui-graphics": [
+      "androidx.compose.ui.graphics",
+      "androidx.compose.ui.graphics.awt",
+      "androidx.compose.ui.graphics.colorspace",
+      "androidx.compose.ui.graphics.drawscope",
+      "androidx.compose.ui.graphics.internal",
+      "androidx.compose.ui.graphics.layer",
+      "androidx.compose.ui.graphics.painter",
+      "androidx.compose.ui.graphics.shadow",
+      "androidx.compose.ui.graphics.vector"
+    ],
+    "org.jetbrains.compose.ui:ui-graphics-desktop": [
+      "androidx.compose.ui.graphics",
+      "androidx.compose.ui.graphics.awt",
+      "androidx.compose.ui.graphics.colorspace",
+      "androidx.compose.ui.graphics.drawscope",
+      "androidx.compose.ui.graphics.internal",
+      "androidx.compose.ui.graphics.layer",
+      "androidx.compose.ui.graphics.painter",
+      "androidx.compose.ui.graphics.shadow",
+      "androidx.compose.ui.graphics.vector"
+    ],
+    "org.jetbrains.compose.ui:ui-test-desktop": [
+      "androidx.compose.ui.test",
+      "androidx.compose.ui.test.internal",
+      "androidx.compose.ui.test.platform",
+      "androidx.compose.ui.test.v2"
+    ],
+    "org.jetbrains.compose.ui:ui-text": [
+      "androidx.compose.ui.text",
+      "androidx.compose.ui.text.font",
+      "androidx.compose.ui.text.input",
+      "androidx.compose.ui.text.internal",
+      "androidx.compose.ui.text.intl",
+      "androidx.compose.ui.text.platform",
+      "androidx.compose.ui.text.style"
+    ],
+    "org.jetbrains.compose.ui:ui-text-desktop": [
+      "androidx.compose.ui.text",
+      "androidx.compose.ui.text.font",
+      "androidx.compose.ui.text.input",
+      "androidx.compose.ui.text.internal",
+      "androidx.compose.ui.text.intl",
+      "androidx.compose.ui.text.platform",
+      "androidx.compose.ui.text.style"
+    ],
+    "org.jetbrains.compose.ui:ui-tooling-preview": [
+      "androidx.compose.desktop.ui.tooling.preview",
+      "androidx.compose.ui.tooling.preview",
+      "androidx.compose.ui.tooling.preview.datasource",
+      "androidx.compose.ui.tooling.preview.internal"
+    ],
+    "org.jetbrains.compose.ui:ui-unit": [
+      "androidx.compose.ui.unit",
+      "androidx.compose.ui.unit.internal"
+    ],
+    "org.jetbrains.compose.ui:ui-unit-desktop": [
+      "androidx.compose.ui.unit",
+      "androidx.compose.ui.unit.internal"
+    ],
+    "org.jetbrains.compose.ui:ui-util": [
+      "androidx.compose.ui",
+      "androidx.compose.ui.util"
+    ],
+    "org.jetbrains.compose.ui:ui-util-desktop": [
+      "androidx.compose.ui",
+      "androidx.compose.ui.util"
+    ],
     "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable": [
       "androidx.compose.compiler.plugins.kotlin",
       "androidx.compose.compiler.plugins.kotlin.analysis",
@@ -2502,6 +2984,22 @@
       "kotlinx.coroutines.sync",
       "kotlinx.coroutines.time"
     ],
+    "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": [
+      "_COROUTINE",
+      "kotlinx.coroutines",
+      "kotlinx.coroutines.channels",
+      "kotlinx.coroutines.debug.internal",
+      "kotlinx.coroutines.flow",
+      "kotlinx.coroutines.flow.internal",
+      "kotlinx.coroutines.future",
+      "kotlinx.coroutines.internal",
+      "kotlinx.coroutines.intrinsics",
+      "kotlinx.coroutines.scheduling",
+      "kotlinx.coroutines.selects",
+      "kotlinx.coroutines.stream",
+      "kotlinx.coroutines.sync",
+      "kotlinx.coroutines.time"
+    ],
     "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j": [
       "kotlinx.coroutines.slf4j"
     ],
@@ -2543,6 +3041,50 @@
       "kotlinx.serialization.json",
       "kotlinx.serialization.json.internal"
     ],
+    "org.jetbrains.runtime:jbr-api": [
+      "com.jetbrains"
+    ],
+    "org.jetbrains.skiko:skiko": [
+      "org.jetbrains.skia",
+      "org.jetbrains.skia.icu",
+      "org.jetbrains.skia.impl",
+      "org.jetbrains.skia.paragraph",
+      "org.jetbrains.skia.shaper",
+      "org.jetbrains.skia.skottie",
+      "org.jetbrains.skia.sksg",
+      "org.jetbrains.skia.svg",
+      "org.jetbrains.skiko",
+      "org.jetbrains.skiko.context",
+      "org.jetbrains.skiko.graphicapi",
+      "org.jetbrains.skiko.internal",
+      "org.jetbrains.skiko.node",
+      "org.jetbrains.skiko.redrawer",
+      "org.jetbrains.skiko.swing",
+      "org.jetbrains.skiko.windows"
+    ],
+    "org.jetbrains.skiko:skiko-awt": [
+      "org.jetbrains.skia",
+      "org.jetbrains.skia.icu",
+      "org.jetbrains.skia.impl",
+      "org.jetbrains.skia.paragraph",
+      "org.jetbrains.skia.shaper",
+      "org.jetbrains.skia.skottie",
+      "org.jetbrains.skia.sksg",
+      "org.jetbrains.skia.svg",
+      "org.jetbrains.skiko",
+      "org.jetbrains.skiko.context",
+      "org.jetbrains.skiko.graphicapi",
+      "org.jetbrains.skiko.internal",
+      "org.jetbrains.skiko.node",
+      "org.jetbrains.skiko.redrawer",
+      "org.jetbrains.skiko.swing",
+      "org.jetbrains.skiko.windows"
+    ],
+    "org.jetbrains.skiko:skiko-awt-runtime-linux-arm64": null,
+    "org.jetbrains.skiko:skiko-awt-runtime-linux-x64": null,
+    "org.jetbrains.skiko:skiko-awt-runtime-macos-arm64": null,
+    "org.jetbrains.skiko:skiko-awt-runtime-macos-x64": null,
+    "org.jetbrains.skiko:skiko-awt-runtime-windows-x64": null,
     "org.jetbrains:annotations": [
       "org.intellij.lang.annotations",
       "org.jetbrains.annotations"
@@ -2665,6 +3207,8 @@
     ],
     "linuxArm64": [
       "androidx.compose.runtime:runtime-desktop",
+      "androidx.navigation3:navigation3-runtime-desktop",
+      "androidx.savedstate:savedstate-desktop",
       "app.cash.sqldelight:compiler-env",
       "app.cash.sqldelight:gradle-plugin",
       "app.cash.sqldelight:jdbc-driver",
@@ -2673,9 +3217,30 @@
       "dev.mokkery:mokkery-plugin",
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
       "dev.zacsweers.metro:compiler",
+      "io.github.ehsannarmani:compose-charts",
+      "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
+      "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
+      "org.jetbrains.compose.animation:animation-core-desktop",
+      "org.jetbrains.compose.animation:animation-desktop",
+      "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64",
+      "org.jetbrains.compose.desktop:desktop-jvm-linux-x64",
+      "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64",
+      "org.jetbrains.compose.desktop:desktop-jvm-macos-x64",
+      "org.jetbrains.compose.desktop:desktop-jvm-windows-x64",
+      "org.jetbrains.compose.foundation:foundation-desktop",
+      "org.jetbrains.compose.foundation:foundation-layout-desktop",
+      "org.jetbrains.compose.material3:material3-desktop",
+      "org.jetbrains.compose.material:material-icons-core-desktop",
+      "org.jetbrains.compose.ui:ui-desktop",
+      "org.jetbrains.compose.ui:ui-geometry-desktop",
+      "org.jetbrains.compose.ui:ui-graphics-desktop",
+      "org.jetbrains.compose.ui:ui-test-desktop",
+      "org.jetbrains.compose.ui:ui-text-desktop",
+      "org.jetbrains.compose.ui:ui-unit-desktop",
+      "org.jetbrains.compose.ui:ui-util-desktop",
       "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
       "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
       "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
@@ -2683,6 +3248,8 @@
     ],
     "linuxX64": [
       "androidx.compose.runtime:runtime-desktop",
+      "androidx.navigation3:navigation3-runtime-desktop",
+      "androidx.savedstate:savedstate-desktop",
       "app.cash.sqldelight:compiler-env",
       "app.cash.sqldelight:gradle-plugin",
       "app.cash.sqldelight:jdbc-driver",
@@ -2691,9 +3258,30 @@
       "dev.mokkery:mokkery-plugin",
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
       "dev.zacsweers.metro:compiler",
+      "io.github.ehsannarmani:compose-charts",
+      "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
+      "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
+      "org.jetbrains.compose.animation:animation-core-desktop",
+      "org.jetbrains.compose.animation:animation-desktop",
+      "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64",
+      "org.jetbrains.compose.desktop:desktop-jvm-linux-x64",
+      "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64",
+      "org.jetbrains.compose.desktop:desktop-jvm-macos-x64",
+      "org.jetbrains.compose.desktop:desktop-jvm-windows-x64",
+      "org.jetbrains.compose.foundation:foundation-desktop",
+      "org.jetbrains.compose.foundation:foundation-layout-desktop",
+      "org.jetbrains.compose.material3:material3-desktop",
+      "org.jetbrains.compose.material:material-icons-core-desktop",
+      "org.jetbrains.compose.ui:ui-desktop",
+      "org.jetbrains.compose.ui:ui-geometry-desktop",
+      "org.jetbrains.compose.ui:ui-graphics-desktop",
+      "org.jetbrains.compose.ui:ui-test-desktop",
+      "org.jetbrains.compose.ui:ui-text-desktop",
+      "org.jetbrains.compose.ui:ui-unit-desktop",
+      "org.jetbrains.compose.ui:ui-util-desktop",
       "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
       "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
       "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
@@ -2701,6 +3289,8 @@
     ],
     "macosArm64": [
       "androidx.compose.runtime:runtime-desktop",
+      "androidx.navigation3:navigation3-runtime-desktop",
+      "androidx.savedstate:savedstate-desktop",
       "app.cash.sqldelight:compiler-env",
       "app.cash.sqldelight:gradle-plugin",
       "app.cash.sqldelight:jdbc-driver",
@@ -2709,9 +3299,30 @@
       "dev.mokkery:mokkery-plugin",
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
       "dev.zacsweers.metro:compiler",
+      "io.github.ehsannarmani:compose-charts",
+      "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
+      "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
+      "org.jetbrains.compose.animation:animation-core-desktop",
+      "org.jetbrains.compose.animation:animation-desktop",
+      "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64",
+      "org.jetbrains.compose.desktop:desktop-jvm-linux-x64",
+      "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64",
+      "org.jetbrains.compose.desktop:desktop-jvm-macos-x64",
+      "org.jetbrains.compose.desktop:desktop-jvm-windows-x64",
+      "org.jetbrains.compose.foundation:foundation-desktop",
+      "org.jetbrains.compose.foundation:foundation-layout-desktop",
+      "org.jetbrains.compose.material3:material3-desktop",
+      "org.jetbrains.compose.material:material-icons-core-desktop",
+      "org.jetbrains.compose.ui:ui-desktop",
+      "org.jetbrains.compose.ui:ui-geometry-desktop",
+      "org.jetbrains.compose.ui:ui-graphics-desktop",
+      "org.jetbrains.compose.ui:ui-test-desktop",
+      "org.jetbrains.compose.ui:ui-text-desktop",
+      "org.jetbrains.compose.ui:ui-unit-desktop",
+      "org.jetbrains.compose.ui:ui-util-desktop",
       "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
       "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
       "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
@@ -2719,6 +3330,8 @@
     ],
     "metadata": [
       "androidx.compose.runtime:runtime-desktop",
+      "androidx.navigation3:navigation3-runtime-desktop",
+      "androidx.savedstate:savedstate-desktop",
       "app.cash.sqldelight:compiler-env",
       "app.cash.sqldelight:gradle-plugin",
       "app.cash.sqldelight:jdbc-driver",
@@ -2729,9 +3342,30 @@
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
       "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt",
       "dev.zacsweers.metro:compiler",
+      "io.github.ehsannarmani:compose-charts",
+      "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
+      "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
+      "org.jetbrains.compose.animation:animation-core-desktop",
+      "org.jetbrains.compose.animation:animation-desktop",
+      "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64",
+      "org.jetbrains.compose.desktop:desktop-jvm-linux-x64",
+      "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64",
+      "org.jetbrains.compose.desktop:desktop-jvm-macos-x64",
+      "org.jetbrains.compose.desktop:desktop-jvm-windows-x64",
+      "org.jetbrains.compose.foundation:foundation-desktop",
+      "org.jetbrains.compose.foundation:foundation-layout-desktop",
+      "org.jetbrains.compose.material3:material3-desktop",
+      "org.jetbrains.compose.material:material-icons-core-desktop",
+      "org.jetbrains.compose.ui:ui-desktop",
+      "org.jetbrains.compose.ui:ui-geometry-desktop",
+      "org.jetbrains.compose.ui:ui-graphics-desktop",
+      "org.jetbrains.compose.ui:ui-test-desktop",
+      "org.jetbrains.compose.ui:ui-text-desktop",
+      "org.jetbrains.compose.ui:ui-unit-desktop",
+      "org.jetbrains.compose.ui:ui-util-desktop",
       "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
       "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
       "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
@@ -2739,6 +3373,8 @@
     ],
     "mingwX64": [
       "androidx.compose.runtime:runtime-desktop",
+      "androidx.navigation3:navigation3-runtime-desktop",
+      "androidx.savedstate:savedstate-desktop",
       "app.cash.sqldelight:compiler-env",
       "app.cash.sqldelight:gradle-plugin",
       "app.cash.sqldelight:jdbc-driver",
@@ -2747,9 +3383,30 @@
       "dev.mokkery:mokkery-plugin",
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
       "dev.zacsweers.metro:compiler",
+      "io.github.ehsannarmani:compose-charts",
+      "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
+      "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
+      "org.jetbrains.compose.animation:animation-core-desktop",
+      "org.jetbrains.compose.animation:animation-desktop",
+      "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64",
+      "org.jetbrains.compose.desktop:desktop-jvm-linux-x64",
+      "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64",
+      "org.jetbrains.compose.desktop:desktop-jvm-macos-x64",
+      "org.jetbrains.compose.desktop:desktop-jvm-windows-x64",
+      "org.jetbrains.compose.foundation:foundation-desktop",
+      "org.jetbrains.compose.foundation:foundation-layout-desktop",
+      "org.jetbrains.compose.material3:material3-desktop",
+      "org.jetbrains.compose.material:material-icons-core-desktop",
+      "org.jetbrains.compose.ui:ui-desktop",
+      "org.jetbrains.compose.ui:ui-geometry-desktop",
+      "org.jetbrains.compose.ui:ui-graphics-desktop",
+      "org.jetbrains.compose.ui:ui-test-desktop",
+      "org.jetbrains.compose.ui:ui-text-desktop",
+      "org.jetbrains.compose.ui:ui-unit-desktop",
+      "org.jetbrains.compose.ui:ui-util-desktop",
       "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
       "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
       "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
@@ -3105,6 +3762,128 @@
         ]
       }
     },
+    "androidx.compose.runtime:runtime-retain": {
+      "jvm": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-retain-desktop-1.12.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-retain-desktop/1.12.1/runtime-retain-desktop-1.12.1.jar",
+            "sha256": "9b7e62a7df333c33eff9e1a6d6c2508a4d8fe4b7a43778075538fe3da4bc4485"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection"
+        ]
+      }
+    },
+    "androidx.compose.runtime:runtime-saveable": {
+      "jvm": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-saveable-desktop-1.12.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable-desktop/1.12.1/runtime-saveable-desktop-1.12.1.jar",
+            "sha256": "069949667409ab6de21053f9fdbff0869ae2a1f70a7212cdb89e7d409fd2552c"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.savedstate:savedstate-compose"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-runtime-compose"
+        ]
+      },
+      "linuxArm64": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-saveable-linuxArm64Main-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable-linuxarm64/1.12.1/runtime-saveable-linuxarm64-1.12.1.klib",
+            "sha256": "c00a4083deeb564fd144226f19fa4808be3e47dd798447c1b67bc4803a0b65e7"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.lifecycle:lifecycle-runtime-compose",
+          "androidx.savedstate:savedstate-compose"
+        ]
+      },
+      "linuxX64": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-saveable-linuxX64Main-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable-linuxx64/1.12.1/runtime-saveable-linuxx64-1.12.1.klib",
+            "sha256": "663585ebfef999b5a07bd7201b5511184571ba60ad68104eed0414c45898b3ec"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.lifecycle:lifecycle-runtime-compose",
+          "androidx.savedstate:savedstate-compose"
+        ]
+      },
+      "macosArm64": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-saveable-macosArm64Main-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable-macosarm64/1.12.1/runtime-saveable-macosarm64-1.12.1.klib",
+            "sha256": "16a8d06562536ae9c603bd2e6f3fd7580d6843aad6bd409135895b1481ca86cc"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.lifecycle:lifecycle-runtime-compose",
+          "androidx.savedstate:savedstate-compose"
+        ]
+      },
+      "metadata": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-saveable-metadata-1.12.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable/1.12.1/runtime-saveable-1.12.1.jar",
+            "sha256": "d7ac307d586b2caabf0bdec4949a21c8f49a653fa688e662d9f4a7eb2d94756e"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.lifecycle:lifecycle-runtime-compose",
+          "androidx.savedstate:savedstate-compose"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "mingwX64": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-saveable-mingwX64Main-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable-mingwx64/1.12.1/runtime-saveable-mingwx64-1.12.1.klib",
+            "sha256": "43d23757f069853444f845a10c196be319cd9bea3511d0b92cebf4cce598ec4d"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.lifecycle:lifecycle-runtime-compose",
+          "androidx.savedstate:savedstate-compose"
+        ]
+      }
+    },
     "androidx.lifecycle:lifecycle-common": {
       "jvm": {
         "version": "2.10.0",
@@ -3122,12 +3901,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "2.9.2",
+        "version": "2.10.0",
         "files": [
           {
-            "name": "lifecycle-common-linuxArm64Main-2.9.2.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-linuxarm64/2.9.2/lifecycle-common-linuxarm64-2.9.2.klib",
-            "sha256": "b08fcc948d7384237e57cf17086035e63837b99da79d10f6b87b9ccfbc291f02"
+            "name": "lifecycle-common-linuxArm64Main-2.10.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-linuxarm64/2.10.0/lifecycle-common-linuxarm64-2.10.0.klib",
+            "sha256": "04bc36b2d8bbedf8339ba49ac14c2784e5b793c7dd88e805eb465d88d2198315"
           }
         ],
         "deps": [
@@ -3137,12 +3916,12 @@
         ]
       },
       "linuxX64": {
-        "version": "2.9.2",
+        "version": "2.10.0",
         "files": [
           {
-            "name": "lifecycle-common-linuxX64Main-2.9.2.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-linuxx64/2.9.2/lifecycle-common-linuxx64-2.9.2.klib",
-            "sha256": "f4e5a68c33d97c112e4bafef656cb7ac651e493c4dc15de0443391b863da232c"
+            "name": "lifecycle-common-linuxX64Main-2.10.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-linuxx64/2.10.0/lifecycle-common-linuxx64-2.10.0.klib",
+            "sha256": "e21fdb3bbbef10f9624e65827ef9e5708d8237363fc030a522dd72f639815aed"
           }
         ],
         "deps": [
@@ -3152,12 +3931,12 @@
         ]
       },
       "macosArm64": {
-        "version": "2.9.2",
+        "version": "2.10.0",
         "files": [
           {
-            "name": "lifecycle-common-macosArm64Main-2.9.2.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-macosarm64/2.9.2/lifecycle-common-macosarm64-2.9.2.klib",
-            "sha256": "4deff4974e41c3754b63b7215bd5a62819c85d0ef874566dd4bda645459ca205"
+            "name": "lifecycle-common-macosArm64Main-2.10.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-macosarm64/2.10.0/lifecycle-common-macosarm64-2.10.0.klib",
+            "sha256": "cbd0b6682c8e033cb10eeb4a30138c3892438756e814496941aedaf0ad3cb09c"
           }
         ],
         "deps": [
@@ -3184,12 +3963,12 @@
         ]
       },
       "mingwX64": {
-        "version": "2.9.2",
+        "version": "2.10.0",
         "files": [
           {
-            "name": "lifecycle-common-mingwX64Main-2.9.2.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-mingwx64/2.9.2/lifecycle-common-mingwx64-2.9.2.klib",
-            "sha256": "972be726d272cb37451c4ea6529e733d57ff7f5c4bbbf61003da13296fb0d73e"
+            "name": "lifecycle-common-mingwX64Main-2.10.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-mingwx64/2.10.0/lifecycle-common-mingwx64-2.10.0.klib",
+            "sha256": "a14643cc5203b98bde28da27fe0fb6c4e3ceea71ff1c71ca2bf407f203ae3429"
           }
         ],
         "deps": [
@@ -3216,12 +3995,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "2.9.2",
+        "version": "2.10.0",
         "files": [
           {
-            "name": "lifecycle-runtime-linuxArm64Main-2.9.2.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-linuxarm64/2.9.2/lifecycle-runtime-linuxarm64-2.9.2.klib",
-            "sha256": "933592b9bc42f6ffc33b2c42a4b9a1aea223bc3360f8b4dde5a22c31d6e29f2c"
+            "name": "lifecycle-runtime-linuxArm64Main-2.10.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-linuxarm64/2.10.0/lifecycle-runtime-linuxarm64-2.10.0.klib",
+            "sha256": "a40519a821de1aa0cb42edf513c028319b3bcb164cdffd2ee3ab52e8efa7d04b"
           }
         ],
         "deps": [
@@ -3230,12 +4009,12 @@
         ]
       },
       "linuxX64": {
-        "version": "2.9.2",
+        "version": "2.10.0",
         "files": [
           {
-            "name": "lifecycle-runtime-linuxX64Main-2.9.2.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-linuxx64/2.9.2/lifecycle-runtime-linuxx64-2.9.2.klib",
-            "sha256": "fdddafb1d8794ce4abde8eb4d033eaa854bf3b9370f225ab1cbf61a4adaf6157"
+            "name": "lifecycle-runtime-linuxX64Main-2.10.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-linuxx64/2.10.0/lifecycle-runtime-linuxx64-2.10.0.klib",
+            "sha256": "206df3d8aaca102f16391f30dc4989ee5352188382131d2efec02ada1272ea92"
           }
         ],
         "deps": [
@@ -3244,12 +4023,12 @@
         ]
       },
       "macosArm64": {
-        "version": "2.9.2",
+        "version": "2.10.0",
         "files": [
           {
-            "name": "lifecycle-runtime-macosArm64Main-2.9.2.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-macosarm64/2.9.2/lifecycle-runtime-macosarm64-2.9.2.klib",
-            "sha256": "4eb9ae6a14da5627fb7b7b4a8e0588e190601024a24879e655c33481aacc676c"
+            "name": "lifecycle-runtime-macosArm64Main-2.10.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-macosarm64/2.10.0/lifecycle-runtime-macosarm64-2.10.0.klib",
+            "sha256": "549eb6d6b29fefa5a7b6c8cad547902b4ef824b20a09ff12a126d0a2b8784139"
           }
         ],
         "deps": [
@@ -3275,16 +4054,677 @@
         ]
       },
       "mingwX64": {
-        "version": "2.9.2",
+        "version": "2.10.0",
         "files": [
           {
-            "name": "lifecycle-runtime-mingwX64Main-2.9.2.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-mingwx64/2.9.2/lifecycle-runtime-mingwx64-2.9.2.klib",
-            "sha256": "c6bbbf2941cd6ca3f91d267085f6d96a7b9e545f32ef94a6801aa2d519153ec1"
+            "name": "lifecycle-runtime-mingwX64Main-2.10.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-mingwx64/2.10.0/lifecycle-runtime-mingwx64-2.10.0.klib",
+            "sha256": "2e219d245386b1ace43ac1e3ca9b2e47de8b90864b31710624b64a3b8fea86d1"
           }
         ],
         "deps": [
           "androidx.annotation:annotation",
+          "androidx.lifecycle:lifecycle-common"
+        ]
+      }
+    },
+    "androidx.lifecycle:lifecycle-runtime-compose": {
+      "jvm": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-runtime-compose-desktop-2.10.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-desktop/2.10.0/lifecycle-runtime-compose-desktop-2.10.0.jar",
+            "sha256": "4d233eeecc6e2769a76442830c5fd1884057c36d0ce2745167193a10cc8976f8"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.lifecycle:lifecycle-runtime"
+        ]
+      },
+      "linuxArm64": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-runtime-compose-linuxArm64Main-2.10.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-linuxarm64/2.10.0/lifecycle-runtime-compose-linuxarm64-2.10.0.klib",
+            "sha256": "9433cff6c16a10b3fdcd23a3282dc249f1d1d655b4d257993a7f1440f4d0bc3f"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.lifecycle:lifecycle-runtime"
+        ]
+      },
+      "linuxX64": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-runtime-compose-linuxX64Main-2.10.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-linuxx64/2.10.0/lifecycle-runtime-compose-linuxx64-2.10.0.klib",
+            "sha256": "ea5e792f946843743a8db30be6d4cffdd84b85e41190d8fb110a52f994dc1f2f"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.lifecycle:lifecycle-runtime"
+        ]
+      },
+      "macosArm64": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-runtime-compose-macosArm64Main-2.10.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-macosarm64/2.10.0/lifecycle-runtime-compose-macosarm64-2.10.0.klib",
+            "sha256": "6a7c18e01f3f90e5c3174ce450d1660ac7c89273e2963f28eca1b31cf49d9bae"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.lifecycle:lifecycle-runtime"
+        ]
+      },
+      "metadata": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-runtime-compose-metadata-2.10.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose/2.10.0/lifecycle-runtime-compose-2.10.0.jar",
+            "sha256": "c05bb3f3ac871b6f1c768980b851ad056459f292aec55ec76cecc7178181edf7"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.lifecycle:lifecycle-runtime"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "mingwX64": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-runtime-compose-mingwX64Main-2.10.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-mingwx64/2.10.0/lifecycle-runtime-compose-mingwx64-2.10.0.klib",
+            "sha256": "97d230110f4e83e23f627f8f5a8a86871ca9267351e39518e59b3dc32658ff66"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.lifecycle:lifecycle-runtime"
+        ]
+      }
+    },
+    "androidx.lifecycle:lifecycle-viewmodel": {
+      "jvm": {
+        "version": "2.11.0",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel-desktop-2.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-desktop/2.11.0/lifecycle-viewmodel-desktop-2.11.0.jar",
+            "sha256": "175c349266ccbb6a2036615725b7066ee3f3319665c98af42206ab3a582a43c3"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection"
+        ]
+      }
+    },
+    "androidx.lifecycle:lifecycle-viewmodel-compose": {
+      "jvm": {
+        "version": "2.11.0",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel-compose-desktop-2.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-compose-desktop/2.11.0/lifecycle-viewmodel-compose-desktop-2.11.0.jar",
+            "sha256": "1b4c58125c7b3693444f40c8ab76881d17fa74726860c24872a3dec3e0fad34b"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.lifecycle:lifecycle-common",
+          "androidx.lifecycle:lifecycle-viewmodel",
+          "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "runtime_deps": [
+          "androidx.lifecycle:lifecycle-runtime-compose"
+        ]
+      }
+    },
+    "androidx.lifecycle:lifecycle-viewmodel-savedstate": {
+      "jvm": {
+        "version": "2.11.0",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel-savedstate-desktop-2.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate-desktop/2.11.0/lifecycle-viewmodel-savedstate-desktop-2.11.0.jar",
+            "sha256": "ca21720ce7f370cb21cabb5329b959eda624107ec06282e3bdc92582917b1d27"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.lifecycle:lifecycle-viewmodel",
+          "androidx.savedstate:savedstate",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-common"
+        ]
+      }
+    },
+    "androidx.navigation3:navigation3-runtime": {
+      "jvm": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-runtime-desktop-1.2.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-desktop/1.2.0/navigation3-runtime-desktop-1.2.0.jar",
+            "sha256": "430fc8ccfd959f5079009921ad5052320fac9d93e7eb52af9cdc21562a6fc442"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.navigationevent:navigationevent",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-runtime"
+        ]
+      },
+      "linuxArm64": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-runtime-linuxArm64Main-1.2.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-linuxarm64/1.2.0/navigation3-runtime-linuxarm64-1.2.0.klib",
+            "sha256": "107e636a5f352b0493952a1afb0bd30c4cb087f398574a2e17717db1bf11703e"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.navigationevent:navigationevent",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "linuxX64": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-runtime-linuxX64Main-1.2.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-linuxx64/1.2.0/navigation3-runtime-linuxx64-1.2.0.klib",
+            "sha256": "960099b1bb276e83b68a4610cc006be2802c8c458fdd55333ad3547231896acb"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.navigationevent:navigationevent",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "macosArm64": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-runtime-macosArm64Main-1.2.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-macosarm64/1.2.0/navigation3-runtime-macosarm64-1.2.0.klib",
+            "sha256": "1e911edd0d0a6cc2c94e70d1f92f3296d8fbdcc006c062ee539d5e26fc7ea1aa"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.navigationevent:navigationevent",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "metadata": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-runtime-metadata-1.2.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime/1.2.0/navigation3-runtime-1.2.0.jar",
+            "sha256": "7083749cf5bfb33ede0f9da4102c9b4a0e820752656bda680434fcda166532a8"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.navigationevent:navigationevent",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "mingwX64": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-runtime-mingwX64Main-1.2.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-mingwx64/1.2.0/navigation3-runtime-mingwx64-1.2.0.klib",
+            "sha256": "299407d69639fdd08fb45214d2a962cd0c595e14d5acccbda9f2ee9d7a3250c0"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.navigationevent:navigationevent",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      }
+    },
+    "androidx.navigation3:navigation3-runtime-desktop": {
+      "jvm": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-runtime-desktop-1.2.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-desktop/1.2.0/navigation3-runtime-desktop-1.2.0.jar",
+            "sha256": "430fc8ccfd959f5079009921ad5052320fac9d93e7eb52af9cdc21562a6fc442"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.navigationevent:navigationevent",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-runtime"
+        ]
+      }
+    },
+    "androidx.navigationevent:navigationevent": {
+      "jvm": {
+        "version": "1.1.2",
+        "files": [
+          {
+            "name": "navigationevent-desktop-1.1.2.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-desktop/1.1.2/navigationevent-desktop-1.1.2.jar",
+            "sha256": "4c92508d4bd3b9cafb2785e8211057d39ed8465b529660223864a19625cedb5b"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime-annotation"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "linuxArm64": {
+        "version": "1.1.1",
+        "files": [
+          {
+            "name": "navigationevent-linuxArm64Main-1.1.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-linuxarm64/1.1.1/navigationevent-linuxarm64-1.1.1.klib",
+            "sha256": "853fba92d88726da1ff9a444fc0fdb05b9bbd24828118a70930d5998c6661325"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "linuxX64": {
+        "version": "1.1.1",
+        "files": [
+          {
+            "name": "navigationevent-linuxX64Main-1.1.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-linuxx64/1.1.1/navigationevent-linuxx64-1.1.1.klib",
+            "sha256": "67e2c3e669f001f0786886a807ac95fcd9b4e7a2ab6de3edbb54cbc64c3e5918"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "macosArm64": {
+        "version": "1.1.1",
+        "files": [
+          {
+            "name": "navigationevent-macosArm64Main-1.1.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-macosarm64/1.1.1/navigationevent-macosarm64-1.1.1.klib",
+            "sha256": "7f7b3c5487d74d89beb2d2078b691a6a8ac8b032af178d9c27a78969db62162b"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadata": {
+        "version": "1.1.2",
+        "files": [
+          {
+            "name": "navigationevent-metadata-1.1.2.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent/1.1.2/navigationevent-1.1.2.jar",
+            "sha256": "adbd571aa7ac75fadcc31fa1a21fcd3718a5c0f8b6eb79aa3f823ff61055027b"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "mingwX64": {
+        "version": "1.1.1",
+        "files": [
+          {
+            "name": "navigationevent-mingwX64Main-1.1.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-mingwx64/1.1.1/navigationevent-mingwx64-1.1.1.klib",
+            "sha256": "76c310e2ed6976e7ac12790502ebc753cf0aa09fd7923930b67d06a095ee61d7"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "androidx.navigationevent:navigationevent-compose": {
+      "jvm": {
+        "version": "1.1.2",
+        "files": [
+          {
+            "name": "navigationevent-compose-desktop-1.1.2.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-compose-desktop/1.1.2/navigationevent-compose-desktop-1.1.2.jar",
+            "sha256": "1d7d20d7826a2cc63ace9862cddd8a7085a11a3ea2cff258c28b3d58e57f143b"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.navigationevent:navigationevent"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "androidx.savedstate:savedstate": {
+      "jvm": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-desktop-1.5.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-desktop/1.5.0/savedstate-desktop-1.5.0.jar",
+            "sha256": "58198c6c979a400fc7831f1ca51d8caa972ca0b1fbe3df5e469b53cf552332b5"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-common"
+        ]
+      },
+      "linuxArm64": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-linuxArm64Main-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-linuxarm64/1.5.0/savedstate-linuxarm64-1.5.0.klib",
+            "sha256": "330bd68650258cfb862522a7667d2d0bbb742e84d0ed23d05b64e3135bb90bd3"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-common",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "linuxX64": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-linuxX64Main-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-linuxx64/1.5.0/savedstate-linuxx64-1.5.0.klib",
+            "sha256": "a9bc44af11eeed3a761779e47cfc8a3fc6fdf12ba650065f467f811905765706"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-common",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "macosArm64": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-macosArm64Main-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-macosarm64/1.5.0/savedstate-macosarm64-1.5.0.klib",
+            "sha256": "6d44ab031a4b5a7ab9e34ab19e6bae12d2b2d8f740c901a80967b0718eb75e84"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-common",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "metadata": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-metadata-1.5.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate/1.5.0/savedstate-1.5.0.jar",
+            "sha256": "af20b2cf3a1b8f5e2fbcf5a11158e6908db5ec856b75afc06441f1d1b5001ab6"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-common",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "mingwX64": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-mingwX64Main-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-mingwx64/1.5.0/savedstate-mingwx64-1.5.0.klib",
+            "sha256": "2b366584ccbb05263f2631734970298a8b9de6fbbacdad1615226406dffc73c5"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-common",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      }
+    },
+    "androidx.savedstate:savedstate-compose": {
+      "jvm": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-compose-desktop-1.5.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-compose-desktop/1.5.0/savedstate-compose-desktop-1.5.0.jar",
+            "sha256": "67be8f2949943826f652c2b5b6910a1af0872f1457e59445ab227c99023ff42b"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.savedstate:savedstate"
+        ]
+      },
+      "linuxArm64": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-compose-linuxArm64Main-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-compose-linuxarm64/1.5.0/savedstate-compose-linuxarm64-1.5.0.klib",
+            "sha256": "f6bc4804b50fde256f735e2c5150a01e75f87cf52527110803ea5b87054bff37"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.savedstate:savedstate"
+        ]
+      },
+      "linuxX64": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-compose-linuxX64Main-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-compose-linuxx64/1.5.0/savedstate-compose-linuxx64-1.5.0.klib",
+            "sha256": "94ccd2391b7cb8706e7bb0cb0234d21d4f256e59dc234b581360cea2925d898f"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.savedstate:savedstate"
+        ]
+      },
+      "macosArm64": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-compose-macosArm64Main-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-compose-macosarm64/1.5.0/savedstate-compose-macosarm64-1.5.0.klib",
+            "sha256": "7f63bb8563cb9d60a4f973853f3834b4488d881ccd4003501335f48e269a7353"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.savedstate:savedstate"
+        ]
+      },
+      "metadata": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-compose-metadata-1.5.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-compose/1.5.0/savedstate-compose-1.5.0.jar",
+            "sha256": "06df9c7e62514ae808aef85709ad790659e1e6a2b6c6f259de03717dc81bad45"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.savedstate:savedstate"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "mingwX64": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-compose-mingwX64Main-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-compose-mingwx64/1.5.0/savedstate-compose-mingwx64-1.5.0.klib",
+            "sha256": "9d6e464e52d17a03a0f22780d621fe98875ebc15ff0661916192be39d1b343d3"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.savedstate:savedstate"
+        ]
+      }
+    },
+    "androidx.savedstate:savedstate-desktop": {
+      "jvm": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-desktop-1.5.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-desktop/1.5.0/savedstate-desktop-1.5.0.jar",
+            "sha256": "58198c6c979a400fc7831f1ca51d8caa972ca0b1fbe3df5e469b53cf552332b5"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
           "androidx.lifecycle:lifecycle-common"
         ]
       }
@@ -6616,6 +8056,36 @@
         ]
       }
     },
+    "io.github.ehsannarmani:compose-charts": {
+      "jvm": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "compose-charts-desktop.jar",
+            "url": "https://repo1.maven.org/maven2/io/github/ehsannarmani/compose-charts-desktop/1.0.0/compose-charts-desktop-1.0.0.jar",
+            "sha256": "a9ffd169e1f9c46b210b2c02ccead3b6d3ab4450b3624c48a3406c1082a3b61a"
+          }
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.foundation:foundation"
+        ]
+      }
+    },
+    "io.github.ehsannarmani:compose-charts-desktop": {
+      "jvm": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "compose-charts-desktop.jar",
+            "url": "https://repo1.maven.org/maven2/io/github/ehsannarmani/compose-charts-desktop/1.0.0/compose-charts-desktop-1.0.0.jar",
+            "sha256": "a9ffd169e1f9c46b210b2c02ccead3b6d3ab4450b3624c48a3406c1082a3b61a"
+          }
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.foundation:foundation"
+        ]
+      }
+    },
     "io.ktor:ktor-client-auth": {
       "jvm": {
         "version": "3.6.0",
@@ -8368,39 +9838,39 @@
     },
     "org.jetbrains.androidx.lifecycle:lifecycle-common": {
       "jvm": {
-        "version": "2.9.5",
+        "version": "2.9.6",
         "files": null,
         "deps": [
           "androidx.lifecycle:lifecycle-common"
         ]
       },
       "linuxArm64": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": null,
         "deps": [
           "androidx.lifecycle:lifecycle-common"
         ]
       },
       "linuxX64": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": null,
         "deps": [
           "androidx.lifecycle:lifecycle-common"
         ]
       },
       "macosArm64": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": null,
         "deps": [
           "androidx.lifecycle:lifecycle-common"
         ]
       },
       "metadata": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": [
           {
-            "name": "lifecycle-common-2.9.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-common/2.9.2/lifecycle-common-2.9.2.jar",
+            "name": "lifecycle-common-2.9.5.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-common/2.9.5/lifecycle-common-2.9.5.jar",
             "sha256": "b21a149fe28cccc7ece37b55098d10027aba3d2e0db31d12d3cdc907ded2368a"
           }
         ],
@@ -8412,12 +9882,12 @@
         ]
       },
       "mingwX64": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": [
           {
-            "name": "lifecycle-common-mingwX64Main-2.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-common-mingwx64/2.9.2/lifecycle-common-mingwx64-2.9.2.klib",
-            "sha256": "0412c2d2aca139c21f95f95242fc7f06da2b07698504e871b159dd7dab2deb32"
+            "name": "lifecycle-common-mingwX64Main-2.9.5.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-common-mingwx64/2.9.5/lifecycle-common-mingwx64-2.9.5.klib",
+            "sha256": "31d07fed834c55c18e294217aacb0a25db6db1de9a352a8af25534cdcb7be817"
           }
         ],
         "deps": [
@@ -8427,28 +9897,29 @@
     },
     "org.jetbrains.androidx.lifecycle:lifecycle-runtime": {
       "jvm": {
+        "version": "2.9.6",
+        "files": null,
+        "deps": [
+          "androidx.lifecycle:lifecycle-runtime",
+          "org.jetbrains.androidx.lifecycle:lifecycle-common"
+        ]
+      },
+      "linuxArm64": {
         "version": "2.9.5",
         "files": null,
         "deps": [
           "androidx.lifecycle:lifecycle-runtime"
         ]
       },
-      "linuxArm64": {
-        "version": "2.9.2",
-        "files": null,
-        "deps": [
-          "androidx.lifecycle:lifecycle-runtime"
-        ]
-      },
       "linuxX64": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": null,
         "deps": [
           "androidx.lifecycle:lifecycle-runtime"
         ]
       },
       "macosArm64": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": null,
         "deps": [
           "androidx.lifecycle:lifecycle-runtime"
@@ -8471,32 +9942,33 @@
         ]
       },
       "mingwX64": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": [
           {
-            "name": "lifecycle-runtime-mingwX64Main-2.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-mingwx64/2.9.2/lifecycle-runtime-mingwx64-2.9.2.klib",
-            "sha256": "007077392a1b026c4a8c8b7ee172b13df48a5e344cdb5268566a07e426ee9a8a"
+            "name": "lifecycle-runtime-mingwX64Main-2.9.5.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-mingwx64/2.9.5/lifecycle-runtime-mingwx64-2.9.5.klib",
+            "sha256": "5dc7874cde545195cd988eca8102f6461fd109a35e3eb409f7d89d3968ecfdfb"
           }
         ],
         "deps": [
-          "androidx.lifecycle:lifecycle-runtime"
+          "androidx.lifecycle:lifecycle-runtime",
+          "org.jetbrains.androidx.lifecycle:lifecycle-common"
         ]
       }
     },
     "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose": {
       "jvm": {
-        "version": "2.9.2",
+        "version": "2.9.6",
         "files": [
           {
-            "name": "lifecycle-runtime-compose-desktop-2.9.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose-desktop/2.9.2/lifecycle-runtime-compose-desktop-2.9.2.jar",
-            "sha256": "f23ecb26579bb3f58dc453ce7a882a45fe95101de69c4573a204c7a85053fe74"
+            "name": "lifecycle-runtime-compose-desktop-2.9.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose-desktop/2.9.6/lifecycle-runtime-compose-desktop-2.9.6.jar",
+            "sha256": "31c3c4b6dea38f078c46829dee2c43abba2bf8757b7ee8a0f660f31217364898"
           }
         ],
         "deps": [
+          "androidx.lifecycle:lifecycle-runtime-compose",
           "org.jetbrains.androidx.lifecycle:lifecycle-runtime",
-          "org.jetbrains.compose.annotation-internal:annotation",
           "org.jetbrains.compose.runtime:runtime"
         ],
         "runtime_deps": [
@@ -8504,150 +9976,277 @@
         ]
       },
       "linuxArm64": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": [
           {
-            "name": "lifecycle-runtime-compose-linuxArm64Main-2.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose-linuxarm64/2.9.2/lifecycle-runtime-compose-linuxarm64-2.9.2.klib",
-            "sha256": "8a7f8804777f927c84995fe7f808298ccf2bc90546e130223216d4df016717f2"
+            "name": "lifecycle-runtime-compose-linuxArm64Main-2.9.5.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose-linuxarm64/2.9.5/lifecycle-runtime-compose-linuxarm64-2.9.5.klib",
+            "sha256": "5a1d24c0cd8b0078064ba69a91b7ca8f925251818d5b82dd3c7d97c81ab0f4d6"
           }
         ],
         "deps": [
+          "androidx.lifecycle:lifecycle-runtime-compose",
           "org.jetbrains.androidx.lifecycle:lifecycle-common",
           "org.jetbrains.androidx.lifecycle:lifecycle-runtime",
-          "org.jetbrains.compose.annotation-internal:annotation",
           "org.jetbrains.compose.runtime:runtime"
         ]
       },
       "linuxX64": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": [
           {
-            "name": "lifecycle-runtime-compose-linuxX64Main-2.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose-linuxx64/2.9.2/lifecycle-runtime-compose-linuxx64-2.9.2.klib",
-            "sha256": "ff9156101ee94f3c1fc26b7278ed064341fc77879bbdf73001c5da20056d9efb"
+            "name": "lifecycle-runtime-compose-linuxX64Main-2.9.5.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose-linuxx64/2.9.5/lifecycle-runtime-compose-linuxx64-2.9.5.klib",
+            "sha256": "b1e0e72521e9e985984091742c95b69ac3b84d5c54417ebd37e6ab3340dcb7bc"
           }
         ],
         "deps": [
+          "androidx.lifecycle:lifecycle-runtime-compose",
           "org.jetbrains.androidx.lifecycle:lifecycle-common",
           "org.jetbrains.androidx.lifecycle:lifecycle-runtime",
-          "org.jetbrains.compose.annotation-internal:annotation",
           "org.jetbrains.compose.runtime:runtime"
         ]
       },
       "macosArm64": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": [
           {
-            "name": "lifecycle-runtime-compose-macosArm64Main-2.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose-macosarm64/2.9.2/lifecycle-runtime-compose-macosarm64-2.9.2.klib",
-            "sha256": "aadfc7e8d535a877517482d8ae6ad12ae66dc4c26a6ebd9102018793012b6800"
+            "name": "lifecycle-runtime-compose-macosArm64Main-2.9.5.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose-macosarm64/2.9.5/lifecycle-runtime-compose-macosarm64-2.9.5.klib",
+            "sha256": "a0d0f12655ecb8890d0c0e09bec0a0567b9c307381da60f41bff24b7f231b0b0"
           }
         ],
         "deps": [
+          "androidx.lifecycle:lifecycle-runtime-compose",
           "org.jetbrains.androidx.lifecycle:lifecycle-common",
           "org.jetbrains.androidx.lifecycle:lifecycle-runtime",
-          "org.jetbrains.compose.annotation-internal:annotation",
           "org.jetbrains.compose.runtime:runtime"
         ]
       },
       "metadata": {
-        "version": "2.9.2",
+        "version": "2.9.5",
         "files": [
           {
-            "name": "lifecycle-runtime-compose-2.9.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose/2.9.2/lifecycle-runtime-compose-2.9.2.jar",
-            "sha256": "780bbe9e2567b62744222b2a011c7b706f1e643d2cb02fee0f5f486e9866a6d4"
+            "name": "lifecycle-runtime-compose-2.9.5.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose/2.9.5/lifecycle-runtime-compose-2.9.5.jar",
+            "sha256": "64f4a647f40b64cd728612712a86f88e13dd9d663bc68afaacc226b2b904ff24"
           }
         ],
         "deps": [
+          "androidx.lifecycle:lifecycle-runtime-compose",
           "org.jetbrains.androidx.lifecycle:lifecycle-common",
           "org.jetbrains.androidx.lifecycle:lifecycle-runtime",
-          "org.jetbrains.compose.annotation-internal:annotation",
           "org.jetbrains.compose.runtime:runtime"
-        ],
-        "source_sets": [
-          "commonMain",
-          "nonAndroidMain"
-        ]
-      },
-      "mingwX64": {
-        "version": "2.9.2",
-        "files": [
-          {
-            "name": "lifecycle-runtime-compose-mingwX64Main-2.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose-mingwx64/2.9.2/lifecycle-runtime-compose-mingwx64-2.9.2.klib",
-            "sha256": "59f10ab4b79b462aa2ce0765ae092a8635fde5e61008d8bb8d842aaedd380ebe"
-          }
-        ],
-        "deps": [
-          "org.jetbrains.androidx.lifecycle:lifecycle-common",
-          "org.jetbrains.androidx.lifecycle:lifecycle-runtime",
-          "org.jetbrains.compose.annotation-internal:annotation",
-          "org.jetbrains.compose.runtime:runtime"
-        ]
-      }
-    },
-    "org.jetbrains.compose.annotation-internal:annotation": {
-      "jvm": {
-        "version": "1.9.0-beta03",
-        "files": null,
-        "deps": [
-          "androidx.annotation:annotation"
-        ]
-      },
-      "linuxArm64": {
-        "version": "1.9.0-beta03",
-        "files": [
-          {
-            "name": "annotation-linuxArm64Main-1.9.0-beta03.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/annotation-internal/annotation-linuxarm64/1.9.0-beta03/annotation-linuxarm64-1.9.0-beta03.klib",
-            "sha256": "bbf38d96a16353206669729d5197c4976f1123bb13c3494eb16e0e6e8616e495"
-          }
-        ],
-        "deps": [
-          "androidx.annotation:annotation"
-        ]
-      },
-      "linuxX64": {
-        "version": "1.9.0-beta03",
-        "files": null,
-        "deps": [
-          "androidx.annotation:annotation"
-        ]
-      },
-      "macosArm64": {
-        "version": "1.9.0-beta03",
-        "files": null,
-        "deps": [
-          "androidx.annotation:annotation"
-        ]
-      },
-      "metadata": {
-        "version": "1.9.0-beta03",
-        "files": [
-          {
-            "name": "annotation-1.9.0-beta03.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/annotation-internal/annotation/1.9.0-beta03/annotation-1.9.0-beta03.jar",
-            "sha256": "597b893edebd7ec3ee66f3c63c91e3c23733f896745d17bc72aef6618a47a68f"
-          }
-        ],
-        "deps": [
-          "androidx.annotation:annotation"
         ],
         "source_sets": [
           "commonMain"
         ]
       },
       "mingwX64": {
-        "version": "1.9.0-beta03",
+        "version": "2.9.5",
         "files": [
           {
-            "name": "annotation-mingwX64Main-1.9.0-beta03.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/annotation-internal/annotation-mingwx64/1.9.0-beta03/annotation-mingwx64-1.9.0-beta03.klib",
-            "sha256": "fa9f465e4efd5b39e53f9256016c1b5ed93a15a10bc165527b1187cb6ff18f7a"
+            "name": "lifecycle-runtime-compose-mingwX64Main-2.9.5.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose-mingwx64/2.9.5/lifecycle-runtime-compose-mingwx64-2.9.5.klib",
+            "sha256": "0138a56679ed63d3e2eedd09adc7c249dac8594363eff3b4ef1fb870e2abb3e2"
           }
         ],
+        "deps": [
+          "androidx.lifecycle:lifecycle-runtime-compose",
+          "org.jetbrains.androidx.lifecycle:lifecycle-common",
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime",
+          "org.jetbrains.compose.runtime:runtime"
+        ]
+      }
+    },
+    "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel": {
+      "jvm": {
+        "version": "2.9.6",
+        "files": null,
+        "deps": [
+          "androidx.lifecycle:lifecycle-viewmodel"
+        ]
+      }
+    },
+    "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate": {
+      "jvm": {
+        "version": "2.9.6",
+        "files": null,
+        "deps": [
+          "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel",
+          "org.jetbrains.androidx.savedstate:savedstate"
+        ]
+      }
+    },
+    "org.jetbrains.androidx.navigation3:navigation3-ui-desktop": {
+      "jvm": {
+        "version": "1.1.2",
+        "files": [
+          {
+            "name": "navigation3-ui-desktop-1.1.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/navigation3/navigation3-ui-desktop/1.1.2/navigation3-ui-desktop-1.1.2.jar",
+            "sha256": "b74001885b88af687e0795b4a4cc80a5fbd7f4ffad2077ab415220afc75021a8"
+          }
+        ],
+        "deps": [
+          "androidx.navigation3:navigation3-runtime",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.androidx.navigationevent:navigationevent-compose",
+          "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui"
+        ],
+        "runtime_deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.lifecycle:lifecycle-runtime-compose"
+        ]
+      }
+    },
+    "org.jetbrains.androidx.navigationevent:navigationevent-compose": {
+      "jvm": {
+        "version": "1.1.0",
+        "files": [
+          {
+            "name": "navigationevent-compose-desktop-1.1.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/navigationevent/navigationevent-compose-desktop/1.1.0/navigationevent-compose-desktop-1.1.0.jar",
+            "sha256": "0514f5d5c14de3b422c48a4eaf1d9dd2ce265041339e4c51ce30db8da1690874"
+          }
+        ],
+        "deps": [
+          "androidx.navigationevent:navigationevent-compose",
+          "org.jetbrains.compose.runtime:runtime"
+        ]
+      }
+    },
+    "org.jetbrains.androidx.savedstate:savedstate": {
+      "jvm": {
+        "version": "1.3.6",
+        "files": null,
+        "deps": [
+          "androidx.savedstate:savedstate"
+        ]
+      }
+    },
+    "org.jetbrains.androidx.savedstate:savedstate-compose": {
+      "jvm": {
+        "version": "1.3.6",
+        "files": [
+          {
+            "name": "savedstate-compose-desktop-1.3.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/savedstate/savedstate-compose-desktop/1.3.6/savedstate-compose-desktop-1.3.6.jar",
+            "sha256": "0f3d045c5fd7e1301ab6c38cd0778067b0484cf39acac1233be71a723a6a8075"
+          }
+        ],
+        "deps": [
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.androidx.savedstate:savedstate",
+          "org.jetbrains.compose.runtime:runtime"
+        ]
+      }
+    },
+    "org.jetbrains.compose.animation:animation": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "animation-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation-desktop/1.12.2/animation-desktop-1.12.2.jar",
+            "sha256": "755ca81764d5aae7afb2d5f72e3253a44a1cc9c0f890d1dcc319f0eb8f00736b"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.animation:animation-core",
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-geometry"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      }
+    },
+    "org.jetbrains.compose.animation:animation-core": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "animation-core-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation-core-desktop/1.12.2/animation-core-desktop-1.12.2.jar",
+            "sha256": "d988b6b7d867146825a9da38e1522fc50580aa14986ab22a8b724fcdcef17875"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      }
+    },
+    "org.jetbrains.compose.animation:animation-core-desktop": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "animation-core-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation-core-desktop/1.12.2/animation-core-desktop-1.12.2.jar",
+            "sha256": "d988b6b7d867146825a9da38e1522fc50580aa14986ab22a8b724fcdcef17875"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      }
+    },
+    "org.jetbrains.compose.animation:animation-desktop": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "animation-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation-desktop/1.12.2/animation-desktop-1.12.2.jar",
+            "sha256": "755ca81764d5aae7afb2d5f72e3253a44a1cc9c0f890d1dcc319f0eb8f00736b"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.animation:animation-core",
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-geometry"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      }
+    },
+    "org.jetbrains.compose.annotation-internal:annotation": {
+      "jvm": {
+        "version": "1.9.1",
+        "files": null,
         "deps": [
           "androidx.annotation:annotation"
         ]
@@ -8655,7 +10254,7 @@
     },
     "org.jetbrains.compose.collection-internal:collection": {
       "jvm": {
-        "version": "1.8.2",
+        "version": "1.9.1",
         "files": null,
         "deps": [
           "androidx.collection:collection"
@@ -8715,6 +10314,278 @@
         ],
         "deps": [
           "androidx.collection:collection"
+        ]
+      }
+    },
+    "org.jetbrains.compose.desktop:desktop": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "desktop-jvm-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/desktop/desktop-jvm/1.12.2/desktop-jvm-1.12.2.jar",
+            "sha256": "adaea6ec630420712dcfd52a356b46aef603129ca7f76cba204569112fa80e1c"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.foundation:foundation",
+          "org.jetbrains.compose.material:material",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-tooling-preview"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": null,
+        "deps": [
+          "org.jetbrains.compose.desktop:desktop"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.skiko:skiko-awt-runtime-linux-arm64"
+        ]
+      }
+    },
+    "org.jetbrains.compose.desktop:desktop-jvm-linux-x64": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": null,
+        "deps": [
+          "org.jetbrains.compose.desktop:desktop"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.skiko:skiko-awt-runtime-linux-x64"
+        ]
+      }
+    },
+    "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": null,
+        "deps": [
+          "org.jetbrains.compose.desktop:desktop"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.skiko:skiko-awt-runtime-macos-arm64"
+        ]
+      }
+    },
+    "org.jetbrains.compose.desktop:desktop-jvm-macos-x64": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": null,
+        "deps": [
+          "org.jetbrains.compose.desktop:desktop"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.skiko:skiko-awt-runtime-macos-x64"
+        ]
+      }
+    },
+    "org.jetbrains.compose.desktop:desktop-jvm-windows-x64": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": null,
+        "deps": [
+          "org.jetbrains.compose.desktop:desktop"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.skiko:skiko-awt-runtime-windows-x64"
+        ]
+      }
+    },
+    "org.jetbrains.compose.foundation:foundation": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "foundation-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation-desktop/1.12.2/foundation-desktop-1.12.2.jar",
+            "sha256": "e1dc29cd9de2f1628a741866a112eedc62fec43bc548d0e4f434bf31207fd1e3"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.ui:ui-text",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.runtime:jbr-api"
+        ]
+      }
+    },
+    "org.jetbrains.compose.foundation:foundation-desktop": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "foundation-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation-desktop/1.12.2/foundation-desktop-1.12.2.jar",
+            "sha256": "e1dc29cd9de2f1628a741866a112eedc62fec43bc548d0e4f434bf31207fd1e3"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.ui:ui-text",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.runtime:jbr-api"
+        ]
+      }
+    },
+    "org.jetbrains.compose.foundation:foundation-layout": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "foundation-layout-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation-layout-desktop/1.12.2/foundation-layout-desktop-1.12.2.jar",
+            "sha256": "57b54c104bae9eea0e90bb26487f8b64ead09a473f1b32cbed8579084f485e7b"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.ui:ui"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      }
+    },
+    "org.jetbrains.compose.foundation:foundation-layout-desktop": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "foundation-layout-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation-layout-desktop/1.12.2/foundation-layout-desktop-1.12.2.jar",
+            "sha256": "57b54c104bae9eea0e90bb26487f8b64ead09a473f1b32cbed8579084f485e7b"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.ui:ui"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      }
+    },
+    "org.jetbrains.compose.material3:material3-desktop": {
+      "jvm": {
+        "version": "1.9.0",
+        "files": [
+          {
+            "name": "material3-desktop-1.9.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/material3/material3-desktop/1.9.0/material3-desktop-1.9.0.jar",
+            "sha256": "78f0787a1c6d20f9b2460a387f51ecf554e211d3c874b22d66530a540390b811"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.foundation:foundation",
+          "org.jetbrains.compose.material:material-ripple",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-text"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.animation:animation-core",
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.ui:ui-backhandler",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-datetime"
+        ]
+      }
+    },
+    "org.jetbrains.compose.material:material": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "material-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/material/material-desktop/1.12.2/material-desktop-1.12.2.jar",
+            "sha256": "0c1dd397b45a7cd830234ddf30d253b586259e726a5cd816cca2e79119a47fa2"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.animation:animation-core",
+          "org.jetbrains.compose.foundation:foundation",
+          "org.jetbrains.compose.material:material-ripple",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-text"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:atomicfu"
+        ]
+      }
+    },
+    "org.jetbrains.compose.material:material-icons-core-desktop": {
+      "jvm": {
+        "version": "1.7.3",
+        "files": [
+          {
+            "name": "material-icons-core-desktop-1.7.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/material/material-icons-core-desktop/1.7.3/material-icons-core-desktop-1.7.3.jar",
+            "sha256": "bcf6c853b6db2ff148d2d3aad3b7a7ea54d93fc7b42e0afd840eb6daf1a1c681"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.ui:ui"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-unit"
+        ]
+      }
+    },
+    "org.jetbrains.compose.material:material-ripple": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "material-ripple-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/material/material-ripple-desktop/1.12.2/material-ripple-desktop-1.12.2.jar",
+            "sha256": "06ac72a5f57b2e724ea129efbc71973a27a9e1ceeb7f568281dcb0d1ef4448fd"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.foundation:foundation",
+          "org.jetbrains.compose.runtime:runtime"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.ui:ui-util"
         ]
       }
     },
@@ -8789,6 +10660,360 @@
         ],
         "deps": [
           "androidx.compose.runtime:runtime"
+        ]
+      }
+    },
+    "org.jetbrains.compose.runtime:runtime-saveable": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "runtime-saveable-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/runtime/runtime-saveable-desktop/1.12.2/runtime-saveable-desktop-1.12.2.jar",
+            "sha256": "d81973dced223d6aea7bf9f6d4ead285494c656ea003b59072babefd25470c7b"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime-saveable",
+          "org.jetbrains.androidx.savedstate:savedstate-compose",
+          "org.jetbrains.compose.runtime:runtime"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-desktop/1.12.2/ui-desktop-1.12.2.jar",
+            "sha256": "eaee42812c81cf1f1a925088bd7e847a343decbc3ccb1682f00f203123a51a17"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime-retain",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-text",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-viewmodel-compose",
+          "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "org.jetbrains.androidx.navigationevent:navigationevent-compose",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui-backhandler": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-backhandler-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-backhandler-desktop/1.12.2/ui-backhandler-desktop-1.12.2.jar",
+            "sha256": "0bc021accc616c2a99afe0c39ca1ec29082fa78a7b99868ed122d162eab828bd"
+          }
+        ],
+        "runtime_deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.androidx.navigationevent:navigationevent-compose",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui-desktop": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-desktop/1.12.2/ui-desktop-1.12.2.jar",
+            "sha256": "eaee42812c81cf1f1a925088bd7e847a343decbc3ccb1682f00f203123a51a17"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime-retain",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-text",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-viewmodel-compose",
+          "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "org.jetbrains.androidx.navigationevent:navigationevent-compose",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui-geometry": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-geometry-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-geometry-desktop/1.12.2/ui-geometry-desktop-1.12.2.jar",
+            "sha256": "2cde44d95ba21654dcced3a3098bdd171b3ef5b17ef7fc6cec0d25983dbc9fa0"
+          }
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui-geometry-desktop": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-geometry-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-geometry-desktop/1.12.2/ui-geometry-desktop-1.12.2.jar",
+            "sha256": "2cde44d95ba21654dcced3a3098bdd171b3ef5b17ef7fc6cec0d25983dbc9fa0"
+          }
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui-graphics": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-graphics-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-graphics-desktop/1.12.2/ui-graphics-desktop-1.12.2.jar",
+            "sha256": "92fddd7609d77a803f7083b1b7dd5a651cba10be27c105361a5d0b3894932085"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui-graphics-desktop": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-graphics-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-graphics-desktop/1.12.2/ui-graphics-desktop-1.12.2.jar",
+            "sha256": "92fddd7609d77a803f7083b1b7dd5a651cba10be27c105361a5d0b3894932085"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui-test-desktop": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-test-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-test-desktop/1.12.2/ui-test-desktop-1.12.2.jar",
+            "sha256": "660fa942dca3fad63d2436841eba124a8908b686961a912f4a0dcddd29469e52"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-text",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-test"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.navigationevent:navigationevent",
+          "junit:junit",
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose",
+          "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel",
+          "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.skiko:skiko"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui-text": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-text-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-text-desktop/1.12.2/ui-text-desktop-1.12.2.jar",
+            "sha256": "672331d7e1440f2406f6a9b6d3d61475316cf622d0dbbe910e47bdbd69861c38"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui-text-desktop": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-text-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-text-desktop/1.12.2/ui-text-desktop-1.12.2.jar",
+            "sha256": "672331d7e1440f2406f6a9b6d3d61475316cf622d0dbbe910e47bdbd69861c38"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui-tooling-preview": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-tooling-preview-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-tooling-preview-desktop/1.12.2/ui-tooling-preview-desktop-1.12.2.jar",
+            "sha256": "19f5005baa27dfbf3f435feed44dfba9c938ba386ac6753d00a67a270cd72231"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.compose.runtime:runtime"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui-unit": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-unit-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-unit-desktop/1.12.2/ui-unit-desktop-1.12.2.jar",
+            "sha256": "7c4998f1224f241dbe88fa59701d697d598fe8979a4acaed717b8365d4cd9300"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.compose.ui:ui-geometry"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui-unit-desktop": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-unit-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-unit-desktop/1.12.2/ui-unit-desktop-1.12.2.jar",
+            "sha256": "7c4998f1224f241dbe88fa59701d697d598fe8979a4acaed717b8365d4cd9300"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.compose.ui:ui-geometry"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui-util": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-util-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-util-desktop/1.12.2/ui-util-desktop-1.12.2.jar",
+            "sha256": "bb81e9748c9bcadeaeb99bab647e21442e62e253a3a497a213c68e040cb2b385"
+          }
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime"
+        ]
+      }
+    },
+    "org.jetbrains.compose.ui:ui-util-desktop": {
+      "jvm": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-util-desktop-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-util-desktop/1.12.2/ui-util-desktop-1.12.2.jar",
+            "sha256": "bb81e9748c9bcadeaeb99bab647e21442e62e253a3a497a213c68e040cb2b385"
+          }
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime"
         ]
       }
     },
@@ -9026,6 +11251,21 @@
         ],
         "deps": [
           "org.jetbrains.kotlinx:atomicfu"
+        ]
+      }
+    },
+    "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": {
+      "jvm": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-jvm-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0.jar",
+            "sha256": "d1d75aa01dffbb4d1c520e67e4c4e7f5f6174718e7cb4632412503f2f0e604fa"
+          }
+        ],
+        "deps": [
+          "org.jetbrains:annotations"
         ]
       }
     },
@@ -9524,6 +11764,127 @@
         ],
         "deps": [
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      }
+    },
+    "org.jetbrains.runtime:jbr-api": {
+      "jvm": {
+        "version": "1.9.0",
+        "files": [
+          {
+            "name": "jbr-api-1.9.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/runtime/jbr-api/1.9.0/jbr-api-1.9.0.jar",
+            "sha256": "7e37284e33b5b304ee6174dcaa92db949b257cc4c8991ca865e7daf5113d8279"
+          }
+        ]
+      }
+    },
+    "org.jetbrains.skiko:skiko": {
+      "jvm": {
+        "version": "0.150.2",
+        "files": [
+          {
+            "name": "skiko-awt-0.150.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko-awt/0.150.2/skiko-awt-0.150.2.jar",
+            "sha256": "6b36a9d9a931f5b4aedc3722ae9e769d13e945a8f18bd480340e625ea10e0171"
+          }
+        ],
+        "runtime_deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm",
+          "org.jetbrains.runtime:jbr-api"
+        ]
+      }
+    },
+    "org.jetbrains.skiko:skiko-awt": {
+      "jvm": {
+        "version": "0.150.2",
+        "files": [
+          {
+            "name": "skiko-awt-0.150.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko-awt/0.150.2/skiko-awt-0.150.2.jar",
+            "sha256": "6b36a9d9a931f5b4aedc3722ae9e769d13e945a8f18bd480340e625ea10e0171"
+          }
+        ],
+        "runtime_deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm",
+          "org.jetbrains.runtime:jbr-api"
+        ]
+      }
+    },
+    "org.jetbrains.skiko:skiko-awt-runtime-linux-arm64": {
+      "jvm": {
+        "version": "0.150.2",
+        "files": [
+          {
+            "name": "skiko-awt-runtime-linux-arm64-0.150.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko-awt-runtime-linux-arm64/0.150.2/skiko-awt-runtime-linux-arm64-0.150.2.jar",
+            "sha256": "aa124057c6e50bdea9e0deb4e85649f0c3d78ecd66e3b1b5751bcbe251dfba59"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.skiko:skiko-awt"
+        ]
+      }
+    },
+    "org.jetbrains.skiko:skiko-awt-runtime-linux-x64": {
+      "jvm": {
+        "version": "0.150.2",
+        "files": [
+          {
+            "name": "skiko-awt-runtime-linux-x64-0.150.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko-awt-runtime-linux-x64/0.150.2/skiko-awt-runtime-linux-x64-0.150.2.jar",
+            "sha256": "c6c1f9fa37464fd0bcca6e486a6b35307b6e2436199de9d009f877121de1c5c2"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.skiko:skiko-awt"
+        ]
+      }
+    },
+    "org.jetbrains.skiko:skiko-awt-runtime-macos-arm64": {
+      "jvm": {
+        "version": "0.150.2",
+        "files": [
+          {
+            "name": "skiko-awt-runtime-macos-arm64-0.150.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko-awt-runtime-macos-arm64/0.150.2/skiko-awt-runtime-macos-arm64-0.150.2.jar",
+            "sha256": "abea519fa519f7245412011cc3ab7a5852cb333b3dc3cac08a83f5bd806c7bec"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.skiko:skiko-awt"
+        ]
+      }
+    },
+    "org.jetbrains.skiko:skiko-awt-runtime-macos-x64": {
+      "jvm": {
+        "version": "0.150.2",
+        "files": [
+          {
+            "name": "skiko-awt-runtime-macos-x64-0.150.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko-awt-runtime-macos-x64/0.150.2/skiko-awt-runtime-macos-x64-0.150.2.jar",
+            "sha256": "f77b1f3a76e94daba2676780e37807697d51d300e31cacc43699709f3ccdff96"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.skiko:skiko-awt"
+        ]
+      }
+    },
+    "org.jetbrains.skiko:skiko-awt-runtime-windows-x64": {
+      "jvm": {
+        "version": "0.150.2",
+        "files": [
+          {
+            "name": "skiko-awt-runtime-windows-x64-0.150.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko-awt-runtime-windows-x64/0.150.2/skiko-awt-runtime-windows-x64-0.150.2.jar",
+            "sha256": "eebad490c2828198e86e641cbd44958617867ce70f893b21852f07d0be099c0a"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.skiko:skiko-awt"
         ]
       }
     },

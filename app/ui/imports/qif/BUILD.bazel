@@ -1,0 +1,37 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_generate true
+
+kmp_library(
+    name = "qif",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    plugins = ["compose"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//app/csvimporter",
+        "//app/importdirectory",
+        "//app/importengineapi",
+        "//app/model/accountmapping",
+        "//app/model/core",
+        "//app/model/csv",
+        "//app/model/csvstrategy",
+        "//app/model/qif",
+        "//app/model/repository/read",
+        "//app/presenter/core",
+        "//app/qifimporter",
+        "//app/tasks",
+        "//app/ui/components",
+        "//app/ui/foundation",
+        "//app/ui/imports/csv",
+        "//utils/compose/filePicker",
+        "//utils/parsers/qif",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:compose_foundation_desktop",
+        "@maven_kmp//:compose_foundation_layout_desktop",
+        "@maven_kmp//:compose_material3_desktop",
+        "@maven_kmp//:compose_ui_desktop",
+        "@maven_kmp//:compose_ui_text_desktop",
+        "@maven_kmp//:kermit",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+)

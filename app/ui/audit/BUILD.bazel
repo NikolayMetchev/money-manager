@@ -1,0 +1,22 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_generate true
+
+kmp_library(
+    name = "audit",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    plugins = ["compose"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//app/model/core",
+        "//utils/compose/scrollbar",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:compose_foundation_desktop",
+        "@maven_kmp//:compose_foundation_layout_desktop",
+        "@maven_kmp//:compose_material3_desktop",
+        "@maven_kmp//:compose_ui_desktop",
+        "@maven_kmp//:compose_ui_text_desktop",
+        "@maven_kmp//:kermit",
+        "@maven_kmp//:kotlinx_datetime",
+    ],
+)

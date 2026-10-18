@@ -17,6 +17,28 @@ var (
 	owners   = map[string][]string{} // package → module directories
 )
 
+// Modules with a kmp_visibility, by label: tests reach them through `:<name>_for_tests`, which only a
+// testonly target may use, as Gradle's verifyNoWriteRepositoryUsage only reads main sources.
+var (
+	restrictedMu sync.Mutex
+	restricted   = map[string]string{}
+)
+
+func recordRestricted(rel, name string) {
+	restrictedMu.Lock()
+	defer restrictedMu.Unlock()
+	restricted["//"+rel] = "//" + rel + ":" + name + "_for_tests"
+}
+
+func forTests(dep string) string {
+	restrictedMu.Lock()
+	defer restrictedMu.Unlock()
+	if t, ok := restricted[dep]; ok {
+		return t
+	}
+	return dep
+}
+
 func recordPackages(rel string, packages []string) {
 	ownersMu.Lock()
 	defer ownersMu.Unlock()

@@ -25,6 +25,7 @@ load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load(":metadata.bzl", "kt_metadata_library")
 load("//bazel/kmp/checks:checks.bzl", "kmp_forbidden_deps", "kmp_reference_check", "kmp_unused_deps")
 load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
+load(":resources.bzl", "kmp_resource_jar")
 load(":native.bzl", "BUILDS_ON", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_executable", "kt_native_klib", "kt_native_test_binary")
 load("//bazel/kmp/plugins:plugins.bzl", "plugin_deps", "plugin_labels")
 
@@ -73,6 +74,19 @@ def _on(platform, labels):
         if target not in out:
             out.append(target)
     return out
+
+def _resource_jars(name, kind, resources):
+    """`resources` as a jar, the JVM compilation's source sets' `resources` dirs merged, the leaf winning."""
+    if not resources:
+        return []
+    kmp_resource_jar(
+        name = name + "_resources",
+        srcs = resources,
+        roots = ["src/%s%s/resources" % (fragment, kind) for fragment in ["common", "jvmAndroid", "jvm"]],
+        testonly = kind == "Test",
+        visibility = ["//visibility:private"],
+    )
+    return [":" + name + "_resources"]
 
 def _unused_deps(name, target, declared, keep_deps):
     """`:<name>_unused_deps`: what the BUILD file declares, less what directives keep, against the JVM compile."""
@@ -132,6 +146,7 @@ def kmp_library(
         forbidden_reference_reason = "",
         forbidden_reference_allowed = [],
         keep_deps = [],
+        resources = [],
         visibility = None):
     """A Kotlin Multiplatform module. Emits `:<name>_jvm` and `:<name>_<target>` per native target.
 
@@ -168,7 +183,10 @@ def kmp_library(
         forbidden_reference_reason: why, for the error message.
         forbidden_reference_allowed: module-relative files exempt from `forbidden_reference`.
         keep_deps: dependencies no source uses (`kmp_keep_dep`), which `:<name>_unused_deps` leaves alone.
-        visibility: the targets' visibility.
+        resources: the JVM classpath resources, from `src/{common,jvmAndroid,jvm}Main/resources`: one jar, a
+            file in a later source set replacing the same path in an earlier one, as Gradle merges them.
+        visibility: the targets' visibility. A restricted module also gets `:<name>_for_tests`, testonly and
+            public, which every module's tests use instead.
     """
     hand_written = common_srcs + jvm_android_srcs + jvm_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs
     kmp_lint(name, hand_written)
@@ -218,6 +236,7 @@ def kmp_library(
         deps = _on("jvm", deps + jvm_deps + exports + jvm_exports) if fragments.srcs else [],
         exports = jvm_exported,
         plugins = plugin_labels(plugins, "jvm"),
+        resource_jars = _resource_jars(name, "Main", resources),
         # moneymanager.kotlin-multiplatform-convention puts Dispatchers.Main on every JVM runtime classpath.
         runtime_deps = [Label("@maven_kmp//:kotlinx_coroutines_swing_jvm")],
         visibility = visibility,
@@ -250,6 +269,16 @@ def kmp_library(
             target_compatible_with = BUILDS_ON.get(target, []),
             visibility = visibility,
         )
+    if visibility and "//visibility:public" not in visibility:
+        # `visibility` keeps main code out (verifyNoWriteRepositoryUsage), but Gradle's check only reads main
+        # sources: any module's tests may use the module. `:<name>_for_tests` is testonly, so only tests can.
+        for platform in ["jvm"] + (["metadata"] + native_targets if native_targets else []):
+            native.alias(
+                name = "%s_for_tests_%s" % (name, platform),
+                actual = ":%s_%s" % (name, platform),
+                testonly = True,
+                visibility = ["//visibility:public"],
+            )
 
 def kmp_test(
         name,
@@ -272,7 +301,11 @@ def kmp_test(
         data = [],
         size = "medium",
         forbidden_deps = [],
-        keep_deps = []):
+        keep_deps = [],
+        resources = [],
+        jvm_flags = [],
+        flaky = False,
+        jvm_tags = []):
     """A module's tests. Emits `:<name>_jvm` and `:<name>_<target>` per native target.
 
     JVM tests are JUnit 4, run by `//bazel/kmp/testing:KmpJUnitRunner`. Native tests are linked with konan's
@@ -302,6 +335,12 @@ def kmp_test(
             suite a bigger one.
         forbidden_deps: modules the tests must never reach either (`:<name>_forbidden_deps_<platform>`).
         keep_deps: dependencies no test source uses (`kmp_keep_dep`), which `:<name>_unused_deps` leaves alone.
+        resources: the JVM tests' classpath resources, from `src/{common,jvmAndroid,jvm}Test/resources`, merged
+            as for kmp_library.
+        jvm_flags: more JVM flags for the JVM test (Gradle's `systemProperty`s: headless Compose Desktop tests).
+        flaky: retry a failing JVM test up to twice more, as the Gradle test-retry plugin does for the Compose
+            modules (`maxRetries = 2`).
+        jvm_tags: Bazel tags on the JVM test (`no-remote-exec` for Skiko, which needs the host's libGL).
     """
     kmp_lint(name, common_srcs + jvm_android_srcs + jvm_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs)
     fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, jvm_srcs)
@@ -320,11 +359,14 @@ def kmp_test(
             associates = [platform_label(associate, "jvm")],
             deps = _on("jvm", deps + jvm_deps),
             plugins = plugin_labels(plugins, "jvm"),
+            resource_jars = _resource_jars(name, "Test", resources),
         )
         _unused_deps(name, lib, declared, keep_deps)
         java_test(
             name = name + "_jvm",
             size = size,
+            flaky = flaky,
+            tags = jvm_tags,
             main_class = "com.moneymanager.bazel.kmp.testing.KmpJUnitRunner",
             use_testrunner = False,
             jvm_flags = [
@@ -332,12 +374,14 @@ def kmp_test(
                 "-Dkmp.test.jar=%s.jar" % lib,
                 # java.util.prefs writes under ~/.java, which the sandbox keeps read-only; tests get their own.
                 "-Djava.util.prefs.userRoot=$${TEST_TMPDIR}/prefs",
+                # Skiko unpacks its native library under ~/.skiko for the same reason (Compose Desktop UI tests).
+                "-Dskiko.data.path=$${TEST_TMPDIR}/skiko",
             ] + select({
                 "@platforms//os:windows": [],
                 # Gradle's test JVMs use /tmp, and terminal tests lay out paths under it within a fixed width
                 # (app/tui's footer). The sandbox's /tmp is hermetic, so this stays per test.
                 "//conditions:default": ["-Djava.io.tmpdir=/tmp"],
-            }),
+            }) + jvm_flags,
             data = data,
             runtime_deps = [
                 ":" + lib,

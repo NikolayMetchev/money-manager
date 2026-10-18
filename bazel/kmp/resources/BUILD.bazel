@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+# kmp_resource_jar's tool (//bazel/kmp:resources.bzl).
+go_library(
+    name = "resources_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/NikolayMetchev/money-manager/bazel/kmp/resources",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "resources",
+    embed = [":resources_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "resources_test",
+    size = "small",
+    srcs = ["main_test.go"],
+    embed = [":resources_lib"],
+)

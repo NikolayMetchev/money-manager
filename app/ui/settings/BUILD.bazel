@@ -1,0 +1,40 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_generate true
+
+kmp_library(
+    name = "settings",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    plugins = ["compose"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//app/db/write",
+        "//app/importengineapi",
+        "//app/model/core",
+        "//app/model/csvstrategy",
+        "//app/model/repository/read",
+        "//app/presenter/core",
+        "//app/remotestorage/core",
+        "//app/remotestorage/googledrive",
+        "//app/remotestorage/sync",
+        "//app/strategycatalog",
+        "//app/tasks",
+        "//app/ui/components",
+        "//app/ui/foundation",
+        "//utils/compose/filePicker",
+        "//utils/compose/scrollbar",
+        "//utils/credentialvault",
+        "//utils/humanreadable",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:compose_charts",
+        "@maven_kmp//:compose_foundation_desktop",
+        "@maven_kmp//:compose_foundation_layout_desktop",
+        "@maven_kmp//:compose_material3_desktop",
+        "@maven_kmp//:compose_material_icons_core_desktop",
+        "@maven_kmp//:compose_ui_desktop",
+        "@maven_kmp//:compose_ui_geometry_desktop",
+        "@maven_kmp//:compose_ui_text_desktop",
+        "@maven_kmp//:kermit",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+)

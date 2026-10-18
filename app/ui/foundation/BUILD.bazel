@@ -1,0 +1,82 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_generate true
+# gazelle:kmp_keep_dep //bazel/kmp/deps:compose_desktop_current_os jvmTest
+# gazelle:kmp_test_jvm_flags -Djava.awt.headless=true -Dskiko.test.harness=true
+# gazelle:kmp_test_flaky true
+# gazelle:kmp_test_jvm_tags no-remote-exec
+
+kmp_library(
+    name = "foundation",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_android_srcs = glob(["src/jvmAndroidMain/kotlin/**/*.kt"]),
+    jvm_deps = [
+        "//utils/localsettings",
+        "@maven_kmp//:kermit",
+    ],
+    jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    plugins = [
+        "compose",
+        "serialization",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//app/importengineapi",
+        "//app/model/core",
+        "//app/model/csvstrategy",
+        "//app/model/repository/read",
+        "//app/tasks",
+        "//utils/archive",
+        "//utils/bigdecimal",
+        "//utils/credentialvault",
+        "//utils/currency",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:androidx_navigation3_runtime",
+        "@maven_kmp//:androidx_savedstate",
+        "@maven_kmp//:compose_foundation_desktop",
+        "@maven_kmp//:compose_foundation_layout_desktop",
+        "@maven_kmp//:compose_material3_desktop",
+        "@maven_kmp//:compose_material_icons_core_desktop",
+        "@maven_kmp//:compose_ui_desktop",
+        "@maven_kmp//:compose_ui_text_desktop",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_datetime",
+        "@maven_kmp//:kotlinx_serialization_core",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":foundation",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    flaky = True,
+    jvm_deps = ["//bazel/kmp/deps:compose_desktop_current_os"],
+    jvm_flags = [
+        "-Djava.awt.headless=true",
+        "-Dskiko.test.harness=true",
+    ],
+    jvm_tags = ["no-remote-exec"],
+    keep_deps = ["//bazel/kmp/deps:compose_desktop_current_os"],
+    plugins = [
+        "compose",
+        "serialization",
+    ],
+    deps = [
+        "//app/model/core",
+        "//app/model/csvstrategy",
+        "//app/tasks",
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/app/ui",
+        "//test/utils/credentialvault",
+        "//utils/bigdecimal",
+        "//utils/credentialvault",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:androidx_navigation3_runtime",
+        "@maven_kmp//:compose_material3_desktop",
+        "@maven_kmp//:compose_ui_test_desktop",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:kotlinx_serialization_core",
+        "@maven_kmp//:kotlinx_serialization_json",
+    ],
+)

@@ -348,7 +348,7 @@ func (r *Resolver) loadPom(c Coordinate, dir string) (*node, error) {
 		n.files = []File{{Name: fmt.Sprintf("%s-%s.jar", c.Artifact, c.Version), URL: url, Sha256: sum}}
 	}
 	for _, d := range pom.pom.Dependencies {
-		if d.Optional == "true" || (d.Type != "" && d.Type != "jar") {
+		if d.Optional == "true" || (d.Type != "" && d.Type != "jar") || (d.Scope != "" && d.Scope != "compile" && d.Scope != "runtime") {
 			continue
 		}
 		dep := Coordinate{pom.expand(d.GroupID), pom.expand(d.ArtifactID), pom.expand(d.Version)}
@@ -361,6 +361,11 @@ func (r *Resolver) loadPom(c Coordinate, dir string) (*node, error) {
 		if dep.Version == "" || strings.Contains(dep.Version, "${") {
 			return nil, fmt.Errorf("%s.pom: can't resolve the version of %s", c, dep.Module())
 		}
+		v, err := pomVersion(dep.Version)
+		if err != nil {
+			return nil, fmt.Errorf("%s.pom: %s: %w", c, dep.Module(), err)
+		}
+		dep.Version = v
 		switch d.Scope {
 		case "", "compile":
 			n.api = append(n.api, dep)
@@ -610,4 +615,18 @@ func versionParts(v string) []string {
 		parts = append(parts, cur)
 	}
 	return parts
+}
+
+// pomVersion reads a POM dependency's version: a plain one, or a hard requirement `[1.2]` (skiko-awt-runtime's
+// skiko-awt), which is that version. A real range would need the repository's version listing, as Gradle reads.
+func pomVersion(v string) (string, error) {
+	if !strings.ContainsAny(v, "[](),") {
+		return v, nil
+	}
+	if inner, ok := strings.CutPrefix(v, "["); ok {
+		if inner, ok = strings.CutSuffix(inner, "]"); ok && !strings.Contains(inner, ",") {
+			return inner, nil
+		}
+	}
+	return "", fmt.Errorf("version range %s isn't supported, only an exact [version]", v)
 }

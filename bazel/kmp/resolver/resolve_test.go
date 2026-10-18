@@ -176,3 +176,16 @@ func TestPickVariantAcceptsOneNamingNoUsage(t *testing.T) {
 		t.Errorf("picked %v over the variant naming the usage", got)
 	}
 }
+
+func TestPomVersion(t *testing.T) {
+	for in, want := range map[string]string{"1.2": "1.2", "[0.150.2]": "0.150.2"} {
+		if got, err := pomVersion(in); err != nil || got != want {
+			t.Errorf("pomVersion(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+	for _, in := range []string{"[1,2)", "(,1]", "[1.0,]"} {
+		if _, err := pomVersion(in); err == nil {
+			t.Errorf("pomVersion(%q) wants an error", in)
+		}
+	}
+}
