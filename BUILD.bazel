@@ -1,5 +1,5 @@
 # Generates every Kotlin Multiplatform module's BUILD.bazel (//bazel/gazelle/kmp): bazel run //:gazelle
-# Check that none is stale: bazel run //:gazelle -- --mode=diff
+# CI's Auto-format PR job regenerates them on every PR; --mode=diff lists what a run would change.
 load("@gazelle//:def.bzl", "gazelle", "gazelle_binary")
 
 # gazelle:exclude bazel/gazelle/kmp/testdata

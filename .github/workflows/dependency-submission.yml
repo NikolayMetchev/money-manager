@@ -1,8 +1,12 @@
-name: Gradle Dependency Submission
+name: Dependency Submission
 
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'bazel/kmp/deps/*.lock.json'
+      - 'bazel/kmp/deps/dependency_snapshot.py'
+      - '.github/workflows/dependency-submission.yml'
   workflow_dispatch:
 
 concurrency:
@@ -19,14 +23,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
-      - name: Setup Gradle environment
-        uses: $/.github/actions/gradle-setup
-
-      - name: Generate and submit dependency graph
-        uses: gradle/actions/dependency-submission@v6.4.0
         with:
-          # Don't save a Gradle User Home entry from main: it would be a second Linux entry
-          # competing with build.yml's build job for the 10 GB Actions cache, and the newest
-          # Linux entry is what read-only jobs fall back to.
-          cache-read-only: true
+          persist-credentials: false
+
+      # Bazel's resolution is the maven_kmp lockfiles (`bazel run @<hub>//:pin`), so the graph is read from
+      # them; nothing needs building. The Kotlin stdlib comes from the Kotlin toolchain, not a lockfile.
+      - name: Submit the lockfiles' dependency graph
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 bazel/kmp/deps/dependency_snapshot.py bazel/kmp/deps/*.lock.json \
+            | gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/snapshots" --input -

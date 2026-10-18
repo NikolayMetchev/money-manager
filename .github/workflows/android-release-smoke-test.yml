@@ -1,8 +1,8 @@
 name: Android Release Smoke Test
 
-# Installs the R8-minified release APK on an emulator and drives first run (app/main/android-smoketest).
-# The instrumented tests in build.yml only run the unminified debug build, so this is the only check
-# that the shrunk app actually starts. Manual only: dispatch it on main, or on a PR's branch to check
+# Installs the R8-minified release APK (debug-signed, //app/main/android:release_debug_signed) on an emulator
+# and drives first run (//app/main/android-smoketest:smoketest_test). The instrumented tests in build.yml only
+# run the unminified debug build, so this is the only check that the shrunk app actually starts. Manual only: dispatch it on main, or on a PR's branch to check
 # that PR (`gh workflow run android-release-smoke-test.yml --ref <branch>`).
 on:
   workflow_dispatch:
@@ -33,12 +33,17 @@ jobs:
         with:
           persist-credentials: false  # read-only job, no git push
 
-      - name: Setup Gradle environment
-        uses: $/.github/actions/gradle-setup
+      - name: Enable KVM for Android emulator hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
         with:
-          cache-read-only: true
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
-          android-emulator: 'true'
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          cache-name: android-smoke-test
 
       # Same key as build.yml's android-test job, so the snapshot it saves on main is reused here.
       # Saved only from main (below), since a dispatch on a PR branch saves a branch-scoped entry.
@@ -49,7 +54,7 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          # Android emulator API level sync: update with the Gradle managed device,
+          # Android emulator API level sync: update with build.yml's emulator job,
           # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
           key: avd-pixel6-api36-aosp-atd-${{ runner.os }}
 
@@ -57,7 +62,7 @@ jobs:
         if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          # Android emulator API level sync: update with the Gradle managed device,
+          # Android emulator API level sync: update with build.yml's emulator job,
           # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
           api-level: 36
           arch: x86_64
@@ -77,7 +82,7 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          # Android emulator API level sync: update with the Gradle managed device,
+          # Android emulator API level sync: update with build.yml's emulator job,
           # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
           key: ${{ steps.avd-cache.outputs.cache-primary-key }}
 
@@ -86,9 +91,7 @@ jobs:
         env:
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-        run: >-
-          ./gradlew :app:main:android:assembleRelease :app:main:android-smoketest:assembleRelease
-          -PreleaseSmokeTest=true --stacktrace --console=plain
+        run: bazel build //app/main/android-smoketest:smoketest_test
 
       - name: Run release smoke test
         timeout-minutes: 20
@@ -97,7 +100,7 @@ jobs:
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
         with:
-          # Android emulator API level sync: update with the Gradle managed device,
+          # Android emulator API level sync: update with build.yml's emulator job,
           # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
           api-level: 36
           arch: x86_64
@@ -108,7 +111,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
-          script: ./gradlew :app:main:android-smoketest:connectedReleaseAndroidTest -PreleaseSmokeTest=true --stacktrace --console=plain
+          script: bazel test //app/main/android-smoketest:smoketest_test --test_output=errors
 
       - name: Upload test results
         if: always()
@@ -116,6 +119,6 @@ jobs:
         with:
           name: android-release-smoke-test-results
           path: |
-            app/main/android-smoketest/build/reports/androidTests/**
-            app/main/android-smoketest/build/outputs/androidTest-results/**
+            bazel-testlogs/app/main/android-smoketest/smoketest_test/test.log
+            bazel-testlogs/app/main/android-smoketest/smoketest_test/test.xml
           retention-days: 7

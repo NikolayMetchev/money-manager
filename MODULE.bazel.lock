@@ -265,7 +265,7 @@
         "bzlTransitiveDigest": "EccTZAbftEchwqh6hRZ6ISnTAmYU1vXRHfumTjUx+ig=",
         "usagesDigest": "af/EB6S6Jhg08XPZPOFfwCev0bH7RX6CSnpYr6oaQG4=",
         "recordedInputs": [
-          "FILE:@@//gradle/libs.versions.toml 41ef06a5b7488c3015e3d0d97bfedfffd62a93dc740ae1616bc129edaeb1d119"
+          "FILE:@@//gradle/libs.versions.toml 82007492b0b53697eb3463434d139eaf81d3bf4623f5abea014d1c6dfb35f5e9"
         ],
         "generatedRepoSpecs": {
           "android_sdk": {

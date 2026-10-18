@@ -1,0 +1,57 @@
+name: 'Bazel Setup'
+description: 'Bazel through bazelisk with its caches, BuildBuddy when the key is set, and the Android SDK platform'
+
+inputs:
+  buildbuddy-api-key:
+    description: 'BuildBuddy API key; empty on a fork''s PR, where the build runs on the restored disk cache alone'
+    required: false
+    default: ''
+  config:
+    description: 'The .bazelrc config BuildBuddy is used with: rbe (every action on its executors) or cache'
+    required: false
+    default: 'rbe'
+  cache-name:
+    description: 'Names the disk cache entry, one per job that builds something different'
+    required: true
+  android-sdk:
+    description: 'Whether to install the Android SDK platform the Android compiles read'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    # The JDK, Kotlin/Native and every Maven library are Bazel repositories (hermetic, sha256-pinned), so
+    # nothing else needs installing. The JVM version lives in .bazelrc and gradle/libs.versions.toml.
+    - name: Set up Bazel
+      uses: bazel-contrib/setup-bazel@0.19.1
+      with:
+        bazelisk-cache: true
+        disk-cache: ${{ github.workflow }}-${{ inputs.cache-name }}
+        repository-cache: true
+        # Only main writes the caches, so PR runs don't evict the entries everyone restores.
+        cache-save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+    - name: Use BuildBuddy
+      if: inputs.buildbuddy-api-key != ''
+      shell: bash
+      env:
+        BUILDBUDDY_API_KEY: ${{ inputs.buildbuddy-api-key }}
+      run: |
+        {
+          echo "common --config=${{ inputs.config }}"
+          echo "common --remote_header=x-buildbuddy-api-key=${BUILDBUDDY_API_KEY}"
+          echo "common --build_metadata=ROLE=CI"
+          echo "common --build_metadata=REPO_URL=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+        } > user.bazelrc
+
+    # Android modules compile against the SDK's android.jar for the catalog's compileSdk (//bazel/kmp/android),
+    # which the runners' preinstalled SDK may not have yet. Bazel only looks; it never downloads it.
+    - name: Install the Android SDK platform
+      if: inputs.android-sdk == 'true'
+      shell: bash
+      run: |
+        level=$(sed -n 's/^android-compileSdk = "\(.*\)"/\1/p' gradle/libs.versions.toml)
+        sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+        [ -f "$sdkmanager" ] || sdkmanager="$sdkmanager.bat"
+        (yes || true) | "$sdkmanager" --install "platforms;android-$level.0" > /dev/null

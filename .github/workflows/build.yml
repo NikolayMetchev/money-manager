@@ -1,10 +1,12 @@
-# Unified CI: build/test, Android instrumented tests, Qodana, and auto-format.
-# A single `changes` job decides once whether the push/PR touches anything
-# other than docs/webpage/markdown; every heavy job below `needs` it and is
-# skipped otherwise. A skipped *required* job is treated as a pass by branch
-# protection, so the required checks still report green (skipping at the
-# workflow level via `on.paths` would instead leave them pending forever and
-# block the merge).
+# Unified CI on Bazel (#1028): build/test, native tests per host, Android device tests, coverage, the desktop
+# installers, Qodana and auto-format. A single `changes` job decides once whether the push/PR touches anything
+# other than docs/webpage/markdown; every heavy job below `needs` it and is skipped otherwise. A skipped
+# *required* job is treated as a pass by branch protection, so the required checks still report green
+# (skipping at the workflow level via `on.paths` would instead leave them pending forever and block the merge).
+#
+# Linux jobs run their actions on BuildBuddy's executors (`--config=rbe`, #1017); macOS and Windows build on
+# their runners and share its remote cache (`--config=cache`). Build results stream to BuildBuddy, linked from
+# each job's summary. On a fork's PR there is no key: the build runs on the restored disk cache alone.
 name: CI
 
 on:
@@ -51,61 +53,81 @@ jobs:
               - '!webpage/**'
               - '!**/*.md'
               - '!.github/workflows/static.yml'
+              - '!.github/workflows/dependency-submission.yml'
 
+  # Everything `bazel build //...` and `bazel test //...` cover on Linux: every compile (JVM, Android, linuxX64,
+  # linuxArm64, mingwX64 and the commonMain metadata checks), the JVM, Android host and linuxX64 tests, ktlint,
+  # detekt, Android lint, the dependency checks Gradle's buildHealth ran (strict and unused deps), the module
+  # checks and the lockfile tests. Auto-format PR keeps the BUILD files in step with the sources.
   build:
     name: Build and Test
     runs-on: ubuntu-latest
     needs: changes
-    # Runs on PRs and pushes to main (not on releases/* pushes). Heavy jobs run in parallel with
+    # Runs on PRs, manual runs and pushes to main (not on releases/* pushes). Heavy jobs run in parallel with
     # lint-format rather than after it: when it pushes formatting fixes, the new run's
     # `concurrency` group cancels this one, so waiting for it would only delay every PR.
     if: >-
       needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' ||
+      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    # The default desktop Google OAuth client, read by the @google_oauth repository. Empty on forks/PRs without the
+    # secrets: the build still compiles and Google Drive reports "not configured".
+    env:
+      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
-      - name: Build with Gradle
-        uses: $/.github/actions/gradle-run
-        # Default desktop Google OAuth client, injected into the JVM build by the
-        # generateGoogleOAuthDefaults task. Scoped to this step only. Empty on forks/PRs without the
-        # secrets — the build still compiles and Google Drive reports "not configured".
-        env:
-          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
-          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
         with:
-          # `koverXmlReport` name-matches into every module and produces the per-module
-          # unit-coverage XMLs. db:core's tests run here too: the dedicated `db-core-test` job was
-          # removed once parallel test forks + minimal test currency seeding cut its ~12 min
-          # jvmTest down to ~1-2 min.
-          # -PskipNative=true: no Kotlin/Native compile, link or test here. Linking the native test
-          # binaries beside the JVM build ran this job out of memory; linuxX64 has its own job below.
-          command: build koverXmlReport -PskipNative=true --stacktrace
-          # The only Linux job that saves Gradle User Home (from main). Every other Linux job is
-          # read-only and restores this entry, so they don't each save their own dependency and
-          # transform entries and evict it from the 10 GB Actions cache.
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          persist-credentials: false  # read-only job, no git push
 
-      - name: Upload coverage and test results to Codecov
-        uses: $/.github/actions/codecov-upload
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
+        with:
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          cache-name: linux
+
+      - name: Build
+        run: bazel build //... 2>&1 | tee build.log
+
+      - name: Test
+        run: bazel test //... 2>&1 | tee test.log
+
+      - name: Build results
+        if: always()
+        uses: ./.github/actions/bazel-summary
+        with:
+          title: Linux
+
+      # Codecov's `files` takes paths, not globs, so list the reports (bazel-testlogs is a symlink).
+      - name: List test reports
+        id: test-reports
+        if: ${{ !cancelled() }}
+        run: echo "files=$(find -L bazel-testlogs/ -name test.xml | paste -sd, -)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && steps.test-reports.outputs.files != '' }}
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit
+          name: unit-test-results
+          report_type: test_results
+          files: ${{ steps.test-reports.outputs.files }}
+          disable_search: true
+          fail_ci_if_error: false
 
-  # Kotlin/Native: each target's common tests run natively on a host of that platform. Apple targets
-  # only link on macOS and mingwX64 only runs on Windows. There is no Kotlin/Native compiler for Linux
-  # arm64 hosts, so linuxArm64 test binaries are cross-linked on x64 and run on an arm64 runner.
-  native-linux-x64:
-    name: Native Tests (linuxX64)
+  # Kover's replacement (#1026): `bazel coverage` over the Kotlin tests, with .bazelrc's JaCoCo filter, merged into
+  # one LCOV report. It credits code to every test that runs it, so it reads higher than Kover's per-module reports
+  # did. The Go tests can't link under coverage, so the Kotlin tests are picked by query.
+  coverage:
+    name: Coverage
     runs-on: ubuntu-latest
     needs: changes
     if: >-
       needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' ||
+      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'push' && github.ref == 'refs/heads/main'))
 
     steps:
@@ -114,25 +136,42 @@ jobs:
         with:
           persist-credentials: false  # read-only job, no git push
 
-      - name: Run linuxX64 tests and link the CLI with Gradle
-        uses: $/.github/actions/gradle-run
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
         with:
-          # The release `mm` link is the one a Linux `build` does locally; it catches link-only failures
-          # (such as the disabled native compiler caches) before the release workflow does.
-          command: linuxX64Test :app:main:cli:linkReleaseExecutableLinuxX64 --stacktrace
-          # Gradle User Home stays read-only (restored from the build job), but ~/.konan is saved from
-          # main: the build job no longer downloads the Kotlin/Native toolchain.
-          kotlin-native-cache-read-only: ${{ github.ref != 'refs/heads/main' }}
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
-          kotlin-native: 'true'
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          cache-name: coverage
 
+      - name: Coverage
+        run: bazel coverage $(bazel query 'attr(name, "^test_(jvm|android)$", tests(//...))')
+
+      - name: Summary
+        run: |
+          cp bazel-out/_coverage/_coverage_report.dat coverage.lcov
+          awk -F: '/^SF:/{f++} /^LF:/{lf+=$2} /^LH:/{lh+=$2}
+            END{printf "### Coverage\n%d files, %d of %d lines (%.1f%%)\n", f, lh, lf, 100*lh/lf}' \
+            coverage.lcov >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unit
+          name: unit
+          files: coverage.lcov
+          disable_search: true
+          fail_ci_if_error: false
+
+  # Kotlin/Native: each target's common tests run natively on a host of that platform. linuxX64's run in the
+  # Build and Test job. There is no Kotlin/Native compiler for Linux arm64 hosts, so linuxArm64's test binaries
+  # are cross-linked on x64 and run on an arm64 runner.
   native-linux-arm64-link:
     name: Native Link (linuxArm64)
     runs-on: ubuntu-latest
     needs: changes
     if: >-
       needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' ||
+      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'push' && github.ref == 'refs/heads/main'))
 
     steps:
@@ -141,21 +180,31 @@ jobs:
         with:
           persist-credentials: false  # read-only job, no git push
 
-      - name: Cross-link linuxArm64 test binaries with Gradle
-        uses: $/.github/actions/gradle-run
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
         with:
-          command: linkDebugTestLinuxArm64 --stacktrace
-          # Gradle User Home stays read-only (restored from the build job), but ~/.konan is saved
-          # from main: this link needs the aarch64 sysroot, which the build job's toolchain lacks.
-          kotlin-native-cache-read-only: ${{ github.ref != 'refs/heads/main' }}
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
-          kotlin-native: 'true'
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          cache-name: linux-arm64
+          android-sdk: 'false'
+
+      # A test binary only builds where it runs (RUNS_ON), so the target platform is set to Linux arm64.
+      - name: Cross-link linuxArm64 test binaries
+        run: |
+          bazel build --platforms=//bazel/platforms:linux_arm64 --remote_download_outputs=toplevel \
+            $(bazel query 'attr(name, "_linuxArm64_bin$", //...)')
+          mkdir -p linux-arm64-tests
+          for binary in $(bazel cquery --platforms=//bazel/platforms:linux_arm64 --output=files \
+              'attr(name, "_linuxArm64_bin$", //...)'); do
+            dir="linux-arm64-tests/$(dirname "${binary#bazel-out/*/bin/}")"
+            mkdir -p "$dir" && cp "$binary" "$dir/"
+          done
+          find linux-arm64-tests -name '*.kexe' | sort
 
       - name: Upload linuxArm64 test binaries
         uses: actions/upload-artifact@v7
         with:
           name: linux-arm64-test-binaries
-          path: '**/build/bin/linuxArm64/debugTest/test.kexe'
+          path: linux-arm64-tests
           if-no-files-found: error
           retention-days: 1
 
@@ -165,10 +214,17 @@ jobs:
     needs: native-linux-arm64-link
 
     steps:
+      # Some tests read files from the tree at run time, from the workspace root (the runfiles' working directory).
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # read-only job, no git push
+
       - name: Download linuxArm64 test binaries
         uses: actions/download-artifact@v8
         with:
           name: linux-arm64-test-binaries
+          path: ${{ runner.temp }}/linux-arm64-tests
 
       - name: Run test binaries
         shell: bash
@@ -179,17 +235,22 @@ jobs:
             chmod +x "$binary"
             "$binary" || status=1
             echo "::endgroup::"
-          done < <(find . -name test.kexe -print0)
+          done < <(find "$RUNNER_TEMP/linux-arm64-tests" -name '*.kexe' -print0)
           exit $status
 
+  # macOS and Windows: every compile their host builds (macosArm64 only builds on a Mac), the host's `mm`, and the
+  # host's native tests. The JVM tests ran on Linux.
   native-macos:
     name: Native Tests (macosArm64)
     runs-on: macos-latest
     needs: changes
     if: >-
       needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' ||
+      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout code
@@ -197,14 +258,24 @@ jobs:
         with:
           persist-credentials: false  # read-only job, no git push
 
-      - name: Run macosArm64 tests with Gradle
-        uses: $/.github/actions/gradle-run
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
         with:
-          command: macosArm64Test --stacktrace
-          # The only macOS job, so it saves Gradle User Home and ~/.konan (from main only).
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
-          kotlin-native: 'true'
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          config: cache
+          cache-name: macos
+
+      - name: Build
+        run: bazel build //... 2>&1 | tee build.log
+
+      - name: Test
+        run: bazel test $(bazel query 'attr(name, "_macosArm64$", tests(//...))') 2>&1 | tee test.log
+
+      - name: Build results
+        if: always()
+        uses: ./.github/actions/bazel-summary
+        with:
+          title: macOS
 
   native-windows:
     name: Native Tests (mingwX64)
@@ -212,8 +283,11 @@ jobs:
     needs: changes
     if: >-
       needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' ||
+      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout code
@@ -221,24 +295,36 @@ jobs:
         with:
           persist-credentials: false  # read-only job, no git push
 
-      - name: Run mingwX64 tests with Gradle
-        uses: $/.github/actions/gradle-run
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
         with:
-          command: mingwX64Test --stacktrace
-          # The Windows job that saves Gradle User Home and ~/.konan (from main only); the
-          # main-only installer job restores its entry read-only.
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
-          kotlin-native: 'true'
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          config: cache
+          cache-name: windows
 
+      - name: Build
+        run: bazel build //... 2>&1 | tee build.log
+
+      - name: Test
+        run: bazel test $(bazel query 'attr(name, "_mingwX64$", tests(//...))') 2>&1 | tee test.log
+
+      - name: Build results
+        if: always()
+        uses: ./.github/actions/bazel-summary
+        with:
+          title: Windows
+
+  # The device tests (#1024): kmp_test's `:<name>_device` targets and the release smoke test, run through adb on
+  # an emulator. They're `manual`, so `bazel test //...` leaves them out; this job runs everything tagged
+  # android_device. The APKs build on BuildBuddy, the tests run here (`local`), one at a time (`exclusive`).
   android-test:
     name: Android Instrumented Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     needs: changes
     if: >-
       needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' ||
+      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'push' && github.ref == 'refs/heads/main'))
 
     steps:
@@ -251,13 +337,24 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v7
-
-      - name: Setup Gradle environment
-        uses: $/.github/actions/gradle-setup
         with:
-          # Read-only (the action's default): restores the build job's Gradle User Home.
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
-          android-emulator: 'true'
+          persist-credentials: false  # read-only job, no git push
+
+      - name: Enable KVM for Android emulator hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
+        with:
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          cache-name: android-device
+
+      # Building first keeps the emulator's time limit for the tests.
+      - name: Build the test APKs
+        run: bazel build $(bazel query 'attr(tags, android_device, tests(//...))')
 
       # Restore on every ref, save only from main (below): a ~2 GB snapshot saved from a PR's merge
       # ref can't be restored by main or any other PR, and only pushes the shared entries out.
@@ -268,7 +365,7 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          # Android emulator API level sync: update with the Gradle managed device,
+          # Android emulator API level sync: update with android-release-smoke-test.yml,
           # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
           key: avd-pixel6-api36-aosp-atd-${{ runner.os }}
 
@@ -276,10 +373,9 @@ jobs:
         if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          # Android emulator API level sync: update with the Gradle managed device,
+          # Android emulator API level sync: update with android-release-smoke-test.yml,
           # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
-          # aosp_atd is the headless test-optimized image — same source as the local
-          # Gradle managed device (systemImageSource = "aosp-atd").
+          # aosp_atd is the headless test-optimized image.
           api-level: 36
           arch: x86_64
           profile: pixel_6
@@ -298,36 +394,41 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          # Android emulator API level sync: update with the Gradle managed device,
-          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
           key: ${{ steps.avd-cache.outputs.cache-primary-key }}
 
-      - name: Run Android instrumented tests
-        timeout-minutes: 20
+      - name: Run the device tests
+        timeout-minutes: 30
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          # Android emulator API level sync: update with the Gradle managed device,
+          # Android emulator API level sync: update with android-release-smoke-test.yml,
           # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
           api-level: 36
           arch: x86_64
           profile: pixel_6
           target: aosp_atd
-          # The API-36 ATD images are only published on the dev sdkmanager channel.
           channel: dev
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
-          # JaCoCo coverage instrumentation slows every instrumented test, so PRs run the tests
-          # uninstrumented; pushes to main collect and upload the instrumented coverage.
-          script: ./gradlew connectedAndroidDeviceTest${{ github.ref == 'refs/heads/main' && ' createAndroidDeviceTestCoverageReport -PandroidCoverage=true' || '' }} --stacktrace --console=plain
+          script: bazel test $(bazel query 'attr(tags, android_device, tests(//...))') --test_output=errors
 
-      - name: Upload coverage and test results to Codecov
-        if: always() && github.ref == 'refs/heads/main'
-        uses: $/.github/actions/codecov-upload
+      # Codecov's `files` takes paths, not globs, so list the reports (bazel-testlogs is a symlink).
+      - name: List test reports
+        id: test-reports
+        if: ${{ !cancelled() }}
+        run: echo "files=$(find -L bazel-testlogs/ -name test.xml | paste -sd, -)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && steps.test-reports.outputs.files != '' }}
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: instrumented
-          coverage-file: '**/build/reports/coverage/**/*.xml'
+          name: instrumented-test-results
+          report_type: test_results
+          files: ${{ steps.test-reports.outputs.files }}
+          disable_search: true
+          fail_ci_if_error: false
 
       - name: Upload test results
         if: always()
@@ -335,47 +436,24 @@ jobs:
         with:
           name: android-test-results
           path: |
-            **/build/reports/androidTests/**
-            **/build/outputs/androidTest-results/**
+            bazel-testlogs/**/test.log
+            bazel-testlogs/**/test.xml
           retention-days: 7
-
-  build-health:
-    name: Dependency Health
-    runs-on: ubuntu-latest
-    needs: changes
-    # DAGP's buildHealth aggregation over every module used to run inside the main build job
-    # (root `build` depended on it); as its own job it gates PRs off the critical path.
-    if: >-
-      needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' ||
-       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false  # read-only job, no git push
-
-      - name: Run buildHealth with Gradle
-        uses: $/.github/actions/gradle-run
-        env:
-          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
-          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-        with:
-          command: buildHealth --stacktrace
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
 
   desktop-proguard:
     name: Desktop ProGuard
     runs-on: ubuntu-latest
     needs: changes
-    # `build` never runs ProGuard (only the release installers do), so a new dependency that needs
-    # keep/dontwarn rules used to surface only when release.yml ran. This shrinks the desktop app
-    # and checks every ServiceLoader provider survived, in parallel with the main build.
+    # `bazel build //...` never runs ProGuard (its targets are manual), so a new dependency that needs
+    # keep/dontwarn rules would surface only when release.yml ran. This shrinks the desktop app and checks
+    # every ServiceLoader provider survived, in parallel with the main build.
     if: >-
       needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' ||
+      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    env:
+      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
 
     steps:
       - name: Checkout code
@@ -383,27 +461,45 @@ jobs:
         with:
           persist-credentials: false  # read-only job, no git push
 
-      - name: Run ProGuard with Gradle
-        uses: $/.github/actions/gradle-run
-        env:
-          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
-          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
         with:
-          # Shrink only: the keep rules and ServiceLoader providers don't depend on the optimizer, which
-          # takes most of ProGuard's ~15 minutes. Release builds (and the Windows installer job) still optimize.
-          command: :app:main:jvm:verifyProguardServiceProviders -PproguardOptimize=false --stacktrace
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          cache-name: proguard
+          android-sdk: 'false'
 
-  desktop-windows-installer:
-    name: Desktop Windows Installer
-    runs-on: windows-latest
+      # Shrink only: the keep rules and ServiceLoader providers don't depend on the optimizer, which takes most
+      # of ProGuard's time. Release builds still optimize.
+      - name: Run ProGuard
+        run: bazel test --define=proguard_optimize=false //app/main/jvm:release_service_providers_test
+
+  # jpackage packages only for its host, so each OS builds its own installer (#1020): a deb, dmg or msi with the
+  # native mm bundled, as release.yml builds them. Then it installs it and starts the app, mm-jvm and mm.
+  # ProGuard's optimizer is off, as in the Desktop ProGuard check.
+  desktop-installer:
+    name: Desktop Installer (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
     needs: changes
-    # Only release.yml ever configured the desktop app on Windows, so Windows-only breakage (like
-    # the WiX setup below) surfaced at release time while every Linux job stayed green. Main only:
-    # ProGuard alone takes ~17 minutes on a Windows runner, too slow to gate every PR on.
     if: >-
       needs.changes.outputs.code == 'true' &&
-      github.event_name == 'push' && github.ref == 'refs/heads/main'
+      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-latest
+            config: rbe
+          - name: macOS
+            os: macos-latest
+            config: cache
+          - name: Windows
+            os: windows-latest
+            config: cache
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout code
@@ -411,25 +507,46 @@ jobs:
         with:
           persist-credentials: false  # read-only job, no git push
 
-      - name: Package MSI with Gradle
-        uses: $/.github/actions/gradle-run
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
         with:
-          # Compose configures WiX by registering tasks on the root project, which isolated projects
-          # rejects (https://youtrack.jetbrains.com/issue/CMP-8375), so opt out for this build only.
-          command: :app:main:jvm:packageReleaseMsi -Dorg.gradle.isolated-projects=false --stacktrace
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          config: ${{ matrix.config }}
+          cache-name: installer-${{ matrix.name }}
+          android-sdk: 'false'
+
+      # jpackage's deb needs fakeroot; the smoke test's display is Xvfb.
+      - name: Install packaging tools
+        if: matrix.name == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y fakeroot xvfb
+
+      - name: Build the installer
+        run: >-
+          bazel build --define=proguard_optimize=false --define=bundle_native_cli=true
+          //app/main/jvm:installer 2>&1 | tee build.log
+
+      - name: Install and start it
+        run: bazel/kmp/jpackage/install_smoke_test.sh bazel-bin/app/main/jvm/installer "$(cat VERSION)"
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: installer-${{ matrix.name }}
+          path: bazel-bin/app/main/jvm/installer/*
+          retention-days: 7
 
   android-release:
     name: Android Release Build
     runs-on: ubuntu-latest
     needs: changes
-    # The R8/minified release APK is no longer built on PRs (-PbuildRelease gates the variant),
-    # so build it on every push to main: R8 breakage surfaces there, and release.yml's
-    # check-build gate then blocks tagging a broken commit. Keep the command identical to
-    # release.yml's Android matrix entry so they share a configuration-cache entry.
+    # The R8/minified release APK is manual (`bazel build //...` leaves it out), so build it on every push to
+    # main: R8 breakage surfaces there, and release.yml's check-build gate then blocks tagging a broken commit.
     if: >-
       needs.changes.outputs.code == 'true' &&
       github.event_name == 'push' && github.ref == 'refs/heads/main'
+    env:
+      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
 
     steps:
       - name: Checkout code
@@ -437,14 +554,14 @@ jobs:
         with:
           persist-credentials: false  # read-only job, no git push
 
-      - name: Build release APK with Gradle
-        uses: $/.github/actions/gradle-run
-        env:
-          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
-          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
         with:
-          command: :app:main:android:assembleRelease -PbuildRelease=true --stacktrace
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          cache-name: android-release
+
+      - name: Build release APK
+        run: bazel build --stamp //app/main/android:release
 
   qodana:
     runs-on: ubuntu-latest
@@ -455,6 +572,8 @@ jobs:
     # Runs the community 2026.2 linter (qodana.yaml). QODANA_TOKEN is a Qodana Cloud
     # community-tier project token, so results upload to Qodana Cloud; the SARIF also goes to
     # GitHub Code Scanning and the run artifact.
+    # The IDE inside Qodana builds its project model from a Gradle import (it has no Bazel import), so this
+    # job is the one that still runs Gradle; deleting Gradle (#1031) decides its future.
     if: >-
       needs.changes.outputs.code == 'true'
     permissions:
@@ -471,7 +590,7 @@ jobs:
           fetch-depth: 0  # a full history is required for pull request analysis
           persist-credentials: false  # read-only job, no git push
       - name: Generate SQLDelight and Mappie sources
-        uses: $/.github/actions/gradle-run
+        uses: ./.github/actions/gradle-run
         with:
           command: jvmMainClasses
           cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
@@ -547,17 +666,22 @@ jobs:
           # GITHUB_TOKEN doesn't trigger workflows to prevent infinite loops
           token: ${{ secrets.PAT_TOKEN }}
 
-      - name: Setup Gradle environment
-        uses: $/.github/actions/gradle-setup
-
-      # lintFormat regenerates the Bazel BUILD files (bazel run //:gazelle) too.
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.19.1
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          cache-name: format
+          android-sdk: 'false'
 
-      - name: Run lintFormat
-        run: ./gradlew lintFormat --no-daemon -Dktlint.ignoreFailures=true --continue
+      # Stale BUILD files are regenerated and pushed, not reported. Gazelle failing is a real error (two modules
+      # declaring one package, an import nothing provides), so it fails the job.
+      - name: Regenerate BUILD files
+        run: bazel run //:gazelle
+
+      # Gazelle again, then ktlint -F. What ktlint can't fix still fails the Build and Test job's `_ktlint` tests, so
+      # a failure here only means there was something left to fix by hand; the fixes it made are still pushed.
+      - name: Run //:format
+        run: bazel run //:format || echo "::warning::ktlint left findings it can't fix"
 
       - name: Check for changes
         id: git-check
@@ -570,7 +694,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Apply lintFormat auto-fixes
+          git commit -m "Apply //:format auto-fixes (Gazelle, ktlint)
 
           🤖 Auto-generated by GitHub Actions"
           git push

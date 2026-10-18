@@ -26,6 +26,9 @@ coverage --instrumentation_filter=^//(app|utils|tools)[/:],-_sqldelight_jvm$,-:t
 common --enable_platform_specific_config
 # Tests read their data through runfiles, which Windows only lays out when asked.
 common:windows --enable_runfiles
+# Windows has no symlinks, so a runfiles tree is a copy (every JVM test's carries the JDK): lay one out only for a
+# test or `run` that needs it, not for every target `bazel build //...` builds, which filled the runner's disk.
+common:windows --nobuild_runfile_links
 
 # STABLE_GIT_COMMIT, which only a stamped build (--stamp) reads: the release APK's VCS info (#1023).
 common:linux --workspace_status_command=bazel/stamp/workspace_status.sh
