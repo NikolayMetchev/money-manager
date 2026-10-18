@@ -33,6 +33,12 @@ common:cache --remote_download_toplevel
 # A cache or BES hiccup slows a build down, it doesn't fail it.
 common:cache --bes_upload_mode=fully_async
 common:cache --remote_local_fallback
+# BuildBuddy's suggestions: compressed and chunked (SplitBlob/SpliceBlob) transfers for large blobs, and the
+# remote gRPC and compact execution logs of the last invocation, for troubleshooting a cache miss or a remote failure.
+common:cache --remote_cache_compression
+common:cache --experimental_remote_cache_chunking
+common:cache --remote_grpc_log=bazel-remote-grpc.log
+common:cache --execution_log_compact_file=execution_log.binpb.zst
 
 # `rbe`: the cache, and every action run on BuildBuddy's Linux x64 executors (the Linux job only: macOS and
 # Windows actions run on their GitHub runners, with the cache).

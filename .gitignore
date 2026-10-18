@@ -59,4 +59,7 @@ webpage/modules-graph.md
 
 # Bazel convenience symlinks and personal settings
 /bazel-*
+# The last invocation's remote gRPC and execution logs (.bazelrc's `cache` config)
+/bazel-remote-grpc.log
+/execution_log.binpb.zst
 /user.bazelrc
