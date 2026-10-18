@@ -94,6 +94,27 @@ jobs:
       - name: Test
         run: bazel test //... 2>&1 | tee test.log
 
+      # A test binary only builds where it runs (RUNS_ON), so the target platform is set to Linux arm64.
+      - name: Cross-link linuxArm64 test binaries
+        run: |
+          bazel build --platforms=//bazel/platforms:linux_arm64 --remote_download_outputs=toplevel \
+            $(bazel query 'attr(name, "_linuxArm64_bin$", //...)')
+          mkdir -p linux-arm64-tests
+          for binary in $(bazel cquery --platforms=//bazel/platforms:linux_arm64 --output=files \
+              'attr(name, "_linuxArm64_bin$", //...)'); do
+            dir="linux-arm64-tests/$(dirname "${binary#bazel-out/*/bin/}")"
+            mkdir -p "$dir" && cp "$binary" "$dir/"
+          done
+          find linux-arm64-tests -name '*.kexe' | sort
+
+      - name: Upload linuxArm64 test binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-arm64-test-binaries
+          path: linux-arm64-tests
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Build results
         if: always()
         uses: ./.github/actions/bazel-summary
@@ -163,55 +184,12 @@ jobs:
           fail_ci_if_error: false
 
   # Kotlin/Native: each target's common tests run natively on a host of that platform. linuxX64's run in the
-  # Build and Test job. There is no Kotlin/Native compiler for Linux arm64 hosts, so linuxArm64's test binaries
-  # are cross-linked on x64 and run on an arm64 runner.
-  native-linux-arm64-link:
-    name: Native Link (linuxArm64)
-    runs-on: ubuntu-latest
-    needs: changes
-    if: >-
-      needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
-       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false  # read-only job, no git push
-
-      - name: Set up Bazel
-        uses: ./.github/actions/bazel-setup
-        with:
-          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          cache-name: linux-arm64
-          android-sdk: 'false'
-
-      # A test binary only builds where it runs (RUNS_ON), so the target platform is set to Linux arm64.
-      - name: Cross-link linuxArm64 test binaries
-        run: |
-          bazel build --platforms=//bazel/platforms:linux_arm64 --remote_download_outputs=toplevel \
-            $(bazel query 'attr(name, "_linuxArm64_bin$", //...)')
-          mkdir -p linux-arm64-tests
-          for binary in $(bazel cquery --platforms=//bazel/platforms:linux_arm64 --output=files \
-              'attr(name, "_linuxArm64_bin$", //...)'); do
-            dir="linux-arm64-tests/$(dirname "${binary#bazel-out/*/bin/}")"
-            mkdir -p "$dir" && cp "$binary" "$dir/"
-          done
-          find linux-arm64-tests -name '*.kexe' | sort
-
-      - name: Upload linuxArm64 test binaries
-        uses: actions/upload-artifact@v7
-        with:
-          name: linux-arm64-test-binaries
-          path: linux-arm64-tests
-          if-no-files-found: error
-          retention-days: 1
-
+  # Build and Test job. There is no Kotlin/Native compiler for Linux arm64 hosts, so Build and Test also
+  # cross-links linuxArm64's test binaries, and this job runs them on an arm64 runner.
   native-linux-arm64:
     name: Native Tests (linuxArm64)
     runs-on: ubuntu-26.04-arm
-    needs: native-linux-arm64-link
+    needs: build
 
     steps:
       # Some tests read files from the tree at run time, from the workspace root (the runfiles' working directory).
