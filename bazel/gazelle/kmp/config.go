@@ -39,6 +39,9 @@ const (
 	// kmp_generated_srcs label …: generated sources (a kotlin_constants target) that join commonMain, as
 	// Gradle's `kotlin.srcDir(task)` does.
 	generatedSrcsDirective = "kmp_generated_srcs"
+	// kmp_cinterops label …: kmp_cinterop targets of the main compilation (KGP's `cinterops.create`). A module
+	// with cinterops but no Kotlin of its own still gets a kmp_library.
+	cinteropsDirective = "kmp_cinterops"
 )
 
 // keepDep is one kmp_keep_dep or kmp_export: the label, the platform whose deps it joins, and whether it's
@@ -57,6 +60,7 @@ type kmpConfig struct {
 	sqldelightDeps    []string
 	keepDeps          []keepDep
 	generatedSrcs     []string
+	cinterops         []string
 	lockFile          string
 	maven             *mavenIndex
 }
@@ -71,6 +75,7 @@ func (c *kmpConfig) clone() *kmpConfig {
 	out.sqldelightDeps = nil
 	out.keepDeps = nil
 	out.generatedSrcs = nil
+	out.cinterops = nil
 	return &out
 }
 
@@ -85,7 +90,7 @@ func (*kmpLang) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
 func (*kmpLang) CheckFlags(fs *flag.FlagSet, c *config.Config) error { return nil }
 
 func (*kmpLang) KnownDirectives() []string {
-	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective, generatedSrcsDirective}
+	return []string{generateDirective, targetsDirective, pluginsDirective, exportDirective, sqldelightPackageDirective, sqldelightDepDirective, lockFileDirective, keepDepDirective, generatedSrcsDirective, cinteropsDirective}
 }
 
 func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
@@ -110,6 +115,8 @@ func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
 				kc.sqldelightPackage = d.Value
 			case sqldelightDepDirective:
 				kc.sqldelightDeps = append(kc.sqldelightDeps, d.Value)
+			case cinteropsDirective:
+				kc.cinterops = append(kc.cinterops, strings.Fields(d.Value)...)
 			case generatedSrcsDirective:
 				kc.generatedSrcs = append(kc.generatedSrcs, strings.Fields(d.Value)...)
 			case lockFileDirective:

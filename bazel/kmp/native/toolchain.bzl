@@ -80,7 +80,10 @@ KONAN_TARGETS = {
 def kotlin_native_toolchain_info(ctx):
     return ctx.toolchains[TOOLCHAIN_TYPE].kotlin_native
 
-def run_konan(ctx, tool, target, arguments, inputs, outputs, mnemonic, progress_message):
+# cinterop's argument parser takes the option's value as the next argument.
+_AIRPLANE = {"cinterop": ["-Xoverride-konan-properties", "airplaneMode=true"]}
+
+def run_konan(ctx, tool, target, arguments, inputs, outputs, mnemonic, progress_message, konan_options = True):
     """Runs a konan tool (`konanc`, `cinterop`, `klib`, …) for one konan target.
 
     Mirrors the distribution's `bin/run_konan` launcher without its shell script, so it runs the same on
@@ -96,6 +99,8 @@ def run_konan(ctx, tool, target, arguments, inputs, outputs, mnemonic, progress_
         outputs: the action's outputs.
         mnemonic: the action mnemonic.
         progress_message: the action progress message.
+        konan_options: whether the tool takes konan's own options; `clang` and `llvm` pass every argument to
+            the LLVM tool, and neither downloads anything.
     """
     kn = kotlin_native_toolchain_info(ctx)
     if target not in kn.targets:
@@ -120,7 +125,7 @@ def run_konan(ctx, tool, target, arguments, inputs, outputs, mnemonic, progress_
     ])
     ctx.actions.run(
         executable = java.java_executable_exec_path,
-        arguments = [launcher] + arguments + ["-Xoverride-konan-properties=airplaneMode=true"],
+        arguments = [launcher] + arguments + (_AIRPLANE.get(tool, ["-Xoverride-konan-properties=airplaneMode=true"]) if konan_options else []),
         inputs = depset(
             direct = (inputs if type(inputs) == "list" else []) + [kn.launcher],
             transitive = [kn.dist_files, kn.targets[target], java.files] +
