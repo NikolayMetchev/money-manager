@@ -101,6 +101,7 @@
       "linuxArm64",
       "linuxX64",
       "macosArm64",
+      "metadata",
       "mingwX64"
     ],
     "excludes": [
@@ -221,6 +222,8 @@
     "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable": "kotlin_compose_compiler_plugin_embeddable",
     "org.jetbrains.kotlin:kotlin-reflect": "org_jetbrains_kotlin_kotlin_reflect",
     "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable": "kotlin_serialization_compiler_plugin_embeddable",
+    "org.jetbrains.kotlin:kotlin-stdlib": "org_jetbrains_kotlin_kotlin_stdlib",
+    "org.jetbrains.kotlin:kotlin-test": "org_jetbrains_kotlin_kotlin_test",
     "org.jetbrains.kotlinx:atomicfu": "atomicfu",
     "org.jetbrains.kotlinx:kotlinx-coroutines-core": "kotlinx_coroutines_core",
     "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j": "org_jetbrains_kotlinx_kotlinx_coroutines_slf4j",
@@ -2672,6 +2675,27 @@
       "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
       "tech.mappie:mappie-compiler-plugin"
     ],
+    "metadata": [
+      "androidx.compose.runtime:runtime-desktop",
+      "app.cash.sqldelight:compiler-env",
+      "app.cash.sqldelight:gradle-plugin",
+      "app.cash.sqldelight:jdbc-driver",
+      "app.cash.sqldelight:native-driver",
+      "app.cash.sqldelight:sqlite-3-25-dialect",
+      "app.cash.sqldelight:sqlite-driver",
+      "dev.mokkery:mokkery-plugin",
+      "dev.whyoleg.cryptography:cryptography-provider-jdk",
+      "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt",
+      "dev.zacsweers.metro:compiler",
+      "junit:junit",
+      "org.apache.poi:poi",
+      "org.apache.poi:poi-ooxml",
+      "org.jetbrains.compose.runtime:runtime-desktop",
+      "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
+      "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable",
+      "org.jetbrains.kotlinx:kotlinx-coroutines-swing",
+      "tech.mappie:mappie-compiler-plugin"
+    ],
     "mingwX64": [
       "androidx.compose.runtime:runtime-desktop",
       "app.cash.sqldelight:compiler-env",
@@ -2732,6 +2756,19 @@
             "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-macosarm64/1.9.1/annotation-macosarm64-1.9.1.klib",
             "sha256": "ebd2a63a5af25537b8d71bb953788fa0f720cf3c216f33587f1672aa66a372af"
           }
+        ]
+      },
+      "metadata": {
+        "version": "1.9.1",
+        "files": [
+          {
+            "name": "annotation-metadata-1.9.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation/1.9.1/annotation-1.9.1.jar",
+            "sha256": "38322afa7345c37e29c65ec8852178ae1c26e23096a0634d07a4a3893931f58c"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -2811,6 +2848,22 @@
         ],
         "deps": [
           "androidx.annotation:annotation"
+        ]
+      },
+      "metadata": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "collection-metadata-1.5.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/collection/collection/1.5.0/collection-1.5.0.jar",
+            "sha256": "f5ffb8f461c4b5d6f2883a2c7047977773b31d5b23ef030c057514c0c9eceb47"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -2893,6 +2946,24 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
+      "metadata": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-metadata-1.12.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime/1.12.1/runtime-1.12.1.jar",
+            "sha256": "530dcacf4311dec991866fe6ce9a62d17be0e11071938b7fb1f99b2ea76d70b4"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.12.1",
         "files": [
@@ -2949,6 +3020,19 @@
             "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-macosarm64/1.12.1/runtime-annotation-macosarm64-1.12.1.klib",
             "sha256": "fdb144ffb59db5824cf416bab86c52e7d0d01d36c03db6d0f08d113ad318c9c1"
           }
+        ]
+      },
+      "metadata": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-annotation-metadata-1.12.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation/1.12.1/runtime-annotation-1.12.1.jar",
+            "sha256": "190e363a7f2951794f5b4f0986da454f39a425b87799b2d592c2a78972d175df"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -3042,6 +3126,23 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
+      "metadata": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-common-metadata-2.10.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common/2.10.0/lifecycle-common-2.10.0.jar",
+            "sha256": "9d3a9980095b769deb4f328f7f325439b188147124d66dc42edd55e3e7beea37"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.10.0",
         "files": [
@@ -3116,6 +3217,23 @@
           "androidx.lifecycle:lifecycle-common"
         ]
       },
+      "metadata": {
+        "version": "2.10.0",
+        "files": [
+          {
+            "name": "lifecycle-runtime-metadata-2.10.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime/2.10.0/lifecycle-runtime-2.10.0.jar",
+            "sha256": "d944d204a450ed01a32effccfb4832bf9d6460090b717a88a013381d204ab639"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.lifecycle:lifecycle-common"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.10.0",
         "files": [
@@ -3186,6 +3304,23 @@
         "deps": [
           "androidx.compose.runtime:runtime",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadata": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "molecule-runtime-metadata-2.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/molecule/molecule-runtime/2.2.0/molecule-runtime-2.2.0.jar",
+            "sha256": "9396a8e2dbd882d934897b71615a16f549b5b05d685a9f74dc55aef6bc406a1e"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -3260,6 +3395,24 @@
         "deps": [
           "app.cash.sqldelight:runtime",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadata": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "sqldelight-async-extensions-metadata-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/async-extensions/2.4.1/async-extensions-2.4.1.jar",
+            "sha256": "cb2724401eb6332fa4ebbf65c8819efca6ef7a286d16eb32da0bcc9ebabe842d"
+          }
+        ],
+        "deps": [
+          "app.cash.sqldelight:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain",
+          "concurrentMain"
         ]
       },
       "mingwX64": {
@@ -3368,6 +3521,24 @@
           "app.cash.sqldelight:async-extensions",
           "app.cash.sqldelight:runtime",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadata": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "sqldelight-coroutines-extensions-metadata-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/coroutines-extensions/2.4.1/coroutines-extensions-2.4.1.jar",
+            "sha256": "96f39d97bae454082a580a3b421fec5ff1faf89507cd5de1b12f164dd3b2ca45"
+          }
+        ],
+        "deps": [
+          "app.cash.sqldelight:async-extensions",
+          "app.cash.sqldelight:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -3551,6 +3722,19 @@
           }
         ]
       },
+      "metadata": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "runtime-metadata-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/runtime/2.4.1/runtime-2.4.1.jar",
+            "sha256": "a986b0c6d09d85f1cc5a1daa0e4f10c442e1753c2283fc37eb98885ff3566091"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.4.1",
         "files": [
@@ -3684,6 +3868,23 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-test"
         ]
       },
+      "metadata": {
+        "version": "1.2.1",
+        "files": [
+          {
+            "name": "Turbine-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/turbine/turbine/1.2.1/turbine-1.2.1.jar",
+            "sha256": "3a5b990fade2c74a5c04bb992213c5efedce31bfa93f412cfadc379d5390979d"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-test"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.2.1",
         "files": [
@@ -3752,6 +3953,22 @@
           "co.touchlab:kermit-core"
         ]
       },
+      "metadata": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "kermit-metadata-2.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/co/touchlab/kermit/2.2.0/kermit-2.2.0.jar",
+            "sha256": "5a32e34f11ecd7cff96ebb0416e2bc317584f260a8c25b740838ca295a347bfc"
+          }
+        ],
+        "deps": [
+          "co.touchlab:kermit-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.2.0",
         "files": [
@@ -3810,6 +4027,19 @@
             "url": "https://repo1.maven.org/maven2/co/touchlab/kermit-core-macosarm64/2.2.0/kermit-core-macosarm64-2.2.0-cinterop-os_log.klib",
             "sha256": "7460ba595fd5282516c63fed1a74d661197f00604a1f78aeecdb2e531d0b76c8"
           }
+        ]
+      },
+      "metadata": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "kermit-core-metadata-2.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/co/touchlab/kermit-core/2.2.0/kermit-core-2.2.0.jar",
+            "sha256": "48e25cb5955a1284913de0d2c82d59abe8b6f28fe2096b3ecf7af10aada606d7"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -4038,6 +4268,23 @@
           "com.github.ajalt.mordant:mordant"
         ]
       },
+      "metadata": {
+        "version": "5.1.0",
+        "files": [
+          {
+            "name": "clikt-mordant-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt/5.1.0/clikt-5.1.0.jar",
+            "sha256": "fa84a8d57b909921a1fd6719cf1714e4da85f143d478f623476bb361cc21abdc"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.clikt:clikt-core",
+          "com.github.ajalt.mordant:mordant"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "5.1.0",
         "files": [
@@ -4094,6 +4341,19 @@
           }
         ]
       },
+      "metadata": {
+        "version": "5.1.0",
+        "files": [
+          {
+            "name": "clikt-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core/5.1.0/clikt-core-5.1.0.jar",
+            "sha256": "2eff59eb6f9ff5acd635246d66737d2586995b932a9eaad7e70b271122e37c04"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "5.1.0",
         "files": [
@@ -4144,6 +4404,19 @@
             "url": "https://repo1.maven.org/maven2/com/github/ajalt/colormath/colormath-macosarm64/3.7.0/colormath-macosarm64-3.7.0.klib",
             "sha256": "03c82577b40e4a6afdb0ece380f863bb6d76e3427246dac517bf2259c308e061"
           }
+        ]
+      },
+      "metadata": {
+        "version": "3.7.0",
+        "files": [
+          {
+            "name": "colormath-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/colormath/colormath/3.7.0/colormath-3.7.0.jar",
+            "sha256": "e892bc2a0e1b66078ed856afb3c79a864521290904cbf31fa04779e8d6567fcb"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -4215,6 +4488,22 @@
           "com.github.ajalt.mordant:mordant-core"
         ]
       },
+      "metadata": {
+        "version": "3.0.2",
+        "files": [
+          {
+            "name": "mordant-omnibus-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant/3.0.2/mordant-3.0.2.jar",
+            "sha256": "090984d202692ffef447e88dfe2c63693a5de29670da0831b863bc284da147e2"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.mordant:mordant-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.0.2",
         "files": [
@@ -4280,6 +4569,22 @@
         ],
         "deps": [
           "com.github.ajalt.colormath:colormath"
+        ]
+      },
+      "metadata": {
+        "version": "3.1.0",
+        "files": [
+          {
+            "name": "mordant-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core/3.1.0/mordant-core-3.1.0.jar",
+            "sha256": "ee696ca6ebe46957d407bcc6c87856c444f80e6faf7e3f0e4bdcdf7d8b9db7bd"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.colormath:colormath"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -4395,6 +4700,19 @@
           }
         ]
       },
+      "metadata": {
+        "version": "0.3.10",
+        "files": [
+          {
+            "name": "bignum-metadata-0.3.10.jar",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum/0.3.10/bignum-0.3.10.jar",
+            "sha256": "9183f3da7a4944ca41ef9f79f51a6a178cbc021936de44e6e9265c6f040eb45c"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.3.10",
         "files": [
@@ -4445,6 +4763,19 @@
             "url": "https://repo1.maven.org/maven2/com/jakewharton/cite/cite-api-macosarm64/0.6.1/cite-api-macosarm64-0.6.1.klib",
             "sha256": "687015294444038debb3a269bd00f68f61e82c25c77ae1e84a7851a51e7a6250"
           }
+        ]
+      },
+      "metadata": {
+        "version": "0.6.1",
+        "files": [
+          {
+            "name": "cite-api-metadata-0.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/cite/cite-api/0.6.1/cite-api-0.6.1.jar",
+            "sha256": "3226a439b1932873e6eca701150d7f7cf3d26b02514b21d907eae0b6d6fdaa86"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -4509,6 +4840,22 @@
         ],
         "deps": [
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadata": {
+        "version": "0.1.0",
+        "files": [
+          {
+            "name": "finalization-hook-metadata-0.1.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/finalization/finalization-hook/0.1.0/finalization-hook-0.1.0.jar",
+            "sha256": "cce3fb5546fb692f680f80b896dfd0d4aaa4b4f002214c48abd865d0a009983f"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -4608,6 +4955,29 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
+      "metadata": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-runtime-metadata-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-runtime/0.18.0/mosaic-runtime-0.18.0.jar",
+            "sha256": "2c99ef2176a84f71298f641e2ff043232235c41cc38c3281dcd777f135932f5c"
+          }
+        ],
+        "deps": [
+          "com.jakewharton.mosaic:mosaic-terminal",
+          "com.jakewharton.mosaic:mosaic-tty-terminal",
+          "de.cketti.unicode:kotlin-codepoints",
+          "dev.drewhamilton.poko:poko-annotations",
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.18.0",
         "files": [
@@ -4690,6 +5060,24 @@
           "com.jakewharton.cite:cite-api",
           "dev.drewhamilton.poko:poko-annotations",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadata": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-terminal-metadata-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-terminal/0.18.0/mosaic-terminal-0.18.0.jar",
+            "sha256": "1fce99396764b7ca1de455df6cbdc979ffd04ef5c94792cf18f719394ce05d8c"
+          }
+        ],
+        "deps": [
+          "com.jakewharton.cite:cite-api",
+          "dev.drewhamilton.poko:poko-annotations",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -4775,6 +5163,25 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
+      "metadata": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-testing-metadata-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-testing/0.18.0/mosaic-testing-0.18.0.jar",
+            "sha256": "b576f3f177a55c09afb2589976319ead0dbc319861566bbe737441311be053cd"
+          }
+        ],
+        "deps": [
+          "com.jakewharton.mosaic:mosaic-runtime",
+          "dev.drewhamilton.poko:poko-annotations",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.18.0",
         "files": [
@@ -4846,6 +5253,19 @@
             "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-tty-macosarm64/0.18.0/mosaic-tty-macosarm64-0.18.0-cinterop-mosaic.klib",
             "sha256": "632c66e1636266e35a5f56565cd13b14d444972f5fb85f369e9c35ab3a22b39d"
           }
+        ]
+      },
+      "metadata": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-tty-metadata-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-tty/0.18.0/mosaic-tty-0.18.0.jar",
+            "sha256": "7fe51cfb205df583ebd289c373cbd5507681836155708db1357a1bb4935c8d23"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -4929,6 +5349,25 @@
           "com.jakewharton.mosaic:mosaic-terminal",
           "com.jakewharton.mosaic:mosaic-tty",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadata": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-tty-terminal-metadata-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-tty-terminal/0.18.0/mosaic-tty-terminal-0.18.0.jar",
+            "sha256": "20178c942fb2a02cee107ec6050793314c2f6911669de4f93d1dce890ae3cec0"
+          }
+        ],
+        "deps": [
+          "com.jakewharton.finalization:finalization-hook",
+          "com.jakewharton.mosaic:mosaic-terminal",
+          "com.jakewharton.mosaic:mosaic-tty",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -5067,6 +5506,19 @@
           }
         ]
       },
+      "metadata": {
+        "version": "0.11.0",
+        "files": [
+          {
+            "name": "kotlin-codepoints-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/de/cketti/unicode/kotlin-codepoints/0.11.0/kotlin-codepoints-0.11.0.jar",
+            "sha256": "4976ac8bcac0030da952cc05450e9e655598263f4648ac26c369b32a303ef062"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.11.0",
         "files": [
@@ -5117,6 +5569,19 @@
             "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-macosarm64/0.23.1/poko-annotations-macosarm64-0.23.1.klib",
             "sha256": "005016751757f75a0c6d2f3a6bac979080c251b2c4f12c1ae569ae2a049aa2fe"
           }
+        ]
+      },
+      "metadata": {
+        "version": "0.23.1",
+        "files": [
+          {
+            "name": "poko-annotations-metadata-0.23.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations/0.23.1/poko-annotations-0.23.1.jar",
+            "sha256": "b9b3145d01cb3acce87615bd626cf8a60018da3cdf2f39d86eb53ebbf16464fe"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -5196,6 +5661,19 @@
             "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-macosarm64/3.5.1/mokkery-core-macosarm64-3.5.1.klib",
             "sha256": "b56bd676a2c4b02aa8b90dacce0d29b826183d1c1c3d9e3200480a63020a034e"
           }
+        ]
+      },
+      "metadata": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-core-metadata-3.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core/3.5.1/mokkery-core-3.5.1.jar",
+            "sha256": "e1f763dddd933776aee93f6023351cdb0fad00be1748adf8ce49f98c448661a5"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -5283,6 +5761,23 @@
           "org.jetbrains.kotlinx:atomicfu"
         ]
       },
+      "metadata": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-runtime-metadata-3.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime/3.5.1/mokkery-runtime-3.5.1.jar",
+            "sha256": "e2644966781888e3e52875bd33f9381d2c40637f1e55435965b91973da7bd64b"
+          }
+        ],
+        "deps": [
+          "dev.drewhamilton.poko:poko-annotations",
+          "dev.mokkery:mokkery-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.5.1",
         "files": [
@@ -5347,6 +5842,22 @@
         ],
         "deps": [
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "metadata": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-bigint-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-bigint/0.6.0/cryptography-bigint-0.6.0.jar",
+            "sha256": "f9ea0dfed6367211ff916d751ace38e36fd34946ad7ab340bee2bc024812bd6c"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -5422,6 +5933,24 @@
           "dev.whyoleg.cryptography:cryptography-bigint",
           "dev.whyoleg.cryptography:cryptography-random",
           "org.jetbrains.kotlinx:kotlinx-io-core"
+        ]
+      },
+      "metadata": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-core-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-core/0.6.0/cryptography-core-0.6.0.jar",
+            "sha256": "9fed5b29b1b5b0d11cdf08a02c8473bb63e02a776de9db2d5e2f9a57104886ad"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-bigint",
+          "dev.whyoleg.cryptography:cryptography-random",
+          "org.jetbrains.kotlinx:kotlinx-io-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -5740,6 +6269,19 @@
           }
         ]
       },
+      "metadata": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-random-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-random/0.6.0/cryptography-random-0.6.0.jar",
+            "sha256": "b391dcf0c4823fa3bf8f5de6f0fa98d5c6368f98a96d02306892d01589704c73"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.6.0",
         "files": [
@@ -6010,6 +6552,19 @@
           }
         ]
       },
+      "metadata": {
+        "version": "1.4.5",
+        "files": [
+          {
+            "name": "runtime-metadata-1.4.5.jar",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime/1.4.5/runtime-1.4.5.jar",
+            "sha256": "b92cdf5738251e6b31493feab4b036941e1f8810a018f1b9b13ab628044406b5"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.4.5",
         "files": [
@@ -6080,6 +6635,23 @@
           "io.ktor:ktor-client-core",
           "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadata": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-auth-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth/3.6.0/ktor-client-auth-3.6.0.jar",
+            "sha256": "2ae2530a061ad20eb49733dca7ca3a2a04190c280192844c34ff328e17418493"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -6176,6 +6748,28 @@
           "io.ktor:ktor-websocket-serialization",
           "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadata": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-core-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core/3.6.0/ktor-client-core-3.6.0.jar",
+            "sha256": "50ccade1e574d946603407be700b88b94a865f47311ed83374e7a24e57f67a57"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-events",
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-http-cio",
+          "io.ktor:ktor-sse",
+          "io.ktor:ktor-websocket-serialization",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain",
+          "jvmAndPosixMain"
         ]
       },
       "mingwX64": {
@@ -6325,6 +6919,20 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
+      "metadata": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-engine-defaults-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults/3.6.0/ktor-client-engine-defaults-3.6.0.jar",
+            "sha256": "db8c15f15e475361481d534af7fb5a93608d9e038e33dcf880f8ef2a8f5e8f50"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -6405,6 +7013,24 @@
           "io.ktor:ktor-http",
           "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadata": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-mock-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock/3.6.0/ktor-client-mock-3.6.0.jar",
+            "sha256": "535a6149b991698f4f0238860991ae4fb75424d0c1e2f3e155cd65863201b363"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "io.ktor:ktor-http",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -6527,6 +7153,23 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
+      "metadata": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-events-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events/3.6.0/ktor-events-3.6.0.jar",
+            "sha256": "cb6b7f195fd9c83b172712fb1368bb99ee601c233aebeffb9edf172b6a102a40"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -6606,6 +7249,24 @@
           "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "metadata": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-http-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http/3.6.0/ktor-http-3.6.0.jar",
+            "sha256": "dc8cd84b0a592ef609c09cd6523516c4c6d2c6a6f24954cc2a41edd178dde037"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -6689,6 +7350,25 @@
           "io.ktor:ktor-io",
           "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadata": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-http-cio-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio/3.6.0/ktor-http-cio-3.6.0.jar",
+            "sha256": "3659febd812086d17c40dddc85889f1d8d7c371e9b8cfa8e16c65f3c97d5650f"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-io",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain",
+          "jvmAndPosixMain"
         ]
       },
       "mingwX64": {
@@ -6782,6 +7462,24 @@
           "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.jetbrains.kotlinx:kotlinx-io-core"
+        ]
+      },
+      "metadata": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-io-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io/3.6.0/ktor-io-3.6.0.jar",
+            "sha256": "32a750ed346a1f4497aa27696e68ca45eb7d294c3caba08f308d77fe312b3395"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-io-core"
+        ],
+        "source_sets": [
+          "commonMain",
+          "jvmAndPosixMain"
         ]
       },
       "mingwX64": {
@@ -6886,6 +7584,23 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
+      "metadata": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-network-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network/3.6.0/ktor-network-3.6.0.jar",
+            "sha256": "cea1854f150d0a73c2bfc0eb0d3386951bb86b0dfc2b7bc9b86fb100eea13b31"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -6987,6 +7702,23 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
+      "metadata": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-serialization-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization/3.6.0/ktor-serialization-3.6.0.jar",
+            "sha256": "fd2aef1509733ca48e84c7953cc772e76816842895c9373a72d42accf6c10e56"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-websockets",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -7062,6 +7794,23 @@
           "io.ktor:ktor-utils",
           "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadata": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-sse-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse/3.6.0/ktor-sse-3.6.0.jar",
+            "sha256": "1f4838ddb7d57e84bdd3913af4b40627662abdbca2fba8921b867f1a62d0bf5d"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -7160,6 +7909,24 @@
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ]
       },
+      "metadata": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-utils-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils/3.6.0/ktor-utils-3.6.0.jar",
+            "sha256": "5aca932a872b735b4af37acfc74b79932ca73b921cef6617ad28001daefb73a5"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-io",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -7236,6 +8003,23 @@
           "io.ktor:ktor-serialization",
           "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadata": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-websocket-serialization-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization/3.6.0/ktor-websocket-serialization-3.6.0.jar",
+            "sha256": "b7455559d7413f9c0b30889209f824401a2434d8f5cc5ea0ad388b48543b753b"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-serialization",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -7317,6 +8101,24 @@
           "io.ktor:ktor-utils",
           "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadata": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-websockets-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets/3.6.0/ktor-websockets-3.6.0.jar",
+            "sha256": "e639140b0db0d00d27f6437fe8b438743033b424e43a1a9be61f91643c9f12d0"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -7553,6 +8355,22 @@
           "androidx.lifecycle:lifecycle-common"
         ]
       },
+      "metadata": {
+        "version": "2.9.2",
+        "files": [
+          {
+            "name": "lifecycle-common-2.9.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-common/2.9.2/lifecycle-common-2.9.2.jar",
+            "sha256": "b21a149fe28cccc7ece37b55098d10027aba3d2e0db31d12d3cdc907ded2368a"
+          }
+        ],
+        "deps": [
+          "androidx.lifecycle:lifecycle-common"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.9.2",
         "files": [
@@ -7594,6 +8412,22 @@
         "files": null,
         "deps": [
           "androidx.lifecycle:lifecycle-runtime"
+        ]
+      },
+      "metadata": {
+        "version": "2.9.2",
+        "files": [
+          {
+            "name": "lifecycle-runtime-2.9.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime/2.9.2/lifecycle-runtime-2.9.2.jar",
+            "sha256": "a20c7995a4cdc2aa6e1b576bed232616fc77c9d84d2b9efcbb39cf2e54a55770"
+          }
+        ],
+        "deps": [
+          "androidx.lifecycle:lifecycle-runtime"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -7677,6 +8511,26 @@
           "org.jetbrains.compose.runtime:runtime"
         ]
       },
+      "metadata": {
+        "version": "2.9.2",
+        "files": [
+          {
+            "name": "lifecycle-runtime-compose-2.9.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose/2.9.2/lifecycle-runtime-compose-2.9.2.jar",
+            "sha256": "780bbe9e2567b62744222b2a011c7b706f1e643d2cb02fee0f5f486e9866a6d4"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.androidx.lifecycle:lifecycle-common",
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime",
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.runtime:runtime"
+        ],
+        "source_sets": [
+          "commonMain",
+          "nonAndroidMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.9.2",
         "files": [
@@ -7729,6 +8583,22 @@
           "androidx.annotation:annotation"
         ]
       },
+      "metadata": {
+        "version": "1.9.0-beta03",
+        "files": [
+          {
+            "name": "annotation-1.9.0-beta03.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/annotation-internal/annotation/1.9.0-beta03/annotation-1.9.0-beta03.jar",
+            "sha256": "597b893edebd7ec3ee66f3c63c91e3c23733f896745d17bc72aef6618a47a68f"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.9.0-beta03",
         "files": [
@@ -7776,6 +8646,22 @@
         "files": null,
         "deps": [
           "androidx.collection:collection"
+        ]
+      },
+      "metadata": {
+        "version": "1.8.2",
+        "files": [
+          {
+            "name": "collection-1.8.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/collection-internal/collection/1.8.2/collection-1.8.2.jar",
+            "sha256": "ed73891406046b98739f34f4befe60f62091c28706f2cb36330297fd9fd88129"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -7845,6 +8731,22 @@
           "androidx.compose.runtime:runtime"
         ]
       },
+      "metadata": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "runtime-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/runtime/runtime/1.12.2/runtime-1.12.2.jar",
+            "sha256": "6ac0a3c72f0f2324308bbb26d2bf3781fb48206b275638168fcf540e6ba58cd4"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime"
+        ],
+        "source_sets": [
+          "redirectCommonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.12.2",
         "files": [
@@ -7910,6 +8812,37 @@
         ]
       }
     },
+    "org.jetbrains.kotlin:kotlin-stdlib": {
+      "metadata": {
+        "version": "2.4.21",
+        "files": [
+          {
+            "name": "kotlin-stdlib-2.4.21-all.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.21/kotlin-stdlib-2.4.21-all.jar",
+            "sha256": "74d9d7cf112bbf3d14612bb9fb867456a0ae36398d330df8178f0de42a61f476"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-test": {
+      "metadata": {
+        "version": "2.4.21",
+        "files": [
+          {
+            "name": "kotlin-test-2.4.21-all.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-test/2.4.21/kotlin-test-2.4.21-all.jar",
+            "sha256": "51d2160793bdd145390829a5ba0dceb45f5e02924be4aac671c3912e4afc8c92"
+          }
+        ],
+        "source_sets": [
+          "annotationsCommonMain",
+          "assertionsCommonMain"
+        ]
+      }
+    },
     "org.jetbrains.kotlinx:atomicfu": {
       "jvm": {
         "version": "0.33.0",
@@ -7964,6 +8897,20 @@
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu-macosarm64/0.33.0/atomicfu-macosarm64-0.33.0-cinterop-interop.klib",
             "sha256": "6c7fadcd957fa614cccafff42e9833ed17e8506be119a6ab262f87bbc402c9a4"
           }
+        ]
+      },
+      "metadata": {
+        "version": "0.33.0",
+        "files": [
+          {
+            "name": "atomicfu-metadata-0.33.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu/0.33.0/atomicfu-0.33.0.jar",
+            "sha256": "615c47eadfab66b5fa859ea6f11f540cec8613e4cbabe24c60753f220a793da8"
+          }
+        ],
+        "source_sets": [
+          "commonMain",
+          "concurrentMain"
         ]
       },
       "mingwX64": {
@@ -8033,6 +8980,23 @@
         ],
         "deps": [
           "org.jetbrains.kotlinx:atomicfu"
+        ]
+      },
+      "metadata": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-metadata-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core/1.11.0/kotlinx-coroutines-core-1.11.0.jar",
+            "sha256": "04e7737fb15cf5f3aed83a91141a5303a0b2acd886f5bbc35cdbe791ad63dfee"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu"
+        ],
+        "source_sets": [
+          "commonMain",
+          "concurrentMain"
         ]
       },
       "mingwX64": {
@@ -8139,6 +9103,23 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
+      "metadata": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-test-metadata-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-test/1.11.0/kotlinx-coroutines-test-1.11.0.jar",
+            "sha256": "8567a0ef58da0d4355b73f708371e84fb39bd28e07788004a8764e3706eb7780"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.11.0",
         "files": [
@@ -8204,6 +9185,22 @@
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ]
       },
+      "metadata": {
+        "version": "0.8.0",
+        "files": [
+          {
+            "name": "kotlinx-datetime-metadata-0.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-datetime/0.8.0/kotlinx-datetime-0.8.0.jar",
+            "sha256": "18b77f04ea476926749707e1ecbba3436a0c50983478062655374f1f119177a3"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.8.0",
         "files": [
@@ -8257,6 +9254,19 @@
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-macosarm64/0.9.1/kotlinx-io-bytestring-macosarm64-0.9.1.klib",
             "sha256": "b20ec12601f9bd20c346be668b5d0429fa960f22782b73955891273913c6db04"
           }
+        ]
+      },
+      "metadata": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-bytestring-metadata-0.9.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring/0.9.1/kotlinx-io-bytestring-0.9.1.jar",
+            "sha256": "4a2bb55f9f428df0bfa775ac540640cc0e6d633ec66f520cd2157bfe10be2f48"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -8323,6 +9333,22 @@
           "org.jetbrains.kotlinx:kotlinx-io-bytestring"
         ]
       },
+      "metadata": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-core-metadata-0.9.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core/0.9.1/kotlinx-io-core-0.9.1.jar",
+            "sha256": "ef28b5f0ee3d666ff5078f6e1b08c08d10a3fe2a169141dfc763de96eaafbcad"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-bytestring"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.9.1",
         "files": [
@@ -8376,6 +9402,19 @@
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-macosarm64/1.11.0/kotlinx-serialization-core-macosarm64-1.11.0.klib",
             "sha256": "551d11833d5611afe63dac02c05dd21611fe5f43d002e014cbe61b380551e3e4"
           }
+        ]
+      },
+      "metadata": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-core-metadata-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core/1.11.0/kotlinx-serialization-core-1.11.0.jar",
+            "sha256": "5f0d16dc5d0803b73e14bba9045507565d2fa7b0186d0dc3824a9403a071d07b"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -8440,6 +9479,22 @@
         ],
         "deps": [
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "metadata": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-json-metadata-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json/1.11.0/kotlinx-serialization-json-1.11.0.jar",
+            "sha256": "57788c37107f55fa980ef36c157e70ecef573158a762783bfd30ed4824419e80"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -8571,6 +9626,19 @@
             "url": "https://repo1.maven.org/maven2/tech/mappie/mappie-api-macosarm64/2.4.21-2.4.5/mappie-api-macosarm64-2.4.21-2.4.5.klib",
             "sha256": "0122d189cf60e0199e72e700e9fdda79bbe5bd218a918958c21c04ae7b2b19d7"
           }
+        ]
+      },
+      "metadata": {
+        "version": "2.4.21-2.4.5",
+        "files": [
+          {
+            "name": "mappie-api-metadata-2.4.21-2.4.5.jar",
+            "url": "https://repo1.maven.org/maven2/tech/mappie/mappie-api/2.4.21-2.4.5/mappie-api-2.4.21-2.4.5.jar",
+            "sha256": "3a70a2f4cb7ab84ea7c4e00fe0005924b5c8d4bb7b1d8bcce78e90df969f75bc"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {

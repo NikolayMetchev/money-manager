@@ -14,14 +14,17 @@ type Platform struct {
 	Name string // jvm, linuxX64, …
 	// konan's target name for a native platform, empty on the JVM.
 	Konan string
+	// Common is the `metadata` platform: the common metadata variant (common.go).
+	Common bool
 }
 
 var platforms = map[string]Platform{
-	"jvm":        {Name: "jvm"},
-	"linuxArm64": {Name: "linuxArm64", Konan: "linux_arm64"},
-	"linuxX64":   {Name: "linuxX64", Konan: "linux_x64"},
-	"macosArm64": {Name: "macosArm64", Konan: "macos_arm64"},
-	"mingwX64":   {Name: "mingwX64", Konan: "mingw_x64"},
+	"jvm":            {Name: "jvm"},
+	"linuxArm64":     {Name: "linuxArm64", Konan: "linux_arm64"},
+	"linuxX64":       {Name: "linuxX64", Konan: "linux_x64"},
+	"macosArm64":     {Name: "macosArm64", Konan: "macos_arm64"},
+	"mingwX64":       {Name: "mingwX64", Konan: "mingw_x64"},
+	metadataPlatform: {Name: metadataPlatform, Common: true},
 }
 
 const jvmVersion = 25
@@ -39,6 +42,8 @@ type Resolved struct {
 	Files   []File   `json:"files"`
 	Deps    []string `json:"deps,omitempty"`         // api: on dependents' compile classpath too
 	Runtime []string `json:"runtime_deps,omitempty"` // runtime only (JVM)
+	// SourceSets are the klib directories of a `metadata` jar our common code sees.
+	SourceSets []string `json:"source_sets,omitempty"`
 }
 
 // fromToolchain modules come from the Kotlin toolchain instead, at the compiler's own version, as KGP does.
@@ -121,17 +126,20 @@ var errNoVariant = errors.New("no variant for this platform")
 
 // node is what one library version contributes on a platform, before versions are settled.
 type node struct {
-	files   []File
-	api     []Coordinate
-	runtime []Coordinate
+	files      []File
+	api        []Coordinate
+	runtime    []Coordinate
+	sourceSets []string
 }
 
 type Resolver struct {
 	fetch    *Fetcher
 	forces   map[string]string // module → version
 	excludes map[string]bool
-	mu       sync.Mutex
-	nodes    map[string]*node // platform|coordinate → node
+	// consumers are the platforms common code is compiled for, whose variants decide what it sees.
+	consumers []Platform
+	mu        sync.Mutex
+	nodes     map[string]*node // platform|coordinate → node
 }
 
 func NewResolver(f *Fetcher, forces map[string]string, excludes []string) *Resolver {
@@ -167,13 +175,16 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 	}
 	module, err := r.fetch.gradleModule(dir, c)
 	if errors.Is(err, errNotFound) {
-		if p.Konan != "" {
+		if p.Konan != "" || p.Common {
 			return nil, fmt.Errorf("%s: %w (it has no Gradle Module Metadata)", c, errNoVariant)
 		}
 		return r.loadPom(c, dir)
 	}
 	if err != nil {
 		return nil, err
+	}
+	if p.Common {
+		return r.loadMetadata(p, c, dir, module)
 	}
 	compileUsage, runtimeUsage := "java-api", "java-runtime"
 	if p.Konan != "" {
@@ -321,7 +332,7 @@ func (r *Resolver) Resolve(p Platform, roots []Coordinate) (map[string]Resolved,
 		if err != nil {
 			return err
 		}
-		res := Resolved{Version: c.Version, Files: n.files}
+		res := Resolved{Version: c.Version, Files: n.files, SourceSets: n.sourceSets}
 		out[module] = res
 		for _, d := range n.api {
 			res.Deps = append(res.Deps, d.Module())

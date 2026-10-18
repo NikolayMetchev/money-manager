@@ -140,6 +140,12 @@ extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output
   own clang and `llvm-ar` (`CompileBundledSqliteTask`'s defines), and `kmp_cinterop` embeds the archive in a klib
   (`-staticLibrary`). `kmp_library(cinterops = …)`, set by `# gazelle:kmp_cinterops`, compiles a module with it, even
   one with no Kotlin of its own. `app/db/core` keeps the dep with `kmp_keep_dep`: nothing imports SQLite, it's linked.
+- **commonMain metadata check** (`//bazel/kmp:metadata.bzl`, #1010): every module with native targets gets
+  `:<name>_metadata`, Gradle's `compileCommonMainKotlinMetadata`: commonMain compiled alone (konan's metadata compiler,
+  the native plugins, `-Werror`) against its deps' common metadata, so an API only some platforms have
+  (`java.util.regex`, `RegexOption.DOT_MATCHES_ALL`) fails even though every platform compile passes. `maven_kmp`'s
+  `metadata` platform is each library's common metadata jar, limited to the source sets all our targets' variants
+  include (and those source sets' dependencies), plus the stdlib's and kotlin-test's. `bazel build //...` runs it.
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.
