@@ -1,0 +1,8 @@
+load("@rules_java//java:java_library.bzl", "java_library")
+
+# Put in front of konan's main class by run_konan (see KonanLauncher.java).
+java_library(
+    name = "launcher",
+    srcs = ["src/com/moneymanager/bazel/kmp/nativelauncher/KonanLauncher.java"],
+    visibility = ["//visibility:public"],
+)

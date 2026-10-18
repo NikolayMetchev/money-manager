@@ -1,13 +1,22 @@
 # The external libraries module BUILD files name, behind stable labels so KMP variant resolution (#1000) and
-# compiler-plugin support (#1001) can repoint them without touching any module.
+# compiler-plugin support (#1001) can repoint them without touching any module. Like modules, each library
+# has one target per platform: `<name>_jvm`, `<name>_linuxX64`, …
 load("@rules_kotlin//kotlin:core.bzl", "kt_compiler_plugin")
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("//bazel/kmp:native.bzl", "kt_native_group", "kt_native_import")
 
 package(default_visibility = ["//visibility:public"])
 
+NATIVE_TARGETS = [
+    "linuxArm64",
+    "linuxX64",
+    "macosArm64",
+    "mingwX64",
+]
+
 # kotlin("test") on the JVM: kotlin-test plus its JUnit 4 binding, as KGP infers for a JUnit 4 test task.
 kt_jvm_library(
-    name = "kotlin_test",
+    name = "kotlin_test_jvm",
     exports = [
         "@maven//:junit_junit",
         "@rules_kotlin//kotlin/compiler:kotlin-test",
@@ -15,13 +24,28 @@ kt_jvm_library(
     ],
 )
 
+# On native, kotlin.test is part of the distribution's stdlib.
+[
+    kt_native_group(
+        name = "kotlin_test_" + target,
+        target = target,
+    )
+    for target in NATIVE_TARGETS
+]
+
+kt_native_import(
+    name = "bignum_linuxX64",
+    klib = "@bignum_linuxx64_klib//file",
+    target = "linuxX64",
+)
+
 alias(
-    name = "kotlinx_io_core",
+    name = "kotlinx_io_core_jvm",
     actual = "@maven//:org_jetbrains_kotlinx_kotlinx_io_core_jvm",
 )
 
 alias(
-    name = "kotlinx_serialization_core",
+    name = "kotlinx_serialization_core_jvm",
     actual = "@maven//:org_jetbrains_kotlinx_kotlinx_serialization_core_jvm",
 )
 

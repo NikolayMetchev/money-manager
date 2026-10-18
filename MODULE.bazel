@@ -58,3 +58,14 @@ maven.install(
     repositories = ["https://repo1.maven.org/maven2"],
 )
 use_repo(maven, "maven")
+
+# The one native Maven library the native spike needs (utils/bigdecimal's nativeMain), until KMP variant
+# resolution (#1000) resolves klibs from Gradle Module Metadata.
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+
+http_file(
+    name = "bignum_linuxx64_klib",
+    downloaded_file_path = "bignum-linuxx64-0.3.10.klib",
+    sha256 = "c2bbdde1370838ae12fa806317826b2ac65d181f29189af7226fc3377dbaf1eb",
+    urls = ["https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-linuxx64/0.3.10/bignum-linuxx64-0.3.10.klib"],
+)
