@@ -242,3 +242,43 @@ func TestPomVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestPickVariantOnAndroid(t *testing.T) {
+	jvm := Variant{Name: "jvmApiElements-published", Attributes: attrs{"org.gradle.usage": "java-api", "org.gradle.category": "library", "org.jetbrains.kotlin.platform.type": "jvm", "org.gradle.jvm.environment": "standard-jvm"}}
+	android := Variant{Name: "androidApiElements-published", Attributes: attrs{"org.gradle.usage": "java-api", "org.gradle.category": "library", "org.jetbrains.kotlin.platform.type": "androidJvm", "org.gradle.libraryelements": "aar"}}
+	native := Variant{Name: "linuxX64ApiElements-published", Attributes: attrs{"org.gradle.usage": "kotlin-api", "org.gradle.category": "library", "org.jetbrains.kotlin.platform.type": "native"}}
+	// KGP's androidJvm variant first, an AAR included.
+	if got := pick(platforms["android"], "java-api", []Variant{jvm, android, native}); got == nil || got.Name != android.Name {
+		t.Errorf("picked %v, want the androidJvm variant", got)
+	}
+	// Then a JVM one, which an Android compilation may take.
+	if got := pick(platforms["android"], "java-api", []Variant{jvm, native}); got == nil || got.Name != jvm.Name {
+		t.Errorf("picked %v, want the JVM variant", got)
+	}
+	// Guava: AGP's android environment over the jre one.
+	jre := Variant{Name: "jreApiElements", Attributes: attrs{"org.gradle.usage": "java-api", "org.gradle.jvm.environment": "standard-jvm"}}
+	flavour := Variant{Name: "androidApiElements", Attributes: attrs{"org.gradle.usage": "java-api", "org.gradle.jvm.environment": "android"}}
+	if got := pick(platforms["android"], "java-api", []Variant{jre, flavour}); got == nil || got.Name != flavour.Name {
+		t.Errorf("picked %v, want the android environment", got)
+	}
+	// The JVM never takes the Android variant.
+	if got := pick(platforms["jvm"], "java-api", []Variant{android}); got != nil {
+		t.Errorf("the JVM picked %s", got.Name)
+	}
+}
+
+func TestStubVariantsAreNoVariant(t *testing.T) {
+	at := Variant{Name: "linuxx64ApiElements"}
+	at.AvailableAt = &struct {
+		URL                    string
+		Group, Module, Version string
+	}{Module: "foundation-linuxx64stubs"}
+	for _, v := range []Variant{{Name: "jvmStubsApiElements-published"}, at} {
+		if !isStubs(&v) {
+			t.Errorf("%s isn't stubs", v.Name)
+		}
+	}
+	if isStubs(&Variant{Name: "jvmApiElements-published"}) {
+		t.Error("a real variant is stubs")
+	}
+}

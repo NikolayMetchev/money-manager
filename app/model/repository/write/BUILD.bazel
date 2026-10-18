@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
 # Only the ImportEngine may write (CLAUDE.md, "Database Writes"): these modules define, implement or inject the
 # write repositories, and app/importer is the engine.
 # gazelle:kmp_visibility //app/db/core:__pkg__ //app/db/di:__pkg__ //app/db/write:__pkg__ //app/di/core:__pkg__ //app/importer:__pkg__ //test/app/db:__pkg__
@@ -17,6 +17,7 @@ load("//bazel/kmp:defs.bzl", "kmp_library")
 
 kmp_library(
     name = "write",
+    android = True,
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     native_targets = [
         "linuxArm64",

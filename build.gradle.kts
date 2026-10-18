@@ -82,6 +82,22 @@ tasks.register("verifyUniquePackages") {
     }
 }
 
+// Bazel's BUILD files are generated from the sources (Gazelle, #1004), so formatting regenerates them too:
+// `./gradlew lintFormat` runs this from the root and ktlint and sortDependencies in every module.
+val gazelle =
+    tasks.register<Exec>("gazelle") {
+        group = "formatting"
+        description = "Regenerates every module's Bazel BUILD file (bazel run //:gazelle)."
+        workingDir = layout.projectDirectory.asFile
+        commandLine("bazel", "run", "//:gazelle")
+    }
+
+tasks.register("lintFormat") {
+    group = "formatting"
+    description = "Runs all formatting tasks"
+    dependsOn(gazelle)
+}
+
 tasks.named("check") {
     dependsOn("verifyUniquePackages")
     // An included build's tasks never run as part of this build's lifecycle unless asked for, so pull

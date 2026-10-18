@@ -24,6 +24,12 @@ kt_jvm_library(
     ],
 )
 
+# On Android, as on the JVM, kotlin("test") is kotlin-test-junit (AGP's host and device tests run JUnit 4).
+kt_jvm_library(
+    name = "kotlin_test_android",
+    exports = [":kotlin_test_jvm"],
+)
+
 # compose.desktop.currentOs (#1018): Compose Desktop with the Skiko runtime of the platform the JVM runs on.
 # Gradle's plugin picks it from the build machine; here it's the target platform, the same thing outside
 # cross-compiles.

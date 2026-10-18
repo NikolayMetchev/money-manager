@@ -1,10 +1,18 @@
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 # gazelle:kmp_generate true
+# gazelle:kmp_targets android
 # gazelle:kmp_test_flaky true
 
 kmp_library(
     name = "filePicker",
+    android = True,
+    android_deps = [
+        "@maven_kmp//:androidx_activity",
+        "@maven_kmp//:androidx_activity_compose",
+        "@maven_kmp//:androidx_compose_ui",
+    ],
+    android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     jvm_deps = [
         "//utils/localsettings",

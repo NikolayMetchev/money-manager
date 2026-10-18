@@ -18,13 +18,14 @@ import (
 type sourceSet struct {
 	dir      string // commonMain
 	srcsAttr string // common_srcs
-	platform string // which deps attribute its imports go to: "" (common), "jvm", "native" or a family
+	platform string // which deps attribute its imports go to: "" (common), "jvmAndroid", "jvm", "android", "native" or a family
 }
 
 var mainSets = []sourceSet{
 	{"commonMain", "common_srcs", ""},
-	{"jvmAndroidMain", "jvm_android_srcs", "jvm"},
+	{"jvmAndroidMain", "jvm_android_srcs", "jvmAndroid"},
 	{"jvmMain", "jvm_srcs", "jvm"},
+	{"androidMain", "android_srcs", "android"},
 	{"nativeMain", "native_srcs", "native"},
 	{"linuxMain", "linux_srcs", "linux"},
 	{"appleMain", "apple_srcs", "apple"},
@@ -35,7 +36,7 @@ var mainSets = []sourceSet{
 
 var testSets = []sourceSet{
 	{"commonTest", "common_srcs", ""},
-	{"jvmAndroidTest", "jvm_android_srcs", "jvm"},
+	{"jvmAndroidTest", "jvm_android_srcs", "jvmAndroid"},
 	{"jvmTest", "jvm_srcs", "jvm"},
 	{"nativeTest", "native_srcs", "native"},
 	{"linuxTest", "linux_srcs", "linux"},
@@ -46,11 +47,12 @@ var testSets = []sourceSet{
 
 // imports is what GenerateRules hands Resolve for one rule: the imported names per platform.
 type imports struct {
-	byPlatform map[string][]string // "" | jvm | native | linux | apple | mingw → imported names
+	byPlatform map[string][]string // "" | jvmAndroid | jvm | android | native | linux | apple | mingw → imported names
 	keep       map[string][]string // platform → labels kept by kmp_keep_dep
 	packages   []string            // the module's own packages (not dependencies)
 	test       bool
 	associate  string // the kmp_library under test, for a kmp_test
+	leaves     leaves // the compilations the rule has, for libraries some platforms lack
 }
 
 var (
@@ -139,7 +141,12 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		return res
 	}
 
-	main, mainSetsPresent := scan(args.Dir, mainSets)
+	sets := mainSets
+	if !kc.android {
+		// Without the Android target Gradle compiles no androidMain.
+		sets = withoutAndroid(sets)
+	}
+	main, mainSetsPresent := scan(args.Dir, sets)
 	sqldelightRoot := filepath.Join(args.Dir, "src", "commonMain", "sqldelight")
 	hasSqldelight := dirHasFiles(sqldelightRoot, ".sq")
 	if len(mainSetsPresent) == 0 && !hasSqldelight && len(kc.cinterops) == 0 {
@@ -158,6 +165,9 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	}
 	if len(kc.cinterops) > 0 {
 		lib.SetAttr("cinterops", kc.cinterops)
+	}
+	if kc.android {
+		lib.SetAttr("android", true)
 	}
 	if len(kc.targets) > 0 {
 		lib.SetAttr("native_targets", kc.targets)
@@ -211,7 +221,7 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	}
 	lib.SetPrivateAttr(packagesKey, ownPackages)
 	res.Gen = append(res.Gen, lib)
-	res.Imports = append(res.Imports, imports{byPlatform: keys(main.imports), keep: kc.kept(false), packages: ownPackages})
+	res.Imports = append(res.Imports, imports{byPlatform: keys(main.imports), keep: kc.kept(false), packages: ownPackages, leaves: leaves{android: kc.android, native: kc.targets}})
 
 	tests, testSetsPresent := scan(args.Dir, testSets)
 	if len(testSetsPresent) > 0 {
@@ -257,7 +267,12 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 			t.SetAttr("keep_deps", kept)
 		}
 		res.Gen = append(res.Gen, t)
-		res.Imports = append(res.Imports, imports{byPlatform: keys(tests.imports), keep: kc.kept(true), test: true, associate: name})
+		// Android host tests are #1022: today a module's tests compile for the JVM and native only.
+		testLeaves := leaves{}
+		if runsOnNative(testSetsPresent) {
+			testLeaves.native = kc.targets
+		}
+		res.Imports = append(res.Imports, imports{byPlatform: keys(tests.imports), keep: kc.kept(true), test: true, associate: name, leaves: testLeaves})
 	}
 	return res
 }
@@ -346,7 +361,7 @@ func (c *kmpConfig) exported() map[string]bool {
 
 func runsOnNative(sets []sourceSet) bool {
 	for _, set := range sets {
-		if set.platform != "jvm" {
+		if set.platform != "jvm" && set.platform != "jvmAndroid" {
 			return true
 		}
 	}
@@ -364,4 +379,14 @@ func resourceGlob(dir, kind string) (rule.GlobValue, bool) {
 		}
 	}
 	return rule.GlobValue{Patterns: patterns}, patterns != nil
+}
+
+func withoutAndroid(sets []sourceSet) []sourceSet {
+	var out []sourceSet
+	for _, set := range sets {
+		if set.platform != "android" {
+			out = append(out, set)
+		}
+	}
+	return out
 }

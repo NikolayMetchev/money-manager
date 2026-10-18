@@ -550,6 +550,12 @@ jobs:
       - name: Setup Gradle environment
         uses: $/.github/actions/gradle-setup
 
+      # lintFormat regenerates the Bazel BUILD files (bazel run //:gazelle) too.
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.19.1
+        with:
+          bazelisk-cache: true
+
       - name: Run lintFormat
         run: ./gradlew lintFormat --no-daemon -Dktlint.ignoreFailures=true --continue
 

@@ -19,7 +19,8 @@ const (
 	// kmp_generate true|false: whether this directory's module gets generated targets. Off by default until
 	// every module builds with Bazel (#1008).
 	generateDirective = "kmp_generate"
-	// kmp_targets linuxX64 linuxArm64 …: the module's Kotlin/Native targets (moneymanager.native-convention).
+	// kmp_targets android linuxX64 linuxArm64 …: the module's targets besides the JVM: `android`
+	// (moneymanager.android-convention) and its Kotlin/Native targets (moneymanager.native-convention).
 	targetsDirective = "kmp_targets"
 	// kmp_plugins name …: compiler plugins to apply besides the ones inferred from the sources.
 	pluginsDirective = "kmp_plugins"
@@ -67,6 +68,8 @@ const (
 	allowReferenceDirective = "kmp_allow_reference"
 )
 
+const androidTarget = "android"
+
 // keepDep is one kmp_keep_dep or kmp_export: the label, the platform whose deps it joins, and whether it's
 // the tests'.
 type keepDep struct {
@@ -76,6 +79,7 @@ type keepDep struct {
 
 type kmpConfig struct {
 	generate          bool
+	android           bool
 	targets           []string
 	plugins           []string
 	exports           []keepDep
@@ -145,7 +149,14 @@ func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
 			case generateDirective:
 				kc.generate = d.Value == "true"
 			case targetsDirective:
-				kc.targets = strings.Fields(d.Value)
+				kc.android, kc.targets = false, nil
+				for _, t := range strings.Fields(d.Value) {
+					if t == androidTarget {
+						kc.android = true
+					} else {
+						kc.targets = append(kc.targets, t)
+					}
+				}
 			case pluginsDirective:
 				kc.plugins = strings.Fields(d.Value)
 			case exportDirective:
@@ -204,21 +215,26 @@ type mavenIndex struct {
 	exports   map[string][]string // library → the libraries its compile classpath (Gradle api) brings
 	same      map[string][]string // library → those that are the same file on some platform (a root module and
 	// the variant it points at: runtime is runtime-desktop's jar on the JVM)
+	platforms map[string]map[string]bool // library → the lockfile platforms it has a variant for
 }
 
 type mavenLibrary struct {
 	name     string // target name in @maven_kmp, without the platform suffix
 	packages int    // how many packages it declares: fewer means more specific
+	catalog  bool   // a catalog library, which Gradle builds name, rather than a module one brings
 }
 
 func loadMavenIndex(path string) *mavenIndex {
-	idx := &mavenIndex{byPackage: map[string][]mavenLibrary{}, exports: map[string][]string{}, same: map[string][]string{}}
+	idx := &mavenIndex{byPackage: map[string][]mavenLibrary{}, exports: map[string][]string{}, same: map[string][]string{}, platforms: map[string]map[string]bool{}}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		log.Printf("kmp: no maven_kmp lockfile at %s: %v", path, err)
 		return idx
 	}
 	var lock struct {
+		Inputs struct {
+			Libraries map[string]string `json:"libraries"` // alias → group:artifact:version
+		} `json:"inputs"`
 		Names     map[string]string   `json:"names"`
 		Packages  map[string][]string `json:"packages"`
 		Artifacts map[string]map[string]struct {
@@ -232,8 +248,14 @@ func loadMavenIndex(path string) *mavenIndex {
 		log.Printf("kmp: %s: %v", path, err)
 		return idx
 	}
+	catalog := map[string]bool{}
+	for _, coordinates := range lock.Inputs.Libraries {
+		group, rest, _ := strings.Cut(coordinates, ":")
+		artifact, _, _ := strings.Cut(rest, ":")
+		catalog[group+":"+artifact] = true
+	}
 	for module, pkgs := range lock.Packages {
-		lib := mavenLibrary{name: lock.Names[module], packages: len(pkgs)}
+		lib := mavenLibrary{name: lock.Names[module], packages: len(pkgs), catalog: catalog[module]}
 		for _, p := range pkgs {
 			idx.byPackage[p] = append(idx.byPackage[p], lib)
 		}
@@ -241,7 +263,12 @@ func loadMavenIndex(path string) *mavenIndex {
 	byFile := map[string][]string{}
 	for module, platforms := range lock.Artifacts {
 		seen := map[string]bool{}
+		name := lock.Names[module]
+		if idx.platforms[name] == nil {
+			idx.platforms[name] = map[string]bool{}
+		}
 		for platform, artifact := range platforms {
+			idx.platforms[name][platform] = true
 			for _, f := range artifact.Files {
 				key := platform + "/" + f.Name
 				byFile[key] = append(byFile[key], lock.Names[module])
@@ -282,8 +309,13 @@ func loadMavenIndex(path string) *mavenIndex {
 // already names in a directive (`named`, as labels), or nothing when those already bring every one of them, as
 // Mosaic's api brings the Compose runtime; then one whose api brings the rest; only then the most specific. (A tool's fat jar that repackages
 // kotlinx.coroutines is never brought, so coroutines-core stays a dependency of its own.)
-func (m *mavenIndex) find(pkg string, named map[string]bool) (string, bool) {
-	libs := m.byPackage[pkg]
+func (m *mavenIndex) find(pkg string, named map[string]bool, on []string) (string, bool) {
+	var libs []mavenLibrary
+	for _, lib := range m.byPackage[pkg] {
+		if m.has(lib.name, on) {
+			libs = append(libs, lib)
+		}
+	}
 	if len(libs) == 0 {
 		return "", false
 	}
@@ -292,6 +324,17 @@ func (m *mavenIndex) find(pkg string, named map[string]bool) (string, bool) {
 			if named[mavenPrefix+lib.name] {
 				return lib.name, true
 			}
+		}
+		// Gradle builds name catalog libraries: on Android androidx's foundation, not the JetBrains module whose
+		// Android variant it is.
+		var fromCatalog []mavenLibrary
+		for _, lib := range libs {
+			if lib.catalog {
+				fromCatalog = append(fromCatalog, lib)
+			}
+		}
+		if len(fromCatalog) > 0 {
+			libs = fromCatalog
 		}
 		reached := m.reached(named)
 		all := true
@@ -317,6 +360,21 @@ func (m *mavenIndex) find(pkg string, named map[string]bool) (string, bool) {
 }
 
 const mavenPrefix = "@maven_kmp//:"
+
+// has is whether a library has a variant for each lockfile platform. One the lockfile doesn't list (one of
+// //bazel/kmp/deps') is everywhere.
+func (m *mavenIndex) has(lib string, platforms []string) bool {
+	have, ok := m.platforms[lib]
+	if !ok {
+		return true
+	}
+	for _, p := range platforms {
+		if !have[p] {
+			return false
+		}
+	}
+	return true
+}
 
 // reached is every library the named ones bring through their exports, transitively.
 func (m *mavenIndex) reached(named map[string]bool) map[string]bool {

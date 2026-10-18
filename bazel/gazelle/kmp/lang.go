@@ -30,20 +30,24 @@ func NewLanguage() language.Language { return &kmpLang{} }
 func (*kmpLang) Name() string { return languageName }
 
 var resolvedAttrs = map[string]bool{
-	"deps":        true,
-	"exports":     true,
-	"jvm_deps":    true,
-	"jvm_exports": true,
-	"native_deps": true,
-	"linux_deps":  true,
-	"apple_deps":  true,
-	"mingw_deps":  true,
+	"deps":                true,
+	"exports":             true,
+	"jvm_android_deps":    true,
+	"jvm_android_exports": true,
+	"jvm_deps":            true,
+	"jvm_exports":         true,
+	"android_deps":        true,
+	"android_exports":     true,
+	"native_deps":         true,
+	"linux_deps":          true,
+	"apple_deps":          true,
+	"mingw_deps":          true,
 }
 
 // The `*_srcs` globs aren't mergeable: each is fixed for its source set, Gazelle can't merge every glob
 // expression, and a source set's attribute is only ever added.
 func mergeable(extra ...string) map[string]bool {
-	out := map[string]bool{"native_targets": true, "plugins": true}
+	out := map[string]bool{"android": true, "native_targets": true, "plugins": true}
 	for _, k := range extra {
 		out[k] = true
 	}

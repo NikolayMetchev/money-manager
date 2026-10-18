@@ -28,8 +28,9 @@ func (*kmpLang) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 
 func (*kmpLang) Embeds(r *rule.Rule, from label.Label) []label.Label { return nil }
 
-// Libraries the toolchain and the distribution provide: no dependency to add.
-var builtin = []string{"kotlin.", "java.", "javax.", "sun.", "kotlinx.cinterop.", "platform."}
+// Libraries the toolchain, the distribution and the Android SDK (android.jar, on every Android compile) provide:
+// no dependency to add.
+var builtin = []string{"kotlin.", "java.", "javax.", "sun.", "kotlinx.cinterop.", "platform.", "android."}
 
 // Dependencies kotlin.* names stand for, which aren't Maven libraries here.
 var kotlinLibraries = map[string]string{
@@ -66,19 +67,37 @@ func (*kmpLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 	for _, platform := range platforms {
 		deps[platform.name] = map[string]bool{}
 	}
+	add := func(platform, dep string) {
+		if imp.test {
+			dep = forTests(dep)
+		}
+		if dep != "" && !self[dep] {
+			deps[platform][dep] = true
+		}
+	}
 	for platform, names := range imp.byPlatform {
 		named := imp.named(platform)
+		below := imp.leaves.below(platform)
 		for _, name := range names {
-			dep, found := resolveImport(c, ix, kc, name, from, named)
-			if !found {
+			// The library every compilation the source set is part of has, as Gradle's metadata resolves one.
+			dep, found := resolveImport(c, ix, kc, name, from, named, lockPlatforms(below))
+			if found {
+				add(platform, dep)
+				continue
+			}
+			if len(below) < 2 {
 				log.Printf("%s: can't resolve import %s", from, name)
 				continue
 			}
-			if imp.test {
-				dep = forTests(dep)
-			}
-			if dep != "" && !self[dep] {
-				deps[platform][dep] = true
+			// None does (androidx's `-desktop` jars are the JVM's alone, its root modules Android's): each
+			// compilation gets the one it has, as Gradle resolves the package per platform.
+			for _, leaf := range below {
+				dep, found := resolveImport(c, ix, kc, name, from, imp.named(leaf.platform), leaf.lockPlatforms)
+				if !found {
+					log.Printf("%s: can't resolve import %s on %s", from, name, leaf.platform)
+					continue
+				}
+				add(leaf.platform, dep)
 			}
 		}
 	}
@@ -127,11 +146,14 @@ type platform struct {
 }
 
 var (
-	commonPlatform = &platform{"", "deps", "exports", nil}
-	nativePlatform = &platform{"native", "native_deps", "", commonPlatform}
-	platforms      = []*platform{
+	commonPlatform     = &platform{"", "deps", "exports", nil}
+	jvmAndroidPlatform = &platform{"jvmAndroid", "jvm_android_deps", "jvm_android_exports", commonPlatform}
+	nativePlatform     = &platform{"native", "native_deps", "", commonPlatform}
+	platforms          = []*platform{
 		commonPlatform,
-		{"jvm", "jvm_deps", "jvm_exports", commonPlatform},
+		jvmAndroidPlatform,
+		{"jvm", "jvm_deps", "jvm_exports", jvmAndroidPlatform},
+		{"android", "android_deps", "android_exports", jvmAndroidPlatform},
 		nativePlatform,
 		// On native every klib dependency is transitive anyway, so the family source sets need no exports.
 		{"linux", "linux_deps", "", nativePlatform},
@@ -165,8 +187,56 @@ func setDeps(r *rule.Rule, depsAttr, exportsAttr string, deps, exports map[strin
 	}
 }
 
-// resolveImport returns the label an import needs ("" for none), and whether it was understood.
-func resolveImport(c *config.Config, ix *resolve.RuleIndex, kc *kmpConfig, name string, from label.Label, named map[string]bool) (string, bool) {
+// leaves are a rule's compilations below its common code: the JVM's, Android's and the native targets'.
+type leaves struct {
+	android bool
+	native  []string
+}
+
+// leaf is one group of compilations sharing a deps attribute, and the lockfile platforms they resolve on.
+type leaf struct {
+	platform      string
+	lockPlatforms []string
+}
+
+// below is the compilations a source set group's code is part of, and so the platforms its libraries need.
+func (l leaves) below(group string) []leaf {
+	jvm := leaf{"jvm", []string{"jvm"}}
+	android := leaf{"android", []string{"android"}}
+	var out []leaf
+	switch group {
+	case "":
+		out = append(out, jvm)
+		if l.android {
+			out = append(out, android)
+		}
+		if len(l.native) > 0 {
+			out = append(out, leaf{"native", l.native})
+		}
+	case "jvmAndroid":
+		out = append(out, jvm)
+		if l.android {
+			out = append(out, android)
+		}
+	case "jvm":
+		out = append(out, jvm)
+	case "android":
+		out = append(out, android)
+	}
+	return out
+}
+
+func lockPlatforms(below []leaf) []string {
+	var out []string
+	for _, l := range below {
+		out = append(out, l.lockPlatforms...)
+	}
+	return out
+}
+
+// resolveImport returns the label an import needs ("" for none), and whether it was understood. `on`, when
+// set, limits libraries to those with a variant for every one of those lockfile platforms.
+func resolveImport(c *config.Config, ix *resolve.RuleIndex, kc *kmpConfig, name string, from label.Label, named map[string]bool, on []string) (string, bool) {
 	for _, pkg := range candidates(name) {
 		if lib, ok := kotlinLibraries[pkg]; ok {
 			return lib, true
@@ -185,11 +255,15 @@ func resolveImport(c *config.Config, ix *resolve.RuleIndex, kc *kmpConfig, name 
 			}
 			return moduleLabel(matches[0].Label, from), true
 		}
-		if lib, ok := kc.maven.find(pkg, named); ok {
+		if lib, ok := kc.maven.find(pkg, named, on); ok {
 			if lib == "" {
 				return "", true
 			}
 			return mavenPrefix + lib, true
+		}
+		if len(kc.maven.byPackage[pkg]) > 0 {
+			// The package's libraries just aren't on these platforms; a parent package's would be the wrong one.
+			return "", false
 		}
 	}
 	return "", false

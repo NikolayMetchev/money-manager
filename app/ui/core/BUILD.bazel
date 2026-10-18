@@ -1,6 +1,7 @@
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 # gazelle:kmp_generate true
+# gazelle:kmp_targets android
 # gazelle:kmp_keep_dep //bazel/kmp/deps:compose_desktop_current_os jvmTest
 # gazelle:kmp_test_jvm_flags -Djava.awt.headless=true -Dskiko.test.harness=true
 # gazelle:kmp_test_flaky true
@@ -10,7 +11,16 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 kmp_library(
     name = "core",
+    android = True,
+    android_deps = [
+        "@maven_kmp//:androidx_compose_material3",
+        "@maven_kmp//:androidx_navigation3_ui",
+    ],
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_deps = [
+        "@maven_kmp//:compose_material3_desktop",
+        "@maven_kmp//:jetbrains_navigation3_ui_desktop",
+    ],
     plugins = ["compose"],
     visibility = ["//visibility:public"],
     deps = [
@@ -55,13 +65,11 @@ kmp_library(
         "//utils/currency",
         "@maven_kmp//:androidx_compose_runtime",
         "@maven_kmp//:androidx_navigation3_runtime",
-        "@maven_kmp//:compose_foundation_desktop",
-        "@maven_kmp//:compose_foundation_layout_desktop",
-        "@maven_kmp//:compose_material3_desktop",
-        "@maven_kmp//:compose_ui_desktop",
-        "@maven_kmp//:compose_ui_text_desktop",
-        "@maven_kmp//:jetbrains_navigation3_ui_desktop",
         "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:org_jetbrains_compose_foundation_foundation",
+        "@maven_kmp//:org_jetbrains_compose_foundation_foundation_layout",
+        "@maven_kmp//:org_jetbrains_compose_ui_ui",
+        "@maven_kmp//:org_jetbrains_compose_ui_ui_text",
     ],
 )
 

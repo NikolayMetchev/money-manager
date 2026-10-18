@@ -1,10 +1,20 @@
 load("//bazel/kmp:defs.bzl", "kmp_library")
 
 # gazelle:kmp_generate true
+# gazelle:kmp_targets android
 
 kmp_library(
     name = "people",
+    android = True,
+    android_deps = [
+        "@maven_kmp//:androidx_compose_material3",
+        "@maven_kmp//:androidx_compose_material_icons_core",
+    ],
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_deps = [
+        "@maven_kmp//:compose_material3_desktop",
+        "@maven_kmp//:compose_material_icons_core_desktop",
+    ],
     plugins = ["compose"],
     visibility = ["//visibility:public"],
     deps = [
@@ -15,11 +25,9 @@ kmp_library(
         "//app/ui/components",
         "//utils/compose/scrollbar",
         "@maven_kmp//:androidx_compose_runtime",
-        "@maven_kmp//:compose_foundation_desktop",
-        "@maven_kmp//:compose_foundation_layout_desktop",
-        "@maven_kmp//:compose_material3_desktop",
-        "@maven_kmp//:compose_material_icons_core_desktop",
-        "@maven_kmp//:compose_ui_desktop",
         "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:org_jetbrains_compose_foundation_foundation",
+        "@maven_kmp//:org_jetbrains_compose_foundation_foundation_layout",
+        "@maven_kmp//:org_jetbrains_compose_ui_ui",
     ],
 )

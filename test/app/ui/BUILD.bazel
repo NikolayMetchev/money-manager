@@ -1,15 +1,22 @@
 load("//bazel/kmp:defs.bzl", "kmp_library")
 
 # gazelle:kmp_generate true
+# gazelle:kmp_targets android
 
 kmp_library(
     name = "ui",
+    android = True,
+    android_deps = [
+        "@maven_kmp//:androidx_compose_ui_test",
+        "@maven_kmp//:androidx_test_monitor",
+    ],
+    android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_deps = ["@maven_kmp//:compose_ui_test_desktop"],
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
     visibility = ["//visibility:public"],
     deps = [
         "//app/model/core",
-        "@maven_kmp//:compose_ui_test_desktop",
         "@maven_kmp//:kotlinx_coroutines_core",
     ],
 )

@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
 # gazelle:kmp_plugins serialization
 # gazelle:kmp_keep_dep //utils/sqlite3 nativeMain
 # SqlFileNamingConventionTest scans every .sq file; the suite takes about three minutes.
@@ -34,6 +34,12 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 kmp_library(
     name = "core",
+    android = True,
+    android_deps = [
+        "@maven_kmp//:androidx_sqlite",
+        "@maven_kmp//:sqldelight_android_driver",
+    ],
+    android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     jvm_deps = ["@maven_kmp//:sqldelight_sqlite_driver"],
     jvm_exports = [

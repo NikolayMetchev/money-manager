@@ -1,0 +1,29 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_targets android
+
+kmp_library(
+    name = "lib",
+    android = True,
+    android_deps = [
+        "@maven_kmp//:sqlite",
+        "@maven_kmp//:ui_android",
+    ],
+    android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_android_srcs = glob(["src/jvmAndroidMain/kotlin/**/*.kt"]),
+    jvm_deps = [
+        "@maven_kmp//:jdbc",
+        "@maven_kmp//:ui_desktop",
+    ],
+    jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+    deps = ["@maven_kmp//:g_ui"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":lib",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    deps = ["//bazel/kmp/deps:kotlin_test"],
+)

@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
 # gazelle:kmp_export @maven_kmp//:ktor_client_core
 # gazelle:kmp_keep_dep @maven_kmp//:ktor_client_engine_defaults jvmAndroidMain
 # gazelle:kmp_keep_dep @maven_kmp//:ktor_client_engine_defaults nativeMain
@@ -8,8 +8,9 @@ load("//bazel/kmp:defs.bzl", "kmp_library")
 
 kmp_library(
     name = "httpclient",
+    android = True,
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
-    jvm_deps = ["@maven_kmp//:ktor_client_engine_defaults"],
+    jvm_android_deps = ["@maven_kmp//:ktor_client_engine_defaults"],
     keep_deps = ["@maven_kmp//:ktor_client_engine_defaults"],
     native_deps = ["@maven_kmp//:ktor_client_engine_defaults"],
     native_targets = [

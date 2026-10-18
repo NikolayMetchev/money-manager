@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
 # gazelle:kmp_plugins serialization
 # gazelle:kmp_export //app/importfilesource/core
 # gazelle:kmp_export //app/remotestorage/core
@@ -27,6 +27,7 @@ kotlin_constants(
 
 kmp_library(
     name = "googledrive",
+    android = True,
     apple_srcs = glob(["src/appleMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     generated_srcs = [":generated_google_oauth"],

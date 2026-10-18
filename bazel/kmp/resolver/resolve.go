@@ -16,9 +16,13 @@ type Platform struct {
 	Konan string
 	// Common is the `metadata` platform: the common metadata variant (common.go).
 	Common bool
+	// Android is the KMP Android library target's compilation (#1021): a library's Android variant (an AAR), or
+	// its JVM one.
+	Android bool
 }
 
 var platforms = map[string]Platform{
+	"android":        {Name: "android", Android: true},
 	"jvm":            {Name: "jvm"},
 	"linuxArm64":     {Name: "linuxArm64", Konan: "linux_arm64"},
 	"linuxX64":       {Name: "linuxX64", Konan: "linux_x64"},
@@ -99,6 +103,9 @@ func wants(p Platform, usage string, a attrs) int {
 		return 0
 	}
 	platform, hasPlatform := a.str("org.jetbrains.kotlin.platform.type")
+	if p.Android {
+		return wantsAndroid(usage, a, platform, hasPlatform)
+	}
 	if p.Konan == "" {
 		if hasPlatform && platform != "jvm" {
 			return 0
@@ -123,6 +130,42 @@ func wants(p Platform, usage string, a attrs) int {
 		return 0
 	}
 	return 2
+}
+
+// wantsAndroid is wants for the Android target: KGP's androidJvm variant first (4), then a JVM one, as KGP's
+// compatibility rule lets an Android compilation take (2); among equals, AGP's `android` environment wins
+// (Guava's android flavour over its jre one). An AAR is as good as a jar: AGP transforms it to its classes.
+func wantsAndroid(usage string, a attrs, platform string, hasPlatform bool) int {
+	score := 1
+	switch {
+	case !hasPlatform:
+	case platform == "androidJvm":
+		score = 4
+	case platform == "jvm":
+		score = 2
+	default:
+		return 0
+	}
+	if v, ok := a.str("org.gradle.libraryelements"); ok && v != "jar" && v != "aar" {
+		return 0
+	}
+	if v, ok := a.str("org.gradle.jvm.version"); ok {
+		if n, err := strconv.Atoi(v); err == nil && n > jvmVersion {
+			return 0
+		}
+	}
+	env, _ := a.str("org.gradle.jvm.environment")
+	switch env {
+	case "android":
+		score++
+	case "", "standard-jvm":
+	default:
+		return 0
+	}
+	if _, hasUsage := a.str("org.gradle.usage"); !hasUsage && score > 1 {
+		score = 1
+	}
+	return score
 }
 
 func pick(p Platform, usage string, variants []Variant) *Variant {
@@ -203,7 +246,7 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 		if p.Konan != "" || p.Common {
 			return nil, fmt.Errorf("%s: %w (it has no Gradle Module Metadata)", c, errNoVariant)
 		}
-		return r.loadPom(c, dir)
+		return r.loadPom(p, c, dir)
 	}
 	if err != nil {
 		return nil, err
@@ -227,6 +270,9 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 	var runtime *Variant
 	if runtimeUsage != "" {
 		runtime = pick(p, runtimeUsage, module.Variants)
+	}
+	if isStubs(api) {
+		return nil, fmt.Errorf("%s: %w (only stubs)", c, errNoVariant)
 	}
 	// A KMP library's root module points at a per-platform module (`kotlinx-coroutines-core-jvm`).
 	if api.AvailableAt != nil {
@@ -272,6 +318,17 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 		}
 	}
 	return n, nil
+}
+
+// isStubs is an AndroidX variant that only stands in for a platform the library doesn't support (Compose
+// Foundation's `jvmStubs`, `linuxx64Stubs`): its classes throw. Gradle would resolve it, but nothing here
+// compiles against one (the desktop app takes JetBrains' Compose instead), so the library has no variant on that
+// platform, and Gazelle doesn't mistake it for one that serves both.
+func isStubs(v *Variant) bool {
+	if strings.Contains(v.Name, "Stubs") {
+		return true
+	}
+	return v.AvailableAt != nil && strings.HasSuffix(v.AvailableAt.Module, "stubs")
 }
 
 func isPlatform(d Dependency) bool {
@@ -355,23 +412,34 @@ func (r *Resolver) dependencies(deps []Dependency) []Coordinate {
 	return out
 }
 
-func (r *Resolver) loadPom(c Coordinate, dir string) (*node, error) {
+func (r *Resolver) loadPom(p Platform, c Coordinate, dir string) (*node, error) {
 	pom, err := r.fetch.effectivePom(c)
 	if err != nil {
 		return nil, err
 	}
 	n := &node{}
+	ext := ""
 	switch pom.pom.Packaging {
 	case "", "jar", "bundle":
-		url := fmt.Sprintf("%s/%s-%s.jar", dir, c.Artifact, c.Version)
+		ext = "jar"
+	case "aar":
+		// A POM-only Android library (Play services): Android only.
+		if !p.Android {
+			return nil, fmt.Errorf("%s: %w (an AAR)", c, errNoVariant)
+		}
+		ext = "aar"
+	}
+	if ext != "" {
+		url := fmt.Sprintf("%s/%s-%s.%s", dir, c.Artifact, c.Version, ext)
 		sum, err := r.fetch.sha256Of(url)
 		if err != nil {
 			return nil, err
 		}
-		n.files = []File{{Name: fmt.Sprintf("%s-%s.jar", c.Artifact, c.Version), URL: url, Sha256: sum}}
+		n.files = []File{{Name: fmt.Sprintf("%s-%s.%s", c.Artifact, c.Version, ext), URL: url, Sha256: sum}}
 	}
 	for _, d := range pom.pom.Dependencies {
-		if d.Optional == "true" || (d.Type != "" && d.Type != "jar") || (d.Scope != "" && d.Scope != "compile" && d.Scope != "runtime") {
+		aar := p.Android && d.Type == "aar"
+		if d.Optional == "true" || (d.Type != "" && d.Type != "jar" && !aar) || (d.Scope != "" && d.Scope != "compile" && d.Scope != "runtime") {
 			continue
 		}
 		dep := Coordinate{pom.expand(d.GroupID), pom.expand(d.ArtifactID), pom.expand(d.Version)}

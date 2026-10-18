@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
 # gazelle:kmp_plugins metro
 # gazelle:kmp_export //app/db/core
 # gazelle:kmp_export //app/db/di
@@ -31,6 +31,7 @@ kotlin_constants(
 
 kmp_library(
     name = "core",
+    android = True,
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     generated_srcs = [":generated_app_version"],
     native_targets = [

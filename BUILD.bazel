@@ -26,7 +26,7 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-# ktlint -F over the tree, as `./gradlew lintFormat` (#1015).
+# Gazelle, then ktlint -F over the tree, as `./gradlew lintFormat` (#1015).
 alias(
     name = "format",
     actual = "//bazel/kmp/lint:format",
@@ -35,7 +35,10 @@ alias(
 gazelle_binary(
     name = "gazelle_bin",
     languages = ["//bazel/gazelle/kmp"],
-    visibility = ["//bazel/gazelle/kmp:__pkg__"],
+    visibility = [
+        "//bazel/gazelle/kmp:__pkg__",
+        "//bazel/kmp/lint:__pkg__",
+    ],
 )
 
 gazelle(

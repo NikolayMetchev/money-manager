@@ -260,6 +260,24 @@
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
+    "//bazel/kmp/android:extensions.bzl%android_sdk": {
+      "general": {
+        "bzlTransitiveDigest": "XsifG2YuGwrck3lJN9qflU83H0jtMxF4xqtGMSNG/kI=",
+        "usagesDigest": "af/EB6S6Jhg08XPZPOFfwCev0bH7RX6CSnpYr6oaQG4=",
+        "recordedInputs": [
+          "FILE:@@//gradle/libs.versions.toml cefbc1c0b6d6f324cb0a71b234bb9f1ec54fedb1fe13e100b9258689b39286e7"
+        ],
+        "generatedRepoSpecs": {
+          "android_sdk": {
+            "repoRuleId": "@@//bazel/kmp/android:extensions.bzl%_platform",
+            "attributes": {
+              "compile_sdk": "37",
+              "local_properties": "/home/nikolaym/IdeaProjects/money-manager/local.properties"
+            }
+          }
+        }
+      }
+    },
     "//bazel/kmp/constants:google_oauth.bzl%google_oauth": {
       "general": {
         "bzlTransitiveDigest": "3WhDu7t3mlQy8UPYdkacQsstX/ytEEuNCU3fJcxx7/A=",

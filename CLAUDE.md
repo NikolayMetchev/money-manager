@@ -57,7 +57,7 @@ timeout; use at least 20 minutes.
 | `./gradlew :app:main:jvm:run` | Run JVM application |
 | `./gradlew :app:main:android:installDebug` | Install Android debug APK |
 | `./gradlew :app:ui:core:pixel6api36AndroidDeviceTest` | Run Android UI tests on managed device |
-| `./gradlew lintFormat` | Format code (ktlint + sort dependencies) |
+| `./gradlew lintFormat` | Format code (ktlint + sort dependencies) and regenerate the Bazel BUILD files (Gazelle) |
 | `./gradlew buildHealth` | Check dependency health |
 | `./gradlew detekt` | Static analysis |
 
@@ -172,7 +172,7 @@ stream to BuildBuddy, anonymously.
   resolves to one a directive names, to nothing when those already bring every candidate, then to the one whose api
   brings the rest, and only then to the most specific. A stale BUILD file is CI's Gazelle diff.
 - **Compose Desktop UI** (#1018): `app/ui/*`, `utils/compose/*` and `test/app/ui` are JVM-only modules (no
-  `kmp_targets`; `android*` source sets are left for the Android phase). Their JVM classpath resources are one jar per
+  native `kmp_targets`). Their JVM classpath resources are one jar per
   compilation (`kmp_resource_jar`, `//bazel/kmp:resources.bzl`), `src/{common,jvmAndroid,jvm}{Main,Test}/resources`
   merged with the later source set winning a clash, as Gradle's `processResources` does (`app/ui/core`'s `money_manager.db`).
   `kmp_test_jvm_flags` is the Compose conventions' headless `systemProperty`s and `kmp_test_flaky true` their test-retry
@@ -205,10 +205,24 @@ stream to BuildBuddy, anonymously.
   ktlint plugin is pinned to it too), `ktlint_official` plus the tree's `.editorconfig` files: the sandbox isn't
   under the repo, so each test carries its package's own and `//:editorconfigs` (those no module owns, such as
   `app/presenter`'s) at their real paths. detekt reads `detekt.yml` over its defaults, without type resolution, as
-  Gradle's per-source-set detekt tasks do. `bazel run //:format` is `lintFormat`'s ktlint -F over the same sources.
+  Gradle's per-source-set detekt tasks do. `bazel run //:format` is `lintFormat`: Gazelle, then ktlint -F over the
+  same sources (`./gradlew lintFormat` runs Gazelle too, through the root `gazelle` task, so `bazel` must be on the PATH).
   The tools resolve on their own classpaths (`maven_kmp.install(name = "ktlint_cli"/"detekt_cli", resolve_stdlib =
   True)`, pinned with `bazel run @ktlint_cli//:pin`). The `.kts` build scripts Gradle's ktlint also checks aren't
   covered: they go at the cutover.
+- **Android libraries** (#1021): `# gazelle:kmp_targets android …` (every module an Android convention reaches) gives
+  a module `:<name>_android`, AGP's Kotlin compile of the library: `commonMain ← jvmAndroidMain ← androidMain` against
+  `@android_sdk//:android_jar` (neverlink), on the JVM's toolchain (the convention's `jvmTarget` is the same). The
+  `android_sdk` extension (`//bazel/kmp/android`) finds the SDK as AGP does (`ANDROID_HOME`, `ANDROID_SDK_ROOT`,
+  `local.properties`) and takes the catalog's `android-compileSdk` platform, never downloading it (CI runs
+  `sdkmanager`). `jvmAndroidMain`'s deps are `jvm_android_deps`/`jvm_android_exports`, which both compiles see.
+  `maven_kmp`'s `android` platform takes KGP's `androidJvm` variant (an AAR: `classes.jar`, merged with its `libs/`
+  jars), else a JVM one, never androidx's `*Stubs`; `library_platforms` limits a library to the platforms whose
+  source sets declare it in Gradle (the `-desktop` jars to `jvm`, the androidx roots to `android`), as Gradle resolves
+  only those. Gazelle resolves an import to a library every compilation of its source set has, else per compilation
+  (commonMain's Material 3 import is `compose_material3_desktop` on the JVM, `androidx_compose_material3` on
+  Android; Compose UI's JetBrains root module has both), preferring catalog libraries over the modules they bring; `android.*` is the SDK. Resources, manifests and dexing are the app's
+  (#1023), and Android host tests #1022.
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.

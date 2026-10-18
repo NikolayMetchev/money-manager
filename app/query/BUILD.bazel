@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
 # gazelle:kmp_forbid_deps //app/db/core //app/di/core //app/ui/core
 # gazelle:kmp_plugins serialization
 # gazelle:kmp_export //app/model/apistrategy
@@ -15,6 +15,7 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 kmp_library(
     name = "query",
+    android = True,
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     forbidden_deps = [
         "//app/db/core",
@@ -67,7 +68,6 @@ kmp_test(
         "@maven_kmp//:kotlinx_coroutines_test",
         "@maven_kmp//:kotlinx_datetime",
         "@maven_kmp//:kotlinx_serialization_json",
-        "@maven_kmp//:mokkery_core",
         "@maven_kmp//:mokkery_runtime",
     ],
 )

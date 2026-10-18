@@ -142,7 +142,7 @@ The main modules (see [`CLAUDE.md`](CLAUDE.md) for the full table and the
 | `./gradlew :app:main:android:installDebug` | Install the Android debug APK |
 | `./gradlew :app:main:cli:installJvmDist` | Build the JVM `mm` into `app/main/cli/build/install/mm-jvm-jvm/bin/mm-jvm` |
 | `./gradlew :app:main:cli:linkReleaseExecutableLinuxX64` | Link the native `mm` (also `LinuxArm64`, `MacosArm64`, `MingwX64`) |
-| `./gradlew lintFormat` | Format code (ktlint + sort dependencies) |
+| `./gradlew lintFormat` | Format code (ktlint + sort dependencies) and regenerate the Bazel BUILD files (Gazelle) |
 | `./gradlew detekt` | Static analysis |
 | `./gradlew buildHealth` | Check dependency health |
 

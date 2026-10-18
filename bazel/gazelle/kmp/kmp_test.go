@@ -54,15 +54,15 @@ func TestMavenIndexPrefersTheSpecificLibrary(t *testing.T) {
 		t.Fatal(err)
 	}
 	idx := loadMavenIndex(lock)
-	if got, _ := idx.find("a.b", nil); got != "core" {
+	if got, _ := idx.find("a.b", nil, nil); got != "core" {
 		t.Errorf("find(a.b) = %s, want core", got)
 	}
 	// A library a directive already names wins: it reaches the specific one through its exports.
-	if got, _ := idx.find("a.b", map[string]bool{"@maven_kmp//:fat": true}); got != "fat" {
+	if got, _ := idx.find("a.b", map[string]bool{"@maven_kmp//:fat": true}, nil); got != "fat" {
 		t.Errorf("find(a.b) with fat named = %s, want fat", got)
 	}
 	// One a named library's api already brings, every declaring library of it, needs no dependency of its own.
-	if got, ok := idx.find("a.b", map[string]bool{"@maven_kmp//:api": true}); got != "" || !ok {
+	if got, ok := idx.find("a.b", map[string]bool{"@maven_kmp//:api": true}, nil); got != "" || !ok {
 		t.Errorf("find(a.b) with api named = %q, %v; want \"\", true", got, ok)
 	}
 	// Of several, the one whose api brings the others covers the import (runtime over runtime-annotation).
@@ -71,7 +71,31 @@ func TestMavenIndexPrefersTheSpecificLibrary(t *testing.T) {
 	if err := os.WriteFile(lock, []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := loadMavenIndex(lock).find("x", nil); got != "rt" {
+	if got, _ := loadMavenIndex(lock).find("x", nil, nil); got != "rt" {
 		t.Errorf("find(x) = %s, want rt", got)
+	}
+}
+
+func TestMavenIndexResolvesPerPlatform(t *testing.T) {
+	lock := filepath.Join(t.TempDir(), "lock.json")
+	// androidx's runtime-desktop is only the JVM's; its root module has an Android variant too.
+	data := `{"names": {"g:desktop": "desktop", "g:root": "root"},
+	          "packages": {"g:desktop": ["p"], "g:root": ["p", "q", "r"]},
+	          "artifacts": {"g:desktop": {"jvm": {}}, "g:root": {"jvm": {}, "android": {}}}}`
+	if err := os.WriteFile(lock, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	idx := loadMavenIndex(lock)
+	if got, _ := idx.find("p", nil, nil); got != "desktop" {
+		t.Errorf("find(p) = %s, want desktop", got)
+	}
+	if got, _ := idx.find("p", nil, lockPlatforms(leaves{android: true}.below(""))); got != "root" {
+		t.Errorf("find(p) on jvm and android = %s, want root", got)
+	}
+	if got, _ := idx.find("p", nil, []string{"android"}); got != "root" {
+		t.Errorf("find(p) on android = %s, want root", got)
+	}
+	if _, ok := idx.find("p", nil, []string{"linuxX64"}); ok {
+		t.Errorf("find(p) on linuxX64 found a library")
 	}
 }

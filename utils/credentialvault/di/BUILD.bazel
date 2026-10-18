@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
 # gazelle:kmp_plugins metro
 # gazelle:kmp_export //app/di/params
 # gazelle:kmp_export //app/di/scope
@@ -10,6 +10,8 @@ load("//bazel/kmp:defs.bzl", "kmp_library")
 
 kmp_library(
     name = "di",
+    android = True,
+    android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
     native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),

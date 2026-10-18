@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 )
@@ -18,6 +19,10 @@ func (f *Fetcher) packagesOf(file File) ([]string, error) {
 	archive, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", file.Name, err)
+	}
+	if strings.HasSuffix(file.Name, ".aar") {
+		// An AAR's classes are its classes.jar (and any libs/*.jar), which is what an Android compile sees.
+		return aarPackages(file.Name, archive)
 	}
 	set := map[string]bool{}
 	// cinterop writes a near-empty fragment for every package enclosing its own (`dev`, `dev.whyoleg`, …); they
@@ -43,6 +48,39 @@ func (f *Fetcher) packagesOf(file File) ([]string, error) {
 	for pkg, size := range klibBytes {
 		if size < emptyFragment && enclosesAnother(pkg, set) {
 			delete(set, pkg)
+		}
+	}
+	var out []string
+	for p := range set {
+		out = append(out, p)
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+func aarPackages(name string, aar *zip.Reader) ([]string, error) {
+	set := map[string]bool{}
+	for _, entry := range aar.File {
+		if entry.Name != "classes.jar" && !(strings.HasPrefix(entry.Name, "libs/") && strings.HasSuffix(entry.Name, ".jar")) {
+			continue
+		}
+		rc, err := entry.Open()
+		if err != nil {
+			return nil, fmt.Errorf("%s %s: %w", name, entry.Name, err)
+		}
+		body, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			return nil, fmt.Errorf("%s %s: %w", name, entry.Name, err)
+		}
+		jar, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+		if err != nil {
+			return nil, fmt.Errorf("%s %s: %w", name, entry.Name, err)
+		}
+		for _, f := range jar.File {
+			if strings.HasSuffix(f.Name, ".class") && !strings.HasPrefix(f.Name, "META-INF/") && strings.Contains(f.Name, "/") {
+				set[strings.ReplaceAll(f.Name[:strings.LastIndex(f.Name, "/")], "/", ".")] = true
+			}
 		}
 	}
 	var out []string
