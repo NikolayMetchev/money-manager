@@ -182,6 +182,15 @@ stream to BuildBuddy, anonymously.
   `skiko.data.path` under `TEST_TMPDIR`, since the sandbox keeps `~/.skiko` read-only. A module with `kmp_visibility`
   also gets a testonly, public `:<name>_for_tests`, which Gazelle gives every test that imports it: Gradle's
   `verifyNoWriteRepositoryUsage` only reads main sources, and only a testonly target can depend on it.
+- **Desktop app and ProGuard** (#1019): `app/main/jvm` is a `kotlin("jvm")` module, so Gazelle reads `src/main` and
+  `src/test` as its JVM leaf. `bazel run //app/main/jvm:app` is Gradle's `run` (a hand-written `java_binary` adding the
+  `runtimeOnly` deps: the CLI, `currentOs`, log4j). `proguard_jars` (`//bazel/kmp/proguard`) is Compose's
+  `proguardReleaseJars`: each runtime jar shrunk into its own (`-injars`/`-outjars` per jar), the target JDK's jmods
+  (`//bazel/kmp/deps:jdk_jmods`) as library jars, Compose's `default-compose-desktop-rules.pro` read from the catalog's
+  Compose Gradle plugin jar (the `@proguard` install), then `proguard-rules.pro`. `jar_filters` drops sqlite-jdbc's other
+  platforms' natives (Gradle's artifact transform). `:release` runs the shrunk app and
+  `:release_service_providers_test` is `verifyProguardServiceProviders`; both are `manual`, and
+  `--define=proguard_optimize=false` is `-PproguardOptimize=false`.
 - **Lint** (`//bazel/kmp/lint`, #1015): every `kmp_library`/`kmp_test` gets `:<name>_ktlint` and `:<name>_detekt`,
   tests that run the tool's own `main` over the hand-written sources (generated ones are left out, as the Gradle
   plugins filter them), and report the same findings Gradle does. ktlint is the catalog's `ktlint-engine` (Gradle's
@@ -206,8 +215,10 @@ stream to BuildBuddy, anonymously.
   `dependencyConstraints` and BOMs (`platform(…)`, Gradle Module Metadata or POM) without bringing anything in,
   except the modules `force_bundles` (the catalog's `build-tool-pins`, Gradle's `configurations.all`) pin
   everywhere and `forces` pins on the JVM and in metadata only (moneymanager.kotlin-convention's substitutions only
-  match `*CompileClasspath`/`*RuntimeClasspath`/`*DependenciesMetadata`, never native klibraries); `excludes` drops a
-  module everywhere, also where a variant points (`available-at`) at it, and the Kotlin stdlib comes
+  match `*CompileClasspath`/`*RuntimeClasspath` (any case)/`*DependenciesMetadata`, never native klibraries); `excludes` drops a
+  module everywhere, also where a variant points (`available-at`) at it. An api-variant dependency the runtime variant
+  leaves out is compile-only (`compile_only_deps`, a neverlink twin), and a library with only a runtime variant (the
+  Compose Gradle plugin) compiles against that one, as in Gradle. The Kotlin stdlib comes
   from the toolchain (unless `resolve_stdlib`, for a tool). Each `maven_kmp.install(name = …)` is its own
   resolution and hub repository, as each Gradle configuration resolves on its own. Versions come from the catalog; `MODULE.bazel` lists the catalog aliases, platforms and
   repositories. It writes `bazel/kmp/deps/maven_kmp.lock.json` (every file with its sha256); after changing either,

@@ -1,0 +1,9 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_generate true
+
+# A resources dir that's gone: the generated glob replaces it.
+kmp_library(
+    name = "app",
+    resources = glob(["src/jvmMain/resources/**"]),
+)

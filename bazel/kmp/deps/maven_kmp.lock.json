@@ -60,6 +60,8 @@
       "ktor-io": "io.ktor:ktor-io:3.6.0",
       "ktor-network": "io.ktor:ktor-network:3.6.0",
       "ktor-utils": "io.ktor:ktor-utils:3.6.0",
+      "log4j-core": "org.apache.logging.log4j:log4j-core:2.26.1",
+      "log4j-slf4j2-impl": "org.apache.logging.log4j:log4j-slf4j2-impl:2.26.1",
       "mappie-api": "tech.mappie:mappie-api:2.4.21-2.4.5",
       "mappie-compiler-plugin": "tech.mappie:mappie-compiler-plugin:2.4.21-2.4.5",
       "metro-compiler": "dev.zacsweers.metro:compiler:1.4.5",
@@ -219,6 +221,7 @@
     "app.cash.sqldelight:sqlite-3-25-dialect": "sqldelight_dialect_sqlite",
     "app.cash.sqldelight:sqlite-driver": "sqldelight_sqlite_driver",
     "app.cash.turbine:turbine": "turbine",
+    "biz.aQute.bnd:biz.aQute.bnd.annotation": "biz_aQute_bnd_biz_aQute_bnd_annotation",
     "co.touchlab:kermit": "kermit",
     "co.touchlab:kermit-core": "kermit_core",
     "co.touchlab:sqliter-driver": "co_touchlab_sqliter_driver",
@@ -233,6 +236,7 @@
     "com.github.ajalt.mordant:mordant-jvm-graal-ffi": "com_github_ajalt_mordant_mordant_jvm_graal_ffi",
     "com.github.ajalt.mordant:mordant-jvm-jna": "com_github_ajalt_mordant_mordant_jvm_jna",
     "com.github.virtuald:curvesapi": "com_github_virtuald_curvesapi",
+    "com.google.errorprone:error_prone_annotations": "com_google_errorprone_error_prone_annotations",
     "com.ionspin.kotlin:bignum": "bignum",
     "com.jakewharton.cite:cite-api": "com_jakewharton_cite_cite_api",
     "com.jakewharton.finalization:finalization-hook": "com_jakewharton_finalization_finalization_hook",
@@ -294,6 +298,8 @@
     "org.apache.commons:commons-lang3": "org_apache_commons_commons_lang3",
     "org.apache.commons:commons-math3": "org_apache_commons_commons_math3",
     "org.apache.logging.log4j:log4j-api": "org_apache_logging_log4j_log4j_api",
+    "org.apache.logging.log4j:log4j-core": "log4j_core",
+    "org.apache.logging.log4j:log4j-slf4j2-impl": "log4j_slf4j2_impl",
     "org.apache.poi:poi": "poi",
     "org.apache.poi:poi-ooxml": "poi_ooxml",
     "org.apache.poi:poi-ooxml-lite": "org_apache_poi_poi_ooxml_lite",
@@ -374,6 +380,10 @@
     "org.jgrapht:jgrapht-core": "org_jgrapht_jgrapht_core",
     "org.jheaps:jheaps": "org_jheaps_jheaps",
     "org.jspecify:jspecify": "org_jspecify_jspecify",
+    "org.osgi:org.osgi.annotation.bundle": "org_osgi_org_osgi_annotation_bundle",
+    "org.osgi:org.osgi.annotation.versioning": "org_osgi_org_osgi_annotation_versioning",
+    "org.osgi:org.osgi.resource": "org_osgi_org_osgi_resource",
+    "org.osgi:org.osgi.service.serviceloader": "org_osgi_org_osgi_service_serviceloader",
     "org.slf4j:slf4j-api": "org_slf4j_slf4j_api",
     "org.xerial:sqlite-jdbc": "org_xerial_sqlite_jdbc",
     "tech.mappie:mappie-api": "mappie_api",
@@ -1562,6 +1572,18 @@
     "app.cash.turbine:turbine": [
       "app.cash.turbine"
     ],
+    "biz.aQute.bnd:biz.aQute.bnd.annotation": [
+      "aQute.bnd.annotation",
+      "aQute.bnd.annotation.baseline",
+      "aQute.bnd.annotation.headers",
+      "aQute.bnd.annotation.jpms",
+      "aQute.bnd.annotation.licenses",
+      "aQute.bnd.annotation.metatype",
+      "aQute.bnd.annotation.plugin",
+      "aQute.bnd.annotation.service",
+      "aQute.bnd.annotation.spi",
+      "aQute.bnd.annotation.xml"
+    ],
     "co.touchlab:kermit": [
       "co.touchlab.kermit"
     ],
@@ -1647,6 +1669,10 @@
       "com.graphbuilder.math.func",
       "com.graphbuilder.org.apache.harmony.awt.gl",
       "com.graphbuilder.struc"
+    ],
+    "com.google.errorprone:error_prone_annotations": [
+      "com.google.errorprone.annotations",
+      "com.google.errorprone.annotations.concurrent"
     ],
     "com.ionspin.kotlin:bignum": [
       "com.ionspin.kotlin.bignum",
@@ -2313,6 +2339,7 @@
     "org.apache.logging.log4j:log4j-api": [
       "org.apache.logging.log4j",
       "org.apache.logging.log4j.internal",
+      "org.apache.logging.log4j.internal.annotation",
       "org.apache.logging.log4j.internal.map",
       "org.apache.logging.log4j.message",
       "org.apache.logging.log4j.simple",
@@ -2321,6 +2348,71 @@
       "org.apache.logging.log4j.status",
       "org.apache.logging.log4j.util",
       "org.apache.logging.log4j.util.internal"
+    ],
+    "org.apache.logging.log4j:log4j-core": [
+      "org.apache.logging.log4j.core",
+      "org.apache.logging.log4j.core.appender",
+      "org.apache.logging.log4j.core.appender.db",
+      "org.apache.logging.log4j.core.appender.db.jdbc",
+      "org.apache.logging.log4j.core.appender.mom",
+      "org.apache.logging.log4j.core.appender.mom.jeromq",
+      "org.apache.logging.log4j.core.appender.mom.kafka",
+      "org.apache.logging.log4j.core.appender.nosql",
+      "org.apache.logging.log4j.core.appender.rewrite",
+      "org.apache.logging.log4j.core.appender.rolling",
+      "org.apache.logging.log4j.core.appender.rolling.action",
+      "org.apache.logging.log4j.core.appender.routing",
+      "org.apache.logging.log4j.core.async",
+      "org.apache.logging.log4j.core.config",
+      "org.apache.logging.log4j.core.config.arbiters",
+      "org.apache.logging.log4j.core.config.builder.api",
+      "org.apache.logging.log4j.core.config.builder.impl",
+      "org.apache.logging.log4j.core.config.composite",
+      "org.apache.logging.log4j.core.config.json",
+      "org.apache.logging.log4j.core.config.plugins",
+      "org.apache.logging.log4j.core.config.plugins.convert",
+      "org.apache.logging.log4j.core.config.plugins.processor",
+      "org.apache.logging.log4j.core.config.plugins.processor.internal",
+      "org.apache.logging.log4j.core.config.plugins.util",
+      "org.apache.logging.log4j.core.config.plugins.validation",
+      "org.apache.logging.log4j.core.config.plugins.validation.constraints",
+      "org.apache.logging.log4j.core.config.plugins.validation.validators",
+      "org.apache.logging.log4j.core.config.plugins.visitors",
+      "org.apache.logging.log4j.core.config.properties",
+      "org.apache.logging.log4j.core.config.status",
+      "org.apache.logging.log4j.core.config.xml",
+      "org.apache.logging.log4j.core.config.yaml",
+      "org.apache.logging.log4j.core.context.internal",
+      "org.apache.logging.log4j.core.filter",
+      "org.apache.logging.log4j.core.filter.mutable",
+      "org.apache.logging.log4j.core.impl",
+      "org.apache.logging.log4j.core.internal.annotation",
+      "org.apache.logging.log4j.core.jackson",
+      "org.apache.logging.log4j.core.jmx",
+      "org.apache.logging.log4j.core.jmx.internal",
+      "org.apache.logging.log4j.core.layout",
+      "org.apache.logging.log4j.core.layout.internal",
+      "org.apache.logging.log4j.core.lookup",
+      "org.apache.logging.log4j.core.message",
+      "org.apache.logging.log4j.core.net",
+      "org.apache.logging.log4j.core.net.ssl",
+      "org.apache.logging.log4j.core.osgi",
+      "org.apache.logging.log4j.core.parser",
+      "org.apache.logging.log4j.core.pattern",
+      "org.apache.logging.log4j.core.script",
+      "org.apache.logging.log4j.core.selector",
+      "org.apache.logging.log4j.core.time",
+      "org.apache.logging.log4j.core.time.internal",
+      "org.apache.logging.log4j.core.tools",
+      "org.apache.logging.log4j.core.tools.picocli",
+      "org.apache.logging.log4j.core.util",
+      "org.apache.logging.log4j.core.util.datetime",
+      "org.apache.logging.log4j.core.util.internal",
+      "org.apache.logging.log4j.core.util.internal.instant"
+    ],
+    "org.apache.logging.log4j:log4j-slf4j2-impl": [
+      "org.apache.logging.slf4j",
+      "org.apache.logging.slf4j.message"
     ],
     "org.apache.poi:poi": [
       "org.apache.poi",
@@ -3145,6 +3237,19 @@
     "org.jspecify:jspecify": [
       "org.jspecify.annotations"
     ],
+    "org.osgi:org.osgi.annotation.bundle": [
+      "org.osgi.annotation.bundle"
+    ],
+    "org.osgi:org.osgi.annotation.versioning": [
+      "org.osgi.annotation.versioning"
+    ],
+    "org.osgi:org.osgi.resource": [
+      "org.osgi.resource",
+      "org.osgi.resource.dto"
+    ],
+    "org.osgi:org.osgi.service.serviceloader": [
+      "org.osgi.service.serviceloader"
+    ],
     "org.slf4j:slf4j-api": [
       "org.slf4j",
       "org.slf4j.event",
@@ -3220,6 +3325,8 @@
       "io.github.ehsannarmani:compose-charts",
       "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
+      "org.apache.logging.log4j:log4j-core",
+      "org.apache.logging.log4j:log4j-slf4j2-impl",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
       "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
@@ -3261,6 +3368,8 @@
       "io.github.ehsannarmani:compose-charts",
       "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
+      "org.apache.logging.log4j:log4j-core",
+      "org.apache.logging.log4j:log4j-slf4j2-impl",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
       "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
@@ -3302,6 +3411,8 @@
       "io.github.ehsannarmani:compose-charts",
       "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
+      "org.apache.logging.log4j:log4j-core",
+      "org.apache.logging.log4j:log4j-slf4j2-impl",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
       "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
@@ -3345,6 +3456,8 @@
       "io.github.ehsannarmani:compose-charts",
       "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
+      "org.apache.logging.log4j:log4j-core",
+      "org.apache.logging.log4j:log4j-slf4j2-impl",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
       "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
@@ -3386,6 +3499,8 @@
       "io.github.ehsannarmani:compose-charts",
       "io.github.ehsannarmani:compose-charts-desktop",
       "junit:junit",
+      "org.apache.logging.log4j:log4j-core",
+      "org.apache.logging.log4j:log4j-slf4j2-impl",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
       "org.jetbrains.androidx.navigation3:navigation3-ui-desktop",
@@ -5380,6 +5495,22 @@
         ]
       }
     },
+    "biz.aQute.bnd:biz.aQute.bnd.annotation": {
+      "jvm": {
+        "version": "7.1.0",
+        "files": [
+          {
+            "name": "biz.aQute.bnd.annotation-7.1.0.jar",
+            "url": "https://repo1.maven.org/maven2/biz/aQute/bnd/biz.aQute.bnd.annotation/7.1.0/biz.aQute.bnd.annotation-7.1.0.jar",
+            "sha256": "f69c2de3a695c113d125ac8053c92a680a3ce9d02ea25845095cf2d4626a7663"
+          }
+        ],
+        "deps": [
+          "org.osgi:org.osgi.resource",
+          "org.osgi:org.osgi.service.serviceloader"
+        ]
+      }
+    },
     "co.touchlab:kermit": {
       "jvm": {
         "version": "2.2.0",
@@ -6135,6 +6266,18 @@
             "name": "curvesapi-1.08.jar",
             "url": "https://repo1.maven.org/maven2/com/github/virtuald/curvesapi/1.08/curvesapi-1.08.jar",
             "sha256": "ad95b08b8bbf9d7d17e5e00814898fa23324f32bc5b62f1a37801e6a56ce0079"
+          }
+        ]
+      }
+    },
+    "com.google.errorprone:error_prone_annotations": {
+      "jvm": {
+        "version": "2.50.0",
+        "files": [
+          {
+            "name": "error_prone_annotations-2.50.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.50.0/error_prone_annotations-2.50.0.jar",
+            "sha256": "4667724877f1d37a689202da191e23efa7657c62eef93ccdac406eccfe5cdd0a"
           }
         ]
       }
@@ -9730,13 +9873,68 @@
     },
     "org.apache.logging.log4j:log4j-api": {
       "jvm": {
-        "version": "2.24.3",
+        "version": "2.26.1",
         "files": [
           {
-            "name": "log4j-api-2.24.3.jar",
-            "url": "https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-api/2.24.3/log4j-api-2.24.3.jar",
-            "sha256": "5b4a0a0cd0e751ded431c162442bdbdd53328d1f8bb2bae5fc1bbeee0f66d80f"
+            "name": "log4j-api-2.26.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-api/2.26.1/log4j-api-2.26.1.jar",
+            "sha256": "f1810a4704ccce019d02bba029dc02a4f2ac0c997f647b465e7d409c1927f822"
           }
+        ],
+        "compile_only_deps": [
+          "biz.aQute.bnd:biz.aQute.bnd.annotation",
+          "com.google.errorprone:error_prone_annotations",
+          "org.jspecify:jspecify",
+          "org.osgi:org.osgi.annotation.bundle",
+          "org.osgi:org.osgi.annotation.versioning"
+        ]
+      }
+    },
+    "org.apache.logging.log4j:log4j-core": {
+      "jvm": {
+        "version": "2.26.1",
+        "files": [
+          {
+            "name": "log4j-core-2.26.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-core/2.26.1/log4j-core-2.26.1.jar",
+            "sha256": "2ec8c3bf5a6d7c89be8620116a2fc973f7dda1ad0261ad393c4d4726edfd3dcb"
+          }
+        ],
+        "deps": [
+          "org.apache.logging.log4j:log4j-api"
+        ],
+        "compile_only_deps": [
+          "biz.aQute.bnd:biz.aQute.bnd.annotation",
+          "com.google.errorprone:error_prone_annotations",
+          "org.jspecify:jspecify",
+          "org.osgi:org.osgi.annotation.bundle",
+          "org.osgi:org.osgi.annotation.versioning"
+        ]
+      }
+    },
+    "org.apache.logging.log4j:log4j-slf4j2-impl": {
+      "jvm": {
+        "version": "2.26.1",
+        "files": [
+          {
+            "name": "log4j-slf4j2-impl-2.26.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-slf4j2-impl/2.26.1/log4j-slf4j2-impl-2.26.1.jar",
+            "sha256": "cbdfb4c2bcc10f0927c61036db54924250f3924ecd13ea913cefe4f99c08fa66"
+          }
+        ],
+        "deps": [
+          "org.apache.logging.log4j:log4j-api",
+          "org.slf4j:slf4j-api"
+        ],
+        "runtime_deps": [
+          "org.apache.logging.log4j:log4j-core"
+        ],
+        "compile_only_deps": [
+          "biz.aQute.bnd:biz.aQute.bnd.annotation",
+          "com.google.errorprone:error_prone_annotations",
+          "org.jspecify:jspecify",
+          "org.osgi:org.osgi.annotation.bundle",
+          "org.osgi:org.osgi.annotation.versioning"
         ]
       }
     },
@@ -11936,6 +12134,57 @@
             "name": "jspecify-1.0.0.jar",
             "url": "https://repo1.maven.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar",
             "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab"
+          }
+        ]
+      }
+    },
+    "org.osgi:org.osgi.annotation.bundle": {
+      "jvm": {
+        "version": "2.0.0",
+        "files": [
+          {
+            "name": "org.osgi.annotation.bundle-2.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/osgi/org.osgi.annotation.bundle/2.0.0/org.osgi.annotation.bundle-2.0.0.jar",
+            "sha256": "b9c9546ec5be3ebc2e85ba4919150ad76d64594805282fc895133a47d264a7ae"
+          }
+        ],
+        "deps": [
+          "org.osgi:org.osgi.annotation.versioning"
+        ]
+      }
+    },
+    "org.osgi:org.osgi.annotation.versioning": {
+      "jvm": {
+        "version": "1.1.2",
+        "files": [
+          {
+            "name": "org.osgi.annotation.versioning-1.1.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/osgi/org.osgi.annotation.versioning/1.1.2/org.osgi.annotation.versioning-1.1.2.jar",
+            "sha256": "f51f235e80df8ffbc30ef1b557b6ea38a696632d675404ec117e952978b8b863"
+          }
+        ]
+      }
+    },
+    "org.osgi:org.osgi.resource": {
+      "jvm": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "org.osgi.resource-1.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/osgi/org.osgi.resource/1.0.0/org.osgi.resource-1.0.0.jar",
+            "sha256": "81fc50f1f1d38a4af28e131907d4afe213249aab05060484edca0e60c4af9b4a"
+          }
+        ]
+      }
+    },
+    "org.osgi:org.osgi.service.serviceloader": {
+      "jvm": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "org.osgi.service.serviceloader-1.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/osgi/org.osgi.service.serviceloader/1.0.0/org.osgi.service.serviceloader-1.0.0.jar",
+            "sha256": "8f876ce2a9aa4e95b1f1952950255103e2487425050a654f3285447ba601c154"
           }
         ]
       }

@@ -31,6 +31,17 @@ single_version_override(
 
 register_toolchains("//bazel/kmp:kotlin_toolchain")
 
+# Each desktop OS's JDK, for its jmods (//bazel/kmp/deps:jdk_jmods).
+jdk = use_extension("@rules_java//java:extensions.bzl", "toolchains")
+use_repo(
+    jdk,
+    "remotejdk25_linux",
+    "remotejdk25_linux_aarch64",
+    "remotejdk25_macos",
+    "remotejdk25_macos_aarch64",
+    "remotejdk25_win",
+)
+
 # Kotlin/Native for the exec host, at rules_kotlin's Kotlin version, with every konan dependency pinned in
 # bazel/kmp/native/pins.bzl (#998). After a Kotlin bump: bazel run @kotlin_native_repin//:repin
 kotlin_native = use_extension("//bazel/kmp/native:extensions.bzl", "kotlin_native")
@@ -157,6 +168,8 @@ maven_kmp.install(
         "ktor-io",
         "ktor-network",
         "ktor-utils",
+        "log4j-core",
+        "log4j-slf4j2-impl",
         "mappie-api",
         "mappie-compiler-plugin",
         "metro-compiler",
@@ -223,4 +236,24 @@ maven_kmp.install(
     resolve_stdlib = True,
 )
 
-use_repo(maven_kmp, "detekt_cli", "ktlint_cli", "maven_kmp")
+# The desktop app's ProGuard (#1019), with the Compose Gradle plugin for the default rules it applies.
+maven_kmp.install(
+    name = "proguard",
+    catalog = "//gradle:libs.versions.toml",
+    # Optional in the plugin's POM, and Gradle-only.
+    excludes = ["org.jetbrains.compose.hot-reload:hot-reload-gradle-plugin"],
+    force_bundles = ["build-tool-pins"],
+    libraries = [
+        "compose-gradle-plugin",
+        "proguard-base",
+    ],
+    lock_file = "//bazel/kmp/deps:proguard.lock.json",
+    platforms = ["jvm"],
+    repositories = [
+        "https://repo1.maven.org/maven2",
+        "https://plugins.gradle.org/m2",
+    ],
+    resolve_stdlib = True,
+)
+
+use_repo(maven_kmp, "detekt_cli", "ktlint_cli", "maven_kmp", "proguard")

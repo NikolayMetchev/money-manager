@@ -224,6 +224,8 @@ mokkery-runtime = { module = "dev.mokkery:mokkery-runtime", version.ref = "mokke
 molecule-runtime = { module = "app.cash.molecule:molecule-runtime", version.ref = "molecule" }
 poi = { module = "org.apache.poi:poi", version.ref = "poi" }
 poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "poi" }
+# Bazel's ProGuard (//bazel/kmp/proguard); Gradle's comes through the Compose plugin, at the same version.
+proguard-base = { module = "com.guardsquare:proguard-base", version.ref = "proguard" }
 schemaspy = { module = "org.schemaspy:schemaspy", version.ref = "schemaspy" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 sort-dependencies-gradle-plugin = { module = "com.squareup.sort-dependencies:com.squareup.sort-dependencies.gradle.plugin", version.ref = "sort-dependencies" }

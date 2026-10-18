@@ -100,6 +100,8 @@ def _through_redirects(artifacts, modules, platform):
 
 _METADATA = "metadata"
 
+_NEVERLINK = "_neverlink"
+
 def _metadata_build(source_sets):
     return "\n".join([
         'filegroup(name = "%s", srcs = glob(["%s/**"]), visibility = ["//visibility:public"])' % (s, s)
@@ -108,6 +110,10 @@ def _metadata_build(source_sets):
 
 def _target(name, platform, resolved, names, artifacts):
     deps = _labels(names, _through_redirects(artifacts, resolved.get("deps", []), platform), platform)
+    compile_only = [
+        label[:-1] + _NEVERLINK + '"'
+        for label in _labels(names, _through_redirects(artifacts, resolved.get("compile_only_deps", []), platform), platform)
+    ]
     runtime = _labels(names, resolved.get("runtime_deps", []), platform)
     files = ['"@%s//file"' % _file_repo(f) for f in resolved["files"] or []]
     full = "%s_%s" % (name, platform)
@@ -118,16 +124,16 @@ def _target(name, platform, resolved, names, artifacts):
         return 'kt_metadata_import(name = "%s", source_sets = [%s], deps = [%s])\n' % (full, ", ".join(source_sets), ", ".join(deps))
     if platform == "jvm":
         if not files:
-            return 'java_library(name = "%s", exports = [%s], runtime_deps = [%s])\n' % (full, ", ".join(deps), ", ".join(runtime))
+            return 'java_library(name = "%s", exports = [%s], runtime_deps = [%s])\n' % (full, ", ".join(deps + compile_only), ", ".join(runtime))
 
         # kt_jvm_import, not java_import: an interface jar would drop the inline function bodies Kotlin
-        # inlines from a library.
+        # inlines from a library. Its neverlink twin is what a compile-only dependency on it exports.
         return 'kt_jvm_import(name = "%s", jars = [%s], exports = [%s], runtime_deps = [%s])\n' % (
             full,
             ", ".join(files),
-            ", ".join(deps),
+            ", ".join(deps + compile_only),
             ", ".join(runtime),
-        )
+        ) + 'kt_jvm_import(name = "%s%s", jars = [%s], neverlink = True)\n' % (full, _NEVERLINK, ", ".join(files))
     if not files:
         return 'kt_native_group(name = "%s", target = "%s", deps = [%s])\n' % (full, platform, ", ".join(deps))
     return 'kt_native_import(name = "%s", target = "%s", klibs = [%s], deps = [%s])\n' % (

@@ -1,0 +1,22 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_generate true
+
+# A resources dir that's gone: the generated glob replaces it.
+kmp_library(
+    name = "app",
+    jvm_deps = ["//ui"],
+    jvm_srcs = glob(["src/main/kotlin/**/*.kt"]),
+    resources = glob(["src/main/resources/**"]),
+    visibility = ["//visibility:public"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":app",
+    jvm_deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "//ui",
+    ],
+    jvm_srcs = glob(["src/test/kotlin/**/*.kt"]),
+)
