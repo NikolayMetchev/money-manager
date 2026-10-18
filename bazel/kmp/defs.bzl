@@ -5,7 +5,8 @@ KGP compiles each platform as one K2 invocation that sees every fragment (source
 separate fragments and checks common code as common code. These macros do the same.
 
 A module emits one target per platform: `:<name>_jvm`, and `:<name>_<target>` (`_linuxX64`, …) for each of
-its `native_targets`. Dependencies are named once, by their module label (`//utils/files:files`), and each
+its `native_targets`. A module with native targets also gets `:<name>_metadata`, commonMain compiled on its
+own against its dependencies' common metadata, as Gradle's `compileCommonMainKotlinMetadata` (metadata.bzl). Dependencies are named once, by their module label (`//utils/files:files`), and each
 platform's compile gets that label's platform target (`//utils/files:files_jvm`, `…:files_linuxX64`).
 Maven libraries in `//bazel/kmp/deps` follow the same naming.
 
@@ -18,6 +19,7 @@ The native compile is `native.bzl`, on the toolchain in `//bazel/kmp/native`.
 
 load("@rules_java//java:java_test.bzl", "java_test")
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load(":metadata.bzl", "kt_metadata_library")
 load(":native.bzl", "BUILDS_ON", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_klib", "kt_native_test_binary")
 load("//bazel/kmp/plugins:plugins.bzl", "plugin_deps", "plugin_labels")
 
@@ -161,6 +163,17 @@ def kmp_library(
         runtime_deps = [Label("@maven_kmp//:kotlinx_coroutines_swing_jvm")],
         visibility = visibility,
     )
+    if native_targets:
+        package = native.package_name()
+        kt_metadata_library(
+            name = name + "_metadata",
+            module = "%s:%s" % (package.replace("/", "."), package.replace("/", "-")),
+            srcs = common_srcs,
+            generated = generated_native,
+            deps = _on("metadata", deps + exports),
+            plugins = plugin_labels(plugins, "native"),
+            visibility = visibility,
+        )
     for target in native_targets:
         # A klib's dependencies are always transitive on native, so api and implementation are the same.
         kt_native_klib(
