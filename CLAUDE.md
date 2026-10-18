@@ -91,13 +91,14 @@ Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer
 (`//app/main/android:release_debug_signed`) on a device and drives first run; CI runs it only via the manual "Android
 Release Smoke Test" workflow (dispatch it on main or a PR branch). Cut a release by pushing a `v*` tag.
 
-**CI**: every workflow sets Bazel up through `.github/actions/bazel-setup`. `build.yml`'s Build and Test is
-`bazel build //...` (plus the cross-linked linuxArm64 and mingwX64 test binaries and the Linux desktop installer) and
-`bazel test //...` (plus the desktop ProGuard check) on Linux (RBE), then installs the deb and starts the app, `mm-jvm`
-and `mm`; Native Tests run those binaries on an arm64 and a Windows runner, and build and test macOS on its own runner
-(with the cache); Coverage, Android Instrumented Tests (an API 36 emulator) and Desktop Installer (macOS and Windows,
-smoke-tested the same way) are their own jobs. Auto-format PR runs `//:format` on every PR and pushes the fixes, so a stale BUILD file is regenerated,
-not reported. Dependency submission reads the lockfiles (`bazel/kmp/deps/dependency_snapshot.py`), and
+**CI**: every workflow sets Bazel up through `.github/actions/bazel-setup`. `build.yml`'s Build and Test, on Linux
+(RBE), is `bazel build //...` (plus the cross-linked linuxArm64 and mingwX64 test binaries and the Linux desktop
+installer), `bazel test //...` (plus the desktop ProGuard check, minus the Kotlin JVM and Android tests) and
+`bazel coverage` over those Kotlin tests, then installs the deb and starts the app, `mm-jvm` and `mm`. Native Tests run
+the cross-linked binaries on an arm64 and a Windows runner, and build and test macOS on its own runner (with the
+cache); Android Instrumented Tests (an API 36 emulator) and Desktop Installer (macOS and Windows, smoke-tested the same
+way) are their own jobs. Auto-format PR runs `//:format` on every PR and pushes the fixes, so a stale BUILD file is
+regenerated, not reported. Dependency submission reads the lockfiles (`bazel/kmp/deps/dependency_snapshot.py`), and
 `renovate-pins.yml` re-pins Renovate's PRs.
 
 **Pre-push**: Always run `bazel build //... && bazel test //...` locally before pushing.

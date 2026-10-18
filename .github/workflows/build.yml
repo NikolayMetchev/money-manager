@@ -103,11 +103,41 @@ jobs:
           bazel build $BAZEL_FLAGS //... //app/main/jvm:installer
           $(bazel query 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') 2>&1 | tee build.log
 
-      # Also the desktop ProGuard check: `//...` never runs ProGuard (its targets are manual), so a new dependency
-      # that needs keep/dontwarn rules would otherwise surface only when release.yml ran. It shrinks the desktop
-      # app and checks every ServiceLoader provider survived.
+      # Every test but the Kotlin JVM and Android ones, which Coverage runs, plus the desktop ProGuard check:
+      # `//...` never runs ProGuard (its targets are manual), so a new dependency that needs keep/dontwarn rules
+      # would otherwise surface only when release.yml ran. It shrinks the desktop app and checks every
+      # ServiceLoader provider survived.
       - name: Test
-        run: bazel test $BAZEL_FLAGS //... //app/main/jvm:release_service_providers_test 2>&1 | tee test.log
+        run: >-
+          bazel test $BAZEL_FLAGS -- //... //app/main/jvm:release_service_providers_test
+          $(bazel query 'attr(name, "^test_(jvm|android)$", tests(//...))' | sed 's/^/-/') 2>&1 | tee test.log
+
+      # Kover's replacement (#1026): the Kotlin JVM and Android tests under `bazel coverage`, with .bazelrc's JaCoCo
+      # filter, merged into one LCOV report. It credits code to every test that runs it, so it reads higher than
+      # Kover's per-module reports did. A command of its own, as coverage instruments what it builds (the
+      # installer and ProGuard must see the real jars), and the Go tests can't link under it.
+      - name: Coverage
+        if: ${{ !cancelled() }}
+        run: >-
+          bazel coverage $BAZEL_FLAGS $(bazel query 'attr(name, "^test_(jvm|android)$", tests(//...))')
+          2>&1 | tee coverage.log
+
+      - name: Coverage summary
+        run: |
+          cp bazel-out/_coverage/_coverage_report.dat coverage.lcov
+          awk -F: '/^SF:/{f++} /^LF:/{lf+=$2} /^LH:/{lh+=$2}
+            END{printf "### Coverage\n%d files, %d of %d lines (%.1f%%)\n", f, lh, lf, 100*lh/lf}' \
+            coverage.lcov >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unit
+          name: unit
+          files: coverage.lcov
+          disable_search: true
+          fail_ci_if_error: false
 
       - name: Install and start the desktop installer
         run: bazel/kmp/jpackage/install_smoke_test.sh bazel-bin/app/main/jvm/installer "$(cat VERSION)"
@@ -166,50 +196,6 @@ jobs:
           name: unit-test-results
           report_type: test_results
           files: ${{ steps.test-reports.outputs.files }}
-          disable_search: true
-          fail_ci_if_error: false
-
-  # Kover's replacement (#1026): `bazel coverage` over the Kotlin tests, with .bazelrc's JaCoCo filter, merged into
-  # one LCOV report. It credits code to every test that runs it, so it reads higher than Kover's per-module reports
-  # did. The Go tests can't link under coverage, so the Kotlin tests are picked by query.
-  coverage:
-    name: Coverage
-    runs-on: ubuntu-latest
-    needs: changes
-    if: >-
-      needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
-       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false  # read-only job, no git push
-
-      - name: Set up Bazel
-        uses: ./.github/actions/bazel-setup
-        with:
-          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          cache-name: coverage
-
-      - name: Coverage
-        run: bazel coverage $(bazel query 'attr(name, "^test_(jvm|android)$", tests(//...))')
-
-      - name: Summary
-        run: |
-          cp bazel-out/_coverage/_coverage_report.dat coverage.lcov
-          awk -F: '/^SF:/{f++} /^LF:/{lf+=$2} /^LH:/{lh+=$2}
-            END{printf "### Coverage\n%d files, %d of %d lines (%.1f%%)\n", f, lh, lf, 100*lh/lf}' \
-            coverage.lcov >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: unit
-          name: unit
-          files: coverage.lcov
           disable_search: true
           fail_ci_if_error: false
 
