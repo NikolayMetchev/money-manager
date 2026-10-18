@@ -1,4 +1,4 @@
-load("@android_sdk//:versions.bzl", "COMPILE_SDK", "MIN_SDK", "TARGET_SDK")
+load("@android_sdk//:versions.bzl", "AGP_VERSION", "COMPILE_SDK", "MIN_SDK", "TARGET_SDK")
 load("//bazel/kmp:defs.bzl", "kmp_library")
 load("//bazel/kmp/android:apk.bzl", "android_apk")
 
@@ -40,7 +40,7 @@ kmp_library(
 # installs (-PreleaseSmokeTest=true).
 [android_apk(
     name = name,
-    agp_version = "9.4.1",
+    agp_version = AGP_VERSION,
     application_id = "com.moneymanager",
     compile_sdk = COMPILE_SDK,
     lib = ":android_android",
@@ -53,6 +53,7 @@ kmp_library(
     target_sdk = TARGET_SDK,
     version_code = 1,
     version_name = "1.0.0",
+    visibility = ["//app/main/android-smoketest:__pkg__"],
 ) for name, release, signed in [
     ("debug", False, True),
     ("release", True, False),

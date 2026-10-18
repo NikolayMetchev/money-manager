@@ -10,6 +10,8 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 # NoDirectRepositoryWritesArchitectureTest scans the module's own commonMain sources.
 # gazelle:kmp_test_data :common_main_sources
 # gazelle:kmp_keep_dep @maven_kmp//:kotlinx_coroutines_android androidMain
+# gazelle:kmp_device_test_srcs src/commonTest/kotlin
+# gazelle:kmp_device_test_resources src/commonTest/resources
 
 kmp_library(
     name = "core",
@@ -82,6 +84,48 @@ kmp_test(
     associate = ":core",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     data = [":common_main_sources"],
+    device_deps = [
+        "//app/apiimporter",
+        "//app/csvimporter",
+        "//app/db/core",
+        "//app/db/di",
+        "//app/importengineapi",
+        "//app/importer",
+        "//app/model/apistrategy",
+        "//app/model/core",
+        "//app/model/csv",
+        "//app/model/csvstrategy",
+        "//app/model/qif",
+        "//app/model/rules",
+        "//app/presenter/core",
+        "//app/qifimporter",
+        "//app/session",
+        "//app/tasks",
+        "//app/ui/components",
+        "//app/ui/foundation",
+        "//app/ui/imports/api",
+        "//app/ui/imports/qif",
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/app/db",
+        "//test/app/ui",
+        "//test/utils/credentialvault",
+        "//utils/bigdecimal",
+        "//utils/credentialvault",
+        "//utils/parsers/qif",
+        "//utils/rest",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:androidx_compose_ui_test",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:kotlinx_serialization_core",
+        "@maven_kmp//:kotlinx_serialization_json",
+        "@maven_kmp//:ktor_client_core",
+        "@maven_kmp//:ktor_client_mock",
+        "@maven_kmp//:ktor_http",
+    ],
+    device_manifest = "src/androidDeviceTest/AndroidManifest.xml",
+    device_resources = glob(["src/commonTest/resources/**"]),
+    device_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     flaky = True,
     jvm_deps = ["//bazel/kmp/deps:compose_desktop_current_os"],
     jvm_flags = [

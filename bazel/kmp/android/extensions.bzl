@@ -6,7 +6,8 @@ neverlink, as `@android_sdk//:android_jar`. `compileSdk` is the catalog's `andro
 downloaded: installing the SDK means accepting its license, which stays the person's (or CI's `sdkmanager`) call.
 Without the SDK the repository still loads, and building anything that needs the jar says what's missing.
 
-`@android_sdk//:versions.bzl` holds the catalog's `android-minSdk`, `android-targetSdk` and `android-compileSdk`, and
+`@android_sdk//:versions.bzl` holds the catalog's `android-minSdk`, `android-targetSdk`, `android-compileSdk` and
+AGP's version, `@android_sdk//:adb` is platform-tools' adb (device tests run through it), and
 `@aapt2//:aapt2` is the host's aapt2, the build AGP itself downloads (`pins.bzl`).
 """
 
@@ -69,7 +70,33 @@ _VERSIONS = """\
 MIN_SDK = {min}
 TARGET_SDK = {target}
 COMPILE_SDK = {compile}
+AGP_VERSION = "{agp}"
 """
+
+# The adb device tests install and run through (`android_device_test`); without platform-tools only running them fails.
+_ADB_FOUND = """
+exports_files(["adb"])
+"""
+
+_ADB_MISSING = """
+genrule(
+    name = "adb_missing",
+    outs = ["adb"],
+    cmd = {cmd},
+    visibility = ["//visibility:public"],
+)
+"""
+
+def _adb(rctx, sdk):
+    exe = "adb.exe" if rctx.os.name.lower().startswith("windows") else "adb"
+    if sdk:
+        adb = rctx.path("%s/platform-tools/%s" % (sdk, exe))
+        rctx.watch(adb)
+        if adb.exists:
+            rctx.symlink(adb, "adb")
+            return _ADB_FOUND
+    message = "No adb: install the SDK's platform-tools with `sdkmanager platform-tools`."
+    return _ADB_MISSING.format(cmd = repr("echo '%s' >&2; exit 1" % message))
 
 # AGP signs debug builds with ~/.android/debug.keystore, creating it when it's missing, so a Bazel APK and a
 # Gradle one install over each other. Without one the build makes its own, as AGP would.
@@ -97,13 +124,15 @@ def _debug_keystore(rctx):
     return _KEYSTORE_MISSING
 
 def _platform_impl(rctx):
-    keystore = _debug_keystore(rctx)
+    tools = _debug_keystore(rctx)
     rctx.file("versions.bzl", _VERSIONS.format(
         min = rctx.attr.min_sdk,
         target = rctx.attr.target_sdk,
         compile = rctx.attr.compile_sdk,
+        agp = rctx.attr.agp,
     ))
     sdk = _sdk_dir(rctx)
+    tools += _adb(rctx, sdk)
     level = rctx.attr.compile_sdk
     # Newer SDKs name the platform after its minor version too (`android-37.0`).
     candidates = ["android-%s" % level, "android-%s.0" % level]
@@ -113,15 +142,16 @@ def _platform_impl(rctx):
             rctx.watch(jar)
             if jar.exists:
                 rctx.symlink(jar, "android.jar")
-                rctx.file("BUILD.bazel", _FOUND + keystore)
+                rctx.file("BUILD.bazel", _FOUND + tools)
                 return
     message = ("No Android SDK platform %s: set ANDROID_HOME (or sdk.dir in local.properties) and install it " +
                "with `sdkmanager \"platforms;%s\"`. Looked in %s.") % (level, candidates[-1], sdk or "no SDK")
-    rctx.file("BUILD.bazel", _MISSING.format(cmd = repr("echo '%s' >&2; exit 1" % message)) + keystore)
+    rctx.file("BUILD.bazel", _MISSING.format(cmd = repr("echo '%s' >&2; exit 1" % message)) + tools)
 
 _platform = repository_rule(
     implementation = _platform_impl,
     attrs = {
+        "agp": attr.string(mandatory = True),
         "compile_sdk": attr.string(mandatory = True),
         "local_properties": attr.string(mandatory = True),
         "min_sdk": attr.string(mandatory = True),
@@ -160,6 +190,7 @@ def _android_sdk_impl(module_ctx):
     root = module_ctx.path(Label("//:MODULE.bazel")).dirname
     _platform(
         name = "android_sdk",
+        agp = versions["android-gradle-plugin"],
         compile_sdk = versions["android-compileSdk"],
         min_sdk = versions["android-minSdk"],
         target_sdk = versions["android-targetSdk"],

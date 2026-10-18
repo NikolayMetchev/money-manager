@@ -1,0 +1,51 @@
+load("@android_sdk//:versions.bzl", "COMPILE_SDK", "MIN_SDK", "TARGET_SDK")
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("//bazel/kmp/android:apk.bzl", "android_apk")
+load("//bazel/kmp/android:device_test.bzl", "INSTRUMENTATION_RUNNER", "android_device_test")
+load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
+
+# The release smoke test (#1024), Gradle's `:app:main:android-smoketest:pixel6api36ReleaseAndroidTest
+# -PreleaseSmokeTest=true`: a self-instrumenting `com.android.test` module that drives the installed R8-minified
+# release app (`//app/main/android:release_debug_signed`) through UiAutomator, from its own process. Hand-written:
+# a `com.android.test` module isn't a KMP one, so Gazelle leaves it alone.
+
+kt_jvm_library(
+    name = "smoketest_lib",
+    testonly = True,
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+    deps = [
+        "//bazel/kmp/android:android_jar",
+        "@maven_kmp//:androidx_test_runner_android",
+        "@maven_kmp//:androidx_test_uiautomator_android",
+        "@maven_kmp//:junit_android",
+    ],
+)
+
+# :smoketest_ktlint and :smoketest_detekt, as for every module.
+kmp_lint(
+    name = "smoketest",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+)
+
+# The module's release build type: debug-signed, not debuggable, not minified.
+android_apk(
+    name = "smoketest_apk",
+    testonly = True,
+    application_id = "com.moneymanager.android.smoketest",
+    compile_sdk = COMPILE_SDK,
+    debuggable = False,
+    lib = ":smoketest_lib",
+    manifest = "src/main/AndroidManifest.xml",
+    min_sdk = MIN_SDK,
+    namespace = "com.moneymanager.android.smoketest",
+    target_sdk = TARGET_SDK,
+    test_runner = INSTRUMENTATION_RUNNER,
+)
+
+android_device_test(
+    name = "smoketest_test",
+    size = "large",
+    apk = ":smoketest_apk",
+    install = {"com.moneymanager": "//app/main/android:release_debug_signed"},
+    package = "com.moneymanager.android.smoketest",
+)

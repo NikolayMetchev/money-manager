@@ -1,2 +1,5 @@
 # gazelle:kmp_targets android
 # gazelle:kmp_android_host_tests false
+# gazelle:kmp_device_test_srcs src/commonTest/kotlin
+# gazelle:kmp_device_test_resources src/commonTest/resources
+# gazelle:kmp_keep_dep @maven_kmp//:ui_android androidDeviceTest

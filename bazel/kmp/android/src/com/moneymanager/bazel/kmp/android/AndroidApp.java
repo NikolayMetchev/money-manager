@@ -11,6 +11,7 @@ import com.android.builder.dexing.R8OutputType;
 import com.android.builder.dexing.R8Tool;
 import com.android.builder.dexing.ResourceShrinkingConfig;
 import com.android.builder.dexing.ToolConfig;
+import com.android.builder.internal.InstrumentedTestManifestGenerator;
 import com.android.builder.internal.packaging.ApkFlinger;
 import com.android.builder.packaging.DexFileComparator;
 import com.android.builder.packaging.DexPackagingMode;
@@ -23,7 +24,9 @@ import com.android.ide.common.symbols.SymbolIo;
 import com.android.ide.common.symbols.SymbolTable;
 import com.android.manifmerger.ManifestMerger2;
 import com.android.manifmerger.ManifestProvider;
+import com.android.manifmerger.ManifestSystemProperty;
 import com.android.manifmerger.MergingReport;
+import com.android.manifmerger.PlaceholderHandler;
 import com.android.tools.build.apkzlib.sign.SigningOptions;
 import com.android.tools.build.apkzlib.zfile.ApkCreatorFactory;
 import com.android.tools.build.apkzlib.zfile.NativeLibrariesPackagingMode;
@@ -62,6 +65,7 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -71,7 +75,8 @@ import javax.xml.parsers.DocumentBuilderFactory;
 
 /**
  * The steps of AGP's APK build that aren't a tool of their own (aapt2, D8, R8), done with AGP's own classes:
- * {@code manifest} is {@code processDebugManifest}, {@code rjar} the R.jar {@code processDebugResources} writes,
+ * {@code manifest} is {@code processDebugManifest}, {@code test-manifest} a test APK's
+ * {@code processAndroidDeviceTestManifest}, {@code rjar} the R.jar {@code processDebugResources} writes,
  * {@code proguard-defaults} {@code getDefaultProguardFile}, {@code embedded-rules} the keep rules AGP extracts from
  * library jars, {@code debug-keystore} the key AGP makes when ~/.android has none, and {@code package}
  * {@code packageDebug}: the APK through AGP's {@code ApkFlinger}, with AGP's
@@ -86,6 +91,7 @@ public final class AndroidApp {
     Map<String, List<String>> flags = parse(Arrays.copyOfRange(args, 1, args.length));
     switch (args[0]) {
       case "manifest" -> manifest(flags);
+      case "test-manifest" -> testManifest(flags);
       case "rjar" -> rJar(flags);
       case "proguard-defaults" -> ProguardFiles.createProguardFile(one(flags, "name"), new File(one(flags, "out")));
       case "embedded-rules" -> embeddedRules(flags);
@@ -182,6 +188,73 @@ public final class AndroidApp {
       report.getLoggingRecords().forEach(r -> System.err.println(r));
       throw new IllegalStateException("manifest merge failed");
     }
+  }
+
+  /**
+   * ProcessTestManifest for a library's self-instrumenting test APK: the instrumentation AGP generates, merged
+   * under the test source set's manifest (when it has one), then with the libraries'.
+   */
+  private static void testManifest(Map<String, List<String>> flags) throws Exception {
+    String applicationId = one(flags, "application-id");
+    String minSdk = one(flags, "min-sdk");
+    String targetSdk = one(flags, "target-sdk");
+    String runner = one(flags, "runner");
+    StdLogger logger = new StdLogger(StdLogger.Level.WARNING);
+    Path tmp = Files.createTempDirectory("test-manifest");
+    File generated = tmp.resolve("generated.xml").toFile();
+    new InstrumentedTestManifestGenerator(
+        generated, applicationId, minSdk, targetSdk, applicationId, runner, false, false).generate();
+    if (flags.containsKey("test-manifest")) {
+      ManifestMerger2.Invoker intermediate = ManifestMerger2.newMerger(
+              new File(one(flags, "test-manifest")), logger, ManifestMerger2.MergeType.APPLICATION)
+          .addLibraryManifest(generated)
+          .addAllowedNonUniqueNamespace(applicationId)
+          .setOverride(ManifestSystemProperty.Document.PACKAGE, applicationId)
+          .setOverride(ManifestSystemProperty.UsesSdk.MIN_SDK_VERSION, minSdk)
+          .setOverride(ManifestSystemProperty.Instrumentation.TARGET_PACKAGE, applicationId)
+          .setNamespace(applicationId)
+          .withFeatures(
+              ManifestMerger2.Invoker.Feature.DISABLE_MINSDKLIBRARY_CHECK,
+              ManifestMerger2.Invoker.Feature.CHECK_IF_PACKAGE_IN_MAIN_MANIFEST,
+              ManifestMerger2.Invoker.Feature.USES_SDK_IN_MANIFEST_LENIENT_HANDLING,
+              ManifestMerger2.Invoker.Feature.DISABLE_REPLACE_WARNING);
+      intermediate.setPlaceHolderValue(PlaceholderHandler.INSTRUMENTATION_RUNNER, runner);
+      intermediate.setOverride(ManifestSystemProperty.Instrumentation.NAME, runner);
+      intermediate.setOverride(ManifestSystemProperty.Instrumentation.FUNCTIONAL_TEST, "false");
+      intermediate.setOverride(ManifestSystemProperty.Instrumentation.HANDLE_PROFILING, "false");
+      intermediate.setOverride(ManifestSystemProperty.UsesSdk.TARGET_SDK_VERSION, targetSdk);
+      File merged = tmp.resolve("intermediate.xml").toFile();
+      writeMerged(intermediate.merge(), merged);
+      generated = merged;
+    }
+    List<ManifestProvider> deps = new ArrayList<>();
+    for (String manifest : all(flags, "dep")) {
+      deps.add(new ManifestProviderImpl(new File(manifest), manifest));
+    }
+    List<ManifestMerger2.Invoker.Feature> features = new ArrayList<>(List.of(
+        ManifestMerger2.Invoker.Feature.DISABLE_MINSDKLIBRARY_CHECK,
+        ManifestMerger2.Invoker.Feature.REMOVE_TOOLS_DECLARATIONS,
+        ManifestMerger2.Invoker.Feature.USES_SDK_IN_MANIFEST_LENIENT_HANDLING));
+    // A library's test APK is debug; a com.android.test module's release variant isn't.
+    if (flags.containsKey("debuggable")) {
+      features.add(ManifestMerger2.Invoker.Feature.DEBUGGABLE);
+    }
+    ManifestMerger2.Invoker last = ManifestMerger2.newMerger(generated, logger, ManifestMerger2.MergeType.APPLICATION)
+        .withFeatures(features.toArray(new ManifestMerger2.Invoker.Feature[0]))
+        .setOverride(ManifestSystemProperty.Document.PACKAGE, applicationId)
+        .addManifestProviders(deps)
+        .setNamespace(applicationId);
+    // As for the app: minSdk 23 or newer without useLegacyPackaging keeps native libraries uncompressed.
+    last.setOverride(ManifestSystemProperty.Application.EXTRACT_NATIVE_LIBS, "false");
+    writeMerged(last.merge(), new File(one(flags, "out")));
+  }
+
+  private static void writeMerged(MergingReport report, File out) throws IOException {
+    if (report.getResult().isError()) {
+      report.getLoggingRecords().forEach(r -> System.err.println(r));
+      throw new IllegalStateException("manifest merge failed");
+    }
+    Files.writeString(out.toPath(), report.getMergedDocument(MergingReport.MergedManifestKind.MERGED));
   }
 
   /**
@@ -391,15 +464,31 @@ public final class AndroidApp {
       for (Map.Entry<String, File> f : files.entrySet()) {
         apk.writeFile(f.getValue(), f.getKey());
       }
-      int n = 0;
-      for (Map.Entry<String, byte[]> res : javaRes.entrySet()) {
-        Path file = scratch.resolve("res" + n++);
-        Files.write(file, res.getValue());
-        apk.writeFile(file.toFile(), res.getKey());
+      // AGP's merged Java resources are an apkzlib jar, whose compressor stores an entry deflating doesn't shrink,
+      // and writeZip keeps each entry's compression.
+      Path resJar = scratch.resolve("java-res.jar");
+      try (ZipOutputStream jar = new ZipOutputStream(Files.newOutputStream(resJar))) {
+        for (Map.Entry<String, byte[]> res : javaRes.entrySet()) {
+          ZipEntry e = new ZipEntry(res.getKey());
+          byte[] bytes = res.getValue();
+          if (deflatedSize(bytes) >= bytes.length) {
+            CRC32 crc = new CRC32();
+            crc.update(bytes);
+            e.setMethod(ZipEntry.STORED);
+            e.setSize(bytes.length);
+            e.setCrc(crc.getValue());
+          }
+          jar.putNextEntry(e);
+          jar.write(bytes);
+          jar.closeEntry();
+        }
       }
-      Path metadata = scratch.resolve("app-metadata.properties");
-      Files.writeString(metadata, "appMetadataVersion=1.1\nandroidGradlePluginVersion=" + one(flags, "agp-version") + "\n");
-      apk.writeFile(metadata.toFile(), "META-INF/com/android/build/gradle/app-metadata.properties");
+      apk.writeZip(resJar.toFile(), null, null);
+      if (flags.containsKey("agp-version")) {
+        Path metadata = scratch.resolve("app-metadata.properties");
+        Files.writeString(metadata, "appMetadataVersion=1.1\nandroidGradlePluginVersion=" + one(flags, "agp-version") + "\n");
+        apk.writeFile(metadata.toFile(), "META-INF/com/android/build/gradle/app-metadata.properties");
+      }
     }
   }
 
@@ -573,6 +662,19 @@ public final class AndroidApp {
     }
     Files.writeString(Path.of(one(flags, "out")),
         "repositories {\n  system: GIT\n  local_root_path: \"$PROJECT_DIR\"\n  revision: \"" + revision + "\"\n}\n");
+  }
+
+  private static int deflatedSize(byte[] bytes) {
+    Deflater deflater = new Deflater(Deflater.DEFAULT_COMPRESSION, true);
+    deflater.setInput(bytes);
+    deflater.finish();
+    byte[] buffer = new byte[8192];
+    int size = 0;
+    while (!deflater.finished()) {
+      size += deflater.deflate(buffer);
+    }
+    deflater.end();
+    return size;
   }
 
   private static Map<String, byte[]> mergeJavaRes(List<String> jars) throws IOException {

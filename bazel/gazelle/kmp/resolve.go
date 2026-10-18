@@ -159,6 +159,8 @@ var (
 		{"linux", "linux_deps", "", nativePlatform},
 		{"apple", "apple_deps", "", nativePlatform},
 		{"mingw", "mingw_deps", "", nativePlatform},
+		// androidDeviceTest is its own compilation: commonTest's dependencies don't reach it.
+		{"androidDevice", "device_deps", "", nil},
 	}
 )
 
@@ -220,7 +222,7 @@ func (l leaves) below(group string) []leaf {
 		}
 	case "jvm":
 		out = append(out, jvm)
-	case "android":
+	case "android", "androidDevice":
 		out = append(out, android)
 	}
 	return out

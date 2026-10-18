@@ -28,6 +28,9 @@ load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
 load(":resources.bzl", "kmp_resource_jar")
 load(":native.bzl", "BUILDS_ON", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_executable", "kt_native_klib", "kt_native_test_binary")
 load("//bazel/kmp/plugins:plugins.bzl", "plugin_deps", "plugin_labels")
+load("//bazel/kmp/android:apk.bzl", "android_apk")
+load("//bazel/kmp/android:device_test.bzl", "INSTRUMENTATION_RUNNER", "android_device_test")
+load("@android_sdk//:versions.bzl", "COMPILE_SDK", "MIN_SDK")
 
 def _fragments(chain):
     """Fragment flags for a `[(fragment, srcs, always), …]` chain, root first.
@@ -364,8 +367,12 @@ def kmp_test(
         resources = [],
         jvm_flags = [],
         flaky = False,
-        jvm_tags = []):
-    """A module's tests. Emits `:<name>_jvm`, `:<name>_android` and `:<name>_<target>` per native target.
+        jvm_tags = [],
+        device_srcs = [],
+        device_deps = [],
+        device_manifest = None,
+        device_resources = []):
+    """A module's tests. Emits `:<name>_jvm`, `:<name>_android`, `:<name>_device` and `:<name>_<target>` per native target.
 
     JVM tests are JUnit 4, run by `//bazel/kmp/testing:KmpJUnitRunner`. Android host tests (AGP's
     `testAndroidHostTest`) are `commonTest ← jvmAndroidTest ← androidHostTest` compiled against the module's
@@ -407,9 +414,14 @@ def kmp_test(
         flaky: retry a failing JVM test up to twice more, as the Gradle test-retry plugin does for the Compose
             modules (`maxRetries = 2`).
         jvm_tags: Bazel tags on the JVM test (`no-remote-exec` for Skiko, which needs the host's libGL).
+        device_srcs: `androidDeviceTest`'s sources: `src/androidDeviceTest/kotlin` and whatever `srcDir`s the
+            module's Gradle build adds to it (the Compose UI modules share `src/commonTest/kotlin`).
+        device_deps: `androidDeviceTest` dependencies, by module label.
+        device_manifest: `src/androidDeviceTest/AndroidManifest.xml`, merged into the test APK's.
+        device_resources: the test APK's Java resources (`src/androidDeviceTest/resources` and shared dirs).
     """
-    kmp_lint(name, common_srcs + jvm_android_srcs + jvm_srcs + android_srcs + native_srcs + linux_srcs + apple_srcs +
-                   mingw_srcs)
+    srcs = common_srcs + jvm_android_srcs + jvm_srcs + android_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs
+    kmp_lint(name, srcs + [s for s in device_srcs if s not in srcs])
     fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, jvm_srcs)
     brought = plugin_deps(plugins)
     declared = deps + jvm_android_deps + jvm_deps
@@ -452,6 +464,9 @@ def kmp_test(
             ),
         )
         _jvm_test(name + "_android", lib, size, flaky, [], [], data, [Label("//bazel/kmp/android:mockable_android_jar")])
+    if device_srcs:
+        _device_test(name, associate, device_srcs, deps_of_plugins = brought, plugins = plugins, deps = device_deps,
+                     manifest = device_manifest, resources = device_resources)
     if forbidden_deps:
         _forbidden_deps(
             name,
@@ -486,6 +501,52 @@ def kmp_test(
             target_compatible_with = RUNS_ON[target],
             runtime_deps = [Label("//bazel/kmp/testing:native_launcher_lib")],
         )
+
+def _device_test(name, associate, srcs, deps_of_plugins, plugins, deps, manifest, resources):
+    """`:<name>_device`: a library's device tests, as AGP builds and runs them (its `androidDeviceTest`)."""
+    lib = name + "_device_lib"
+    resource_jars = []
+    if resources:
+        kmp_resource_jar(
+            name = name + "_device_resources",
+            srcs = resources,
+            roots = ["src/commonTest/resources", "src/androidDeviceTest/resources"],
+            testonly = True,
+            visibility = ["//visibility:private"],
+        )
+        resource_jars = [":" + name + "_device_resources"]
+    kt_jvm_library(
+        name = lib,
+        testonly = True,
+        srcs = srcs,
+        associates = [platform_label(associate, "android")],
+        deps = _on("android", deps + deps_of_plugins.deps + deps_of_plugins.exports) +
+               [Label("//bazel/kmp/android:android_jar")],
+        plugins = plugin_labels(plugins, "jvm"),
+        resource_jars = resource_jars,
+    )
+
+    # The Android convention's namespace (`com.moneymanager.<group>`), and AGP's test application id after it.
+    application_id = "com.moneymanager.%s.test" % native.package_name().replace("/", ".").replace("-", ".")
+    android_apk(
+        name = name + "_device_apk",
+        testonly = True,
+        application_id = application_id,
+        compile_sdk = COMPILE_SDK,
+        lib = ":" + lib,
+        manifest = manifest,
+        min_sdk = MIN_SDK,
+        namespace = application_id,
+        # The library convention sets no targetSdk, and AGP's test APK then takes compileSdk.
+        target_sdk = COMPILE_SDK,
+        test_runner = INSTRUMENTATION_RUNNER,
+    )
+    android_device_test(
+        name = name + "_device",
+        size = "large",
+        apk = ":%s_device_apk" % name,
+        package = application_id,
+    )
 
 def _jvm_test(name, lib, size, flaky, tags, jvm_flags, data, runtime_deps):
     """A JUnit 4 test over `lib`'s classes, run by KmpJUnitRunner (the JVM tests and the Android host tests)."""

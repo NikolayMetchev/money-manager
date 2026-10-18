@@ -99,6 +99,97 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           done
 
+  android-device:
+    name: Bazel Android device tests
+    runs-on: ubuntu-latest
+    # The device tests (#1024): kmp_test's `:test_device` targets and the release smoke test, run through adb on
+    # the emulator build.yml's Android Instrumented Tests job uses, from its AVD cache. They're `manual`, so
+    # `bazel test //...` leaves them out; this job runs everything tagged android_device. The APKs build on
+    # BuildBuddy, the tests run here (`local`), one at a time (`exclusive`).
+    timeout-minutes: 45
+    env:
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android/sdk/ndk
+          sudo rm -rf /opt/ghc
+          df -h
+
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Enable KVM for Android emulator hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.19.1
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-android-device
+          repository-cache: true
+          cache-save: ${{ github.event_name == 'push' }}
+
+      - name: Use BuildBuddy
+        if: env.BUILDBUDDY_API_KEY != ''
+        run: |
+          {
+            echo "common --config=rbe"
+            echo "common --remote_header=x-buildbuddy-api-key=${BUILDBUDDY_API_KEY}"
+            echo "common --build_metadata=ROLE=CI"
+            echo "common --build_metadata=REPO_URL=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          } > user.bazelrc
+
+      - name: Install the Android SDK platform
+        run: |
+          level=$(sed -n 's/^android-compileSdk = "\(.*\)"/\1/p' gradle/libs.versions.toml)
+          (yes || true) | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-$level.0" > /dev/null
+
+      # Building first keeps the emulator's time limit for the tests.
+      - name: Build the test APKs
+        run: bazel build $(bazel query 'attr(tags, android_device, tests(//...))')
+
+      # build.yml's Android Instrumented Tests job saves this cache from main.
+      - name: Restore AVD cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          # Android emulator API level sync: update with build.yml's emulator job and CLAUDE.md.
+          key: avd-pixel6-api36-aosp-atd-${{ runner.os }}
+
+      - name: Run the device tests
+        timeout-minutes: 30
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          # Android emulator API level sync: update with build.yml's emulator job and CLAUDE.md.
+          api-level: 36
+          arch: x86_64
+          profile: pixel_6
+          target: aosp_atd
+          channel: dev
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: bazel test $(bazel query 'attr(tags, android_device, tests(//...))') --test_output=errors
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bazel-android-device-test-results
+          path: |
+            bazel-testlogs/**/test.log
+            bazel-testlogs/**/test.xml
+          retention-days: 7
+
   installer:
     name: Bazel installer (${{ matrix.name }})
     runs-on: ${{ matrix.os }}

@@ -1,5 +1,6 @@
 load("@rules_java//java:java_binary.bzl", "java_binary")
 load("@rules_java//java:java_import.bzl", "java_import")
+load("@rules_java//java:java_library.bzl", "java_library")
 load(":apk.bzl", "stamp_setting")
 
 # The SDK's android.jar, which every Android compile has on its classpath (neverlink): extensions.bzl.
@@ -70,5 +71,13 @@ stamp_setting(
         ":stamped": True,
         "//conditions:default": False,
     }),
+    visibility = ["//visibility:public"],
+)
+
+# Runs a test APK's instrumentation on a connected device (kmp_test's `:<name>_device`).
+java_library(
+    name = "device_test_runner",
+    testonly = True,
+    srcs = ["src/com/moneymanager/bazel/kmp/android/DeviceTestRunner.java"],
     visibility = ["//visibility:public"],
 )

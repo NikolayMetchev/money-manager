@@ -2,6 +2,8 @@ load("//bazel/kmp:defs.bzl", "kmp_library")
 
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android
+# gazelle:kmp_device_test_srcs src/commonTest/kotlin
+# gazelle:kmp_device_test_resources src/commonTest/resources
 
 kmp_library(
     name = "importDirectory",

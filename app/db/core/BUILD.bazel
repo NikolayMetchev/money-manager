@@ -30,6 +30,8 @@
 # gazelle:kmp_export @maven_kmp//:sqldelight_jdbc_driver jvmMain
 # gazelle:kmp_export @maven_kmp//:sqldelight_runtime jvmMain
 # gazelle:kmp_keep_dep @maven_kmp//:sqldelight_sqlite_driver jvmMain
+# gazelle:kmp_device_test_srcs src/commonTest/kotlin/com/moneymanager/database/repository src/commonTest/kotlin/com/moneymanager/database/audit
+# gazelle:kmp_keep_dep @maven_kmp//:androidx_test_runner androidDeviceTest
 
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
@@ -104,11 +106,35 @@ kmp_test(
     associate = ":core",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     data = ["//app/db/write:sqldelight_sq"],
+    device_deps = [
+        "//app/importengineapi",
+        "//app/model/apistrategy",
+        "//app/model/core",
+        "//app/model/csvstrategy",
+        "//app/model/importdirectory",
+        "//app/model/qif",
+        "//app/model/repository/read",
+        "//app/model/repository/write:write_for_tests",
+        "//app/model/timeline",
+        "//app/strategies",
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/app/db",
+        "//utils/bigdecimal",
+        "@maven_kmp//:androidx_test_runner",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:sqldelight_runtime",
+    ],
+    device_srcs = glob([
+        "src/commonTest/kotlin/com/moneymanager/database/repository/**/*.kt",
+        "src/commonTest/kotlin/com/moneymanager/database/audit/**/*.kt",
+    ]),
     jvm_deps = [
         "@maven_kmp//:kotlinx_serialization_core",
         "@maven_kmp//:kotlinx_serialization_json",
     ],
     jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
+    keep_deps = ["@maven_kmp//:androidx_test_runner"],
     native_targets = [
         "linuxArm64",
         "linuxX64",

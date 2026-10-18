@@ -4,7 +4,9 @@ The app's Android compile (a `kmp_library` with `jvm = False`) and everything on
 APK, in AGP's steps:
 
 - `processDebugManifest`: the app's manifest merged with every AAR's (`AndroidApp manifest`, AGP's
-  `mergeManifests`), `applicationId`, versions and SDK levels injected, `android:debuggable` in a debug build.
+  `mergeManifests`), `applicationId`, versions and SDK levels injected, `android:debuggable` in a debug build. A
+  test APK (`test_runner`, a library's `androidDeviceTest`) is `processAndroidDeviceTestManifest` instead
+  (`AndroidApp test-manifest`): AGP's generated `<instrumentation>`, targeting the test APK itself.
 - `processDebugResources`: `aapt2 link` over the AARs' compiled resources (`aar.bzl`), later classpath entries
   overlaid first so the earlier one wins, and the R.jar AGP writes: one non-transitive R class per AAR, with the
   app's final ids (`AndroidApp rjar`).
@@ -192,19 +194,28 @@ def _android_apk_impl(ctx):
 
     manifest = ctx.actions.declare_file(name + "/AndroidManifest.xml")
     args = ctx.actions.args()
-    args.add("--main", ctx.file.manifest)
     args.add_all([a.manifest for a in aars], before_each = "--dep")
-    args.add("--namespace", ctx.attr.namespace)
     args.add("--application-id", ctx.attr.application_id)
-    args.add("--version-code", ctx.attr.version_code)
-    args.add("--version-name", ctx.attr.version_name)
     args.add("--min-sdk", ctx.attr.min_sdk)
     args.add("--target-sdk", ctx.attr.target_sdk)
-    args.add("--compile-sdk", ctx.attr.compile_sdk)
-    if not ctx.attr.release:
-        args.add("--debuggable")
     args.add("--out", manifest)
-    _run_tool(ctx, "manifest", args, [ctx.file.manifest] + [a.manifest for a in aars], [manifest], "MergeManifests")
+    inputs = [a.manifest for a in aars] + ctx.files.manifest
+    if ctx.attr.test_runner:
+        if ctx.file.manifest:
+            args.add("--test-manifest", ctx.file.manifest)
+        args.add("--runner", ctx.attr.test_runner)
+        if ctx.attr.debuggable:
+            args.add("--debuggable")
+        _run_tool(ctx, "test-manifest", args, inputs, [manifest], "MergeTestManifests")
+    else:
+        args.add("--main", ctx.file.manifest)
+        args.add("--namespace", ctx.attr.namespace)
+        args.add("--version-code", ctx.attr.version_code)
+        args.add("--version-name", ctx.attr.version_name)
+        args.add("--compile-sdk", ctx.attr.compile_sdk)
+        if not ctx.attr.release:
+            args.add("--debuggable")
+        _run_tool(ctx, "manifest", args, inputs, [manifest], "MergeManifests")
 
     # A release build links to aapt2's proto format, which R8's resource shrinker reads.
     linked = ctx.actions.declare_file(name + ("/resources_proto.ap_" if ctx.attr.release else "/resources.ap_"))
@@ -219,7 +230,7 @@ def _android_apk_impl(ctx):
     args.add("--output-text-symbols", r_txt)
     if ctx.attr.release:
         args.add("--proto-format")
-    else:
+    elif ctx.attr.debuggable:
         args.add("--debug-mode")
     args.add("-o", linked)
     ctx.actions.run(
@@ -257,6 +268,8 @@ def _android_apk_impl(ctx):
         # D8 builds debug by default. `--debug` would reach java_binary's launcher, which waits for a debugger.
         args = ctx.actions.args()
         args.add("--min-api", ctx.attr.min_sdk)
+        if not ctx.attr.debuggable:
+            args.add("--release")
         args.add("--lib", android_jar)
         args.add("--output", dex)
         args.add_all(program)
@@ -280,7 +293,9 @@ def _android_apk_impl(ctx):
     args.add_all([a.root for a in aars], before_each = "--aar-root")
     args.add_all(["%s=%s" % (path, f.path) for path, f in files.items()], before_each = "--file")
     args.add("--min-sdk", ctx.attr.min_sdk)
-    args.add("--agp-version", ctx.attr.agp_version)
+    if not ctx.attr.test_runner:
+        # AGP writes app-metadata.properties into an app, never a test APK.
+        args.add("--agp-version", ctx.attr.agp_version)
     inputs = [resources, dex] + java_res + files.values()
     if ctx.attr.signed:
         args.add("--keystore", ctx.file._debug_keystore)
@@ -302,24 +317,34 @@ def _android_apk_impl(ctx):
 android_apk = rule(
     implementation = _android_apk_impl,
     attrs = {
-        "agp_version": attr.string(mandatory = True, doc = "Recorded in app-metadata.properties, as AGP does."),
+        "agp_version": attr.string(doc = "Recorded in an app's app-metadata.properties, as AGP does."),
         "application_id": attr.string(mandatory = True),
         "compile_sdk": attr.int(mandatory = True),
+        "debuggable": attr.bool(
+            default = True,
+            doc = "A test APK only: false for a `com.android.test` module's release variant, dexed as release.",
+        ),
         "lib": attr.label(
             mandatory = True,
             providers = [JavaInfo],
             aspects = [_aars_aspect],
             doc = "The app's Android compile (`:<name>_android`).",
         ),
-        "manifest": attr.label(allow_single_file = True, mandatory = True, doc = "src/main/AndroidManifest.xml."),
+        "manifest": attr.label(
+            allow_single_file = True,
+            doc = "src/main/AndroidManifest.xml, or a test APK's source-set manifest (optional there).",
+        ),
         "min_sdk": attr.int(mandatory = True),
         "namespace": attr.string(mandatory = True),
         "proguard_specs": attr.label_list(allow_files = True, doc = "The app's keep rules (release only)."),
         "release": attr.bool(doc = "R8 (minified) instead of D8, and not debuggable."),
         "signed": attr.bool(default = True, doc = "Sign with the debug key (v2, as AGP signs minSdk 24+)."),
         "target_sdk": attr.int(mandatory = True),
-        "version_code": attr.int(mandatory = True),
-        "version_name": attr.string(mandatory = True),
+        "test_runner": attr.string(
+            doc = "A self-instrumenting test APK's instrumentation runner, as AGP builds a library's device tests.",
+        ),
+        "version_code": attr.int(),
+        "version_name": attr.string(),
         "_aapt2": attr.label(default = Label("@aapt2"), executable = True, cfg = "exec", allow_single_file = True),
         "_android_jar": attr.label(default = Label("@android_sdk//:android.jar"), allow_single_file = True),
         "_d8": attr.label(default = Label("//bazel/kmp/android:d8"), executable = True, cfg = "exec"),
