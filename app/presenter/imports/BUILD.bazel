@@ -1,0 +1,65 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_plugins compose
+# gazelle:kmp_export //app/session
+# gazelle:kmp_export //app/tasks
+# gazelle:kmp_export @maven_kmp//:androidx_compose_runtime
+# gazelle:kmp_export @maven_kmp//:kotlinx_coroutines_core
+# gazelle:kmp_keep_dep @maven_kmp//:kotlinx_coroutines_test commonTest
+# gazelle:kmp_keep_dep @maven_kmp//:ktor_client_core commonTest
+# gazelle:kmp_export @maven_kmp//:androidx_compose_runtime_desktop jvmMain
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "imports",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_exports = ["@maven_kmp//:androidx_compose_runtime_desktop"],
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["compose"],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/session",
+        "//app/tasks",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+    deps = ["@maven_kmp//:androidx_compose_runtime_runtime_annotation"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":imports",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["compose"],
+    deps = [
+        "//app/importengineapi",
+        "//app/importfilesource/core",
+        "//app/importfilesource/localfolder",
+        "//app/model/core",
+        "//app/model/importdirectory",
+        "//app/session",
+        "//app/tasks",
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/app/db",
+        "//test/utils/credentialvault",
+        "//utils/files",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:kotlinx_io_core",
+        "@maven_kmp//:ktor_client_core",
+        "@maven_kmp//:molecule_runtime",
+        "@maven_kmp//:turbine",
+    ],
+)

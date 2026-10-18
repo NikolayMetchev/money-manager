@@ -23,6 +23,9 @@ go_binary(
 go_test(
     name = "resolver_test",
     size = "small",
-    srcs = ["resolve_test.go"],
+    srcs = [
+        "metadata_test.go",
+        "resolve_test.go",
+    ],
     embed = [":resolver_lib"],
 )

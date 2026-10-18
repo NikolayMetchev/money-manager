@@ -59,7 +59,13 @@ def platform_label(dep, platform):
     return "%s:%s_%s" % (package, target, platform)
 
 def _on(platform, labels):
-    return [platform_label(dep, platform) for dep in labels]
+    """Each label's platform target, once: a directive, a plugin and an import may all name one."""
+    out = []
+    for dep in labels:
+        target = platform_label(dep, platform)
+        if target not in out:
+            out.append(target)
+    return out
 
 def _family(target, linux, apple, mingw):
     """What a target's family source set (linuxMain, appleMain, mingwMain) has: its sources or its deps."""
@@ -117,7 +123,7 @@ def kmp_library(
     brought = plugin_deps(plugins)
     generated_native = []
     if sqldelight:
-        exports = exports + ["@maven_kmp//:sqldelight_runtime"]
+        exports = exports + [d for d in ["@maven_kmp//:sqldelight_runtime"] if d not in exports]
         generated_native = [sqldelight + "_kt"]
 
         # rules_kotlin can't put a srcjar's sources in a fragment, and K2 rejects sources in none, so on the JVM
@@ -141,7 +147,7 @@ def kmp_library(
         fragment_refines = fragments.fragment_refines,
         # Gradle's api is on the module's own classpath too; Bazel's exports are only on its dependents'. A
         # module with no sources of its own (only generated ones) just exports.
-        deps = _on("jvm", deps + jvm_deps) + jvm_exported if fragments.srcs else [],
+        deps = _on("jvm", deps + jvm_deps + exports + jvm_exports) if fragments.srcs else [],
         exports = jvm_exported,
         plugins = plugin_labels(plugins, "jvm"),
         visibility = visibility,
@@ -226,8 +232,12 @@ def kmp_test(
         size = size,
         main_class = "com.moneymanager.bazel.kmp.testing.KmpJUnitRunner",
         use_testrunner = False,
-        # The runner finds this jar on its classpath by file name.
-        jvm_flags = ["-Dkmp.test.jar=%s.jar" % lib],
+        jvm_flags = [
+            # The runner finds this jar on its classpath by file name.
+            "-Dkmp.test.jar=%s.jar" % lib,
+            # java.util.prefs writes under ~/.java, which the sandbox keeps read-only; tests get their own.
+            "-Djava.util.prefs.userRoot=$${TEST_TMPDIR}/prefs",
+        ],
         runtime_deps = [
             ":" + lib,
             Label("//bazel/kmp/testing:runner"),

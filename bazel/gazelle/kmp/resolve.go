@@ -29,7 +29,7 @@ func (*kmpLang) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 func (*kmpLang) Embeds(r *rule.Rule, from label.Label) []label.Label { return nil }
 
 // Libraries the toolchain and the distribution provide: no dependency to add.
-var builtin = []string{"kotlin.", "java.", "javax.", "kotlinx.cinterop.", "platform."}
+var builtin = []string{"kotlin.", "java.", "javax.", "sun.", "kotlinx.cinterop.", "platform."}
 
 // Dependencies kotlin.* names stand for, which aren't Maven libraries here.
 var kotlinLibraries = map[string]string{
@@ -60,7 +60,7 @@ func (*kmpLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 	// The module itself and, for tests, the module under test, written as moduleLabel writes them.
 	self := map[string]bool{moduleLabel(from, from): true}
 	if imp.associate != "" {
-		self[moduleLabel(label.New("", from.Pkg, imp.associate), from)] = true
+		self[moduleLabel(label.New(from.Repo, from.Pkg, imp.associate), from)] = true
 	}
 	deps := map[string]map[string]bool{}
 	for _, platform := range platforms {

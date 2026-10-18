@@ -1,0 +1,62 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_plugins compose
+# gazelle:kmp_export //app/model/core
+# gazelle:kmp_export //app/remotestorage/sync
+# gazelle:kmp_export //app/session
+# gazelle:kmp_export //utils/credentialvault
+# gazelle:kmp_export @maven_kmp//:androidx_compose_runtime
+# gazelle:kmp_export @maven_kmp//:kotlinx_coroutines_core
+# gazelle:kmp_export @maven_kmp//:androidx_compose_runtime_desktop jvmMain
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "status",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_exports = ["@maven_kmp//:androidx_compose_runtime_desktop"],
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["compose"],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/model/core",
+        "//app/remotestorage/sync",
+        "//app/session",
+        "//utils/credentialvault",
+        "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+    deps = ["@maven_kmp//:androidx_compose_runtime_runtime_annotation"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":status",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["compose"],
+    deps = [
+        "//app/importengineapi",
+        "//app/model/core",
+        "//app/remotestorage/sync",
+        "//app/session",
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/app/db",
+        "//test/app/remotestorage",
+        "//test/utils/credentialvault",
+        "//utils/credentialvault",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:molecule_runtime",
+        "@maven_kmp//:turbine",
+    ],
+)

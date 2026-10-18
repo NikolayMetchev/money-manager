@@ -1,0 +1,46 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export //app/importengineapi
+# gazelle:kmp_export //app/model/core
+# gazelle:kmp_export //app/model/reconciliation
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "reconciliation",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+    exports = [
+        "//app/importengineapi",
+        "//app/model/core",
+        "//app/model/reconciliation",
+    ],
+    deps = ["//utils/bigdecimal"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":reconciliation",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    deps = [
+        "//app/importengineapi",
+        "//app/model/core",
+        "//app/model/reconciliation",
+        "//app/tasks",
+        "//bazel/kmp/deps:kotlin_test",
+        "//utils/bigdecimal",
+        "@maven_kmp//:kotlinx_coroutines_test",
+    ],
+)

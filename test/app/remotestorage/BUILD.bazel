@@ -1,0 +1,18 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export //app/remotestorage/core
+
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+kmp_library(
+    name = "remotestorage",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+    exports = ["//app/remotestorage/core"],
+)

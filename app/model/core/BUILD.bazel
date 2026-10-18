@@ -1,9 +1,10 @@
-load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
-
 # gazelle:kmp_generate true
 # gazelle:kmp_targets linuxArm64 linuxX64 macosArm64 mingwX64
-# gazelle:kmp_export @maven_kmp//:kotlinx_serialization_core
+# gazelle:kmp_plugins serialization
 # gazelle:kmp_export //utils/bigdecimal
+# gazelle:kmp_export @maven_kmp//:kotlinx_serialization_core
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 kmp_library(
     name = "core",
