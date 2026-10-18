@@ -372,7 +372,22 @@ maven_kmp.install(
     resolve_stdlib = True,
 )
 
-use_repo(maven_kmp, "android_tools", "detekt_cli", "ktlint_cli", "maven_kmp", "proguard")
+# Android lint (#1025): the lint-gradle AGP resolves to run lint, on its own classpath as AGP runs it.
+maven_kmp.install(
+    name = "android_lint",
+    catalog = "//gradle:libs.versions.toml",
+    force_bundles = ["build-tool-pins"],
+    libraries = ["android-lint-gradle"],
+    lock_file = "//bazel/kmp/deps:android_lint.lock.json",
+    platforms = ["jvm"],
+    repositories = [
+        "https://maven.google.com",
+        "https://repo1.maven.org/maven2",
+    ],
+    resolve_stdlib = True,
+)
+
+use_repo(maven_kmp, "android_lint", "android_tools", "detekt_cli", "ktlint_cli", "maven_kmp", "proguard")
 
 android_sdk = use_extension("//bazel/kmp/android:extensions.bzl", "android_sdk")
 use_repo(android_sdk, "aapt2", "android_sdk")

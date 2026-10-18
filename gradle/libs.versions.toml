@@ -5,6 +5,8 @@
 android-compileSdk = "37"
 develocity = "4.6.0"
 android-gradle-plugin = "9.4.1"
+# The lint AGP runs (com.android.tools.lint:lint-gradle), whose version is always AGP's + 23: Bazel's Android lint (#1025).
+android-lint = "32.4.1"
 android-minSdk = "30"
 android-targetSdk = "36"
 play-services-auth = "22.0.0"
@@ -108,6 +110,8 @@ buildtool-tink = "1.24.0"
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle-plugin" }
 # AGP's builder, for its MockableJarGenerator: Bazel's Android host tests run on the same mockable android.jar.
 android-builder = { module = "com.android.tools.build:builder", version.ref = "android-gradle-plugin" }
+# The lint AGP resolves to run lint, for Bazel's `android_lint` (#1025).
+android-lint-gradle = { module = "com.android.tools.lint:lint-gradle", version.ref = "android-lint" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "play-services-auth" }
 androidx-activity = { module = "androidx.activity:activity", version.ref = "androidx-activity-compose" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity-compose" }

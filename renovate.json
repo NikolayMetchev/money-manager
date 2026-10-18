@@ -17,6 +17,11 @@
       "description": "Kotlin's Gradle plugins all read the one catalog version; split groups open duplicate PRs that each fail alone",
       "matchPackageNames": ["/^org\\.jetbrains\\.kotlin[.:]/"],
       "groupName": "kotlin monorepo"
+    },
+    {
+      "description": "AGP and the lint it runs release together (lint's version is AGP's + 23); Bazel's Android lint pins lint-gradle beside AGP",
+      "matchPackageNames": ["com.android.tools.build:gradle", "com.android.tools.build:builder", "com.android.tools.lint:lint-gradle", "/^com\\.android\\.(application|kotlin\\.multiplatform\\.library)$/"],
+      "groupName": "android gradle plugin"
     }
   ]
 }

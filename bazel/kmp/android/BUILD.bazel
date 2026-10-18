@@ -81,3 +81,13 @@ java_library(
     srcs = ["src/com/moneymanager/bazel/kmp/android/DeviceTestRunner.java"],
     visibility = ["//visibility:public"],
 )
+
+# The lint AGP runs (#1025), on the classpath AGP resolves for it (`com.android.tools.lint:lint-gradle`).
+
+java_library(
+    name = "lint_runner",
+    testonly = True,
+    srcs = ["src/com/moneymanager/bazel/kmp/android/LintRunner.java"],
+    visibility = ["//visibility:public"],
+    runtime_deps = ["@android_lint//:android_lint_gradle_jvm"],
+)

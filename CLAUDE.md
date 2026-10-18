@@ -259,6 +259,14 @@ stream to BuildBuddy, anonymously.
   Known differences: the device compile is named after its module (rules_kotlin takes an associate's name, so only
   Mokkery's `MokkeryModuleScope_<hash>` class names differ), its classpath has androidx.test:core 1.7.0 where Gradle's
   per-module resolution has 1.5.0, and D8's synthetic class names differ (one dex action, not one per class).
+- **Android lint** (`//bazel/kmp/android:lint.bzl`, #1025): `android_lint` is AGP's `lintDebug`, the one Android
+  lint task Gradle has (only `app/main/android`; the KMP library modules have none). It runs the lint AGP does
+  (`android-lint-gradle` in the catalog, always AGP + 23, its own `maven_kmp.install(name = "android_lint")`) over the
+  lint model AGP's `generateDebugLintReportModel` writes, built from the APK's `AndroidAppInfo`: namespace, SDK levels,
+  merged manifest, classes and R.jar, and every AAR extracted (its `lint.jar`, `public.txt`, `annotations.zip`), under
+  moneyManagerLintPolicy's options plus the module's `disable`. Not in its model: build-tools' `core-lambda-stubs.jar`
+  and D8's backported-methods list (both only quiet NewApi on desugared calls). `@android_sdk//:lint_sdk` is the
+  platform laid out as an SDK for lint's `--sdk-home`.
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.

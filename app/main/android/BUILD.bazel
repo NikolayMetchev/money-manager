@@ -1,6 +1,7 @@
 load("@android_sdk//:versions.bzl", "AGP_VERSION", "COMPILE_SDK", "MIN_SDK", "TARGET_SDK")
 load("//bazel/kmp:defs.bzl", "kmp_library")
 load("//bazel/kmp/android:apk.bzl", "android_apk")
+load("//bazel/kmp/android:lint.bzl", "android_lint")
 
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android
@@ -59,3 +60,18 @@ kmp_library(
     ("release", True, False),
     ("release_debug_signed", True, True),
 ]]
+
+# AGP's lintDebug (#1025), under moneyManagerLintPolicy plus the application convention's own disables: API 37 is
+# still beta, so the target SDK stays on the latest stable one.
+android_lint(
+    name = "lint",
+    size = "medium",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+    agp_version = AGP_VERSION,
+    apk = ":debug",
+    disable = [
+        "GradleDependency",
+        "OldTargetApi",
+    ],
+    java_source_level = "25",
+)
