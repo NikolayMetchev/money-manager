@@ -75,6 +75,10 @@ jobs:
     env:
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+      # On every command, so they share one analysis cache; they only change ProGuard and the installer. Shrink
+      # only: the keep rules and ServiceLoader providers don't depend on ProGuard's optimizer, which takes most of
+      # its time (release builds optimize). The installer bundles the native mm, as release.yml's does.
+      BAZEL_FLAGS: --define=proguard_optimize=false --define=bundle_native_cli=true
 
     steps:
       - name: Checkout code
@@ -88,18 +92,37 @@ jobs:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
           cache-name: linux
 
-      # Also the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`, manual so local builds skip
-      # them), linked here for Native Tests to run on their own runners.
-      - name: Build
-        run: bazel build //... $(bazel query 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') 2>&1 | tee build.log
+      # jpackage's deb needs fakeroot; the installer smoke test's display is Xvfb.
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y fakeroot xvfb
 
+      # Also the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`, manual so local builds skip
+      # them), linked here for Native Tests to run on their own runners, and the Linux desktop installer.
+      - name: Build
+        run: >-
+          bazel build $BAZEL_FLAGS //... //app/main/jvm:installer
+          $(bazel query 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') 2>&1 | tee build.log
+
+      # Also the desktop ProGuard check: `//...` never runs ProGuard (its targets are manual), so a new dependency
+      # that needs keep/dontwarn rules would otherwise surface only when release.yml ran. It shrinks the desktop
+      # app and checks every ServiceLoader provider survived.
       - name: Test
-        run: bazel test //... 2>&1 | tee test.log
+        run: bazel test $BAZEL_FLAGS //... //app/main/jvm:release_service_providers_test 2>&1 | tee test.log
+
+      - name: Install and start the desktop installer
+        run: bazel/kmp/jpackage/install_smoke_test.sh bazel-bin/app/main/jvm/installer "$(cat VERSION)"
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: installer-Linux
+          path: bazel-bin/app/main/jvm/installer/*
+          retention-days: 7
 
       - name: Collect native test binaries
         run: |
           for target in linuxArm64 mingwX64; do
-            for binary in $(bazel cquery --output=files "attr(name, \"_${target}_cross\$\", //...)"); do
+            for binary in $(bazel cquery $BAZEL_FLAGS --output=files "attr(name, \"_${target}_cross\$\", //...)"); do
               dir="native-tests/$target/$(dirname "${binary#bazel-out/*/bin/}")"
               mkdir -p "$dir" && cp "$binary" "$dir/"
             done
@@ -398,42 +421,9 @@ jobs:
             bazel-testlogs/**/test.xml
           retention-days: 7
 
-  desktop-proguard:
-    name: Desktop ProGuard
-    runs-on: ubuntu-latest
-    needs: changes
-    # `bazel build //...` never runs ProGuard (its targets are manual), so a new dependency that needs
-    # keep/dontwarn rules would surface only when release.yml ran. This shrinks the desktop app and checks
-    # every ServiceLoader provider survived, in parallel with the main build.
-    if: >-
-      needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
-       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
-    env:
-      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
-      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false  # read-only job, no git push
-
-      - name: Set up Bazel
-        uses: ./.github/actions/bazel-setup
-        with:
-          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          cache-name: proguard
-          android-sdk: 'false'
-
-      # Shrink only: the keep rules and ServiceLoader providers don't depend on the optimizer, which takes most
-      # of ProGuard's time. Release builds still optimize.
-      - name: Run ProGuard
-        run: bazel test --define=proguard_optimize=false //app/main/jvm:release_service_providers_test
-
-  # jpackage packages only for its host, so each OS builds its own installer (#1020): a deb, dmg or msi with the
-  # native mm bundled, as release.yml builds them. Then it installs it and starts the app, mm-jvm and mm.
-  # ProGuard's optimizer is off, as in the Desktop ProGuard check.
+  # jpackage packages only for its host, so each OS builds its own installer (#1020): a dmg or msi here (Build and
+  # Test builds the deb) with the native mm bundled, as release.yml builds them. Then it installs it and starts the
+  # app, mm-jvm and mm. ProGuard's optimizer is off, as in Build and Test's ProGuard check.
   desktop-installer:
     name: Desktop Installer (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
@@ -446,9 +436,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Linux
-            os: ubuntu-latest
-            config: rbe
           - name: macOS
             os: macos-latest
             config: cache
@@ -472,11 +459,6 @@ jobs:
           config: ${{ matrix.config }}
           cache-name: installer-${{ matrix.name }}
           android-sdk: 'false'
-
-      # jpackage's deb needs fakeroot; the smoke test's display is Xvfb.
-      - name: Install packaging tools
-        if: matrix.name == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y fakeroot xvfb
 
       - name: Build the installer
         run: >-

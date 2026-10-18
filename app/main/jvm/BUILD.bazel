@@ -59,7 +59,7 @@ java_binary(
 )
 
 # Compose's proguardReleaseJars: not part of `bazel build //...`, as it isn't of Gradle's `build`.
-# `--define=proguard_optimize=false` skips the optimizer, as CI's ProGuard check does.
+# `--define=proguard_optimize=false` skips the optimizer, as CI's Build and Test does.
 proguard_jars(
     name = "release_jars",
     # sqlite-jdbc carries its JNI library for ~24 OS/CPU pairs; the app only ever runs on its own.
