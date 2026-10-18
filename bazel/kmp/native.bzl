@@ -192,25 +192,33 @@ kt_native_test_binary = rule(
     toolchains = [TOOLCHAIN_TYPE],
 )
 
-def _linux_arm64_transition_impl(_settings, _attr):
-    return {"//command_line_option:platforms": [str(Label("//bazel/platforms:linux_arm64"))]}
+# The platform a cross-linked test binary is built for, per target that every host can link (BUILDS_ON).
+CROSS_PLATFORMS = {
+    "linuxArm64": Label("//bazel/platforms:linux_arm64"),
+    "mingwX64": Label("//bazel/platforms:windows_x64"),
+}
 
-_linux_arm64_transition = transition(
-    implementation = _linux_arm64_transition_impl,
+def _cross_transition_impl(_settings, attr):
+    return {"//command_line_option:platforms": [str(attr.platform)]}
+
+_cross_transition = transition(
+    implementation = _cross_transition_impl,
     inputs = [],
     outputs = ["//command_line_option:platforms"],
 )
 
-def _linux_arm64_cross_impl(ctx):
+def _cross_impl(ctx):
     return [DefaultInfo(files = depset(ctx.files.binary))]
 
-# Kotlin/Native has no Linux arm64 host, so CI links these on x64 in its one `bazel build` and runs them on an
-# arm64 runner; the transition saves that build a second invocation with `--platforms`.
-kt_native_linux_arm64_cross = rule(
-    implementation = _linux_arm64_cross_impl,
-    doc = "A linuxArm64 test binary, built for Linux arm64 from whatever platform the build targets.",
+# Kotlin/Native has no Linux arm64 host, and a Windows runner is slow to build on, so CI links these on Linux x64
+# in its one `bazel build` and runs them on a runner of their own; the transition saves that build a second
+# invocation with `--platforms`.
+kt_native_cross_test_binary = rule(
+    implementation = _cross_impl,
+    doc = "A test binary built for `platform` from whatever platform the build targets.",
     attrs = {
-        "binary": attr.label(mandatory = True, cfg = _linux_arm64_transition),
+        "binary": attr.label(mandatory = True, cfg = _cross_transition),
+        "platform": attr.label(mandatory = True),
     },
 )
 

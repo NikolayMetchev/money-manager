@@ -88,28 +88,37 @@ jobs:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
           cache-name: linux
 
-      # Also the linuxArm64 test binaries (`:<name>_linuxArm64_cross`, manual so local builds skip them), linked
-      # here for Native Tests (linuxArm64) to run.
+      # Also the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`, manual so local builds skip
+      # them), linked here for Native Tests to run on their own runners.
       - name: Build
-        run: bazel build //... $(bazel query 'attr(name, "_linuxArm64_cross$", //...)') 2>&1 | tee build.log
+        run: bazel build //... $(bazel query 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') 2>&1 | tee build.log
 
       - name: Test
         run: bazel test //... 2>&1 | tee test.log
 
-      - name: Collect linuxArm64 test binaries
+      - name: Collect native test binaries
         run: |
-          mkdir -p linux-arm64-tests
-          for binary in $(bazel cquery --output=files 'attr(name, "_linuxArm64_cross$", //...)'); do
-            dir="linux-arm64-tests/$(dirname "${binary#bazel-out/*/bin/}")"
-            mkdir -p "$dir" && cp "$binary" "$dir/"
+          for target in linuxArm64 mingwX64; do
+            for binary in $(bazel cquery --output=files "attr(name, \"_${target}_cross\$\", //...)"); do
+              dir="native-tests/$target/$(dirname "${binary#bazel-out/*/bin/}")"
+              mkdir -p "$dir" && cp "$binary" "$dir/"
+            done
           done
-          find linux-arm64-tests -name '*.kexe' | sort
+          find native-tests -type f | sort
 
       - name: Upload linuxArm64 test binaries
         uses: actions/upload-artifact@v7
         with:
-          name: linux-arm64-test-binaries
-          path: linux-arm64-tests
+          name: linuxArm64-test-binaries
+          path: native-tests/linuxArm64
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload mingwX64 test binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: mingwX64-test-binaries
+          path: native-tests/mingwX64
           if-no-files-found: error
           retention-days: 1
 
@@ -182,12 +191,23 @@ jobs:
           fail_ci_if_error: false
 
   # Kotlin/Native: each target's common tests run natively on a host of that platform. linuxX64's run in the
-  # Build and Test job. There is no Kotlin/Native compiler for Linux arm64 hosts, so Build and Test's build
-  # cross-links linuxArm64's test binaries, and this job runs them on an arm64 runner.
-  native-linux-arm64:
-    name: Native Tests (linuxArm64)
-    runs-on: ubuntu-26.04-arm
+  # Build and Test job, which also cross-links linuxArm64's (there is no Kotlin/Native compiler for Linux arm64
+  # hosts) and mingwX64's (a Windows runner builds far slower than BuildBuddy); these jobs only run them.
+  native-cross:
+    name: Native Tests (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
     needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linuxArm64
+            os: ubuntu-26.04-arm
+          - target: mingwX64
+            os: windows-latest
+    defaults:
+      run:
+        shell: bash
 
     steps:
       # Some tests read files from the tree at run time, from the workspace root (the runfiles' working directory).
@@ -196,14 +216,13 @@ jobs:
         with:
           persist-credentials: false  # read-only job, no git push
 
-      - name: Download linuxArm64 test binaries
+      - name: Download test binaries
         uses: actions/download-artifact@v8
         with:
-          name: linux-arm64-test-binaries
-          path: ${{ runner.temp }}/linux-arm64-tests
+          name: ${{ matrix.target }}-test-binaries
+          path: ${{ runner.temp }}/native-tests
 
       - name: Run test binaries
-        shell: bash
         run: |
           status=0
           while IFS= read -r -d '' binary; do
@@ -211,11 +230,11 @@ jobs:
             chmod +x "$binary"
             "$binary" || status=1
             echo "::endgroup::"
-          done < <(find "$RUNNER_TEMP/linux-arm64-tests" -name '*.kexe' -print0)
+          done < <(find "$RUNNER_TEMP/native-tests" -type f \( -name '*.kexe' -o -name '*.exe' \) -print0)
           exit $status
 
-  # macOS and Windows: every compile their host builds (macosArm64 only builds on a Mac), the host's `mm`, and the
-  # host's native tests. The JVM tests ran on Linux.
+  # macOS: every compile a Mac builds (macosArm64 only builds there: it needs Xcode), its `mm`, and its native
+  # tests. The JVM tests ran on Linux.
   native-macos:
     name: Native Tests (macosArm64)
     runs-on: macos-latest
@@ -252,43 +271,6 @@ jobs:
         uses: ./.github/actions/bazel-summary
         with:
           title: macOS
-
-  native-windows:
-    name: Native Tests (mingwX64)
-    runs-on: windows-latest
-    needs: changes
-    if: >-
-      needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
-       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false  # read-only job, no git push
-
-      - name: Set up Bazel
-        uses: ./.github/actions/bazel-setup
-        with:
-          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          config: cache
-          cache-name: windows
-
-      - name: Build
-        run: bazel build //... 2>&1 | tee build.log
-
-      - name: Test
-        run: bazel test $(bazel query 'attr(name, "_mingwX64$", tests(//...))') 2>&1 | tee test.log
-
-      - name: Build results
-        if: always()
-        uses: ./.github/actions/bazel-summary
-        with:
-          title: Windows
 
   # The device tests (#1024): kmp_test's `:<name>_device` targets and the release smoke test, run through adb on
   # an emulator. They're `manual`, so `bazel test //...` leaves them out; this job runs everything tagged

@@ -81,8 +81,9 @@ Flags and configs:
   the keep rules, and the optimizer is most of ProGuard's ~15 minutes); CI's Desktop ProGuard check passes it.
 - `--define=bundle_native_cli=true` puts the host's native `mm` into the desktop installer
   (`//app/main/jvm:installer`: a deb, dmg or msi on its own OS only).
-- `:<name>_linuxArm64_cross` (manual) is a module's linuxArm64 test binary built for Linux arm64 by a transition, so an x64
-  host cross-links it in an ordinary build; CI's Build and Test adds them to its `bazel build //...`.
+- `:<name>_linuxArm64_cross` and `:<name>_mingwX64_cross` (manual) are a module's test binary built for Linux arm64 or
+  Windows by a transition, so any host cross-links them in an ordinary build; CI's Build and Test adds them to its
+  `bazel build //...`.
 
 Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer`, and `//app/main/cli:mm-linux-x64`,
 `:mm-linux-arm64`, `:mm-windows-x64`, `:mm-macos-arm64` (the Apple one only on macOS). The release smoke test,
@@ -91,8 +92,9 @@ Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer
 Release Smoke Test" workflow (dispatch it on main or a PR branch). Cut a release by pushing a `v*` tag.
 
 **CI**: every workflow sets Bazel up through `.github/actions/bazel-setup`. `build.yml`'s Build and Test is
-`bazel build //...` and `bazel test //...` on Linux (RBE); Native Tests run macOS and Windows (on their own runners,
-with the cache) and linuxArm64 (cross-linked, run on an arm64 runner); Coverage, Android Instrumented Tests (an API 36
+`bazel build //...` (plus the cross-linked linuxArm64 and mingwX64 test binaries) and `bazel test //...` on Linux
+(RBE); Native Tests run those binaries on an arm64 and a Windows runner, and build and test macOS on its own runner
+(with the cache); Coverage, Android Instrumented Tests (an API 36
 emulator), Desktop ProGuard and Desktop Installer (each OS: installs it and starts the app, `mm-jvm` and `mm`) are
 their own jobs. Auto-format PR runs `//:format` on every PR and pushes the fixes, so a stale BUILD file is regenerated,
 not reported. Dependency submission reads the lockfiles (`bazel/kmp/deps/dependency_snapshot.py`), and

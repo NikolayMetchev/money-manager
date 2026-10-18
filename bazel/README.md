@@ -180,8 +180,9 @@ dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2, libffi), a
 `@kotlin_native` with konan's data dir inside it. Rules call konan through `run_konan` (`toolchain.bzl`), which
 passes `airplaneMode=true`, so nothing is fetched at build time. One toolchain per exec host carries every target it
 builds (Linux and Windows hosts: linuxX64, linuxArm64, mingwX64; macOS adds macosArm64), picked by name rather than
-by platform, which is how a Linux x64 host cross-links for `//bazel/platforms:linux_arm64`: `kmp_test`'s `:<name>_linuxArm64_cross`
-(manual) transitions its linuxArm64 test binary to that platform, so CI links them in its one `bazel build`.
+by platform, which is how a Linux x64 host cross-links for `//bazel/platforms:linux_arm64`: `kmp_test`'s `:<name>_<target>_cross`
+(manual, for linuxArm64 and mingwX64: `CROSS_PLATFORMS`) transitions that target's test binary to its platform, so CI
+links them in its one `bazel build` and only runs them on an arm64 and a Windows runner.
 
 `kmp_native_executable` links the release binary per target (`-opt`, the module's klib `-Xinclude`d, no compiler
 caches: Clikt's two klibs both define a private `Context.selfAndAncestors()`) as `:<name>_<target>`, all `manual`;
