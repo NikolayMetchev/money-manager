@@ -1,0 +1,28 @@
+# Compiles and runs against every library maven_kmp resolves, on the JVM and natively (#1000).
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "libraries",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = ["linuxX64"],
+    deps = [
+        "@maven_kmp//:bignum",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_datetime",
+        "@maven_kmp//:kotlinx_io_core",
+        "@maven_kmp//:kotlinx_serialization_core",
+        "@maven_kmp//:sqldelight_runtime",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":libraries",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = ["linuxX64"],
+    deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+    ],
+)

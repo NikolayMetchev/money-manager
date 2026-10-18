@@ -175,20 +175,20 @@ kt_native_test_binary = rule(
 def _import_impl(ctx):
     deps = [d[KlibInfo].transitive_klibs for d in ctx.attr.deps]
     return [
-        DefaultInfo(files = depset([ctx.file.klib])),
+        DefaultInfo(files = depset(ctx.files.klibs)),
         KlibInfo(
-            klib = ctx.file.klib,
+            klib = ctx.files.klibs[0],
             target = KONAN_TARGETS[ctx.attr.target],
-            transitive_klibs = depset([ctx.file.klib], transitive = deps),
+            transitive_klibs = depset(ctx.files.klibs, transitive = deps),
         ),
     ]
 
 kt_native_import = rule(
     implementation = _import_impl,
-    doc = "A prebuilt klib (a Maven library's native variant).",
+    doc = "A prebuilt library: a Maven library's native variant, one klib plus any cinterop klibs it ships.",
     attrs = {
         "deps": attr.label_list(providers = [KlibInfo]),
-        "klib": attr.label(mandatory = True, allow_single_file = [".klib"]),
+        "klibs": attr.label_list(mandatory = True, allow_files = [".klib"]),
         "target": attr.string(mandatory = True, values = KONAN_TARGETS.keys()),
     },
     provides = [KlibInfo],

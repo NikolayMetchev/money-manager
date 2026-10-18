@@ -1,0 +1,666 @@
+{
+  "version": 1,
+  "inputs": {
+    "libraries": {
+      "bignum": "com.ionspin.kotlin:bignum:0.3.10",
+      "junit": "junit:junit:4.13.2",
+      "kotlinx-coroutines-core": "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0",
+      "kotlinx-coroutines-test": "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0",
+      "kotlinx-datetime": "org.jetbrains.kotlinx:kotlinx-datetime:0.8.0",
+      "kotlinx-io-core": "org.jetbrains.kotlinx:kotlinx-io-core:0.9.1",
+      "kotlinx-serialization-core": "org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0",
+      "sqldelight-runtime": "app.cash.sqldelight:runtime:2.4.1"
+    },
+    "forces": {
+      "androidx.activity:activity": "1.13.0",
+      "androidx.annotation:annotation": "1.9.1",
+      "androidx.annotation:annotation-jvm": "1.9.1",
+      "androidx.collection:collection": "1.5.0",
+      "androidx.concurrent:concurrent-futures": "1.2.0",
+      "androidx.lifecycle:lifecycle-common": "2.10.0",
+      "androidx.lifecycle:lifecycle-common-jvm": "2.10.0",
+      "androidx.lifecycle:lifecycle-runtime": "2.10.0",
+      "androidx.lifecycle:lifecycle-runtime-android": "2.10.0",
+      "androidx.lifecycle:lifecycle-runtime-compose": "2.10.0",
+      "androidx.lifecycle:lifecycle-runtime-compose-android": "2.10.0",
+      "androidx.lifecycle:lifecycle-runtime-ktx": "2.10.0",
+      "androidx.lifecycle:lifecycle-runtime-ktx-android": "2.10.0",
+      "androidx.navigationevent:navigationevent": "1.1.2",
+      "androidx.navigationevent:navigationevent-compose": "1.1.2",
+      "androidx.savedstate:savedstate": "1.5.0",
+      "androidx.savedstate:savedstate-compose": "1.5.0",
+      "androidx.test.services:storage": "1.6.0",
+      "androidx.test:runner": "1.7.0",
+      "androidx.tracing:tracing": "1.2.0",
+      "org.jetbrains.kotlinx:atomicfu": "0.33.0",
+      "org.jetbrains.kotlinx:atomicfu-jvm": "0.33.0",
+      "org.jetbrains.kotlinx:kotlinx-coroutines-android": "1.11.0",
+      "org.jetbrains.kotlinx:kotlinx-coroutines-bom": "1.11.0",
+      "org.jetbrains.kotlinx:kotlinx-coroutines-core": "1.11.0",
+      "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": "1.11.0",
+      "org.jetbrains.kotlinx:kotlinx-serialization-bom": "1.11.0",
+      "org.jetbrains.kotlinx:kotlinx-serialization-core": "1.11.0",
+      "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm": "1.11.0",
+      "org.jetbrains.kotlinx:kotlinx-serialization-json": "1.11.0",
+      "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": "1.11.0",
+      "org.jetbrains:annotations": "23.0.0",
+      "org.slf4j:slf4j-api": "2.0.20"
+    },
+    "platforms": [
+      "jvm",
+      "linuxArm64",
+      "linuxX64",
+      "macosArm64",
+      "mingwX64"
+    ]
+  },
+  "names": {
+    "app.cash.sqldelight:runtime": "sqldelight_runtime",
+    "com.ionspin.kotlin:bignum": "bignum",
+    "junit:junit": "junit",
+    "org.hamcrest:hamcrest-core": "org_hamcrest_hamcrest_core",
+    "org.jetbrains.kotlinx:atomicfu": "org_jetbrains_kotlinx_atomicfu",
+    "org.jetbrains.kotlinx:kotlinx-coroutines-core": "kotlinx_coroutines_core",
+    "org.jetbrains.kotlinx:kotlinx-coroutines-test": "kotlinx_coroutines_test",
+    "org.jetbrains.kotlinx:kotlinx-datetime": "kotlinx_datetime",
+    "org.jetbrains.kotlinx:kotlinx-io-bytestring": "org_jetbrains_kotlinx_kotlinx_io_bytestring",
+    "org.jetbrains.kotlinx:kotlinx-io-core": "kotlinx_io_core",
+    "org.jetbrains.kotlinx:kotlinx-serialization-core": "kotlinx_serialization_core",
+    "org.jetbrains:annotations": "org_jetbrains_annotations"
+  },
+  "skipped": {
+    "linuxArm64": [
+      "junit:junit"
+    ],
+    "linuxX64": [
+      "junit:junit"
+    ],
+    "macosArm64": [
+      "junit:junit"
+    ],
+    "mingwX64": [
+      "junit:junit"
+    ]
+  },
+  "artifacts": {
+    "app.cash.sqldelight:runtime": {
+      "jvm": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "runtime-jvm-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/runtime-jvm/2.4.1/runtime-jvm-2.4.1.jar",
+            "sha256": "9b01bc44676db299fd22440f3261569f6d8659bfbd3bd4da374ee38cbd4ab4b6"
+          }
+        ]
+      },
+      "linuxArm64": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "runtime-linuxArm64Main-2.4.1.klib",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/runtime-linuxarm64/2.4.1/runtime-linuxarm64-2.4.1.klib",
+            "sha256": "4d70c0c6522482336a030018c1858e8e3bf537851c0efe7fb44756da48476b3f"
+          }
+        ]
+      },
+      "linuxX64": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "runtime-linuxX64Main-2.4.1.klib",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/runtime-linuxx64/2.4.1/runtime-linuxx64-2.4.1.klib",
+            "sha256": "ac55e73cbcb5659cbd88f409664387755056a01cba66f2e4a6cbf7ff8da9ee59"
+          }
+        ]
+      },
+      "macosArm64": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "runtime-macosArm64Main-2.4.1.klib",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/runtime-macosarm64/2.4.1/runtime-macosarm64-2.4.1.klib",
+            "sha256": "38db73ca871fc97495b41361620bd9221ea6488e349191093010b054cba1aba5"
+          }
+        ]
+      },
+      "mingwX64": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "runtime-mingwX64Main-2.4.1.klib",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/runtime-mingwx64/2.4.1/runtime-mingwx64-2.4.1.klib",
+            "sha256": "7a57d9929f04f4343608934f684cc7aef83e8e5ed41bec73ec864a0ab253babd"
+          }
+        ]
+      }
+    },
+    "com.ionspin.kotlin:bignum": {
+      "jvm": {
+        "version": "0.3.10",
+        "files": [
+          {
+            "name": "bignum-jvm-0.3.10.jar",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-jvm/0.3.10/bignum-jvm-0.3.10.jar",
+            "sha256": "c5c718466ef822290ed6ea2013dee788c468a993fa53f34d0e07acc8d6ef087d"
+          }
+        ]
+      },
+      "linuxArm64": {
+        "version": "0.3.10",
+        "files": [
+          {
+            "name": "bignum.klib",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-linuxarm64/0.3.10/bignum-linuxarm64-0.3.10.klib",
+            "sha256": "f4d114276ae6f98538980dc1b9221e52acce428b38dfa5205b35e6592e4e71da"
+          }
+        ]
+      },
+      "linuxX64": {
+        "version": "0.3.10",
+        "files": [
+          {
+            "name": "bignum.klib",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-linuxx64/0.3.10/bignum-linuxx64-0.3.10.klib",
+            "sha256": "c2bbdde1370838ae12fa806317826b2ac65d181f29189af7226fc3377dbaf1eb"
+          }
+        ]
+      },
+      "macosArm64": {
+        "version": "0.3.10",
+        "files": [
+          {
+            "name": "bignum.klib",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-macosarm64/0.3.10/bignum-macosarm64-0.3.10.klib",
+            "sha256": "5bf92670ac38b3fc53e91a75ce4c8f1745e109630573d42196fe784ee585bb0b"
+          }
+        ]
+      },
+      "mingwX64": {
+        "version": "0.3.10",
+        "files": [
+          {
+            "name": "bignum.klib",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-mingwx64/0.3.10/bignum-mingwx64-0.3.10.klib",
+            "sha256": "c4e5cfe254f7246af325b46ae17c0a5e03edbc6b9fb318a42f3d6b011dfae649"
+          }
+        ]
+      }
+    },
+    "junit:junit": {
+      "jvm": {
+        "version": "4.13.2",
+        "files": [
+          {
+            "name": "junit-4.13.2.jar",
+            "url": "https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar",
+            "sha256": "8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3"
+          }
+        ],
+        "deps": [
+          "org.hamcrest:hamcrest-core"
+        ]
+      }
+    },
+    "org.hamcrest:hamcrest-core": {
+      "jvm": {
+        "version": "1.3",
+        "files": [
+          {
+            "name": "hamcrest-core-1.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar",
+            "sha256": "66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9"
+          }
+        ]
+      }
+    },
+    "org.jetbrains.kotlinx:atomicfu": {
+      "linuxArm64": {
+        "version": "0.33.0",
+        "files": [
+          {
+            "name": "atomicfu-linuxArm64Main-0.33.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu-linuxarm64/0.33.0/atomicfu-linuxarm64-0.33.0.klib",
+            "sha256": "452177ab4f88d6b8a713d3edbc893a8b4894615663584d4e6969d568ec1a647e"
+          },
+          {
+            "name": "atomicfu-linuxArm64Cinterop-interopMain-0.33.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu-linuxarm64/0.33.0/atomicfu-linuxarm64-0.33.0-cinterop-interop.klib",
+            "sha256": "3fd3f6394edbdd3a04bd282e06b21d0751d3ea24cd2e2177b73d8c9ca98d218b"
+          }
+        ]
+      },
+      "linuxX64": {
+        "version": "0.33.0",
+        "files": [
+          {
+            "name": "atomicfu-linuxX64Main-0.33.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu-linuxx64/0.33.0/atomicfu-linuxx64-0.33.0.klib",
+            "sha256": "6e5916a1d492f14ed257c7f4977c94179a141e00da67c08ff492b058848044be"
+          },
+          {
+            "name": "atomicfu-linuxX64Cinterop-interopMain-0.33.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu-linuxx64/0.33.0/atomicfu-linuxx64-0.33.0-cinterop-interop.klib",
+            "sha256": "69a60e899f17d3ec9f2b734199e74e54cda2d1ceea28d918608830bc6c3916c8"
+          }
+        ]
+      },
+      "macosArm64": {
+        "version": "0.33.0",
+        "files": [
+          {
+            "name": "atomicfu-macosArm64Main-0.33.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu-macosarm64/0.33.0/atomicfu-macosarm64-0.33.0.klib",
+            "sha256": "ff7abc4b4625ea3819e2ed888d85670d9c6a7b57992ba5752a02337b206e9f49"
+          },
+          {
+            "name": "atomicfu-macosArm64Cinterop-interopMain-0.33.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu-macosarm64/0.33.0/atomicfu-macosarm64-0.33.0-cinterop-interop.klib",
+            "sha256": "6c7fadcd957fa614cccafff42e9833ed17e8506be119a6ab262f87bbc402c9a4"
+          }
+        ]
+      },
+      "mingwX64": {
+        "version": "0.33.0",
+        "files": [
+          {
+            "name": "atomicfu-mingwX64Main-0.33.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu-mingwx64/0.33.0/atomicfu-mingwx64-0.33.0.klib",
+            "sha256": "2da01aea1739aaf5072e581c0156fa9debb5d40409223c34af87c3be2df58291"
+          },
+          {
+            "name": "atomicfu-mingwX64Cinterop-interopMain-0.33.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu-mingwx64/0.33.0/atomicfu-mingwx64-0.33.0-cinterop-interop.klib",
+            "sha256": "76b6852a6f0085fdc6c8fcddec3665cbfe042e994f371f95d3c583190ba493b8"
+          }
+        ]
+      }
+    },
+    "org.jetbrains.kotlinx:kotlinx-coroutines-core": {
+      "jvm": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-jvm-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0.jar",
+            "sha256": "d1d75aa01dffbb4d1c520e67e4c4e7f5f6174718e7cb4632412503f2f0e604fa"
+          }
+        ],
+        "deps": [
+          "org.jetbrains:annotations"
+        ]
+      },
+      "linuxArm64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-linuxArm64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-linuxarm64/1.11.0/kotlinx-coroutines-core-linuxarm64-1.11.0.klib",
+            "sha256": "8672f07a82877c8a5f8134fd3dd424ef41d4d868f90d63624a9f245c88dc41a2"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu"
+        ]
+      },
+      "linuxX64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-linuxX64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-linuxx64/1.11.0/kotlinx-coroutines-core-linuxx64-1.11.0.klib",
+            "sha256": "730dfd3def8b19ec7f03b77c6f227fd205c19b638c7988b9cba9292dda830784"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu"
+        ]
+      },
+      "macosArm64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-macosArm64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-macosarm64/1.11.0/kotlinx-coroutines-core-macosarm64-1.11.0.klib",
+            "sha256": "782a837c8593af70135378fb90b999cf0cb9880dc746619f64d6c5c224d014d0"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu"
+        ]
+      },
+      "mingwX64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-mingwX64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-mingwx64/1.11.0/kotlinx-coroutines-core-mingwx64-1.11.0.klib",
+            "sha256": "371cff91d0dd0cd2dccacaa53468554276b85f64fad1c0f607ef2d7af55548dd"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu"
+        ]
+      }
+    },
+    "org.jetbrains.kotlinx:kotlinx-coroutines-test": {
+      "jvm": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-test-jvm-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-test-jvm/1.11.0/kotlinx-coroutines-test-jvm-1.11.0.jar",
+            "sha256": "d4f7ee71da708af4719dceb6d3200c8f9dc5146ea1a812cb628ed53c64196f96"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains:annotations"
+        ]
+      },
+      "linuxArm64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-test-linuxArm64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-test-linuxarm64/1.11.0/kotlinx-coroutines-test-linuxarm64-1.11.0.klib",
+            "sha256": "332df9e65503eb426117d6cf3ccd79c8efb4b2c890e818dac805cd1a813aeea7"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "linuxX64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-test-linuxX64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-test-linuxx64/1.11.0/kotlinx-coroutines-test-linuxx64-1.11.0.klib",
+            "sha256": "261996f5b46775393207e49f7b2c9d02d8f148a3fabcc9c170d3f78519739013"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "macosArm64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-test-macosArm64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-test-macosarm64/1.11.0/kotlinx-coroutines-test-macosarm64-1.11.0.klib",
+            "sha256": "1e9602d5d7750e1bcde2480494c9ae65a3d1d19f966eb755731db9b359cc9039"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "mingwX64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-test-mingwX64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-test-mingwx64/1.11.0/kotlinx-coroutines-test-mingwx64-1.11.0.klib",
+            "sha256": "977e1798bee81a508764538ab4c277b6815ac38066112e35ce456681f34580f2"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "org.jetbrains.kotlinx:kotlinx-datetime": {
+      "jvm": {
+        "version": "0.8.0",
+        "files": [
+          {
+            "name": "kotlinx-datetime-jvm-0.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-datetime-jvm/0.8.0/kotlinx-datetime-jvm-0.8.0.jar",
+            "sha256": "ee44b51f8977c2f51d575299a4fc6782ab3700eba4cfc7fad548cced1543936a"
+          }
+        ]
+      },
+      "linuxArm64": {
+        "version": "0.8.0",
+        "files": [
+          {
+            "name": "kotlinx-datetime-linuxArm64Main-0.8.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-datetime-linuxarm64/0.8.0/kotlinx-datetime-linuxarm64-0.8.0.klib",
+            "sha256": "9364f5a56ef06710ca44804260bb9b767c71ff29cd6cfcdf99d466669300debd"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "linuxX64": {
+        "version": "0.8.0",
+        "files": [
+          {
+            "name": "kotlinx-datetime-linuxX64Main-0.8.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-datetime-linuxx64/0.8.0/kotlinx-datetime-linuxx64-0.8.0.klib",
+            "sha256": "90dfd71cf7e193103731f6094d75db8b93674d48b0ee037872177ebbdc994d65"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "macosArm64": {
+        "version": "0.8.0",
+        "files": [
+          {
+            "name": "kotlinx-datetime-macosArm64Main-0.8.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-datetime-macosarm64/0.8.0/kotlinx-datetime-macosarm64-0.8.0.klib",
+            "sha256": "175a07fd9150e167722ddd371e9eedd07411f9d40d884ddf12291d9477a23938"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "mingwX64": {
+        "version": "0.8.0",
+        "files": [
+          {
+            "name": "kotlinx-datetime-mingwX64Main-0.8.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-datetime-mingwx64/0.8.0/kotlinx-datetime-mingwx64-0.8.0.klib",
+            "sha256": "fe4dd80745cefac967f7e4e62ebd7bb7be1939d80d401c652b21da18d10d2f2d"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      }
+    },
+    "org.jetbrains.kotlinx:kotlinx-io-bytestring": {
+      "jvm": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-bytestring-jvm-0.9.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-jvm/0.9.1/kotlinx-io-bytestring-jvm-0.9.1.jar",
+            "sha256": "8589de0b7c476bfdd02a24641685f609ade72f5e595cf2909c168acdba7e6ba4"
+          }
+        ]
+      },
+      "linuxArm64": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-bytestring-linuxArm64Main-0.9.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-linuxarm64/0.9.1/kotlinx-io-bytestring-linuxarm64-0.9.1.klib",
+            "sha256": "58779d02861eece9e2f55cd5c1e008e7c71f9c26c3f2df26a8a180253d3bc070"
+          }
+        ]
+      },
+      "linuxX64": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-bytestring-linuxX64Main-0.9.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-linuxx64/0.9.1/kotlinx-io-bytestring-linuxx64-0.9.1.klib",
+            "sha256": "166494f0fe3c1a94e4e4cb981a6721c10e2ba900320e915b54b87f8ffadfe496"
+          }
+        ]
+      },
+      "macosArm64": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-bytestring-macosArm64Main-0.9.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-macosarm64/0.9.1/kotlinx-io-bytestring-macosarm64-0.9.1.klib",
+            "sha256": "b20ec12601f9bd20c346be668b5d0429fa960f22782b73955891273913c6db04"
+          }
+        ]
+      },
+      "mingwX64": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-bytestring-mingwX64Main-0.9.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-mingwx64/0.9.1/kotlinx-io-bytestring-mingwx64-0.9.1.klib",
+            "sha256": "396151414a8b90c46dfd6e4c4d6e8179f4e59007eb5c4a788fad5c6c2951ba3f"
+          }
+        ]
+      }
+    },
+    "org.jetbrains.kotlinx:kotlinx-io-core": {
+      "jvm": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-core-jvm-0.9.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-jvm/0.9.1/kotlinx-io-core-jvm-0.9.1.jar",
+            "sha256": "765d8851d8ca694706931331b92386844800867e041b720f1f193dbda874d370"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-bytestring"
+        ]
+      },
+      "linuxArm64": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-core-linuxArm64Main-0.9.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-linuxarm64/0.9.1/kotlinx-io-core-linuxarm64-0.9.1.klib",
+            "sha256": "91d0d3c066973ba5bd4746f7382d9bb81aeece14a71eacf151f35b7f65818f58"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-bytestring"
+        ]
+      },
+      "linuxX64": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-core-linuxX64Main-0.9.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-linuxx64/0.9.1/kotlinx-io-core-linuxx64-0.9.1.klib",
+            "sha256": "436a22a2528b0e66f4d2becfca32d37aa35e2b16c1131f94912ffd16c1b049c7"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-bytestring"
+        ]
+      },
+      "macosArm64": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-core-macosArm64Main-0.9.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-macosarm64/0.9.1/kotlinx-io-core-macosarm64-0.9.1.klib",
+            "sha256": "8af9ce3402b639aebcb029539cc7b71e2bada133e46c0f3be8793570223978bd"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-bytestring"
+        ]
+      },
+      "mingwX64": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-core-mingwX64Main-0.9.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-mingwx64/0.9.1/kotlinx-io-core-mingwx64-0.9.1.klib",
+            "sha256": "aaafcfcb5c9cf54542a81bd946a470848d07498249d741af8c940fbb38d13e2d"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-bytestring"
+        ]
+      }
+    },
+    "org.jetbrains.kotlinx:kotlinx-serialization-core": {
+      "jvm": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-core-jvm-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.11.0/kotlinx-serialization-core-jvm-1.11.0.jar",
+            "sha256": "f4a801c647d4351327cd9e1ac4113e2be9ea37a64ab0abae269c25a52e28f35d"
+          }
+        ]
+      },
+      "linuxArm64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-core-linuxArm64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-linuxarm64/1.11.0/kotlinx-serialization-core-linuxarm64-1.11.0.klib",
+            "sha256": "37bc0018a8b9710abb5ed1bce661232adcbcc580a7c8493361c57a400f51a09f"
+          }
+        ]
+      },
+      "linuxX64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-core-linuxX64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-linuxx64/1.11.0/kotlinx-serialization-core-linuxx64-1.11.0.klib",
+            "sha256": "c7d13b51077f65108ecca60d027df31f0e59f1c41281b66fc2197798da429d92"
+          }
+        ]
+      },
+      "macosArm64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-core-macosArm64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-macosarm64/1.11.0/kotlinx-serialization-core-macosarm64-1.11.0.klib",
+            "sha256": "551d11833d5611afe63dac02c05dd21611fe5f43d002e014cbe61b380551e3e4"
+          }
+        ]
+      },
+      "mingwX64": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-core-mingwX64Main-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-mingwx64/1.11.0/kotlinx-serialization-core-mingwx64-1.11.0.klib",
+            "sha256": "f28c607d943982c4aed12e893c960f5fdbb58603c28f4f7fdb8e9849ce4bbc97"
+          }
+        ]
+      }
+    },
+    "org.jetbrains:annotations": {
+      "jvm": {
+        "version": "23.0.0",
+        "files": [
+          {
+            "name": "annotations-23.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/23.0.0/annotations-23.0.0.jar",
+            "sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05"
+          }
+        ]
+      }
+    }
+  }
+}
