@@ -19,7 +19,7 @@ JPackageInfo = provider(
     },
 )
 
-def _run(ctx, mode, out, lines, inputs, mnemonic, message, remote = True):
+def _run(ctx, mode, out, lines, inputs, mnemonic, message, host = False):
     params = ctx.actions.declare_file("%s.%s.params" % (ctx.label.name, mode))
     ctx.actions.write(params, "\n".join([mode, out.path] + lines) + "\n")
     ctx.actions.run(
@@ -29,7 +29,7 @@ def _run(ctx, mode, out, lines, inputs, mnemonic, message, remote = True):
         outputs = [out],
         mnemonic = mnemonic,
         progress_message = message,
-        execution_requirements = {} if remote else {"no-remote-exec": "1"},
+        execution_requirements = {"no-remote-exec": "1", "no-sandbox": "1"} if host else {},
     )
 
 def _jlink_impl(ctx):
@@ -173,8 +173,9 @@ def _installer_impl(ctx):
         depset([image] + wix, transitive = [info.inputs]),
         "JPackageInstaller",
         "Packaging the %s installer %%{label}" % ctx.attr.type,
-        # dpkg-deb and fakeroot, hdiutil, WiX: the installer tools are the host's own.
-        remote = False,
+        # dpkg-deb and fakeroot, hdiutil, WiX: the installer tools are the host's own, and they run outside the
+        # sandbox too. In the darwin sandbox, jpackage gets EPERM in the copied .app and hdiutil can't attach.
+        host = True,
     )
     return [DefaultInfo(files = depset([out]))]
 
