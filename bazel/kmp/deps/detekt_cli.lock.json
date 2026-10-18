@@ -1,0 +1,2266 @@
+{
+  "version": 1,
+  "inputs": {
+    "libraries": {
+      "detekt-cli": "dev.detekt:detekt-cli:2.0.0-alpha.6"
+    },
+    "forces": {
+      "ch.qos.logback:logback-classic": "1.6.5",
+      "ch.qos.logback:logback-core": "1.6.5",
+      "com.google.api.grpc:proto-google-common-protos": "2.78.0",
+      "com.google.code.findbugs:jsr305": "3.0.2",
+      "com.google.code.gson:gson": "2.14.0",
+      "com.google.crypto.tink:tink": "1.24.0",
+      "com.google.errorprone:error_prone_annotations": "2.50.0",
+      "com.google.guava:failureaccess": "1.0.3",
+      "com.google.guava:guava": "33.7.2-jre",
+      "com.google.j2objc:j2objc-annotations": "3.1",
+      "com.google.protobuf:protobuf-java": "4.36.2",
+      "com.google.protobuf:protobuf-java-util": "4.36.2",
+      "com.squareup:javawriter": "2.5.1",
+      "com.squareup:kotlinpoet": "2.4.0",
+      "com.squareup:kotlinpoet-jvm": "2.4.0",
+      "commons-io:commons-io": "2.22.0",
+      "dev.drewhamilton.poko:poko-annotations": "0.23.2",
+      "dev.drewhamilton.poko:poko-annotations-jvm": "0.23.2",
+      "io.grpc:grpc-api": "1.85.0",
+      "io.grpc:grpc-context": "1.85.0",
+      "io.grpc:grpc-core": "1.85.0",
+      "io.grpc:grpc-netty": "1.85.0",
+      "io.grpc:grpc-protobuf": "1.85.0",
+      "io.grpc:grpc-protobuf-lite": "1.85.0",
+      "io.grpc:grpc-stub": "1.85.0",
+      "io.netty:netty-buffer": "4.2.19.Final",
+      "io.netty:netty-codec": "4.2.19.Final",
+      "io.netty:netty-codec-http": "4.2.19.Final",
+      "io.netty:netty-codec-http2": "4.2.19.Final",
+      "io.netty:netty-codec-socks": "4.2.19.Final",
+      "io.netty:netty-common": "4.2.19.Final",
+      "io.netty:netty-handler": "4.2.19.Final",
+      "io.netty:netty-handler-proxy": "4.2.19.Final",
+      "io.netty:netty-resolver": "4.2.19.Final",
+      "io.netty:netty-transport": "4.2.19.Final",
+      "io.netty:netty-transport-native-unix-common": "4.2.19.Final",
+      "io.perfmark:perfmark-api": "0.27.0",
+      "org.apache.httpcomponents:httpclient": "4.5.14",
+      "org.checkerframework:checker-qual": "4.3.1",
+      "org.codehaus.mojo:animal-sniffer-annotations": "1.28",
+      "org.ow2.asm:asm": "9.11.1",
+      "org.ow2.asm:asm-analysis": "9.11.1",
+      "org.ow2.asm:asm-commons": "9.11.1",
+      "org.ow2.asm:asm-tree": "9.11.1",
+      "org.ow2.asm:asm-util": "9.11.1"
+    },
+    "platforms": [
+      "jvm"
+    ],
+    "excludes": [],
+    "resolve_stdlib": true
+  },
+  "names": {
+    "com.github.ben-manes.caffeine:caffeine": "com_github_ben_manes_caffeine_caffeine",
+    "com.google.errorprone:error_prone_annotations": "com_google_errorprone_error_prone_annotations",
+    "dev.detekt:detekt-api": "dev_detekt_detekt_api",
+    "dev.detekt:detekt-cli": "detekt_cli",
+    "dev.detekt:detekt-core": "dev_detekt_detekt_core",
+    "dev.detekt:detekt-kotlin-analysis-api": "dev_detekt_detekt_kotlin_analysis_api",
+    "dev.detekt:detekt-kotlin-analysis-api-standalone": "dev_detekt_detekt_kotlin_analysis_api_standalone",
+    "dev.detekt:detekt-metrics": "dev_detekt_detekt_metrics",
+    "dev.detekt:detekt-parser": "dev_detekt_detekt_parser",
+    "dev.detekt:detekt-psi-utils": "dev_detekt_detekt_psi_utils",
+    "dev.detekt:detekt-report-checkstyle": "dev_detekt_detekt_report_checkstyle",
+    "dev.detekt:detekt-report-html": "dev_detekt_detekt_report_html",
+    "dev.detekt:detekt-report-markdown": "dev_detekt_detekt_report_markdown",
+    "dev.detekt:detekt-report-sarif": "dev_detekt_detekt_report_sarif",
+    "dev.detekt:detekt-rules": "dev_detekt_detekt_rules",
+    "dev.detekt:detekt-rules-comments": "dev_detekt_detekt_rules_comments",
+    "dev.detekt:detekt-rules-complexity": "dev_detekt_detekt_rules_complexity",
+    "dev.detekt:detekt-rules-coroutines": "dev_detekt_detekt_rules_coroutines",
+    "dev.detekt:detekt-rules-empty-blocks": "dev_detekt_detekt_rules_empty_blocks",
+    "dev.detekt:detekt-rules-exceptions": "dev_detekt_detekt_rules_exceptions",
+    "dev.detekt:detekt-rules-naming": "dev_detekt_detekt_rules_naming",
+    "dev.detekt:detekt-rules-performance": "dev_detekt_detekt_rules_performance",
+    "dev.detekt:detekt-rules-potential-bugs": "dev_detekt_detekt_rules_potential_bugs",
+    "dev.detekt:detekt-rules-style": "dev_detekt_detekt_rules_style",
+    "dev.detekt:detekt-tooling": "dev_detekt_detekt_tooling",
+    "dev.detekt:detekt-utils": "dev_detekt_detekt_utils",
+    "dev.drewhamilton.poko:poko-annotations": "dev_drewhamilton_poko_poko_annotations",
+    "io.github.detekt.sarif4k:sarif4k": "io_github_detekt_sarif4k_sarif4k",
+    "org.checkerframework:checker-qual": "org_checkerframework_checker_qual",
+    "org.jcommander:jcommander": "org_jcommander_jcommander",
+    "org.jetbrains.intellij.deps.kotlinx:kotlinx-coroutines-core": "org_jetbrains_intellij_deps_kotlinx_kotlinx_coroutines_core",
+    "org.jetbrains.kotlin:kotlin-build-tools-api": "org_jetbrains_kotlin_kotlin_build_tools_api",
+    "org.jetbrains.kotlin:kotlin-compiler": "org_jetbrains_kotlin_kotlin_compiler",
+    "org.jetbrains.kotlin:kotlin-reflect": "org_jetbrains_kotlin_kotlin_reflect",
+    "org.jetbrains.kotlin:kotlin-script-runtime": "org_jetbrains_kotlin_kotlin_script_runtime",
+    "org.jetbrains.kotlin:kotlin-stdlib": "org_jetbrains_kotlin_kotlin_stdlib",
+    "org.jetbrains.kotlin:kotlin-stdlib-jdk7": "org_jetbrains_kotlin_kotlin_stdlib_jdk7",
+    "org.jetbrains.kotlin:kotlin-stdlib-jdk8": "org_jetbrains_kotlin_kotlin_stdlib_jdk8",
+    "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": "org_jetbrains_kotlinx_kotlinx_coroutines_core_jvm",
+    "org.jetbrains.kotlinx:kotlinx-html-jvm": "org_jetbrains_kotlinx_kotlinx_html_jvm",
+    "org.jetbrains.kotlinx:kotlinx-serialization-core": "org_jetbrains_kotlinx_kotlinx_serialization_core",
+    "org.jetbrains.kotlinx:kotlinx-serialization-json": "org_jetbrains_kotlinx_kotlinx_serialization_json",
+    "org.jetbrains:annotations": "org_jetbrains_annotations",
+    "org.snakeyaml:snakeyaml-engine": "org_snakeyaml_snakeyaml_engine"
+  },
+  "packages": {
+    "com.github.ben-manes.caffeine:caffeine": [
+      "com.github.benmanes.caffeine",
+      "com.github.benmanes.caffeine.base",
+      "com.github.benmanes.caffeine.cache",
+      "com.github.benmanes.caffeine.cache.stats"
+    ],
+    "com.google.errorprone:error_prone_annotations": [
+      "com.google.errorprone.annotations",
+      "com.google.errorprone.annotations.concurrent"
+    ],
+    "dev.detekt:detekt-api": [
+      "dev.detekt.api",
+      "dev.detekt.api.internal",
+      "dev.detekt.detekt_api"
+    ],
+    "dev.detekt:detekt-cli": [
+      "dev.detekt.cli",
+      "dev.detekt.cli.runners"
+    ],
+    "dev.detekt:detekt-core": [
+      "dev.detekt.core",
+      "dev.detekt.core.baseline",
+      "dev.detekt.core.config",
+      "dev.detekt.core.config.validation",
+      "dev.detekt.core.extensions",
+      "dev.detekt.core.parser",
+      "dev.detekt.core.reporting",
+      "dev.detekt.core.reporting.console",
+      "dev.detekt.core.rules",
+      "dev.detekt.core.settings",
+      "dev.detekt.core.suppressors",
+      "dev.detekt.core.tooling",
+      "dev.detekt.core.util"
+    ],
+    "dev.detekt:detekt-kotlin-analysis-api": [
+      "org.jetbrains.kotlin.analysis.api",
+      "org.jetbrains.kotlin.analysis.api.annotations",
+      "org.jetbrains.kotlin.analysis.api.base",
+      "org.jetbrains.kotlin.analysis.api.compile",
+      "org.jetbrains.kotlin.analysis.api.components",
+      "org.jetbrains.kotlin.analysis.api.contracts.description",
+      "org.jetbrains.kotlin.analysis.api.contracts.description.booleans",
+      "org.jetbrains.kotlin.analysis.api.diagnostics",
+      "org.jetbrains.kotlin.analysis.api.fir",
+      "org.jetbrains.kotlin.analysis.api.fir.annotations",
+      "org.jetbrains.kotlin.analysis.api.fir.components",
+      "org.jetbrains.kotlin.analysis.api.fir.components.compilation",
+      "org.jetbrains.kotlin.analysis.api.fir.contracts",
+      "org.jetbrains.kotlin.analysis.api.fir.diagnostics",
+      "org.jetbrains.kotlin.analysis.api.fir.evaluate",
+      "org.jetbrains.kotlin.analysis.api.fir.modification",
+      "org.jetbrains.kotlin.analysis.api.fir.projectStructure",
+      "org.jetbrains.kotlin.analysis.api.fir.references",
+      "org.jetbrains.kotlin.analysis.api.fir.scopes",
+      "org.jetbrains.kotlin.analysis.api.fir.signatures",
+      "org.jetbrains.kotlin.analysis.api.fir.statistics",
+      "org.jetbrains.kotlin.analysis.api.fir.symbols",
+      "org.jetbrains.kotlin.analysis.api.fir.symbols.pointers",
+      "org.jetbrains.kotlin.analysis.api.fir.types",
+      "org.jetbrains.kotlin.analysis.api.fir.types.qualifiers",
+      "org.jetbrains.kotlin.analysis.api.fir.types.typeCreation",
+      "org.jetbrains.kotlin.analysis.api.fir.utils",
+      "org.jetbrains.kotlin.analysis.api.impl.base",
+      "org.jetbrains.kotlin.analysis.api.impl.base.annotations",
+      "org.jetbrains.kotlin.analysis.api.impl.base.components",
+      "org.jetbrains.kotlin.analysis.api.impl.base.contracts.description",
+      "org.jetbrains.kotlin.analysis.api.impl.base.contracts.description.booleans",
+      "org.jetbrains.kotlin.analysis.api.impl.base.imports",
+      "org.jetbrains.kotlin.analysis.api.impl.base.java",
+      "org.jetbrains.kotlin.analysis.api.impl.base.java.source",
+      "org.jetbrains.kotlin.analysis.api.impl.base.lifetime",
+      "org.jetbrains.kotlin.analysis.api.impl.base.permissions",
+      "org.jetbrains.kotlin.analysis.api.impl.base.projectStructure",
+      "org.jetbrains.kotlin.analysis.api.impl.base.references",
+      "org.jetbrains.kotlin.analysis.api.impl.base.resolution",
+      "org.jetbrains.kotlin.analysis.api.impl.base.restrictedAnalysis",
+      "org.jetbrains.kotlin.analysis.api.impl.base.scopes",
+      "org.jetbrains.kotlin.analysis.api.impl.base.sessions",
+      "org.jetbrains.kotlin.analysis.api.impl.base.signatures",
+      "org.jetbrains.kotlin.analysis.api.impl.base.symbols",
+      "org.jetbrains.kotlin.analysis.api.impl.base.symbols.pointers",
+      "org.jetbrains.kotlin.analysis.api.impl.base.types",
+      "org.jetbrains.kotlin.analysis.api.impl.base.types.typeCreation",
+      "org.jetbrains.kotlin.analysis.api.impl.base.util",
+      "org.jetbrains.kotlin.analysis.api.imports",
+      "org.jetbrains.kotlin.analysis.api.lifetime",
+      "org.jetbrains.kotlin.analysis.api.permissions",
+      "org.jetbrains.kotlin.analysis.api.platform",
+      "org.jetbrains.kotlin.analysis.api.platform.caches",
+      "org.jetbrains.kotlin.analysis.api.platform.declarations",
+      "org.jetbrains.kotlin.analysis.api.platform.java",
+      "org.jetbrains.kotlin.analysis.api.platform.lifetime",
+      "org.jetbrains.kotlin.analysis.api.platform.modification",
+      "org.jetbrains.kotlin.analysis.api.platform.packages",
+      "org.jetbrains.kotlin.analysis.api.platform.permissions",
+      "org.jetbrains.kotlin.analysis.api.platform.projectStructure",
+      "org.jetbrains.kotlin.analysis.api.platform.resolution",
+      "org.jetbrains.kotlin.analysis.api.platform.restrictedAnalysis",
+      "org.jetbrains.kotlin.analysis.api.platform.statistics",
+      "org.jetbrains.kotlin.analysis.api.platform.utils",
+      "org.jetbrains.kotlin.analysis.api.projectStructure",
+      "org.jetbrains.kotlin.analysis.api.renderer.base",
+      "org.jetbrains.kotlin.analysis.api.renderer.base.annotations",
+      "org.jetbrains.kotlin.analysis.api.renderer.base.annotations.renderers",
+      "org.jetbrains.kotlin.analysis.api.renderer.base.contextReceivers",
+      "org.jetbrains.kotlin.analysis.api.renderer.base.contextReceivers.renderers",
+      "org.jetbrains.kotlin.analysis.api.renderer.declarations",
+      "org.jetbrains.kotlin.analysis.api.renderer.declarations.bodies",
+      "org.jetbrains.kotlin.analysis.api.renderer.declarations.impl",
+      "org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers",
+      "org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.impl",
+      "org.jetbrains.kotlin.analysis.api.renderer.declarations.modifiers.renderers",
+      "org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers",
+      "org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.callables",
+      "org.jetbrains.kotlin.analysis.api.renderer.declarations.renderers.classifiers",
+      "org.jetbrains.kotlin.analysis.api.renderer.declarations.superTypes",
+      "org.jetbrains.kotlin.analysis.api.renderer.types",
+      "org.jetbrains.kotlin.analysis.api.renderer.types.impl",
+      "org.jetbrains.kotlin.analysis.api.renderer.types.renderers",
+      "org.jetbrains.kotlin.analysis.api.resolution",
+      "org.jetbrains.kotlin.analysis.api.resolve.extensions",
+      "org.jetbrains.kotlin.analysis.api.scopes",
+      "org.jetbrains.kotlin.analysis.api.session",
+      "org.jetbrains.kotlin.analysis.api.signatures",
+      "org.jetbrains.kotlin.analysis.api.symbols",
+      "org.jetbrains.kotlin.analysis.api.symbols.markers",
+      "org.jetbrains.kotlin.analysis.api.symbols.pointers",
+      "org.jetbrains.kotlin.analysis.api.types",
+      "org.jetbrains.kotlin.analysis.api.types.typeCreation",
+      "org.jetbrains.kotlin.analysis.api.utils",
+      "org.jetbrains.kotlin.analysis.api.utils.errors",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.api",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.api.services",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.api.targets",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.caches",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.caches.cleanable",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.compile",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.diagnostics",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.diagnostics.fir",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.element.builder",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.file.builder",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.file.structure",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.lazy.resolve",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.projectStructure",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.providers",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.resolve.extensions",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.resolver",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.services",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.sessions",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.structure",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.state",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.statistics",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.statistics.domains",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.stubBased.deserialization",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.symbolProviders",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.symbolProviders.caches",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.symbolProviders.combined",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.symbolProviders.factories",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.transformers",
+      "org.jetbrains.kotlin.analysis.low.level.api.fir.util",
+      "org.jetbrains.kotlin.analysis.utils",
+      "org.jetbrains.kotlin.analysis.utils.caches",
+      "org.jetbrains.kotlin.analysis.utils.collections",
+      "org.jetbrains.kotlin.analysis.utils.errors",
+      "org.jetbrains.kotlin.analysis.utils.printer",
+      "org.jetbrains.kotlin.analysis.utils.reflection",
+      "org.jetbrains.kotlin.light.classes.symbol",
+      "org.jetbrains.kotlin.light.classes.symbol.annotations",
+      "org.jetbrains.kotlin.light.classes.symbol.classes",
+      "org.jetbrains.kotlin.light.classes.symbol.codeReferences",
+      "org.jetbrains.kotlin.light.classes.symbol.fields",
+      "org.jetbrains.kotlin.light.classes.symbol.methods",
+      "org.jetbrains.kotlin.light.classes.symbol.modifierLists",
+      "org.jetbrains.kotlin.light.classes.symbol.parameters"
+    ],
+    "dev.detekt:detekt-kotlin-analysis-api-standalone": [
+      "org.jetbrains.kotlin.analysis.api.standalone",
+      "org.jetbrains.kotlin.analysis.api.standalone.base",
+      "org.jetbrains.kotlin.analysis.api.standalone.base.declarations",
+      "org.jetbrains.kotlin.analysis.api.standalone.base.java",
+      "org.jetbrains.kotlin.analysis.api.standalone.base.modification",
+      "org.jetbrains.kotlin.analysis.api.standalone.base.packages",
+      "org.jetbrains.kotlin.analysis.api.standalone.base.permissions",
+      "org.jetbrains.kotlin.analysis.api.standalone.base.projectStructure",
+      "org.jetbrains.kotlin.analysis.api.standalone.base.services",
+      "org.jetbrains.kotlin.analysis.project.structure.builder",
+      "org.jetbrains.kotlin.analysis.project.structure.impl"
+    ],
+    "dev.detekt:detekt-metrics": [
+      "dev.detekt.metrics",
+      "dev.detekt.metrics.processors",
+      "dev.detekt.metrics.processors.util"
+    ],
+    "dev.detekt:detekt-parser": [
+      "dev.detekt.parser"
+    ],
+    "dev.detekt:detekt-psi-utils": [
+      "dev.detekt.psi",
+      "dev.detekt.psi.internal"
+    ],
+    "dev.detekt:detekt-report-checkstyle": [
+      "dev.detekt.report.xml"
+    ],
+    "dev.detekt:detekt-report-html": [
+      "dev.detekt.report.html"
+    ],
+    "dev.detekt:detekt-report-markdown": [
+      "dev.detekt.report.markdown"
+    ],
+    "dev.detekt:detekt-report-sarif": [
+      "dev.detekt.report.sarif"
+    ],
+    "dev.detekt:detekt-rules": null,
+    "dev.detekt:detekt-rules-comments": [
+      "dev.detekt.rules.comments",
+      "dev.detekt.rules.comments.internal"
+    ],
+    "dev.detekt:detekt-rules-complexity": [
+      "dev.detekt.rules.complexity"
+    ],
+    "dev.detekt:detekt-rules-coroutines": [
+      "dev.detekt.rules.coroutines",
+      "dev.detekt.rules.coroutines.utils"
+    ],
+    "dev.detekt:detekt-rules-empty-blocks": [
+      "dev.detekt.rules.emptyblocks",
+      "dev.detekt.rules.emptyblocks.internal"
+    ],
+    "dev.detekt:detekt-rules-exceptions": [
+      "dev.detekt.rules.exceptions"
+    ],
+    "dev.detekt:detekt-rules-naming": [
+      "dev.detekt.rules.naming",
+      "dev.detekt.rules.naming.util"
+    ],
+    "dev.detekt:detekt-rules-performance": [
+      "dev.detekt.rules.performance"
+    ],
+    "dev.detekt:detekt-rules-potential-bugs": [
+      "dev.detekt.rules.potentialbugs"
+    ],
+    "dev.detekt:detekt-rules-style": [
+      "dev.detekt.rules.style",
+      "dev.detekt.rules.style.movelambdaout",
+      "dev.detekt.rules.style.optional"
+    ],
+    "dev.detekt:detekt-tooling": [
+      "dev.detekt.tooling.api",
+      "dev.detekt.tooling.api.spec",
+      "dev.detekt.tooling.dsl",
+      "dev.detekt.tooling.internal"
+    ],
+    "dev.detekt:detekt-utils": [
+      "dev.detekt.utils"
+    ],
+    "dev.drewhamilton.poko:poko-annotations": [
+      "dev.drewhamilton.poko"
+    ],
+    "io.github.detekt.sarif4k:sarif4k": [
+      "io.github.detekt.sarif4k"
+    ],
+    "org.checkerframework:checker-qual": [
+      "org.checkerframework.checker.builder.qual",
+      "org.checkerframework.checker.calledmethods.qual",
+      "org.checkerframework.checker.compilermsgs.qual",
+      "org.checkerframework.checker.fenum.qual",
+      "org.checkerframework.checker.formatter.qual",
+      "org.checkerframework.checker.guieffect.qual",
+      "org.checkerframework.checker.i18n.qual",
+      "org.checkerframework.checker.i18nformatter.qual",
+      "org.checkerframework.checker.index.qual",
+      "org.checkerframework.checker.initialization.qual",
+      "org.checkerframework.checker.interning.qual",
+      "org.checkerframework.checker.lock.qual",
+      "org.checkerframework.checker.modifiability.qual",
+      "org.checkerframework.checker.mustcall.qual",
+      "org.checkerframework.checker.nonempty.qual",
+      "org.checkerframework.checker.nullness.qual",
+      "org.checkerframework.checker.optional.qual",
+      "org.checkerframework.checker.propkey.qual",
+      "org.checkerframework.checker.regex.qual",
+      "org.checkerframework.checker.signature.qual",
+      "org.checkerframework.checker.signedness.qual",
+      "org.checkerframework.checker.sqlquotes.qual",
+      "org.checkerframework.checker.tainting.qual",
+      "org.checkerframework.checker.units.qual",
+      "org.checkerframework.common.aliasing.qual",
+      "org.checkerframework.common.initializedfields.qual",
+      "org.checkerframework.common.reflection.qual",
+      "org.checkerframework.common.returnsreceiver.qual",
+      "org.checkerframework.common.subtyping.qual",
+      "org.checkerframework.common.util.count.report.qual",
+      "org.checkerframework.common.value.qual",
+      "org.checkerframework.dataflow.qual",
+      "org.checkerframework.framework.qual"
+    ],
+    "org.jcommander:jcommander": [
+      "com.beust.jcommander",
+      "com.beust.jcommander.converters",
+      "com.beust.jcommander.defaultprovider",
+      "com.beust.jcommander.internal",
+      "com.beust.jcommander.parser",
+      "com.beust.jcommander.validators"
+    ],
+    "org.jetbrains.intellij.deps.kotlinx:kotlinx-coroutines-core": [
+      "_COROUTINE",
+      "kotlinx.coroutines",
+      "kotlinx.coroutines.channels",
+      "kotlinx.coroutines.debug.internal",
+      "kotlinx.coroutines.flow",
+      "kotlinx.coroutines.flow.internal",
+      "kotlinx.coroutines.future",
+      "kotlinx.coroutines.internal",
+      "kotlinx.coroutines.internal.intellij",
+      "kotlinx.coroutines.intrinsics",
+      "kotlinx.coroutines.scheduling",
+      "kotlinx.coroutines.selects",
+      "kotlinx.coroutines.stream",
+      "kotlinx.coroutines.sync",
+      "kotlinx.coroutines.time"
+    ],
+    "org.jetbrains.kotlin:kotlin-build-tools-api": [
+      "org.jetbrains.kotlin.buildtools.api",
+      "org.jetbrains.kotlin.buildtools.api.abi",
+      "org.jetbrains.kotlin.buildtools.api.abi.operations",
+      "org.jetbrains.kotlin.buildtools.api.arguments",
+      "org.jetbrains.kotlin.buildtools.api.arguments.enums",
+      "org.jetbrains.kotlin.buildtools.api.cri",
+      "org.jetbrains.kotlin.buildtools.api.internal",
+      "org.jetbrains.kotlin.buildtools.api.internal.wrappers",
+      "org.jetbrains.kotlin.buildtools.api.jvm",
+      "org.jetbrains.kotlin.buildtools.api.jvm.operations",
+      "org.jetbrains.kotlin.buildtools.api.trackers",
+      "org.jetbrains.kotlin.buildtools.internal"
+    ],
+    "org.jetbrains.kotlin:kotlin-compiler": [
+      "com.fasterxml.aalto",
+      "com.fasterxml.aalto.impl",
+      "com.fasterxml.aalto.in",
+      "com.fasterxml.aalto.stax",
+      "com.fasterxml.aalto.util",
+      "com.google.common.base",
+      "com.google.common.collect",
+      "com.google.common.graph",
+      "com.google.common.hash",
+      "com.google.common.io",
+      "com.google.common.math",
+      "com.google.common.primitives",
+      "com.google.common.util.concurrent",
+      "com.intellij",
+      "com.intellij.codeInsight",
+      "com.intellij.codeInsight.completion.scope",
+      "com.intellij.codeInsight.daemon.impl.analysis",
+      "com.intellij.codeInsight.folding",
+      "com.intellij.codeInsight.folding.impl",
+      "com.intellij.codeInsight.highlighting",
+      "com.intellij.codeInsight.javadoc",
+      "com.intellij.codeInsight.multiverse",
+      "com.intellij.codeInsight.runner",
+      "com.intellij.codeWithMe",
+      "com.intellij.concurrency",
+      "com.intellij.concurrency.client",
+      "com.intellij.core",
+      "com.intellij.diagnostic",
+      "com.intellij.extapi.psi",
+      "com.intellij.formatting",
+      "com.intellij.ide",
+      "com.intellij.ide.highlighter",
+      "com.intellij.ide.lightEdit",
+      "com.intellij.ide.plugins",
+      "com.intellij.ide.plugins.cl",
+      "com.intellij.ide.util",
+      "com.intellij.idea",
+      "com.intellij.injected.editor",
+      "com.intellij.l10n",
+      "com.intellij.lang",
+      "com.intellij.lang.folding",
+      "com.intellij.lang.impl",
+      "com.intellij.lang.injection",
+      "com.intellij.lang.java",
+      "com.intellij.lang.java.beans",
+      "com.intellij.lang.java.lexer",
+      "com.intellij.lang.java.parser",
+      "com.intellij.lang.jvm",
+      "com.intellij.lang.jvm.annotation",
+      "com.intellij.lang.jvm.facade",
+      "com.intellij.lang.jvm.types",
+      "com.intellij.lexer",
+      "com.intellij.mock",
+      "com.intellij.model",
+      "com.intellij.model.psi",
+      "com.intellij.navigation",
+      "com.intellij.notebook.editor",
+      "com.intellij.openapi",
+      "com.intellij.openapi.application",
+      "com.intellij.openapi.application.ex",
+      "com.intellij.openapi.application.impl",
+      "com.intellij.openapi.client",
+      "com.intellij.openapi.command",
+      "com.intellij.openapi.command.impl",
+      "com.intellij.openapi.command.undo",
+      "com.intellij.openapi.components",
+      "com.intellij.openapi.diagnostic",
+      "com.intellij.openapi.editor",
+      "com.intellij.openapi.editor.actionSystem",
+      "com.intellij.openapi.editor.colors",
+      "com.intellij.openapi.editor.event",
+      "com.intellij.openapi.editor.ex",
+      "com.intellij.openapi.editor.impl",
+      "com.intellij.openapi.editor.impl.event",
+      "com.intellij.openapi.editor.markup",
+      "com.intellij.openapi.extensions",
+      "com.intellij.openapi.extensions.impl",
+      "com.intellij.openapi.fileEditor",
+      "com.intellij.openapi.fileEditor.impl",
+      "com.intellij.openapi.fileTypes",
+      "com.intellij.openapi.module",
+      "com.intellij.openapi.progress",
+      "com.intellij.openapi.progress.impl",
+      "com.intellij.openapi.progress.util",
+      "com.intellij.openapi.project",
+      "com.intellij.openapi.projectRoots",
+      "com.intellij.openapi.roots",
+      "com.intellij.openapi.roots.impl",
+      "com.intellij.openapi.ui",
+      "com.intellij.openapi.util",
+      "com.intellij.openapi.util.io",
+      "com.intellij.openapi.util.objectTree",
+      "com.intellij.openapi.util.registry",
+      "com.intellij.openapi.util.text",
+      "com.intellij.openapi.vfs",
+      "com.intellij.openapi.vfs.encoding",
+      "com.intellij.openapi.vfs.impl",
+      "com.intellij.openapi.vfs.impl.jar",
+      "com.intellij.openapi.vfs.limits",
+      "com.intellij.openapi.vfs.local",
+      "com.intellij.openapi.vfs.newvfs",
+      "com.intellij.openapi.vfs.newvfs.events",
+      "com.intellij.openapi.vfs.pointers",
+      "com.intellij.openapi.vfs.transformer",
+      "com.intellij.openapi.wm.ex",
+      "com.intellij.patterns",
+      "com.intellij.patterns.compiler",
+      "com.intellij.platform.backend.navigation",
+      "com.intellij.pom",
+      "com.intellij.pom.core.impl",
+      "com.intellij.pom.event",
+      "com.intellij.pom.impl",
+      "com.intellij.pom.java",
+      "com.intellij.pom.tree",
+      "com.intellij.pom.tree.events",
+      "com.intellij.pom.tree.events.impl",
+      "com.intellij.pom.wrappers",
+      "com.intellij.psi",
+      "com.intellij.psi.augment",
+      "com.intellij.psi.codeStyle",
+      "com.intellij.psi.compiled",
+      "com.intellij.psi.controlFlow",
+      "com.intellij.psi.css",
+      "com.intellij.psi.filters",
+      "com.intellij.psi.filters.classes",
+      "com.intellij.psi.filters.element",
+      "com.intellij.psi.filters.position",
+      "com.intellij.psi.impl",
+      "com.intellij.psi.impl.cache",
+      "com.intellij.psi.impl.compiled",
+      "com.intellij.psi.impl.file",
+      "com.intellij.psi.impl.file.impl",
+      "com.intellij.psi.impl.java.stubs",
+      "com.intellij.psi.impl.java.stubs.impl",
+      "com.intellij.psi.impl.java.stubs.index",
+      "com.intellij.psi.impl.light",
+      "com.intellij.psi.impl.meta",
+      "com.intellij.psi.impl.search",
+      "com.intellij.psi.impl.smartPointers",
+      "com.intellij.psi.impl.source",
+      "com.intellij.psi.impl.source.codeStyle",
+      "com.intellij.psi.impl.source.javadoc",
+      "com.intellij.psi.impl.source.resolve",
+      "com.intellij.psi.impl.source.resolve.graphInference",
+      "com.intellij.psi.impl.source.resolve.graphInference.constraints",
+      "com.intellij.psi.impl.source.resolve.reference",
+      "com.intellij.psi.impl.source.resolve.reference.impl",
+      "com.intellij.psi.impl.source.resolve.reference.impl.manipulators",
+      "com.intellij.psi.impl.source.resolve.reference.impl.providers",
+      "com.intellij.psi.impl.source.tree",
+      "com.intellij.psi.impl.source.tree.injected",
+      "com.intellij.psi.impl.source.tree.java",
+      "com.intellij.psi.infos",
+      "com.intellij.psi.javadoc",
+      "com.intellij.psi.meta",
+      "com.intellij.psi.presentation.java",
+      "com.intellij.psi.scope",
+      "com.intellij.psi.scope.conflictResolvers",
+      "com.intellij.psi.scope.processor",
+      "com.intellij.psi.scope.util",
+      "com.intellij.psi.search",
+      "com.intellij.psi.search.impl",
+      "com.intellij.psi.search.searches",
+      "com.intellij.psi.stub",
+      "com.intellij.psi.stubs",
+      "com.intellij.psi.targets",
+      "com.intellij.psi.templateLanguages",
+      "com.intellij.psi.text",
+      "com.intellij.psi.tree",
+      "com.intellij.psi.tree.java",
+      "com.intellij.psi.util",
+      "com.intellij.reference",
+      "com.intellij.serialization",
+      "com.intellij.serviceContainer",
+      "com.intellij.testFramework",
+      "com.intellij.ui",
+      "com.intellij.ui.icons",
+      "com.intellij.util",
+      "com.intellij.util.cls",
+      "com.intellij.util.codeInsight",
+      "com.intellij.util.concurrency",
+      "com.intellij.util.containers",
+      "com.intellij.util.containers.hash",
+      "com.intellij.util.diff",
+      "com.intellij.util.execution",
+      "com.intellij.util.graph",
+      "com.intellij.util.graph.impl",
+      "com.intellij.util.indexing",
+      "com.intellij.util.indexing.containers",
+      "com.intellij.util.indexing.impl",
+      "com.intellij.util.io",
+      "com.intellij.util.io.keyStorage",
+      "com.intellij.util.io.pagecache",
+      "com.intellij.util.io.pagecache.impl",
+      "com.intellij.util.io.stats",
+      "com.intellij.util.io.storage",
+      "com.intellij.util.io.zip",
+      "com.intellij.util.keyFMap",
+      "com.intellij.util.lang",
+      "com.intellij.util.messages",
+      "com.intellij.util.messages.impl",
+      "com.intellij.util.pico",
+      "com.intellij.util.ref",
+      "com.intellij.util.system",
+      "com.intellij.util.text",
+      "com.intellij.util.ui",
+      "com.intellij.util.xml.dom",
+      "com.intellij.util.xmlb",
+      "com.intellij.util.xmlb.annotations",
+      "com.sun.jna",
+      "com.sun.jna.internal",
+      "com.sun.jna.platform",
+      "com.sun.jna.platform.dnd",
+      "com.sun.jna.platform.linux",
+      "com.sun.jna.platform.mac",
+      "com.sun.jna.platform.unix",
+      "com.sun.jna.platform.unix.aix",
+      "com.sun.jna.platform.unix.solaris",
+      "com.sun.jna.platform.win32",
+      "com.sun.jna.platform.win32.COM",
+      "com.sun.jna.platform.win32.COM.tlb",
+      "com.sun.jna.platform.win32.COM.tlb.imp",
+      "com.sun.jna.platform.win32.COM.util",
+      "com.sun.jna.platform.win32.COM.util.annotation",
+      "com.sun.jna.platform.wince",
+      "com.sun.jna.ptr",
+      "com.sun.jna.win32",
+      "io.opentelemetry.api",
+      "io.opentelemetry.api.common",
+      "io.opentelemetry.api.internal",
+      "io.opentelemetry.api.logs",
+      "io.opentelemetry.api.metrics",
+      "io.opentelemetry.api.trace",
+      "io.vavr",
+      "io.vavr.collection",
+      "io.vavr.concurrent",
+      "io.vavr.control",
+      "it.unimi.dsi.fastutil",
+      "it.unimi.dsi.fastutil.booleans",
+      "it.unimi.dsi.fastutil.bytes",
+      "it.unimi.dsi.fastutil.chars",
+      "it.unimi.dsi.fastutil.doubles",
+      "it.unimi.dsi.fastutil.floats",
+      "it.unimi.dsi.fastutil.ints",
+      "it.unimi.dsi.fastutil.longs",
+      "it.unimi.dsi.fastutil.objects",
+      "it.unimi.dsi.fastutil.shorts",
+      "javax.inject",
+      "kotlinx.collections.immutable",
+      "kotlinx.collections.immutable.implementations.immutableList",
+      "kotlinx.collections.immutable.implementations.immutableMap",
+      "kotlinx.collections.immutable.implementations.immutableSet",
+      "kotlinx.collections.immutable.implementations.persistentOrderedMap",
+      "kotlinx.collections.immutable.implementations.persistentOrderedSet",
+      "kotlinx.collections.immutable.internal",
+      "net.jpountz.lz4",
+      "net.jpountz.util",
+      "net.jpountz.xxhash",
+      "one.util.streamex",
+      "org.antlr.v4.runtime",
+      "org.antlr.v4.runtime.atn",
+      "org.antlr.v4.runtime.dfa",
+      "org.antlr.v4.runtime.misc",
+      "org.antlr.v4.runtime.tree",
+      "org.antlr.v4.runtime.tree.pattern",
+      "org.apache.log4j",
+      "org.codehaus.stax2",
+      "org.codehaus.stax2.ri",
+      "org.codehaus.stax2.ri.typed",
+      "org.codehaus.stax2.typed",
+      "org.fusesource.jansi",
+      "org.fusesource.jansi.internal",
+      "org.fusesource.jansi.io",
+      "org.jdom",
+      "org.jdom.filter2",
+      "org.jdom.output",
+      "org.jetbrains.annotations",
+      "org.jetbrains.concurrency",
+      "org.jetbrains.kotlin",
+      "org.jetbrains.kotlin.analysis.decompiled.light.classes",
+      "org.jetbrains.kotlin.analysis.decompiled.light.classes.origin",
+      "org.jetbrains.kotlin.analysis.decompiler.js",
+      "org.jetbrains.kotlin.analysis.decompiler.konan",
+      "org.jetbrains.kotlin.analysis.decompiler.psi",
+      "org.jetbrains.kotlin.analysis.decompiler.psi.file",
+      "org.jetbrains.kotlin.analysis.decompiler.psi.text",
+      "org.jetbrains.kotlin.analysis.decompiler.stub",
+      "org.jetbrains.kotlin.analysis.decompiler.stub.file",
+      "org.jetbrains.kotlin.analysis.decompiler.stub.flags",
+      "org.jetbrains.kotlin.analysis.utils",
+      "org.jetbrains.kotlin.analysis.utils.caches",
+      "org.jetbrains.kotlin.analysis.utils.collections",
+      "org.jetbrains.kotlin.analysis.utils.errors",
+      "org.jetbrains.kotlin.analysis.utils.printer",
+      "org.jetbrains.kotlin.analysis.utils.reflection",
+      "org.jetbrains.kotlin.analyzer",
+      "org.jetbrains.kotlin.analyzer.common",
+      "org.jetbrains.kotlin.asJava",
+      "org.jetbrains.kotlin.asJava.builder",
+      "org.jetbrains.kotlin.asJava.classes",
+      "org.jetbrains.kotlin.asJava.elements",
+      "org.jetbrains.kotlin.asJava.finder",
+      "org.jetbrains.kotlin.backend.common",
+      "org.jetbrains.kotlin.backend.common.actualizer",
+      "org.jetbrains.kotlin.backend.common.actualizer.checker",
+      "org.jetbrains.kotlin.backend.common.descriptors",
+      "org.jetbrains.kotlin.backend.common.diagnostics",
+      "org.jetbrains.kotlin.backend.common.extensions",
+      "org.jetbrains.kotlin.backend.common.ir",
+      "org.jetbrains.kotlin.backend.common.linkage",
+      "org.jetbrains.kotlin.backend.common.linkage.issues",
+      "org.jetbrains.kotlin.backend.common.linkage.partial",
+      "org.jetbrains.kotlin.backend.common.lower",
+      "org.jetbrains.kotlin.backend.common.lower.coroutines",
+      "org.jetbrains.kotlin.backend.common.lower.inline",
+      "org.jetbrains.kotlin.backend.common.lower.loops",
+      "org.jetbrains.kotlin.backend.common.lower.loops.handlers",
+      "org.jetbrains.kotlin.backend.common.lower.optimizations",
+      "org.jetbrains.kotlin.backend.common.output",
+      "org.jetbrains.kotlin.backend.common.overrides",
+      "org.jetbrains.kotlin.backend.common.phaser",
+      "org.jetbrains.kotlin.backend.common.serialization",
+      "org.jetbrains.kotlin.backend.common.serialization.encodings",
+      "org.jetbrains.kotlin.backend.common.serialization.mangle",
+      "org.jetbrains.kotlin.backend.common.serialization.mangle.descriptor",
+      "org.jetbrains.kotlin.backend.common.serialization.mangle.ir",
+      "org.jetbrains.kotlin.backend.common.serialization.metadata",
+      "org.jetbrains.kotlin.backend.common.serialization.proto",
+      "org.jetbrains.kotlin.backend.common.serialization.signature",
+      "org.jetbrains.kotlin.backend.jvm",
+      "org.jetbrains.kotlin.backend.jvm.caches",
+      "org.jetbrains.kotlin.backend.jvm.codegen",
+      "org.jetbrains.kotlin.backend.jvm.extensions",
+      "org.jetbrains.kotlin.backend.jvm.intrinsics",
+      "org.jetbrains.kotlin.backend.jvm.ir",
+      "org.jetbrains.kotlin.backend.jvm.lower",
+      "org.jetbrains.kotlin.backend.jvm.lower.indy",
+      "org.jetbrains.kotlin.backend.jvm.mapping",
+      "org.jetbrains.kotlin.backend.jvm.metadata",
+      "org.jetbrains.kotlin.backend.jvm.overrides",
+      "org.jetbrains.kotlin.backend.jvm.serialization",
+      "org.jetbrains.kotlin.backend.jvm.serialization.proto",
+      "org.jetbrains.kotlin.backend.konan",
+      "org.jetbrains.kotlin.backend.konan.cgen",
+      "org.jetbrains.kotlin.backend.konan.checkers",
+      "org.jetbrains.kotlin.backend.konan.descriptors",
+      "org.jetbrains.kotlin.backend.konan.driver",
+      "org.jetbrains.kotlin.backend.konan.ir",
+      "org.jetbrains.kotlin.backend.konan.ir.annotations",
+      "org.jetbrains.kotlin.backend.konan.lower",
+      "org.jetbrains.kotlin.backend.konan.serialization",
+      "org.jetbrains.kotlin.backend.wasm",
+      "org.jetbrains.kotlin.backend.wasm.dce",
+      "org.jetbrains.kotlin.backend.wasm.dwarf",
+      "org.jetbrains.kotlin.backend.wasm.dwarf.entries",
+      "org.jetbrains.kotlin.backend.wasm.dwarf.lines",
+      "org.jetbrains.kotlin.backend.wasm.dwarf.utils",
+      "org.jetbrains.kotlin.backend.wasm.export",
+      "org.jetbrains.kotlin.backend.wasm.ic",
+      "org.jetbrains.kotlin.backend.wasm.ir2wasm",
+      "org.jetbrains.kotlin.backend.wasm.lower",
+      "org.jetbrains.kotlin.backend.wasm.serialization",
+      "org.jetbrains.kotlin.backend.wasm.utils",
+      "org.jetbrains.kotlin.build",
+      "org.jetbrains.kotlin.build.report",
+      "org.jetbrains.kotlin.build.report.metrics",
+      "org.jetbrains.kotlin.build.report.statistics",
+      "org.jetbrains.kotlin.build.report.statistics.file",
+      "org.jetbrains.kotlin.build.report.statistics.json",
+      "org.jetbrains.kotlin.builtins",
+      "org.jetbrains.kotlin.builtins.functions",
+      "org.jetbrains.kotlin.builtins.jvm",
+      "org.jetbrains.kotlin.builtins.konan",
+      "org.jetbrains.kotlin.cfg",
+      "org.jetbrains.kotlin.cfg.pseudocode",
+      "org.jetbrains.kotlin.cfg.pseudocode.instructions",
+      "org.jetbrains.kotlin.cfg.pseudocode.instructions.eval",
+      "org.jetbrains.kotlin.cfg.pseudocode.instructions.jumps",
+      "org.jetbrains.kotlin.cfg.pseudocode.instructions.special",
+      "org.jetbrains.kotlin.cfg.pseudocodeTraverser",
+      "org.jetbrains.kotlin.cfg.variable",
+      "org.jetbrains.kotlin.checkers",
+      "org.jetbrains.kotlin.checkers.diagnostics",
+      "org.jetbrains.kotlin.checkers.diagnostics.factories",
+      "org.jetbrains.kotlin.checkers.utils",
+      "org.jetbrains.kotlin.cli",
+      "org.jetbrains.kotlin.cli.common",
+      "org.jetbrains.kotlin.cli.common.arguments",
+      "org.jetbrains.kotlin.cli.common.config",
+      "org.jetbrains.kotlin.cli.common.environment",
+      "org.jetbrains.kotlin.cli.common.extensions",
+      "org.jetbrains.kotlin.cli.common.fir",
+      "org.jetbrains.kotlin.cli.common.localfs",
+      "org.jetbrains.kotlin.cli.common.messages",
+      "org.jetbrains.kotlin.cli.common.modules",
+      "org.jetbrains.kotlin.cli.common.output",
+      "org.jetbrains.kotlin.cli.common.profiling",
+      "org.jetbrains.kotlin.cli.common.repl",
+      "org.jetbrains.kotlin.cli.js",
+      "org.jetbrains.kotlin.cli.js.klib",
+      "org.jetbrains.kotlin.cli.jvm",
+      "org.jetbrains.kotlin.cli.jvm.compiler",
+      "org.jetbrains.kotlin.cli.jvm.compiler.jarfs",
+      "org.jetbrains.kotlin.cli.jvm.compiler.legacy.pipeline",
+      "org.jetbrains.kotlin.cli.jvm.config",
+      "org.jetbrains.kotlin.cli.jvm.index",
+      "org.jetbrains.kotlin.cli.jvm.modules",
+      "org.jetbrains.kotlin.cli.jvm.plugins",
+      "org.jetbrains.kotlin.cli.metadata",
+      "org.jetbrains.kotlin.cli.pipeline",
+      "org.jetbrains.kotlin.cli.pipeline.jvm",
+      "org.jetbrains.kotlin.cli.pipeline.metadata",
+      "org.jetbrains.kotlin.cli.pipeline.web",
+      "org.jetbrains.kotlin.cli.pipeline.web.js",
+      "org.jetbrains.kotlin.cli.pipeline.web.wasm",
+      "org.jetbrains.kotlin.cli.plugins",
+      "org.jetbrains.kotlin.codegen",
+      "org.jetbrains.kotlin.codegen.coroutines",
+      "org.jetbrains.kotlin.codegen.extensions",
+      "org.jetbrains.kotlin.codegen.inline",
+      "org.jetbrains.kotlin.codegen.inline.coroutines",
+      "org.jetbrains.kotlin.codegen.intrinsics",
+      "org.jetbrains.kotlin.codegen.optimization",
+      "org.jetbrains.kotlin.codegen.optimization.boxing",
+      "org.jetbrains.kotlin.codegen.optimization.common",
+      "org.jetbrains.kotlin.codegen.optimization.fixStack",
+      "org.jetbrains.kotlin.codegen.optimization.nullCheck",
+      "org.jetbrains.kotlin.codegen.optimization.temporaryVals",
+      "org.jetbrains.kotlin.codegen.optimization.transformer",
+      "org.jetbrains.kotlin.codegen.pseudoInsns",
+      "org.jetbrains.kotlin.codegen.serialization",
+      "org.jetbrains.kotlin.codegen.signature",
+      "org.jetbrains.kotlin.codegen.state",
+      "org.jetbrains.kotlin.compiler.plugin",
+      "org.jetbrains.kotlin.compilerRunner",
+      "org.jetbrains.kotlin.config",
+      "org.jetbrains.kotlin.config.nativeBinaryOptions",
+      "org.jetbrains.kotlin.config.phaser",
+      "org.jetbrains.kotlin.constant",
+      "org.jetbrains.kotlin.container",
+      "org.jetbrains.kotlin.context",
+      "org.jetbrains.kotlin.contracts",
+      "org.jetbrains.kotlin.contracts.description",
+      "org.jetbrains.kotlin.contracts.description.expressions",
+      "org.jetbrains.kotlin.contracts.interpretation",
+      "org.jetbrains.kotlin.contracts.model",
+      "org.jetbrains.kotlin.contracts.model.functors",
+      "org.jetbrains.kotlin.contracts.model.structure",
+      "org.jetbrains.kotlin.contracts.model.visitors",
+      "org.jetbrains.kotlin.contracts.parsing",
+      "org.jetbrains.kotlin.contracts.parsing.effects",
+      "org.jetbrains.kotlin.coroutines",
+      "org.jetbrains.kotlin.descriptors",
+      "org.jetbrains.kotlin.descriptors.annotations",
+      "org.jetbrains.kotlin.descriptors.deserialization",
+      "org.jetbrains.kotlin.descriptors.impl",
+      "org.jetbrains.kotlin.descriptors.java",
+      "org.jetbrains.kotlin.descriptors.konan",
+      "org.jetbrains.kotlin.descriptors.runtime.components",
+      "org.jetbrains.kotlin.descriptors.runtime.structure",
+      "org.jetbrains.kotlin.descriptors.synthetic",
+      "org.jetbrains.kotlin.diagnostics",
+      "org.jetbrains.kotlin.diagnostics.impl",
+      "org.jetbrains.kotlin.diagnostics.rendering",
+      "org.jetbrains.kotlin.extensions",
+      "org.jetbrains.kotlin.extensions.internal",
+      "org.jetbrains.kotlin.fileClasses",
+      "org.jetbrains.kotlin.fir",
+      "org.jetbrains.kotlin.fir.analysis",
+      "org.jetbrains.kotlin.fir.analysis.cfa",
+      "org.jetbrains.kotlin.fir.analysis.cfa.util",
+      "org.jetbrains.kotlin.fir.analysis.checkers",
+      "org.jetbrains.kotlin.fir.analysis.checkers.cfa",
+      "org.jetbrains.kotlin.fir.analysis.checkers.config",
+      "org.jetbrains.kotlin.fir.analysis.checkers.context",
+      "org.jetbrains.kotlin.fir.analysis.checkers.declaration",
+      "org.jetbrains.kotlin.fir.analysis.checkers.declaration.crv",
+      "org.jetbrains.kotlin.fir.analysis.checkers.experimental",
+      "org.jetbrains.kotlin.fir.analysis.checkers.expression",
+      "org.jetbrains.kotlin.fir.analysis.checkers.extra",
+      "org.jetbrains.kotlin.fir.analysis.checkers.syntax",
+      "org.jetbrains.kotlin.fir.analysis.checkers.type",
+      "org.jetbrains.kotlin.fir.analysis.collectors",
+      "org.jetbrains.kotlin.fir.analysis.collectors.components",
+      "org.jetbrains.kotlin.fir.analysis.diagnostics",
+      "org.jetbrains.kotlin.fir.analysis.diagnostics.js",
+      "org.jetbrains.kotlin.fir.analysis.diagnostics.jvm",
+      "org.jetbrains.kotlin.fir.analysis.diagnostics.native",
+      "org.jetbrains.kotlin.fir.analysis.diagnostics.wasm",
+      "org.jetbrains.kotlin.fir.analysis.diagnostics.web.common",
+      "org.jetbrains.kotlin.fir.analysis.extensions",
+      "org.jetbrains.kotlin.fir.analysis.js.checkers",
+      "org.jetbrains.kotlin.fir.analysis.js.checkers.declaration",
+      "org.jetbrains.kotlin.fir.analysis.js.checkers.expression",
+      "org.jetbrains.kotlin.fir.analysis.jvm",
+      "org.jetbrains.kotlin.fir.analysis.jvm.checkers",
+      "org.jetbrains.kotlin.fir.analysis.jvm.checkers.declaration",
+      "org.jetbrains.kotlin.fir.analysis.jvm.checkers.expression",
+      "org.jetbrains.kotlin.fir.analysis.jvm.checkers.type",
+      "org.jetbrains.kotlin.fir.analysis.native.checkers",
+      "org.jetbrains.kotlin.fir.analysis.wasm.checkers",
+      "org.jetbrains.kotlin.fir.analysis.wasm.checkers.declaration",
+      "org.jetbrains.kotlin.fir.analysis.wasm.checkers.expression",
+      "org.jetbrains.kotlin.fir.analysis.web.common.checkers",
+      "org.jetbrains.kotlin.fir.analysis.web.common.checkers.declaration",
+      "org.jetbrains.kotlin.fir.analysis.web.common.checkers.expression",
+      "org.jetbrains.kotlin.fir.backend",
+      "org.jetbrains.kotlin.fir.backend.generators",
+      "org.jetbrains.kotlin.fir.backend.jvm",
+      "org.jetbrains.kotlin.fir.backend.native",
+      "org.jetbrains.kotlin.fir.backend.native.interop",
+      "org.jetbrains.kotlin.fir.backend.utils",
+      "org.jetbrains.kotlin.fir.builder",
+      "org.jetbrains.kotlin.fir.caches",
+      "org.jetbrains.kotlin.fir.checkers",
+      "org.jetbrains.kotlin.fir.contracts",
+      "org.jetbrains.kotlin.fir.contracts.builder",
+      "org.jetbrains.kotlin.fir.contracts.description",
+      "org.jetbrains.kotlin.fir.contracts.impl",
+      "org.jetbrains.kotlin.fir.declarations",
+      "org.jetbrains.kotlin.fir.declarations.builder",
+      "org.jetbrains.kotlin.fir.declarations.comparators",
+      "org.jetbrains.kotlin.fir.declarations.impl",
+      "org.jetbrains.kotlin.fir.declarations.synthetic",
+      "org.jetbrains.kotlin.fir.declarations.utils",
+      "org.jetbrains.kotlin.fir.descriptors",
+      "org.jetbrains.kotlin.fir.deserialization",
+      "org.jetbrains.kotlin.fir.diagnostics",
+      "org.jetbrains.kotlin.fir.expressions",
+      "org.jetbrains.kotlin.fir.expressions.builder",
+      "org.jetbrains.kotlin.fir.expressions.impl",
+      "org.jetbrains.kotlin.fir.extensions",
+      "org.jetbrains.kotlin.fir.extensions.predicate",
+      "org.jetbrains.kotlin.fir.extensions.utils",
+      "org.jetbrains.kotlin.fir.impl",
+      "org.jetbrains.kotlin.fir.java",
+      "org.jetbrains.kotlin.fir.java.declarations",
+      "org.jetbrains.kotlin.fir.java.deserialization",
+      "org.jetbrains.kotlin.fir.java.enhancement",
+      "org.jetbrains.kotlin.fir.java.scopes",
+      "org.jetbrains.kotlin.fir.java.symbols",
+      "org.jetbrains.kotlin.fir.lazy",
+      "org.jetbrains.kotlin.fir.lightTree",
+      "org.jetbrains.kotlin.fir.lightTree.converter",
+      "org.jetbrains.kotlin.fir.lightTree.fir",
+      "org.jetbrains.kotlin.fir.lightTree.fir.modifier",
+      "org.jetbrains.kotlin.fir.modules",
+      "org.jetbrains.kotlin.fir.pipeline",
+      "org.jetbrains.kotlin.fir.plugin",
+      "org.jetbrains.kotlin.fir.references",
+      "org.jetbrains.kotlin.fir.references.builder",
+      "org.jetbrains.kotlin.fir.references.impl",
+      "org.jetbrains.kotlin.fir.renderer",
+      "org.jetbrains.kotlin.fir.resolve",
+      "org.jetbrains.kotlin.fir.resolve.calls",
+      "org.jetbrains.kotlin.fir.resolve.calls.candidate",
+      "org.jetbrains.kotlin.fir.resolve.calls.jvm",
+      "org.jetbrains.kotlin.fir.resolve.calls.overloads",
+      "org.jetbrains.kotlin.fir.resolve.calls.stages",
+      "org.jetbrains.kotlin.fir.resolve.calls.tower",
+      "org.jetbrains.kotlin.fir.resolve.dfa",
+      "org.jetbrains.kotlin.fir.resolve.dfa.cfg",
+      "org.jetbrains.kotlin.fir.resolve.diagnostics",
+      "org.jetbrains.kotlin.fir.resolve.inference",
+      "org.jetbrains.kotlin.fir.resolve.inference.model",
+      "org.jetbrains.kotlin.fir.resolve.optimization",
+      "org.jetbrains.kotlin.fir.resolve.providers",
+      "org.jetbrains.kotlin.fir.resolve.providers.impl",
+      "org.jetbrains.kotlin.fir.resolve.scopes",
+      "org.jetbrains.kotlin.fir.resolve.substitution",
+      "org.jetbrains.kotlin.fir.resolve.transformers",
+      "org.jetbrains.kotlin.fir.resolve.transformers.body.resolve",
+      "org.jetbrains.kotlin.fir.resolve.transformers.contracts",
+      "org.jetbrains.kotlin.fir.resolve.transformers.mpp",
+      "org.jetbrains.kotlin.fir.resolve.transformers.plugin",
+      "org.jetbrains.kotlin.fir.scopes",
+      "org.jetbrains.kotlin.fir.scopes.impl",
+      "org.jetbrains.kotlin.fir.scopes.jvm",
+      "org.jetbrains.kotlin.fir.serialization",
+      "org.jetbrains.kotlin.fir.serialization.constant",
+      "org.jetbrains.kotlin.fir.session",
+      "org.jetbrains.kotlin.fir.session.environment",
+      "org.jetbrains.kotlin.fir.symbols",
+      "org.jetbrains.kotlin.fir.symbols.impl",
+      "org.jetbrains.kotlin.fir.types",
+      "org.jetbrains.kotlin.fir.types.builder",
+      "org.jetbrains.kotlin.fir.types.impl",
+      "org.jetbrains.kotlin.fir.types.jvm",
+      "org.jetbrains.kotlin.fir.util",
+      "org.jetbrains.kotlin.fir.utils.exceptions",
+      "org.jetbrains.kotlin.fir.visitors",
+      "org.jetbrains.kotlin.frontend.di",
+      "org.jetbrains.kotlin.frontend.java.di",
+      "org.jetbrains.kotlin.frontend.js.di",
+      "org.jetbrains.kotlin.idea",
+      "org.jetbrains.kotlin.idea.references",
+      "org.jetbrains.kotlin.incremental",
+      "org.jetbrains.kotlin.incremental.classpathDiff",
+      "org.jetbrains.kotlin.incremental.classpathDiff.impl",
+      "org.jetbrains.kotlin.incremental.components",
+      "org.jetbrains.kotlin.incremental.dirtyFiles",
+      "org.jetbrains.kotlin.incremental.impl",
+      "org.jetbrains.kotlin.incremental.javaInterop",
+      "org.jetbrains.kotlin.incremental.js",
+      "org.jetbrains.kotlin.incremental.multiproject",
+      "org.jetbrains.kotlin.incremental.parsing",
+      "org.jetbrains.kotlin.incremental.snapshots",
+      "org.jetbrains.kotlin.incremental.storage",
+      "org.jetbrains.kotlin.incremental.util",
+      "org.jetbrains.kotlin.inline",
+      "org.jetbrains.kotlin.ir",
+      "org.jetbrains.kotlin.ir.backend.js",
+      "org.jetbrains.kotlin.ir.backend.js.checkers",
+      "org.jetbrains.kotlin.ir.backend.js.checkers.declarations",
+      "org.jetbrains.kotlin.ir.backend.js.checkers.expressions",
+      "org.jetbrains.kotlin.ir.backend.js.dce",
+      "org.jetbrains.kotlin.ir.backend.js.ic",
+      "org.jetbrains.kotlin.ir.backend.js.ir",
+      "org.jetbrains.kotlin.ir.backend.js.jsexport",
+      "org.jetbrains.kotlin.ir.backend.js.lower",
+      "org.jetbrains.kotlin.ir.backend.js.lower.calls",
+      "org.jetbrains.kotlin.ir.backend.js.lower.cleanup",
+      "org.jetbrains.kotlin.ir.backend.js.lower.coroutines",
+      "org.jetbrains.kotlin.ir.backend.js.lower.inline",
+      "org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir",
+      "org.jetbrains.kotlin.ir.backend.js.lower.transformers",
+      "org.jetbrains.kotlin.ir.backend.js.transformers.irToJs",
+      "org.jetbrains.kotlin.ir.backend.js.tsexport",
+      "org.jetbrains.kotlin.ir.backend.js.utils",
+      "org.jetbrains.kotlin.ir.backend.js.utils.serialization",
+      "org.jetbrains.kotlin.ir.backend.js.wasm",
+      "org.jetbrains.kotlin.ir.backend.js.wasm.declarations",
+      "org.jetbrains.kotlin.ir.backend.jvm",
+      "org.jetbrains.kotlin.ir.backend.jvm.serialization",
+      "org.jetbrains.kotlin.ir.builders",
+      "org.jetbrains.kotlin.ir.builders.declarations",
+      "org.jetbrains.kotlin.ir.declarations",
+      "org.jetbrains.kotlin.ir.declarations.impl",
+      "org.jetbrains.kotlin.ir.declarations.lazy",
+      "org.jetbrains.kotlin.ir.descriptors",
+      "org.jetbrains.kotlin.ir.expressions",
+      "org.jetbrains.kotlin.ir.expressions.impl",
+      "org.jetbrains.kotlin.ir.inline",
+      "org.jetbrains.kotlin.ir.inline.checkers",
+      "org.jetbrains.kotlin.ir.inline.diagnostics",
+      "org.jetbrains.kotlin.ir.inline.konan",
+      "org.jetbrains.kotlin.ir.interpreter",
+      "org.jetbrains.kotlin.ir.interpreter.builtins",
+      "org.jetbrains.kotlin.ir.interpreter.checker",
+      "org.jetbrains.kotlin.ir.interpreter.exceptions",
+      "org.jetbrains.kotlin.ir.interpreter.intrinsics",
+      "org.jetbrains.kotlin.ir.interpreter.preprocessor",
+      "org.jetbrains.kotlin.ir.interpreter.proxy",
+      "org.jetbrains.kotlin.ir.interpreter.proxy.reflection",
+      "org.jetbrains.kotlin.ir.interpreter.stack",
+      "org.jetbrains.kotlin.ir.interpreter.state",
+      "org.jetbrains.kotlin.ir.interpreter.state.reflection",
+      "org.jetbrains.kotlin.ir.interpreter.transformer",
+      "org.jetbrains.kotlin.ir.objcinterop",
+      "org.jetbrains.kotlin.ir.overrides",
+      "org.jetbrains.kotlin.ir.symbols",
+      "org.jetbrains.kotlin.ir.symbols.impl",
+      "org.jetbrains.kotlin.ir.types",
+      "org.jetbrains.kotlin.ir.types.impl",
+      "org.jetbrains.kotlin.ir.util",
+      "org.jetbrains.kotlin.ir.validation",
+      "org.jetbrains.kotlin.ir.validation.checkers",
+      "org.jetbrains.kotlin.ir.validation.checkers.context",
+      "org.jetbrains.kotlin.ir.validation.checkers.declaration",
+      "org.jetbrains.kotlin.ir.validation.checkers.expression",
+      "org.jetbrains.kotlin.ir.validation.checkers.symbol",
+      "org.jetbrains.kotlin.ir.validation.checkers.type",
+      "org.jetbrains.kotlin.ir.visitors",
+      "org.jetbrains.kotlin.javac",
+      "org.jetbrains.kotlin.javac.components",
+      "org.jetbrains.kotlin.javac.resolve",
+      "org.jetbrains.kotlin.javac.wrappers.symbols",
+      "org.jetbrains.kotlin.javac.wrappers.trees",
+      "org.jetbrains.kotlin.js",
+      "org.jetbrains.kotlin.js.analyze",
+      "org.jetbrains.kotlin.js.analyzer",
+      "org.jetbrains.kotlin.js.artifacts",
+      "org.jetbrains.kotlin.js.backend",
+      "org.jetbrains.kotlin.js.backend.ast",
+      "org.jetbrains.kotlin.js.backend.ast.metadata",
+      "org.jetbrains.kotlin.js.common",
+      "org.jetbrains.kotlin.js.config",
+      "org.jetbrains.kotlin.js.descriptorUtils",
+      "org.jetbrains.kotlin.js.inline.clean",
+      "org.jetbrains.kotlin.js.inline.util",
+      "org.jetbrains.kotlin.js.inline.util.collectors",
+      "org.jetbrains.kotlin.js.naming",
+      "org.jetbrains.kotlin.js.parser",
+      "org.jetbrains.kotlin.js.parser.antlr",
+      "org.jetbrains.kotlin.js.parser.antlr.generated",
+      "org.jetbrains.kotlin.js.parser.sourcemaps",
+      "org.jetbrains.kotlin.js.patterns",
+      "org.jetbrains.kotlin.js.resolve",
+      "org.jetbrains.kotlin.js.resolve.diagnostics",
+      "org.jetbrains.kotlin.js.sourceMap",
+      "org.jetbrains.kotlin.js.translate.context",
+      "org.jetbrains.kotlin.js.translate.utils",
+      "org.jetbrains.kotlin.js.util",
+      "org.jetbrains.kotlin.kapt3.diagnostic",
+      "org.jetbrains.kotlin.kdoc.lexer",
+      "org.jetbrains.kotlin.kdoc.parser",
+      "org.jetbrains.kotlin.kdoc.psi.api",
+      "org.jetbrains.kotlin.kdoc.psi.impl",
+      "org.jetbrains.kotlin.konan",
+      "org.jetbrains.kotlin.konan.config",
+      "org.jetbrains.kotlin.konan.exec",
+      "org.jetbrains.kotlin.konan.file",
+      "org.jetbrains.kotlin.konan.library",
+      "org.jetbrains.kotlin.konan.library.components",
+      "org.jetbrains.kotlin.konan.library.impl",
+      "org.jetbrains.kotlin.konan.library.writer",
+      "org.jetbrains.kotlin.konan.properties",
+      "org.jetbrains.kotlin.konan.target",
+      "org.jetbrains.kotlin.konan.util",
+      "org.jetbrains.kotlin.lang",
+      "org.jetbrains.kotlin.lexer",
+      "org.jetbrains.kotlin.library",
+      "org.jetbrains.kotlin.library.abi",
+      "org.jetbrains.kotlin.library.abi.impl",
+      "org.jetbrains.kotlin.library.abi.parser",
+      "org.jetbrains.kotlin.library.components",
+      "org.jetbrains.kotlin.library.encodings",
+      "org.jetbrains.kotlin.library.impl",
+      "org.jetbrains.kotlin.library.loader",
+      "org.jetbrains.kotlin.library.metadata",
+      "org.jetbrains.kotlin.library.metadata.impl",
+      "org.jetbrains.kotlin.library.metadata.resolver",
+      "org.jetbrains.kotlin.library.metadata.resolver.impl",
+      "org.jetbrains.kotlin.library.writer",
+      "org.jetbrains.kotlin.load.java",
+      "org.jetbrains.kotlin.load.java.components",
+      "org.jetbrains.kotlin.load.java.descriptors",
+      "org.jetbrains.kotlin.load.java.lazy",
+      "org.jetbrains.kotlin.load.java.lazy.descriptors",
+      "org.jetbrains.kotlin.load.java.lazy.types",
+      "org.jetbrains.kotlin.load.java.sam",
+      "org.jetbrains.kotlin.load.java.sources",
+      "org.jetbrains.kotlin.load.java.structure",
+      "org.jetbrains.kotlin.load.java.structure.impl",
+      "org.jetbrains.kotlin.load.java.structure.impl.classFiles",
+      "org.jetbrains.kotlin.load.java.structure.impl.source",
+      "org.jetbrains.kotlin.load.java.typeEnhancement",
+      "org.jetbrains.kotlin.load.kotlin",
+      "org.jetbrains.kotlin.load.kotlin.header",
+      "org.jetbrains.kotlin.load.kotlin.incremental",
+      "org.jetbrains.kotlin.load.kotlin.incremental.components",
+      "org.jetbrains.kotlin.metadata",
+      "org.jetbrains.kotlin.metadata.builtins",
+      "org.jetbrains.kotlin.metadata.deserialization",
+      "org.jetbrains.kotlin.metadata.java",
+      "org.jetbrains.kotlin.metadata.js",
+      "org.jetbrains.kotlin.metadata.jvm",
+      "org.jetbrains.kotlin.metadata.jvm.deserialization",
+      "org.jetbrains.kotlin.metadata.jvm.serialization",
+      "org.jetbrains.kotlin.metadata.serialization",
+      "org.jetbrains.kotlin.modules",
+      "org.jetbrains.kotlin.mpp",
+      "org.jetbrains.kotlin.name",
+      "org.jetbrains.kotlin.native.interop",
+      "org.jetbrains.kotlin.parsing",
+      "org.jetbrains.kotlin.platform",
+      "org.jetbrains.kotlin.platform.js",
+      "org.jetbrains.kotlin.platform.jvm",
+      "org.jetbrains.kotlin.platform.konan",
+      "org.jetbrains.kotlin.platform.wasm",
+      "org.jetbrains.kotlin.plugin.references",
+      "org.jetbrains.kotlin.progress",
+      "org.jetbrains.kotlin.protobuf",
+      "org.jetbrains.kotlin.psi",
+      "org.jetbrains.kotlin.psi.addRemoveModifier",
+      "org.jetbrains.kotlin.psi.codeFragmentUtil",
+      "org.jetbrains.kotlin.psi.debugText",
+      "org.jetbrains.kotlin.psi.findDocComment",
+      "org.jetbrains.kotlin.psi.impl",
+      "org.jetbrains.kotlin.psi.psiUtil",
+      "org.jetbrains.kotlin.psi.stubs",
+      "org.jetbrains.kotlin.psi.stubs.elements",
+      "org.jetbrains.kotlin.psi.stubs.impl",
+      "org.jetbrains.kotlin.psi.synthetics",
+      "org.jetbrains.kotlin.psi.typeRefHelpers",
+      "org.jetbrains.kotlin.psi.utils",
+      "org.jetbrains.kotlin.psi2ir",
+      "org.jetbrains.kotlin.psi2ir.descriptors",
+      "org.jetbrains.kotlin.psi2ir.generators",
+      "org.jetbrains.kotlin.psi2ir.generators.fragments",
+      "org.jetbrains.kotlin.psi2ir.intermediate",
+      "org.jetbrains.kotlin.psi2ir.lazy",
+      "org.jetbrains.kotlin.psi2ir.preprocessing",
+      "org.jetbrains.kotlin.psi2ir.transformations",
+      "org.jetbrains.kotlin.references",
+      "org.jetbrains.kotlin.references.utils",
+      "org.jetbrains.kotlin.renderer",
+      "org.jetbrains.kotlin.resolution",
+      "org.jetbrains.kotlin.resolve",
+      "org.jetbrains.kotlin.resolve.annotations",
+      "org.jetbrains.kotlin.resolve.bindingContextUtil",
+      "org.jetbrains.kotlin.resolve.calls",
+      "org.jetbrains.kotlin.resolve.calls.callUtil",
+      "org.jetbrains.kotlin.resolve.calls.checkers",
+      "org.jetbrains.kotlin.resolve.calls.components",
+      "org.jetbrains.kotlin.resolve.calls.components.candidate",
+      "org.jetbrains.kotlin.resolve.calls.context",
+      "org.jetbrains.kotlin.resolve.calls.inference",
+      "org.jetbrains.kotlin.resolve.calls.inference.components",
+      "org.jetbrains.kotlin.resolve.calls.inference.constraintPosition",
+      "org.jetbrains.kotlin.resolve.calls.inference.model",
+      "org.jetbrains.kotlin.resolve.calls.model",
+      "org.jetbrains.kotlin.resolve.calls.mpp",
+      "org.jetbrains.kotlin.resolve.calls.results",
+      "org.jetbrains.kotlin.resolve.calls.smartcasts",
+      "org.jetbrains.kotlin.resolve.calls.tasks",
+      "org.jetbrains.kotlin.resolve.calls.tower",
+      "org.jetbrains.kotlin.resolve.calls.util",
+      "org.jetbrains.kotlin.resolve.checkers",
+      "org.jetbrains.kotlin.resolve.codegen",
+      "org.jetbrains.kotlin.resolve.constants",
+      "org.jetbrains.kotlin.resolve.constants.evaluate",
+      "org.jetbrains.kotlin.resolve.deprecation",
+      "org.jetbrains.kotlin.resolve.descriptorUtil",
+      "org.jetbrains.kotlin.resolve.diagnostics",
+      "org.jetbrains.kotlin.resolve.extensions",
+      "org.jetbrains.kotlin.resolve.inline",
+      "org.jetbrains.kotlin.resolve.jvm",
+      "org.jetbrains.kotlin.resolve.jvm.annotations",
+      "org.jetbrains.kotlin.resolve.jvm.checkers",
+      "org.jetbrains.kotlin.resolve.jvm.diagnostics",
+      "org.jetbrains.kotlin.resolve.jvm.extensions",
+      "org.jetbrains.kotlin.resolve.jvm.jvmSignature",
+      "org.jetbrains.kotlin.resolve.jvm.kotlinSignature",
+      "org.jetbrains.kotlin.resolve.jvm.modules",
+      "org.jetbrains.kotlin.resolve.jvm.multiplatform",
+      "org.jetbrains.kotlin.resolve.jvm.platform",
+      "org.jetbrains.kotlin.resolve.konan.diagnostics",
+      "org.jetbrains.kotlin.resolve.konan.platform",
+      "org.jetbrains.kotlin.resolve.lazy",
+      "org.jetbrains.kotlin.resolve.lazy.data",
+      "org.jetbrains.kotlin.resolve.lazy.declarations",
+      "org.jetbrains.kotlin.resolve.lazy.descriptors",
+      "org.jetbrains.kotlin.resolve.multiplatform",
+      "org.jetbrains.kotlin.resolve.references",
+      "org.jetbrains.kotlin.resolve.repl",
+      "org.jetbrains.kotlin.resolve.sam",
+      "org.jetbrains.kotlin.resolve.scopes",
+      "org.jetbrains.kotlin.resolve.scopes.optimization",
+      "org.jetbrains.kotlin.resolve.scopes.receivers",
+      "org.jetbrains.kotlin.resolve.scopes.synthetic",
+      "org.jetbrains.kotlin.resolve.scopes.utils",
+      "org.jetbrains.kotlin.resolve.source",
+      "org.jetbrains.kotlin.resolve.typeBinding",
+      "org.jetbrains.kotlin.serialization",
+      "org.jetbrains.kotlin.serialization.deserialization",
+      "org.jetbrains.kotlin.serialization.deserialization.builtins",
+      "org.jetbrains.kotlin.serialization.deserialization.descriptors",
+      "org.jetbrains.kotlin.serialization.js",
+      "org.jetbrains.kotlin.serialization.js.ast",
+      "org.jetbrains.kotlin.stats",
+      "org.jetbrains.kotlin.storage",
+      "org.jetbrains.kotlin.synthetic",
+      "org.jetbrains.kotlin.type",
+      "org.jetbrains.kotlin.types",
+      "org.jetbrains.kotlin.types.checker",
+      "org.jetbrains.kotlin.types.error",
+      "org.jetbrains.kotlin.types.expressions",
+      "org.jetbrains.kotlin.types.expressions.typeInfoFactory",
+      "org.jetbrains.kotlin.types.expressions.unqualifiedSuper",
+      "org.jetbrains.kotlin.types.extensions",
+      "org.jetbrains.kotlin.types.model",
+      "org.jetbrains.kotlin.types.typeUtil",
+      "org.jetbrains.kotlin.types.typesApproximation",
+      "org.jetbrains.kotlin.util",
+      "org.jetbrains.kotlin.util.capitalizeDecapitalize",
+      "org.jetbrains.kotlin.util.collectionUtils",
+      "org.jetbrains.kotlin.util.slicedMap",
+      "org.jetbrains.kotlin.util.vavr",
+      "org.jetbrains.kotlin.utils",
+      "org.jetbrains.kotlin.utils.addToStdlib",
+      "org.jetbrains.kotlin.utils.concurrent.block",
+      "org.jetbrains.kotlin.utils.exceptions",
+      "org.jetbrains.kotlin.utils.fileUtils",
+      "org.jetbrains.kotlin.utils.kapt",
+      "org.jetbrains.kotlin.utils.repl",
+      "org.jetbrains.kotlin.utils.strings",
+      "org.jetbrains.kotlin.wasm.analyze",
+      "org.jetbrains.kotlin.wasm.config",
+      "org.jetbrains.kotlin.wasm.ir",
+      "org.jetbrains.kotlin.wasm.ir.convertors",
+      "org.jetbrains.kotlin.wasm.ir.debug",
+      "org.jetbrains.kotlin.wasm.ir.source.location",
+      "org.jetbrains.kotlin.wasm.resolve",
+      "org.jetbrains.kotlin.wasm.resolve.diagnostics",
+      "org.jetbrains.kotlin.wasm.util",
+      "org.jetbrains.org.objectweb.asm",
+      "org.jetbrains.org.objectweb.asm.commons",
+      "org.jetbrains.org.objectweb.asm.signature",
+      "org.jetbrains.org.objectweb.asm.tree",
+      "org.jetbrains.org.objectweb.asm.tree.analysis",
+      "org.jetbrains.org.objectweb.asm.util",
+      "org.jline.builtins",
+      "org.jline.console",
+      "org.jline.keymap",
+      "org.jline.reader",
+      "org.jline.reader.impl",
+      "org.jline.reader.impl.history",
+      "org.jline.terminal",
+      "org.jline.terminal.impl",
+      "org.jline.terminal.spi",
+      "org.jline.utils",
+      "org.picocontainer"
+    ],
+    "org.jetbrains.kotlin:kotlin-reflect": [
+      "kotlin.reflect.full",
+      "kotlin.reflect.jvm",
+      "kotlin.reflect.jvm.internal",
+      "kotlin.reflect.jvm.internal.calls",
+      "kotlin.reflect.jvm.internal.impl",
+      "kotlin.reflect.jvm.internal.impl.builtins",
+      "kotlin.reflect.jvm.internal.impl.builtins.functions",
+      "kotlin.reflect.jvm.internal.impl.builtins.jvm",
+      "kotlin.reflect.jvm.internal.impl.descriptors",
+      "kotlin.reflect.jvm.internal.impl.descriptors.annotations",
+      "kotlin.reflect.jvm.internal.impl.descriptors.deserialization",
+      "kotlin.reflect.jvm.internal.impl.descriptors.impl",
+      "kotlin.reflect.jvm.internal.impl.descriptors.java",
+      "kotlin.reflect.jvm.internal.impl.descriptors.runtime.components",
+      "kotlin.reflect.jvm.internal.impl.descriptors.runtime.structure",
+      "kotlin.reflect.jvm.internal.impl.incremental",
+      "kotlin.reflect.jvm.internal.impl.incremental.components",
+      "kotlin.reflect.jvm.internal.impl.km",
+      "kotlin.reflect.jvm.internal.impl.km.internal",
+      "kotlin.reflect.jvm.internal.impl.km.internal.common",
+      "kotlin.reflect.jvm.internal.impl.km.internal.extensions",
+      "kotlin.reflect.jvm.internal.impl.km.jvm",
+      "kotlin.reflect.jvm.internal.impl.km.jvm.internal",
+      "kotlin.reflect.jvm.internal.impl.load.java",
+      "kotlin.reflect.jvm.internal.impl.load.java.components",
+      "kotlin.reflect.jvm.internal.impl.load.java.descriptors",
+      "kotlin.reflect.jvm.internal.impl.load.java.lazy",
+      "kotlin.reflect.jvm.internal.impl.load.java.lazy.descriptors",
+      "kotlin.reflect.jvm.internal.impl.load.java.lazy.types",
+      "kotlin.reflect.jvm.internal.impl.load.java.sources",
+      "kotlin.reflect.jvm.internal.impl.load.java.structure",
+      "kotlin.reflect.jvm.internal.impl.load.java.typeEnhancement",
+      "kotlin.reflect.jvm.internal.impl.load.kotlin",
+      "kotlin.reflect.jvm.internal.impl.load.kotlin.header",
+      "kotlin.reflect.jvm.internal.impl.metadata",
+      "kotlin.reflect.jvm.internal.impl.metadata.builtins",
+      "kotlin.reflect.jvm.internal.impl.metadata.deserialization",
+      "kotlin.reflect.jvm.internal.impl.metadata.jvm",
+      "kotlin.reflect.jvm.internal.impl.metadata.jvm.deserialization",
+      "kotlin.reflect.jvm.internal.impl.metadata.serialization",
+      "kotlin.reflect.jvm.internal.impl.name",
+      "kotlin.reflect.jvm.internal.impl.platform",
+      "kotlin.reflect.jvm.internal.impl.protobuf",
+      "kotlin.reflect.jvm.internal.impl.renderer",
+      "kotlin.reflect.jvm.internal.impl.resolve",
+      "kotlin.reflect.jvm.internal.impl.resolve.calls.inference",
+      "kotlin.reflect.jvm.internal.impl.resolve.constants",
+      "kotlin.reflect.jvm.internal.impl.resolve.deprecation",
+      "kotlin.reflect.jvm.internal.impl.resolve.descriptorUtil",
+      "kotlin.reflect.jvm.internal.impl.resolve.jvm",
+      "kotlin.reflect.jvm.internal.impl.resolve.sam",
+      "kotlin.reflect.jvm.internal.impl.resolve.scopes",
+      "kotlin.reflect.jvm.internal.impl.resolve.scopes.receivers",
+      "kotlin.reflect.jvm.internal.impl.serialization",
+      "kotlin.reflect.jvm.internal.impl.serialization.deserialization",
+      "kotlin.reflect.jvm.internal.impl.serialization.deserialization.builtins",
+      "kotlin.reflect.jvm.internal.impl.serialization.deserialization.descriptors",
+      "kotlin.reflect.jvm.internal.impl.storage",
+      "kotlin.reflect.jvm.internal.impl.types",
+      "kotlin.reflect.jvm.internal.impl.types.checker",
+      "kotlin.reflect.jvm.internal.impl.types.error",
+      "kotlin.reflect.jvm.internal.impl.types.extensions",
+      "kotlin.reflect.jvm.internal.impl.types.model",
+      "kotlin.reflect.jvm.internal.impl.types.typeUtil",
+      "kotlin.reflect.jvm.internal.impl.types.typesApproximation",
+      "kotlin.reflect.jvm.internal.impl.util",
+      "kotlin.reflect.jvm.internal.impl.util.capitalizeDecapitalize",
+      "kotlin.reflect.jvm.internal.impl.util.collectionUtils",
+      "kotlin.reflect.jvm.internal.impl.utils",
+      "kotlin.reflect.jvm.internal.impl.utils.addToStdlib",
+      "kotlin.reflect.jvm.internal.types"
+    ],
+    "org.jetbrains.kotlin:kotlin-script-runtime": [
+      "kotlin.script.dependencies",
+      "kotlin.script.experimental.dependencies",
+      "kotlin.script.experimental.location",
+      "kotlin.script.extensions",
+      "kotlin.script.templates",
+      "kotlin.script.templates.standard"
+    ],
+    "org.jetbrains.kotlin:kotlin-stdlib": [
+      "kotlin",
+      "kotlin.annotation",
+      "kotlin.collections",
+      "kotlin.collections.builders",
+      "kotlin.collections.jdk8",
+      "kotlin.collections.unsigned",
+      "kotlin.comparisons",
+      "kotlin.concurrent",
+      "kotlin.concurrent.atomics",
+      "kotlin.concurrent.internal",
+      "kotlin.contracts",
+      "kotlin.coroutines",
+      "kotlin.coroutines.cancellation",
+      "kotlin.coroutines.debug",
+      "kotlin.coroutines.intrinsics",
+      "kotlin.coroutines.jvm.internal",
+      "kotlin.enums",
+      "kotlin.experimental",
+      "kotlin.internal",
+      "kotlin.internal.jdk7",
+      "kotlin.internal.jdk8",
+      "kotlin.io",
+      "kotlin.io.encoding",
+      "kotlin.io.path",
+      "kotlin.jdk7",
+      "kotlin.js",
+      "kotlin.jvm",
+      "kotlin.jvm.functions",
+      "kotlin.jvm.internal",
+      "kotlin.jvm.internal.markers",
+      "kotlin.jvm.internal.unsafe",
+      "kotlin.jvm.jdk8",
+      "kotlin.jvm.optionals",
+      "kotlin.math",
+      "kotlin.properties",
+      "kotlin.random",
+      "kotlin.random.jdk8",
+      "kotlin.ranges",
+      "kotlin.reflect",
+      "kotlin.sequences",
+      "kotlin.streams.jdk8",
+      "kotlin.system",
+      "kotlin.text",
+      "kotlin.text.jdk8",
+      "kotlin.time",
+      "kotlin.time.jdk8",
+      "kotlin.uuid"
+    ],
+    "org.jetbrains.kotlin:kotlin-stdlib-jdk7": null,
+    "org.jetbrains.kotlin:kotlin-stdlib-jdk8": null,
+    "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": [
+      "_COROUTINE",
+      "kotlinx.coroutines",
+      "kotlinx.coroutines.channels",
+      "kotlinx.coroutines.debug",
+      "kotlinx.coroutines.debug.internal",
+      "kotlinx.coroutines.flow",
+      "kotlinx.coroutines.flow.internal",
+      "kotlinx.coroutines.future",
+      "kotlinx.coroutines.internal",
+      "kotlinx.coroutines.intrinsics",
+      "kotlinx.coroutines.scheduling",
+      "kotlinx.coroutines.selects",
+      "kotlinx.coroutines.stream",
+      "kotlinx.coroutines.sync",
+      "kotlinx.coroutines.time"
+    ],
+    "org.jetbrains.kotlinx:kotlinx-html-jvm": [
+      "kotlinx.html",
+      "kotlinx.html.attributes",
+      "kotlinx.html.consumers",
+      "kotlinx.html.dom",
+      "kotlinx.html.impl",
+      "kotlinx.html.org.w3c.dom.events",
+      "kotlinx.html.stream"
+    ],
+    "org.jetbrains.kotlinx:kotlinx-serialization-core": [
+      "kotlinx.serialization",
+      "kotlinx.serialization.builtins",
+      "kotlinx.serialization.descriptors",
+      "kotlinx.serialization.encoding",
+      "kotlinx.serialization.internal",
+      "kotlinx.serialization.modules"
+    ],
+    "org.jetbrains.kotlinx:kotlinx-serialization-json": [
+      "kotlinx.serialization.json",
+      "kotlinx.serialization.json.internal"
+    ],
+    "org.jetbrains:annotations": [
+      "org.intellij.lang.annotations",
+      "org.jetbrains.annotations"
+    ],
+    "org.snakeyaml:snakeyaml-engine": [
+      "org.snakeyaml.engine.external.com.google.gdata.util.common.base",
+      "org.snakeyaml.engine.v2.api",
+      "org.snakeyaml.engine.v2.api.lowlevel",
+      "org.snakeyaml.engine.v2.comments",
+      "org.snakeyaml.engine.v2.common",
+      "org.snakeyaml.engine.v2.composer",
+      "org.snakeyaml.engine.v2.constructor",
+      "org.snakeyaml.engine.v2.constructor.core",
+      "org.snakeyaml.engine.v2.constructor.json",
+      "org.snakeyaml.engine.v2.emitter",
+      "org.snakeyaml.engine.v2.env",
+      "org.snakeyaml.engine.v2.events",
+      "org.snakeyaml.engine.v2.exceptions",
+      "org.snakeyaml.engine.v2.nodes",
+      "org.snakeyaml.engine.v2.parser",
+      "org.snakeyaml.engine.v2.representer",
+      "org.snakeyaml.engine.v2.resolver",
+      "org.snakeyaml.engine.v2.scanner",
+      "org.snakeyaml.engine.v2.schema",
+      "org.snakeyaml.engine.v2.serializer",
+      "org.snakeyaml.engine.v2.tokens",
+      "org.snakeyaml.engine.v2.util"
+    ]
+  },
+  "artifacts": {
+    "com.github.ben-manes.caffeine:caffeine": {
+      "jvm": {
+        "version": "2.9.3",
+        "files": [
+          {
+            "name": "caffeine-2.9.3.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ben-manes/caffeine/caffeine/2.9.3/caffeine-2.9.3.jar",
+            "sha256": "1e0a7bbef1dd791653143f3f05d0e489934bf5481e58a87c9e619cd46b68729b"
+          }
+        ],
+        "deps": [
+          "com.google.errorprone:error_prone_annotations",
+          "org.checkerframework:checker-qual"
+        ]
+      }
+    },
+    "com.google.errorprone:error_prone_annotations": {
+      "jvm": {
+        "version": "2.50.0",
+        "files": [
+          {
+            "name": "error_prone_annotations-2.50.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.50.0/error_prone_annotations-2.50.0.jar",
+            "sha256": "4667724877f1d37a689202da191e23efa7657c62eef93ccdac406eccfe5cdd0a"
+          }
+        ]
+      }
+    },
+    "dev.detekt:detekt-api": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-api-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-api/2.0.0-alpha.6/detekt-api-2.0.0-alpha.6.jar",
+            "sha256": "8f0034fee79fc86200a8e0fcfe2ff4e79853d58a5bc86201884e613e0f75b022"
+          }
+        ],
+        "deps": [
+          "dev.detekt:detekt-kotlin-analysis-api",
+          "org.jetbrains.kotlin:kotlin-compiler",
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ],
+        "runtime_deps": [
+          "dev.drewhamilton.poko:poko-annotations"
+        ]
+      }
+    },
+    "dev.detekt:detekt-cli": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-cli-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-cli/2.0.0-alpha.6/detekt-cli-2.0.0-alpha.6.jar",
+            "sha256": "b721be68c1cf6ffc6be9cf38dd554ec3865622a51164e3385e7602e532e0b67e"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ],
+        "runtime_deps": [
+          "dev.detekt:detekt-api",
+          "dev.detekt:detekt-core",
+          "dev.detekt:detekt-report-checkstyle",
+          "dev.detekt:detekt-report-html",
+          "dev.detekt:detekt-report-markdown",
+          "dev.detekt:detekt-report-sarif",
+          "dev.detekt:detekt-rules",
+          "dev.detekt:detekt-tooling",
+          "dev.detekt:detekt-utils",
+          "org.jcommander:jcommander",
+          "org.jetbrains.kotlin:kotlin-compiler"
+        ]
+      }
+    },
+    "dev.detekt:detekt-core": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-core-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-core/2.0.0-alpha.6/detekt-core-2.0.0-alpha.6.jar",
+            "sha256": "8af995b6a4e164827eb227660d8d9486b596d6bd5d708bb30cb8d6f5ab5bb697"
+          }
+        ],
+        "deps": [
+          "dev.detekt:detekt-api",
+          "dev.detekt:detekt-tooling",
+          "org.jetbrains.kotlin:kotlin-compiler",
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ],
+        "runtime_deps": [
+          "dev.detekt:detekt-kotlin-analysis-api",
+          "dev.detekt:detekt-kotlin-analysis-api-standalone",
+          "dev.detekt:detekt-metrics",
+          "dev.detekt:detekt-parser",
+          "dev.detekt:detekt-psi-utils",
+          "dev.detekt:detekt-utils",
+          "org.jetbrains.kotlin:kotlin-reflect",
+          "org.snakeyaml:snakeyaml-engine"
+        ]
+      }
+    },
+    "dev.detekt:detekt-kotlin-analysis-api": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-kotlin-analysis-api-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-kotlin-analysis-api/2.0.0-alpha.6/detekt-kotlin-analysis-api-2.0.0-alpha.6.jar",
+            "sha256": "b0dffe98e07832202d19c0cbb2a2402e3a18580a054fe06165aaffc83996b2f6"
+          }
+        ],
+        "runtime_deps": [
+          "com.github.ben-manes.caffeine:caffeine",
+          "org.jetbrains.intellij.deps.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      }
+    },
+    "dev.detekt:detekt-kotlin-analysis-api-standalone": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-kotlin-analysis-api-standalone-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-kotlin-analysis-api-standalone/2.0.0-alpha.6/detekt-kotlin-analysis-api-standalone-2.0.0-alpha.6.jar",
+            "sha256": "08fe542ba4b1552af778549035589e55540b5d167072c3c26b33918fbcfe349b"
+          }
+        ]
+      }
+    },
+    "dev.detekt:detekt-metrics": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-metrics-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-metrics/2.0.0-alpha.6/detekt-metrics-2.0.0-alpha.6.jar",
+            "sha256": "e7966d514b40dabc8f5b485fd75d64b4dd61fd9c2506fc5be6126a6c9ed84761"
+          }
+        ],
+        "deps": [
+          "dev.detekt:detekt-api",
+          "org.jetbrains.kotlin:kotlin-compiler",
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.detekt:detekt-parser": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-parser-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-parser/2.0.0-alpha.6/detekt-parser-2.0.0-alpha.6.jar",
+            "sha256": "cbd3e36e3542f56621890f38e788a32585f7f205faad30310efb41af20deb336"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-compiler",
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.detekt:detekt-psi-utils": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-psi-utils-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-psi-utils/2.0.0-alpha.6/detekt-psi-utils-2.0.0-alpha.6.jar",
+            "sha256": "2a840710986d98b100b9ebc474b15a699e186440194a7b3a08b692e9668f668c"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-compiler",
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.detekt:detekt-report-checkstyle": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-report-checkstyle-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-report-checkstyle/2.0.0-alpha.6/detekt-report-checkstyle-2.0.0-alpha.6.jar",
+            "sha256": "d7c711544a1a0d36b853f0adde3a11eb6a71fe2b9aa8ce59a022d96b8e92ce71"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.detekt:detekt-report-html": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-report-html-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-report-html/2.0.0-alpha.6/detekt-report-html-2.0.0-alpha.6.jar",
+            "sha256": "e1a8169b0b0bfafdaf73424c2a4047b4ffa617162b55f30c5e715ec564cc5e3f"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ],
+        "runtime_deps": [
+          "dev.detekt:detekt-utils",
+          "org.jetbrains.kotlinx:kotlinx-html-jvm"
+        ]
+      }
+    },
+    "dev.detekt:detekt-report-markdown": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-report-markdown-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-report-markdown/2.0.0-alpha.6/detekt-report-markdown-2.0.0-alpha.6.jar",
+            "sha256": "72caa38a2817a861bb835b418e4d0a1a4010293dad978e78f90ac76ac87476a2"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ],
+        "runtime_deps": [
+          "dev.detekt:detekt-metrics",
+          "dev.detekt:detekt-utils"
+        ]
+      }
+    },
+    "dev.detekt:detekt-report-sarif": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-report-sarif-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-report-sarif/2.0.0-alpha.6/detekt-report-sarif-2.0.0-alpha.6.jar",
+            "sha256": "d5399be3d48401a0ce5eeafb717acb6c8380fc4fae845625e5be42657d07259e"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ],
+        "runtime_deps": [
+          "io.github.detekt.sarif4k:sarif4k"
+        ]
+      }
+    },
+    "dev.detekt:detekt-rules": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-rules-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-rules/2.0.0-alpha.6/detekt-rules-2.0.0-alpha.6.jar",
+            "sha256": "c6deada2fac53b8ea6523dbda77597b128006674616f140f04df23264c6d1aa3"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ],
+        "runtime_deps": [
+          "dev.detekt:detekt-rules-comments",
+          "dev.detekt:detekt-rules-complexity",
+          "dev.detekt:detekt-rules-coroutines",
+          "dev.detekt:detekt-rules-empty-blocks",
+          "dev.detekt:detekt-rules-exceptions",
+          "dev.detekt:detekt-rules-naming",
+          "dev.detekt:detekt-rules-performance",
+          "dev.detekt:detekt-rules-potential-bugs",
+          "dev.detekt:detekt-rules-style"
+        ]
+      }
+    },
+    "dev.detekt:detekt-rules-comments": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-rules-comments-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-rules-comments/2.0.0-alpha.6/detekt-rules-comments-2.0.0-alpha.6.jar",
+            "sha256": "db8ee70c4f1a70b55d7e0ad5a7adcde0eb85b5cc1e345296cdf9b01aa2336a0e"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.detekt:detekt-rules-complexity": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-rules-complexity-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-rules-complexity/2.0.0-alpha.6/detekt-rules-complexity-2.0.0-alpha.6.jar",
+            "sha256": "d392170d4c52d0790f61a6298004e7b3f5b01df9fe99c4db2df110d7d1c78e8a"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.detekt:detekt-rules-coroutines": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-rules-coroutines-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-rules-coroutines/2.0.0-alpha.6/detekt-rules-coroutines-2.0.0-alpha.6.jar",
+            "sha256": "f827aeaf7cec376c469e85ee07621fe5b86e2e578f0c796a97d2465f81acb94a"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.detekt:detekt-rules-empty-blocks": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-rules-empty-blocks-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-rules-empty-blocks/2.0.0-alpha.6/detekt-rules-empty-blocks-2.0.0-alpha.6.jar",
+            "sha256": "ba4567ee229fd411a952d6c62f445b17469a844190b5b9caa7e2b833fcf85cf1"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.detekt:detekt-rules-exceptions": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-rules-exceptions-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-rules-exceptions/2.0.0-alpha.6/detekt-rules-exceptions-2.0.0-alpha.6.jar",
+            "sha256": "e1db7894d72e7ce3b0cacf595beece178e9427d2550597d17e8c302ea2405850"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.detekt:detekt-rules-naming": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-rules-naming-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-rules-naming/2.0.0-alpha.6/detekt-rules-naming-2.0.0-alpha.6.jar",
+            "sha256": "2fdac9546984ed686455632d353807dce8b80dbafd63581e998217d9d8d25e75"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.detekt:detekt-rules-performance": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-rules-performance-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-rules-performance/2.0.0-alpha.6/detekt-rules-performance-2.0.0-alpha.6.jar",
+            "sha256": "acd9eedf91ecad47a36fea47f979310c525fe6e532936be9fd3341c0a24cd30f"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.detekt:detekt-rules-potential-bugs": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-rules-potential-bugs-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-rules-potential-bugs/2.0.0-alpha.6/detekt-rules-potential-bugs-2.0.0-alpha.6.jar",
+            "sha256": "8bbe2dbfeaf395d1eab0c0a4c1c22e9b9b9a3a12bde51ed7544244abc9039afe"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.detekt:detekt-rules-style": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-rules-style-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-rules-style/2.0.0-alpha.6/detekt-rules-style-2.0.0-alpha.6.jar",
+            "sha256": "3cc055c19fc7b542f5dfe814ce443f41d19c8c24625b2d9a6daeb272d3bf1c37"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.detekt:detekt-tooling": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-tooling-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-tooling/2.0.0-alpha.6/detekt-tooling-2.0.0-alpha.6.jar",
+            "sha256": "5ea31725f051d28db19ab33153b565d27d853dd8310720c7357648c3d5d6b721"
+          }
+        ],
+        "deps": [
+          "dev.detekt:detekt-api",
+          "org.jetbrains.kotlin:kotlin-compiler",
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.detekt:detekt-utils": {
+      "jvm": {
+        "version": "2.0.0-alpha.6",
+        "files": [
+          {
+            "name": "detekt-utils-2.0.0-alpha.6.jar",
+            "url": "https://repo1.maven.org/maven2/dev/detekt/detekt-utils/2.0.0-alpha.6/detekt-utils-2.0.0-alpha.6.jar",
+            "sha256": "e61a3341c0091d204c4f96d3bfe619724807b698fcb6f105df74b3051a38b474"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "dev.drewhamilton.poko:poko-annotations": {
+      "jvm": {
+        "version": "0.23.2",
+        "files": [
+          {
+            "name": "poko-annotations-jvm-0.23.2.jar",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations-jvm/0.23.2/poko-annotations-jvm-0.23.2.jar",
+            "sha256": "9042e6da375ffa8e201d349e7ac926d1bab7694a818102c3a6a2f7d6e014bcc8"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "io.github.detekt.sarif4k:sarif4k": {
+      "jvm": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "sarif4k-jvm-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/github/detekt/sarif4k/sarif4k-jvm/0.6.0/sarif4k-jvm-0.6.0.jar",
+            "sha256": "b3ac96dd97acba8318dbe26f6a432d6c6db91c46c780805e8928b8103e5763dc"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib",
+          "org.jetbrains.kotlinx:kotlinx-serialization-json"
+        ]
+      }
+    },
+    "org.checkerframework:checker-qual": {
+      "jvm": {
+        "version": "4.3.1",
+        "files": [
+          {
+            "name": "checker-qual-4.3.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/checkerframework/checker-qual/4.3.1/checker-qual-4.3.1.jar",
+            "sha256": "66c061a19e20fb005c173169534aba7bf78e904a8a6da6fe8c6e97d277f6d347"
+          }
+        ]
+      }
+    },
+    "org.jcommander:jcommander": {
+      "jvm": {
+        "version": "1.85",
+        "files": [
+          {
+            "name": "jcommander-1.85.jar",
+            "url": "https://repo1.maven.org/maven2/org/jcommander/jcommander/1.85/jcommander-1.85.jar",
+            "sha256": "fa7552d2831a2b20778d86851d093edca68fbc0a77f792b6223110e4fae67a70"
+          }
+        ]
+      }
+    },
+    "org.jetbrains.intellij.deps.kotlinx:kotlinx-coroutines-core": {
+      "jvm": {
+        "version": "1.10.2-intellij-1",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-jvm-1.10.2-intellij-1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/intellij/deps/kotlinx/kotlinx-coroutines-core-jvm/1.10.2-intellij-1/kotlinx-coroutines-core-jvm-1.10.2-intellij-1.jar",
+            "sha256": "1e9b4b60644ca8dd5e9687ad096aee0028bd9d3a24afed3e38565b22ca726ee0"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib",
+          "org.jetbrains:annotations"
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-build-tools-api": {
+      "jvm": {
+        "version": "2.4.10",
+        "files": [
+          {
+            "name": "kotlin-build-tools-api-2.4.10.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-build-tools-api/2.4.10/kotlin-build-tools-api-2.4.10.jar",
+            "sha256": "3953d283e7710c990672e403a87df393d9726a9bf3e172194ebb5c33e062fcb0"
+          }
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-compiler": {
+      "jvm": {
+        "version": "2.4.10",
+        "files": [
+          {
+            "name": "kotlin-compiler-2.4.10.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-compiler/2.4.10/kotlin-compiler-2.4.10.jar",
+            "sha256": "db12b1af0db0e10eeedfc15d5dac0316604e5c556321f60e3bcd73075a66f0a3"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-build-tools-api",
+          "org.jetbrains.kotlin:kotlin-reflect",
+          "org.jetbrains.kotlin:kotlin-script-runtime",
+          "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm"
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-reflect": {
+      "jvm": {
+        "version": "2.4.10",
+        "files": [
+          {
+            "name": "kotlin-reflect-2.4.10.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-reflect/2.4.10/kotlin-reflect-2.4.10.jar",
+            "sha256": "25a1aef7454d46548ecaaf51021b0e52e38141a62ed75af124da109b7324c4e5"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-script-runtime": {
+      "jvm": {
+        "version": "2.4.10",
+        "files": [
+          {
+            "name": "kotlin-script-runtime-2.4.10.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-script-runtime/2.4.10/kotlin-script-runtime-2.4.10.jar",
+            "sha256": "f4a5b30c2fdfbe386b097101b7989dbeea3743c06396136664784e08e15c6899"
+          }
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-stdlib": {
+      "jvm": {
+        "version": "2.4.20",
+        "files": [
+          {
+            "name": "kotlin-stdlib-2.4.20.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.20/kotlin-stdlib-2.4.20.jar",
+            "sha256": "2226de463d309d4a5500a481320b3dea515a6981dcae1def531fbc158884e25f"
+          }
+        ],
+        "deps": [
+          "org.jetbrains:annotations"
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-stdlib-jdk7": {
+      "jvm": {
+        "version": "2.4.10",
+        "files": [
+          {
+            "name": "kotlin-stdlib-jdk7-2.4.10.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk7/2.4.10/kotlin-stdlib-jdk7-2.4.10.jar",
+            "sha256": "e7a8fe7cacf3b9c838f6b3fcb26dfdd41f844551a3ba67fd3f959a0d9d5c0bef"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-stdlib-jdk8": {
+      "jvm": {
+        "version": "2.4.10",
+        "files": [
+          {
+            "name": "kotlin-stdlib-jdk8-2.4.10.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk8/2.4.10/kotlin-stdlib-jdk8-2.4.10.jar",
+            "sha256": "08346b7f4cfba40c1139161c9f30b68199f425cecf3b63de67838063f34a05c7"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib",
+          "org.jetbrains.kotlin:kotlin-stdlib-jdk7"
+        ]
+      }
+    },
+    "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": {
+      "jvm": {
+        "version": "1.8.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-jvm-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.8.0/kotlinx-coroutines-core-jvm-1.8.0.jar",
+            "sha256": "9860906a1937490bf5f3b06d2f0e10ef451e65b95b269f22daf68a3d1f5065c5"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib",
+          "org.jetbrains:annotations"
+        ]
+      }
+    },
+    "org.jetbrains.kotlinx:kotlinx-html-jvm": {
+      "jvm": {
+        "version": "0.12.0",
+        "files": [
+          {
+            "name": "kotlinx-html-jvm-0.12.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-html-jvm/0.12.0/kotlinx-html-jvm-0.12.0.jar",
+            "sha256": "f854126f39acbd963fd54e0cd226000a151a76f7225ee28185d52f44e262befb"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "org.jetbrains.kotlinx:kotlinx-serialization-core": {
+      "jvm": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-core-jvm-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.11.0/kotlinx-serialization-core-jvm-1.11.0.jar",
+            "sha256": "f4a801c647d4351327cd9e1ac4113e2be9ea37a64ab0abae269c25a52e28f35d"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "org.jetbrains.kotlinx:kotlinx-serialization-json": {
+      "jvm": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-json-jvm-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.11.0/kotlinx-serialization-json-jvm-1.11.0.jar",
+            "sha256": "563a25b4eb5c9128ae9c2479f3d1a5c44dcd176112b91cf03682e906eba5c935"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      }
+    },
+    "org.jetbrains:annotations": {
+      "jvm": {
+        "version": "23.0.0",
+        "files": [
+          {
+            "name": "annotations-23.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/23.0.0/annotations-23.0.0.jar",
+            "sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05"
+          }
+        ]
+      }
+    },
+    "org.snakeyaml:snakeyaml-engine": {
+      "jvm": {
+        "version": "2.10",
+        "files": [
+          {
+            "name": "snakeyaml-engine-2.10.jar",
+            "url": "https://repo1.maven.org/maven2/org/snakeyaml/snakeyaml-engine/2.10/snakeyaml-engine-2.10.jar",
+            "sha256": "c99d9fd66c7c251d881a9cd95089b7c8044c29a1b02983d7036981bd4354ec37"
+          }
+        ]
+      }
+    }
+  }
+}

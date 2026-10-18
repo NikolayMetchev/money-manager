@@ -172,4 +172,29 @@ maven_kmp.install(
         "https://repo1.maven.org/maven2",
     ],
 )
-use_repo(maven_kmp, "maven_kmp")
+
+# The lint tools (#1015), each resolved on its own like the Gradle configuration (`ktlint`, `detekt`) it matches:
+# only the build-tool-pins bundle applies to those (moneymanager.kotlin-convention's `configurations.all`).
+maven_kmp.install(
+    name = "detekt_cli",
+    catalog = "//gradle:libs.versions.toml",
+    force_bundles = ["build-tool-pins"],
+    libraries = ["detekt-cli"],
+    lock_file = "//bazel/kmp/deps:detekt_cli.lock.json",
+    platforms = ["jvm"],
+    repositories = ["https://repo1.maven.org/maven2"],
+    resolve_stdlib = True,
+)
+
+maven_kmp.install(
+    name = "ktlint_cli",
+    catalog = "//gradle:libs.versions.toml",
+    force_bundles = ["build-tool-pins"],
+    libraries = ["ktlint-cli"],
+    lock_file = "//bazel/kmp/deps:ktlint_cli.lock.json",
+    platforms = ["jvm"],
+    repositories = ["https://repo1.maven.org/maven2"],
+    resolve_stdlib = True,
+)
+
+use_repo(maven_kmp, "detekt_cli", "ktlint_cli", "maven_kmp")

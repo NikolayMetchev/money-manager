@@ -52,8 +52,19 @@ func fromToolchain(module string) bool {
 		strings.HasPrefix(module, "org.jetbrains.kotlin:kotlin-test")
 }
 
+func (r *Resolver) forced(p Platform, module string) (string, bool) {
+	if v, ok := r.forces[module]; ok {
+		return v, true
+	}
+	if p.Konan == "" {
+		v, ok := r.classpathForces[module]
+		return v, ok
+	}
+	return "", false
+}
+
 func (r *Resolver) excluded(module string) bool {
-	return fromToolchain(module) || r.excludes[module]
+	return (!r.resolveStdlib && fromToolchain(module)) || r.excludes[module]
 }
 
 type attrs map[string]any
@@ -73,10 +84,12 @@ func (a attrs) str(key string) (string, bool) {
 }
 
 // wants decides whether a variant fits the platform (and usage), and how well: 2 = it names the platform,
-// 1 = it fits without naming one (a plain Java library), 0 = it doesn't fit.
+// 1 = it fits without naming one (a plain Java library, or one that names no usage either), 0 = it doesn't fit.
+// As in Gradle, an attribute the variant leaves out is compatible: kotlin-stdlib-common's only variant names
+// nothing but its category.
 func wants(p Platform, usage string, a attrs) int {
 	is := func(key, value string) bool { v, ok := a.str(key); return !ok || v == value }
-	if v, _ := a.str("org.gradle.usage"); v != usage {
+	if !is("org.gradle.usage", usage) {
 		return 0
 	}
 	if !is("org.gradle.category", "library") {
@@ -95,7 +108,7 @@ func wants(p Platform, usage string, a attrs) int {
 				return 0
 			}
 		}
-		if hasPlatform {
+		if _, hasUsage := a.str("org.gradle.usage"); hasPlatform && hasUsage {
 			return 2
 		}
 		return 1
@@ -130,12 +143,20 @@ type node struct {
 	api        []Coordinate
 	runtime    []Coordinate
 	sourceSets []string
+	// platforms are the BOMs it depends on (`platform(…)`), and constraints its own dependencyConstraints and,
+	// on a BOM, the versions it aligns. Neither is a dependency: they only raise versions (Resolve).
+	platforms   []Coordinate
+	constraints []Coordinate
 }
 
 type Resolver struct {
-	fetch    *Fetcher
-	forces   map[string]string // module → version
-	excludes map[string]bool
+	fetch  *Fetcher
+	forces map[string]string // module → version
+	// classpathForces apply on the JVM and to common metadata, not on native (Gradle's classpath substitutions).
+	classpathForces map[string]string
+	excludes        map[string]bool
+	// resolveStdlib resolves the toolchain's modules too: a tool's classpath has its own stdlib.
+	resolveStdlib bool
 	// consumers are the platforms common code is compiled for, whose variants decide what it sees.
 	consumers []Platform
 	mu        sync.Mutex
@@ -212,7 +233,11 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 		n.files = append(n.files, File{Name: f.Name, URL: dir + "/" + f.URL, Sha256: f.Sha256})
 	}
 	n.api = r.dependencies(api.Dependencies)
+	n.platforms = r.platformDependencies(api.Dependencies)
+	n.constraints = r.constraints(api.DependencyConstraints)
 	if runtime != nil {
+		n.platforms = append(n.platforms, r.platformDependencies(runtime.Dependencies)...)
+		n.constraints = append(n.constraints, r.constraints(runtime.DependencyConstraints)...)
 		apiSet := map[string]bool{}
 		for _, d := range n.api {
 			apiSet[d.Module()] = true
@@ -226,11 +251,77 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 	return n, nil
 }
 
+func isPlatform(d Dependency) bool {
+	v, _ := attrs(d.Attributes).str("org.gradle.category")
+	return v == "platform" || v == "enforced-platform"
+}
+
+// platformDependencies are the BOMs among deps: Resolve applies their constraints.
+func (r *Resolver) platformDependencies(deps []Dependency) []Coordinate {
+	var out []Coordinate
+	for _, d := range deps {
+		if isPlatform(d) && d.version() != "" {
+			out = append(out, Coordinate{d.Group, d.Module, d.version()})
+		}
+	}
+	return out
+}
+
+func (r *Resolver) constraints(deps []Dependency) []Coordinate {
+	var out []Coordinate
+	for _, d := range deps {
+		if !r.excluded(d.Group+":"+d.Module) && d.version() != "" {
+			out = append(out, Coordinate{d.Group, d.Module, d.version()})
+		}
+	}
+	return out
+}
+
+// platform loads a BOM's constraints (every variant's: a BOM's variants all align the same modules).
+func (r *Resolver) platform(c Coordinate) ([]Coordinate, error) {
+	key := "platform|" + c.String()
+	r.mu.Lock()
+	if n, ok := r.nodes[key]; ok {
+		r.mu.Unlock()
+		return n.constraints, nil
+	}
+	r.mu.Unlock()
+	dir, err := r.fetch.moduleDir(c)
+	if err != nil {
+		return nil, err
+	}
+	n := &node{}
+	module, err := r.fetch.gradleModule(dir, c)
+	switch {
+	case errors.Is(err, errNotFound):
+		// A POM BOM (kotlinx-serialization-bom) constrains what its dependencyManagement lists.
+		pom, err := r.fetch.effectivePom(c)
+		if err != nil {
+			return nil, err
+		}
+		for module, version := range pom.managed {
+			if ga := strings.SplitN(module, ":", 2); len(ga) == 2 && !r.excluded(module) && version != "" {
+				n.constraints = append(n.constraints, Coordinate{ga[0], ga[1], version})
+			}
+		}
+	case err != nil:
+		return nil, err
+	default:
+		for _, v := range module.Variants {
+			n.constraints = append(n.constraints, r.constraints(v.DependencyConstraints)...)
+		}
+	}
+	r.mu.Lock()
+	r.nodes[key] = n
+	r.mu.Unlock()
+	return n.constraints, nil
+}
+
 func (r *Resolver) dependencies(deps []Dependency) []Coordinate {
 	var out []Coordinate
 	for _, d := range deps {
-		// A platform/BOM dependency only aligns versions; the highest-version rule already does that.
-		if v, _ := attrs(d.Attributes).str("org.gradle.category"); v == "platform" || v == "enforced-platform" {
+		// A platform/BOM dependency is no library: Resolve applies its constraints (platformDependencies).
+		if isPlatform(d) {
 			continue
 		}
 		if r.excluded(d.Group+":"+d.Module) || d.version() == "" {
@@ -285,9 +376,14 @@ func (r *Resolver) loadPom(c Coordinate, dir string) (*node, error) {
 // with no variant for the platform (a JVM-only library on native) are left out.
 func (r *Resolver) Resolve(p Platform, roots []Coordinate) (map[string]Resolved, []string, error) {
 	version := map[string]string{}
+	// Gradle's constraints (a node's dependencyConstraints, a BOM's alignment) join the highest-version rule
+	// for a module something depends on, and never bring one in. A force still wins.
+	constraint := map[string]string{}
 	request := func(c Coordinate) bool {
-		if forced, ok := r.forces[c.Module()]; ok {
+		if forced, ok := r.forced(p, c.Module()); ok {
 			c.Version = forced
+		} else if v, ok := constraint[c.Module()]; ok && CompareVersions(v, c.Version) > 0 {
+			c.Version = v
 		}
 		if cur, ok := version[c.Module()]; ok && CompareVersions(c.Version, cur) <= 0 {
 			return false
@@ -295,8 +391,33 @@ func (r *Resolver) Resolve(p Platform, roots []Coordinate) (map[string]Resolved,
 		version[c.Module()] = c.Version
 		return true
 	}
-	var skipped []string
 	var queue []Coordinate
+	// constrain records a constraint, and re-requests a module already in the graph at a lower version.
+	constrain := func(c Coordinate) {
+		if v, ok := constraint[c.Module()]; ok && CompareVersions(c.Version, v) <= 0 {
+			return
+		}
+		constraint[c.Module()] = c.Version
+		if _, ok := version[c.Module()]; ok && request(c) {
+			queue = append(queue, c)
+		}
+	}
+	platformVersion := map[string]string{}
+	applyPlatform := func(c Coordinate) error {
+		if cur, ok := platformVersion[c.Module()]; ok && CompareVersions(c.Version, cur) <= 0 {
+			return nil
+		}
+		platformVersion[c.Module()] = c.Version
+		cs, err := r.platform(c)
+		if err != nil {
+			return err
+		}
+		for _, k := range cs {
+			constrain(k)
+		}
+		return nil
+	}
+	var skipped []string
 	for _, root := range roots {
 		if _, err := r.node(p, root); errors.Is(err, errNoVariant) {
 			skipped = append(skipped, root.Module())
@@ -313,8 +434,21 @@ func (r *Resolver) Resolve(p Platform, roots []Coordinate) (map[string]Resolved,
 		queue = queue[1:]
 		c.Version = version[c.Module()]
 		n, err := r.node(p, c)
+		if errors.Is(err, errNoVariant) {
+			// Gradle drops what only a superseded version asked for (kotlin-stdlib 1.6's POM wants
+			// kotlin-stdlib-common, which has no JVM variant since 1.9). The walk below fails if it's still reached.
+			continue
+		}
 		if err != nil {
 			return nil, nil, err
+		}
+		for _, k := range n.constraints {
+			constrain(k)
+		}
+		for _, b := range n.platforms {
+			if err := applyPlatform(b); err != nil {
+				return nil, nil, err
+			}
 		}
 		for _, d := range append(append([]Coordinate{}, n.api...), n.runtime...) {
 			if request(d) {
@@ -351,7 +485,7 @@ func (r *Resolver) Resolve(p Platform, roots []Coordinate) (map[string]Resolved,
 		out[module] = res
 		for _, d := range append(append([]string{}, res.Deps...), res.Runtime...) {
 			if err := walk(d); err != nil {
-				return err
+				return fmt.Errorf("%w\n  needed by %s", err, c)
 			}
 		}
 		return nil

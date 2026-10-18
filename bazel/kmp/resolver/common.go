@@ -62,7 +62,13 @@ func (r *Resolver) loadMetadata(p Platform, c Coordinate, dir string, module *Gr
 			deps = append(deps, d)
 		}
 	}
-	return &node{files: []File{file}, api: r.dependencies(deps), sourceSets: sourceSets}, nil
+	return &node{
+		files:       []File{file},
+		api:         r.dependencies(deps),
+		sourceSets:  sourceSets,
+		platforms:   r.platformDependencies(variant.Dependencies),
+		constraints: r.constraints(variant.DependencyConstraints),
+	}, nil
 }
 
 // visibleSourceSets are the library's source sets that every consumer target's variant includes, and the

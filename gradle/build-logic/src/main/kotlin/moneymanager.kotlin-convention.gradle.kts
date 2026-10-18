@@ -163,6 +163,8 @@ detekt {
 }
 
 ktlint {
+    // The engine Bazel's //bazel/kmp/lint runs too (catalog `ktlint-cli`), so both lint the same way.
+    version.set(libs.versions.ktlint.engine)
     android.set(false)
     // Allow CI to ignore failures when auto-formatting via system property
     // Usage: ./gradlew lintFormat -Dktlint.ignoreFailures=true

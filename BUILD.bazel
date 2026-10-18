@@ -7,6 +7,31 @@ load("@gazelle//:def.bzl", "gazelle", "gazelle_binary")
 # The app version, compiled into app/di/core (#1011).
 exports_files(["VERSION"])
 
+# detekt's configuration, over its defaults (//bazel/kmp/lint, #1015).
+exports_files(["detekt.yml"])
+
+# The .editorconfig files no module's package owns (app/presenter's, app/ui's): every ktlint test carries them,
+# at their own paths, and ktlint reads the ones above each file, as it does in the tree.
+filegroup(
+    name = "editorconfigs",
+    # Depth-limited: `**` would walk every Gradle build directory in the tree.
+    srcs = glob(
+        [
+            "*/.editorconfig",
+            "*/*/.editorconfig",
+            "*/*/*/.editorconfig",
+        ],
+        allow_empty = True,
+    ),
+    visibility = ["//visibility:public"],
+)
+
+# ktlint -F over the tree, as `./gradlew lintFormat` (#1015).
+alias(
+    name = "format",
+    actual = "//bazel/kmp/lint:format",
+)
+
 gazelle_binary(
     name = "gazelle_bin",
     languages = ["//bazel/gazelle/kmp"],

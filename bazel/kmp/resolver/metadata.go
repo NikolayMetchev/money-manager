@@ -155,7 +155,9 @@ type Variant struct {
 		Group, Module, Version string
 	} `json:"available-at"`
 	Dependencies []Dependency
-	Files        []struct {
+	// DependencyConstraints raise a module's version when something else brings it in; they never add it.
+	DependencyConstraints []Dependency `json:"dependencyConstraints"`
+	Files                 []struct {
 		Name, URL, Sha256 string
 	}
 }
