@@ -89,3 +89,71 @@ jobs:
               grep -E "Streaming build results to|INFO: [0-9,]+ processes" "$step.log" | sed 's/^/    /'
             } >> "$GITHUB_STEP_SUMMARY"
           done
+
+  installer:
+    name: Bazel installer (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    # jpackage packages only for its host, so each OS builds its own installer (#1020): Compose's
+    # packageReleaseDeb/Dmg/Msi with the native mm bundled, as release.yml builds them. Then it installs it
+    # and starts the app, mm-jvm and mm. ProGuard's optimizer is off, as in build.yml's Desktop ProGuard check.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-latest
+            config: rbe
+          - name: macOS
+            os: macos-latest
+            config: cache
+          - name: Windows
+            os: windows-latest
+            config: cache
+    env:
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.19.1
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-installer-${{ matrix.name }}
+          repository-cache: true
+          cache-save: ${{ github.event_name == 'push' }}
+
+      - name: Use BuildBuddy
+        if: env.BUILDBUDDY_API_KEY != ''
+        run: |
+          {
+            echo "common --config=${{ matrix.config }}"
+            echo "common --remote_header=x-buildbuddy-api-key=${BUILDBUDDY_API_KEY}"
+            echo "common --build_metadata=ROLE=CI"
+            echo "common --build_metadata=REPO_URL=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          } > user.bazelrc
+
+      # jpackage's deb needs fakeroot; the smoke test's display is Xvfb.
+      - name: Install packaging tools
+        if: matrix.name == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y fakeroot xvfb
+
+      - name: Build the installer
+        run: >-
+          bazel build --define=proguard_optimize=false --define=bundle_native_cli=true
+          //app/main/jvm:installer 2>&1 | tee build.log
+
+      - name: Install and start it
+        run: bazel/kmp/jpackage/install_smoke_test.sh bazel-bin/app/main/jvm/installer "$(cat VERSION)"
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: bazel-installer-${{ matrix.name }}
+          path: bazel-bin/app/main/jvm/installer/*
+          retention-days: 7

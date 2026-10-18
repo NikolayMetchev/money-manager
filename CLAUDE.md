@@ -191,6 +191,14 @@ stream to BuildBuddy, anonymously.
   platforms' natives (Gradle's artifact transform). `:release` runs the shrunk app and
   `:release_service_providers_test` is `verifyProguardServiceProviders`; both are `manual`, and
   `--define=proguard_optimize=false` is `-PproguardOptimize=false`.
+- **Desktop installers** (`//bazel/kmp/jpackage`, #1020): `jlink_runtime`, `jpackage_app_image` and `jpackage_installer`
+  are Compose's `createRuntimeImage`, `createReleaseDistributable` and `packageRelease<Format>`, with the arguments
+  Compose passes. `JPackageRunner` lays out jpackage's input as Compose does (skiko's natives unpacked next to the
+  jars, macOS's `Info.plist` and ad-hoc signing on Apple Silicon) and reads Compose's default icons and entitlements
+  from the plugin jar. jpackage packages only for its host: `//app/main/jvm:installer` is a deb, dmg or msi by OS
+  (WiX 3.11 is `@wix`, as Compose downloads it), and its action runs locally (dpkg-deb/fakeroot, hdiutil, WiX).
+  `--define=bundle_native_cli=true` is `-PbundleNativeCli=true`. The `installer` job in `bazel.yml` installs it on
+  each OS and starts the app, `mm-jvm` and `mm` (`install_smoke_test.sh`).
 - **Lint** (`//bazel/kmp/lint`, #1015): every `kmp_library`/`kmp_test` gets `:<name>_ktlint` and `:<name>_detekt`,
   tests that run the tool's own `main` over the hand-written sources (generated ones are left out, as the Gradle
   plugins filter them), and report the same findings Gradle does. ktlint is the catalog's `ktlint-engine` (Gradle's

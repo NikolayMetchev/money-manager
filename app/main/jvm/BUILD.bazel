@@ -1,6 +1,7 @@
 load("@rules_java//java:java_binary.bzl", "java_binary")
 load("@rules_java//java:java_test.bzl", "java_test")
 load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp/jpackage:jpackage.bzl", "jlink_runtime", "jpackage_app_image", "jpackage_installer")
 load("//bazel/kmp/proguard:proguard.bzl", "proguard_jars")
 
 # gazelle:kmp_generate true
@@ -98,4 +99,74 @@ java_test(
     tags = ["manual"],
     use_testrunner = False,
     runtime_deps = ["//bazel/kmp/proguard:service_provider_check"],
+)
+
+# Compose's native distributions (#1020): `:runtime` is createRuntimeImage, `:app_image` createReleaseDistributable,
+# `:installer` packageReleaseDeb/Dmg/Msi, for the host (jpackage packages only for its own OS). The release
+# workflow passes `--define=bundle_native_cli=true` (Gradle's -PbundleNativeCli=true) to bundle the native mm.
+jlink_runtime(
+    name = "runtime",
+    # Compose's defaults plus `modules(…)`: java.sql, and jdk.unsupported for mm-jvm's Ctrl-C handler (sun.misc.Signal).
+    modules = [
+        "java.base",
+        "java.desktop",
+        "java.logging",
+        "jdk.crypto.ec",
+        "java.sql",
+        "jdk.unsupported",
+    ],
+    tags = ["manual"],
+)
+
+jpackage_app_image(
+    name = "app_image",
+    package_name = "MoneyManager",
+    app_content = select({
+        "//bazel/kmp/jpackage:bundle_native_cli": "//app/main/cli:mm",
+        "//conditions:default": None,
+    }),
+    args = select({
+        "@platforms//os:windows": ["--win-console"],  # Show console window to see error output
+        "//conditions:default": [],
+    }),
+    bundle_id = "com.moneymanager.app",
+    description = "Personal Finance Management Application",
+    jars = ":release_jars",
+    java_options = _JVM_FLAGS,
+    launchers = {"mm-jvm.properties": "mm-jvm"},
+    main_class = _MAIN_CLASS,
+    main_jar = "app-main-jvm.jar",
+    runtime = ":runtime",
+    tags = ["manual"],
+    vendor = "MoneyManager",
+    version_file = "//:VERSION",
+)
+
+jpackage_installer(
+    name = "installer",
+    app_image = ":app_image",
+    args = select({
+        "@platforms//os:windows": [
+            "--win-dir-chooser",
+            "--win-per-user-install",
+            "--win-shortcut",
+            "--win-menu",
+            "--win-menu-group",
+            "MoneyManager",
+            # IMPORTANT: Keep this UUID constant across versions to allow upgrades/reinstalls
+            "--win-upgrade-uuid",
+            "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        ],
+        "//conditions:default": [],
+    }),
+    tags = ["manual"],
+    type = select({
+        "@platforms//os:macos": "dmg",
+        "@platforms//os:windows": "msi",
+        "//conditions:default": "deb",
+    }),
+    wix = select({
+        "@platforms//os:windows": "@wix",
+        "//conditions:default": None,
+    }),
 )

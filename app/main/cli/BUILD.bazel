@@ -123,6 +123,8 @@ kmp_native_executable(
         "macosArm64": "mm-macos-arm64",
         "mingwX64": "mm-windows-x64",
     },
+    # The desktop installer bundles the host's mm (`--define=bundle_native_cli=true`).
+    visibility = ["//app/main/jvm:__pkg__"],
 )
 
 # `mm-jvm`: the CLI on the JVM, laid out as Gradle's `installDist` (bin/ scripts, lib/ jars); the desktop
