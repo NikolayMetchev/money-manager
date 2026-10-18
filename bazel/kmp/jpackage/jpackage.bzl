@@ -12,7 +12,7 @@ load("@rules_java//java/common:java_info.bzl", "JavaInfo")
 JPackageInfo = provider(
     doc = "What an app image's installer repeats to jpackage: the image's name, version, launchers and content.",
     fields = {
-        "head": "jpackage arguments before the type's own (`--add-launcher`, `--app-content`).",
+        "head": "jpackage arguments before the type's own (`--add-launcher`, `--app-content`): the image's only.",
         "inputs": "depset of the files those arguments name.",
         "options": "JPackageRunner options (`--version-file`, `--name`, `--cli`, `--bundle-id`).",
         "tail": "jpackage arguments after the type (`--name`, `--description`, `--app-version`, `--vendor`).",
@@ -85,7 +85,7 @@ def _common(ctx):
 def _image_impl(ctx):
     out = ctx.actions.declare_directory(ctx.label.name)
     info = _common(ctx)
-    options = list(info.options)
+    options = list(info.options) + ["--runtime", ctx.file.runtime.path]
     jars = ctx.attr.jars[DefaultInfo].files.to_list()
     if ctx.attr.main_jar not in [jar.basename for jar in jars]:
         fail("%s: main_jar %s isn't one of %s's jars" % (ctx.label, ctx.attr.main_jar, ctx.attr.jars.label))
@@ -97,7 +97,7 @@ def _image_impl(ctx):
         "--input",
         "{libs}",
         "--runtime-image",
-        runtime.path,
+        "{runtime}",
         "--resource-dir",
         "{resources}",
         # A Java system property, so `/` serves on Windows too (Compose writes `$APPDIR\\resources` there).
@@ -162,7 +162,8 @@ def _installer_impl(ctx):
     if wix:
         candle = [f for f in wix if f.basename == "candle.exe"]
         options += ["--wix", candle[0].dirname]
-    lines = options + ["--"] + info.head + ["--resource-dir", "{resources}", "--type", ctx.attr.type]
+    # The image already holds the launchers and content, and jpackage rejects `--add-launcher` with `--app-image`.
+    lines = options + ["--", "--resource-dir", "{resources}", "--type", ctx.attr.type]
     lines += info.tail + ctx.attr.args
     _run(
         ctx,
@@ -179,8 +180,8 @@ def _installer_impl(ctx):
 
 jpackage_installer = rule(
     implementation = _installer_impl,
-    doc = """Compose's `package<Format>`: jpackage's installer over a `jpackage_app_image` (its name, version,
-    launchers and content repeated, as Compose repeats them), in a directory.""",
+    doc = """Compose's `package<Format>`: jpackage's installer over a `jpackage_app_image` (its name and version
+    repeated, as Compose repeats them), in a directory.""",
     attrs = {
         "app_image": attr.label(
             mandatory = True,

@@ -34,11 +34,13 @@ import java.util.zip.ZipOutputStream;
  *   <li>{@code installer <out> <options…> -- <jpackage args…>}: jpackage's installer over an app image.
  * </ul>
  *
- * <p>In the jpackage arguments {@code {version}} is the version file's text, {@code {libs}}, {@code {resources}}
- * and {@code {cli}} the directories this runner lays out, and {@code {icon}} / {@code {entitlements}} Compose's
- * defaults, read from the Compose Gradle plugin's jar on this classpath (so they move with the catalog's Compose).
- * Options: {@code --version-file F}, {@code --jar F} (repeated), {@code --cli F} (the native {@code mm}),
- * {@code --app-image DIR}, {@code --wix DIR} (put on jpackage's {@code PATH}, as Compose does on Windows),
+ * <p>In the jpackage arguments {@code {version}} is the version file's text, {@code {libs}}, {@code {runtime}},
+ * {@code {resources}} and {@code {cli}} the directories this runner lays out, and {@code {icon}} /
+ * {@code {entitlements}} Compose's defaults, read from the Compose Gradle plugin's jar on this classpath (so they
+ * move with the catalog's Compose). Options: {@code --version-file F}, {@code --jar F} (repeated), {@code --runtime
+ * DIR} (a jlinked runtime, copied writable: jpackage changes it in place, and Bazel's inputs are read-only),
+ * {@code --cli F} (the native {@code mm}), {@code --app-image DIR}, {@code --wix DIR} (put on jpackage's
+ * {@code PATH}, as Compose does on Windows),
  * {@code --name N}, and on macOS {@code --bundle-id B} (else {@code --main-class C}'s package) for the
  * {@code Info.plist}, {@code --mac-package-identifier} and, with Compose's entitlements, {@code --mac-entitlements}.
  *
@@ -92,9 +94,13 @@ public final class JPackageRunner {
       if (HOST_OS == OS.MAC) {
         writeInfoPlist(resources.resolve("Info.plist"), options, values.get("{version}"));
       }
-      if (mode.equals("image")) {
-        values.put("{libs}", layOutLibs(work.resolve("libs"), options.getOrDefault("--jar", List.of()), work)
-            .toString());
+      if (options.containsKey("--jar")) {
+        values.put("{libs}", layOutLibs(work.resolve("libs"), options.get("--jar"), work).toString());
+      }
+      if (options.containsKey("--runtime")) {
+        Path runtime = work.resolve("runtime");
+        copyWritable(Path.of(one(options, "--runtime")), runtime);
+        values.put("{runtime}", runtime.toString());
       }
       if (options.containsKey("--cli")) {
         values.put("{cli}", layOutCli(work.resolve("cli"), options.get("--cli")).toString());
@@ -139,7 +145,27 @@ public final class JPackageRunner {
         signRuntime(out.resolve(one(options, "--name") + ".app"), Path.of(values.get("{entitlements}")));
       }
     } finally {
-      deleteRecursively(work);
+      try {
+        deleteRecursively(work);
+      } catch (IOException e) {
+        // A temp directory left behind mustn't hide what happened.
+        System.err.println("warning: couldn't delete " + work + ": " + e);
+      }
+    }
+  }
+
+  /** Copies a directory tree, every file left writable by its owner. */
+  private static void copyWritable(Path from, Path to) throws IOException {
+    try (Stream<Path> walk = Files.walk(from)) {
+      for (Path source : walk.toList()) {
+        Path target = to.resolve(from.relativize(source).toString());
+        if (Files.isDirectory(source)) {
+          Files.createDirectories(target);
+        } else {
+          Files.copy(source, target, StandardCopyOption.COPY_ATTRIBUTES);
+        }
+        target.toFile().setWritable(true, true);
+      }
     }
   }
 
@@ -160,6 +186,8 @@ public final class JPackageRunner {
       boolean signDylibs = HOST_OS == OS.MAC && HOST_ARCH.equals("arm64");
       if (!skiko && !signDylibs) {
         Files.copy(source, target);
+        // Bazel's inputs are read-only, and Windows won't delete a read-only copy.
+        target.toFile().setWritable(true, true);
         continue;
       }
       try (ZipInputStream in = new ZipInputStream(Files.newInputStream(source));
@@ -323,6 +351,8 @@ public final class JPackageRunner {
     }
     try (Stream<Path> walk = Files.walk(dir)) {
       for (Path path : walk.sorted(Comparator.reverseOrder()).toList()) {
+        // Windows won't delete a read-only file.
+        path.toFile().setWritable(true, true);
         Files.delete(path);
       }
     }
