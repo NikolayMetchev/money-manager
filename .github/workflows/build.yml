@@ -620,6 +620,9 @@ jobs:
           find "$CACHES" -maxdepth 5 -type d \( -name external_build_system -o -name projects \) \
             -not -path '*gradle*' -not -path '*.m2*' -print -prune -exec rm -rf {} +
           find "$CACHES" -maxdepth 6 -type f -path '*/workspace/*.cache' -not -path '*gradle*' -print -delete
+          # Plugins too, so the scan runs only the ones qodana.yaml lists: main's cache still holds the Gradle build's
+          # SQLDelight plugin, which can't find the dialect without a Gradle import and rejects valid SQLite.
+          rm -rf "$CACHES/plugins"
       # The runner image sets ANDROID_HOME in its environment, which the env context below doesn't see.
       - name: Expose the Android SDK path
         run: echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
