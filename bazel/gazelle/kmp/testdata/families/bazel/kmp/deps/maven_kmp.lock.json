@@ -1,0 +1,18 @@
+{
+  "names": {
+    "org.jetbrains.kotlinx:kotlinx-coroutines-core": "kotlinx_coroutines_core",
+    "org.jetbrains.kotlinx:kotlinx-serialization-core": "kotlinx_serialization_core",
+    "io.ktor:ktor-client-okhttp": "ktor_client_okhttp",
+    "io.ktor:ktor-client-curl": "ktor_client_curl",
+    "io.ktor:ktor-client-winhttp": "ktor_client_winhttp",
+    "io.ktor:ktor-client-core": "ktor_client_core"
+  },
+  "packages": {
+    "org.jetbrains.kotlinx:kotlinx-coroutines-core": ["kotlinx.coroutines", "kotlinx.coroutines.flow"],
+    "org.jetbrains.kotlinx:kotlinx-serialization-core": ["kotlinx.serialization"],
+    "io.ktor:ktor-client-okhttp": ["io.ktor.client.engine.okhttp"],
+    "io.ktor:ktor-client-curl": ["io.ktor.client.engine.curl"],
+    "io.ktor:ktor-client-winhttp": ["io.ktor.client.engine.winhttp"],
+    "io.ktor:ktor-client-core": ["io.ktor.client", "io.ktor.client.engine"]
+  }
+}
