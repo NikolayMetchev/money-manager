@@ -162,8 +162,23 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	if len(plugins) > 0 {
 		lib.SetAttr("plugins", sorted(plugins))
 	}
-	lib.SetAttr("visibility", []string{"//visibility:public"})
+	if len(kc.visibility) > 0 {
+		lib.SetAttr("visibility", kc.visibility)
+	} else {
+		lib.SetAttr("visibility", []string{"//visibility:public"})
+	}
+	if len(kc.forbidDeps) > 0 {
+		lib.SetAttr("forbidden_deps", kc.forbidDeps)
+	}
+	if kc.forbidReference != "" {
+		lib.SetAttr("forbidden_reference", kc.forbidReference)
+		lib.SetAttr("forbidden_reference_reason", kc.referenceReason)
+		if len(kc.allowReference) > 0 {
+			lib.SetAttr("forbidden_reference_allowed", kc.allowReference)
+		}
+	}
 	ownPackages := sortedKeys(main.packages)
+	recordPackages(args.Rel, ownPackages)
 
 	if hasSqldelight {
 		if kc.sqldelightPackage == "" {
@@ -212,6 +227,9 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		}
 		if kc.testSize != "" {
 			t.SetAttr("size", kc.testSize)
+		}
+		if len(kc.forbidDeps) > 0 {
+			t.SetAttr("forbidden_deps", kc.forbidDeps)
 		}
 		res.Gen = append(res.Gen, t)
 		res.Imports = append(res.Imports, imports{byPlatform: keys(tests.imports), keep: kc.kept(true), test: true, associate: name})

@@ -1,0 +1,29 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_forbid_deps //lib/db //lib/ui
+# gazelle:kmp_forbid_reference \b[A-Za-z]+WriteRepository\b route writes through the engine
+# gazelle:kmp_allow_reference src/commonMain/kotlin/Engine.kt
+
+kmp_library(
+    name = "engine",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    forbidden_deps = [
+        "//lib/db",
+        "//lib/ui",
+    ],
+    forbidden_reference = "\\b[A-Za-z]+WriteRepository\\b",
+    forbidden_reference_allowed = ["src/commonMain/kotlin/Engine.kt"],
+    forbidden_reference_reason = "route writes through the engine",
+    visibility = ["//visibility:public"],
+    deps = ["//lib/write"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":engine",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    forbidden_deps = [
+        "//lib/db",
+        "//lib/ui",
+    ],
+)
