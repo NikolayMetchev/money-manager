@@ -262,10 +262,10 @@
   "moduleExtensions": {
     "//bazel/kmp/android:extensions.bzl%android_sdk": {
       "general": {
-        "bzlTransitiveDigest": "XsifG2YuGwrck3lJN9qflU83H0jtMxF4xqtGMSNG/kI=",
+        "bzlTransitiveDigest": "cL6SJjZpJA76retPFtGogDJo2yM0Zg6uFaSocBdAxws=",
         "usagesDigest": "af/EB6S6Jhg08XPZPOFfwCev0bH7RX6CSnpYr6oaQG4=",
         "recordedInputs": [
-          "FILE:@@//gradle/libs.versions.toml cefbc1c0b6d6f324cb0a71b234bb9f1ec54fedb1fe13e100b9258689b39286e7"
+          "FILE:@@//gradle/libs.versions.toml d553d2fe706a1ad2370dd0220c8af76e4d528b35e89cb2346a9b56e3138bda4b"
         ],
         "generatedRepoSpecs": {
           "android_sdk": {

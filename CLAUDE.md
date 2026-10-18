@@ -222,7 +222,14 @@ stream to BuildBuddy, anonymously.
   only those. Gazelle resolves an import to a library every compilation of its source set has, else per compilation
   (commonMain's Material 3 import is `compose_material3_desktop` on the JVM, `androidx_compose_material3` on
   Android; Compose UI's JetBrains root module has both), preferring catalog libraries over the modules they bring; `android.*` is the SDK. Resources, manifests and dexing are the app's
-  (#1023), and Android host tests #1022.
+  (#1023). A library's `androidMain` `runtimeOnly` deps are `kmp_keep_dep … androidMain` (the cryptography provider).
+- **Android host tests** (#1022): AGP's `testAndroidHostTest` is `kmp_test(android = True)`'s `:<name>_android`:
+  `commonTest ← jvmAndroidTest ← androidHostTest` compiled against the module's `_android` and `android.jar`, run by
+  `KmpJUnitRunner` on AGP's mockable jar (`//bazel/kmp/android:mockable_android_jar`, which AGP's own
+  `MockableJarGenerator`, from `@android_tools`, builds byte-identical to Gradle's, returning default values as the
+  convention's `isReturnDefaultValues` asks). Gazelle sets it on every Android module with tests; one whose Gradle
+  build disables `testAndroidHostTest` (the Compose UI feature convention, tests that need a device) says
+  `# gazelle:kmp_android_host_tests false`. The same 29 modules and 862 cases as Gradle.
 - **Kotlin/Native toolchain** (`//bazel/kmp/native`): the `kotlin_native` module extension downloads the host's
   `kotlin-native-prebuilt` and every konan dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2,
   libffi), all sha256-pinned in `bazel/kmp/native/pins.bzl`, into `@kotlin_native` with konan's data dir inside it.

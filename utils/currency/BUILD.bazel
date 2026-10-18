@@ -22,6 +22,7 @@ kmp_library(
 
 kmp_test(
     name = "test",
+    android = True,
     associate = ":currency",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     jvm_android_srcs = glob(["src/jvmAndroidTest/kotlin/**/*.kt"]),

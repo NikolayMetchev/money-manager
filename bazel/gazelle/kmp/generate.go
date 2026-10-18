@@ -38,6 +38,7 @@ var testSets = []sourceSet{
 	{"commonTest", "common_srcs", ""},
 	{"jvmAndroidTest", "jvm_android_srcs", "jvmAndroid"},
 	{"jvmTest", "jvm_srcs", "jvm"},
+	{"androidHostTest", "android_srcs", "android"},
 	{"nativeTest", "native_srcs", "native"},
 	{"linuxTest", "linux_srcs", "linux"},
 	{"appleTest", "apple_srcs", "apple"},
@@ -223,7 +224,11 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	res.Gen = append(res.Gen, lib)
 	res.Imports = append(res.Imports, imports{byPlatform: keys(main.imports), keep: kc.kept(false), packages: ownPackages, leaves: leaves{android: kc.android, native: kc.targets}})
 
-	tests, testSetsPresent := scan(args.Dir, testSets)
+	tSets := testSets
+	if !kc.android {
+		tSets = withoutAndroid(tSets)
+	}
+	tests, testSetsPresent := scan(args.Dir, tSets)
 	if len(testSetsPresent) > 0 {
 		t := rule.NewRule("kmp_test", "test")
 		t.SetAttr("associate", ":"+name)
@@ -234,6 +239,10 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		// sources.
 		if len(kc.targets) > 0 && runsOnNative(testSetsPresent) {
 			t.SetAttr("native_targets", kc.targets)
+		}
+		hostTests := kc.android && !kc.noHostTests && runsOnAndroid(testSetsPresent)
+		if hostTests {
+			t.SetAttr("android", true)
 		}
 		testPlugins := union(plugins, nil)
 		for p := range tests.plugins {
@@ -267,8 +276,7 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 			t.SetAttr("keep_deps", kept)
 		}
 		res.Gen = append(res.Gen, t)
-		// Android host tests are #1022: today a module's tests compile for the JVM and native only.
-		testLeaves := leaves{}
+		testLeaves := leaves{android: hostTests}
 		if runsOnNative(testSetsPresent) {
 			testLeaves.native = kc.targets
 		}
@@ -359,9 +367,19 @@ func (c *kmpConfig) exported() map[string]bool {
 	return out
 }
 
+// runsOnAndroid is whether any of the tests' source sets is in the Android host tests' compilation.
+func runsOnAndroid(sets []sourceSet) bool {
+	for _, set := range sets {
+		if set.platform == "" || set.platform == "jvmAndroid" || set.platform == "android" {
+			return true
+		}
+	}
+	return false
+}
+
 func runsOnNative(sets []sourceSet) bool {
 	for _, set := range sets {
-		if set.platform != "jvm" && set.platform != "jvmAndroid" {
+		if set.platform != "jvm" && set.platform != "jvmAndroid" && set.platform != "android" {
 			return true
 		}
 	}

@@ -1,0 +1,2 @@
+# gazelle:kmp_targets android
+# gazelle:kmp_android_host_tests false

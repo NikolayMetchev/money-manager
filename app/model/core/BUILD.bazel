@@ -36,6 +36,7 @@ kmp_library(
 
 kmp_test(
     name = "test",
+    android = True,
     associate = ":core",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     native_targets = [

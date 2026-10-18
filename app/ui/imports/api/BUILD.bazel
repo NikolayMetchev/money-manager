@@ -2,6 +2,7 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android
+# gazelle:kmp_android_host_tests false
 # gazelle:kmp_test_jvm_flags -Djava.awt.headless=true -Dskiko.test.harness=true
 # gazelle:kmp_test_flaky true
 # gazelle:kmp_test_jvm_tags no-remote-exec

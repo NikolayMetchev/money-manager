@@ -1,0 +1,18 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_targets android
+# gazelle:kmp_android_host_tests false
+
+kmp_library(
+    name = "dev",
+    android = True,
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":dev",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    deps = ["//bazel/kmp/deps:kotlin_test"],
+)

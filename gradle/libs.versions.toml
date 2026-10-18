@@ -106,6 +106,8 @@ buildtool-tink = "1.24.0"
 
 [libraries]
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle-plugin" }
+# AGP's builder, for its MockableJarGenerator: Bazel's Android host tests run on the same mockable android.jar.
+android-builder = { module = "com.android.tools.build:builder", version.ref = "android-gradle-plugin" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "play-services-auth" }
 androidx-activity = { module = "androidx.activity:activity", version.ref = "androidx-activity-compose" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity-compose" }

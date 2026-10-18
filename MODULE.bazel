@@ -353,7 +353,22 @@ maven_kmp.install(
     resolve_stdlib = True,
 )
 
-use_repo(maven_kmp, "detekt_cli", "ktlint_cli", "maven_kmp", "proguard")
+# AGP's builder (#1022): its MockableJarGenerator makes the android.jar Android host tests run on.
+maven_kmp.install(
+    name = "android_tools",
+    catalog = "//gradle:libs.versions.toml",
+    force_bundles = ["build-tool-pins"],
+    libraries = ["android-builder"],
+    lock_file = "//bazel/kmp/deps:android_tools.lock.json",
+    platforms = ["jvm"],
+    repositories = [
+        "https://maven.google.com",
+        "https://repo1.maven.org/maven2",
+    ],
+    resolve_stdlib = True,
+)
+
+use_repo(maven_kmp, "android_tools", "detekt_cli", "ktlint_cli", "maven_kmp", "proguard")
 
 android_sdk = use_extension("//bazel/kmp/android:extensions.bzl", "android_sdk")
 use_repo(android_sdk, "android_sdk")

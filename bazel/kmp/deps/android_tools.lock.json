@@ -1,0 +1,2266 @@
+{
+  "version": 1,
+  "inputs": {
+    "libraries": {
+      "android-builder": "com.android.tools.build:builder:9.4.1"
+    },
+    "forces": {
+      "ch.qos.logback:logback-classic": "1.6.5",
+      "ch.qos.logback:logback-core": "1.6.5",
+      "com.google.api.grpc:proto-google-common-protos": "2.78.0",
+      "com.google.code.findbugs:jsr305": "3.0.2",
+      "com.google.code.gson:gson": "2.14.0",
+      "com.google.crypto.tink:tink": "1.24.0",
+      "com.google.errorprone:error_prone_annotations": "2.50.0",
+      "com.google.guava:failureaccess": "1.0.3",
+      "com.google.guava:guava": "33.7.2-jre",
+      "com.google.j2objc:j2objc-annotations": "3.1",
+      "com.google.protobuf:protobuf-java": "4.36.2",
+      "com.google.protobuf:protobuf-java-util": "4.36.2",
+      "com.squareup:javawriter": "2.5.1",
+      "com.squareup:kotlinpoet": "2.4.0",
+      "com.squareup:kotlinpoet-jvm": "2.4.0",
+      "commons-io:commons-io": "2.22.0",
+      "dev.drewhamilton.poko:poko-annotations": "0.23.2",
+      "dev.drewhamilton.poko:poko-annotations-jvm": "0.23.2",
+      "io.grpc:grpc-api": "1.85.0",
+      "io.grpc:grpc-context": "1.85.0",
+      "io.grpc:grpc-core": "1.85.0",
+      "io.grpc:grpc-netty": "1.85.0",
+      "io.grpc:grpc-protobuf": "1.85.0",
+      "io.grpc:grpc-protobuf-lite": "1.85.0",
+      "io.grpc:grpc-stub": "1.85.0",
+      "io.netty:netty-buffer": "4.2.19.Final",
+      "io.netty:netty-codec": "4.2.19.Final",
+      "io.netty:netty-codec-http": "4.2.19.Final",
+      "io.netty:netty-codec-http2": "4.2.19.Final",
+      "io.netty:netty-codec-socks": "4.2.19.Final",
+      "io.netty:netty-common": "4.2.19.Final",
+      "io.netty:netty-handler": "4.2.19.Final",
+      "io.netty:netty-handler-proxy": "4.2.19.Final",
+      "io.netty:netty-resolver": "4.2.19.Final",
+      "io.netty:netty-transport": "4.2.19.Final",
+      "io.netty:netty-transport-native-unix-common": "4.2.19.Final",
+      "io.perfmark:perfmark-api": "0.27.0",
+      "org.apache.httpcomponents:httpclient": "4.5.14",
+      "org.checkerframework:checker-qual": "4.3.1",
+      "org.codehaus.mojo:animal-sniffer-annotations": "1.28",
+      "org.ow2.asm:asm": "9.11.1",
+      "org.ow2.asm:asm-analysis": "9.11.1",
+      "org.ow2.asm:asm-commons": "9.11.1",
+      "org.ow2.asm:asm-tree": "9.11.1",
+      "org.ow2.asm:asm-util": "9.11.1"
+    },
+    "platforms": [
+      "jvm"
+    ],
+    "excludes": [],
+    "resolve_stdlib": true
+  },
+  "names": {
+    "com.android.tools.analytics-library:protos": "com_android_tools_analytics_library_protos",
+    "com.android.tools.analytics-library:shared": "com_android_tools_analytics_library_shared",
+    "com.android.tools.analytics-library:tracker": "com_android_tools_analytics_library_tracker",
+    "com.android.tools.build:aapt2-proto": "com_android_tools_build_aapt2_proto",
+    "com.android.tools.build:apksig": "com_android_tools_build_apksig",
+    "com.android.tools.build:apkzlib": "com_android_tools_build_apkzlib",
+    "com.android.tools.build:builder": "android_builder",
+    "com.android.tools.build:builder-model": "com_android_tools_build_builder_model",
+    "com.android.tools.build:builder-test-api": "com_android_tools_build_builder_test_api",
+    "com.android.tools.build:manifest-merger": "com_android_tools_build_manifest_merger",
+    "com.android.tools.ddms:ddmlib": "com_android_tools_ddms_ddmlib",
+    "com.android.tools.layoutlib:layoutlib-api": "com_android_tools_layoutlib_layoutlib_api",
+    "com.android.tools:annotations": "com_android_tools_annotations",
+    "com.android.tools:common": "com_android_tools_common",
+    "com.android.tools:dvlib": "com_android_tools_dvlib",
+    "com.android.tools:repository": "com_android_tools_repository",
+    "com.android.tools:sdk-common": "com_android_tools_sdk_common",
+    "com.android.tools:sdklib": "com_android_tools_sdklib",
+    "com.android:signflinger": "com_android_signflinger",
+    "com.android:zipflinger": "com_android_zipflinger",
+    "com.google.code.findbugs:jsr305": "com_google_code_findbugs_jsr305",
+    "com.google.code.gson:gson": "com_google_code_gson_gson",
+    "com.google.errorprone:error_prone_annotations": "com_google_errorprone_error_prone_annotations",
+    "com.google.guava:failureaccess": "com_google_guava_failureaccess",
+    "com.google.guava:guava": "com_google_guava_guava",
+    "com.google.guava:guava-testlib": "com_google_guava_guava_testlib",
+    "com.google.guava:listenablefuture": "com_google_guava_listenablefuture",
+    "com.google.j2objc:j2objc-annotations": "com_google_j2objc_j2objc_annotations",
+    "com.google.jimfs:jimfs": "com_google_jimfs_jimfs",
+    "com.google.protobuf:protobuf-java": "com_google_protobuf_protobuf_java",
+    "com.google.truth:truth": "com_google_truth_truth",
+    "com.squareup:javawriter": "com_squareup_javawriter",
+    "com.sun.istack:istack-commons-runtime": "com_sun_istack_istack_commons_runtime",
+    "com.sun.xml.fastinfoset:FastInfoset": "com_sun_xml_fastinfoset_FastInfoset",
+    "commons-codec:commons-codec": "commons_codec_commons_codec",
+    "commons-io:commons-io": "commons_io_commons_io",
+    "commons-logging:commons-logging": "commons_logging_commons_logging",
+    "jakarta.activation:jakarta.activation-api": "jakarta_activation_jakarta_activation_api",
+    "jakarta.xml.bind:jakarta.xml.bind-api": "jakarta_xml_bind_jakarta_xml_bind_api",
+    "javax.inject:javax.inject": "javax_inject_javax_inject",
+    "junit:junit": "junit_junit",
+    "net.java.dev.jna:jna": "net_java_dev_jna_jna",
+    "net.java.dev.jna:jna-platform": "net_java_dev_jna_jna_platform",
+    "net.sf.kxml:kxml2": "net_sf_kxml_kxml2",
+    "org.apache.commons:commons-compress": "org_apache_commons_commons_compress",
+    "org.apache.commons:commons-lang3": "org_apache_commons_commons_lang3",
+    "org.apache.httpcomponents:httpclient": "org_apache_httpcomponents_httpclient",
+    "org.apache.httpcomponents:httpcore": "org_apache_httpcomponents_httpcore",
+    "org.apache.httpcomponents:httpmime": "org_apache_httpcomponents_httpmime",
+    "org.bouncycastle:bcpkix-jdk18on": "org_bouncycastle_bcpkix_jdk18on",
+    "org.bouncycastle:bcprov-jdk18on": "org_bouncycastle_bcprov_jdk18on",
+    "org.bouncycastle:bcutil-jdk18on": "org_bouncycastle_bcutil_jdk18on",
+    "org.glassfish.jaxb:jaxb-runtime": "org_glassfish_jaxb_jaxb_runtime",
+    "org.glassfish.jaxb:txw2": "org_glassfish_jaxb_txw2",
+    "org.hamcrest:hamcrest-core": "org_hamcrest_hamcrest_core",
+    "org.jetbrains.kotlin:kotlin-reflect": "org_jetbrains_kotlin_kotlin_reflect",
+    "org.jetbrains.kotlin:kotlin-stdlib": "org_jetbrains_kotlin_kotlin_stdlib",
+    "org.jetbrains.kotlin:kotlin-stdlib-jdk7": "org_jetbrains_kotlin_kotlin_stdlib_jdk7",
+    "org.jetbrains.kotlin:kotlin-stdlib-jdk8": "org_jetbrains_kotlin_kotlin_stdlib_jdk8",
+    "org.jetbrains.kotlinx:kotlinx-coroutines-core": "org_jetbrains_kotlinx_kotlinx_coroutines_core",
+    "org.jetbrains:annotations": "org_jetbrains_annotations",
+    "org.jspecify:jspecify": "org_jspecify_jspecify",
+    "org.jvnet.staxex:stax-ex": "org_jvnet_staxex_stax_ex",
+    "org.ow2.asm:asm": "org_ow2_asm_asm",
+    "org.ow2.asm:asm-commons": "org_ow2_asm_asm_commons",
+    "org.ow2.asm:asm-tree": "org_ow2_asm_asm_tree"
+  },
+  "packages": {
+    "com.android.tools.analytics-library:protos": [
+      "com.android.tools.build.gradle.internal.profile",
+      "com.google.wireless.android.play.playlog.proto",
+      "com.google.wireless.android.sdk.stats"
+    ],
+    "com.android.tools.analytics-library:shared": [
+      "com.android.tools.analytics"
+    ],
+    "com.android.tools.analytics-library:tracker": [
+      "com.android.tools.analytics"
+    ],
+    "com.android.tools.build:aapt2-proto": [
+      "android.aapt.pb.internal",
+      "com.android.aapt"
+    ],
+    "com.android.tools.build:apksig": [
+      "com.android.apksig",
+      "com.android.apksig.apk",
+      "com.android.apksig.internal.apk",
+      "com.android.apksig.internal.apk.stamp",
+      "com.android.apksig.internal.apk.v1",
+      "com.android.apksig.internal.apk.v2",
+      "com.android.apksig.internal.apk.v3",
+      "com.android.apksig.internal.apk.v4",
+      "com.android.apksig.internal.asn1",
+      "com.android.apksig.internal.asn1.ber",
+      "com.android.apksig.internal.jar",
+      "com.android.apksig.internal.oid",
+      "com.android.apksig.internal.pkcs7",
+      "com.android.apksig.internal.util",
+      "com.android.apksig.internal.x509",
+      "com.android.apksig.internal.zip",
+      "com.android.apksig.kms",
+      "com.android.apksig.util",
+      "com.android.apksig.zip"
+    ],
+    "com.android.tools.build:apkzlib": [
+      "com.android.tools.build.apkzlib.bytestorage",
+      "com.android.tools.build.apkzlib.sign",
+      "com.android.tools.build.apkzlib.utils",
+      "com.android.tools.build.apkzlib.zfile",
+      "com.android.tools.build.apkzlib.zip",
+      "com.android.tools.build.apkzlib.zip.compress",
+      "com.android.tools.build.apkzlib.zip.utils"
+    ],
+    "com.android.tools.build:builder": [
+      "com.android.builder.compiling",
+      "com.android.builder.core",
+      "com.android.builder.dependency",
+      "com.android.builder.dependency.level2",
+      "com.android.builder.dexing",
+      "com.android.builder.dexing.r8",
+      "com.android.builder.errors",
+      "com.android.builder.files",
+      "com.android.builder.internal",
+      "com.android.builder.internal.aapt",
+      "com.android.builder.internal.aapt.v2",
+      "com.android.builder.internal.compiler",
+      "com.android.builder.internal.incremental",
+      "com.android.builder.internal.matcher",
+      "com.android.builder.internal.packaging",
+      "com.android.builder.merge",
+      "com.android.builder.multidex",
+      "com.android.builder.packaging",
+      "com.android.builder.png",
+      "com.android.builder.profile",
+      "com.android.builder.sdk",
+      "com.android.builder.signing",
+      "com.android.builder.symbols",
+      "com.android.builder.tasks",
+      "com.android.builder.testing",
+      "com.android.builder.utils",
+      "com.android.tools.r8",
+      "com.android.tools.r8.androidapi",
+      "com.android.tools.r8.assistant.postprocessing",
+      "com.android.tools.r8.assistant.runtime",
+      "com.android.tools.r8.com.google.protobuf",
+      "com.android.tools.r8.com.google.protobuf.compiler",
+      "com.android.tools.r8.compatproguard",
+      "com.android.tools.r8.dex",
+      "com.android.tools.r8.diagnostic",
+      "com.android.tools.r8.diagnostic.internal",
+      "com.android.tools.r8.errors",
+      "com.android.tools.r8.experimental.graphinfo",
+      "com.android.tools.r8.graph",
+      "com.android.tools.r8.graph.proto",
+      "com.android.tools.r8.inspector",
+      "com.android.tools.r8.internal",
+      "com.android.tools.r8.ir.analysis.value",
+      "com.android.tools.r8.ir.desugar.desugaredlibrary.lint",
+      "com.android.tools.r8.ir.desugar.varhandle",
+      "com.android.tools.r8.ir.optimize",
+      "com.android.tools.r8.ir.optimize.inliner",
+      "com.android.tools.r8.ir.optimize.unsafe",
+      "com.android.tools.r8.it.unimi.dsi.fastutil.ints",
+      "com.android.tools.r8.it.unimi.dsi.fastutil.longs",
+      "com.android.tools.r8.it.unimi.dsi.fastutil.objects",
+      "com.android.tools.r8.keepradius",
+      "com.android.tools.r8.kotlin",
+      "com.android.tools.r8.libanalyzer",
+      "com.android.tools.r8.metadata",
+      "com.android.tools.r8.naming",
+      "com.android.tools.r8.naming.mappinginformation",
+      "com.android.tools.r8.origin",
+      "com.android.tools.r8.position",
+      "com.android.tools.r8.processkeeprules",
+      "com.android.tools.r8.profile.art",
+      "com.android.tools.r8.profile.art.diagnostic",
+      "com.android.tools.r8.references",
+      "com.android.tools.r8.relocated.keepanno.proto",
+      "com.android.tools.r8.relocator",
+      "com.android.tools.r8.resourceshrinker",
+      "com.android.tools.r8.retrace",
+      "com.android.tools.r8.shaking",
+      "com.android.tools.r8.startup",
+      "com.android.tools.r8.startup.diagnostic",
+      "com.android.tools.r8.synthesis",
+      "com.android.tools.r8.threading",
+      "com.android.tools.r8.threading.providers.blocking",
+      "com.android.tools.r8.threading.providers.singlethreaded",
+      "com.android.tools.r8.tracereferences",
+      "com.android.tools.r8.utils",
+      "com.android.tools.r8.utils.positions"
+    ],
+    "com.android.tools.build:builder-model": [
+      "com.android.build",
+      "com.android.builder.model",
+      "com.android.builder.model.level2",
+      "com.android.builder.model.v2",
+      "com.android.builder.model.v2.dsl",
+      "com.android.builder.model.v2.ide",
+      "com.android.builder.model.v2.models",
+      "com.android.builder.model.v2.models.ndk"
+    ],
+    "com.android.tools.build:builder-test-api": [
+      "com.android.builder.testing.api"
+    ],
+    "com.android.tools.build:manifest-merger": [
+      "com.android.manifmerger"
+    ],
+    "com.android.tools.ddms:ddmlib": [
+      "com.android.commands.am",
+      "com.android.ddmlib",
+      "com.android.ddmlib.clientmanager",
+      "com.android.ddmlib.idevicemanager",
+      "com.android.ddmlib.internal",
+      "com.android.ddmlib.internal.commands",
+      "com.android.ddmlib.internal.jdwp",
+      "com.android.ddmlib.internal.jdwp.chunkhandler",
+      "com.android.ddmlib.internal.jdwp.interceptor",
+      "com.android.ddmlib.jdwp",
+      "com.android.ddmlib.jdwp.packets",
+      "com.android.ddmlib.log",
+      "com.android.ddmlib.logcat",
+      "com.android.ddmlib.testrunner",
+      "com.android.ddmlib.utils",
+      "com.android.incfs.install",
+      "com.android.incfs.install.adb.ddmlib",
+      "com.android.server.adb.protos"
+    ],
+    "com.android.tools.layoutlib:layoutlib-api": [
+      "com.android.ide.common.rendering.api",
+      "com.android.resources"
+    ],
+    "com.android.tools:annotations": [
+      "com.android.annotations",
+      "com.android.annotations.concurrency"
+    ],
+    "com.android.tools:common": [
+      "com.android",
+      "com.android.ide.common.blame",
+      "com.android.io",
+      "com.android.prefs",
+      "com.android.resources",
+      "com.android.sdklib",
+      "com.android.support",
+      "com.android.testing.utils",
+      "com.android.tools.proguard",
+      "com.android.utils",
+      "com.android.utils.cache",
+      "com.android.utils.concurrency",
+      "com.android.utils.cxx",
+      "com.android.utils.cxx.collections",
+      "com.android.utils.cxx.io",
+      "com.android.utils.cxx.ninja",
+      "com.android.utils.cxx.os",
+      "com.android.utils.cxx.process",
+      "com.android.utils.function",
+      "com.android.utils.reflection",
+      "com.android.utils.sleep",
+      "com.android.utils.text",
+      "com.android.xml",
+      "com.android.xml.sax"
+    ],
+    "com.android.tools:dvlib": [
+      "com.android.dvlib"
+    ],
+    "com.android.tools:repository": [
+      "com.android.repository",
+      "com.android.repository.api",
+      "com.android.repository.impl.downloader",
+      "com.android.repository.impl.generated.generic.v1",
+      "com.android.repository.impl.generated.generic.v2",
+      "com.android.repository.impl.generated.v1",
+      "com.android.repository.impl.generated.v2",
+      "com.android.repository.impl.installer",
+      "com.android.repository.impl.manager",
+      "com.android.repository.impl.meta",
+      "com.android.repository.impl.sources",
+      "com.android.repository.impl.sources.generated.v1",
+      "com.android.repository.io",
+      "com.android.repository.util"
+    ],
+    "com.android.tools:sdk-common": [
+      "com.android.ide.common.blame",
+      "com.android.ide.common.blame.parser",
+      "com.android.ide.common.blame.parser.aapt",
+      "com.android.ide.common.blame.parser.util",
+      "com.android.ide.common.build",
+      "com.android.ide.common.caching",
+      "com.android.ide.common.fonts",
+      "com.android.ide.common.gradle",
+      "com.android.ide.common.internal",
+      "com.android.ide.common.pagealign",
+      "com.android.ide.common.process",
+      "com.android.ide.common.r8",
+      "com.android.ide.common.rendering",
+      "com.android.ide.common.repository",
+      "com.android.ide.common.resources",
+      "com.android.ide.common.resources.configuration",
+      "com.android.ide.common.resources.escape.string",
+      "com.android.ide.common.resources.escape.xml",
+      "com.android.ide.common.resources.sampledata",
+      "com.android.ide.common.resources.usage",
+      "com.android.ide.common.sdk",
+      "com.android.ide.common.signing",
+      "com.android.ide.common.symbols",
+      "com.android.ide.common.util",
+      "com.android.ide.common.vectordrawable",
+      "com.android.ide.common.workers",
+      "com.android.ide.common.xml",
+      "com.android.projectmodel",
+      "wireless.android.instantapps.sdk"
+    ],
+    "com.android.tools:sdklib": [
+      "com.android.sdklib",
+      "com.android.sdklib.devices",
+      "com.android.sdklib.internal.avd",
+      "com.android.sdklib.internal.build",
+      "com.android.sdklib.internal.project",
+      "com.android.sdklib.repository",
+      "com.android.sdklib.repository.generated.addon.v1",
+      "com.android.sdklib.repository.generated.addon.v2",
+      "com.android.sdklib.repository.generated.addon.v3",
+      "com.android.sdklib.repository.generated.addon.v4",
+      "com.android.sdklib.repository.generated.common.v1",
+      "com.android.sdklib.repository.generated.common.v2",
+      "com.android.sdklib.repository.generated.common.v3",
+      "com.android.sdklib.repository.generated.common.v4",
+      "com.android.sdklib.repository.generated.repository.v1",
+      "com.android.sdklib.repository.generated.repository.v2",
+      "com.android.sdklib.repository.generated.repository.v3",
+      "com.android.sdklib.repository.generated.repository.v4",
+      "com.android.sdklib.repository.generated.sysimg.v1",
+      "com.android.sdklib.repository.generated.sysimg.v2",
+      "com.android.sdklib.repository.generated.sysimg.v3",
+      "com.android.sdklib.repository.generated.sysimg.v4",
+      "com.android.sdklib.repository.generated.sysimg.v5",
+      "com.android.sdklib.repository.installer",
+      "com.android.sdklib.repository.legacy",
+      "com.android.sdklib.repository.legacy.descriptors",
+      "com.android.sdklib.repository.legacy.io",
+      "com.android.sdklib.repository.legacy.local",
+      "com.android.sdklib.repository.legacy.remote",
+      "com.android.sdklib.repository.legacy.remote.internal",
+      "com.android.sdklib.repository.legacy.remote.internal.archives",
+      "com.android.sdklib.repository.legacy.remote.internal.packages",
+      "com.android.sdklib.repository.legacy.remote.internal.sources",
+      "com.android.sdklib.repository.meta",
+      "com.android.sdklib.repository.sources",
+      "com.android.sdklib.repository.sources.generated.v1",
+      "com.android.sdklib.repository.sources.generated.v2",
+      "com.android.sdklib.repository.sources.generated.v3",
+      "com.android.sdklib.repository.sources.generated.v4",
+      "com.android.sdklib.repository.sources.generated.v5",
+      "com.android.sdklib.repository.sources.generated.v6",
+      "com.android.sdklib.repository.sources.generated.v7",
+      "com.android.sdklib.repository.targets",
+      "com.android.sdklib.tool",
+      "com.android.sdklib.tool.sdkmanager",
+      "com.android.sdklib.util"
+    ],
+    "com.android:signflinger": [
+      "com.android.signflinger"
+    ],
+    "com.android:zipflinger": [
+      "com.android.zipflinger"
+    ],
+    "com.google.code.findbugs:jsr305": [
+      "javax.annotation",
+      "javax.annotation.concurrent",
+      "javax.annotation.meta"
+    ],
+    "com.google.code.gson:gson": [
+      "com.google.gson",
+      "com.google.gson.annotations",
+      "com.google.gson.internal",
+      "com.google.gson.internal.bind",
+      "com.google.gson.internal.bind.util",
+      "com.google.gson.internal.reflect",
+      "com.google.gson.internal.sql",
+      "com.google.gson.reflect",
+      "com.google.gson.stream"
+    ],
+    "com.google.errorprone:error_prone_annotations": [
+      "com.google.errorprone.annotations",
+      "com.google.errorprone.annotations.concurrent"
+    ],
+    "com.google.guava:failureaccess": [
+      "com.google.common.util.concurrent.internal"
+    ],
+    "com.google.guava:guava": [
+      "com.google.common.annotations",
+      "com.google.common.base",
+      "com.google.common.base.internal",
+      "com.google.common.cache",
+      "com.google.common.collect",
+      "com.google.common.escape",
+      "com.google.common.eventbus",
+      "com.google.common.graph",
+      "com.google.common.hash",
+      "com.google.common.html",
+      "com.google.common.io",
+      "com.google.common.math",
+      "com.google.common.net",
+      "com.google.common.primitives",
+      "com.google.common.reflect",
+      "com.google.common.util.concurrent",
+      "com.google.common.xml",
+      "com.google.thirdparty.publicsuffix"
+    ],
+    "com.google.guava:guava-testlib": [
+      "com.google.common.collect.testing",
+      "com.google.common.collect.testing.features",
+      "com.google.common.collect.testing.google",
+      "com.google.common.collect.testing.testers",
+      "com.google.common.escape.testing",
+      "com.google.common.testing",
+      "com.google.common.util.concurrent.testing"
+    ],
+    "com.google.guava:listenablefuture": null,
+    "com.google.j2objc:j2objc-annotations": [
+      "com.google.j2objc.annotations"
+    ],
+    "com.google.jimfs:jimfs": [
+      "com.google.common.jimfs"
+    ],
+    "com.google.protobuf:protobuf-java": [
+      "com.google.protobuf",
+      "com.google.protobuf.compiler"
+    ],
+    "com.google.truth:truth": [
+      "com.google.common.truth",
+      "com.google.common.truth.codegen"
+    ],
+    "com.squareup:javawriter": [
+      "com.squareup.javawriter"
+    ],
+    "com.sun.istack:istack-commons-runtime": [
+      "com.sun.istack",
+      "com.sun.istack.localization",
+      "com.sun.istack.logging"
+    ],
+    "com.sun.xml.fastinfoset:FastInfoset": [
+      "com.sun.xml.fastinfoset",
+      "com.sun.xml.fastinfoset.algorithm",
+      "com.sun.xml.fastinfoset.alphabet",
+      "com.sun.xml.fastinfoset.dom",
+      "com.sun.xml.fastinfoset.org.apache.xerces.util",
+      "com.sun.xml.fastinfoset.sax",
+      "com.sun.xml.fastinfoset.stax",
+      "com.sun.xml.fastinfoset.stax.events",
+      "com.sun.xml.fastinfoset.stax.factory",
+      "com.sun.xml.fastinfoset.stax.util",
+      "com.sun.xml.fastinfoset.tools",
+      "com.sun.xml.fastinfoset.util",
+      "com.sun.xml.fastinfoset.vocab",
+      "org.jvnet.fastinfoset",
+      "org.jvnet.fastinfoset.sax",
+      "org.jvnet.fastinfoset.sax.helpers",
+      "org.jvnet.fastinfoset.stax"
+    ],
+    "commons-codec:commons-codec": [
+      "org.apache.commons.codec",
+      "org.apache.commons.codec.binary",
+      "org.apache.commons.codec.cli",
+      "org.apache.commons.codec.digest",
+      "org.apache.commons.codec.language",
+      "org.apache.commons.codec.language.bm",
+      "org.apache.commons.codec.net"
+    ],
+    "commons-io:commons-io": [
+      "org.apache.commons.io",
+      "org.apache.commons.io.build",
+      "org.apache.commons.io.channels",
+      "org.apache.commons.io.charset",
+      "org.apache.commons.io.comparator",
+      "org.apache.commons.io.file",
+      "org.apache.commons.io.file.attribute",
+      "org.apache.commons.io.file.spi",
+      "org.apache.commons.io.filefilter",
+      "org.apache.commons.io.function",
+      "org.apache.commons.io.input",
+      "org.apache.commons.io.input.buffer",
+      "org.apache.commons.io.monitor",
+      "org.apache.commons.io.output",
+      "org.apache.commons.io.serialization"
+    ],
+    "commons-logging:commons-logging": [
+      "org.apache.commons.logging",
+      "org.apache.commons.logging.impl"
+    ],
+    "jakarta.activation:jakarta.activation-api": [
+      "javax.activation"
+    ],
+    "jakarta.xml.bind:jakarta.xml.bind-api": [
+      "javax.xml.bind",
+      "javax.xml.bind.annotation",
+      "javax.xml.bind.annotation.adapters",
+      "javax.xml.bind.attachment",
+      "javax.xml.bind.helpers",
+      "javax.xml.bind.util"
+    ],
+    "javax.inject:javax.inject": [
+      "javax.inject"
+    ],
+    "junit:junit": [
+      "junit.extensions",
+      "junit.framework",
+      "junit.runner",
+      "junit.textui",
+      "org.junit",
+      "org.junit.experimental",
+      "org.junit.experimental.categories",
+      "org.junit.experimental.max",
+      "org.junit.experimental.results",
+      "org.junit.experimental.runners",
+      "org.junit.experimental.theories",
+      "org.junit.experimental.theories.internal",
+      "org.junit.experimental.theories.suppliers",
+      "org.junit.internal",
+      "org.junit.internal.builders",
+      "org.junit.internal.matchers",
+      "org.junit.internal.requests",
+      "org.junit.internal.runners",
+      "org.junit.internal.runners.model",
+      "org.junit.internal.runners.rules",
+      "org.junit.internal.runners.statements",
+      "org.junit.matchers",
+      "org.junit.rules",
+      "org.junit.runner",
+      "org.junit.runner.manipulation",
+      "org.junit.runner.notification",
+      "org.junit.runners",
+      "org.junit.runners.model",
+      "org.junit.runners.parameterized",
+      "org.junit.validator"
+    ],
+    "net.java.dev.jna:jna": [
+      "com.sun.jna",
+      "com.sun.jna.internal",
+      "com.sun.jna.ptr",
+      "com.sun.jna.win32"
+    ],
+    "net.java.dev.jna:jna-platform": [
+      "com.sun.jna.platform",
+      "com.sun.jna.platform.dnd",
+      "com.sun.jna.platform.linux",
+      "com.sun.jna.platform.mac",
+      "com.sun.jna.platform.unix",
+      "com.sun.jna.platform.unix.solaris",
+      "com.sun.jna.platform.win32",
+      "com.sun.jna.platform.win32.COM",
+      "com.sun.jna.platform.win32.COM.tlb",
+      "com.sun.jna.platform.win32.COM.tlb.imp",
+      "com.sun.jna.platform.win32.COM.util",
+      "com.sun.jna.platform.win32.COM.util.annotation",
+      "com.sun.jna.platform.wince"
+    ],
+    "net.sf.kxml:kxml2": [
+      "org.kxml2.io",
+      "org.kxml2.kdom",
+      "org.kxml2.wap",
+      "org.kxml2.wap.syncml",
+      "org.kxml2.wap.wml",
+      "org.kxml2.wap.wv",
+      "org.xmlpull.v1"
+    ],
+    "org.apache.commons:commons-compress": [
+      "org.apache.commons.compress",
+      "org.apache.commons.compress.archivers",
+      "org.apache.commons.compress.archivers.ar",
+      "org.apache.commons.compress.archivers.arj",
+      "org.apache.commons.compress.archivers.cpio",
+      "org.apache.commons.compress.archivers.dump",
+      "org.apache.commons.compress.archivers.examples",
+      "org.apache.commons.compress.archivers.jar",
+      "org.apache.commons.compress.archivers.sevenz",
+      "org.apache.commons.compress.archivers.tar",
+      "org.apache.commons.compress.archivers.zip",
+      "org.apache.commons.compress.changes",
+      "org.apache.commons.compress.compressors",
+      "org.apache.commons.compress.compressors.brotli",
+      "org.apache.commons.compress.compressors.bzip2",
+      "org.apache.commons.compress.compressors.deflate",
+      "org.apache.commons.compress.compressors.deflate64",
+      "org.apache.commons.compress.compressors.gzip",
+      "org.apache.commons.compress.compressors.lz4",
+      "org.apache.commons.compress.compressors.lz77support",
+      "org.apache.commons.compress.compressors.lzma",
+      "org.apache.commons.compress.compressors.lzw",
+      "org.apache.commons.compress.compressors.pack200",
+      "org.apache.commons.compress.compressors.snappy",
+      "org.apache.commons.compress.compressors.xz",
+      "org.apache.commons.compress.compressors.z",
+      "org.apache.commons.compress.compressors.zstandard",
+      "org.apache.commons.compress.harmony",
+      "org.apache.commons.compress.harmony.archive.internal.nls",
+      "org.apache.commons.compress.harmony.pack200",
+      "org.apache.commons.compress.harmony.unpack200",
+      "org.apache.commons.compress.harmony.unpack200.bytecode",
+      "org.apache.commons.compress.harmony.unpack200.bytecode.forms",
+      "org.apache.commons.compress.java.util.jar",
+      "org.apache.commons.compress.parallel",
+      "org.apache.commons.compress.utils"
+    ],
+    "org.apache.commons:commons-lang3": [
+      "org.apache.commons.lang3",
+      "org.apache.commons.lang3.arch",
+      "org.apache.commons.lang3.builder",
+      "org.apache.commons.lang3.compare",
+      "org.apache.commons.lang3.concurrent",
+      "org.apache.commons.lang3.concurrent.locks",
+      "org.apache.commons.lang3.event",
+      "org.apache.commons.lang3.exception",
+      "org.apache.commons.lang3.function",
+      "org.apache.commons.lang3.math",
+      "org.apache.commons.lang3.mutable",
+      "org.apache.commons.lang3.reflect",
+      "org.apache.commons.lang3.stream",
+      "org.apache.commons.lang3.text",
+      "org.apache.commons.lang3.text.translate",
+      "org.apache.commons.lang3.time",
+      "org.apache.commons.lang3.tuple",
+      "org.apache.commons.lang3.util"
+    ],
+    "org.apache.httpcomponents:httpclient": [
+      "org.apache.http.auth",
+      "org.apache.http.auth.params",
+      "org.apache.http.client",
+      "org.apache.http.client.config",
+      "org.apache.http.client.entity",
+      "org.apache.http.client.methods",
+      "org.apache.http.client.params",
+      "org.apache.http.client.protocol",
+      "org.apache.http.client.utils",
+      "org.apache.http.conn",
+      "org.apache.http.conn.params",
+      "org.apache.http.conn.routing",
+      "org.apache.http.conn.scheme",
+      "org.apache.http.conn.socket",
+      "org.apache.http.conn.ssl",
+      "org.apache.http.conn.util",
+      "org.apache.http.cookie",
+      "org.apache.http.cookie.params",
+      "org.apache.http.impl.auth",
+      "org.apache.http.impl.client",
+      "org.apache.http.impl.conn",
+      "org.apache.http.impl.conn.tsccm",
+      "org.apache.http.impl.cookie",
+      "org.apache.http.impl.execchain"
+    ],
+    "org.apache.httpcomponents:httpcore": [
+      "org.apache.http",
+      "org.apache.http.annotation",
+      "org.apache.http.concurrent",
+      "org.apache.http.config",
+      "org.apache.http.entity",
+      "org.apache.http.impl",
+      "org.apache.http.impl.bootstrap",
+      "org.apache.http.impl.entity",
+      "org.apache.http.impl.io",
+      "org.apache.http.impl.pool",
+      "org.apache.http.io",
+      "org.apache.http.message",
+      "org.apache.http.params",
+      "org.apache.http.pool",
+      "org.apache.http.protocol",
+      "org.apache.http.ssl",
+      "org.apache.http.util"
+    ],
+    "org.apache.httpcomponents:httpmime": [
+      "org.apache.http.entity.mime",
+      "org.apache.http.entity.mime.content"
+    ],
+    "org.bouncycastle:bcpkix-jdk18on": [
+      "org.bouncycastle.cert",
+      "org.bouncycastle.cert.bc",
+      "org.bouncycastle.cert.cmp",
+      "org.bouncycastle.cert.crmf",
+      "org.bouncycastle.cert.crmf.bc",
+      "org.bouncycastle.cert.crmf.jcajce",
+      "org.bouncycastle.cert.dane",
+      "org.bouncycastle.cert.dane.fetcher",
+      "org.bouncycastle.cert.jcajce",
+      "org.bouncycastle.cert.ocsp",
+      "org.bouncycastle.cert.ocsp.jcajce",
+      "org.bouncycastle.cert.path",
+      "org.bouncycastle.cert.path.validations",
+      "org.bouncycastle.cert.selector",
+      "org.bouncycastle.cert.selector.jcajce",
+      "org.bouncycastle.cmc",
+      "org.bouncycastle.cms",
+      "org.bouncycastle.cms.bc",
+      "org.bouncycastle.cms.jcajce",
+      "org.bouncycastle.dvcs",
+      "org.bouncycastle.eac",
+      "org.bouncycastle.eac.jcajce",
+      "org.bouncycastle.eac.operator",
+      "org.bouncycastle.eac.operator.jcajce",
+      "org.bouncycastle.est",
+      "org.bouncycastle.est.jcajce",
+      "org.bouncycastle.its",
+      "org.bouncycastle.its.bc",
+      "org.bouncycastle.its.jcajce",
+      "org.bouncycastle.its.operator",
+      "org.bouncycastle.mime",
+      "org.bouncycastle.mime.encoding",
+      "org.bouncycastle.mime.smime",
+      "org.bouncycastle.mozilla",
+      "org.bouncycastle.mozilla.jcajce",
+      "org.bouncycastle.openssl",
+      "org.bouncycastle.openssl.bc",
+      "org.bouncycastle.openssl.jcajce",
+      "org.bouncycastle.operator",
+      "org.bouncycastle.operator.bc",
+      "org.bouncycastle.operator.jcajce",
+      "org.bouncycastle.pkcs",
+      "org.bouncycastle.pkcs.bc",
+      "org.bouncycastle.pkcs.jcajce",
+      "org.bouncycastle.pkix",
+      "org.bouncycastle.pkix.jcajce",
+      "org.bouncycastle.pkix.util",
+      "org.bouncycastle.pkix.util.filter",
+      "org.bouncycastle.tsp",
+      "org.bouncycastle.tsp.cms",
+      "org.bouncycastle.tsp.ers",
+      "org.bouncycastle.voms"
+    ],
+    "org.bouncycastle:bcprov-jdk18on": [
+      "org.bouncycastle",
+      "org.bouncycastle.asn1",
+      "org.bouncycastle.asn1.anssi",
+      "org.bouncycastle.asn1.bc",
+      "org.bouncycastle.asn1.cryptopro",
+      "org.bouncycastle.asn1.gm",
+      "org.bouncycastle.asn1.nist",
+      "org.bouncycastle.asn1.ocsp",
+      "org.bouncycastle.asn1.pkcs",
+      "org.bouncycastle.asn1.sec",
+      "org.bouncycastle.asn1.teletrust",
+      "org.bouncycastle.asn1.ua",
+      "org.bouncycastle.asn1.util",
+      "org.bouncycastle.asn1.x500",
+      "org.bouncycastle.asn1.x500.style",
+      "org.bouncycastle.asn1.x509",
+      "org.bouncycastle.asn1.x509.qualified",
+      "org.bouncycastle.asn1.x509.sigi",
+      "org.bouncycastle.asn1.x9",
+      "org.bouncycastle.crypto",
+      "org.bouncycastle.crypto.agreement",
+      "org.bouncycastle.crypto.agreement.ecjpake",
+      "org.bouncycastle.crypto.agreement.jpake",
+      "org.bouncycastle.crypto.agreement.kdf",
+      "org.bouncycastle.crypto.agreement.srp",
+      "org.bouncycastle.crypto.commitments",
+      "org.bouncycastle.crypto.constraints",
+      "org.bouncycastle.crypto.digests",
+      "org.bouncycastle.crypto.ec",
+      "org.bouncycastle.crypto.encodings",
+      "org.bouncycastle.crypto.engines",
+      "org.bouncycastle.crypto.examples",
+      "org.bouncycastle.crypto.fpe",
+      "org.bouncycastle.crypto.generators",
+      "org.bouncycastle.crypto.hpke",
+      "org.bouncycastle.crypto.io",
+      "org.bouncycastle.crypto.kems",
+      "org.bouncycastle.crypto.macs",
+      "org.bouncycastle.crypto.modes",
+      "org.bouncycastle.crypto.modes.gcm",
+      "org.bouncycastle.crypto.modes.kgcm",
+      "org.bouncycastle.crypto.paddings",
+      "org.bouncycastle.crypto.params",
+      "org.bouncycastle.crypto.parsers",
+      "org.bouncycastle.crypto.prng",
+      "org.bouncycastle.crypto.prng.drbg",
+      "org.bouncycastle.crypto.signers",
+      "org.bouncycastle.crypto.threshold",
+      "org.bouncycastle.crypto.tls",
+      "org.bouncycastle.crypto.util",
+      "org.bouncycastle.i18n",
+      "org.bouncycastle.i18n.filter",
+      "org.bouncycastle.iana",
+      "org.bouncycastle.internal.asn1.bsi",
+      "org.bouncycastle.internal.asn1.cms",
+      "org.bouncycastle.internal.asn1.cryptlib",
+      "org.bouncycastle.internal.asn1.eac",
+      "org.bouncycastle.internal.asn1.edec",
+      "org.bouncycastle.internal.asn1.gnu",
+      "org.bouncycastle.internal.asn1.iana",
+      "org.bouncycastle.internal.asn1.isara",
+      "org.bouncycastle.internal.asn1.isismtt",
+      "org.bouncycastle.internal.asn1.iso",
+      "org.bouncycastle.internal.asn1.kisa",
+      "org.bouncycastle.internal.asn1.microsoft",
+      "org.bouncycastle.internal.asn1.misc",
+      "org.bouncycastle.internal.asn1.nsri",
+      "org.bouncycastle.internal.asn1.ntt",
+      "org.bouncycastle.internal.asn1.oiw",
+      "org.bouncycastle.internal.asn1.rosstandart",
+      "org.bouncycastle.jcajce",
+      "org.bouncycastle.jcajce.interfaces",
+      "org.bouncycastle.jcajce.io",
+      "org.bouncycastle.jcajce.provider.asymmetric",
+      "org.bouncycastle.jcajce.provider.asymmetric.compositesignatures",
+      "org.bouncycastle.jcajce.provider.asymmetric.dh",
+      "org.bouncycastle.jcajce.provider.asymmetric.dsa",
+      "org.bouncycastle.jcajce.provider.asymmetric.dstu",
+      "org.bouncycastle.jcajce.provider.asymmetric.ec",
+      "org.bouncycastle.jcajce.provider.asymmetric.ecgost",
+      "org.bouncycastle.jcajce.provider.asymmetric.ecgost12",
+      "org.bouncycastle.jcajce.provider.asymmetric.edec",
+      "org.bouncycastle.jcajce.provider.asymmetric.elgamal",
+      "org.bouncycastle.jcajce.provider.asymmetric.gost",
+      "org.bouncycastle.jcajce.provider.asymmetric.ies",
+      "org.bouncycastle.jcajce.provider.asymmetric.mldsa",
+      "org.bouncycastle.jcajce.provider.asymmetric.mlkem",
+      "org.bouncycastle.jcajce.provider.asymmetric.rsa",
+      "org.bouncycastle.jcajce.provider.asymmetric.slhdsa",
+      "org.bouncycastle.jcajce.provider.asymmetric.util",
+      "org.bouncycastle.jcajce.provider.asymmetric.x509",
+      "org.bouncycastle.jcajce.provider.config",
+      "org.bouncycastle.jcajce.provider.digest",
+      "org.bouncycastle.jcajce.provider.drbg",
+      "org.bouncycastle.jcajce.provider.keystore",
+      "org.bouncycastle.jcajce.provider.keystore.bc",
+      "org.bouncycastle.jcajce.provider.keystore.bcfks",
+      "org.bouncycastle.jcajce.provider.keystore.pkcs12",
+      "org.bouncycastle.jcajce.provider.keystore.util",
+      "org.bouncycastle.jcajce.provider.symmetric",
+      "org.bouncycastle.jcajce.provider.symmetric.util",
+      "org.bouncycastle.jcajce.provider.util",
+      "org.bouncycastle.jcajce.spec",
+      "org.bouncycastle.jcajce.util",
+      "org.bouncycastle.jce",
+      "org.bouncycastle.jce.exception",
+      "org.bouncycastle.jce.interfaces",
+      "org.bouncycastle.jce.netscape",
+      "org.bouncycastle.jce.provider",
+      "org.bouncycastle.jce.spec",
+      "org.bouncycastle.ldap",
+      "org.bouncycastle.math",
+      "org.bouncycastle.math.ec",
+      "org.bouncycastle.math.ec.custom.djb",
+      "org.bouncycastle.math.ec.custom.gm",
+      "org.bouncycastle.math.ec.custom.sec",
+      "org.bouncycastle.math.ec.endo",
+      "org.bouncycastle.math.ec.rfc7748",
+      "org.bouncycastle.math.ec.rfc8032",
+      "org.bouncycastle.math.ec.tools",
+      "org.bouncycastle.math.field",
+      "org.bouncycastle.math.raw",
+      "org.bouncycastle.pqc.asn1",
+      "org.bouncycastle.pqc.crypto",
+      "org.bouncycastle.pqc.crypto.bike",
+      "org.bouncycastle.pqc.crypto.cmce",
+      "org.bouncycastle.pqc.crypto.crystals.dilithium",
+      "org.bouncycastle.pqc.crypto.falcon",
+      "org.bouncycastle.pqc.crypto.frodo",
+      "org.bouncycastle.pqc.crypto.gemss",
+      "org.bouncycastle.pqc.crypto.hqc",
+      "org.bouncycastle.pqc.crypto.lms",
+      "org.bouncycastle.pqc.crypto.mldsa",
+      "org.bouncycastle.pqc.crypto.mlkem",
+      "org.bouncycastle.pqc.crypto.newhope",
+      "org.bouncycastle.pqc.crypto.ntru",
+      "org.bouncycastle.pqc.crypto.ntruprime",
+      "org.bouncycastle.pqc.crypto.picnic",
+      "org.bouncycastle.pqc.crypto.rainbow",
+      "org.bouncycastle.pqc.crypto.saber",
+      "org.bouncycastle.pqc.crypto.slhdsa",
+      "org.bouncycastle.pqc.crypto.sphincs",
+      "org.bouncycastle.pqc.crypto.sphincsplus",
+      "org.bouncycastle.pqc.crypto.util",
+      "org.bouncycastle.pqc.crypto.xmss",
+      "org.bouncycastle.pqc.crypto.xwing",
+      "org.bouncycastle.pqc.jcajce.interfaces",
+      "org.bouncycastle.pqc.jcajce.provider",
+      "org.bouncycastle.pqc.jcajce.provider.bike",
+      "org.bouncycastle.pqc.jcajce.provider.cmce",
+      "org.bouncycastle.pqc.jcajce.provider.dilithium",
+      "org.bouncycastle.pqc.jcajce.provider.falcon",
+      "org.bouncycastle.pqc.jcajce.provider.frodo",
+      "org.bouncycastle.pqc.jcajce.provider.gmss",
+      "org.bouncycastle.pqc.jcajce.provider.hqc",
+      "org.bouncycastle.pqc.jcajce.provider.kyber",
+      "org.bouncycastle.pqc.jcajce.provider.lms",
+      "org.bouncycastle.pqc.jcajce.provider.mceliece",
+      "org.bouncycastle.pqc.jcajce.provider.newhope",
+      "org.bouncycastle.pqc.jcajce.provider.ntru",
+      "org.bouncycastle.pqc.jcajce.provider.ntruprime",
+      "org.bouncycastle.pqc.jcajce.provider.picnic",
+      "org.bouncycastle.pqc.jcajce.provider.rainbow",
+      "org.bouncycastle.pqc.jcajce.provider.saber",
+      "org.bouncycastle.pqc.jcajce.provider.sphincs",
+      "org.bouncycastle.pqc.jcajce.provider.sphincsplus",
+      "org.bouncycastle.pqc.jcajce.provider.util",
+      "org.bouncycastle.pqc.jcajce.provider.xmss",
+      "org.bouncycastle.pqc.jcajce.spec",
+      "org.bouncycastle.pqc.legacy.crypto.gmss",
+      "org.bouncycastle.pqc.legacy.crypto.gmss.util",
+      "org.bouncycastle.pqc.legacy.crypto.mceliece",
+      "org.bouncycastle.pqc.legacy.crypto.ntru",
+      "org.bouncycastle.pqc.legacy.crypto.qtesla",
+      "org.bouncycastle.pqc.legacy.crypto.rainbow",
+      "org.bouncycastle.pqc.legacy.crypto.rainbow.util",
+      "org.bouncycastle.pqc.legacy.math.linearalgebra",
+      "org.bouncycastle.pqc.legacy.math.ntru.euclid",
+      "org.bouncycastle.pqc.legacy.math.ntru.polynomial",
+      "org.bouncycastle.pqc.legacy.math.ntru.util",
+      "org.bouncycastle.pqc.math.ntru",
+      "org.bouncycastle.pqc.math.ntru.parameters",
+      "org.bouncycastle.util",
+      "org.bouncycastle.util.encoders",
+      "org.bouncycastle.util.io",
+      "org.bouncycastle.util.io.pem",
+      "org.bouncycastle.util.test",
+      "org.bouncycastle.x509",
+      "org.bouncycastle.x509.extension",
+      "org.bouncycastle.x509.util"
+    ],
+    "org.bouncycastle:bcutil-jdk18on": [
+      "org.bouncycastle.asn1.bsi",
+      "org.bouncycastle.asn1.cmc",
+      "org.bouncycastle.asn1.cmp",
+      "org.bouncycastle.asn1.cms",
+      "org.bouncycastle.asn1.cms.ecc",
+      "org.bouncycastle.asn1.crmf",
+      "org.bouncycastle.asn1.cryptlib",
+      "org.bouncycastle.asn1.dvcs",
+      "org.bouncycastle.asn1.eac",
+      "org.bouncycastle.asn1.edec",
+      "org.bouncycastle.asn1.esf",
+      "org.bouncycastle.asn1.ess",
+      "org.bouncycastle.asn1.est",
+      "org.bouncycastle.asn1.gnu",
+      "org.bouncycastle.asn1.iana",
+      "org.bouncycastle.asn1.icao",
+      "org.bouncycastle.asn1.isara",
+      "org.bouncycastle.asn1.isismtt",
+      "org.bouncycastle.asn1.isismtt.ocsp",
+      "org.bouncycastle.asn1.isismtt.x509",
+      "org.bouncycastle.asn1.iso",
+      "org.bouncycastle.asn1.kisa",
+      "org.bouncycastle.asn1.microsoft",
+      "org.bouncycastle.asn1.misc",
+      "org.bouncycastle.asn1.mozilla",
+      "org.bouncycastle.asn1.nsri",
+      "org.bouncycastle.asn1.ntt",
+      "org.bouncycastle.asn1.oiw",
+      "org.bouncycastle.asn1.rosstandart",
+      "org.bouncycastle.asn1.smime",
+      "org.bouncycastle.asn1.tsp",
+      "org.bouncycastle.oer",
+      "org.bouncycastle.oer.its",
+      "org.bouncycastle.oer.its.etsi102941",
+      "org.bouncycastle.oer.its.etsi102941.basetypes",
+      "org.bouncycastle.oer.its.etsi103097",
+      "org.bouncycastle.oer.its.etsi103097.extension",
+      "org.bouncycastle.oer.its.ieee1609dot2",
+      "org.bouncycastle.oer.its.ieee1609dot2.basetypes",
+      "org.bouncycastle.oer.its.ieee1609dot2dot1",
+      "org.bouncycastle.oer.its.template.etsi102941",
+      "org.bouncycastle.oer.its.template.etsi102941.basetypes",
+      "org.bouncycastle.oer.its.template.etsi103097",
+      "org.bouncycastle.oer.its.template.etsi103097.extension",
+      "org.bouncycastle.oer.its.template.ieee1609dot2",
+      "org.bouncycastle.oer.its.template.ieee1609dot2.basetypes",
+      "org.bouncycastle.oer.its.template.ieee1609dot2dot1"
+    ],
+    "org.glassfish.jaxb:jaxb-runtime": [
+      "com.sun.xml.bind",
+      "com.sun.xml.bind.annotation",
+      "com.sun.xml.bind.api",
+      "com.sun.xml.bind.api.impl",
+      "com.sun.xml.bind.marshaller",
+      "com.sun.xml.bind.unmarshaller",
+      "com.sun.xml.bind.util",
+      "com.sun.xml.bind.v2",
+      "com.sun.xml.bind.v2.bytecode",
+      "com.sun.xml.bind.v2.model.annotation",
+      "com.sun.xml.bind.v2.model.core",
+      "com.sun.xml.bind.v2.model.impl",
+      "com.sun.xml.bind.v2.model.nav",
+      "com.sun.xml.bind.v2.model.runtime",
+      "com.sun.xml.bind.v2.model.util",
+      "com.sun.xml.bind.v2.runtime",
+      "com.sun.xml.bind.v2.runtime.output",
+      "com.sun.xml.bind.v2.runtime.property",
+      "com.sun.xml.bind.v2.runtime.reflect",
+      "com.sun.xml.bind.v2.runtime.reflect.opt",
+      "com.sun.xml.bind.v2.runtime.unmarshaller",
+      "com.sun.xml.bind.v2.schemagen",
+      "com.sun.xml.bind.v2.schemagen.episode",
+      "com.sun.xml.bind.v2.schemagen.xmlschema",
+      "com.sun.xml.bind.v2.util"
+    ],
+    "org.glassfish.jaxb:txw2": [
+      "com.sun.xml.txw2",
+      "com.sun.xml.txw2.annotation",
+      "com.sun.xml.txw2.output"
+    ],
+    "org.hamcrest:hamcrest-core": [
+      "org.hamcrest",
+      "org.hamcrest.core",
+      "org.hamcrest.internal"
+    ],
+    "org.jetbrains.kotlin:kotlin-reflect": [
+      "kotlin.reflect.full",
+      "kotlin.reflect.jvm",
+      "kotlin.reflect.jvm.internal",
+      "kotlin.reflect.jvm.internal.calls",
+      "kotlin.reflect.jvm.internal.impl",
+      "kotlin.reflect.jvm.internal.impl.builtins",
+      "kotlin.reflect.jvm.internal.impl.builtins.functions",
+      "kotlin.reflect.jvm.internal.impl.builtins.jvm",
+      "kotlin.reflect.jvm.internal.impl.descriptors",
+      "kotlin.reflect.jvm.internal.impl.descriptors.annotations",
+      "kotlin.reflect.jvm.internal.impl.descriptors.deserialization",
+      "kotlin.reflect.jvm.internal.impl.descriptors.impl",
+      "kotlin.reflect.jvm.internal.impl.descriptors.java",
+      "kotlin.reflect.jvm.internal.impl.descriptors.runtime.components",
+      "kotlin.reflect.jvm.internal.impl.descriptors.runtime.structure",
+      "kotlin.reflect.jvm.internal.impl.incremental",
+      "kotlin.reflect.jvm.internal.impl.incremental.components",
+      "kotlin.reflect.jvm.internal.impl.km",
+      "kotlin.reflect.jvm.internal.impl.km.internal",
+      "kotlin.reflect.jvm.internal.impl.km.internal.common",
+      "kotlin.reflect.jvm.internal.impl.km.internal.extensions",
+      "kotlin.reflect.jvm.internal.impl.km.jvm",
+      "kotlin.reflect.jvm.internal.impl.km.jvm.internal",
+      "kotlin.reflect.jvm.internal.impl.load.java",
+      "kotlin.reflect.jvm.internal.impl.load.java.components",
+      "kotlin.reflect.jvm.internal.impl.load.java.descriptors",
+      "kotlin.reflect.jvm.internal.impl.load.java.lazy",
+      "kotlin.reflect.jvm.internal.impl.load.java.lazy.descriptors",
+      "kotlin.reflect.jvm.internal.impl.load.java.lazy.types",
+      "kotlin.reflect.jvm.internal.impl.load.java.sources",
+      "kotlin.reflect.jvm.internal.impl.load.java.structure",
+      "kotlin.reflect.jvm.internal.impl.load.java.typeEnhancement",
+      "kotlin.reflect.jvm.internal.impl.load.kotlin",
+      "kotlin.reflect.jvm.internal.impl.load.kotlin.header",
+      "kotlin.reflect.jvm.internal.impl.metadata",
+      "kotlin.reflect.jvm.internal.impl.metadata.builtins",
+      "kotlin.reflect.jvm.internal.impl.metadata.deserialization",
+      "kotlin.reflect.jvm.internal.impl.metadata.jvm",
+      "kotlin.reflect.jvm.internal.impl.metadata.jvm.deserialization",
+      "kotlin.reflect.jvm.internal.impl.metadata.serialization",
+      "kotlin.reflect.jvm.internal.impl.name",
+      "kotlin.reflect.jvm.internal.impl.platform",
+      "kotlin.reflect.jvm.internal.impl.protobuf",
+      "kotlin.reflect.jvm.internal.impl.renderer",
+      "kotlin.reflect.jvm.internal.impl.resolve",
+      "kotlin.reflect.jvm.internal.impl.resolve.calls.inference",
+      "kotlin.reflect.jvm.internal.impl.resolve.constants",
+      "kotlin.reflect.jvm.internal.impl.resolve.deprecation",
+      "kotlin.reflect.jvm.internal.impl.resolve.descriptorUtil",
+      "kotlin.reflect.jvm.internal.impl.resolve.jvm",
+      "kotlin.reflect.jvm.internal.impl.resolve.sam",
+      "kotlin.reflect.jvm.internal.impl.resolve.scopes",
+      "kotlin.reflect.jvm.internal.impl.resolve.scopes.receivers",
+      "kotlin.reflect.jvm.internal.impl.serialization",
+      "kotlin.reflect.jvm.internal.impl.serialization.deserialization",
+      "kotlin.reflect.jvm.internal.impl.serialization.deserialization.builtins",
+      "kotlin.reflect.jvm.internal.impl.serialization.deserialization.descriptors",
+      "kotlin.reflect.jvm.internal.impl.storage",
+      "kotlin.reflect.jvm.internal.impl.types",
+      "kotlin.reflect.jvm.internal.impl.types.checker",
+      "kotlin.reflect.jvm.internal.impl.types.error",
+      "kotlin.reflect.jvm.internal.impl.types.extensions",
+      "kotlin.reflect.jvm.internal.impl.types.model",
+      "kotlin.reflect.jvm.internal.impl.types.typeUtil",
+      "kotlin.reflect.jvm.internal.impl.types.typesApproximation",
+      "kotlin.reflect.jvm.internal.impl.util",
+      "kotlin.reflect.jvm.internal.impl.util.capitalizeDecapitalize",
+      "kotlin.reflect.jvm.internal.impl.util.collectionUtils",
+      "kotlin.reflect.jvm.internal.impl.utils",
+      "kotlin.reflect.jvm.internal.impl.utils.addToStdlib"
+    ],
+    "org.jetbrains.kotlin:kotlin-stdlib": [
+      "kotlin",
+      "kotlin.annotation",
+      "kotlin.collections",
+      "kotlin.collections.builders",
+      "kotlin.collections.jdk8",
+      "kotlin.collections.unsigned",
+      "kotlin.comparisons",
+      "kotlin.concurrent",
+      "kotlin.concurrent.atomics",
+      "kotlin.concurrent.internal",
+      "kotlin.contracts",
+      "kotlin.coroutines",
+      "kotlin.coroutines.cancellation",
+      "kotlin.coroutines.intrinsics",
+      "kotlin.coroutines.jvm.internal",
+      "kotlin.enums",
+      "kotlin.experimental",
+      "kotlin.internal",
+      "kotlin.internal.jdk7",
+      "kotlin.internal.jdk8",
+      "kotlin.io",
+      "kotlin.io.encoding",
+      "kotlin.io.path",
+      "kotlin.jdk7",
+      "kotlin.js",
+      "kotlin.jvm",
+      "kotlin.jvm.functions",
+      "kotlin.jvm.internal",
+      "kotlin.jvm.internal.markers",
+      "kotlin.jvm.internal.unsafe",
+      "kotlin.jvm.jdk8",
+      "kotlin.jvm.optionals",
+      "kotlin.math",
+      "kotlin.properties",
+      "kotlin.random",
+      "kotlin.random.jdk8",
+      "kotlin.ranges",
+      "kotlin.reflect",
+      "kotlin.sequences",
+      "kotlin.streams.jdk8",
+      "kotlin.system",
+      "kotlin.text",
+      "kotlin.text.jdk8",
+      "kotlin.time",
+      "kotlin.time.jdk8",
+      "kotlin.uuid"
+    ],
+    "org.jetbrains.kotlin:kotlin-stdlib-jdk7": null,
+    "org.jetbrains.kotlin:kotlin-stdlib-jdk8": null,
+    "org.jetbrains.kotlinx:kotlinx-coroutines-core": [
+      "_COROUTINE",
+      "kotlinx.coroutines",
+      "kotlinx.coroutines.channels",
+      "kotlinx.coroutines.debug",
+      "kotlinx.coroutines.debug.internal",
+      "kotlinx.coroutines.flow",
+      "kotlinx.coroutines.flow.internal",
+      "kotlinx.coroutines.future",
+      "kotlinx.coroutines.internal",
+      "kotlinx.coroutines.intrinsics",
+      "kotlinx.coroutines.scheduling",
+      "kotlinx.coroutines.selects",
+      "kotlinx.coroutines.stream",
+      "kotlinx.coroutines.sync",
+      "kotlinx.coroutines.time"
+    ],
+    "org.jetbrains:annotations": [
+      "org.intellij.lang.annotations",
+      "org.jetbrains.annotations"
+    ],
+    "org.jspecify:jspecify": [
+      "org.jspecify.annotations"
+    ],
+    "org.jvnet.staxex:stax-ex": [
+      "org.jvnet.staxex",
+      "org.jvnet.staxex.util"
+    ],
+    "org.ow2.asm:asm": [
+      "org.objectweb.asm",
+      "org.objectweb.asm.signature"
+    ],
+    "org.ow2.asm:asm-commons": [
+      "org.objectweb.asm.commons"
+    ],
+    "org.ow2.asm:asm-tree": [
+      "org.objectweb.asm.tree"
+    ]
+  },
+  "artifacts": {
+    "com.android.tools.analytics-library:protos": {
+      "jvm": {
+        "version": "32.4.1",
+        "files": [
+          {
+            "name": "protos-32.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/analytics-library/protos/32.4.1/protos-32.4.1.jar",
+            "sha256": "54a932e1559e3b4a68dfd0d52f22bcf436802f063fef6cb32003f91c7dd43c60"
+          }
+        ],
+        "deps": [
+          "com.google.protobuf:protobuf-java"
+        ]
+      }
+    },
+    "com.android.tools.analytics-library:shared": {
+      "jvm": {
+        "version": "32.4.1",
+        "files": [
+          {
+            "name": "shared-32.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/analytics-library/shared/32.4.1/shared-32.4.1.jar",
+            "sha256": "6d1e9fe43d27fc1aa99e5792285905c7f8d081d96747aadb1e76cc08dffdb53d"
+          }
+        ],
+        "deps": [
+          "com.android.tools.analytics-library:protos"
+        ],
+        "runtime_deps": [
+          "com.android.tools:annotations",
+          "com.android.tools:common",
+          "com.google.code.gson:gson",
+          "com.google.guava:guava",
+          "net.java.dev.jna:jna-platform",
+          "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "com.android.tools.analytics-library:tracker": {
+      "jvm": {
+        "version": "32.4.1",
+        "files": [
+          {
+            "name": "tracker-32.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/analytics-library/tracker/32.4.1/tracker-32.4.1.jar",
+            "sha256": "a9b02daac32d0f5908a5ea62fbd140f9d3a6ba513ad71867dbeefbb2e2bfdd13"
+          }
+        ],
+        "deps": [
+          "com.android.tools.analytics-library:protos",
+          "com.android.tools.analytics-library:shared"
+        ],
+        "runtime_deps": [
+          "com.android.tools:annotations",
+          "com.android.tools:common",
+          "com.google.guava:guava",
+          "com.google.protobuf:protobuf-java",
+          "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "com.android.tools.build:aapt2-proto": {
+      "jvm": {
+        "version": "9.4.1-15978811",
+        "files": [
+          {
+            "name": "aapt2-proto-9.4.1-15978811.jar",
+            "url": "https://maven.google.com/com/android/tools/build/aapt2-proto/9.4.1-15978811/aapt2-proto-9.4.1-15978811.jar",
+            "sha256": "5bcdd71fde7863c68c67ee4a69cf86206fbd3a2de66f5a3e4625ce5fb4ead2b5"
+          }
+        ],
+        "runtime_deps": [
+          "com.google.protobuf:protobuf-java"
+        ]
+      }
+    },
+    "com.android.tools.build:apksig": {
+      "jvm": {
+        "version": "9.4.1",
+        "files": [
+          {
+            "name": "apksig-9.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/build/apksig/9.4.1/apksig-9.4.1.jar",
+            "sha256": "7ae2e5980c77d853e3513074ee7c822bbdcdcde1668889d17faa7fe8bc8aa821"
+          }
+        ]
+      }
+    },
+    "com.android.tools.build:apkzlib": {
+      "jvm": {
+        "version": "9.4.1",
+        "files": [
+          {
+            "name": "apkzlib-9.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/build/apkzlib/9.4.1/apkzlib-9.4.1.jar",
+            "sha256": "4b16189ee60a63ab2b04ddfade4e851c8597fad917923c4db1406c105724107e"
+          }
+        ],
+        "runtime_deps": [
+          "com.android.tools.build:apksig",
+          "com.google.code.findbugs:jsr305",
+          "com.google.guava:guava",
+          "org.bouncycastle:bcpkix-jdk18on",
+          "org.bouncycastle:bcprov-jdk18on"
+        ]
+      }
+    },
+    "com.android.tools.build:builder": {
+      "jvm": {
+        "version": "9.4.1",
+        "files": [
+          {
+            "name": "builder-9.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/build/builder/9.4.1/builder-9.4.1.jar",
+            "sha256": "3ac6cce8e9aaa42683d66cf3b0d10b0bb44e40f9dea4a4db512481e858197b75"
+          }
+        ],
+        "deps": [
+          "com.android.tools.build:apksig",
+          "com.android.tools.build:apkzlib",
+          "com.android.tools.build:manifest-merger",
+          "com.android:zipflinger",
+          "com.squareup:javawriter"
+        ],
+        "runtime_deps": [
+          "com.android.tools.analytics-library:protos",
+          "com.android.tools.analytics-library:tracker",
+          "com.android.tools.build:builder-model",
+          "com.android.tools.build:builder-test-api",
+          "com.android.tools.ddms:ddmlib",
+          "com.android.tools.layoutlib:layoutlib-api",
+          "com.android.tools:common",
+          "com.android.tools:sdk-common",
+          "com.android.tools:sdklib",
+          "com.android:signflinger",
+          "com.google.code.gson:gson",
+          "javax.inject:javax.inject",
+          "org.bouncycastle:bcpkix-jdk18on",
+          "org.bouncycastle:bcprov-jdk18on",
+          "org.jetbrains.kotlin:kotlin-stdlib",
+          "org.ow2.asm:asm-commons"
+        ]
+      }
+    },
+    "com.android.tools.build:builder-model": {
+      "jvm": {
+        "version": "9.4.1",
+        "files": [
+          {
+            "name": "builder-model-9.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/build/builder-model/9.4.1/builder-model-9.4.1.jar",
+            "sha256": "6fcae3cf38fa06c4b2d5eabe5616c8e0f5c9da86512cb9b1efbb69b2f8019b60"
+          }
+        ],
+        "runtime_deps": [
+          "com.android.tools:annotations",
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "com.android.tools.build:builder-test-api": {
+      "jvm": {
+        "version": "9.4.1",
+        "files": [
+          {
+            "name": "builder-test-api-9.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/build/builder-test-api/9.4.1/builder-test-api-9.4.1.jar",
+            "sha256": "3cdf0caf8b2a104eb6239d4ea3e95a6c20ba2e76fa0ad1134c8e93e7757bd432"
+          }
+        ],
+        "runtime_deps": [
+          "com.android.tools.ddms:ddmlib",
+          "com.android.tools:annotations",
+          "com.android.tools:common",
+          "com.google.guava:guava"
+        ]
+      }
+    },
+    "com.android.tools.build:manifest-merger": {
+      "jvm": {
+        "version": "32.4.1",
+        "files": [
+          {
+            "name": "manifest-merger-32.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/build/manifest-merger/32.4.1/manifest-merger-32.4.1.jar",
+            "sha256": "a8ade13523ccf3289fdb4946fcf23831d2eac8ad8b216f63a74850d46cdc8dd4"
+          }
+        ],
+        "runtime_deps": [
+          "com.android.tools:common",
+          "com.android.tools:sdk-common",
+          "com.android.tools:sdklib",
+          "com.google.code.gson:gson",
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "com.android.tools.ddms:ddmlib": {
+      "jvm": {
+        "version": "32.4.1",
+        "files": [
+          {
+            "name": "ddmlib-32.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/ddms/ddmlib/32.4.1/ddmlib-32.4.1.jar",
+            "sha256": "ad7b49fc07ca341d205fb7eb17cd0610a18cd1678e55b6b4a869bbdee3fbf0e3"
+          }
+        ],
+        "runtime_deps": [
+          "com.android.tools:common",
+          "com.google.protobuf:protobuf-java",
+          "net.sf.kxml:kxml2",
+          "org.jetbrains:annotations"
+        ]
+      }
+    },
+    "com.android.tools.layoutlib:layoutlib-api": {
+      "jvm": {
+        "version": "32.4.1",
+        "files": [
+          {
+            "name": "layoutlib-api-32.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/layoutlib/layoutlib-api/32.4.1/layoutlib-api-32.4.1.jar",
+            "sha256": "24d9d0877a956ebd6e586640147bc6bd52ce904f0e6ab740be0899271e354543"
+          }
+        ],
+        "runtime_deps": [
+          "com.android.tools:annotations",
+          "com.android.tools:common",
+          "net.sf.kxml:kxml2",
+          "org.jetbrains:annotations"
+        ]
+      }
+    },
+    "com.android.tools:annotations": {
+      "jvm": {
+        "version": "32.4.1",
+        "files": [
+          {
+            "name": "annotations-32.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/annotations/32.4.1/annotations-32.4.1.jar",
+            "sha256": "32e90226ae4c7b59ed61b06689ae8356bab080cd79f6569455fd92925439a339"
+          }
+        ]
+      }
+    },
+    "com.android.tools:common": {
+      "jvm": {
+        "version": "32.4.1",
+        "files": [
+          {
+            "name": "common-32.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/common/32.4.1/common-32.4.1.jar",
+            "sha256": "cace5b28f2342119fe1a2db5baa36f8bd3391a086788e04fb8326bb70d6c4989"
+          }
+        ],
+        "deps": [
+          "com.android.tools:annotations",
+          "com.google.guava:guava"
+        ],
+        "runtime_deps": [
+          "net.java.dev.jna:jna-platform",
+          "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+        ]
+      }
+    },
+    "com.android.tools:dvlib": {
+      "jvm": {
+        "version": "32.4.1",
+        "files": [
+          {
+            "name": "dvlib-32.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/dvlib/32.4.1/dvlib-32.4.1.jar",
+            "sha256": "ff910a7349bc7f22ed2601ee48ad27a6c5bd27b59f82c4610a12d0a4c468bf45"
+          }
+        ],
+        "runtime_deps": [
+          "com.android.tools:common"
+        ]
+      }
+    },
+    "com.android.tools:repository": {
+      "jvm": {
+        "version": "32.4.1",
+        "files": [
+          {
+            "name": "repository-32.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/repository/32.4.1/repository-32.4.1.jar",
+            "sha256": "9fd419f3307be633aaf7b02b52832521c1300d4bf9058cee83bb11139990a7f9"
+          }
+        ],
+        "runtime_deps": [
+          "com.android.tools.analytics-library:shared",
+          "com.android.tools:common",
+          "com.google.jimfs:jimfs",
+          "org.apache.commons:commons-compress",
+          "org.glassfish.jaxb:jaxb-runtime",
+          "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      }
+    },
+    "com.android.tools:sdk-common": {
+      "jvm": {
+        "version": "32.4.1",
+        "files": [
+          {
+            "name": "sdk-common-32.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/sdk-common/32.4.1/sdk-common-32.4.1.jar",
+            "sha256": "0ef83f5f212f2fce8300a167ba256d1cd81e4cda6adc868f7025a8dbdd2ae14f"
+          }
+        ],
+        "runtime_deps": [
+          "com.android.tools.analytics-library:shared",
+          "com.android.tools.build:aapt2-proto",
+          "com.android.tools.ddms:ddmlib",
+          "com.android.tools.layoutlib:layoutlib-api",
+          "com.android.tools:common",
+          "com.android.tools:sdklib",
+          "com.google.code.gson:gson",
+          "com.google.guava:guava",
+          "com.google.protobuf:protobuf-java",
+          "javax.inject:javax.inject",
+          "net.sf.kxml:kxml2",
+          "org.apache.commons:commons-compress",
+          "org.bouncycastle:bcpkix-jdk18on",
+          "org.bouncycastle:bcprov-jdk18on",
+          "org.glassfish.jaxb:jaxb-runtime",
+          "org.jetbrains.kotlin:kotlin-reflect",
+          "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+        ]
+      }
+    },
+    "com.android.tools:sdklib": {
+      "jvm": {
+        "version": "32.4.1",
+        "files": [
+          {
+            "name": "sdklib-32.4.1.jar",
+            "url": "https://maven.google.com/com/android/tools/sdklib/32.4.1/sdklib-32.4.1.jar",
+            "sha256": "d0bbe0e03155a7bdd9bac03567b6b26797f81a778f55d5eadc3e71e7a0a27434"
+          }
+        ],
+        "deps": [
+          "com.android.tools:repository"
+        ],
+        "runtime_deps": [
+          "com.android.tools.layoutlib:layoutlib-api",
+          "com.android.tools:common",
+          "com.android.tools:dvlib",
+          "com.google.code.gson:gson",
+          "org.apache.commons:commons-compress",
+          "org.apache.httpcomponents:httpcore",
+          "org.apache.httpcomponents:httpmime",
+          "org.glassfish.jaxb:jaxb-runtime"
+        ]
+      }
+    },
+    "com.android:signflinger": {
+      "jvm": {
+        "version": "9.4.1",
+        "files": [
+          {
+            "name": "signflinger-9.4.1.jar",
+            "url": "https://maven.google.com/com/android/signflinger/9.4.1/signflinger-9.4.1.jar",
+            "sha256": "7d82126c9483b540173a65b0354fe27f067ec85c8e64676795873640a06b288d"
+          }
+        ],
+        "runtime_deps": [
+          "com.android.tools.build:apksig",
+          "com.android.tools:annotations",
+          "com.android:zipflinger"
+        ]
+      }
+    },
+    "com.android:zipflinger": {
+      "jvm": {
+        "version": "9.4.1",
+        "files": [
+          {
+            "name": "zipflinger-9.4.1.jar",
+            "url": "https://maven.google.com/com/android/zipflinger/9.4.1/zipflinger-9.4.1.jar",
+            "sha256": "0a1984d14cc8070f734ddcc5a947f122dfee364cdbe18595afb691aa803890e0"
+          }
+        ],
+        "runtime_deps": [
+          "com.android.tools:annotations"
+        ]
+      }
+    },
+    "com.google.code.findbugs:jsr305": {
+      "jvm": {
+        "version": "3.0.2",
+        "files": [
+          {
+            "name": "jsr305-3.0.2.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar",
+            "sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7"
+          }
+        ]
+      }
+    },
+    "com.google.code.gson:gson": {
+      "jvm": {
+        "version": "2.14.0",
+        "files": [
+          {
+            "name": "gson-2.14.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/code/gson/gson/2.14.0/gson-2.14.0.jar",
+            "sha256": "2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f"
+          }
+        ],
+        "deps": [
+          "com.google.errorprone:error_prone_annotations"
+        ]
+      }
+    },
+    "com.google.errorprone:error_prone_annotations": {
+      "jvm": {
+        "version": "2.50.0",
+        "files": [
+          {
+            "name": "error_prone_annotations-2.50.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.50.0/error_prone_annotations-2.50.0.jar",
+            "sha256": "4667724877f1d37a689202da191e23efa7657c62eef93ccdac406eccfe5cdd0a"
+          }
+        ]
+      }
+    },
+    "com.google.guava:failureaccess": {
+      "jvm": {
+        "version": "1.0.3",
+        "files": [
+          {
+            "name": "failureaccess-1.0.3.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/guava/failureaccess/1.0.3/failureaccess-1.0.3.jar",
+            "sha256": "cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb"
+          }
+        ]
+      }
+    },
+    "com.google.guava:guava": {
+      "jvm": {
+        "version": "33.7.2-jre",
+        "files": [
+          {
+            "name": "guava-33.7.2-jre.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/guava/guava/33.7.2-jre/guava-33.7.2-jre.jar",
+            "sha256": ""
+          }
+        ],
+        "deps": [
+          "com.google.errorprone:error_prone_annotations",
+          "com.google.guava:failureaccess",
+          "com.google.guava:listenablefuture",
+          "com.google.j2objc:j2objc-annotations",
+          "org.jspecify:jspecify"
+        ]
+      }
+    },
+    "com.google.guava:guava-testlib": {
+      "jvm": {
+        "version": "18.0",
+        "files": [
+          {
+            "name": "guava-testlib-18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/guava/guava-testlib/18.0/guava-testlib-18.0.jar",
+            "sha256": "775dd917a6214ac999cfaddc9e0610bca8de39940f2ecd482e015821310906f9"
+          }
+        ],
+        "deps": [
+          "com.google.code.findbugs:jsr305",
+          "com.google.guava:guava",
+          "com.google.truth:truth",
+          "junit:junit"
+        ]
+      }
+    },
+    "com.google.guava:listenablefuture": {
+      "jvm": {
+        "version": "9999.0-empty-to-avoid-conflict-with-guava",
+        "files": [
+          {
+            "name": "listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar",
+            "sha256": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99"
+          }
+        ]
+      }
+    },
+    "com.google.j2objc:j2objc-annotations": {
+      "jvm": {
+        "version": "3.1",
+        "files": [
+          {
+            "name": "j2objc-annotations-3.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/j2objc/j2objc-annotations/3.1/j2objc-annotations-3.1.jar",
+            "sha256": "84d3a150518485f8140ea99b8a985656749629f6433c92b80c75b36aba3b099b"
+          }
+        ]
+      }
+    },
+    "com.google.jimfs:jimfs": {
+      "jvm": {
+        "version": "1.1",
+        "files": [
+          {
+            "name": "jimfs-1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/jimfs/jimfs/1.1/jimfs-1.1.jar",
+            "sha256": "c4828e28d7c0a930af9387510b3bada7daa5c04d7c25a75c7b8b081f1c257ddd"
+          }
+        ],
+        "deps": [
+          "com.google.guava:guava",
+          "com.google.guava:guava-testlib",
+          "com.google.truth:truth",
+          "junit:junit"
+        ]
+      }
+    },
+    "com.google.protobuf:protobuf-java": {
+      "jvm": {
+        "version": "4.36.2",
+        "files": [
+          {
+            "name": "protobuf-java-4.36.2.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/protobuf/protobuf-java/4.36.2/protobuf-java-4.36.2.jar",
+            "sha256": "0773e72eaf375e1285df330575bfec5bda5da674d544d0e142a17f89c8f754da"
+          }
+        ]
+      }
+    },
+    "com.google.truth:truth": {
+      "jvm": {
+        "version": "0.27",
+        "files": [
+          {
+            "name": "truth-0.27.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/truth/truth/0.27/truth-0.27.jar",
+            "sha256": "80308a6a989a0c966681dcb0d827787b62cb7020584fcfcda5759f2fb810df80"
+          }
+        ],
+        "deps": [
+          "com.google.guava:guava",
+          "junit:junit"
+        ]
+      }
+    },
+    "com.squareup:javawriter": {
+      "jvm": {
+        "version": "2.5.1",
+        "files": [
+          {
+            "name": "javawriter-2.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/squareup/javawriter/2.5.1/javawriter-2.5.1.jar",
+            "sha256": "39b054910ff212d4379129a89070fb7dbb1f341371c925e9e99904f154a22d93"
+          }
+        ]
+      }
+    },
+    "com.sun.istack:istack-commons-runtime": {
+      "jvm": {
+        "version": "3.0.8",
+        "files": [
+          {
+            "name": "istack-commons-runtime-3.0.8.jar",
+            "url": "https://repo1.maven.org/maven2/com/sun/istack/istack-commons-runtime/3.0.8/istack-commons-runtime-3.0.8.jar",
+            "sha256": "4ffabb06be454a05e4398e20c77fa2b6308d4b88dfbef7ca30a76b5b7d5505ef"
+          }
+        ],
+        "deps": [
+          "jakarta.activation:jakarta.activation-api",
+          "junit:junit"
+        ]
+      }
+    },
+    "com.sun.xml.fastinfoset:FastInfoset": {
+      "jvm": {
+        "version": "1.2.16",
+        "files": [
+          {
+            "name": "FastInfoset-1.2.16.jar",
+            "url": "https://repo1.maven.org/maven2/com/sun/xml/fastinfoset/FastInfoset/1.2.16/FastInfoset-1.2.16.jar",
+            "sha256": "056f3a1e144409f21ed16afc26805f58e9a21f3fce1543c42d400719d250c511"
+          }
+        ]
+      }
+    },
+    "commons-codec:commons-codec": {
+      "jvm": {
+        "version": "1.17.1",
+        "files": [
+          {
+            "name": "commons-codec-1.17.1.jar",
+            "url": "https://repo1.maven.org/maven2/commons-codec/commons-codec/1.17.1/commons-codec-1.17.1.jar",
+            "sha256": "f9f6cb103f2ddc3c99a9d80ada2ae7bf0685111fd6bffccb72033d1da4e6ff23"
+          }
+        ]
+      }
+    },
+    "commons-io:commons-io": {
+      "jvm": {
+        "version": "2.22.0",
+        "files": [
+          {
+            "name": "commons-io-2.22.0.jar",
+            "url": "https://repo1.maven.org/maven2/commons-io/commons-io/2.22.0/commons-io-2.22.0.jar",
+            "sha256": "2b9a7b1f726fb86216dbd2c8321eabe0221dbd5b1be81c18e1cb53811b104758"
+          }
+        ]
+      }
+    },
+    "commons-logging:commons-logging": {
+      "jvm": {
+        "version": "1.2",
+        "files": [
+          {
+            "name": "commons-logging-1.2.jar",
+            "url": "https://repo1.maven.org/maven2/commons-logging/commons-logging/1.2/commons-logging-1.2.jar",
+            "sha256": "daddea1ea0be0f56978ab3006b8ac92834afeefbd9b7e4e6316fca57df0fa636"
+          }
+        ]
+      }
+    },
+    "jakarta.activation:jakarta.activation-api": {
+      "jvm": {
+        "version": "1.2.1",
+        "files": [
+          {
+            "name": "jakarta.activation-api-1.2.1.jar",
+            "url": "https://repo1.maven.org/maven2/jakarta/activation/jakarta.activation-api/1.2.1/jakarta.activation-api-1.2.1.jar",
+            "sha256": "8b0a0f52fa8b05c5431921a063ed866efaa41dadf2e3a7ee3e1961f2b0d9645b"
+          }
+        ]
+      }
+    },
+    "jakarta.xml.bind:jakarta.xml.bind-api": {
+      "jvm": {
+        "version": "2.3.2",
+        "files": [
+          {
+            "name": "jakarta.xml.bind-api-2.3.2.jar",
+            "url": "https://repo1.maven.org/maven2/jakarta/xml/bind/jakarta.xml.bind-api/2.3.2/jakarta.xml.bind-api-2.3.2.jar",
+            "sha256": "69156304079bdeed9fc0ae3b39389f19b3cc4ba4443bc80508995394ead742ea"
+          }
+        ],
+        "deps": [
+          "jakarta.activation:jakarta.activation-api"
+        ]
+      }
+    },
+    "javax.inject:javax.inject": {
+      "jvm": {
+        "version": "1",
+        "files": [
+          {
+            "name": "javax.inject-1.jar",
+            "url": "https://repo1.maven.org/maven2/javax/inject/javax.inject/1/javax.inject-1.jar",
+            "sha256": "91c77044a50c481636c32d916fd89c9118a72195390452c81065080f957de7ff"
+          }
+        ]
+      }
+    },
+    "junit:junit": {
+      "jvm": {
+        "version": "4.12",
+        "files": [
+          {
+            "name": "junit-4.12.jar",
+            "url": "https://repo1.maven.org/maven2/junit/junit/4.12/junit-4.12.jar",
+            "sha256": "59721f0805e223d84b90677887d9ff567dc534d7c502ca903c0c2b17f05c116a"
+          }
+        ],
+        "deps": [
+          "org.hamcrest:hamcrest-core"
+        ]
+      }
+    },
+    "net.java.dev.jna:jna": {
+      "jvm": {
+        "version": "5.6.0",
+        "files": [
+          {
+            "name": "jna-5.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/net/java/dev/jna/jna/5.6.0/jna-5.6.0.jar",
+            "sha256": "5557e235a8aa2f9766d5dc609d67948f2a8832c2d796cea9ef1d6cbe0b3b7eaf"
+          }
+        ]
+      }
+    },
+    "net.java.dev.jna:jna-platform": {
+      "jvm": {
+        "version": "5.6.0",
+        "files": [
+          {
+            "name": "jna-platform-5.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/net/java/dev/jna/jna-platform/5.6.0/jna-platform-5.6.0.jar",
+            "sha256": "9ecea8bf2b1b39963939d18b70464eef60c508fed8820f9dcaba0c35518eabf7"
+          }
+        ],
+        "deps": [
+          "net.java.dev.jna:jna"
+        ]
+      }
+    },
+    "net.sf.kxml:kxml2": {
+      "jvm": {
+        "version": "2.3.0",
+        "files": [
+          {
+            "name": "kxml2-2.3.0.jar",
+            "url": "https://repo1.maven.org/maven2/net/sf/kxml/kxml2/2.3.0/kxml2-2.3.0.jar",
+            "sha256": "f264dd9f79a1fde10ce5ecc53221eff24be4c9331c830b7d52f2f08a7b633de2"
+          }
+        ]
+      }
+    },
+    "org.apache.commons:commons-compress": {
+      "jvm": {
+        "version": "1.27.1",
+        "files": [
+          {
+            "name": "commons-compress-1.27.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-compress/1.27.1/commons-compress-1.27.1.jar",
+            "sha256": "293d80f54b536b74095dcd7ea3cf0a29bbfc3402519281332495f4420d370d16"
+          }
+        ],
+        "deps": [
+          "commons-codec:commons-codec",
+          "commons-io:commons-io",
+          "org.apache.commons:commons-lang3"
+        ]
+      }
+    },
+    "org.apache.commons:commons-lang3": {
+      "jvm": {
+        "version": "3.16.0",
+        "files": [
+          {
+            "name": "commons-lang3-3.16.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.16.0/commons-lang3-3.16.0.jar",
+            "sha256": "08709dd74d602b705ce4017d26544210056a4ba583d5b20c09373406fe7a00f8"
+          }
+        ]
+      }
+    },
+    "org.apache.httpcomponents:httpclient": {
+      "jvm": {
+        "version": "4.5.14",
+        "files": [
+          {
+            "name": "httpclient-4.5.14.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/httpcomponents/httpclient/4.5.14/httpclient-4.5.14.jar",
+            "sha256": "c8bc7e1c51a6d4ce72f40d2ebbabf1c4b68bfe76e732104b04381b493478e9d6"
+          }
+        ],
+        "deps": [
+          "commons-codec:commons-codec",
+          "commons-logging:commons-logging",
+          "org.apache.httpcomponents:httpcore"
+        ]
+      }
+    },
+    "org.apache.httpcomponents:httpcore": {
+      "jvm": {
+        "version": "4.4.16",
+        "files": [
+          {
+            "name": "httpcore-4.4.16.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/httpcomponents/httpcore/4.4.16/httpcore-4.4.16.jar",
+            "sha256": "6c9b3dd142a09dc468e23ad39aad6f75a0f2b85125104469f026e52a474e464f"
+          }
+        ]
+      }
+    },
+    "org.apache.httpcomponents:httpmime": {
+      "jvm": {
+        "version": "4.5.6",
+        "files": [
+          {
+            "name": "httpmime-4.5.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/httpcomponents/httpmime/4.5.6/httpmime-4.5.6.jar",
+            "sha256": "0b2b1102c18d3c7e05a77214b9b7501a6f6056174ae5604e0e256776eda7553e"
+          }
+        ],
+        "deps": [
+          "org.apache.httpcomponents:httpclient"
+        ]
+      }
+    },
+    "org.bouncycastle:bcpkix-jdk18on": {
+      "jvm": {
+        "version": "1.80.2",
+        "files": [
+          {
+            "name": "bcpkix-jdk18on-1.80.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/bouncycastle/bcpkix-jdk18on/1.80.2/bcpkix-jdk18on-1.80.2.jar",
+            "sha256": "d43bacacb557e7e9dd6e03f03ca56213214a646cee584e2c657b0e0b0db4a3f5"
+          }
+        ],
+        "deps": [
+          "org.bouncycastle:bcutil-jdk18on"
+        ]
+      }
+    },
+    "org.bouncycastle:bcprov-jdk18on": {
+      "jvm": {
+        "version": "1.80.2",
+        "files": [
+          {
+            "name": "bcprov-jdk18on-1.80.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/bouncycastle/bcprov-jdk18on/1.80.2/bcprov-jdk18on-1.80.2.jar",
+            "sha256": "b33227f07dce264daf1aac2e798ef109a4901f31abedac53635746dd93679d3b"
+          }
+        ]
+      }
+    },
+    "org.bouncycastle:bcutil-jdk18on": {
+      "jvm": {
+        "version": "1.80.2",
+        "files": [
+          {
+            "name": "bcutil-jdk18on-1.80.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/bouncycastle/bcutil-jdk18on/1.80.2/bcutil-jdk18on-1.80.2.jar",
+            "sha256": "bc78d32d7ffb141ee27e4fb77df04259d842c899e7e8eaf912f990d7253bd3b4"
+          }
+        ],
+        "deps": [
+          "org.bouncycastle:bcprov-jdk18on"
+        ]
+      }
+    },
+    "org.glassfish.jaxb:jaxb-runtime": {
+      "jvm": {
+        "version": "2.3.2",
+        "files": [
+          {
+            "name": "jaxb-runtime-2.3.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/glassfish/jaxb/jaxb-runtime/2.3.2/jaxb-runtime-2.3.2.jar",
+            "sha256": "e6e0a1e89fb6ff786279e6a0082d5cef52dc2ebe67053d041800737652b4fd1b"
+          }
+        ],
+        "deps": [
+          "com.sun.istack:istack-commons-runtime",
+          "com.sun.xml.fastinfoset:FastInfoset",
+          "jakarta.activation:jakarta.activation-api",
+          "jakarta.xml.bind:jakarta.xml.bind-api",
+          "org.glassfish.jaxb:txw2",
+          "org.jvnet.staxex:stax-ex"
+        ]
+      }
+    },
+    "org.glassfish.jaxb:txw2": {
+      "jvm": {
+        "version": "2.3.2",
+        "files": [
+          {
+            "name": "txw2-2.3.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/glassfish/jaxb/txw2/2.3.2/txw2-2.3.2.jar",
+            "sha256": "4a6a9f483388d461b81aa9a28c685b8b74c0597993bf1884b04eddbca95f48fe"
+          }
+        ]
+      }
+    },
+    "org.hamcrest:hamcrest-core": {
+      "jvm": {
+        "version": "1.3",
+        "files": [
+          {
+            "name": "hamcrest-core-1.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar",
+            "sha256": "66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9"
+          }
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-reflect": {
+      "jvm": {
+        "version": "2.2.10",
+        "files": [
+          {
+            "name": "kotlin-reflect-2.2.10.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-reflect/2.2.10/kotlin-reflect-2.2.10.jar",
+            "sha256": "c48db4f8cd1bfd67f72d59255065fb41bfda43ca2942dac4d9deb897aa126ba4"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-stdlib": {
+      "jvm": {
+        "version": "2.2.10",
+        "files": [
+          {
+            "name": "kotlin-stdlib-2.2.10.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.2.10/kotlin-stdlib-2.2.10.jar",
+            "sha256": "9c67cc79efd6b9215b49d2a4308f5f3433537376c7c88e89bdd6729bd096e61a"
+          }
+        ],
+        "deps": [
+          "org.jetbrains:annotations"
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-stdlib-jdk7": {
+      "jvm": {
+        "version": "2.2.10",
+        "files": [
+          {
+            "name": "kotlin-stdlib-jdk7-2.2.10.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk7/2.2.10/kotlin-stdlib-jdk7-2.2.10.jar",
+            "sha256": "cf95eccc6cc784dff479dee0b8834f3584b93292cc5d91972e82f5d7b9e13e3b"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib"
+        ]
+      }
+    },
+    "org.jetbrains.kotlin:kotlin-stdlib-jdk8": {
+      "jvm": {
+        "version": "2.2.10",
+        "files": [
+          {
+            "name": "kotlin-stdlib-jdk8-2.2.10.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk8/2.2.10/kotlin-stdlib-jdk8-2.2.10.jar",
+            "sha256": "8974bfdd08b1d81843fe8d11f0729ab6e5b3c1f88d671ebe0c006358129ce149"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib",
+          "org.jetbrains.kotlin:kotlin-stdlib-jdk7"
+        ]
+      }
+    },
+    "org.jetbrains.kotlinx:kotlinx-coroutines-core": {
+      "jvm": {
+        "version": "1.9.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-jvm-1.9.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.9.0/kotlinx-coroutines-core-jvm-1.9.0.jar",
+            "sha256": "ad89c2892235e670f222d819cb3d81188143cb19a05b59df9889ae4269f5c70a"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-stdlib",
+          "org.jetbrains:annotations"
+        ]
+      }
+    },
+    "org.jetbrains:annotations": {
+      "jvm": {
+        "version": "23.0.0",
+        "files": [
+          {
+            "name": "annotations-23.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/23.0.0/annotations-23.0.0.jar",
+            "sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05"
+          }
+        ]
+      }
+    },
+    "org.jspecify:jspecify": {
+      "jvm": {
+        "version": "1.0.1",
+        "files": [
+          {
+            "name": "jspecify-1.0.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jspecify/jspecify/1.0.1/jspecify-1.0.1.jar",
+            "sha256": "070d75f261fe4c5b8202508366715f7f2d4660f88c8ef7e6d3575e48c9683b66"
+          }
+        ]
+      }
+    },
+    "org.jvnet.staxex:stax-ex": {
+      "jvm": {
+        "version": "1.8.1",
+        "files": [
+          {
+            "name": "stax-ex-1.8.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jvnet/staxex/stax-ex/1.8.1/stax-ex-1.8.1.jar",
+            "sha256": "20522549056e9e50aa35ef0b445a2e47a53d06be0b0a9467d704e2483ffb049a"
+          }
+        ],
+        "deps": [
+          "jakarta.activation:jakarta.activation-api",
+          "jakarta.xml.bind:jakarta.xml.bind-api"
+        ]
+      }
+    },
+    "org.ow2.asm:asm": {
+      "jvm": {
+        "version": "9.11.1",
+        "files": [
+          {
+            "name": "asm-9.11.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm/9.11.1/asm-9.11.1.jar",
+            "sha256": "ae4e6e10d59d0a1500317764b21881ad883f8550e33c66e6142f7032c6fb566c"
+          }
+        ]
+      }
+    },
+    "org.ow2.asm:asm-commons": {
+      "jvm": {
+        "version": "9.11.1",
+        "files": [
+          {
+            "name": "asm-commons-9.11.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.11.1/asm-commons-9.11.1.jar",
+            "sha256": "6a5095ec53726156a78b2cd2efd45bc4e877754eca7c234f61224a53d6bfa661"
+          }
+        ],
+        "deps": [
+          "org.ow2.asm:asm",
+          "org.ow2.asm:asm-tree"
+        ]
+      }
+    },
+    "org.ow2.asm:asm-tree": {
+      "jvm": {
+        "version": "9.11.1",
+        "files": [
+          {
+            "name": "asm-tree-9.11.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.11.1/asm-tree-9.11.1.jar",
+            "sha256": "2b15c3c1b288a9fad3bb2cd6d988ba9521554914ed1f2a2029141fa3f483154a"
+          }
+        ],
+        "deps": [
+          "org.ow2.asm:asm"
+        ]
+      }
+    }
+  }
+}

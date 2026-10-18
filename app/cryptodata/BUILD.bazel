@@ -51,6 +51,7 @@ kmp_library(
 
 kmp_test(
     name = "test",
+    android = True,
     associate = ":cryptodata",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     native_targets = [

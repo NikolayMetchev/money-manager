@@ -321,14 +321,17 @@ def kmp_test(
         common_srcs = [],
         jvm_android_srcs = [],
         jvm_srcs = [],
+        android_srcs = [],
         native_srcs = [],
         linux_srcs = [],
         apple_srcs = [],
         mingw_srcs = [],
         native_targets = [],
+        android = False,
         deps = [],
         jvm_android_deps = [],
         jvm_deps = [],
+        android_deps = [],
         native_deps = [],
         linux_deps = [],
         apple_deps = [],
@@ -342,9 +345,12 @@ def kmp_test(
         jvm_flags = [],
         flaky = False,
         jvm_tags = []):
-    """A module's tests. Emits `:<name>_jvm` and `:<name>_<target>` per native target.
+    """A module's tests. Emits `:<name>_jvm`, `:<name>_android` and `:<name>_<target>` per native target.
 
-    JVM tests are JUnit 4, run by `//bazel/kmp/testing:KmpJUnitRunner`. Native tests are linked with konan's
+    JVM tests are JUnit 4, run by `//bazel/kmp/testing:KmpJUnitRunner`. Android host tests (AGP's
+    `testAndroidHostTest`) are `commonTest ← jvmAndroidTest ← androidHostTest` compiled against the module's
+    Android compile, run the same way on a JVM with AGP's mockable android.jar
+    (`//bazel/kmp/android:mockable_android_jar`), which returns default values as the Android convention asks. Native tests are linked with konan's
     test runner and run by `//bazel/kmp/testing:native_launcher`; a target's tests only run where its
     executables do (`RUNS_ON`), so on Linux x64 only `_linuxX64` runs.
 
@@ -354,14 +360,17 @@ def kmp_test(
         common_srcs: `src/commonTest/kotlin` sources.
         jvm_android_srcs: `src/jvmAndroidTest/kotlin` sources.
         jvm_srcs: `src/jvmTest/kotlin` sources.
+        android_srcs: `src/androidHostTest/kotlin` sources.
         native_srcs: `src/nativeTest/kotlin` sources.
         linux_srcs: `src/linuxTest/kotlin` sources.
         apple_srcs: `src/appleTest/kotlin` sources.
         mingw_srcs: `src/mingwTest/kotlin` sources.
         native_targets: the Kotlin/Native targets to test on, by KGP's names.
+        android: run the tests as Android host tests too (the associate must be an Android `kmp_library`).
         deps: test dependencies (Gradle `implementation` on `commonTest`), by module label.
         jvm_android_deps: `jvmAndroidTest` dependencies.
         jvm_deps: `jvmTest` dependencies.
+        android_deps: `androidHostTest` dependencies.
         native_deps: `nativeTest` dependencies.
         linux_deps: `linuxTest` dependencies.
         apple_deps: `appleTest` dependencies.
@@ -373,16 +382,18 @@ def kmp_test(
         forbidden_deps: modules the tests must never reach either (`:<name>_forbidden_deps_<platform>`).
         keep_deps: dependencies no test source uses (`kmp_keep_dep`), which `:<name>_unused_deps` leaves alone.
         resources: the JVM tests' classpath resources, from `src/{common,jvmAndroid,jvm}Test/resources`, merged
-            as for kmp_library.
+            as for kmp_library. The Android host tests get those not under `src/jvmTest`.
         jvm_flags: more JVM flags for the JVM test (Gradle's `systemProperty`s: headless Compose Desktop tests).
         flaky: retry a failing JVM test up to twice more, as the Gradle test-retry plugin does for the Compose
             modules (`maxRetries = 2`).
         jvm_tags: Bazel tags on the JVM test (`no-remote-exec` for Skiko, which needs the host's libGL).
     """
-    kmp_lint(name, common_srcs + jvm_android_srcs + jvm_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs)
+    kmp_lint(name, common_srcs + jvm_android_srcs + jvm_srcs + android_srcs + native_srcs + linux_srcs + apple_srcs +
+                   mingw_srcs)
     fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, jvm_srcs)
     brought = plugin_deps(plugins)
     declared = deps + jvm_android_deps + jvm_deps
+    android_deps = jvm_android_deps + android_deps
     jvm_deps = jvm_android_deps + jvm_deps
     deps = deps + brought.deps + brought.exports
     # Tests with only native sources have no JVM test, as KGP's jvmTest finds no sources (utils/sqlite3).
@@ -400,32 +411,27 @@ def kmp_test(
             resource_jars = _resource_jars(name, "Test", resources),
         )
         _unused_deps(name, lib, declared, keep_deps)
-        java_test(
-            name = name + "_jvm",
-            size = size,
-            flaky = flaky,
-            tags = jvm_tags,
-            main_class = "com.moneymanager.bazel.kmp.testing.KmpJUnitRunner",
-            use_testrunner = False,
-            jvm_flags = [
-                # The runner finds this jar on its classpath by file name.
-                "-Dkmp.test.jar=%s.jar" % lib,
-                # java.util.prefs writes under ~/.java, which the sandbox keeps read-only; tests get their own.
-                "-Djava.util.prefs.userRoot=$${TEST_TMPDIR}/prefs",
-                # Skiko unpacks its native library under ~/.skiko for the same reason (Compose Desktop UI tests).
-                "-Dskiko.data.path=$${TEST_TMPDIR}/skiko",
-            ] + select({
-                "@platforms//os:windows": [],
-                # Gradle's test JVMs use /tmp, and terminal tests lay out paths under it within a fixed width
-                # (app/tui's footer). The sandbox's /tmp is hermetic, so this stays per test.
-                "//conditions:default": ["-Djava.io.tmpdir=/tmp"],
-            }) + jvm_flags,
-            data = data,
-            runtime_deps = [
-                ":" + lib,
-                Label("//bazel/kmp/testing:runner"),
-            ],
+        _jvm_test(name + "_jvm", lib, size, flaky, jvm_tags, jvm_flags, data, [])
+    android_fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, android_srcs, "androidHost")
+    if android and android_fragments.srcs:
+        lib = name + "_android_lib"
+        kt_jvm_library(
+            name = lib,
+            testonly = True,
+            srcs = android_fragments.srcs,
+            fragment_srcs = android_fragments.fragment_srcs,
+            fragment_refines = android_fragments.fragment_refines,
+            associates = [platform_label(associate, "android")],
+            # As AGP: compiled against android.jar, run on the mockable one.
+            deps = _on("android", deps + android_deps) + [Label("//bazel/kmp/android:android_jar")],
+            plugins = plugin_labels(plugins, "jvm"),
+            resource_jars = _resource_jars(
+                name + "_android",
+                "Test",
+                [r for r in resources if "/src/jvmTest/" not in "/" + r],
+            ),
         )
+        _jvm_test(name + "_android", lib, size, flaky, [], [], data, [Label("//bazel/kmp/android:mockable_android_jar")])
     if forbidden_deps:
         _forbidden_deps(
             name,
@@ -460,6 +466,35 @@ def kmp_test(
             target_compatible_with = RUNS_ON[target],
             runtime_deps = [Label("//bazel/kmp/testing:native_launcher_lib")],
         )
+
+def _jvm_test(name, lib, size, flaky, tags, jvm_flags, data, runtime_deps):
+    """A JUnit 4 test over `lib`'s classes, run by KmpJUnitRunner (the JVM tests and the Android host tests)."""
+    java_test(
+        name = name,
+        size = size,
+        flaky = flaky,
+        tags = tags,
+        main_class = "com.moneymanager.bazel.kmp.testing.KmpJUnitRunner",
+        use_testrunner = False,
+        jvm_flags = [
+            # The runner finds this jar on its classpath by file name.
+            "-Dkmp.test.jar=%s.jar" % lib,
+            # java.util.prefs writes under ~/.java, which the sandbox keeps read-only; tests get their own.
+            "-Djava.util.prefs.userRoot=$${TEST_TMPDIR}/prefs",
+            # Skiko unpacks its native library under ~/.skiko for the same reason (Compose Desktop UI tests).
+            "-Dskiko.data.path=$${TEST_TMPDIR}/skiko",
+        ] + select({
+            "@platforms//os:windows": [],
+            # Gradle's test JVMs use /tmp, and terminal tests lay out paths under it within a fixed width
+            # (app/tui's footer). The sandbox's /tmp is hermetic, so this stays per test.
+            "//conditions:default": ["-Djava.io.tmpdir=/tmp"],
+        }) + jvm_flags,
+        data = data,
+        runtime_deps = [
+            ":" + lib,
+            Label("//bazel/kmp/testing:runner"),
+        ] + runtime_deps,
+    )
 
 def kmp_static_library(name, srcs, native_targets, hdrs = [], defines = [], library_name = None, visibility = None):
     """A C static library per Kotlin/Native target (`:<name>_<target>`), built with that target's konan clang.

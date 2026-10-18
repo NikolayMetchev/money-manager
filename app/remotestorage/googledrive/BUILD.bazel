@@ -68,6 +68,7 @@ kmp_library(
 
 kmp_test(
     name = "test",
+    android = True,
     associate = ":googledrive",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     linux_deps = [

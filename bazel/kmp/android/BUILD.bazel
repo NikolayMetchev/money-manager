@@ -1,6 +1,33 @@
+load("@rules_java//java:java_binary.bzl", "java_binary")
+load("@rules_java//java:java_import.bzl", "java_import")
+
 # The SDK's android.jar, which every Android compile has on its classpath (neverlink): extensions.bzl.
 alias(
     name = "android_jar",
     actual = "@android_sdk//:android_jar",
+    visibility = ["//visibility:public"],
+)
+
+java_binary(
+    name = "mockable_jar",
+    srcs = ["src/com/moneymanager/bazel/kmp/android/MockableJar.java"],
+    main_class = "com.moneymanager.bazel.kmp.android.MockableJar",
+    deps = ["@android_tools//:android_builder_jvm"],
+)
+
+genrule(
+    name = "mockable_android_jar_gen",
+    srcs = ["@android_sdk//:android.jar"],
+    outs = ["mockable-android.jar"],
+    cmd = "$(execpath :mockable_jar) $< $@",
+    tools = [":mockable_jar"],
+)
+
+# What Android host tests run on, instead of android.jar (#1022): AGP's mockable jar, returning default values
+# as the Android convention's `withHostTest { isReturnDefaultValues = true }` asks.
+java_import(
+    name = "mockable_android_jar",
+    testonly = True,
+    jars = [":mockable_android_jar_gen"],
     visibility = ["//visibility:public"],
 )
