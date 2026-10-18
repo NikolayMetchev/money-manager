@@ -2,6 +2,7 @@
 # extensions.bzl): kotlin("test"). Compiler plugins are //bazel/kmp/plugins. Like modules, each has one target per platform:
 # `<name>_jvm`, `<name>_linuxX64`, …
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("//bazel/kmp:metadata.bzl", "kt_metadata_group")
 load("//bazel/kmp:native.bzl", "kt_native_group")
 
 package(default_visibility = ["//visibility:public"])
@@ -37,6 +38,12 @@ kt_jvm_library(
     )
     for target in NATIVE_TARGETS
 ]
+
+# Common code sees kotlin-test's common metadata, resolved with the stdlib's (#1010).
+kt_metadata_group(
+    name = "kotlin_test_metadata",
+    deps = ["@maven_kmp//:org_jetbrains_kotlin_kotlin_test_metadata"],
+)
 
 # Fails when maven_kmp.lock.json no longer matches MODULE.bazel's maven_kmp.install or the catalog.
 test_suite(

@@ -5,6 +5,7 @@ go_library(
     name = "resolver_lib",
     srcs = [
         "catalog.go",
+        "common.go",
         "main.go",
         "metadata.go",
         "packages.go",
@@ -24,6 +25,7 @@ go_test(
     name = "resolver_test",
     size = "small",
     srcs = [
+        "common_test.go",
         "metadata_test.go",
         "resolve_test.go",
     ],

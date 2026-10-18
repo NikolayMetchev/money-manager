@@ -157,6 +157,7 @@ maven_kmp.install(
         "linuxArm64",
         "linuxX64",
         "macosArm64",
+        "metadata",
         "mingwX64",
     ],
     # settings.gradle.kts: Google's repository only for these groups, Maven Central for everything.
