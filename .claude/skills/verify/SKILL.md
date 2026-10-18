@@ -16,8 +16,8 @@ sent to the nested display stay inside it (they never touch the user's real poin
 Xwayland :9 -geometry 1600x1000 -decorate -retro &
 XWAYLAND_PID=$!
 
-# 2. Launch the app inside it in the background (first window paint takes ~15s once gradle is warm)
-DISPLAY=:9 ./gradlew :app:main:jvm:run --console=plain &
+# 2. Launch the app inside it in the background (first window paint takes ~15s once the build is cached)
+DISPLAY=:9 bazel run //app/main/jvm:app &
 APP_PID=$!
 
 # 3. Screenshot (ImageMagick `import` works against the nested server; no WM needed)
@@ -44,5 +44,5 @@ Settings); Imports screen has top tabs Directories/CSV/QIF/API/Misc.
 - Cleanup: `kill $APP_PID` (or close the app window — either exits cleanly), then
   `kill $XWAYLAND_PID`. Kill the captured PIDs, not by pattern, to avoid hitting the user's
   own `Xwayland :1` session process.
-- Don't run the GUI while a full `./gradlew build` is running — they contend for the
-  configuration cache lock.
+- Don't start the GUI while a full `bazel build //...` is running — `bazel run` waits for the Bazel
+  server's lock until the build finishes.

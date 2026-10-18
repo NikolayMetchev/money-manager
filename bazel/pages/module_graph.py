@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """The Pages site's module graph (webpage/modules-graph.md) from `bazel query` (#1027).
 
-Reads `bazel query --output=streamed_jsonproto` over the modules on stdin and writes the Mermaid graph the
-module-graph Gradle plugin wrote, which webpage/modules.html parses: `:from -- <compilation> --> :to`, one
+Reads `bazel query --output=streamed_jsonproto` over the modules on stdin and writes the Mermaid graph
+webpage/modules.html parses: `:from -- <compilation> --> :to`, one
 edge per module dependency of each compilation (`jvmMain`, `androidTest`, `linuxX64Main`, …). A module's
 compilations are its kmp_library/kmp_test targets (`<name>_<platform>`, `test_<platform>_lib`/`_bin`);
 an edge is a dep or export on another module's target. Usage:

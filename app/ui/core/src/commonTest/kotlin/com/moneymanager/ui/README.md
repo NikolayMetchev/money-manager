@@ -6,14 +6,11 @@ This directory contains multiplatform UI tests for the Compose components using 
 
 ### All Platforms
 ```bash
-# Run all common tests (JVM, Android, etc.)
-./gradlew :compose-ui:test
+# Run the JVM tests
+bazel test //app/ui/core:test_jvm
 
-# Run JVM-specific tests
-./gradlew :compose-ui:jvmTest
-
-# Run Android tests (requires emulator or device)
-./gradlew :compose-ui:testDebugUnitTest
+# Run the Android device tests (requires a running emulator or device)
+bazel test //app/ui/core:test_device
 ```
 
 The tests work on all platforms (Windows, macOS, Linux) thanks to the Skiko desktop runtime dependency included in `jvmTest`.
