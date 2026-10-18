@@ -81,7 +81,7 @@ the cutover. Run it through bazelisk (`.bazelversion`): `bazel build //...`. It 
 committed `MODULE.bazel.lock`), on the same JDK 25 (`.bazelrc`). The KMP rules live in `//bazel/kmp` and the Gazelle
 extension in `//bazel/gazelle/kmp` (not `//build`, which is Gradle's root output). Every CI workflow runs on Bazel
 (#1028; only the Qodana job still imports the Gradle build, for its IDE's project model): `build.yml`'s Build and Test
-is `bazel build //...` and `bazel test //...` plus the Gazelle diff, and each job sets Bazel up through
+is `bazel build //...` and `bazel test //...`, Auto-format PR regenerates and pushes the BUILD files, and each job sets Bazel up through
 `.github/actions/bazel-setup`. CI uses BuildBuddy (#1017): the Linux jobs run every action on its executors
 (`--config=rbe`), macOS and Windows build on their runners with its remote cache (`--config=cache`). The linuxArm64
 test binaries cross-link with `--platforms=//bazel/platforms:linux_arm64` and run on an arm64 runner. Dependency
@@ -118,7 +118,7 @@ stream to BuildBuddy, anonymously.
   Plugin options may use `{temp}`, a directory of the compile's own (Mappie keeps state there).
 - **Metro across modules** (#1002): contribution hints (`metro/hints`) reach the graph's compile through ordinary
   `deps`, in jars and klibs alike, because ABI jars stay off. A dep that exists only so Metro sees it (app/di/core's
-  feature DI modules) is a plain dep marked `# keep`, so Gazelle (and the Gazelle-diff check, #1016) keeps it
+  feature DI modules) is a plain dep marked `# keep`, so Gazelle keeps it
   though no import explains it (or name it with `# gazelle:kmp_keep_dep`, which also exempts it from the unused-deps check).
 - **SQLDelight** (`//bazel/kmp/sqldelight`, #1003): `sqldelight_library` runs the SQLDelight compiler (the
   `SqlDelightEnvironment` the Gradle task drives, with its defaults) over a module's `.sq` files, upstream databases'
@@ -129,7 +129,7 @@ stream to BuildBuddy, anonymously.
   (refresh with `:update_golden` after checking a bump). Fragments: like KGP, `commonMain` and the leaf are always
   named, empty or not (K2 takes a lone common fragment for the platform's own).
 - **Gazelle** (`//bazel/gazelle/kmp`, Go, #1004): `bazel run //:gazelle` writes every opted-in module's BUILD file;
-  CI fails on `--mode=diff`. Never edit a generated rule by hand: change the sources or a directive. A module is
+  CI's Auto-format PR job runs it and pushes what changed (and fails when Gazelle does). Never edit a generated rule by hand: change the sources or a directive. A module is
   its directory's `src/<sourceSet>/kotlin` dirs (plus `src/commonMain/sqldelight`); imports become `deps` per platform,
   resolved by package to a module or to the `@maven_kmp` library whose files declare it (the lockfile lists each
   library's packages); plugins are inferred (`@Serializable`, `@Composable`, Metro/Mappie/Mokkery imports). Directives
@@ -166,7 +166,7 @@ stream to BuildBuddy, anonymously.
   engine's own module to `ImportEngineImpl.kt` (comment lines may name one). `kmp_forbid_deps` is
   `verifyNoDbDependency`: an aspect fails analysis, per platform and for the tests too, when a pure importer reaches
   `app/db/core`, `app/di/core` or `app/ui/core`, naming the path. Gazelle itself is `verifyUniquePackages`: a run fails
-  when two generated modules' main sources declare one package (so CI's Gazelle diff catches it).
+  when two generated modules' main sources declare one package (so CI's Auto-format PR job fails).
 - **Dependency hygiene** (#1016), Gradle's `buildHealth`: the toolchain runs rules_kotlin's strict deps as an error (a
   class used from a dep that isn't declared, or exported by one that is, fails the compile: Gradle's `api` is fine), and
   every module and test gets `:<name>_unused_deps` (`//bazel/kmp/checks/unuseddeps`), which fails `bazel build` when its
@@ -174,7 +174,7 @@ stream to BuildBuddy, anonymously.
   counts). Exports and `keep_deps` (written from `kmp_keep_dep`) are exempt: Metro graphs, SQLDelight and other
   generated code use them where jdeps can't see. A package several libraries declare (`androidx.compose.runtime`)
   resolves to one a directive names, to nothing when those already bring every candidate, then to the one whose api
-  brings the rest, and only then to the most specific. A stale BUILD file is CI's Gazelle diff.
+  brings the rest, and only then to the most specific. Auto-format PR regenerates a stale BUILD file.
 - **Compose Desktop UI** (#1018): `app/ui/*`, `utils/compose/*` and `test/app/ui` are JVM-only modules (no
   native `kmp_targets`). Their JVM classpath resources are one jar per
   compilation (`kmp_resource_jar`, `//bazel/kmp:resources.bzl`), `src/{common,jvmAndroid,jvm}{Main,Test}/resources`

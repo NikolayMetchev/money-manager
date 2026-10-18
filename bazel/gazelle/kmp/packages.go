@@ -10,7 +10,7 @@ import (
 
 // One package, one module (CLAUDE.md, "Packages"): a package the main sources of two modules declare lets
 // `internal` leak across the module boundary and hides which module owns a type. Gazelle sees every module's
-// packages, so it fails the run (and CI's `--mode=diff`) when two declare the same one. Test source sets
+// packages, so it fails the run (and CI's Auto-format PR job) when two declare the same one. Test source sets
 // compile separately and may share packages.
 var (
 	ownersMu sync.Mutex
