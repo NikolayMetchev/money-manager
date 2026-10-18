@@ -1,0 +1,18 @@
+load("@rules_java//java:java_binary.bzl", "java_binary")
+
+# `--define=bundle_native_cli=true` puts the host's native mm in the desktop app (Gradle's -PbundleNativeCli=true).
+config_setting(
+    name = "bundle_native_cli",
+    define_values = {"bundle_native_cli": "true"},
+    visibility = ["//visibility:public"],
+)
+
+# jlink and jpackage, with the Compose Gradle plugin's jar for its default icons and entitlements (see
+# JPackageRunner.java).
+java_binary(
+    name = "runner",
+    srcs = ["src/com/moneymanager/bazel/kmp/jpackage/JPackageRunner.java"],
+    main_class = "com.moneymanager.bazel.kmp.jpackage.JPackageRunner",
+    visibility = ["//visibility:public"],
+    runtime_deps = ["@proguard//:compose_gradle_plugin_jvm"],
+)
