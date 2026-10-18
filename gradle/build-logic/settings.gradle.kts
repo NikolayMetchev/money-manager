@@ -16,7 +16,7 @@ pluginManagement {
 plugins {
     // Version is hardcoded (not a catalog alias) because type-safe `libs.plugins.*` accessors only
     // become available *after* this very plugin is applied — a bootstrap chicken-and-egg.
-    id("dev.panuszewski.typesafe-conventions") version "0.12.0"
+    id("dev.panuszewski.typesafe-conventions") version "0.12.1"
 }
 
 dependencyResolutionManagement {
