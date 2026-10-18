@@ -16,6 +16,12 @@ common --@rules_kotlin//kotlin/settings:experimental_strict_associate_dependenci
 
 test --test_output=errors
 
+# Coverage (#1026), Kover's replacement: JaCoCo over the production modules (not test/'s fixtures, the tests
+# themselves or SQLDelight's generated code, as Kover's filters leave them out), merged into one LCOV report,
+# bazel-out/_coverage/_coverage_report.dat. Run it over the Kotlin tests (the `test_jvm`/`test_android` targets).
+coverage --combined_report=lcov
+coverage --instrumentation_filter=^//(app|utils|tools)[/:],-_sqldelight_jvm$,-:test_[a-z_]+$
+
 # Platform-specific settings below (`common:linux`, `common:windows`, …) apply on their own host.
 common --enable_platform_specific_config
 # Tests read their data through runfiles, which Windows only lays out when asked.
