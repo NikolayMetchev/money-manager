@@ -282,3 +282,22 @@ func TestStubVariantsAreNoVariant(t *testing.T) {
 		t.Error("a real variant is stubs")
 	}
 }
+
+func TestBreakCycles(t *testing.T) {
+	out := map[string]Resolved{
+		"g:plugin": {Deps: []string{"g:api", "g:builder"}},
+		"g:api":    {Deps: []string{"g:common"}, Runtime: []string{"g:plugin"}},
+		"g:builder": {Runtime: []string{"g:common"}},
+		"g:common": {},
+	}
+	breakCycles(out, []Coordinate{{"g", "plugin", "1"}}, nil)
+	if got := out["g:api"].Runtime; len(got) != 0 {
+		t.Errorf("api still depends on %v at runtime", got)
+	}
+	if got, want := out["g:plugin"].Deps, []string{"g:api", "g:builder"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("plugin deps = %v, want %v", got, want)
+	}
+	if got, want := out["g:builder"].Runtime, []string{"g:common"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("a shared dependency that closes no cycle went: %v, want %v", got, want)
+	}
+}

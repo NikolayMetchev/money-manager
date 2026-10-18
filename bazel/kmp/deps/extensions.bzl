@@ -112,22 +112,31 @@ def _metadata_build(source_sets):
 
 _ANDROID = "android"
 
-# An AAR's code: its classes.jar, merged with the jars it bundles (`libs/`) when it has any, as kt_jvm_import
-# takes one jar. Its resources and manifest are the app's (#1023).
+# An AAR: its classes.jar, merged with the jars it bundles (`libs/`) when it has any, as kt_jvm_import takes one jar,
+# and its Android parts for the app (`aar_import`).
 _AAR_BUILD = """\
+load("@money_manager//bazel/kmp/android:aar.bzl", "aar_import")
+
 LIBS = glob(["libs/*.jar"], allow_empty = True)
 
 [genrule(
     name = "merged",
     srcs = ["classes.jar"] + LIBS,
     outs = ["merged.jar"],
-    cmd = "$(execpath @bazel_tools//tools/jdk:singlejar) --output $@ --sources $(SRCS)",
+    cmd = "$(execpath @bazel_tools//tools/jdk:singlejar) --exclude_build_data --output $@ --sources $(SRCS)",
     tools = ["@bazel_tools//tools/jdk:singlejar"],
 ) for _ in LIBS[:1]]
 
-alias(
+aar_import(
     name = "jar",
-    actual = ":merged" if LIBS else "classes.jar",
+    jar = ":merged" if LIBS else "classes.jar",
+    manifest = "AndroidManifest.xml",
+    res = glob(["res/**"], allow_empty = True),
+    r_txt = glob(["R.txt"], allow_empty = True),
+    assets = glob(["assets/**"], allow_empty = True),
+    jni = glob(["jni/**"], allow_empty = True),
+    proguard = glob(["proguard.txt"], allow_empty = True),
+    art_profile = glob(["baseline-prof.txt"], allow_empty = True),
     visibility = ["//visibility:public"],
 )
 """

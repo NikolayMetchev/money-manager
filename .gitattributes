@@ -1,2 +1,4 @@
 # Generated-code goldens are compared byte for byte, so Windows checkouts keep them LF.
 bazel/kmp/sqldelight/tests/golden/** text eol=lf
+# cmd scripts keep the CRLF they were written with.
+bazel/stamp/*.bat -text

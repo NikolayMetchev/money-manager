@@ -1,0 +1,60 @@
+load("@android_sdk//:versions.bzl", "COMPILE_SDK", "MIN_SDK", "TARGET_SDK")
+load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp/android:apk.bzl", "android_apk")
+
+# gazelle:kmp_generate true
+# gazelle:kmp_targets android
+# gazelle:kmp_main_platform android
+# gazelle:kmp_plugins compose
+
+kmp_library(
+    name = "android",
+    android = True,
+    android_deps = [
+        "//app/cryptodata",
+        "//app/db/write",
+        "//app/di/core",
+        "//app/di/params",
+        "//app/importfilesource/di",
+        "//app/presenter/core",
+        "//app/remotestorage/core",
+        "//app/remotestorage/googledrive",
+        "//app/remotestorage/sync",
+        "//app/session",
+        "//app/ui/core",
+        "@maven_kmp//:androidx_activity",
+        "@maven_kmp//:androidx_activity_compose",
+        "@maven_kmp//:com_google_android_gms_play_services_base",
+        "@maven_kmp//:kermit",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:ktor_client_core",
+        "@maven_kmp//:play_services_auth",
+    ],
+    android_srcs = glob(["src/main/kotlin/**/*.kt"]),
+    jvm = False,
+    plugins = ["compose"],
+    visibility = ["//visibility:public"],
+)
+
+# AGP's assembleDebug and assembleRelease (apk.bzl); `release_debug_signed` is the release APK the smoke test
+# installs (-PreleaseSmokeTest=true).
+[android_apk(
+    name = name,
+    agp_version = "9.4.1",
+    application_id = "com.moneymanager",
+    compile_sdk = COMPILE_SDK,
+    lib = ":android_android",
+    manifest = "src/main/AndroidManifest.xml",
+    min_sdk = MIN_SDK,
+    namespace = "com.moneymanager.android",
+    proguard_specs = ["proguard-rules.pro"],
+    release = release,
+    signed = signed,
+    target_sdk = TARGET_SDK,
+    version_code = 1,
+    version_name = "1.0.0",
+) for name, release, signed in [
+    ("debug", False, True),
+    ("release", True, False),
+    ("release_debug_signed", True, True),
+]]

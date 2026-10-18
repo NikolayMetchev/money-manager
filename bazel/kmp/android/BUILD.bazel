@@ -1,5 +1,6 @@
 load("@rules_java//java:java_binary.bzl", "java_binary")
 load("@rules_java//java:java_import.bzl", "java_import")
+load(":apk.bzl", "stamp_setting")
 
 # The SDK's android.jar, which every Android compile has on its classpath (neverlink): extensions.bzl.
 alias(
@@ -29,5 +30,45 @@ java_import(
     name = "mockable_android_jar",
     testonly = True,
     jars = [":mockable_android_jar_gen"],
+    visibility = ["//visibility:public"],
+)
+
+# The steps of an APK build AGP does with its own classes (apk.bzl).
+java_binary(
+    name = "android_app",
+    srcs = ["src/com/moneymanager/bazel/kmp/android/AndroidApp.java"],
+    main_class = "com.moneymanager.bazel.kmp.android.AndroidApp",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@android_tools//:android_builder_jvm",
+        "@android_tools//:android_gradle_plugin_jvm",
+        "@android_tools//:com_android_tools_build_apkzlib_jvm",
+        "@android_tools//:com_android_tools_build_manifest_merger_jvm",
+        "@android_tools//:com_android_tools_common_jvm",
+        "@android_tools//:com_android_tools_sdk_common_jvm",
+        "@android_tools//:com_google_guava_guava_jvm",
+    ],
+)
+
+# D8, as AGP bundles it in its builder jar (a release build runs R8 through AGP's own runR8: AndroidApp r8).
+java_binary(
+    name = "d8",
+    main_class = "com.android.tools.r8.D8",
+    visibility = ["//visibility:public"],
+    runtime_deps = ["@android_tools//:android_builder_jvm"],
+)
+
+config_setting(
+    name = "stamped",
+    values = {"stamp": "1"},
+)
+
+# Whether android_apk records the commit (STABLE_GIT_COMMIT, from the workspace status command) as AGP's VCS info.
+stamp_setting(
+    name = "stamp",
+    stamped = select({
+        ":stamped": True,
+        "//conditions:default": False,
+    }),
     visibility = ["//visibility:public"],
 )

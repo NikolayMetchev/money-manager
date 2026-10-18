@@ -90,8 +90,9 @@ def _resource_jars(name, kind, resources):
     )
     return [":" + name + "_resources"]
 
-def _unused_deps(name, target, declared, keep_deps):
-    """`:<name>_unused_deps`: what the BUILD file declares, less what directives keep, against the JVM compile."""
+def _unused_deps(name, target, declared, keep_deps, platform = "jvm"):
+    """`:<name>_unused_deps`: what the BUILD file declares, less what directives keep, against the JVM compile
+    (an Android app's Android one)."""
     names = []
     for dep in declared:
         if dep not in keep_deps and dep not in names:
@@ -99,7 +100,7 @@ def _unused_deps(name, target, declared, keep_deps):
     kmp_unused_deps(
         name = name + "_unused_deps",
         target = ":" + target,
-        deps = _on("jvm", names),
+        deps = _on(platform, names),
         names = names,
         module = "//" + native.package_name(),
         testonly = True,
@@ -122,6 +123,16 @@ def _forbidden_deps(name, forbidden, jvm, natives, compatible):
             target_compatible_with = compatible.get(platform, []),
         )
 
+def _module_name(native_targets, jvm):
+    """Gradle's Kotlin module name, which internal members' JVM names and Compose's lambda names carry: KGP's
+    `<group>_<archivesName>` (the convention's group is the dotted path; the native convention names the archive
+    after the dashed path, the rest keep the directory's name), but a `com.android.application` module's own name."""
+    package = native.package_name()
+    base = package.split("/")[-1]
+    if not jvm:
+        return base
+    return "%s_%s" % (package.replace("/", "."), package.replace("/", "-") if native_targets else base)
+
 def kmp_library(
         name,
         common_srcs = [],
@@ -133,6 +144,7 @@ def kmp_library(
         apple_srcs = [],
         mingw_srcs = [],
         android = False,
+        jvm = True,
         native_targets = [],
         deps = [],
         jvm_android_deps = [],
@@ -175,6 +187,9 @@ def kmp_library(
         apple_srcs: `src/appleMain/kotlin` sources.
         mingw_srcs: `src/mingwMain/kotlin` sources.
         android: whether the module has an Android target (`:<name>_android`).
+        jvm: whether it has a JVM one: an Android app (`com.android.application`) has only `:<name>_android`.
+            The JVM and Android compiles take Gradle's Kotlin module name (`_module_name`), which a
+            `com.android.application` module names differently.
         native_targets: the Kotlin/Native targets, by KGP's names (`linuxX64`, …).
         deps: `commonMain` `implementation` dependencies, by module label. A compilation has one
             classpath, as in KGP.
@@ -219,14 +234,15 @@ def kmp_library(
             allowed = forbidden_reference_allowed,
         )
     if forbidden_deps:
-        bytecode = {p: name + "_" + p for p in ["jvm"] + (["android"] if android else [])}
+        bytecode = {p: name + "_" + p for p in (["jvm"] if jvm else []) + (["android"] if android else [])}
         _forbidden_deps(name, forbidden_deps, bytecode, {t: name + "_" + t for t in native_targets}, BUILDS_ON)
     # Exports are kmp_export directives, a person's say-so (some only generated code uses: Metro's graph,
     # SQLDelight's queries), so only what imports brought is checked.
-    declared = deps + jvm_android_deps + jvm_deps
+    declared = deps + jvm_android_deps + (jvm_deps if jvm else android_deps)
     common_srcs = common_srcs + generated_srcs
     native_deps = native_deps + cinterops
     fragments = _jvm_fragments("Main", common_srcs, jvm_android_srcs, jvm_srcs)
+    module_name = _module_name(native_targets, jvm)
     brought = plugin_deps(plugins)
     generated_native = []
     if sqldelight:
@@ -236,7 +252,7 @@ def kmp_library(
         # rules_kotlin can't put a srcjar's sources in a fragment, and K2 rejects sources in none, so on the JVM
         # the generated code (which uses nothing of the module's own) compiles on its own and is exported.
         # konanc gets it as commonMain, beside the module's sources, as KGP compiles it.
-        for platform in ["jvm"] + (["android"] if android else []):
+        for platform in (["jvm"] if jvm else []) + (["android"] if android else []):
             kt_jvm_library(
                 name = "%s_sqldelight_%s" % (name, platform),
                 srcs = [sqldelight],
@@ -247,24 +263,25 @@ def kmp_library(
         jvm_android_exports = jvm_android_exports + [":" + name + "_sqldelight"]
     exports = exports + brought.exports
     deps = [d for d in deps + brought.deps if d not in exports]
-    jvm_exported = _on("jvm", exports + jvm_android_exports + jvm_exports)
-    kt_jvm_library(
-        name = name + "_jvm",
-        srcs = fragments.srcs,
-        fragment_srcs = fragments.fragment_srcs,
-        fragment_refines = fragments.fragment_refines,
-        # Gradle's api is on the module's own classpath too; Bazel's exports are only on its dependents'. A
-        # module with no sources of its own (only generated ones) just exports.
-        deps = _on("jvm", deps + jvm_android_deps + jvm_deps + exports + jvm_android_exports + jvm_exports) if fragments.srcs else [],
-        exports = jvm_exported,
-        plugins = plugin_labels(plugins, "jvm"),
-        resource_jars = _resource_jars(name, "Main", resources),
-        # moneymanager.kotlin-multiplatform-convention puts Dispatchers.Main on every JVM runtime classpath.
-        runtime_deps = [Label("@maven_kmp//:kotlinx_coroutines_swing_jvm")],
-        visibility = visibility,
-    )
-    if fragments.srcs:
-        _unused_deps(name, name + "_jvm", declared, keep_deps)
+    if jvm:
+        kt_jvm_library(
+            name = name + "_jvm",
+            srcs = fragments.srcs,
+            fragment_srcs = fragments.fragment_srcs,
+            fragment_refines = fragments.fragment_refines,
+            # Gradle's api is on the module's own classpath too; Bazel's exports are only on its dependents'. A
+            # module with no sources of its own (only generated ones) just exports.
+            deps = _on("jvm", deps + jvm_android_deps + jvm_deps + exports + jvm_android_exports + jvm_exports) if fragments.srcs else [],
+            exports = _on("jvm", exports + jvm_android_exports + jvm_exports),
+            module_name = module_name,
+            plugins = plugin_labels(plugins, "jvm"),
+            resource_jars = _resource_jars(name, "Main", resources),
+            # moneymanager.kotlin-multiplatform-convention puts Dispatchers.Main on every JVM runtime classpath.
+            runtime_deps = [Label("@maven_kmp//:kotlinx_coroutines_swing_jvm")],
+            visibility = visibility,
+        )
+        if fragments.srcs:
+            _unused_deps(name, name + "_jvm", declared, keep_deps)
     if android:
         android_fragments = _jvm_fragments("Main", common_srcs, jvm_android_srcs, android_srcs, "android")
         kt_jvm_library(
@@ -275,9 +292,12 @@ def kmp_library(
             deps = _on("android", deps + jvm_android_deps + android_deps + exports + jvm_android_exports + android_exports) +
                    [Label("//bazel/kmp/android:android_jar")] if android_fragments.srcs else [],
             exports = _on("android", exports + jvm_android_exports + android_exports),
+            module_name = module_name,
             plugins = plugin_labels(plugins, "jvm"),
             visibility = visibility,
         )
+        if not jvm and android_fragments.srcs:
+            _unused_deps(name, name + "_android", declared, keep_deps, "android")
     if native_targets:
         package = native.package_name()
         kt_metadata_library(
@@ -307,7 +327,7 @@ def kmp_library(
     if visibility and "//visibility:public" not in visibility:
         # `visibility` keeps main code out (verifyNoWriteRepositoryUsage), but Gradle's check only reads main
         # sources: any module's tests may use the module. `:<name>_for_tests` is testonly, so only tests can.
-        for platform in ["jvm"] + (["android"] if android else []) + (["metadata"] + native_targets if native_targets else []):
+        for platform in (["jvm"] if jvm else []) + (["android"] if android else []) + (["metadata"] + native_targets if native_targets else []):
             native.alias(
                 name = "%s_for_tests_%s" % (name, platform),
                 actual = ":%s_%s" % (name, platform),
