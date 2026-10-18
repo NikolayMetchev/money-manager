@@ -100,15 +100,21 @@ jobs:
         with:
           title: Linux
 
-      - name: Upload test results to Codecov
+      # Codecov's `files` takes paths, not globs, so list the reports (bazel-testlogs is a symlink).
+      - name: List test reports
+        id: test-reports
         if: ${{ !cancelled() }}
+        run: echo "files=$(find -L bazel-testlogs/ -name test.xml | paste -sd, -)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && steps.test-reports.outputs.files != '' }}
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit
           name: unit-test-results
           report_type: test_results
-          files: bazel-testlogs/**/test.xml
+          files: ${{ steps.test-reports.outputs.files }}
           disable_search: true
           fail_ci_if_error: false
 
@@ -406,15 +412,21 @@ jobs:
           disable-animations: true
           script: bazel test $(bazel query 'attr(tags, android_device, tests(//...))') --test_output=errors
 
-      - name: Upload test results to Codecov
+      # Codecov's `files` takes paths, not globs, so list the reports (bazel-testlogs is a symlink).
+      - name: List test reports
+        id: test-reports
         if: ${{ !cancelled() }}
+        run: echo "files=$(find -L bazel-testlogs/ -name test.xml | paste -sd, -)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && steps.test-reports.outputs.files != '' }}
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: instrumented
           name: instrumented-test-results
           report_type: test_results
-          files: bazel-testlogs/**/test.xml
+          files: ${{ steps.test-reports.outputs.files }}
           disable_search: true
           fail_ci_if_error: false
 
