@@ -27,6 +27,10 @@ kmp_library(
         "//app/ui/core",
     ],
     jvm_deps = ["@maven_kmp//:cryptography_provider_jdk"],
+    keep_deps = [
+        "@maven_kmp//:cryptography_provider_jdk",
+        "@maven_kmp//:cryptography_provider_openssl3_prebuilt",
+    ],
     native_deps = ["@maven_kmp//:cryptography_provider_openssl3_prebuilt"],
     native_targets = [
         "linuxArm64",

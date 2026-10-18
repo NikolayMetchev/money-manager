@@ -22,6 +22,9 @@ kt_kotlinc_options(
 
 define_kt_toolchain(
     name = "kotlin_toolchain",
+    # A dependency used only through another's exports is Gradle's api, not a strict-deps violation. The
+    # unused half is //bazel/kmp/checks's kmp_unused_deps: rules_kotlin's also counts what a dep re-exports.
+    experimental_strict_kotlin_deps = "error",
     # Never strip downstream compile jars to ABI jars: Metro's contribution hints (#1002) and Compose's
     # stability metadata live in what an ABI jar drops.
     experimental_use_abi_jars = False,

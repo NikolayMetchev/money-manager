@@ -47,12 +47,31 @@ func TestScanFile(t *testing.T) {
 
 func TestMavenIndexPrefersTheSpecificLibrary(t *testing.T) {
 	lock := filepath.Join(t.TempDir(), "lock.json")
-	data := `{"names": {"g:core": "core", "g:fat": "fat"},
-	          "packages": {"g:core": ["a.b"], "g:fat": ["a.b", "c", "d"]}}`
+	data := `{"names": {"g:core": "core", "g:fat": "fat", "g:api": "api"},
+	          "packages": {"g:core": ["a.b"], "g:fat": ["a.b", "c", "d"], "g:api": ["e"]},
+	          "artifacts": {"g:api": {"jvm": {"deps": ["g:fat", "g:core"]}}}}`
 	if err := os.WriteFile(lock, []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := loadMavenIndex(lock).find("a.b"); got != "core" {
+	idx := loadMavenIndex(lock)
+	if got, _ := idx.find("a.b", nil); got != "core" {
 		t.Errorf("find(a.b) = %s, want core", got)
+	}
+	// A library a directive already names wins: it reaches the specific one through its exports.
+	if got, _ := idx.find("a.b", map[string]bool{"@maven_kmp//:fat": true}); got != "fat" {
+		t.Errorf("find(a.b) with fat named = %s, want fat", got)
+	}
+	// One a named library's api already brings, every declaring library of it, needs no dependency of its own.
+	if got, ok := idx.find("a.b", map[string]bool{"@maven_kmp//:api": true}); got != "" || !ok {
+		t.Errorf("find(a.b) with api named = %q, %v; want \"\", true", got, ok)
+	}
+	// Of several, the one whose api brings the others covers the import (runtime over runtime-annotation).
+	data = `{"names": {"g:ann": "ann", "g:rt": "rt"}, "packages": {"g:ann": ["x"], "g:rt": ["x", "y"]},
+	          "artifacts": {"g:rt": {"jvm": {"deps": ["g:ann"]}}}}`
+	if err := os.WriteFile(lock, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := loadMavenIndex(lock).find("x", nil); got != "rt" {
+		t.Errorf("find(x) = %s, want rt", got)
 	}
 }

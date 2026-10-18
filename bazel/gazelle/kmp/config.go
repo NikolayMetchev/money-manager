@@ -181,6 +181,9 @@ func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
 // mavenIndex maps a package to the @maven_kmp libraries that declare it.
 type mavenIndex struct {
 	byPackage map[string][]mavenLibrary
+	exports   map[string][]string // library → the libraries its compile classpath (Gradle api) brings
+	same      map[string][]string // library → those that are the same file on some platform (a root module and
+	// the variant it points at: runtime is runtime-desktop's jar on the JVM)
 }
 
 type mavenLibrary struct {
@@ -189,15 +192,21 @@ type mavenLibrary struct {
 }
 
 func loadMavenIndex(path string) *mavenIndex {
-	idx := &mavenIndex{byPackage: map[string][]mavenLibrary{}}
+	idx := &mavenIndex{byPackage: map[string][]mavenLibrary{}, exports: map[string][]string{}, same: map[string][]string{}}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		log.Printf("kmp: no maven_kmp lockfile at %s: %v", path, err)
 		return idx
 	}
 	var lock struct {
-		Names    map[string]string   `json:"names"`
-		Packages map[string][]string `json:"packages"`
+		Names     map[string]string   `json:"names"`
+		Packages  map[string][]string `json:"packages"`
+		Artifacts map[string]map[string]struct {
+			Deps  []string `json:"deps"`
+			Files []struct {
+				Name string `json:"name"`
+			} `json:"files"`
+		} `json:"artifacts"`
 	}
 	if err := json.Unmarshal(data, &lock); err != nil {
 		log.Printf("kmp: %s: %v", path, err)
@@ -207,6 +216,31 @@ func loadMavenIndex(path string) *mavenIndex {
 		lib := mavenLibrary{name: lock.Names[module], packages: len(pkgs)}
 		for _, p := range pkgs {
 			idx.byPackage[p] = append(idx.byPackage[p], lib)
+		}
+	}
+	byFile := map[string][]string{}
+	for module, platforms := range lock.Artifacts {
+		seen := map[string]bool{}
+		for platform, artifact := range platforms {
+			for _, f := range artifact.Files {
+				key := platform + "/" + f.Name
+				byFile[key] = append(byFile[key], lock.Names[module])
+			}
+			for _, dep := range artifact.Deps {
+				if name, ok := lock.Names[dep]; ok && !seen[name] {
+					seen[name] = true
+					idx.exports[lock.Names[module]] = append(idx.exports[lock.Names[module]], name)
+				}
+			}
+		}
+	}
+	for _, libs := range byFile {
+		for _, a := range libs {
+			for _, b := range libs {
+				if a != b {
+					idx.same[a] = append(idx.same[a], b)
+				}
+			}
 		}
 	}
 	for p, libs := range idx.byPackage {
@@ -223,12 +257,67 @@ func loadMavenIndex(path string) *mavenIndex {
 	return idx
 }
 
-func (m *mavenIndex) find(pkg string) (string, bool) {
+// find picks the library for a package, "" when no new one is needed. A package several libraries declare
+// (androidx.compose.runtime is in runtime, runtime-desktop and runtime-annotation) is whichever one the module
+// already names in a directive (`named`, as labels), or nothing when those already bring every one of them, as
+// Mosaic's api brings the Compose runtime; then one whose api brings the rest; only then the most specific. (A tool's fat jar that repackages
+// kotlinx.coroutines is never brought, so coroutines-core stays a dependency of its own.)
+func (m *mavenIndex) find(pkg string, named map[string]bool) (string, bool) {
 	libs := m.byPackage[pkg]
 	if len(libs) == 0 {
 		return "", false
 	}
+	if len(libs) > 1 {
+		for _, lib := range libs {
+			if named[mavenPrefix+lib.name] {
+				return lib.name, true
+			}
+		}
+		reached := m.reached(named)
+		all := true
+		for _, lib := range libs {
+			all = all && reached[lib.name]
+		}
+		if all {
+			return "", true
+		}
+		// One that brings the rest covers whatever the import is (the runtime brings its annotations).
+		for _, lib := range libs {
+			brings := m.reached(map[string]bool{mavenPrefix + lib.name: true})
+			covers := true
+			for _, other := range libs {
+				covers = covers && (other.name == lib.name || brings[other.name])
+			}
+			if covers {
+				return lib.name, true
+			}
+		}
+	}
 	return libs[0].name, true
+}
+
+const mavenPrefix = "@maven_kmp//:"
+
+// reached is every library the named ones bring through their exports, transitively.
+func (m *mavenIndex) reached(named map[string]bool) map[string]bool {
+	out := map[string]bool{}
+	var queue []string
+	for l := range named {
+		if name, ok := strings.CutPrefix(l, mavenPrefix); ok {
+			queue = append(queue, name)
+		}
+	}
+	for len(queue) > 0 {
+		name := queue[0]
+		queue = queue[1:]
+		for _, dep := range append(append([]string(nil), m.exports[name]...), m.same[name]...) {
+			if !out[dep] {
+				out[dep] = true
+				queue = append(queue, dep)
+			}
+		}
+	}
+	return out
 }
 
 // parseKeepDep reads a directive's `label [sourceSet]`.

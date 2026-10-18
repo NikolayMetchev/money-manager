@@ -29,13 +29,16 @@ kmp_library(
         "@maven_kmp//:androidx_compose_runtime",
         "@maven_kmp//:kotlinx_coroutines_core",
     ],
-    deps = ["@maven_kmp//:androidx_compose_runtime_runtime_annotation"],
 )
 
 kmp_test(
     name = "test",
     associate = ":imports",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    keep_deps = [
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:ktor_client_core",
+    ],
     native_targets = [
         "linuxArm64",
         "linuxX64",

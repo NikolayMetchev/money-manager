@@ -67,8 +67,9 @@ func (*kmpLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 		deps[platform.name] = map[string]bool{}
 	}
 	for platform, names := range imp.byPlatform {
+		named := imp.named(platform)
 		for _, name := range names {
-			dep, found := resolveImport(c, ix, kc, name, from)
+			dep, found := resolveImport(c, ix, kc, name, from, named)
 			if !found {
 				log.Printf("%s: can't resolve import %s", from, name)
 				continue
@@ -96,6 +97,23 @@ func (*kmpLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 	for _, platform := range platforms {
 		setDeps(r, platform.depsAttr, platform.exportsAttr, deps[platform.name], exported, imp.test)
 	}
+}
+
+// named is what the directives give a platform's compile, its parents' included: an import of a package several
+// libraries declare resolves to one of these.
+func (imp imports) named(name string) map[string]bool {
+	out := map[string]bool{}
+	for _, p := range platforms {
+		if p.name != name {
+			continue
+		}
+		for ; p != nil; p = p.parent {
+			for _, l := range imp.keep[p.name] {
+				out[l] = true
+			}
+		}
+	}
+	return out
 }
 
 // platform is a group of source sets with one deps attribute; parent is the group every one of its
@@ -145,7 +163,7 @@ func setDeps(r *rule.Rule, depsAttr, exportsAttr string, deps, exports map[strin
 }
 
 // resolveImport returns the label an import needs ("" for none), and whether it was understood.
-func resolveImport(c *config.Config, ix *resolve.RuleIndex, kc *kmpConfig, name string, from label.Label) (string, bool) {
+func resolveImport(c *config.Config, ix *resolve.RuleIndex, kc *kmpConfig, name string, from label.Label, named map[string]bool) (string, bool) {
 	for _, pkg := range candidates(name) {
 		if lib, ok := kotlinLibraries[pkg]; ok {
 			return lib, true
@@ -164,8 +182,11 @@ func resolveImport(c *config.Config, ix *resolve.RuleIndex, kc *kmpConfig, name 
 			}
 			return moduleLabel(matches[0].Label, from), true
 		}
-		if lib, ok := kc.maven.find(pkg); ok {
-			return "@maven_kmp//:" + lib, true
+		if lib, ok := kc.maven.find(pkg, named); ok {
+			if lib == "" {
+				return "", true
+			}
+			return mavenPrefix + lib, true
 		}
 	}
 	return "", false

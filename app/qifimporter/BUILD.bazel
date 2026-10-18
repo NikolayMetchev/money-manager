@@ -55,6 +55,7 @@ kmp_test(
         "//app/di/core",
         "//app/ui/core",
     ],
+    keep_deps = ["@maven_kmp//:kotlinx_coroutines_test"],
     native_targets = [
         "linuxArm64",
         "linuxX64",
