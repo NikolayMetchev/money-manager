@@ -81,7 +81,8 @@ Flags and configs:
   the keep rules, and the optimizer is most of ProGuard's ~15 minutes); CI's Desktop ProGuard check passes it.
 - `--define=bundle_native_cli=true` puts the host's native `mm` into the desktop installer
   (`//app/main/jvm:installer`: a deb, dmg or msi on its own OS only).
-- `--platforms=//bazel/platforms:linux_arm64` cross-links the linuxArm64 test binaries on a Linux x64 host.
+- `:<name>_linuxArm64_cross` (manual) is a module's linuxArm64 test binary built for Linux arm64 by a transition, so an x64
+  host cross-links it in an ordinary build; CI's Build and Test adds them to its `bazel build //...`.
 
 Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer`, and `//app/main/cli:mm-linux-x64`,
 `:mm-linux-arm64`, `:mm-windows-x64`, `:mm-macos-arm64` (the Apple one only on macOS). The release smoke test,

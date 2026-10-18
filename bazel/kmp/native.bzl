@@ -192,6 +192,28 @@ kt_native_test_binary = rule(
     toolchains = [TOOLCHAIN_TYPE],
 )
 
+def _linux_arm64_transition_impl(_settings, _attr):
+    return {"//command_line_option:platforms": [str(Label("//bazel/platforms:linux_arm64"))]}
+
+_linux_arm64_transition = transition(
+    implementation = _linux_arm64_transition_impl,
+    inputs = [],
+    outputs = ["//command_line_option:platforms"],
+)
+
+def _linux_arm64_cross_impl(ctx):
+    return [DefaultInfo(files = depset(ctx.files.binary))]
+
+# Kotlin/Native has no Linux arm64 host, so CI links these on x64 in its one `bazel build` and runs them on an
+# arm64 runner; the transition saves that build a second invocation with `--platforms`.
+kt_native_linux_arm64_cross = rule(
+    implementation = _linux_arm64_cross_impl,
+    doc = "A linuxArm64 test binary, built for Linux arm64 from whatever platform the build targets.",
+    attrs = {
+        "binary": attr.label(mandatory = True, cfg = _linux_arm64_transition),
+    },
+)
+
 def _import_impl(ctx):
     deps = [d[KlibInfo].transitive_klibs for d in ctx.attr.deps]
     return [

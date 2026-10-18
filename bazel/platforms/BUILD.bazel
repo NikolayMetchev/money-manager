@@ -14,7 +14,7 @@ platform(
 )
 
 # Linux arm64, a target only: Kotlin/Native has no Linux arm64 host, so CI cross-links the linuxArm64 test
-# binaries on x64 with `--platforms` set to this and runs them on an arm64 runner, as Gradle's CI does.
+# binaries on x64 (`:<name>_linuxArm64_cross` transitions to this) and runs them on an arm64 runner.
 platform(
     name = "linux_arm64",
     constraint_values = [

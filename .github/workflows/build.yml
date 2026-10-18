@@ -88,20 +88,18 @@ jobs:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
           cache-name: linux
 
+      # Also the linuxArm64 test binaries (`:<name>_linuxArm64_cross`, manual so local builds skip them), linked
+      # here for Native Tests (linuxArm64) to run.
       - name: Build
-        run: bazel build //... 2>&1 | tee build.log
+        run: bazel build //... $(bazel query 'attr(name, "_linuxArm64_cross$", //...)') 2>&1 | tee build.log
 
       - name: Test
         run: bazel test //... 2>&1 | tee test.log
 
-      # A test binary only builds where it runs (RUNS_ON), so the target platform is set to Linux arm64.
-      - name: Cross-link linuxArm64 test binaries
+      - name: Collect linuxArm64 test binaries
         run: |
-          bazel build --platforms=//bazel/platforms:linux_arm64 --remote_download_outputs=toplevel \
-            $(bazel query 'attr(name, "_linuxArm64_bin$", //...)')
           mkdir -p linux-arm64-tests
-          for binary in $(bazel cquery --platforms=//bazel/platforms:linux_arm64 --output=files \
-              'attr(name, "_linuxArm64_bin$", //...)'); do
+          for binary in $(bazel cquery --output=files 'attr(name, "_linuxArm64_cross$", //...)'); do
             dir="linux-arm64-tests/$(dirname "${binary#bazel-out/*/bin/}")"
             mkdir -p "$dir" && cp "$binary" "$dir/"
           done
@@ -184,7 +182,7 @@ jobs:
           fail_ci_if_error: false
 
   # Kotlin/Native: each target's common tests run natively on a host of that platform. linuxX64's run in the
-  # Build and Test job. There is no Kotlin/Native compiler for Linux arm64 hosts, so Build and Test also
+  # Build and Test job. There is no Kotlin/Native compiler for Linux arm64 hosts, so Build and Test's build
   # cross-links linuxArm64's test binaries, and this job runs them on an arm64 runner.
   native-linux-arm64:
     name: Native Tests (linuxArm64)
