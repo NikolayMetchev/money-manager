@@ -103,6 +103,12 @@ way) are their own jobs. Auto-format PR runs `//:format` on every PR and pushes 
 regenerated, not reported. Dependency submission reads the lockfiles (`bazel/kmp/deps/dependency_snapshot.py`), and
 `renovate-pins.yml` re-pins Renovate's PRs.
 
+**Qodana** (`qodana.yml`, inspections in `qodana.yaml`) scans a PR in PR mode: it reports only problems in the files the
+PR changes. Pushes to main and manual runs scan everything, so anything PR mode misses shows up on main. A change whose
+effects reach other modules (a shared API, the DI graph, `qodana.yaml`, the inspection profile) should carry the
+`qodana-full` label, which reruns the PR's scan in full; removing the label goes back to PR mode. Qodana has its own
+workflow because label events start it: any other label's run skips, without cancelling the scan in progress.
+
 **Pre-push**: Always run `bazel build //... && bazel test //...` locally before pushing.
 
 ## Project Structure
