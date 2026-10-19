@@ -108,13 +108,17 @@ fun ImportStrategyDialog(
                     isError = strategyName.isBlank(),
                     supportingText = {
                         when {
-                            strategyName.isBlank() -> Text("Name is required")
-                            existingWithName != null ->
+                            strategyName.isBlank() -> {
+                                Text("Name is required")
+                            }
+
+                            existingWithName != null -> {
                                 Text(
                                     "A strategy with this name already exists — it will be updated in " +
                                         "place and its per-strategy account mappings replaced.",
                                     color = MaterialTheme.colorScheme.tertiary,
                                 )
+                            }
                         }
                     },
                 )

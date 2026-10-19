@@ -300,14 +300,17 @@ private fun SourceReconciliation(
                     empty = "Everything ${source.name} has on the linked wallets is in Money Manager.",
                 ) { LegRow(it.leg, accountNames, onOpenLeg) }
             }
-            ResultTab.MISSING_IN_SOURCE ->
+
+            ResultTab.MISSING_IN_SOURCE -> {
                 legGroups(
                     prefix = "src",
                     groups = groupByWalletAndMonth(loaded.missingInSource, { it.walletAccountId }, { it.leg.timestamp }, walletName),
                     expanded = expanded,
                     empty = "Everything on the linked accounts in ${source.name}'s date range is in ${source.name}.",
                 ) { LegRow(it.leg, accountNames, onOpenLeg) }
-            ResultTab.FUZZY ->
+            }
+
+            ResultTab.FUZZY -> {
                 legGroups(
                     prefix = "fuzzy",
                     groups =
@@ -315,7 +318,9 @@ private fun SourceReconciliation(
                     expanded = expanded,
                     empty = "No near matches: every match agrees to the second.",
                 ) { MatchRow(it, accountNames, onOpenLeg) }
-            ResultTab.MATCHED ->
+            }
+
+            ResultTab.MATCHED -> {
                 legGroups(
                     prefix = "matched",
                     groups =
@@ -323,6 +328,7 @@ private fun SourceReconciliation(
                     expanded = expanded,
                     empty = "Nothing matched yet — link the wallets above.",
                 ) { MatchRow(it, accountNames, onOpenLeg) }
+            }
         }
     }
 }

@@ -78,10 +78,17 @@ private fun flattenInto(
     target: MutableMap<String, String>,
 ) {
     when (element) {
-        is JsonObject -> element.forEach { (key, value) -> flattenInto(value, if (prefix.isEmpty()) key else "$prefix.$key", target) }
-        is JsonArray ->
+        is JsonObject -> {
+            element.forEach { (key, value) -> flattenInto(value, if (prefix.isEmpty()) key else "$prefix.$key", target) }
+        }
+
+        is JsonArray -> {
             element.forEachIndexed { index, value -> flattenInto(value, "$prefix[$index]", target) }
-        is JsonPrimitive -> if (element !is JsonNull) target[prefix] = element.content
+        }
+
+        is JsonPrimitive -> {
+            if (element !is JsonNull) target[prefix] = element.content
+        }
     }
 }
 

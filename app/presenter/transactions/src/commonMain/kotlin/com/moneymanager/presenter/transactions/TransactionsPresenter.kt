@@ -121,10 +121,17 @@ fun presentTransactions(
                 val size = currentPageSize
                 val page =
                     when (val anchor = loading.anchor) {
-                        Anchor.Newest -> query.page(account, size, loading.range.from, loading.range.to)
-                        is Anchor.Position ->
+                        Anchor.Newest -> {
+                            query.page(account, size, loading.range.from, loading.range.to)
+                        }
+
+                        is Anchor.Position -> {
                             query.page(account, size, loading.range.from, loading.range.to, cursor = anchor.cursor)
-                        is Anchor.Transfer -> query.pageContaining(account, anchor.id, size)
+                        }
+
+                        is Anchor.Transfer -> {
+                            query.pageContaining(account, anchor.id, size)
+                        }
                     }
                 val focus =
                     when (val anchor = loading.anchor) {
@@ -165,13 +172,17 @@ fun presentTransactions(
         remember {
             { event ->
                 when (event) {
-                    is TransactionsEvent.SetRange -> target = target.next(event.range, Anchor.Newest)
+                    is TransactionsEvent.SetRange -> {
+                        target = target.next(event.range, Anchor.Newest)
+                    }
+
                     is TransactionsEvent.JumpTo -> {
                         val to = target.range.to
                         val at = if (to != null && event.at > to) to else event.at
                         target = target.next(target.range, Anchor.Position(TransactionCursor(at, 0), focus = true))
                     }
-                    is TransactionsEvent.ShowTransfer ->
+
+                    is TransactionsEvent.ShowTransfer -> {
                         target =
                             Target(
                                 event.accountId,
@@ -180,9 +191,20 @@ fun presentTransactions(
                                 target.generation + 1,
                                 refresh = false,
                             )
-                    TransactionsEvent.LoadOlder -> extend(older = true)
-                    TransactionsEvent.LoadNewer -> extend(older = false)
-                    is TransactionsEvent.Select -> selectedId = event.id
+                    }
+
+                    TransactionsEvent.LoadOlder -> {
+                        extend(older = true)
+                    }
+
+                    TransactionsEvent.LoadNewer -> {
+                        extend(older = false)
+                    }
+
+                    is TransactionsEvent.Select -> {
+                        selectedId = event.id
+                    }
+
                     TransactionsEvent.Refresh -> {
                         // Re-read from just above the newest row on screen, so the list stays where it is.
                         val anchor =

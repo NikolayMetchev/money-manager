@@ -113,8 +113,12 @@ class StrategyLibraryService(
                 val refs = csvStrategyExportService.parseExport(export).unresolvedReferences
                 StrategyParseResult(key, refs)
             }
+
             // API strategies, pass-through definitions and the currency list carry no entity references to resolve.
-            StrategyKind.API, StrategyKind.PASS_THROUGH, StrategyKind.CURRENCIES -> StrategyParseResult(key, emptyList())
+            StrategyKind.API, StrategyKind.PASS_THROUGH, StrategyKind.CURRENCIES -> {
+                StrategyParseResult(key, emptyList())
+            }
+
             StrategyKind.GLOBAL_MAPPINGS -> {
                 val export = AccountMappingExportCodec.decode(json)
                 val refs =

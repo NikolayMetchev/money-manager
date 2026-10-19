@@ -23,16 +23,25 @@ object StrategyArtifactCodec {
     ): String {
         val canonical =
             when (kind) {
-                StrategyKind.CSV, StrategyKind.QIF, StrategyKind.XLSX ->
+                StrategyKind.CSV, StrategyKind.QIF, StrategyKind.XLSX -> {
                     CsvStrategyExportCodec.encode(CsvStrategyExportCodec.decode(json).copy(version = ""))
-                StrategyKind.API ->
+                }
+
+                StrategyKind.API -> {
                     ApiStrategyExportCodec.encode(ApiStrategyExportCodec.decode(json).copy(version = ""))
-                StrategyKind.GLOBAL_MAPPINGS ->
+                }
+
+                StrategyKind.GLOBAL_MAPPINGS -> {
                     AccountMappingExportCodec.encode(AccountMappingExportCodec.decode(json).copy(version = ""))
-                StrategyKind.PASS_THROUGH ->
+                }
+
+                StrategyKind.PASS_THROUGH -> {
                     PassThroughExportCodec.encode(PassThroughExportCodec.decode(json).copy(version = ""))
-                StrategyKind.CURRENCIES ->
+                }
+
+                StrategyKind.CURRENCIES -> {
                     CurrencyListExportCodec.encode(CurrencyListExportCodec.decode(json).copy(version = ""))
+                }
             }
         return contentHash(canonical)
     }

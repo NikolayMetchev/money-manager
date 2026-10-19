@@ -145,19 +145,27 @@ class SessionImports(
         val outcome =
             try {
                 when {
-                    directories != null && apis != null ->
+                    directories != null && apis != null -> {
                         manager.await("import-all", "Import all", ImportRunOutcome::summary) {
                             importBoth(directories, apis.first, apis.second)
                         }
-                    directories != null ->
+                    }
+
+                    directories != null -> {
                         manager.await(IMPORT_ALL_TASK_KEY, "Import directories", ImportRunOutcome::summary) {
                             ImportRunOutcome(directories = importDirectories(directories))
                         }
-                    apis != null ->
+                    }
+
+                    apis != null -> {
                         manager.await(API_DOWNLOAD_IMPORT_ALL_TASK_KEY, "Import APIs", ImportRunOutcome::summary) {
                             ImportRunOutcome(apis = importApis(apis.first, apis.second))
                         }
-                    else -> ImportRunOutcome()
+                    }
+
+                    else -> {
+                        ImportRunOutcome()
+                    }
                 }
             } finally {
                 if (directories?.apply == true || request.apis?.apply == true) {

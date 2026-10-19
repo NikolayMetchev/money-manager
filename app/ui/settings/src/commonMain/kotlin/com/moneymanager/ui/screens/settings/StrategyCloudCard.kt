@@ -318,14 +318,18 @@ private fun StatusSummary(
 ) {
     val line =
         when {
-            toUpload == 0 && updatesAvailable == 0 && newOnRemote == 0 && conflicts == 0 -> "✓ Everything is synced"
-            else ->
+            toUpload == 0 && updatesAvailable == 0 && newOnRemote == 0 && conflicts == 0 -> {
+                "✓ Everything is synced"
+            }
+
+            else -> {
                 buildList {
                     if (toUpload > 0) add("$toUpload to upload")
                     if (updatesAvailable > 0) add("$updatesAvailable to update")
                     if (newOnRemote > 0) add("$newOnRemote new on Drive")
                     if (conflicts > 0) add("$conflicts in conflict")
                 }.joinToString(" · ")
+            }
         }
     Text(line, style = MaterialTheme.typography.bodyMedium)
     if (conflicts > 0) {

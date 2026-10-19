@@ -105,8 +105,6 @@ actual class BigDecimal internal constructor(
 
     actual companion object {
         actual val ZERO: BigDecimal = BigDecimal(IonBigInteger.ZERO, 0)
-        actual val ONE: BigDecimal = BigDecimal(IonBigInteger.ONE, 0)
-        actual val TEN: BigDecimal = BigDecimal(IonBigInteger.TEN, 0)
     }
 }
 

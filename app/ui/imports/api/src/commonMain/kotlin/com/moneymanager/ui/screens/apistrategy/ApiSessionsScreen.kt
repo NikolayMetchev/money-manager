@@ -343,6 +343,7 @@ fun ApiSessionsScreen(
                     CircularProgressIndicator()
                 }
             }
+
             credentials.isEmpty() -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
@@ -352,6 +353,7 @@ fun ApiSessionsScreen(
                     )
                 }
             }
+
             else -> {
                 val filteredCredentials =
                     filterCredentialsByStrategy(
@@ -1137,6 +1139,7 @@ fun ApiSessionTrafficScreen(
                     CircularProgressIndicator()
                 }
             }
+
             pairs.isEmpty() -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
@@ -1146,6 +1149,7 @@ fun ApiSessionTrafficScreen(
                     )
                 }
             }
+
             else -> {
                 val lazyListState = rememberLazyListState()
                 var listRootY by remember { mutableFloatStateOf(0f) }
@@ -1676,6 +1680,7 @@ private fun JsonTreeNode(
                     )
                 }
             }
+
             is JsonArray -> {
                 element.forEachIndexed { index, value ->
                     val nextSegments =
@@ -1700,7 +1705,8 @@ private fun JsonTreeNode(
                     )
                 }
             }
-            else -> Unit
+
+            else -> {}
         }
     }
 }

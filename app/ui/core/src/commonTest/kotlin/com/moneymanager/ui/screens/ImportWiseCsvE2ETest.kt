@@ -257,12 +257,18 @@ class ImportWiseCsvE2ETest {
 
         for (char in line) {
             when (char) {
-                '"' -> inQuotes = !inQuotes
+                '"' -> {
+                    inQuotes = !inQuotes
+                }
+
                 ',' if !inQuotes -> {
                     result.add(current.toString())
                     current = StringBuilder()
                 }
-                else -> current.append(char)
+
+                else -> {
+                    current.append(char)
+                }
             }
         }
         result.add(current.toString())

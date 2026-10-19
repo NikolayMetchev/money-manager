@@ -40,9 +40,13 @@ internal fun loopbackImportFileSourceFactory(
     object : ImportFileSourceFactory {
         override suspend fun create(directory: ImportDirectory): ImportFileSource =
             when (directory.provider) {
-                ImportDirectoryProvider.LOCAL -> LocalFolderImportFileSource(directory.folderRef)
-                ImportDirectoryProvider.GDRIVE ->
+                ImportDirectoryProvider.LOCAL -> {
+                    LocalFolderImportFileSource(directory.folderRef)
+                }
+
+                ImportDirectoryProvider.GDRIVE -> {
                     driveImportFileSource(signedInTokenSource(directory.providerConfig, vault, browser), directory.folderRef)
+                }
             }
     }
 

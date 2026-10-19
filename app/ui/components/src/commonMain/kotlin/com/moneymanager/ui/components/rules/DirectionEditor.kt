@@ -90,7 +90,7 @@ fun DirectionEditor(
             }
         }
         when (direction) {
-            is Direction.AmountSign ->
+            is Direction.AmountSign -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
                         checked = !direction.positiveIsIncoming,
@@ -99,6 +99,8 @@ fun DirectionEditor(
                     )
                     Text("Positive amounts are money going out", modifier = Modifier.padding(start = 4.dp))
                 }
+            }
+
             is Direction.Field -> {
                 pathField.Field(
                     "Direction field",
@@ -127,7 +129,8 @@ fun DirectionEditor(
                     isError = direction.incomingValues.isEmpty(),
                 )
             }
-            null, Direction.Outgoing -> Unit
+
+            null, Direction.Outgoing -> {}
         }
     }
 }

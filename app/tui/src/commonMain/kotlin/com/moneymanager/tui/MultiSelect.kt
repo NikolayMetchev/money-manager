@@ -49,18 +49,49 @@ class MultiSelect<T>(
         val last = (shown.size - 1).coerceAtLeast(0)
         val current = cursor.coerceIn(0, last)
         when {
-            single && event.key == "Enter" ->
+            single && event.key == "Enter" -> {
                 return shown.getOrNull(current)?.let { (value, _) -> PickResult.Apply(setOf(value)) } ?: PickResult.Continue
-            event.key == "Enter" -> return PickResult.Apply(selected)
-            event.key == "Escape" -> return PickResult.Cancel
-            single && event.key == " " -> return PickResult.Continue
-            event.ctrl && event.key == "a" -> selected = emptySet()
-            event.key == " " -> shown.getOrNull(current)?.let { (value, _) -> selected = toggle(value) }
-            event.key == "ArrowUp" -> cursor = (current - 1).coerceAtLeast(0)
-            event.key == "ArrowDown" -> cursor = (current + 1).coerceAtMost(last)
-            event.key == "PageUp" -> cursor = (current - pageRows).coerceAtLeast(0)
-            event.key == "PageDown" -> cursor = (current + pageRows).coerceAtMost(last)
-            filter.handle(event) -> cursor = 0
+            }
+
+            event.key == "Enter" -> {
+                return PickResult.Apply(selected)
+            }
+
+            event.key == "Escape" -> {
+                return PickResult.Cancel
+            }
+
+            single && event.key == " " -> {
+                return PickResult.Continue
+            }
+
+            event.ctrl && event.key == "a" -> {
+                selected = emptySet()
+            }
+
+            event.key == " " -> {
+                shown.getOrNull(current)?.let { (value, _) -> selected = toggle(value) }
+            }
+
+            event.key == "ArrowUp" -> {
+                cursor = (current - 1).coerceAtLeast(0)
+            }
+
+            event.key == "ArrowDown" -> {
+                cursor = (current + 1).coerceAtMost(last)
+            }
+
+            event.key == "PageUp" -> {
+                cursor = (current - pageRows).coerceAtLeast(0)
+            }
+
+            event.key == "PageDown" -> {
+                cursor = (current + pageRows).coerceAtMost(last)
+            }
+
+            filter.handle(event) -> {
+                cursor = 0
+            }
         }
         return PickResult.Continue
     }
@@ -115,8 +146,14 @@ internal class OpenPicker<T>(
         pageRows: Int,
     ): Boolean =
         when (val result = select.handle(event, pageRows)) {
-            PickResult.Continue -> true
-            PickResult.Cancel -> false
+            PickResult.Continue -> {
+                true
+            }
+
+            PickResult.Cancel -> {
+                false
+            }
+
             is PickResult.Apply -> {
                 apply(result.selected)
                 false

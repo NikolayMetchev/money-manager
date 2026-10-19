@@ -83,10 +83,12 @@ fun presentImports(
                             }
                         }
                     }
-                    ImportsEvent.Cancel ->
+
+                    ImportsEvent.Cancel -> {
                         manager.tasks.value
                             .filter { it.parentId == null && it.isRunning }
                             .forEach { manager.cancel(it.id) }
+                    }
                 }
             }
         }
@@ -97,7 +99,9 @@ fun presentImports(
 private fun ImportsEvent.Start.toRequest(): ImportRequest =
     when (kind) {
         ImportKind.DIRECTORIES -> ImportRequest(directories = DirectoryImport())
+
         ImportKind.APIS -> ImportRequest(apis = ApiImport(forceFull = forceFull))
+
         // As `mm import all`: a database without APIs, or with its vault locked, still imports its folders.
         ImportKind.ALL -> ImportRequest(directories = DirectoryImport(), apis = ApiImport(forceFull = forceFull, optional = true))
     }

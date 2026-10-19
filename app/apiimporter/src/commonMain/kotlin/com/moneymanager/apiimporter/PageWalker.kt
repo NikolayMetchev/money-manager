@@ -133,11 +133,13 @@ private suspend fun walkUnit(
                 limit?.let { params[it.limitParam] = it.limitValue.toString() }
                 marker = offset.toString()
             }
+
             is ApiPaging.Token -> {
                 token?.let { params[paging.param] = it }
                 limit?.let { params[it.limitParam] = it.limitValue.toString() }
                 marker = tokenPage.toString()
             }
+
             is ApiPaging.BeforeCursor -> {
                 // Page size first: the bank feed's recorded URLs (which resume an interrupted download)
                 // have always carried it ahead of the cursor.
@@ -145,11 +147,15 @@ private suspend fun walkUnit(
                 before?.let { params[paging.param] = it.toString() }
                 marker = before?.toString()
             }
+
             ApiPaging.Single -> {
                 limit?.let { params[it.limitParam] = it.limitValue.toString() }
                 marker = null
             }
-            is ApiPaging.ForwardId -> error("forward-id walks are not windowed")
+
+            is ApiPaging.ForwardId -> {
+                error("forward-id walks are not windowed")
+            }
         }
         val page =
             when (val outcome = fetch(PageRequest(window, params, marker, windowIndex))) {
@@ -160,7 +166,10 @@ private suspend fun walkUnit(
         val items = page.items
         val keepPaging =
             when (paging) {
-                ApiPaging.Single -> false
+                ApiPaging.Single -> {
+                    false
+                }
+
                 is ApiPaging.Offset -> {
                     val pageSize = pagination!!.limitValue
                     itemsSeen += items.size
@@ -168,6 +177,7 @@ private suspend fun walkUnit(
                     val total = paging.totalCountField?.let { field -> totalCountFromJson(page.body, field) }
                     items.size >= pageSize && (total == null || itemsSeen < total)
                 }
+
                 is ApiPaging.Token -> {
                     val sent = token
                     token = nextPageToken(page.body, paging, sent)
@@ -179,13 +189,17 @@ private suspend fun walkUnit(
                             } == true
                     token != null && items.isNotEmpty() && !pagedPastCutoff
                 }
+
                 is ApiPaging.BeforeCursor -> {
                     val earliest = items.mapNotNull { it.position(paging.positionField) }.minOrNull()
                     before = earliest
                     val reachedCutoff = cutoff != null && earliest != null && earliest <= cutoff
                     items.isNotEmpty() && earliest != null && !reachedCutoff
                 }
-                is ApiPaging.ForwardId -> false
+
+                is ApiPaging.ForwardId -> {
+                    false
+                }
             }
         if (!keepPaging) return UnitOutcome.Complete
     }

@@ -162,8 +162,14 @@ fun SourceInfoSection(
 
         val deviceSuffix = if (currentDeviceId != null && source.deviceId == currentDeviceId.id) " (This Device)" else ""
         when (val origin = source.source) {
-            Source.Manual -> PlatformOriginRows("Manual", deviceSuffix, source.deviceInfo, labelWidth)
-            Source.SampleGenerator -> PlatformOriginRows("Sample Generator", deviceSuffix, source.deviceInfo, labelWidth)
+            Source.Manual -> {
+                PlatformOriginRows("Manual", deviceSuffix, source.deviceInfo, labelWidth)
+            }
+
+            Source.SampleGenerator -> {
+                PlatformOriginRows("Sample Generator", deviceSuffix, source.deviceInfo, labelWidth)
+            }
+
             is Source.Csv -> {
                 val rowIndex = origin.rowIndex
                 val fileName = source.fileName
@@ -196,6 +202,7 @@ fun SourceInfoSection(
                 }
                 DeviceInfoRows(source.deviceInfo, labelWidth)
             }
+
             is Source.Qif -> {
                 val recordIndex = origin.recordIndex
                 val fileName = source.fileName
@@ -227,12 +234,17 @@ fun SourceInfoSection(
                 }
                 DeviceInfoRows(source.deviceInfo, labelWidth)
             }
-            Source.System -> FieldValueRow("Origin", "System", labelWidth = labelWidth)
+
+            Source.System -> {
+                FieldValueRow("Origin", "System", labelWidth = labelWidth)
+            }
+
             Source.Merge, Source.Unmerge -> {
                 val label = if (origin == Source.Merge) "Merge" else "Undo Merge"
                 FieldValueRow("Origin", "$label$deviceSuffix", labelWidth = labelWidth)
                 DeviceInfoRows(source.deviceInfo, labelWidth)
             }
+
             is Source.Api -> {
                 val requestId = origin.requestId
                 val jsonPath = origin.jsonPath
@@ -286,9 +298,11 @@ private fun DeviceInfoRows(
             FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
             FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
         }
+
         is DeviceInfo.Android -> {
             FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
         }
+
         null -> {}
     }
 }

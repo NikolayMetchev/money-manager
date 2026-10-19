@@ -409,8 +409,14 @@ suspend fun bulkReimportQif(
             }
         when {
             // An empty file has nothing to re-import, and (unlike a missing strategy) is not counted.
-            rows.isEmpty() -> BulkReimportFileOutcome.NoWork
-            matched == null -> BulkReimportFileOutcome.NoStrategy
+            rows.isEmpty() -> {
+                BulkReimportFileOutcome.NoWork
+            }
+
+            matched == null -> {
+                BulkReimportFileOutcome.NoStrategy
+            }
+
             else -> {
                 val plan =
                     planQifReimport(

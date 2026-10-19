@@ -120,7 +120,10 @@ data class AccountSnapshot(
         includeShadow: Boolean = false,
     ): AccountWithBalances =
         when (ref) {
-            is AccountRef.Id -> accounts.firstOrNull { it.account.id == ref.id } ?: throw UnknownAccountException(ref)
+            is AccountRef.Id -> {
+                accounts.firstOrNull { it.account.id == ref.id } ?: throw UnknownAccountException(ref)
+            }
+
             is AccountRef.Name -> {
                 val matches = accounts.filter { (includeShadow || !it.isShadow) && ref.match.matches(it.account.name) }
                 // A name that is exactly one account's wins over the others it is part of ("Cash" vs "Cash ISA").
@@ -136,7 +139,10 @@ data class AccountSnapshot(
 
     private fun resolveOwner(ref: OwnerRef): PersonId =
         when (ref) {
-            is OwnerRef.Id -> ref.id
+            is OwnerRef.Id -> {
+                ref.id
+            }
+
             is OwnerRef.Name -> {
                 val matches = people.filter { it.fullName.equals(ref.name.trim(), ignoreCase = true) }
                 when (matches.size) {

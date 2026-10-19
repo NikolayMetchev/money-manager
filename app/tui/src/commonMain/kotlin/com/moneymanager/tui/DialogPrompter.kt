@@ -116,18 +116,21 @@ class DialogPrompter : Prompter {
             return true
         }
         when (current) {
-            is PromptRequest.Line ->
+            is PromptRequest.Line -> {
                 when (event.key) {
                     "Enter" -> current.answer.complete(current.editor.text)
                     "Escape" -> current.answer.complete(null)
                     else -> current.editor.handle(event)
                 }
-            is PromptRequest.Confirm ->
+            }
+
+            is PromptRequest.Confirm -> {
                 when (event.key) {
                     "y", "Y" -> current.answer.complete(true)
                     "n", "N" -> current.answer.complete(false)
                     "Enter", "Escape" -> current.answer.complete(current.default)
                 }
+            }
         }
         return true
     }

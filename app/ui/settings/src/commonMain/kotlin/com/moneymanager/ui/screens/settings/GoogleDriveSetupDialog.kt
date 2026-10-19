@@ -162,12 +162,14 @@ fun GoogleDriveSetupDialog(
         },
         confirmButton = {
             when {
-                !connected ->
+                !connected -> {
                     TextButton(onClick = ::connect, enabled = !connecting) {
                         Text("Sign in with Google")
                     }
+                }
+
                 // Name clash: let the user open the existing archive or overwrite it in place.
-                mode == GoogleDriveSetupMode.CREATE && clash != null ->
+                mode == GoogleDriveSetupMode.CREATE && clash != null -> {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { onOpen(null, clash, password) }, enabled = openClashValid) {
                             Text("Open")
@@ -176,16 +178,21 @@ fun GoogleDriveSetupDialog(
                             Text("Overwrite")
                         }
                     }
-                mode == GoogleDriveSetupMode.CREATE ->
+                }
+
+                mode == GoogleDriveSetupMode.CREATE -> {
                     TextButton(
                         onClick = { onCreate(null, name, password, null) },
                         enabled = createValid,
                     ) { Text("Upload") }
-                else ->
+                }
+
+                else -> {
                     TextButton(
                         onClick = { selected?.let { file -> onOpen(null, file, password) } },
                         enabled = openValid,
                     ) { Text("Open") }
+                }
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },

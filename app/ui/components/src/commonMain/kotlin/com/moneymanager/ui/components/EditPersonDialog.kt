@@ -119,14 +119,18 @@ fun EditPersonDialog(
                             val value = attribute.value.trim()
                             val original = originalAttributeList.find { it.id == id } ?: return@forEach
                             when {
-                                typeName.isBlank() || value.isBlank() -> deletedAttributeIds.add(id)
-                                original.attributeType.name != typeName || original.value != value ->
+                                typeName.isBlank() || value.isBlank() -> {
+                                    deletedAttributeIds.add(id)
+                                }
+
+                                original.attributeType.name != typeName || original.value != value -> {
                                     updatedAttributes[id] =
                                         NewAttribute(
                                             importEngine.getOrCreateAttributeType(typeName),
                                             value,
                                             attribute.groupKey,
                                         )
+                                }
                             }
                         }
                         editableAttributes.filterKeys { it < 0 }.forEach { (_, attribute) ->

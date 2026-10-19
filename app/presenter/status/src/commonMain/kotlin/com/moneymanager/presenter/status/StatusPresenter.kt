@@ -129,7 +129,7 @@ fun presentStatus(
 
             { event ->
                 when (event) {
-                    is StatusEvent.Connect ->
+                    is StatusEvent.Connect -> {
                         run("Connecting") {
                             val controller = checkNotNull(remote)
                             if (controller.resume(event.password)) {
@@ -139,24 +139,37 @@ fun presentStatus(
                                 StatusMessage("That password doesn't open the cloud copy.", error = true)
                             }
                         }
-                    StatusEvent.CheckRemote ->
+                    }
+
+                    StatusEvent.CheckRemote -> {
                         run("Checking the cloud") {
                             checkNotNull(remote).checkRemote(session.database)
                             null
                         }
-                    is StatusEvent.Upload ->
+                    }
+
+                    is StatusEvent.Upload -> {
                         run("Uploading") {
                             when (checkNotNull(remote).syncNow(session.database, force = event.force)) {
-                                SyncResult.UPLOADED -> StatusMessage("Uploaded.", error = false)
-                                SyncResult.BLOCKED ->
+                                SyncResult.UPLOADED -> {
+                                    StatusMessage("Uploaded.", error = false)
+                                }
+
+                                SyncResult.BLOCKED -> {
                                     StatusMessage(
                                         "Another device changed the cloud copy since this one last synced: download it, or overwrite it.",
                                         error = true,
                                     )
-                                SyncResult.NO_SESSION -> StatusMessage("Connect to the cloud copy first.", error = true)
+                                }
+
+                                SyncResult.NO_SESSION -> {
+                                    StatusMessage("Connect to the cloud copy first.", error = true)
+                                }
                             }
                         }
-                    StatusEvent.UnlockVault ->
+                    }
+
+                    StatusEvent.UnlockVault -> {
                         run("Unlocking the vault") {
                             try {
                                 vault.requireUnlocked("Unlock the credential vault")
@@ -165,11 +178,14 @@ fun presentStatus(
                             }
                             null
                         }
-                    StatusEvent.LockVault ->
+                    }
+
+                    StatusEvent.LockVault -> {
                         run("Locking the vault") {
                             vault.lock()
                             null
                         }
+                    }
                 }
             }
         }

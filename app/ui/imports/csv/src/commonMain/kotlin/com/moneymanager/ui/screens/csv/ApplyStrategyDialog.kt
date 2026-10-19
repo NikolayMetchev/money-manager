@@ -132,8 +132,10 @@ fun ApplyStrategyDialog(
             // pre-selected source account to match the new strategy's default.
             when (val strategySourceMapping = strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]) {
                 is HardCodedAccountMapping -> selectedSourceAccountId = strategySourceMapping.accountId
+
                 // Per-row mapping: clear any override left over from a previously selected strategy
                 null -> Unit
+
                 else -> selectedSourceAccountId = null
             }
         }

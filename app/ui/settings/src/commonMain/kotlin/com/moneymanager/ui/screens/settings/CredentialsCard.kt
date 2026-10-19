@@ -84,11 +84,16 @@ internal fun CredentialsCard() {
                         }
                     }
                 }
-                is VaultState.Locked ->
+
+                is VaultState.Locked -> {
                     OutlinedButton(onClick = { runAction { vault.requireUnlocked("Unlock your credentials") } }) { Text("Unlock…") }
-                is VaultState.NoFile ->
+                }
+
+                is VaultState.NoFile -> {
                     OutlinedButton(onClick = { runAction { vault.requireUnlocked("Create your credential file") } }) { Text("Create…") }
-                VaultState.Unbound -> Unit
+                }
+
+                VaultState.Unbound -> {}
             }
         }
         message?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
@@ -195,11 +200,21 @@ private fun CredentialBackupSection(
 
 private fun backupStatus(state: CredentialSyncState): String =
     when (state.status) {
-        CredentialSyncStatus.IDLE -> "Backed up whenever the credential file is unlocked and changes."
-        CredentialSyncStatus.IN_SYNC -> "Backed up and up to date."
-        CredentialSyncStatus.NEEDS_REMOTE_PASSWORD ->
+        CredentialSyncStatus.IDLE -> {
+            "Backed up whenever the credential file is unlocked and changes."
+        }
+
+        CredentialSyncStatus.IN_SYNC -> {
+            "Backed up and up to date."
+        }
+
+        CredentialSyncStatus.NEEDS_REMOTE_PASSWORD -> {
             state.message ?: "The backup uses a different password. Enter it to merge the two."
-        CredentialSyncStatus.ERROR -> "Backup failed: ${state.message}"
+        }
+
+        CredentialSyncStatus.ERROR -> {
+            "Backup failed: ${state.message}"
+        }
     }
 
 @Composable

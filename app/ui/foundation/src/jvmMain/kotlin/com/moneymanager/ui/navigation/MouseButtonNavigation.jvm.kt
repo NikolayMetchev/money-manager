@@ -44,8 +44,14 @@ actual fun Modifier.mouseButtonNavigation(
                     AWTEventListener { event ->
                         if (event is MouseEvent && event.id == MouseEvent.MOUSE_PRESSED) {
                             when (event.button) {
-                                AWT_BUTTON_BACK -> latestOnBack()
-                                AWT_BUTTON_FORWARD -> latestOnForward()
+                                AWT_BUTTON_BACK -> {
+                                    latestOnBack()
+                                }
+
+                                AWT_BUTTON_FORWARD -> {
+                                    latestOnForward()
+                                }
+
                                 else -> {}
                             }
                         }
@@ -60,8 +66,14 @@ actual fun Modifier.mouseButtonNavigation(
         // so the press is handled at the root before a child (e.g. a clickable card) consumes it.
         onPointerEvent(PointerEventType.Press, pass = PointerEventPass.Initial) { event ->
             when (event.button) {
-                PointerButton.Back -> onBack()
-                PointerButton.Forward -> onForward()
+                PointerButton.Back -> {
+                    onBack()
+                }
+
+                PointerButton.Forward -> {
+                    onForward()
+                }
+
                 else -> {}
             }
         }

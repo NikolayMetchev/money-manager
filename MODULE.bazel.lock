@@ -266,7 +266,7 @@
         "bzlTransitiveDigest": "1OrTILyUjUSJe6xnK/Nw46TQNayBz1hFAMMjrM0/Hb8=",
         "usagesDigest": "af/EB6S6Jhg08XPZPOFfwCev0bH7RX6CSnpYr6oaQG4=",
         "recordedInputs": [
-          "FILE:@@//libs.versions.toml 7f2a77f77624c163e40a0d7aacab3553a42195b189173b4ee533d8607d0c438e"
+          "FILE:@@//libs.versions.toml 3f5c8fe81aab57995aa3fe09c9f594b9764f911b4930d6f82fdfcc964b63e2d2"
         ],
         "generatedRepoSpecs": {
           "android_sdk": {
@@ -276,7 +276,7 @@
               "compile_sdk": "37",
               "min_sdk": "30",
               "target_sdk": "36",
-              "local_properties": "/home/runner/work/money-manager/money-manager/local.properties"
+              "local_properties": "/home/nikolaym/IdeaProjects/worktrees/money-manager/version-bumps/money-manager/local.properties"
             }
           },
           "aapt2": {

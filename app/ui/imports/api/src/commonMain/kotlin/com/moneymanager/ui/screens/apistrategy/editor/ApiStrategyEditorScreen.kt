@@ -83,10 +83,14 @@ fun ApiStrategyEditorScreen(
             strategyLoad !is StrategyLoad.Loaded -> {
                 { CircularProgressIndicator() }
             }
+
             isEditMode && existingStrategy == null -> {
                 { Text("Strategy not found.", style = MaterialTheme.typography.bodyLarge) }
             }
-            else -> null
+
+            else -> {
+                null
+            }
         }
     if (placeholder != null) {
         EditorPlaceholder(isEditMode = isEditMode, onBack = onBack, content = placeholder)
@@ -216,15 +220,33 @@ fun ApiStrategyEditorScreen(
         ) {
             val enabled = !state.isSaving
             when (state.selectedTab) {
-                EditorTab.GENERAL -> GeneralTab(state, enabled)
-                EditorTab.ENDPOINTS -> EndpointsTab(state, enabled)
-                EditorTab.ACCOUNT_MAPPINGS ->
+                EditorTab.GENERAL -> {
+                    GeneralTab(state, enabled)
+                }
+
+                EditorTab.ENDPOINTS -> {
+                    EndpointsTab(state, enabled)
+                }
+
+                EditorTab.ACCOUNT_MAPPINGS -> {
                     AccountMappingsTab(state, accountJsonPaths, accountSampleItem != null, onRequestPick, enabled)
-                EditorTab.TRANSACTION_MAPPINGS ->
+                }
+
+                EditorTab.TRANSACTION_MAPPINGS -> {
                     TransactionMappingsTab(state, txJsonPaths, txSampleItem != null, onRequestPick, enabled)
-                EditorTab.PEOPLE -> PeopleTab(state, txJsonPaths, onRequestPick, enabled)
-                EditorTab.RULES -> RulesTab(state, txJsonPaths, onRequestPick, enabled)
-                EditorTab.ADVANCED -> AdvancedTab(state, enabled, accountRepository, categoryRepository, personRepository)
+                }
+
+                EditorTab.PEOPLE -> {
+                    PeopleTab(state, txJsonPaths, onRequestPick, enabled)
+                }
+
+                EditorTab.RULES -> {
+                    RulesTab(state, txJsonPaths, onRequestPick, enabled)
+                }
+
+                EditorTab.ADVANCED -> {
+                    AdvancedTab(state, enabled, accountRepository, categoryRepository, personRepository)
+                }
             }
 
             state.errorMessage?.let {

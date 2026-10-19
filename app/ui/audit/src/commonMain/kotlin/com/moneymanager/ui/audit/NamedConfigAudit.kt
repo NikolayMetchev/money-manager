@@ -56,8 +56,14 @@ fun computeNamedConfigAuditDiffs(
     revisions.mapIndexed { index, revision ->
         val previous = revisions.getOrNull(index - 1)
         when (revision.auditType) {
-            AuditType.INSERT -> revision.toDiff(FieldChange.Created(revision.name), emptyList())
-            AuditType.DELETE -> revision.toDiff(FieldChange.Deleted(revision.name), emptyList())
+            AuditType.INSERT -> {
+                revision.toDiff(FieldChange.Created(revision.name), emptyList())
+            }
+
+            AuditType.DELETE -> {
+                revision.toDiff(FieldChange.Deleted(revision.name), emptyList())
+            }
+
             AuditType.UPDATE -> {
                 val newName =
                     when {

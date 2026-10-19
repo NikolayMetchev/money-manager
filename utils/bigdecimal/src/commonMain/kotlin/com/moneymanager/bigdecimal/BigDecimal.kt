@@ -77,15 +77,5 @@ expect class BigDecimal : Comparable<BigDecimal> {
          * The value 0, with a scale of 0.
          */
         val ZERO: BigDecimal
-
-        /**
-         * The value 1, with a scale of 0.
-         */
-        val ONE: BigDecimal
-
-        /**
-         * The value 10, with a scale of 0.
-         */
-        val TEN: BigDecimal
     }
 }

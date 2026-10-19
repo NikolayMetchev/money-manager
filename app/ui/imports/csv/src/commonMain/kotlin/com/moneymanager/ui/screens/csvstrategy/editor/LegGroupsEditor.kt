@@ -108,7 +108,7 @@ private fun LegGroupRuleEditor(
         if (rule.side !is LegSide.DebitWhen) onRuleChanged(rule.copy(side = LegSide.DebitWhen(emptyList())))
     }
     when (val side = rule.side) {
-        is LegSide.Sign ->
+        is LegSide.Sign -> {
             ColumnDropdown(
                 columns = columns,
                 selectedColumn = side.path.takeIf { it.isNotBlank() },
@@ -118,7 +118,9 @@ private fun LegGroupRuleEditor(
                 enabled = enabled,
                 isError = side.path.isBlank(),
             )
-        is LegSide.DebitWhen ->
+        }
+
+        is LegSide.DebitWhen -> {
             RowConditionsEditor(
                 conditions = side.conditions,
                 onConditionsChanged = { onRuleChanged(rule.copy(side = LegSide.DebitWhen(it))) },
@@ -126,6 +128,7 @@ private fun LegGroupRuleEditor(
                 enabled = enabled,
                 title = "A leg is a debit when all of these hold",
             )
+        }
     }
     Spacer(modifier = Modifier.height(8.dp))
     KeyPartsEditor(rule.key, { onRuleChanged(rule.copy(key = it)) }, columns, firstRow, enabled)
@@ -151,7 +154,7 @@ private fun LegGroupRuleEditor(
         }
     }
     when (val assembly = rule.assembly) {
-        is LegAssembly.Trade ->
+        is LegAssembly.Trade -> {
             OutlinedTextField(
                 value = assembly.description,
                 onValueChange = { onRuleChanged(rule.copy(assembly = assembly.copy(description = it))) },
@@ -160,6 +163,8 @@ private fun LegGroupRuleEditor(
                 singleLine = true,
                 enabled = enabled,
             )
+        }
+
         is LegAssembly.ThroughAccount -> {
             Text(
                 "Intermediate account rules. With none, each leg keeps the counterparty its own row names " +
@@ -274,11 +279,15 @@ internal fun LegGroupRule.isComplete(): Boolean =
             is LegSide.DebitWhen -> side.conditions.all { it.isComplete() }
         } &&
         when (val assembly = assembly) {
-            is LegAssembly.Trade -> true
-            is LegAssembly.ThroughAccount ->
+            is LegAssembly.Trade -> {
+                true
+            }
+
+            is LegAssembly.ThroughAccount -> {
                 assembly.accounts.all { it.isComplete() } &&
                     assembly.fundingWhen.all { it.isComplete() } &&
                     assembly.relationshipTypeName.isNotBlank()
+            }
         }
 
 private fun defaultLegGroupRule(): LegGroupRule =

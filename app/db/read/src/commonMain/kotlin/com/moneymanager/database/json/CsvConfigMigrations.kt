@@ -35,8 +35,11 @@ internal val csvSharedRulesStep =
 
 private fun csvObjectOntoSharedRules(obj: JsonObject): JsonObject =
     when {
-        "operator" in obj && "columnName" in obj -> rowConditionToCondition(obj)
-        obj.isType("DirectColumnMapping", "DirectColumnExport") ->
+        "operator" in obj && "columnName" in obj -> {
+            rowConditionToCondition(obj)
+        }
+
+        obj.isType("DirectColumnMapping", "DirectColumnExport") -> {
             obj.replacingWithValueExpr(
                 key = "value",
                 paths = listOf(obj.string("columnName")!!) + obj.stringList("fallbackColumns"),
@@ -44,21 +47,29 @@ private fun csvObjectOntoSharedRules(obj: JsonObject): JsonObject =
                 "columnName",
                 "fallbackColumns",
             )
-        obj.isType("CurrencyLookupMapping", "CurrencyLookupExport") ->
+        }
+
+        obj.isType("CurrencyLookupMapping", "CurrencyLookupExport") -> {
             obj.replacingWithValueExpr(
                 key = "value",
                 paths = listOf(obj.string("columnName")!!),
                 extractionKey = "extraction",
                 "columnName",
             )
-        obj.isType("AmountParsingMapping", "AmountParsingExport") && obj.string("feeCurrencyColumnName") != null ->
+        }
+
+        obj.isType("AmountParsingMapping", "AmountParsingExport") && obj.string("feeCurrencyColumnName") != null -> {
             obj.replacingWithValueExpr(
                 key = "feeCurrency",
                 paths = listOf(obj.string("feeCurrencyColumnName")!!),
                 extractionKey = "feeCurrencyExtraction",
                 "feeCurrencyColumnName",
             )
-        else -> obj
+        }
+
+        else -> {
+            obj
+        }
     }
 
 /** This object with [removed] (and [extractionKey]) dropped and a `ValueExpr` of [paths] put at [key]. */
@@ -161,10 +172,15 @@ private fun legacyAccountRules(obj: JsonObject): Pair<List<JsonObject>, JsonElem
     val category = obj["defaultCategoryId"] ?: obj["defaultCategoryName"]
     val column = obj.string("columnName")
     return when {
-        obj.isType("AccountRulesMapping", "AccountRulesExport") -> (obj["rules"] as JsonArray).map { it as JsonObject } to category
-        obj.isType("AccountLookupMapping", "AccountLookupExport") ->
+        obj.isType("AccountRulesMapping", "AccountRulesExport") -> {
+            (obj["rules"] as JsonArray).map { it as JsonObject } to category
+        }
+
+        obj.isType("AccountLookupMapping", "AccountLookupExport") -> {
             listOf(rule(paths = listOf(column!!) + obj.stringList("fallbackColumns"))) to category
-        obj.isType("TemplateAccountMapping", "TemplateAccountExport") ->
+        }
+
+        obj.isType("TemplateAccountMapping", "TemplateAccountExport") -> {
             listOf(
                 rule(
                     paths = listOf(column!!),
@@ -173,11 +189,15 @@ private fun legacyAccountRules(obj: JsonObject): Pair<List<JsonObject>, JsonElem
                     name = obj.string("prefix").orEmpty() + VALUE + obj.string("suffix").orEmpty(),
                 ),
             ) to category
-        obj.isType("AttributeMatchAccountMapping", "AttributeMatchAccountExport") ->
+        }
+
+        obj.isType("AttributeMatchAccountMapping", "AttributeMatchAccountExport") -> {
             listOf(
                 rule(paths = listOf(column!!), trim = true, attributeTypeName = obj.string("attributeTypeName")),
                 rule(paths = listOf(column), trim = true),
             ) to category
+        }
+
         obj.isType("RegexAccountMapping", "RegexAccountExport") -> {
             val patternRules =
                 (obj["rules"] as? JsonArray).orEmpty().map { element ->
@@ -200,6 +220,7 @@ private fun legacyAccountRules(obj: JsonObject): Pair<List<JsonObject>, JsonElem
                 }
             (patternRules + rule(paths = listOf(column!!) + obj.stringList("fallbackColumns"))) to category
         }
+
         obj.isType("ConditionalAccountMapping", "ConditionalAccountExport") -> {
             val conditions = (obj["conditions"] as? JsonArray).orEmpty()
             val (whenTrue, trueCategory) = legacyAccountRules(obj.getValue("whenTrue") as JsonObject)
@@ -210,7 +231,10 @@ private fun legacyAccountRules(obj: JsonObject): Pair<List<JsonObject>, JsonElem
                 }
             (guarded + whenFalse) to (falseCategory ?: trueCategory)
         }
-        else -> error("A conditional account mapping can only branch to a column-based mapping, not ${obj.string("type")}")
+
+        else -> {
+            error("A conditional account mapping can only branch to a column-based mapping, not ${obj.string("type")}")
+        }
     }
 }
 

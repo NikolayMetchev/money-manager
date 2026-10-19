@@ -74,10 +74,8 @@ class BigDecimalTest {
     }
 
     @Test
-    fun constants_haveCorrectValues() {
+    fun zero_hasCorrectValue() {
         assertEquals("0", BigDecimal.ZERO.toString())
-        assertEquals("1", BigDecimal.ONE.toString())
-        assertEquals("10", BigDecimal.TEN.toString())
     }
 
     @Test

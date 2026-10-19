@@ -168,8 +168,9 @@ private fun ColumnScope.StepBody(
 ) {
     when (step) {
         // Chosen before the database existed, so it is never rendered as a body.
-        SetupWizardStep.DATABASE -> Unit
-        SetupWizardStep.CURRENCY ->
+        SetupWizardStep.DATABASE -> {}
+
+        SetupWizardStep.CURRENCY -> {
             CurrencyPicker(
                 selectedCurrencyId = selectedCurrencyId,
                 onCurrencySelected = onCurrencySelected,
@@ -177,7 +178,9 @@ private fun ColumnScope.StepBody(
                 currencyRepository = services.accounts.currencyRepository,
                 modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp),
             )
-        SetupWizardStep.STRATEGIES ->
+        }
+
+        SetupWizardStep.STRATEGIES -> {
             if (strategyCatalogController != null) {
                 StrategyCatalogScreen(
                     controller = strategyCatalogController,
@@ -190,7 +193,9 @@ private fun ColumnScope.StepBody(
                     showBackAction = false,
                 )
             }
-        SetupWizardStep.STRATEGY_SYNC ->
+        }
+
+        SetupWizardStep.STRATEGY_SYNC -> {
             if (strategySyncController != null) {
                 // The card grows with the strategy list and the wizard body doesn't scroll on its own,
                 // so it would be clipped on a phone once the list is longer than the step.
@@ -206,7 +211,9 @@ private fun ColumnScope.StepBody(
                     )
                 }
             }
-        SetupWizardStep.IMPORT_DIRECTORIES ->
+        }
+
+        SetupWizardStep.IMPORT_DIRECTORIES -> {
             ImportDirectoriesScreen(
                 importDirectoryService = importDirectoryService,
                 importDirectoryRepository = services.imports.importDirectoryRepository,
@@ -218,7 +225,9 @@ private fun ColumnScope.StepBody(
                 deviceId = services.deviceId,
                 driveFolderBrowser = driveFolderBrowser,
             )
-        SetupWizardStep.API_IMPORTS ->
+        }
+
+        SetupWizardStep.API_IMPORTS -> {
             ApiConnectionsScreen(
                 apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
                 apiSessionRepository = services.imports.apiSessionRepository,
@@ -226,5 +235,6 @@ private fun ColumnScope.StepBody(
                 // The wizard prints the step title and owns Back/Next, so the screen shows neither.
                 showHeader = false,
             )
+        }
     }
 }

@@ -78,14 +78,16 @@ internal fun buildStrategyFromEditorState(
     val fieldMappings =
         buildMap {
             when (state.sourceAccountMode) {
-                SourceAccountMode.FIXED_ACCOUNT ->
+                SourceAccountMode.FIXED_ACCOUNT -> {
                     state.selectedAccountId?.let { accountId ->
                         put(
                             TransferField.SOURCE_ACCOUNT,
                             HardCodedAccountMapping(fieldType = TransferField.SOURCE_ACCOUNT, accountId = accountId),
                         )
                     }
-                SourceAccountMode.RULES ->
+                }
+
+                SourceAccountMode.RULES -> {
                     put(
                         TransferField.SOURCE_ACCOUNT,
                         AccountRulesMapping(
@@ -94,6 +96,7 @@ internal fun buildStrategyFromEditorState(
                             defaultCategoryId = state.sourceDefaultCategoryId,
                         ),
                     )
+                }
             }
             put(
                 TransferField.TARGET_ACCOUNT,
@@ -148,12 +151,14 @@ internal fun buildStrategyFromEditorState(
             put(
                 TransferField.CURRENCY,
                 when (state.currencyMode) {
-                    CurrencyMode.HARDCODED ->
+                    CurrencyMode.HARDCODED -> {
                         HardCodedCurrencyMapping(
                             fieldType = TransferField.CURRENCY,
                             currencyId = state.selectedCurrencyId!!,
                         )
-                    CurrencyMode.FROM_COLUMN ->
+                    }
+
+                    CurrencyMode.FROM_COLUMN -> {
                         CurrencyLookupMapping(
                             fieldType = TransferField.CURRENCY,
                             value =
@@ -162,23 +167,27 @@ internal fun buildStrategyFromEditorState(
                                     extraction = state.currencyExtraction,
                                 ),
                         )
+                    }
                 },
             )
             putAll(state.tradeCreditMappings)
             put(
                 TransferField.TIMEZONE,
                 when (state.timezoneMode) {
-                    TimezoneMode.HARDCODED ->
+                    TimezoneMode.HARDCODED -> {
                         HardCodedTimezoneMapping(
                             fieldType = TransferField.TIMEZONE,
                             timezoneId = state.selectedTimezone,
                         )
-                    TimezoneMode.FROM_COLUMN ->
+                    }
+
+                    TimezoneMode.FROM_COLUMN -> {
                         TimezoneLookupMapping(
                             fieldType = TransferField.TIMEZONE,
                             columnName = state.timezoneColumnName!!,
                             aliases = parseAliases(state.timezoneAliasesText, upperCaseValues = false),
                         )
+                    }
                 },
             )
         }

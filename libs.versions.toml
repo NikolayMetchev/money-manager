@@ -47,7 +47,7 @@ kotlinx-io = "0.9.1"
 kotlinx-serialization = "1.11.0"
 ktlint = "14.2.0"
 # The ktlint engine Bazel's `@ktlint_cli` resolves (#1015).
-ktlint-engine = "1.5.0"
+ktlint-engine = "1.8.0"
 ktor = "3.6.0"
 log4j = "2.26.1"
 mappie = "2.4.21-2.4.5"

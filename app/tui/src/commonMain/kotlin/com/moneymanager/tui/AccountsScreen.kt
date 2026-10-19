@@ -136,27 +136,63 @@ private fun AccountsView(
             return true
         }
         when (event.key) {
-            "/" -> editing = true
-            "r" -> model.eventSink(AccountsEvent.SetNameIsRegex(!model.filter.nameIsRegex))
-            "p" ->
+            "/" -> {
+                editing = true
+            }
+
+            "r" -> {
+                model.eventSink(AccountsEvent.SetNameIsRegex(!model.filter.nameIsRegex))
+            }
+
+            "p" -> {
                 picker =
                     OpenPicker(MultiSelect("Owners", model.people.map { it.id to it.fullName }, model.filter.ownerIds)) {
                         model.eventSink(AccountsEvent.SetOwners(it))
                     }
-            "a" ->
+            }
+
+            "a" -> {
                 picker =
                     OpenPicker(MultiSelect("Assets", model.availableAssets.map { it.id to it.code }, model.filter.assetIds)) {
                         model.eventSink(AccountsEvent.SetAssets(it))
                     }
-            "s" -> model.eventSink(AccountsEvent.SetIncludeShadow(!model.filter.includeShadow))
-            "z" -> model.eventSink(AccountsEvent.SetNonZeroOnly(!model.filter.nonZeroOnly))
-            "g" -> grouped = !grouped
-            "Enter" -> (lines.getOrNull(lineOf(at)) as? ListLine.Entry)?.let { openAccount(it.account.account.id) }
-            "ArrowUp" -> select(at - 1)
-            "ArrowDown" -> select(at + 1)
-            "PageUp" -> select(at - visibleRows)
-            "PageDown" -> select(at + visibleRows)
-            else -> return false
+            }
+
+            "s" -> {
+                model.eventSink(AccountsEvent.SetIncludeShadow(!model.filter.includeShadow))
+            }
+
+            "z" -> {
+                model.eventSink(AccountsEvent.SetNonZeroOnly(!model.filter.nonZeroOnly))
+            }
+
+            "g" -> {
+                grouped = !grouped
+            }
+
+            "Enter" -> {
+                (lines.getOrNull(lineOf(at)) as? ListLine.Entry)?.let { openAccount(it.account.account.id) }
+            }
+
+            "ArrowUp" -> {
+                select(at - 1)
+            }
+
+            "ArrowDown" -> {
+                select(at + 1)
+            }
+
+            "PageUp" -> {
+                select(at - visibleRows)
+            }
+
+            "PageDown" -> {
+                select(at + visibleRows)
+            }
+
+            else -> {
+                return false
+            }
         }
         return true
     }
@@ -175,7 +211,10 @@ private fun AccountsView(
             }
             lines.drop(first).take(visibleRows).forEachIndexed { offset, line ->
                 when (line) {
-                    is ListLine.Heading -> Text(fit(line.text, inner), textStyle = TextStyle.Bold)
+                    is ListLine.Heading -> {
+                        Text(fit(line.text, inner), textStyle = TextStyle.Bold)
+                    }
+
                     is ListLine.Entry -> {
                         val text = fit(line.account.line(inner), inner)
                         Text(text, textStyle = if (first + offset == currentLine) TextStyle.Invert else TextStyle.Unspecified)

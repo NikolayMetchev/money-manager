@@ -53,18 +53,24 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
 
     private fun accountsPage(startingAfter: String?): String =
         when (startingAfter) {
-            null ->
+            null -> {
                 """{"pagination":{"next_starting_after":"$btcWallet"},
                    "data":[{"id":"$btcWallet","currency":{"code":"BTC"},"type":"wallet"}]}"""
-            btcWallet ->
+            }
+
+            btcWallet -> {
                 """{"pagination":{"next_starting_after":null},
                    "data":[{"id":"$gbpWallet","currency":{"code":"GBP"},"type":"fiat"}]}"""
-            else -> error("unexpected accounts cursor $startingAfter")
+            }
+
+            else -> {
+                error("unexpected accounts cursor $startingAfter")
+            }
         }
 
     private fun btcLedgerPage(startingAfter: String?): String =
         when (startingAfter) {
-            null ->
+            null -> {
                 """{"pagination":{"next_starting_after":"page-2"},"data":[
                   {"id":"r1","type":"receive","status":"completed","created_at":"2024-01-01T10:00:00Z",
                    "amount":{"amount":"0.5","currency":"BTC"},"native_amount":{"amount":"15000","currency":"GBP"},
@@ -82,7 +88,9 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
                    "amount":{"amount":"0.002","currency":"BTC"},"native_amount":{"amount":"20","currency":"GBP"},
                    "advanced_trade_fill":{"order_id":"O1","product_id":"BTC-GBP","commission":"0.12","fill_price":"10000"}}
                 ]}"""
-            "page-2" ->
+            }
+
+            "page-2" -> {
                 """{"pagination":{"next_starting_after":null},"data":[
                   {"id":"s1","type":"send","status":"completed","created_at":"2024-01-05T10:00:00Z",
                    "amount":{"amount":"-0.05","currency":"BTC"},"native_amount":{"amount":"-1500","currency":"GBP"},
@@ -91,7 +99,11 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
                   {"id":"s2","type":"send","status":"pending","created_at":"2024-01-06T10:00:00Z",
                    "amount":{"amount":"-0.3","currency":"BTC"},"native_amount":{"amount":"-9000","currency":"GBP"}}
                 ]}"""
-            else -> error("unexpected BTC ledger cursor $startingAfter")
+            }
+
+            else -> {
+                error("unexpected BTC ledger cursor $startingAfter")
+            }
         }
 
     private val gbpLedger =

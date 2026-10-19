@@ -266,8 +266,12 @@ fun TransactionEditDialog(
                     else -> descriptionFocusRequester.requestFocus()
                 }
             }
+
             // All fields are valid but nothing changed (edit mode) — mirror the disabled Save button.
-            !hasChanges -> return@submit
+            !hasChanges -> {
+                return@submit
+            }
+
             else -> {
                 isSaving = true
                 errorMessage = null
@@ -341,13 +345,18 @@ fun TransactionEditDialog(
 
                             // Handle the "excluded" attribute (well-known id = -1)
                             when {
-                                isExcluded && originalExcludedAttr == null ->
+                                isExcluded && originalExcludedAttr == null -> {
                                     newAttributes.add(NewAttribute(AttributeTypeId(-1), excludeReason))
-                                isExcluded && excludeReason != originalExcludedAttr!!.value ->
+                                }
+
+                                isExcluded && excludeReason != originalExcludedAttr!!.value -> {
                                     updatedAttributes[originalExcludedAttr.id] =
                                         NewAttribute(AttributeTypeId(-1), excludeReason)
-                                !isExcluded && originalExcludedAttr != null ->
+                                }
+
+                                !isExcluded && originalExcludedAttr != null -> {
                                     deletedAttributeIds.add(originalExcludedAttr.id)
+                                }
                             }
 
                             // One UPDATE intent: transfer fields + attribute deltas, applied

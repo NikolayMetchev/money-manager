@@ -187,15 +187,21 @@ internal fun computeAccountAuditDiffs(
     // delete/create. Matched by revision, which is exact (no fragile timestamp window).
     fun mergeNoteFor(entry: AccountAuditEntry): String? =
         when (entry.auditType) {
-            AuditType.DELETE ->
+            AuditType.DELETE -> {
                 mergeContexts
                     .firstOrNull { it.deletedAccountRevisionId == entry.revisionId }
                     ?.let { "Merged into \"${it.survivingAccountName ?: "another account"}\"" }
-            AuditType.INSERT ->
+            }
+
+            AuditType.INSERT -> {
                 mergeContexts
                     .firstOrNull { it.reversed && it.deletedAccountRevisionId + 1 == entry.revisionId }
                     ?.let { "Restored — merge with \"${it.survivingAccountName ?: "another account"}\" undone" }
-            AuditType.UPDATE -> null
+            }
+
+            AuditType.UPDATE -> {
+                null
+            }
         }
 
     data class OwnershipChanges(
@@ -260,7 +266,7 @@ internal fun computeAccountAuditDiffs(
             val mergeNote = mergeNoteFor(entry)
 
             when (entry.auditType) {
-                AuditType.INSERT ->
+                AuditType.INSERT -> {
                     AccountAuditDiff(
                         id = entry.id,
                         auditTimestamp = entry.auditTimestamp,
@@ -275,7 +281,9 @@ internal fun computeAccountAuditDiffs(
                         source = effectiveSource,
                         mergeNote = mergeNote,
                     )
-                AuditType.DELETE ->
+                }
+
+                AuditType.DELETE -> {
                     AccountAuditDiff(
                         id = entry.id,
                         auditTimestamp = entry.auditTimestamp,
@@ -290,6 +298,8 @@ internal fun computeAccountAuditDiffs(
                         source = effectiveSource,
                         mergeNote = mergeNote,
                     )
+                }
+
                 AuditType.UPDATE -> {
                     val previousEntry = entries.getOrNull(index - 1)
 
@@ -381,6 +391,7 @@ private fun AccountAuditDiffCard(
                     onQifSourceClick = onQifSourceClick,
                 )
             }
+
             AuditType.UPDATE -> {
                 if (!diff.hasChanges) {
                     NoVisibleChangesText()
@@ -408,6 +419,7 @@ private fun AccountAuditDiffCard(
                     onQifSourceClick = onQifSourceClick,
                 )
             }
+
             AuditType.DELETE -> {
                 val errorColor = MaterialTheme.colorScheme.error
                 DeletedFinalValuesLabel(errorColor)

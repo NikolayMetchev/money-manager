@@ -61,7 +61,7 @@ internal fun AmountDateTab(
             Text("Credit / Debit Columns")
         }
         when (state.amountMode) {
-            AmountMode.SINGLE_COLUMN ->
+            AmountMode.SINGLE_COLUMN -> {
                 ColumnDropdown(
                     columns = csvColumns,
                     selectedColumn = state.amountColumnName,
@@ -71,6 +71,8 @@ internal fun AmountDateTab(
                     enabled = enabled,
                     isError = state.amountColumnName == null,
                 )
+            }
+
             AmountMode.CREDIT_DEBIT_COLUMNS -> {
                 ColumnDropdown(
                     columns = csvColumns,
@@ -154,7 +156,7 @@ internal fun AmountDateTab(
             Text("From CSV Column")
         }
         when (state.currencyMode) {
-            CurrencyMode.HARDCODED ->
+            CurrencyMode.HARDCODED -> {
                 CurrencyPicker(
                     selectedCurrencyId = state.selectedCurrencyId,
                     onCurrencySelected = { state.selectedCurrencyId = it },
@@ -163,7 +165,9 @@ internal fun AmountDateTab(
                     enabled = enabled,
                     isError = state.selectedCurrencyId == null,
                 )
-            CurrencyMode.FROM_COLUMN ->
+            }
+
+            CurrencyMode.FROM_COLUMN -> {
                 ColumnDropdown(
                     columns = csvColumns,
                     selectedColumn = state.currencyColumnName,
@@ -173,6 +177,7 @@ internal fun AmountDateTab(
                     enabled = enabled,
                     isError = state.currencyColumnName == null,
                 )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -197,12 +202,14 @@ internal fun AmountDateTab(
             Text("From CSV Column")
         }
         when (state.timezoneMode) {
-            TimezoneMode.HARDCODED ->
+            TimezoneMode.HARDCODED -> {
                 TimezonePicker(
                     selectedTimezone = state.selectedTimezone,
                     onTimezoneSelected = { state.selectedTimezone = it },
                     enabled = enabled,
                 )
+            }
+
             TimezoneMode.FROM_COLUMN -> {
                 ColumnDropdown(
                     columns = csvColumns,

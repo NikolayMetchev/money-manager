@@ -165,24 +165,29 @@ class IncrementalApiDownloadE2ETest : DbTest() {
                         MockEngine { request ->
                             val url = request.url.toString()
                             when {
-                                url.contains("statement.json") ->
+                                url.contains("statement.json") -> {
                                     respond(
                                         content = """{ "error": "server exploded" }""",
                                         status = HttpStatusCode.InternalServerError,
                                         headers = headersOf(HttpHeaders.ContentType, "application/json"),
                                     )
-                                url.contains("/balances") ->
+                                }
+
+                                url.contains("/balances") -> {
                                     respond(
                                         content = INCREMENTAL_BALANCES_JSON,
                                         status = HttpStatusCode.OK,
                                         headers = headersOf(HttpHeaders.ContentType, "application/json"),
                                     )
-                                else ->
+                                }
+
+                                else -> {
                                     respond(
                                         content = INCREMENTAL_PROFILES_JSON,
                                         status = HttpStatusCode.OK,
                                         headers = headersOf(HttpHeaders.ContentType, "application/json"),
                                     )
+                                }
                             }
                         },
                 )

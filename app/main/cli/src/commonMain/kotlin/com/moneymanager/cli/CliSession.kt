@@ -78,7 +78,7 @@ internal class CliSession(
             usage("No database at $explicit")
         }
         return when (val target = sessions.resolveStartup(explicit)) {
-            is StartupTarget.Open ->
+            is StartupTarget.Open -> {
                 prepare(
                     sessions.open(
                         target.location,
@@ -86,6 +86,8 @@ internal class CliSession(
                             target.remoteCache || isCloudCache(target.location),
                     ),
                 )
+            }
+
             is StartupTarget.NeedsRemoteUnlock -> {
                 val password =
                     remotePassword(target.binding.remoteName)
@@ -95,7 +97,10 @@ internal class CliSession(
                         )
                 prepare(sessions.restoreRemote(target.binding, password), restored = true)
             }
-            StartupTarget.ChooseDatabase -> null
+
+            StartupTarget.ChooseDatabase -> {
+                null
+            }
         }
     }
 

@@ -27,8 +27,12 @@ internal fun loopbackRemoteStorageProviderFactory(
             subfolder: String?,
         ): RemoteStorageProvider =
             when (providerId) {
-                GOOGLE_DRIVE_PROVIDER_ID ->
+                GOOGLE_DRIVE_PROVIDER_ID -> {
                     googleDriveProvider(config ?: GoogleOAuthDefaults.providerConfig(), vault, browser, subfolder)
-                else -> throw IllegalArgumentException("Unknown remote storage provider: $providerId")
+                }
+
+                else -> {
+                    throw IllegalArgumentException("Unknown remote storage provider: $providerId")
+                }
             }
     }

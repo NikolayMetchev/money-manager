@@ -242,15 +242,18 @@ class TransactionWriteRepositoryImpl(
                                 val (typeId, groupKey) = slot
                                 val existing = existingBySlot[slot]
                                 when {
-                                    existing == null ->
+                                    existing == null -> {
                                         transferAttributeWriteQueries.insert(
                                             transaction_id = updatedTransfer.id.id,
                                             attribute_type_id = typeId,
                                             attribute_value = attr.value,
                                             group_key = groupKey,
                                         )
-                                    existing.second != attr.value ->
+                                    }
+
+                                    existing.second != attr.value -> {
                                         transferAttributeWriteQueries.updateValue(attr.value, existing.first)
+                                    }
                                     // Same value already present: nothing to do.
                                 }
                             }

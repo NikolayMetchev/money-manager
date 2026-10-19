@@ -37,15 +37,21 @@ private fun walkElement(
     results: MutableList<JsonPathEntry>,
 ) {
     when (element) {
-        is JsonObject ->
+        is JsonObject -> {
             element.forEach { (key, value) ->
                 walkElement(value, if (path.isEmpty()) key else "$path.$key", results)
             }
+        }
+
         // Use the first array element to discover item-level paths
-        is JsonArray -> element.firstOrNull()?.let { walkElement(it, path, results) }
-        is JsonPrimitive ->
+        is JsonArray -> {
+            element.firstOrNull()?.let { walkElement(it, path, results) }
+        }
+
+        is JsonPrimitive -> {
             if (path.isNotEmpty()) {
                 results.add(JsonPathEntry(path, element.content.take(60)))
             }
+        }
     }
 }
