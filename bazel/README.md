@@ -281,8 +281,9 @@ release's `mm-<os>-<arch>` (`pkg_tar` keeping the exec bit; a copied `.exe` on W
 Every workflow sets Bazel up through `.github/actions/bazel-setup` (bazelisk, disk and repository caches, the Android
 SDK platform, and `user.bazelrc`). CI uses BuildBuddy: the Linux jobs run every action on its executors
 (`--config=rbe`), Windows builds on its runner with its remote cache (`--config=cache`), and macOS
-(`--config=rbe-mac`) sends every action to the executors except what needs Xcode: `EXEC_ON` (`kmp/native.bzl`) keeps
-macosArm64's cinterop, C compiles, links and test runs on the Mac (`no-remote-exec`), while its klibs compile on Linux. To use it
+(`--config=rbe-mac`) builds on its runner too except for Kotlin/Native klib compiles: `kt_native_klib` requires the
+`compiles_klibs` exec constraint, which the bare host `rbe-mac` lists first lacks, so klibs resolve the Linux toolchain
+on `rbe_linux_x64` and `--strategy=KotlinNativeCompile=remote` runs them there, sharing the Linux job's cache. To use it
 locally, copy `user.bazelrc.example` to `user.bazelrc` and put your API key in `~/.bazelrc`
 (`common --remote_header=x-buildbuddy-api-key=…`). Without a key, pass neither config: invocations would still stream
 to BuildBuddy, anonymously. The executors run our image, `bazel/platforms/rbe/Dockerfile`: BuildBuddy's Ubuntu 24.04

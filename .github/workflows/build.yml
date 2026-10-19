@@ -277,8 +277,8 @@ jobs:
           fail_ci_if_error: false
 
   # macOS: every compile a Mac builds, its `mm`, and its native tests. The JVM tests ran on Linux. `rbe-mac`
-  # sends the compiles to BuildBuddy's Linux executors, macosArm64 klibs included (#1089); only what needs
-  # Xcode (cinterop, C, the links and the tests) runs on the runner.
+  # sends its Kotlin/Native klib compiles, macosArm64 included, to BuildBuddy's Linux executors (#1089);
+  # everything else (cinterop, C, links, tests) runs on the runner.
   native-macos:
     name: Native Tests (macosArm64)
     runs-on: macos-latest

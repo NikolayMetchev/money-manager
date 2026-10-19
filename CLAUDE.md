@@ -73,7 +73,7 @@ to one module with `bazel test //utils/files/...`.
 
 Flags and configs:
 - `--config=rbe` runs every action on BuildBuddy (Linux), `--config=cache` only uses its cache (any OS), and
-  `--config=rbe-mac` (macOS) runs everything there but what needs Xcode (macosArm64 cinterop, links, tests). Copy
+  `--config=rbe-mac` (macOS) runs only the Kotlin/Native klib compiles there, on its Linux toolchain. Copy
   `user.bazelrc.example` to `user.bazelrc` and put your API key in `~/.bazelrc`
   (`common --remote_header=x-buildbuddy-api-key=…`). Without a key pass neither: invocations would still stream to
   BuildBuddy, anonymously. The executors run our image (`bazel/platforms/rbe/Dockerfile`, published by

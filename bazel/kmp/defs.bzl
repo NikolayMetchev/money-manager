@@ -28,7 +28,7 @@ load("//bazel/kmp/dokka:dokka.bzl", "dokka_module")
 load("//bazel/kmp/checks:checks.bzl", "kmp_forbidden_deps", "kmp_reference_check", "kmp_unused_deps")
 load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
 load(":resources.bzl", "kmp_resource_jar")
-load(":native.bzl", "BUILDS_ON", "CROSS_PLATFORMS", "EXEC_ON", "FAMILIES", "RUNS_ON", "exec_tags", "konan_static_library", "kt_native_cinterop", "kt_native_cross_test_binary", "kt_native_executable", "kt_native_klib", "kt_native_test_binary")
+load(":native.bzl", "BUILDS_ON", "CROSS_PLATFORMS", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_cross_test_binary", "kt_native_executable", "kt_native_klib", "kt_native_test_binary")
 load("//bazel/kmp/plugins:plugins.bzl", "plugin_deps", "plugin_labels")
 load("//bazel/kmp/android:apk.bzl", "android_apk")
 load("//bazel/kmp/android:device_test.bzl", "INSTRUMENTATION_RUNNER", "android_device_test")
@@ -336,6 +336,7 @@ def kmp_library(
             family_srcs = _family(target, linux_srcs, apple_srcs, mingw_srcs),
             deps = _on(target, deps + native_deps + _family(target, linux_deps, apple_deps, mingw_deps) + exports),
             plugins = plugin_labels(plugins, "native"),
+            exec_compatible_with = ["//bazel/platforms:compiles_klibs"],
             target_compatible_with = BUILDS_ON.get(target, []),
             visibility = visibility,
         )
@@ -520,8 +521,6 @@ def kmp_test(
             family_srcs = _family(target, linux_srcs, apple_srcs, mingw_srcs),
             deps = _on(target, deps + native_deps + _family(target, linux_deps, apple_deps, mingw_deps)),
             plugins = plugin_labels(plugins, "native"),
-            exec_compatible_with = EXEC_ON.get(target, []),
-            tags = exec_tags(target),
             target_compatible_with = RUNS_ON[target],
         )
         java_test(
@@ -531,8 +530,6 @@ def kmp_test(
             use_testrunner = False,
             args = ["$(rootpath :%s)" % binary],
             data = [":" + binary] + data,
-            exec_compatible_with = EXEC_ON.get(target, []),
-            tags = exec_tags(target),
             target_compatible_with = RUNS_ON[target],
             runtime_deps = [Label("//bazel/kmp/testing:native_launcher_lib")],
         )
@@ -639,8 +636,6 @@ def kmp_static_library(name, srcs, native_targets, hdrs = [], defines = [], libr
             defines = defines,
             library_name = library_name or name,
             target = target,
-            exec_compatible_with = EXEC_ON.get(target, []),
-            tags = exec_tags(target),
             target_compatible_with = BUILDS_ON.get(target, []),
             visibility = visibility,
         )
@@ -664,8 +659,6 @@ def kmp_cinterop(name, def_file, native_targets, static_libraries = [], deps = [
             static_libraries = _on(target, static_libraries),
             deps = _on(target, deps),
             target = target,
-            exec_compatible_with = EXEC_ON.get(target, []),
-            tags = exec_tags(target),
             target_compatible_with = BUILDS_ON.get(target, []),
             visibility = visibility,
         )
@@ -694,8 +687,7 @@ def kmp_native_executable(name, library, entry_point, base_name, native_targets,
             entry_point = entry_point,
             base_name = base_name,
             target = target,
-            exec_compatible_with = EXEC_ON.get(target, []),
-            tags = ["manual"] + exec_tags(target),
+            tags = ["manual"],
             target_compatible_with = BUILDS_ON.get(target, []),
             visibility = visibility,
         )
