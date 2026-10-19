@@ -252,6 +252,7 @@ data class CsvTransferWithAttributes(
  *
  * @property validTransfers List of transfers to import with their status
  * @property errorRows Rows that failed to parse
+ * @property skippedRowIndexes Rows a strategy rule skipped
  * @property newAccounts New accounts that need to be created
  * @property statusCounts Count of transfers by import status
  */
@@ -260,6 +261,7 @@ data class ImportPreparation(
     val errorRows: List<MappingResult.Error>,
     val newAccounts: Set<NewAccount>,
     val statusCounts: Map<ImportStatus, Int> = emptyMap(),
+    val skippedRowIndexes: List<Long> = emptyList(),
 )
 
 /**
@@ -400,6 +402,7 @@ class CsvTransferMapper(
     fun prepareImport(rows: List<CsvRow>): ImportPreparation {
         val validTransfers = mutableListOf<CsvTransferWithAttributes>()
         val errorRows = mutableListOf<MappingResult.Error>()
+        val skippedRowIndexes = mutableListOf<Long>()
         val newAccounts = mutableSetOf<NewAccount>()
         val statusCounts = mutableMapOf<ImportStatus, Int>()
 
@@ -433,7 +436,7 @@ class CsvTransferMapper(
                 is MappingResult.Error -> {
                     errorRows.add(result)
                 }
-                is MappingResult.Skipped -> Unit
+                is MappingResult.Skipped -> skippedRowIndexes.add(result.rowIndex)
             }
         }
 
@@ -442,6 +445,7 @@ class CsvTransferMapper(
             errorRows = errorRows,
             newAccounts = newAccounts,
             statusCounts = statusCounts,
+            skippedRowIndexes = skippedRowIndexes,
         )
     }
 

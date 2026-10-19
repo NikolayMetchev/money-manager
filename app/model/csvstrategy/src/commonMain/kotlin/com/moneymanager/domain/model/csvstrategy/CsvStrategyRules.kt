@@ -25,9 +25,18 @@ fun CsvStrategyConfig<*>.ownedAttributeValues(): Map<String, Set<String>?> {
     for (action in ruleActions()) {
         when (action) {
             is RuleAction.Attribute -> owned.getOrPut(action.typeName) { mutableListOf() } += action.value.constantOrNull()
+            // A reason read from the row can be any value; a constant one is written as excludedAttributeValue writes it.
             is RuleAction.Exclude ->
                 owned.getOrPut(EXCLUDED_ATTRIBUTE_TYPE_NAME) { mutableListOf() } +=
-                    action.reason?.constantOrNull() ?: EXCLUDED_ATTRIBUTE_TYPE_NAME
+                    action.reason.let { reason ->
+                        if (reason ==
+                            null
+                        ) {
+                            EXCLUDED_ATTRIBUTE_TYPE_NAME
+                        } else {
+                            reason.constantOrNull()?.let(::excludedAttributeValue)
+                        }
+                    }
             else -> Unit
         }
     }

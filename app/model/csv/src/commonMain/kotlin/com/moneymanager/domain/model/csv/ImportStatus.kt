@@ -24,4 +24,9 @@ enum class ImportStatus {
      * An error occurred while processing this CSV row.
      */
     ERROR,
+
+    /**
+     * A strategy rule skipped this CSV row: nothing was imported, and later imports leave it alone.
+     */
+    SKIPPED,
 }

@@ -229,8 +229,9 @@ internal class CsvStrategyEditorState(
     private val contentMatchValid: Boolean
         get() = contentMatchRules.all { it.isComplete() }
 
+    // Rules find a group by name, so two groups sharing one would leave a leg's group ambiguous.
     private val legGroupsValid: Boolean
-        get() = legGroups.all { it.isComplete() }
+        get() = legGroups.all { it.isComplete() } && legGroups.map { it.name.trim() }.let { it.size == it.toSet().size }
 
     private val currencyValid: Boolean
         get() =

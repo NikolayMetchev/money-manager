@@ -254,6 +254,7 @@ fun CsvPreviewTable(
                                             ImportStatus.DUPLICATE -> "Duplicate" to MaterialTheme.colorScheme.secondary
                                             ImportStatus.UPDATED -> "Updated" to MaterialTheme.colorScheme.tertiary
                                             ImportStatus.ERROR -> "Error" to MaterialTheme.colorScheme.error
+                                            ImportStatus.SKIPPED -> "Skipped" to MaterialTheme.colorScheme.outline
                                         }
                                     SelectableText(
                                         text = statusText,

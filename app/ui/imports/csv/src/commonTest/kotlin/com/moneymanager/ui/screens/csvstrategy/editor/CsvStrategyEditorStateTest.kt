@@ -9,6 +9,8 @@ import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
+import com.moneymanager.domain.model.csvstrategy.LegGroupRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
@@ -93,6 +95,18 @@ class CsvStrategyEditorStateTest {
 
         state.rules = listOf(payeeRule)
         assertFalse(state.rulesHaveError)
+    }
+
+    @Test
+    fun `leg groups must have distinct names`() {
+        val state = CsvStrategyEditorState(strategy = null, availableColumnNames = setOf("Amount", "Payee"))
+        val group = LegGroupRule(name = "Trades", assembly = LegAssembly.Trade())
+
+        state.legGroups = listOf(group, group.copy(name = "Dust"))
+        assertFalse(state.tabHasError(EditorTab.ADVANCED))
+
+        state.legGroups = listOf(group, group.copy(name = " Trades "))
+        assertTrue(state.tabHasError(EditorTab.ADVANCED), "a rule's leg could not tell the two groups apart")
     }
 
     @Test

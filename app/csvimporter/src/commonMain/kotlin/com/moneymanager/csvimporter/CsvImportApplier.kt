@@ -715,6 +715,16 @@ private fun ImportPreparation.withUnresolvedAccountsAsErrors(): ImportPreparatio
     )
 }
 
+private fun ImportPreparation.skippedRowMutations(id: CsvImportId): List<CsvImportMutation> =
+    if (skippedRowIndexes.isEmpty()) {
+        emptyList()
+    } else {
+        listOf(
+            CsvImportMutation.UpdateRowStatuses(id, ImportStatus.SKIPPED.name, skippedRowIndexes.associateWith { null }),
+            CsvImportMutation.ClearErrors(id, skippedRowIndexes),
+        )
+    }
+
 /**
  * Applies [strategy] to [rows] of a single [csvImport] and writes back per-row statuses. Creates new
  * accounts the user accepted, persists/auto-captures account mappings, runs the central import engine,
@@ -823,14 +833,15 @@ suspend fun runCsvImport(
     val errorCount = finalPrep.errorRows.size
     logger.i { "Prepared $validCount valid transfers, $errorCount error rows" }
 
-    // Mark mapping errors as ERROR status in database and save error messages
+    // Mark mapping errors as ERROR status in database and save error messages. Skipped rows are settled
+    // too, so they never count as pending again.
     importEngine.applyCsvImportMutations(
         finalPrep.errorRows.flatMap { errorRow ->
             listOf(
                 CsvImportMutation.UpdateRowStatus(csvImport.id, errorRow.rowIndex, ImportStatus.ERROR.name),
                 CsvImportMutation.SaveError(csvImport.id, errorRow.rowIndex, errorRow.errorMessage),
             )
-        },
+        } + finalPrep.skippedRowMutations(csvImport.id),
     )
 
     // Pre-resolve attribute types. The unidentified-counterparty marker is engine-facing rather than a
@@ -1188,7 +1199,7 @@ suspend fun runCsvImport(
             ImportStatus.IMPORTED -> importedStatuses[rowIndex] = outcome.transferId
             ImportStatus.DUPLICATE -> duplicateStatuses[rowIndex] = outcome.transferId
             ImportStatus.UPDATED -> updatedStatuses[rowIndex] = outcome.transferId
-            ImportStatus.ERROR -> Unit
+            ImportStatus.ERROR, ImportStatus.SKIPPED -> Unit
         }
     }
     // Cross-asset conversion rows are imported as trades, which the engine reports via createdTradeIds
@@ -1258,7 +1269,7 @@ suspend fun runCsvImport(
         maintenance.refreshMaterializedViews()
     }
 
-    if ((successCount + duplicateCount) > 0) {
+    if ((successCount + duplicateCount + finalPrep.skippedRowIndexes.size) > 0) {
         recordCsvApplication(importEngine, csvImport.id, strategy)
     }
 

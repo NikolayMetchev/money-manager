@@ -545,6 +545,33 @@ class CsvTransferMapperTest {
     }
 
     @Test
+    fun `prepareImport reports the rows a rule skipped apart from the errors`() {
+        val strategy = createStrategy()
+        val skipPending =
+            StrategyRule(conditions = listOf(Condition("Description", ConditionOp.EQUALS, "Pending")), actions = listOf(RuleAction.Skip))
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy.copy(config = strategy.config.copy(rules = listOf(skipPending) + strategy.config.rules)),
+                columns = columns,
+                existingAccounts = mapOf("Payee Account" to testTargetAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        val preparation =
+            mapper.prepareImport(
+                listOf(
+                    CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Pending", "-50.00", "Payee Account")),
+                    CsvRow(rowIndex = 2, values = listOf("16/12/2024", "Settled", "-75.00", "Payee Account")),
+                ),
+            )
+
+        assertEquals(listOf(1L), preparation.skippedRowIndexes)
+        assertEquals(listOf(2L), preparation.validTransfers.map { it.rowIndex })
+        assertTrue(preparation.errorRows.isEmpty())
+    }
+
+    @Test
     fun `prepareImport collects new accounts to create`() {
         val strategy = createStrategy()
         val mapper =
