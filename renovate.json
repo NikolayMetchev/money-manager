@@ -7,6 +7,10 @@
   "automerge": true,
   "automergeType": "pr",
   "platformAutomerge": true,
+  "gitIgnoredAuthors": [
+    "github-actions[bot]@users.noreply.github.com",
+    "41898282+github-actions[bot]@users.noreply.github.com"
+  ],
   "packageRules": [
     {
       "description": "kotlinx-datetime publishes '-0.6.x-compat' sibling releases; they are not upgrades",
