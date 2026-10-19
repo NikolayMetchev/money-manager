@@ -190,7 +190,7 @@ class RuleEngine(
     }
 }
 
-private val TEMPLATE_PLACEHOLDER = Regex("""\{([^{}]+)\}""")
+private val TEMPLATE_PLACEHOLDER = Regex("""\{([^{}]+)}""")
 
 /** [template] with each `{path}` replaced by [record]'s value there (blank when absent). */
 fun renderTemplate(
