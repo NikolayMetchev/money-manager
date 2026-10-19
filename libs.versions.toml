@@ -44,7 +44,7 @@ kotlin = "2.4.21"
 kotlinx-coroutines = "1.11.0"
 kotlinx-datetime = "0.8.0"
 kotlinx-io = "0.9.1"
-kotlinx-serialization = "1.11.0"
+kotlinx-serialization = "1.12.0"
 ktlint = "14.2.0"
 # The ktlint engine Bazel's `@ktlint_cli` resolves (#1015).
 ktlint-engine = "1.8.0"
