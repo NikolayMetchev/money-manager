@@ -307,11 +307,16 @@ class StrategySyncController(
         return reading(key, remoteFile) { library.canonicalHash(key, json) }
     }
 
-    /** Whether [remoteFile] is the revision that already failed to read, so it isn't retried until it changes. */
+    /**
+     * Whether [remoteFile] is the revision that already failed to read, so it isn't retried until it changes. A
+     * backend without revisions can't say whether it changed, so its files are read again every time.
+     */
     private fun knownUnreadable(
         key: StrategyKey,
         remoteFile: RemoteFile,
-    ): Boolean = readFailures[key]?.let { it.revisionId == remoteFile.revisionId } == true
+    ): Boolean =
+        remoteFile.revisionId != null &&
+            readFailures[key]?.let { it.revisionId == remoteFile.revisionId } == true
 
     private suspend fun classify(
         contents: RemoteContents,

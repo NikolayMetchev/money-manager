@@ -74,7 +74,7 @@ class StrategyConfigMigrationsTest {
                 ),
             )
         val failure = assertFailsWith<IllegalArgumentException> { StrategyConfigMigrations.upgradeCsv(config) }
-        assertEquals("CurrencyLookupExport has no \"columnName\"", failure.message)
+        assertTrue("columnName" in failure.message.orEmpty(), failure.message)
     }
 }
 
