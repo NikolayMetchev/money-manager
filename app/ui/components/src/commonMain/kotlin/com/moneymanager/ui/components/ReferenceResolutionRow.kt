@@ -130,8 +130,14 @@ fun ReferenceResolutionRow(
                                             val id = selectedOption!!.removePrefix("existing:").toLongOrNull()
                                             accounts.find { it.id.id == id }?.name ?: "Select..."
                                         }
-                                        selectedOption == "create" -> "Create on import: $createNewName"
-                                        else -> "Select..."
+
+                                        selectedOption == "create" -> {
+                                            "Create on import: $createNewName"
+                                        }
+
+                                        else -> {
+                                            "Select..."
+                                        }
                                     },
                                 onValueChange = {},
                                 readOnly = true,
@@ -217,12 +223,18 @@ fun ReferenceResolutionRow(
                         OutlinedTextField(
                             value =
                                 when {
-                                    selectedOption == "create" -> "Create: $createNewName"
+                                    selectedOption == "create" -> {
+                                        "Create: $createNewName"
+                                    }
+
                                     selectedOption?.startsWith("existing:") == true -> {
                                         val id = selectedOption!!.removePrefix("existing:").toLongOrNull()
                                         categories.find { it.id == id }?.name ?: "Select..."
                                     }
-                                    else -> "Select..."
+
+                                    else -> {
+                                        "Select..."
+                                    }
                                 },
                             onValueChange = {},
                             readOnly = true,
@@ -288,13 +300,19 @@ fun ReferenceResolutionRow(
                         OutlinedTextField(
                             value =
                                 when {
-                                    selectedOption == "create" -> "Create: $createNewName"
+                                    selectedOption == "create" -> {
+                                        "Create: $createNewName"
+                                    }
+
                                     selectedOption?.startsWith("existing:") == true -> {
                                         val id = selectedOption!!.removePrefix("existing:")
                                         currencies.find { it.id.id.toString() == id }?.let { "${it.code} - ${it.name}" }
                                             ?: "Select..."
                                     }
-                                    else -> "Select..."
+
+                                    else -> {
+                                        "Select..."
+                                    }
                                 },
                             onValueChange = {},
                             readOnly = true,

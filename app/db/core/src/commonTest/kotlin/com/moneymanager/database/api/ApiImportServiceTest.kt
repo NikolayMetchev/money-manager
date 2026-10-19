@@ -90,8 +90,11 @@ class ApiImportServiceTest : DbTest() {
             val url = request.url.toString()
             requestedUrls += url
             when {
-                "api.monzo.com" !in url -> respond("down", HttpStatusCode.InternalServerError)
-                else ->
+                "api.monzo.com" !in url -> {
+                    respond("down", HttpStatusCode.InternalServerError)
+                }
+
+                else -> {
                     respond(
                         content =
                             when {
@@ -102,6 +105,7 @@ class ApiImportServiceTest : DbTest() {
                         status = HttpStatusCode.OK,
                         headers = headersOf(HttpHeaders.ContentType, "application/json"),
                     )
+                }
             }
         }
 

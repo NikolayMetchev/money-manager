@@ -150,8 +150,10 @@ internal val apiOnePipelineStep =
         reshaped.rewriteObjects { obj ->
             when {
                 "path" in obj && "responseArrayKey" in obj -> obj.withPagination { paginationToV2(it, bankFeed = false) }
+
                 // Trade mappings that read their assets from explicit fields carried a placeholder symbol path.
                 obj.string("splitMode") == "EXPLICIT_FIELDS" -> JsonObject(obj.without("instrumentField"))
+
                 else -> obj
             }
         } as JsonObject
@@ -193,17 +195,28 @@ private fun paginationToV2(
         }
     val paging: JsonObject =
         when {
-            bankFeed && mode == "DATE_WINDOW" -> pagingJson("single")
-            bankFeed -> pagingJson("before", "param" to cursorParam, "positionField" to cursorResponseField)
-            mode == "FORWARD_ID_CURSOR" -> pagingJson("forwardId", "param" to cursorParam, "idField" to cursorResponseField)
-            offsetParam != null ->
+            bankFeed && mode == "DATE_WINDOW" -> {
+                pagingJson("single")
+            }
+
+            bankFeed -> {
+                pagingJson("before", "param" to cursorParam, "positionField" to cursorResponseField)
+            }
+
+            mode == "FORWARD_ID_CURSOR" -> {
+                pagingJson("forwardId", "param" to cursorParam, "idField" to cursorResponseField)
+            }
+
+            offsetParam != null -> {
                 pagingJson(
                     "offset",
                     "param" to offsetParam,
                     "pageNumbers" to (old.string("offsetMode") == "PAGE_NUMBER"),
                     "totalCountField" to old.string("totalCountField"),
                 )
-            nextCursorField != null ->
+            }
+
+            nextCursorField != null -> {
                 pagingJson(
                     "token",
                     "tokenField" to nextCursorField,
@@ -211,7 +224,11 @@ private fun paginationToV2(
                     "urlEncoded" to (old.string("nextCursorUrlEncoded") == "true"),
                     "positionField" to cursorResponseField.takeIf { mode == "TOKEN_CURSOR" },
                 )
-            else -> pagingJson("single")
+            }
+
+            else -> {
+                pagingJson("single")
+            }
         }
     val pages = paging.string("type") != "single"
     val sendLimit = bankFeed && pages || pages && old.string("sendLimitParam") == "true"
@@ -268,8 +285,11 @@ private fun transactionMappingsOntoDirection(obj: JsonObject): JsonObject {
     val signField = obj.string("signField")?.takeIf { obj.string("signSource") == "FIELD" }
     val direction =
         when {
-            obj.string("directionFromAmountSign") == "true" -> JsonObject(mapOf("type" to JsonPrimitive("amountSign")))
-            signField != null ->
+            obj.string("directionFromAmountSign") == "true" -> {
+                JsonObject(mapOf("type" to JsonPrimitive("amountSign")))
+            }
+
+            signField != null -> {
                 JsonObject(
                     mapOf(
                         "type" to JsonPrimitive("field"),
@@ -277,7 +297,11 @@ private fun transactionMappingsOntoDirection(obj: JsonObject): JsonObject {
                         "incomingValues" to JsonArray(obj.stringList("creditValues").sorted().map(::JsonPrimitive)),
                     ),
                 )
-            else -> null
+            }
+
+            else -> {
+                null
+            }
         }
     val rest = obj.without("directionFromAmountSign", "signSource", "signField", "creditValues")
     return JsonObject(if (direction == null) rest else rest + ("direction" to direction))

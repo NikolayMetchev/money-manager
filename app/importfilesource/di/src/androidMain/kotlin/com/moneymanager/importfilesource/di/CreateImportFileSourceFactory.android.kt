@@ -18,7 +18,7 @@ actual fun createImportFileSourceFactory(
     object : ImportFileSourceFactory {
         override suspend fun create(directory: ImportDirectory): ImportFileSource =
             when (directory.provider) {
-                ImportDirectoryProvider.LOCAL ->
+                ImportDirectoryProvider.LOCAL -> {
                     // SAF-picked folders carry a content:// tree/document URI; plain paths (rows created
                     // before SAF support, or app-readable paths) still go through java.io.
                     if (SafFolderImportFileSource.isDocumentTreeRef(directory.folderRef)) {
@@ -26,6 +26,8 @@ actual fun createImportFileSourceFactory(
                     } else {
                         LocalFolderImportFileSource(directory.folderRef)
                     }
+                }
+
                 ImportDirectoryProvider.GDRIVE -> {
                     // directory.providerConfig (bring-your-own OAuth client) is a JVM concept and is
                     // deliberately ignored: Android auth is bound to the app's package + signing key.

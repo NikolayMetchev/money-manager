@@ -113,6 +113,7 @@ class SqlFileNamingConventionTest {
                         violations.add("${file.name}: '${it.label}' is a ${it.kind} but Select files must contain only SELECT reads")
                     }
                 }
+
                 base.endsWith("Write") -> {
                     queries.filter { it.kind == Kind.READ }.forEach {
                         violations.add(
@@ -124,6 +125,7 @@ class SqlFileNamingConventionTest {
                         violations.add("${file.name}: a Write file must contain at least one mutation")
                     }
                 }
+
                 else -> {
                     // Schema file: DDL and unlabelled seed rows only.
                     queries.forEach {

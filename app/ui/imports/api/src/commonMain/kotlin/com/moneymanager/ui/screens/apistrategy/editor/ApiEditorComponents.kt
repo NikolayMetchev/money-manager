@@ -192,10 +192,14 @@ internal fun LongFieldRow(
                 parseError -> {
                     { Text("Must be a whole number") }
                 }
+
                 supportingText != null -> {
                     { Text(supportingText) }
                 }
-                else -> null
+
+                else -> {
+                    null
+                }
             },
     )
 }
@@ -794,7 +798,10 @@ internal fun PaginationEditor(
 
     fun paging(updated: ApiPaging) = onChange(config.copy(paging = updated))
     when (val p = config.paging) {
-        ApiPaging.Single -> Unit
+        ApiPaging.Single -> {
+            Unit
+        }
+
         is ApiPaging.Offset -> {
             TextFieldRow("Offset param", p.param, { paging(p.copy(param = it)) }, enabled, isError = p.param.isBlank())
             ToggleRow(
@@ -807,14 +814,17 @@ internal fun PaginationEditor(
                 paging(p.copy(totalCountField = it.ifBlank { null }))
             }, enabled)
         }
+
         is ApiPaging.BeforeCursor -> {
             TextFieldRow("Cursor param", p.param, { paging(p.copy(param = it)) }, enabled)
             TextFieldRow("Item timestamp field", p.positionField, { paging(p.copy(positionField = it)) }, enabled)
         }
+
         is ApiPaging.ForwardId -> {
             TextFieldRow("Cursor param", p.param, { paging(p.copy(param = it)) }, enabled)
             TextFieldRow("Item id field", p.idField, { paging(p.copy(idField = it)) }, enabled)
         }
+
         is ApiPaging.Token -> {
             TextFieldRow(
                 "Next-page token field",

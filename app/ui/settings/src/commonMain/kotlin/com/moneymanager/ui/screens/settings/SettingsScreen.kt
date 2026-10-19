@@ -280,14 +280,17 @@ fun SettingsScreen(
                                 try {
                                     val duration =
                                         when (operation) {
-                                            MaintenanceOperation.REINDEX ->
+                                            MaintenanceOperation.REINDEX -> {
                                                 maintenance.reindex()
+                                            }
 
-                                            MaintenanceOperation.VACUUM ->
+                                            MaintenanceOperation.VACUUM -> {
                                                 maintenance.vacuum()
+                                            }
 
-                                            MaintenanceOperation.ANALYZE ->
+                                            MaintenanceOperation.ANALYZE -> {
                                                 maintenance.analyze()
+                                            }
                                         }
                                     maintenanceState =
                                         maintenanceState.copy(

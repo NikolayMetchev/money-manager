@@ -147,8 +147,14 @@ class CredentialSyncController(
                     saveBaseline(path, remote, applied.fileBytes)
                 }
             }
-            localChanged -> upload(provider, remote.id, name, path, local)
-            else -> Unit
+
+            localChanged -> {
+                upload(provider, remote.id, name, path, local)
+            }
+
+            else -> {
+                Unit
+            }
         }
     }
 

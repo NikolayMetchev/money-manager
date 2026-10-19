@@ -101,15 +101,24 @@ fun TransactionAuditScreen(
                 auditEntries.mapIndexed { index, entry ->
                     val newValuesForUpdate =
                         when {
-                            entry.auditType != AuditType.UPDATE -> null
-                            index == 0 && transfer != null ->
+                            entry.auditType != AuditType.UPDATE -> {
+                                null
+                            }
+
+                            index == 0 && transfer != null -> {
                                 UpdateNewValues.fromTransfer(transfer)
-                            index > 0 ->
+                            }
+
+                            index > 0 -> {
                                 UpdateNewValues.fromAuditEntry(
                                     auditEntries[index - 1],
                                     attributeValues = attributeStates[index - 1],
                                 )
-                            else -> null
+                            }
+
+                            else -> {
+                                null
+                            }
                         }
                     TransferAuditRow(computeAuditDiff(entry, newValuesForUpdate))
                 }
@@ -139,7 +148,7 @@ fun TransactionAuditScreen(
         onBack = onBack,
         diffCard = { row ->
             when (row) {
-                is TransferAuditRow ->
+                is TransferAuditRow -> {
                     TransactionAuditDiffCard(
                         diff = row.diff,
                         accounts = accounts,
@@ -150,7 +159,9 @@ fun TransactionAuditScreen(
                         onApiSourceClick = onApiSourceClick,
                         onAccountClick = onAccountClick,
                     )
-                is TradeAuditRow ->
+                }
+
+                is TradeAuditRow -> {
                     TradeAuditDiffCard(
                         entry = row.entry,
                         previous = row.previous,
@@ -162,6 +173,7 @@ fun TransactionAuditScreen(
                         onApiSourceClick = onApiSourceClick,
                         onAccountClick = onAccountClick,
                     )
+                }
             }
         },
     )
@@ -199,11 +211,15 @@ private fun TradeAuditDiffCard(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             when (entry.auditType) {
-                AuditType.INSERT ->
+                AuditType.INSERT -> {
                     TradeSnapshotContent("Created with:", entry, accounts, auditedAccountNames, onAccountClick)
-                AuditType.UPDATE ->
+                }
+
+                AuditType.UPDATE -> {
                     TradeUpdateContent(entry, previous, accounts, auditedAccountNames, onAccountClick)
-                AuditType.DELETE ->
+                }
+
+                AuditType.DELETE -> {
                     TradeSnapshotContent(
                         header = "Deleted (final values):",
                         entry = entry,
@@ -212,6 +228,7 @@ private fun TradeAuditDiffCard(
                         onAccountClick = onAccountClick,
                         valueColor = MaterialTheme.colorScheme.error,
                     )
+                }
             }
             SourceInfoSection(
                 entry.source,
@@ -341,7 +358,7 @@ private fun TransactionAuditDiffCard(
         revisionId = diff.revisionId,
     ) {
         when (diff.auditType) {
-            AuditType.INSERT ->
+            AuditType.INSERT -> {
                 InsertDiffContent(
                     diff,
                     accounts,
@@ -352,7 +369,9 @@ private fun TransactionAuditDiffCard(
                     onApiSourceClick,
                     onAccountClick,
                 )
-            AuditType.UPDATE ->
+            }
+
+            AuditType.UPDATE -> {
                 UpdateDiffContent(
                     diff,
                     accounts,
@@ -363,7 +382,9 @@ private fun TransactionAuditDiffCard(
                     onApiSourceClick,
                     onAccountClick,
                 )
-            AuditType.DELETE ->
+            }
+
+            AuditType.DELETE -> {
                 DeleteDiffContent(
                     diff,
                     accounts,
@@ -374,6 +395,7 @@ private fun TransactionAuditDiffCard(
                     onApiSourceClick,
                     onAccountClick,
                 )
+            }
         }
     }
 }
@@ -597,6 +619,7 @@ private fun AttributeChangesSection(attributeChanges: List<AttributeChange>) {
                         )
                     }
                 }
+
                 is AttributeChange.Removed -> {
                     Row(
                         modifier = Modifier.padding(start = 8.dp),
@@ -620,6 +643,7 @@ private fun AttributeChangesSection(attributeChanges: List<AttributeChange>) {
                         )
                     }
                 }
+
                 is AttributeChange.Changed -> {
                     Row(
                         modifier = Modifier.padding(start = 8.dp),
@@ -651,6 +675,7 @@ private fun AttributeChangesSection(attributeChanges: List<AttributeChange>) {
                         )
                     }
                 }
+
                 is AttributeChange.ModifiedFrom -> {
                     Row(
                         modifier = Modifier.padding(start = 8.dp),

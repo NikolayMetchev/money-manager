@@ -89,16 +89,19 @@ class CsvParser {
                         inQuotes = !inQuotes
                     }
                 }
+
                 // Handle delimiter outside quotes
-                options.delimiter ->
+                options.delimiter -> {
                     if (!inQuotes) {
                         currentRow.add(currentField.toString())
                         currentField.clear()
                     } else {
                         currentField.append(char)
                     }
+                }
+
                 // Handle newline outside quotes (end of row)
-                '\n' ->
+                '\n' -> {
                     if (!inQuotes) {
                         currentRow.add(currentField.toString())
                         currentField.clear()
@@ -109,8 +112,10 @@ class CsvParser {
                     } else {
                         currentField.append(char)
                     }
+                }
+
                 // Handle CR outside quotes (CRLF or old Mac format)
-                '\r' ->
+                '\r' -> {
                     if (!inQuotes) {
                         currentRow.add(currentField.toString())
                         currentField.clear()
@@ -124,6 +129,8 @@ class CsvParser {
                     } else {
                         currentField.append(char)
                     }
+                }
+
                 // Regular character (including newlines inside quotes)
                 else -> {
                     currentField.append(char)

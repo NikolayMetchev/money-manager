@@ -317,8 +317,11 @@ fun MoneyManagerApp(
                                                 is Screen.ApiStrategies, is Screen.ApiStrategyEditor,
                                                 is Screen.ApiStrategyAuditHistory,
                                                 -> ImportTab.API
+
                                                 is Screen.QifImportDetail, is Screen.QifStrategyEditor -> ImportTab.QIF
+
                                                 is Screen.Imports -> currentScreen.tab
+
                                                 else -> ImportTab.DIRECTORIES
                                             },
                                         ),
@@ -669,18 +672,24 @@ fun MoneyManagerApp(
                                                 },
                                                 onTimelineFileClick = { file ->
                                                     when (file.kind) {
-                                                        TimelineSourceKind.CSV ->
+                                                        TimelineSourceKind.CSV -> {
                                                             navigationHistory.navigateTo(
                                                                 Screen.CsvImportDetail(CsvImportId(Uuid.parse(file.fileId))),
                                                             )
-                                                        TimelineSourceKind.QIF ->
+                                                        }
+
+                                                        TimelineSourceKind.QIF -> {
                                                             navigationHistory.navigateTo(
                                                                 Screen.QifImportDetail(QifImportId(Uuid.parse(file.fileId))),
                                                             )
-                                                        TimelineSourceKind.API ->
+                                                        }
+
+                                                        TimelineSourceKind.API -> {
                                                             navigationHistory.navigateTo(
                                                                 Screen.ApiSessionTraffic(ApiSessionId(file.fileId.toLong())),
                                                             )
+                                                        }
+
                                                         TimelineSourceKind.MANUAL -> {}
                                                     }
                                                 },

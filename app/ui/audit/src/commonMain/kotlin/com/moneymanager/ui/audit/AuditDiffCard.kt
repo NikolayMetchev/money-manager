@@ -30,24 +30,29 @@ fun AuditDiffCard(
 
     val (headerColor, headerText, containerColor) =
         when (auditType) {
-            AuditType.INSERT ->
+            AuditType.INSERT -> {
                 Triple(
                     MaterialTheme.colorScheme.primary,
                     "Created",
                     MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
                 )
-            AuditType.UPDATE ->
+            }
+
+            AuditType.UPDATE -> {
                 Triple(
                     MaterialTheme.colorScheme.tertiary,
                     "Updated",
                     MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f),
                 )
-            AuditType.DELETE ->
+            }
+
+            AuditType.DELETE -> {
                 Triple(
                     MaterialTheme.colorScheme.error,
                     "Deleted",
                     MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
                 )
+            }
         }
 
     Card(

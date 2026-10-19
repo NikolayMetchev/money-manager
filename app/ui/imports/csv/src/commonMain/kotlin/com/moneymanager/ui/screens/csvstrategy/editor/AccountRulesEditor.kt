@@ -223,14 +223,21 @@ private fun AccountRuleEditor(
                 onClick = {
                     onRuleChanged(
                         when (match) {
-                            RuleMatch.ALWAYS -> rule.copy(pattern = null, attributeTypeName = null)
-                            RuleMatch.PATTERN -> rule.copy(pattern = rule.pattern ?: "", attributeTypeName = null)
-                            RuleMatch.ATTRIBUTE ->
+                            RuleMatch.ALWAYS -> {
+                                rule.copy(pattern = null, attributeTypeName = null)
+                            }
+
+                            RuleMatch.PATTERN -> {
+                                rule.copy(pattern = rule.pattern ?: "", attributeTypeName = null)
+                            }
+
+                            RuleMatch.ATTRIBUTE -> {
                                 rule.copy(
                                     pattern = null,
                                     attributeTypeName =
                                         rule.attributeTypeName ?: existingAttributeTypeNames.firstOrNull().orEmpty(),
                                 )
+                            }
                         },
                     )
                 },
@@ -252,7 +259,8 @@ private fun AccountRuleEditor(
             )
             PatternPreview(rule, columns, rows)
         }
-        RuleMatch.ATTRIBUTE ->
+
+        RuleMatch.ATTRIBUTE -> {
             OutlinedTextField(
                 value = rule.attributeTypeName.orEmpty(),
                 onValueChange = { onRuleChanged(rule.copy(attributeTypeName = it)) },
@@ -263,7 +271,11 @@ private fun AccountRuleEditor(
                 isError = rule.attributeTypeName.isNullOrBlank(),
                 supportingText = { Text("Known: ${existingAttributeTypeNames.joinToString()}") },
             )
-        RuleMatch.ALWAYS -> Unit
+        }
+
+        RuleMatch.ALWAYS -> {
+            Unit
+        }
     }
     if (rule.match != RuleMatch.ATTRIBUTE) {
         OutlinedTextField(

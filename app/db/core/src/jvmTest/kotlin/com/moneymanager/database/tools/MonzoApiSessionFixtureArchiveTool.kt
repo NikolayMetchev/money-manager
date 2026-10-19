@@ -36,6 +36,7 @@ fun main(args: Array<String>) {
             val passphrase = System.getenv("MONZO_FIXTURE_PASSPHRASE") ?: error("MONZO_FIXTURE_PASSPHRASE is required")
             encryptDirectory(File(args[1]), File(args[2]), passphrase)
         }
+
         "decrypt" -> {
             val passphrase = System.getenv("MONZO_FIXTURE_PASSPHRASE")
             if (passphrase.isNullOrBlank()) {
@@ -43,7 +44,10 @@ fun main(args: Array<String>) {
             }
             decryptArchive(File(args[1]), File(args[2]), passphrase)
         }
-        else -> error("Unknown command: ${args[0]}")
+
+        else -> {
+            error("Unknown command: ${args[0]}")
+        }
     }
 }
 

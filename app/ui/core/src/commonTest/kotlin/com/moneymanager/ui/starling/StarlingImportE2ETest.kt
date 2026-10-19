@@ -224,14 +224,26 @@ class StarlingImportE2ETest : DbTest() {
         val url = request.url.toString()
         val json =
             when {
-                url.contains("/account-holder/individual") -> ACCOUNT_HOLDER_JSON
-                url.contains("/identifiers") -> identifiersJson ?: error("Unexpected identifiers request: $url")
+                url.contains("/account-holder/individual") -> {
+                    ACCOUNT_HOLDER_JSON
+                }
+
+                url.contains("/identifiers") -> {
+                    identifiersJson ?: error("Unexpected identifiers request: $url")
+                }
+
                 url.contains("/feed/account/") -> {
                     feedRequestUrls?.add(url)
                     feedJson
                 }
-                url.contains("/api/v2/accounts") -> accountsJson
-                else -> error("Unexpected request: $url")
+
+                url.contains("/api/v2/accounts") -> {
+                    accountsJson
+                }
+
+                else -> {
+                    error("Unexpected request: $url")
+                }
             }
         respond(content = json, status = HttpStatusCode.OK, headers = headersOf(HttpHeaders.ContentType, "application/json"))
     }

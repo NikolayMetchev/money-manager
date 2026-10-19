@@ -455,53 +455,84 @@ class ImportEngineImpl(
     private fun validate(batch: ImportBatch) {
         batch.transfers.forEach {
             when (it.operation) {
-                ImportOperation.CREATE ->
+                ImportOperation.CREATE -> {
                     require(it.fromAccount != null && it.toAccount != null && it.timestamp != null && it.amount != null) {
                         "CREATE transfer requires fromAccount/toAccount/timestamp/amount"
                     }
-                ImportOperation.UPDATE, ImportOperation.DELETE ->
+                }
+
+                ImportOperation.UPDATE, ImportOperation.DELETE -> {
                     require(it.existingId != null) { "${it.operation} transfer requires existingId" }
+                }
             }
         }
         batch.accountsToCreate.forEach {
             when (it.operation) {
-                ImportOperation.CREATE ->
+                ImportOperation.CREATE -> {
                     require(it.name != null && it.openingDate != null) { "CREATE account requires name/openingDate" }
-                ImportOperation.UPDATE, ImportOperation.DELETE ->
+                }
+
+                ImportOperation.UPDATE, ImportOperation.DELETE -> {
                     require(it.existingId != null) { "${it.operation} account requires existingId" }
+                }
             }
         }
         batch.categories.forEach {
             when (it.operation) {
-                ImportOperation.CREATE -> require(it.name != null) { "CREATE category requires name" }
-                ImportOperation.UPDATE ->
+                ImportOperation.CREATE -> {
+                    require(it.name != null) { "CREATE category requires name" }
+                }
+
+                ImportOperation.UPDATE -> {
                     require(it.existingId != null && it.category != null) { "UPDATE category requires existingId and category" }
-                ImportOperation.DELETE -> require(it.existingId != null) { "DELETE category requires existingId" }
+                }
+
+                ImportOperation.DELETE -> {
+                    require(it.existingId != null) { "DELETE category requires existingId" }
+                }
             }
         }
         batch.currencies.forEach {
             when (it.operation) {
-                ImportOperation.CREATE -> require(it.code != null && it.name != null) { "CREATE currency requires code/name" }
-                ImportOperation.UPDATE ->
+                ImportOperation.CREATE -> {
+                    require(it.code != null && it.name != null) { "CREATE currency requires code/name" }
+                }
+
+                ImportOperation.UPDATE -> {
                     require(it.currency != null) { "UPDATE currency requires currency" }
-                ImportOperation.DELETE -> require(it.existingId != null) { "DELETE currency requires existingId" }
+                }
+
+                ImportOperation.DELETE -> {
+                    require(it.existingId != null) { "DELETE currency requires existingId" }
+                }
             }
         }
         batch.peopleToCreate.forEach {
             when (it.operation) {
-                ImportOperation.CREATE -> require(it.firstName != null) { "CREATE person requires firstName" }
-                ImportOperation.UPDATE, ImportOperation.DELETE ->
+                ImportOperation.CREATE -> {
+                    require(it.firstName != null) { "CREATE person requires firstName" }
+                }
+
+                ImportOperation.UPDATE, ImportOperation.DELETE -> {
                     require(it.existingId != null) { "${it.operation} person requires existingId" }
+                }
             }
         }
         batch.ownerships.forEach {
             when (it.operation) {
-                ImportOperation.CREATE ->
+                ImportOperation.CREATE -> {
                     require((it.personKey != null || it.existingPersonId != null) && it.account != null) {
                         "CREATE ownership requires a person and an account"
                     }
-                ImportOperation.DELETE -> require(it.existingId != null) { "DELETE ownership requires existingId" }
-                ImportOperation.UPDATE -> error("Ownerships have no UPDATE operation")
+                }
+
+                ImportOperation.DELETE -> {
+                    require(it.existingId != null) { "DELETE ownership requires existingId" }
+                }
+
+                ImportOperation.UPDATE -> {
+                    error("Ownerships have no UPDATE operation")
+                }
             }
         }
     }
@@ -618,6 +649,7 @@ class ImportEngineImpl(
             classified.mapIndexed { i, c ->
                 when (c.status) {
                     ImportStatus.IMPORTED -> RowOutcome(ImportStatus.IMPORTED, createdIdByIndex[i])
+
                     // For an in-batch duplicate, resolve to the earlier accepted transfer's created id.
                     else -> RowOutcome(c.status, c.existing ?: c.inBatchMatchIndex?.let { createdIdByIndex[it] })
                 }
@@ -724,11 +756,15 @@ class ImportEngineImpl(
                             claimedInBatch += LegKey(inBatchMatch.toImportIndex, inBatchMatch.legIndex)
                             ReversalLink(ReversalTarget.BatchRow(inBatchMatch.toImportIndex, inBatchMatch.legIndex), reversalTypeId)
                         }
+
                         existingMatch != null -> {
                             claimedExisting += existingMatch.id
                             ReversalLink(ReversalTarget.Existing(existingMatch.id), reversalTypeId)
                         }
-                        else -> null
+
+                        else -> {
+                            null
+                        }
                     }
                 if (link != null) links[legIndex] = link
                 batchSpendLegs += BatchSpendLeg(index, legIndex, spendSource, spendTarget, amount, timestamp)
@@ -1243,7 +1279,10 @@ class ImportEngineImpl(
                                 }
                             }
                     }
-                    is PersonMatchKey.ByNameKey -> byNameKey[match.nameKey]
+
+                    is PersonMatchKey.ByNameKey -> {
+                        byNameKey[match.nameKey]
+                    }
                 }
             if (existingId != null) {
                 keyToId[intent.key] = existingId
@@ -1273,7 +1312,10 @@ class ImportEngineImpl(
                     byAttr.getOrPut(match.typeId to match.value) { newId }
                     match.nameKeyFallback?.let { byNameKey.getOrPut(it) { newId } }
                 }
-                is PersonMatchKey.ByNameKey -> Unit
+
+                is PersonMatchKey.ByNameKey -> {
+                    Unit
+                }
             }
         }
         return PersonResolution(keyToId, created)
@@ -1497,11 +1539,13 @@ class ImportEngineImpl(
                             transactionRepository.getTransactionsByAccountAndDateRange(it, minTs, maxTs).first()
                         }.distinctBy { it.id }
                 }
+
                 is DedupePolicy.UniqueIdentifier -> {
                     accountIds
                         .flatMap { transactionRepository.getTransactionsByAccount(it).first() }
                         .distinctBy { it.id }
                 }
+
                 is DedupePolicy.ApiMultiKey -> {
                     // Load full history for every account the batch touches (the own account may be the
                     // source or the target depending on transaction direction), plus the app accounts
@@ -1511,7 +1555,10 @@ class ImportEngineImpl(
                         .flatMap { transactionRepository.getTransactionsByAccount(it).first() }
                         .distinctBy { it.id }
                 }
-                is DedupePolicy.None -> emptyList()
+
+                is DedupePolicy.None -> {
+                    emptyList()
+                }
             }
         // A leg another source could only date approximately may truly sit far outside the date range
         // above, so load those few legs on the batch's accounts whatever their date.
@@ -1826,10 +1873,14 @@ class ImportEngineImpl(
                     if (reversalLink != null) {
                         val reversalTargetId =
                             when (val target = reversalLink.target) {
-                                is ReversalTarget.Existing -> target.id
-                                is ReversalTarget.BatchRow ->
+                                is ReversalTarget.Existing -> {
+                                    target.id
+                                }
+
+                                is ReversalTarget.BatchRow -> {
                                     spendTempIdByLeg[LegKey(target.toImportIndex, target.legIndex)]
                                         ?: priorSpendLegIds[LegKey(target.toImportIndex, target.legIndex)]
+                                }
                             }
                         if (reversalTargetId != null) {
                             legRelationships += NewRelationship(reversalTargetId, reversalLink.typeId)
@@ -1945,11 +1996,18 @@ class ImportEngineImpl(
             val change = exclusionChanges.getValue(mainOf.getValue(legId))
             val stored = leg.attributes.firstOrNull { it.attributeType.id == excludedTypeId }
             when {
-                change.exclusion != null && stored == null -> TransferUpdate(leg, listOf(change.exclusion)) to change.source
+                change.exclusion != null && stored == null -> {
+                    TransferUpdate(leg, listOf(change.exclusion)) to change.source
+                }
+
                 // Only lift an exclusion the source itself set (see ImportTransfer.ownedAttributes).
-                change.exclusion == null && stored != null && change.ownedValues.let { it == null || stored.value in it } ->
+                change.exclusion == null && stored != null && change.ownedValues.let { it == null || stored.value in it } -> {
                     TransferUpdate(leg, emptyList(), mapOf(excludedTypeId to change.ownedValues)) to change.source
-                else -> null
+                }
+
+                else -> {
+                    null
+                }
             }
         }
     }
@@ -1968,11 +2026,15 @@ class ImportEngineImpl(
         keyToId: Map<LocalAccountKey, AccountId>,
     ): AccountRef =
         when (ref) {
-            is AccountRef.Existing -> ref
-            is AccountRef.Local ->
+            is AccountRef.Existing -> {
+                ref
+            }
+
+            is AccountRef.Local -> {
                 AccountRef.Existing(
                     keyToId[ref.key] ?: error("Unresolved account reference: ${ref.key}"),
                 )
+            }
         }
 
     private fun requireId(ref: AccountRef?): AccountId =
@@ -2103,9 +2165,13 @@ class ImportEngineImpl(
                                 declinedTypeId
                         }
                     when {
-                        m.realAccountIds.isEmpty() && declined.isEmpty() ->
+                        m.realAccountIds.isEmpty() && declined.isEmpty() -> {
                             accountAttributeRepository.insert(m.shadowAccountId, declinedTypeId, "true")
-                        m.realAccountIds.isNotEmpty() -> declined.forEach { accountAttributeRepository.delete(it.id) }
+                        }
+
+                        m.realAccountIds.isNotEmpty() -> {
+                            declined.forEach { accountAttributeRepository.delete(it.id) }
+                        }
                     }
                 }
             }
@@ -2130,42 +2196,66 @@ class ImportEngineImpl(
         val csvStrategyIds = mutableMapOf<String, CsvImportStrategyId>()
         for (m in batch.csvStrategyMutations) {
             when (m) {
-                is CsvStrategyMutation.Create ->
+                is CsvStrategyMutation.Create -> {
                     csvStrategyIds.putUnique(m.key, csvImportStrategyRepository.createStrategy(m.strategy, m.source), "CsvStrategy")
-                is CsvStrategyMutation.Update -> csvImportStrategyRepository.updateStrategy(m.strategy, m.source)
-                is CsvStrategyMutation.Delete -> csvImportStrategyRepository.deleteStrategy(m.id)
+                }
+
+                is CsvStrategyMutation.Update -> {
+                    csvImportStrategyRepository.updateStrategy(m.strategy, m.source)
+                }
+
+                is CsvStrategyMutation.Delete -> {
+                    csvImportStrategyRepository.deleteStrategy(m.id)
+                }
             }
         }
 
         val apiStrategyIds = mutableMapOf<String, ApiImportStrategyId>()
         for (m in batch.apiStrategyMutations) {
             when (m) {
-                is ApiStrategyMutation.Create ->
+                is ApiStrategyMutation.Create -> {
                     apiStrategyIds.putUnique(m.key, apiImportStrategyRepository.createStrategy(m.strategy, m.source), "ApiStrategy")
-                is ApiStrategyMutation.Update -> apiImportStrategyRepository.updateStrategy(m.strategy, m.source)
-                is ApiStrategyMutation.Delete -> apiImportStrategyRepository.deleteStrategy(m.id)
+                }
+
+                is ApiStrategyMutation.Update -> {
+                    apiImportStrategyRepository.updateStrategy(m.strategy, m.source)
+                }
+
+                is ApiStrategyMutation.Delete -> {
+                    apiImportStrategyRepository.deleteStrategy(m.id)
+                }
             }
         }
 
         val accountMappingIds = mutableMapOf<String, Long>()
         for (m in batch.accountMappingMutations) {
             when (m) {
-                is AccountMappingMutation.Create ->
+                is AccountMappingMutation.Create -> {
                     accountMappingIds.putUnique(
                         m.key,
                         accountMappingRepository.createMapping(m.valuePattern, m.accountId, m.strategyId),
                         "AccountMapping",
                     )
-                is AccountMappingMutation.CreateBatch -> accountMappingRepository.createMappings(m.mappings)
-                is AccountMappingMutation.Update -> accountMappingRepository.updateMapping(m.mapping)
-                is AccountMappingMutation.Delete -> accountMappingRepository.deleteMapping(m.id)
+                }
+
+                is AccountMappingMutation.CreateBatch -> {
+                    accountMappingRepository.createMappings(m.mappings)
+                }
+
+                is AccountMappingMutation.Update -> {
+                    accountMappingRepository.updateMapping(m.mapping)
+                }
+
+                is AccountMappingMutation.Delete -> {
+                    accountMappingRepository.deleteMapping(m.id)
+                }
             }
         }
 
         val csvImportIds = mutableMapOf<String, CsvImportId>()
         for (m in batch.csvImportMutations) {
             when (m) {
-                is CsvImportMutation.Create ->
+                is CsvImportMutation.Create -> {
                     csvImportIds.putUnique(
                         m.key,
                         csvImportRepository.createImport(
@@ -2179,8 +2269,13 @@ class ImportEngineImpl(
                         ),
                         "CsvImport",
                     )
-                is CsvImportMutation.Restage -> csvImportRepository.restageImport(m.id, m.headers, m.rows, m.worksheetName)
-                is CsvImportMutation.Repopulate ->
+                }
+
+                is CsvImportMutation.Restage -> {
+                    csvImportRepository.restageImport(m.id, m.headers, m.rows, m.worksheetName)
+                }
+
+                is CsvImportMutation.Repopulate -> {
                     csvImportRepository.repopulateImport(
                         m.id,
                         m.headers,
@@ -2191,68 +2286,129 @@ class ImportEngineImpl(
                         m.rowIndexRemap,
                         m.xlsxBytes,
                     )
-                is CsvImportMutation.Delete -> csvImportRepository.deleteImport(m.id)
-                is CsvImportMutation.SetIgnored -> csvImportRepository.setImportIgnored(m.id, m.ignored)
-                is CsvImportMutation.ResetToUnimported -> csvImportRepository.resetToUnimported(m.id)
-                is CsvImportMutation.UpdateRowTransferId -> csvImportRepository.updateRowTransferId(m.id, m.rowIndex, m.transferId)
-                is CsvImportMutation.UpdateRowTransferIds -> csvImportRepository.updateRowTransferIdsBatch(m.id, m.rowTransferMap)
-                is CsvImportMutation.UpdateRowStatus -> csvImportRepository.updateRowStatus(m.id, m.rowIndex, m.status, m.transferId)
-                is CsvImportMutation.UpdateRowStatuses -> csvImportRepository.updateRowStatusesBatch(m.id, m.status, m.rowTransferMap)
-                is CsvImportMutation.ResetRowStatuses -> csvImportRepository.resetRowStatuses(m.id, m.rowIndexes)
-                is CsvImportMutation.SaveError -> csvImportRepository.saveError(m.id, m.rowIndex, m.errorMessage)
-                is CsvImportMutation.ClearError -> csvImportRepository.clearError(m.id, m.rowIndex)
-                is CsvImportMutation.ClearErrors -> csvImportRepository.clearErrors(m.id, m.rowIndexes)
-                is CsvImportMutation.RecordApplication ->
+                }
+
+                is CsvImportMutation.Delete -> {
+                    csvImportRepository.deleteImport(m.id)
+                }
+
+                is CsvImportMutation.SetIgnored -> {
+                    csvImportRepository.setImportIgnored(m.id, m.ignored)
+                }
+
+                is CsvImportMutation.ResetToUnimported -> {
+                    csvImportRepository.resetToUnimported(m.id)
+                }
+
+                is CsvImportMutation.UpdateRowTransferId -> {
+                    csvImportRepository.updateRowTransferId(m.id, m.rowIndex, m.transferId)
+                }
+
+                is CsvImportMutation.UpdateRowTransferIds -> {
+                    csvImportRepository.updateRowTransferIdsBatch(m.id, m.rowTransferMap)
+                }
+
+                is CsvImportMutation.UpdateRowStatus -> {
+                    csvImportRepository.updateRowStatus(m.id, m.rowIndex, m.status, m.transferId)
+                }
+
+                is CsvImportMutation.UpdateRowStatuses -> {
+                    csvImportRepository.updateRowStatusesBatch(m.id, m.status, m.rowTransferMap)
+                }
+
+                is CsvImportMutation.ResetRowStatuses -> {
+                    csvImportRepository.resetRowStatuses(m.id, m.rowIndexes)
+                }
+
+                is CsvImportMutation.SaveError -> {
+                    csvImportRepository.saveError(m.id, m.rowIndex, m.errorMessage)
+                }
+
+                is CsvImportMutation.ClearError -> {
+                    csvImportRepository.clearError(m.id, m.rowIndex)
+                }
+
+                is CsvImportMutation.ClearErrors -> {
+                    csvImportRepository.clearErrors(m.id, m.rowIndexes)
+                }
+
+                is CsvImportMutation.RecordApplication -> {
                     csvImportRepository.recordImportApplication(
                         m.id,
                         m.strategyId,
                         m.strategyName,
                         m.appliedAt,
                     )
+                }
             }
         }
 
         val qifImportIds = mutableMapOf<String, QifImportId>()
         for (m in batch.qifImportMutations) {
             when (m) {
-                is QifImportMutation.Create ->
+                is QifImportMutation.Create -> {
                     qifImportIds.putUnique(
                         m.key,
                         qifImportRepository.createImport(m.fileName, m.records, m.accountType, m.fileChecksum, m.fileLastModified),
                         "QifImport",
                     )
-                is QifImportMutation.Delete -> qifImportRepository.deleteImport(m.id)
-                is QifImportMutation.SetIgnored -> qifImportRepository.setImportIgnored(m.id, m.ignored)
-                is QifImportMutation.UpdateRecordStatuses ->
+                }
+
+                is QifImportMutation.Delete -> {
+                    qifImportRepository.deleteImport(m.id)
+                }
+
+                is QifImportMutation.SetIgnored -> {
+                    qifImportRepository.setImportIgnored(m.id, m.ignored)
+                }
+
+                is QifImportMutation.UpdateRecordStatuses -> {
                     qifImportRepository.updateRecordStatusesBatch(
                         m.id,
                         m.status,
                         m.recordTransferMap,
                     )
-                is QifImportMutation.SaveError -> qifImportRepository.saveError(m.id, m.recordIndex, m.errorMessage)
-                is QifImportMutation.ClearErrors -> qifImportRepository.clearErrors(m.id, m.recordIndexes)
-                is QifImportMutation.RecordApplication ->
+                }
+
+                is QifImportMutation.SaveError -> {
+                    qifImportRepository.saveError(m.id, m.recordIndex, m.errorMessage)
+                }
+
+                is QifImportMutation.ClearErrors -> {
+                    qifImportRepository.clearErrors(m.id, m.recordIndexes)
+                }
+
+                is QifImportMutation.RecordApplication -> {
                     qifImportRepository.recordImportApplication(
                         m.id,
                         m.strategyId,
                         m.strategyName,
                         m.appliedAt,
                     )
+                }
             }
         }
 
         val importDirectoryIds = mutableMapOf<String, ImportDirectoryId>()
         for (m in batch.importDirectoryMutations) {
             when (m) {
-                is ImportDirectoryMutation.Create ->
+                is ImportDirectoryMutation.Create -> {
                     importDirectoryIds.putUnique(
                         m.key,
                         importDirectoryRepository.createDirectory(m.directory, m.source),
                         "ImportDirectory",
                     )
-                is ImportDirectoryMutation.Update -> importDirectoryRepository.updateDirectory(m.directory, m.source)
-                is ImportDirectoryMutation.Delete -> importDirectoryRepository.deleteDirectory(m.id)
-                is ImportDirectoryMutation.RecordFileImported ->
+                }
+
+                is ImportDirectoryMutation.Update -> {
+                    importDirectoryRepository.updateDirectory(m.directory, m.source)
+                }
+
+                is ImportDirectoryMutation.Delete -> {
+                    importDirectoryRepository.deleteDirectory(m.id)
+                }
+
+                is ImportDirectoryMutation.RecordFileImported -> {
                     importDirectoryRepository.recordFileImported(
                         m.directoryId,
                         m.fileRef,
@@ -2264,6 +2420,7 @@ class ImportEngineImpl(
                         m.qifImportId,
                         m.importedAt,
                     )
+                }
             }
         }
 
@@ -2273,45 +2430,68 @@ class ImportEngineImpl(
         val apiResponseIds = mutableMapOf<String, ApiResponseId>()
         for (m in batch.apiSessionMutations) {
             when (m) {
-                is ApiSessionMutation.EnsureCredential ->
+                is ApiSessionMutation.EnsureCredential -> {
                     apiCredentialIds.putUnique(
                         m.key,
                         apiSessionRepository.ensureCredential(m.strategyId, m.createdAt),
                         "ApiCredential",
                     )
-                is ApiSessionMutation.UpdateCredentialStrategy ->
+                }
+
+                is ApiSessionMutation.UpdateCredentialStrategy -> {
                     apiSessionRepository.updateCredentialStrategy(
                         m.credentialId,
                         m.strategyId,
                     )
-                is ApiSessionMutation.CreateSession ->
+                }
+
+                is ApiSessionMutation.CreateSession -> {
                     apiSessionIds.putUnique(
                         m.key,
                         apiSessionRepository.createSession(m.deviceId, m.createdAt, expiresAt = null, m.credentialId),
                         "ApiSession",
                     )
-                is ApiSessionMutation.InsertRequest ->
+                }
+
+                is ApiSessionMutation.InsertRequest -> {
                     apiRequestIds.putUnique(
                         m.key,
                         apiSessionRepository.insertRequest(m.sessionId, m.method, m.url, m.headers),
                         "ApiRequest",
                     )
-                is ApiSessionMutation.RecordDownloadCoverage ->
+                }
+
+                is ApiSessionMutation.RecordDownloadCoverage -> {
                     apiSessionRepository.recordDownloadCoverage(m.sessionId, m.endpointKey, m.coversUntil)
-                is ApiSessionMutation.InsertResponse ->
+                }
+
+                is ApiSessionMutation.InsertResponse -> {
                     apiResponseIds.putUnique(
                         m.key,
                         apiSessionRepository.insertResponse(m.requestId, m.sessionId, m.json),
                         "ApiResponse",
                     )
-                is ApiSessionMutation.DeleteSession -> apiSessionRepository.deleteSession(m.id)
-                is ApiSessionMutation.InsertResponseTransaction ->
+                }
+
+                is ApiSessionMutation.DeleteSession -> {
+                    apiSessionRepository.deleteSession(m.id)
+                }
+
+                is ApiSessionMutation.InsertResponseTransaction -> {
                     apiSessionRepository.insertResponseTransaction(m.responseId, m.jsonPath, m.state, m.transactionId, m.errorMessage)
-                is ApiSessionMutation.InsertResponseTransactions -> apiSessionRepository.insertResponseTransactions(m.transactions)
-                is ApiSessionMutation.DeleteResponseTransactionsBySession ->
+                }
+
+                is ApiSessionMutation.InsertResponseTransactions -> {
+                    apiSessionRepository.insertResponseTransactions(m.transactions)
+                }
+
+                is ApiSessionMutation.DeleteResponseTransactionsBySession -> {
                     apiSessionRepository.deleteResponseTransactionsBySession(m.sessionId)
-                is ApiSessionMutation.MarkSessionImported ->
+                }
+
+                is ApiSessionMutation.MarkSessionImported -> {
                     apiSessionRepository.markSessionImported(m.id, m.revisionId, m.importedAt, m.importDurationMillis)
+                }
             }
         }
 

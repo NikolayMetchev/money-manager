@@ -942,7 +942,10 @@ class MonzoImportE2ETest : DbTest() {
                     val url = request.url.toString()
                     val json =
                         when {
-                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/accounts") -> {
+                                ACCOUNTS_JSON
+                            }
+
                             url.contains("/transactions") -> {
                                 transactionRequestCount++
                                 when (transactionRequestCount) {
@@ -951,7 +954,10 @@ class MonzoImportE2ETest : DbTest() {
                                     else -> EMPTY_TRANSACTIONS_JSON
                                 }
                             }
-                            else -> error("Unexpected request: $url")
+
+                            else -> {
+                                error("Unexpected request: $url")
+                            }
                         }
                     respond(
                         content = json,
@@ -1120,13 +1126,25 @@ class MonzoImportE2ETest : DbTest() {
                     val url = request.url.toString()
                     val json =
                         when {
-                            url.contains("/accounts") -> ACCOUNTS_WITH_SHARED_OWNER_ID_JSON
-                            url.contains("/transactions") && url.contains(ACCOUNT_ID) && !url.contains("before=") ->
+                            url.contains("/accounts") -> {
+                                ACCOUNTS_WITH_SHARED_OWNER_ID_JSON
+                            }
+
+                            url.contains("/transactions") && url.contains(ACCOUNT_ID) && !url.contains("before=") -> {
                                 SHARED_OWNER_FIRST_ACCOUNT_ACTIVITY_JSON
-                            url.contains("/transactions") && url.contains(SHARED_OWNER_SECOND_ACCOUNT_ID) && !url.contains("before=") ->
+                            }
+
+                            url.contains("/transactions") && url.contains(SHARED_OWNER_SECOND_ACCOUNT_ID) && !url.contains("before=") -> {
                                 SHARED_OWNER_SECOND_ACCOUNT_ACTIVITY_JSON
-                            url.contains("/transactions") -> EMPTY_TRANSACTIONS_JSON
-                            else -> error("Unexpected request: $url")
+                            }
+
+                            url.contains("/transactions") -> {
+                                EMPTY_TRANSACTIONS_JSON
+                            }
+
+                            else -> {
+                                error("Unexpected request: $url")
+                            }
                         }
                     respond(
                         content = json,
@@ -1531,11 +1549,21 @@ class MonzoImportE2ETest : DbTest() {
                     val url = request.url.toString()
                     val json =
                         when {
-                            url.contains("/accounts") -> ACCOUNTS_JSON
-                            url.contains("/transactions") && !url.contains("before=") ->
+                            url.contains("/accounts") -> {
+                                ACCOUNTS_JSON
+                            }
+
+                            url.contains("/transactions") && !url.contains("before=") -> {
                                 TRANSACTIONS_WITH_ATM_AND_COUNTERPARTY_IDS_JSON
-                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
-                            else -> error("Unexpected request: $url")
+                            }
+
+                            url.contains("/transactions") && url.contains("before=") -> {
+                                EMPTY_TRANSACTIONS_JSON
+                            }
+
+                            else -> {
+                                error("Unexpected request: $url")
+                            }
                         }
                     respond(
                         content = json,
@@ -1616,11 +1644,21 @@ class MonzoImportE2ETest : DbTest() {
                     val url = request.url.toString()
                     val json =
                         when {
-                            url.contains("/accounts") -> ACCOUNTS_JSON
-                            url.contains("/transactions") && !url.contains("before=") ->
+                            url.contains("/accounts") -> {
+                                ACCOUNTS_JSON
+                            }
+
+                            url.contains("/transactions") && !url.contains("before=") -> {
                                 TRANSACTION_WITH_NULL_ATM_FEES_JSON
-                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
-                            else -> error("Unexpected request: $url")
+                            }
+
+                            url.contains("/transactions") && url.contains("before=") -> {
+                                EMPTY_TRANSACTIONS_JSON
+                            }
+
+                            else -> {
+                                error("Unexpected request: $url")
+                            }
                         }
                     respond(
                         content = json,
@@ -2035,11 +2073,21 @@ class MonzoImportE2ETest : DbTest() {
                     val url = request.url.toString()
                     val json =
                         when {
-                            url.contains("/accounts") -> ACCOUNTS_JSON
-                            url.contains("/transactions") && !url.contains("before=") ->
+                            url.contains("/accounts") -> {
+                                ACCOUNTS_JSON
+                            }
+
+                            url.contains("/transactions") && !url.contains("before=") -> {
                                 TRANSACTIONS_WITH_EPHEMERAL_COUNTERPARTY_JSON
-                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
-                            else -> error("Unexpected request: $url")
+                            }
+
+                            url.contains("/transactions") && url.contains("before=") -> {
+                                EMPTY_TRANSACTIONS_JSON
+                            }
+
+                            else -> {
+                                error("Unexpected request: $url")
+                            }
                         }
                     respond(
                         content = json,
@@ -2198,11 +2246,21 @@ class MonzoImportE2ETest : DbTest() {
                     val url = request.url.toString()
                     val json =
                         when {
-                            url.contains("/accounts") -> THREE_ACCOUNTS_JSON
-                            url.contains("/transactions") && url.contains(PERSONAL_ACCOUNT_ID) && !url.contains("before=") ->
+                            url.contains("/accounts") -> {
+                                THREE_ACCOUNTS_JSON
+                            }
+
+                            url.contains("/transactions") && url.contains(PERSONAL_ACCOUNT_ID) && !url.contains("before=") -> {
                                 PERSONAL_ACCOUNT_ACTIVITY_JSON
-                            url.contains("/transactions") -> EMPTY_TRANSACTIONS_JSON
-                            else -> error("Unexpected request: $url")
+                            }
+
+                            url.contains("/transactions") -> {
+                                EMPTY_TRANSACTIONS_JSON
+                            }
+
+                            else -> {
+                                error("Unexpected request: $url")
+                            }
                         }
                     respond(
                         content = json,
@@ -2272,11 +2330,21 @@ class MonzoImportE2ETest : DbTest() {
                     val url = request.url.toString()
                     val json =
                         when {
-                            url.contains("/accounts") -> THREE_ACCOUNTS_JSON
-                            url.contains("/transactions") && url.contains(PERSONAL_ACCOUNT_ID) && !url.contains("before=") ->
+                            url.contains("/accounts") -> {
+                                THREE_ACCOUNTS_JSON
+                            }
+
+                            url.contains("/transactions") && url.contains(PERSONAL_ACCOUNT_ID) && !url.contains("before=") -> {
                                 SELF_TRANSFER_TO_JOINT_JSON
-                            url.contains("/transactions") -> EMPTY_TRANSACTIONS_JSON
-                            else -> error("Unexpected request: $url")
+                            }
+
+                            url.contains("/transactions") -> {
+                                EMPTY_TRANSACTIONS_JSON
+                            }
+
+                            else -> {
+                                error("Unexpected request: $url")
+                            }
                         }
                     respond(
                         content = json,
@@ -2387,11 +2455,21 @@ class MonzoImportE2ETest : DbTest() {
                     val url = request.url.toString()
                     val json =
                         when {
-                            url.contains("/accounts") -> THREE_ACCOUNTS_JSON
-                            url.contains("/transactions") && url.contains(PERSONAL_ACCOUNT_ID) && !url.contains("before=") ->
+                            url.contains("/accounts") -> {
+                                THREE_ACCOUNTS_JSON
+                            }
+
+                            url.contains("/transactions") && url.contains(PERSONAL_ACCOUNT_ID) && !url.contains("before=") -> {
                                 SELF_TRANSFER_TO_JOINT_JSON
-                            url.contains("/transactions") -> EMPTY_TRANSACTIONS_JSON
-                            else -> error("Unexpected request: $url")
+                            }
+
+                            url.contains("/transactions") -> {
+                                EMPTY_TRANSACTIONS_JSON
+                            }
+
+                            else -> {
+                                error("Unexpected request: $url")
+                            }
                         }
                     respond(
                         content = json,
@@ -2486,11 +2564,21 @@ class MonzoImportE2ETest : DbTest() {
                     val url = request.url.toString()
                     val json =
                         when {
-                            url.contains("/accounts") -> THREE_ACCOUNTS_JSON
-                            url.contains("/transactions") && url.contains(REWARDS_ACCOUNT_ID) && !url.contains("before=") ->
+                            url.contains("/accounts") -> {
+                                THREE_ACCOUNTS_JSON
+                            }
+
+                            url.contains("/transactions") && url.contains(REWARDS_ACCOUNT_ID) && !url.contains("before=") -> {
                                 REWARDS_ACTIVITY_JSON
-                            url.contains("/transactions") -> EMPTY_TRANSACTIONS_JSON
-                            else -> error("Unexpected request: $url")
+                            }
+
+                            url.contains("/transactions") -> {
+                                EMPTY_TRANSACTIONS_JSON
+                            }
+
+                            else -> {
+                                error("Unexpected request: $url")
+                            }
                         }
                     respond(
                         content = json,

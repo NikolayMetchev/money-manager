@@ -67,9 +67,13 @@ internal fun EndpointsTab(
             enabled = enabled,
         )
         when (accounts) {
-            is ApiAccountsSource.Single ->
+            is ApiAccountsSource.Single -> {
                 SingleAccountEditor(a = accounts, onChange = { v -> state.updateConfig { copy(accounts = v) } }, enabled = enabled)
-            is ApiAccountsSource.Downloaded -> DownloadedAccountsEditor(state, accounts, enabled)
+            }
+
+            is ApiAccountsSource.Downloaded -> {
+                DownloadedAccountsEditor(state, accounts, enabled)
+            }
         }
 
         Spacer(Modifier.padding(top = 4.dp))

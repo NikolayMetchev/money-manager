@@ -177,13 +177,17 @@ private fun rowLabel(
     accountNameById: Map<AccountId, String>,
 ): String =
     when (groupMode) {
-        TimelineGroupMode.ACCOUNT -> accountNameById[range.accountId] ?: UNKNOWN_ACCOUNT_LABEL
-        TimelineGroupMode.STRATEGY ->
+        TimelineGroupMode.ACCOUNT -> {
+            accountNameById[range.accountId] ?: UNKNOWN_ACCOUNT_LABEL
+        }
+
+        TimelineGroupMode.STRATEGY -> {
             when (range.kind) {
                 TimelineSourceKind.MANUAL -> MANUAL_ROW_LABEL
                 TimelineSourceKind.API -> range.strategyName ?: UNKNOWN_STRATEGY_LABEL
                 TimelineSourceKind.CSV, TimelineSourceKind.QIF -> range.strategyName ?: UNKNOWN_STRATEGY_LABEL
             }
+        }
     }
 
 private fun fileLabel(
@@ -267,6 +271,7 @@ fun axisTicks(
                 ticks += LocalDate(year, 1, 1).toEpochDays() to year.toString()
             }
         }
+
         else -> {
             val everyMonths = if (span >= QUARTER_TICKS_MIN_SPAN_DAYS) MONTHS_PER_QUARTER else 1
             var year = start.year

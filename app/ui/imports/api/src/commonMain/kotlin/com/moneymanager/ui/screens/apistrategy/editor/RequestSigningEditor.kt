@@ -142,7 +142,7 @@ internal fun SigPartListEditor(
                         enabled = enabled,
                     )
                     when (part) {
-                        is SigPart.Literal ->
+                        is SigPart.Literal -> {
                             TextFieldRow(
                                 label = "Text",
                                 value = part.text,
@@ -151,7 +151,9 @@ internal fun SigPartListEditor(
                                 },
                                 enabled = enabled,
                             )
-                        is SigPart.ParamString ->
+                        }
+
+                        is SigPart.ParamString -> {
                             EnumDropdown(
                                 label = "Format",
                                 options = ParamStringFormat.entries,
@@ -162,6 +164,8 @@ internal fun SigPartListEditor(
                                 optionLabel = { it.name },
                                 enabled = enabled,
                             )
+                        }
+
                         is SigPart.Sha256 -> {
                             Text(
                                 "Nested parts",
@@ -176,7 +180,10 @@ internal fun SigPartListEditor(
                                 enabled = enabled,
                             )
                         }
-                        else -> Unit
+
+                        else -> {
+                            Unit
+                        }
                     }
                 }
             }

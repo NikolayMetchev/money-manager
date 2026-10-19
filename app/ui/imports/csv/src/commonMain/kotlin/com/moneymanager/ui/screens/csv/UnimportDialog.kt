@@ -91,10 +91,12 @@ fun UnimportDialog(
                         .verticalScroll(rememberScrollState()),
             ) {
                 when (val currentPlan = plan) {
-                    null ->
+                    null -> {
                         if (errorMessage == null) {
                             ReimportProgressIndicator(Progress("Preparing preview"))
                         }
+                    }
+
                     else -> {
                         if (isRunning) {
                             ReimportProgressIndicator(progress ?: Progress("Starting unimport"))
@@ -210,10 +212,12 @@ fun CsvUnimportAllDialog(
                         .verticalScroll(rememberScrollState()),
             ) {
                 when (val currentPlan = plan) {
-                    null ->
+                    null -> {
                         if (errorMessage == null) {
                             ReimportProgressIndicator(Progress("Preparing preview"))
                         }
+                    }
+
                     else -> {
                         if (isRunning) {
                             ReimportProgressIndicator(progress ?: Progress("Starting unimport"))

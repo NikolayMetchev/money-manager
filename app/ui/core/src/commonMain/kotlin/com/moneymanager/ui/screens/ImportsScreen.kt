@@ -149,7 +149,7 @@ fun ImportsScreen(
         }
 
         when (selectedTab) {
-            ImportTab.DIRECTORIES ->
+            ImportTab.DIRECTORIES -> {
                 ImportDirectoriesScreen(
                     importDirectoryService = importDirectoryService,
                     importDirectoryRepository = importDirectoryRepository,
@@ -176,7 +176,9 @@ fun ImportsScreen(
                         importEngine.setCsvImportIgnored(id, ignored = false)
                     },
                 )
-            ImportTab.CSV ->
+            }
+
+            ImportTab.CSV -> {
                 CsvImportsScreen(
                     importDirectoryService = importDirectoryService,
                     csvImportRepository = csvImportRepository,
@@ -194,7 +196,9 @@ fun ImportsScreen(
                     onImportClick = onCsvImportClick,
                     onStrategiesClick = onCsvStrategiesClick,
                 )
-            ImportTab.QIF ->
+            }
+
+            ImportTab.QIF -> {
                 QifImportsScreen(
                     importDirectoryService = importDirectoryService,
                     qifImportRepository = qifImportRepository,
@@ -207,7 +211,9 @@ fun ImportsScreen(
                     onImportClick = onQifImportClick,
                     onStrategiesClick = onCsvStrategiesClick,
                 )
-            ImportTab.API ->
+            }
+
+            ImportTab.API -> {
                 ApiSessionsScreen(
                     apiSessionRepository = apiSessionRepository,
                     importTimelineRepository = importTimelineRepository,
@@ -227,7 +233,9 @@ fun ImportsScreen(
                     onSessionClick = onSessionClick,
                     onTransactionsImported = onTransactionsImported,
                 )
-            ImportTab.MISC ->
+            }
+
+            ImportTab.MISC -> {
                 MiscImportsTab(
                     passThroughAccountRepository = passThroughAccountRepository,
                     accountMappingRepository = accountMappingRepository,
@@ -239,7 +247,9 @@ fun ImportsScreen(
                     importEngine = importEngine,
                     onBrowsePassThroughCatalog = onBrowsePassThroughCatalog,
                 )
-            ImportTab.TIMELINE ->
+            }
+
+            ImportTab.TIMELINE -> {
                 ImportTimelineScreen(
                     importTimelineRepository = importTimelineRepository,
                     accountRepository = accountRepository,
@@ -247,7 +257,9 @@ fun ImportsScreen(
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     onOpenFile = onTimelineFileClick,
                 )
-            ImportTab.RECONCILIATION ->
+            }
+
+            ImportTab.RECONCILIATION -> {
                 ReconciliationImportsTab(
                     reconciliation = {
                         ReconciliationScreen(
@@ -299,6 +311,7 @@ fun ImportsScreen(
                         )
                     },
                 )
+            }
         }
     }
 }
@@ -357,14 +370,16 @@ private fun MiscImportsTab(
             Tab(selected = subTab == 1, onClick = { subTab = 1 }, text = { Text("Account Mappings") })
         }
         when (subTab) {
-            0 ->
+            0 -> {
                 PassThroughAccountsScreen(
                     passThroughAccountRepository = passThroughAccountRepository,
                     importEngine = importEngine,
                     appVersion = appVersion,
                     onBrowseCatalog = onBrowsePassThroughCatalog,
                 )
-            else ->
+            }
+
+            else -> {
                 AccountMappingsScreen(
                     accountMappingRepository = accountMappingRepository,
                     accountRepository = accountRepository,
@@ -373,6 +388,7 @@ private fun MiscImportsTab(
                     accountMappingExportService = accountMappingExportService,
                     appVersion = appVersion,
                 )
+            }
         }
     }
 }

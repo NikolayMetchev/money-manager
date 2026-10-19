@@ -182,12 +182,17 @@ fun ReimportDialog(
                         .verticalScroll(rememberScrollState()),
             ) {
                 when {
-                    !strategyResolved -> CircularProgressIndicator()
-                    strategy == null ->
+                    !strategyResolved -> {
+                        CircularProgressIndicator()
+                    }
+
+                    strategy == null -> {
                         Text(
                             text = "No strategy matches this import. Create or restore a matching strategy first.",
                             color = MaterialTheme.colorScheme.error,
                         )
+                    }
+
                     else -> {
                         Text(
                             text = "Strategy: ${strategy?.name}",
@@ -210,10 +215,12 @@ fun ReimportDialog(
                         }
 
                         when (val currentPlan = plan) {
-                            null ->
+                            null -> {
                                 if (errorMessage == null) {
                                     ReimportProgressIndicator(planProgress ?: Progress("Preparing preview"))
                                 }
+                            }
+
                             else -> {
                                 if (isRunning) {
                                     ReimportProgressIndicator(executeProgress ?: Progress("Starting re-import"))

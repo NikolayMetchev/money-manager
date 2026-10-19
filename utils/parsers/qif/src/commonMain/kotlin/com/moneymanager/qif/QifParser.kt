@@ -141,18 +141,29 @@ class QifParser {
         ) {
             when (code) {
                 'D' -> date = value
+
                 'T', 'U' -> if (amount == null || code == 'T') amount = value
+
                 'P' -> payee = value
+
                 'M' -> memo = value
+
                 'L' -> applyCategoryOrTransfer(value)
+
                 // `N` is context-dependent: account name in !Account, action in investments,
                 // check/reference number otherwise. Resolved in build().
                 'N' -> numberField = value
+
                 'C' -> clearedStatus = value
+
                 'A' -> address.add(value)
+
                 'S' -> splits.add(QifSplit().withCategoryOrTransfer(value))
+
                 'E' -> updateLastSplit { it.copy(memo = value) }
+
                 '$' -> updateLastSplit { it.copy(amount = value) }
+
                 // Unrecognised codes are ignored; QifRecord.rawLines keeps the record verbatim.
                 else -> Unit
             }

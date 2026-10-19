@@ -183,12 +183,19 @@ private val EMPTY = AccountSnapshot(accounts = emptyList(), people = emptyList()
 
 private fun parseName(filter: AccountsFilter): Result<NameMatch?> =
     when {
-        filter.nameText.isBlank() -> Result.success(null)
-        !filter.nameIsRegex -> Result.success(NameMatch.Substring(filter.nameText))
-        else ->
+        filter.nameText.isBlank() -> {
+            Result.success(null)
+        }
+
+        !filter.nameIsRegex -> {
+            Result.success(NameMatch.Substring(filter.nameText))
+        }
+
+        else -> {
             try {
                 Result.success(NameMatch.Pattern(filter.nameText))
             } catch (e: IllegalArgumentException) {
                 Result.failure(e)
             }
+        }
     }

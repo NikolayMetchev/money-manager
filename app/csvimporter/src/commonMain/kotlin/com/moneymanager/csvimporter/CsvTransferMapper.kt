@@ -422,6 +422,7 @@ class CsvTransferMapper(
 
                     newAccounts.addAll(result.newAccounts)
                 }
+
                 is MappingResult.Error -> {
                     errorRows.add(result)
                 }
@@ -631,14 +632,19 @@ class CsvTransferMapper(
                 }
             val passThrough =
                 when {
-                    strategyConduit == null -> detectedPassThrough
+                    strategyConduit == null -> {
+                        detectedPassThrough
+                    }
+
                     // The strategy conduit forwards to the conduit the description names; that chain goes on.
-                    detectedPassThrough != null ->
+                    detectedPassThrough != null -> {
                         detectedPassThrough.copy(
                             conduitNames = conduitNames,
                             spendDescriptions = listOf(description) + detectedPassThrough.spendDescriptions,
                         )
-                    else ->
+                    }
+
+                    else -> {
                         CsvPassThrough(
                             conduitNames = conduitNames,
                             merchantName =
@@ -650,6 +656,7 @@ class CsvTransferMapper(
                             relationshipTypeId = WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID,
                             incoming = flipAccounts,
                         )
+                    }
                 }
             val effectiveSourceAccountId =
                 if (conduitAccountId != null && flipAccounts) conduitAccountId else sourceAccountId
@@ -696,14 +703,21 @@ class CsvTransferMapper(
             val sourceMapping = strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]
             val unidentifiedCounterpartyAccountId =
                 when {
-                    strategyConduit != null ->
+                    strategyConduit != null -> {
                         ownAccountId.takeIf {
                             sourceAccountOverride == null &&
                                 sourceMapping != null &&
                                 isUnidentifiedCounterparty(sourceMapping, values, sourceUsedPersistedMappings)
                         }
-                    passThroughMatch != null || conversionDetection != null || tradeTo != null -> null
-                    else -> counterpartyAccountId.takeIf { isUnidentifiedCounterparty(targetMapping, values, targetUsedPersistedMappings) }
+                    }
+
+                    passThroughMatch != null || conversionDetection != null || tradeTo != null -> {
+                        null
+                    }
+
+                    else -> {
+                        counterpartyAccountId.takeIf { isUnidentifiedCounterparty(targetMapping, values, targetUsedPersistedMappings) }
+                    }
                 }
 
             // A fee is modelled as its own movement (linked to this transfer), not folded into the amount.
@@ -914,7 +928,10 @@ class CsvTransferMapper(
             if (!rules.all(rule.legWhen, trimmed)) return@firstNotNullOfOrNull null
             val side =
                 when (val legSide = rule.side) {
-                    is LegSide.DebitWhen -> if (rules.all(legSide.conditions, trimmed)) GroupLegSide.DEBIT else GroupLegSide.CREDIT
+                    is LegSide.DebitWhen -> {
+                        if (rules.all(legSide.conditions, trimmed)) GroupLegSide.DEBIT else GroupLegSide.CREDIT
+                    }
+
                     is LegSide.Sign -> {
                         val amount =
                             getColumnValueOrNull(legSide.path, values)
@@ -930,8 +947,11 @@ class CsvTransferMapper(
                 } ?: return@firstNotNullOfOrNull null
             val throughAccountName =
                 when (val assembly = rule.assembly) {
-                    is LegAssembly.Trade -> null
-                    is LegAssembly.ThroughAccount ->
+                    is LegAssembly.Trade -> {
+                        null
+                    }
+
+                    is LegAssembly.ThroughAccount -> {
                         if (assembly.accounts.isEmpty()) {
                             null
                         } else {
@@ -941,6 +961,7 @@ class CsvTransferMapper(
                                 ?.takeIf { it.isNotBlank() }
                                 ?: return@firstNotNullOfOrNull null
                         }
+                    }
                 }
             val funding =
                 (rule.assembly as? LegAssembly.ThroughAccount)
@@ -968,6 +989,7 @@ class CsvTransferMapper(
                             ?: error("amountColumnName required for SINGLE_COLUMN mode")
                     parseBigDecimal(getColumnValue(columnName, values))
                 }
+
                 AmountMode.CREDIT_DEBIT_COLUMNS -> {
                     val creditColumnName =
                         mapping.creditColumnName
@@ -1193,7 +1215,10 @@ class CsvTransferMapper(
         applyPersistedMappings: Boolean = true,
     ): AccountId =
         when (mapping) {
-            is HardCodedAccountMapping -> mapping.accountId
+            is HardCodedAccountMapping -> {
+                mapping.accountId
+            }
+
             is AccountRulesMapping -> {
                 val resolution = resolveAccount(mapping, values)
                 (if (applyPersistedMappings) findPersistedMapping(resolution.sourceValue) else null)
@@ -1201,7 +1226,10 @@ class CsvTransferMapper(
                     ?: resolveExistingAccountId(resolution.accountName)
                     ?: UNRESOLVED_ACCOUNT_ID // Placeholder for new accounts
             }
-            else -> throw IllegalArgumentException("Invalid account mapping type: ${mapping::class}")
+
+            else -> {
+                throw IllegalArgumentException("Invalid account mapping type: ${mapping::class}")
+            }
         }
 
     /**
@@ -1252,16 +1280,26 @@ class CsvTransferMapper(
         val rulesMapping = mapping as? AccountRulesMapping ?: return null
         val resolution = resolveAccount(rulesMapping, values)
         return when {
-            applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null -> null
-            resolution.attributeAccountId != null -> null
-            resolution.accountName.isBlank() || accountExists(resolution.accountName) -> null
-            else ->
+            applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null -> {
+                null
+            }
+
+            resolution.attributeAccountId != null -> {
+                null
+            }
+
+            resolution.accountName.isBlank() || accountExists(resolution.accountName) -> {
+                null
+            }
+
+            else -> {
                 NewAccount(resolution.accountName, rulesMapping.defaultCategoryId) to
                     DiscoveredAccountMapping(
                         csvValue = resolution.sourceValue,
                         targetAccountName = resolution.accountName,
                         matchedPattern = resolution.rule?.pattern,
                     )
+            }
         }
     }
 
@@ -1315,7 +1353,10 @@ class CsvTransferMapper(
         values: List<String>,
     ): TimeZone =
         when (mapping) {
-            is HardCodedTimezoneMapping -> TimeZone.of(mapping.timezoneId)
+            is HardCodedTimezoneMapping -> {
+                TimeZone.of(mapping.timezoneId)
+            }
+
             is TimezoneLookupMapping -> {
                 val value = getColumnValue(mapping.columnName, values).trim()
                 val tzId =
@@ -1324,7 +1365,10 @@ class CsvTransferMapper(
                         ?.value ?: value
                 if (tzId.isNotBlank()) TimeZone.of(tzId) else TimeZone.currentSystemDefault()
             }
-            else -> TimeZone.currentSystemDefault()
+
+            else -> {
+                TimeZone.currentSystemDefault()
+            }
         }
 
     private fun parseDescription(

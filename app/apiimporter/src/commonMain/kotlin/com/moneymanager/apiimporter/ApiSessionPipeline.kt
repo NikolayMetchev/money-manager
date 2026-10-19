@@ -86,6 +86,7 @@ suspend fun downloadApiSession(
                 )
             ApiSessionDownloadResult(accounts = ApiAccountsDownloadResult(accountCount = 1), transactions = transactions, people = null)
         }
+
         is ApiAccountsSource.Downloaded -> {
             val token = bearerToken(apiClient, strategy, credentials, onPhase)
             onPhase("Downloading accounts...")
@@ -203,6 +204,7 @@ suspend fun importApiSession(
                 duplicateCount = result.duplicatesSkipped,
             )
         }
+
         is ApiAccountsSource.Downloaded -> {
             val transactions =
                 importApiSessionTransactions(

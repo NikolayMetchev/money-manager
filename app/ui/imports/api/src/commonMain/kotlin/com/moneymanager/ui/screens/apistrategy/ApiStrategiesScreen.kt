@@ -274,10 +274,13 @@ private fun StrategyCard(
             Text(
                 text =
                     when (val accounts = strategy.config.accounts) {
-                        is ApiAccountsSource.Single ->
+                        is ApiAccountsSource.Single -> {
                             "Single account: ${accounts.name}  |  ${strategy.config.dataEndpoints.size} data endpoints"
-                        is ApiAccountsSource.Downloaded ->
+                        }
+
+                        is ApiAccountsSource.Downloaded -> {
                             "Accounts: ${accounts.endpoint.path}  |  Transactions: ${strategy.config.bankTransactions?.endpoint?.path.orEmpty()}"
+                        }
                     },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

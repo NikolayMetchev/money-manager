@@ -144,10 +144,17 @@ fun CloudStorageCard(
                         .onSuccess { result ->
                             message =
                                 when (result) {
-                                    SyncResult.UPLOADED -> "Uploaded to ${currentBinding.remoteName}"
-                                    SyncResult.BLOCKED ->
+                                    SyncResult.UPLOADED -> {
+                                        "Uploaded to ${currentBinding.remoteName}"
+                                    }
+
+                                    SyncResult.BLOCKED -> {
                                         "The remote changed since your last sync — download first, or overwrite it."
-                                    SyncResult.NO_SESSION -> "No active cloud session"
+                                    }
+
+                                    SyncResult.NO_SESSION -> {
+                                        "No active cloud session"
+                                    }
                                 }
                             refreshTick++
                         }.onFailure { message = "Upload failed: ${it.message}" }
@@ -451,20 +458,23 @@ private fun ConflictConfirmDialog(
 ) {
     val (title, body, confirmLabel) =
         when (action) {
-            ConflictAction.UploadOverwrite ->
+            ConflictAction.UploadOverwrite -> {
                 Triple(
                     "Overwrite remote changes?",
                     "Another device changed this database since your last sync. Uploading now will overwrite " +
                         "those changes with your local copy. This can't be undone.",
                     "Overwrite remote",
                 )
-            ConflictAction.DownloadDiscard ->
+            }
+
+            ConflictAction.DownloadDiscard -> {
                 Triple(
                     "Discard local changes?",
                     "Another device changed this database since your last sync. Downloading now will discard " +
                         "your local unsynced changes. This can't be undone.",
                     "Discard local",
                 )
+            }
         }
     AlertDialog(
         onDismissRequest = onDismiss,

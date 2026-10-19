@@ -308,12 +308,14 @@ suspend fun downloadApiSessionExchange(
             val error =
                 when {
                     response.statusCode != 200 -> "HTTP ${response.statusCode}: ${response.body}"
+
                     !responseCodeOk(
                         response.body,
                         endpoint.successCodeField,
                         endpoint.successCodeOkValue,
                         endpoint.errorArrayField,
                     ) -> "API error: ${response.body}"
+
                     else -> null
                 }
             if (error == null) {
@@ -407,9 +409,11 @@ suspend fun downloadApiSessionExchange(
                     val body = fetchPage(endpoint, requestParams(endpoint, page, fanOutParam, fanOutValue), recordedUrl, fanOutValue)
                     when {
                         body != null -> PageOutcome.Fetched(body, pageItems(endpoint, body).also { itemSink?.addAll(it) })
+
                         // A window the provider won't serve is skipped (no coverage recorded for it) so the
                         // newer windows still run; any other failure abandons the endpoint.
                         lastFetchWindowOutOfRange -> PageOutcome.WindowOutOfRange
+
                         else -> PageOutcome.Failed
                     }
                 },
@@ -475,16 +479,26 @@ internal fun resolveValueSet(
     preserveCase: Boolean = false,
 ): List<String> =
     when (valueSet) {
-        is ApiValueSet.Static -> valueSet.values
-        is ApiValueSet.FromValueEndpoint ->
+        is ApiValueSet.Static -> {
+            valueSet.values
+        }
+
+        is ApiValueSet.FromValueEndpoint -> {
             valueItemsByPath[valueSet.endpointPath].orEmpty().flatMap { item ->
                 valueSet.fields.mapNotNull { field -> item.str(field) }
             }
-        is ApiValueSet.FromDataEndpoint ->
+        }
+
+        is ApiValueSet.FromDataEndpoint -> {
             dataItemsByPath[valueSet.endpointPath].orEmpty().flatMap { item ->
                 valueSet.fields.mapNotNull { field -> item.str(field) }
             }
-        is ApiValueSet.Union -> valueSet.sets.flatMap { resolveValueSet(it, valueItemsByPath, dataItemsByPath, preserveCase) }
+        }
+
+        is ApiValueSet.Union -> {
+            valueSet.sets.flatMap { resolveValueSet(it, valueItemsByPath, dataItemsByPath, preserveCase) }
+        }
+
         is ApiValueSet.CrossProduct -> {
             val lefts = resolveValueSet(valueSet.left, valueItemsByPath, dataItemsByPath, preserveCase).distinct()
             val rights = resolveValueSet(valueSet.right, valueItemsByPath, dataItemsByPath, preserveCase).distinct()
@@ -740,11 +754,15 @@ private fun parseExchangeItem(
         return
     }
     when (dataEndpoint.kind) {
-        ApiEndpointKind.TRADES ->
+        ApiEndpointKind.TRADES -> {
             dataEndpoint.tradeMappings?.let { parseTrade(obj, it, requestId, jsonPath, windowStart) }?.let(into.trades::add)
-        ApiEndpointKind.ORDERS ->
+        }
+
+        ApiEndpointKind.ORDERS -> {
             dataEndpoint.tradeMappings?.let { parseOrder(obj, it, requestId, jsonPath) }?.let(into.orders::add)
-        ApiEndpointKind.DEPOSITS ->
+        }
+
+        ApiEndpointKind.DEPOSITS -> {
             dataEndpoint.transactionMappings
                 ?.let {
                     parseExchangeTransfer(
@@ -759,7 +777,9 @@ private fun parseExchangeItem(
                         windowEnd,
                     )
                 }?.let(into.transfers::addAll)
-        ApiEndpointKind.WITHDRAWALS ->
+        }
+
+        ApiEndpointKind.WITHDRAWALS -> {
             dataEndpoint.transactionMappings
                 ?.let {
                     parseExchangeTransfer(
@@ -774,7 +794,11 @@ private fun parseExchangeItem(
                         windowEnd,
                     )
                 }?.let(into.transfers::addAll)
-        ApiEndpointKind.BANK_TRANSACTIONS -> Unit
+        }
+
+        ApiEndpointKind.BANK_TRANSACTIONS -> {
+            Unit
+        }
     }
 }
 
@@ -1422,8 +1446,12 @@ private fun splitInstrument(
             val parts = instrument.split(tm.instrumentSeparator)
             if (parts.size >= 2) parts[0] to parts[1] else null
         }
+
         // EXPLICIT_FIELDS is resolved directly in parseTrade from the base/quote asset fields.
-        InstrumentSplitMode.EXPLICIT_FIELDS -> null
+        InstrumentSplitMode.EXPLICIT_FIELDS -> {
+            null
+        }
+
         InstrumentSplitMode.QUOTE_SUFFIX -> {
             // Kraken marks some crypto/crypto pairs as "synthetic_pair" and reports them
             // slash-separated (e.g. "SUI/BTC") instead of concatenated like its usual pairs
@@ -1498,13 +1526,22 @@ private fun parseExchangeTransfer(
         // names the direction in a field instead, read like a bank feed's FIELD sign source.
         val resolvedDirection =
             when (val configured = tm.direction) {
-                null -> direction
-                is Direction.AmountSign ->
+                null -> {
+                    direction
+                }
+
+                is Direction.AmountSign -> {
                     if ((rawAmount < BigDecimal.ZERO) == configured.positiveIsIncoming) TransferDirection.OUT else TransferDirection.IN
-                is Direction.Field ->
+                }
+
+                is Direction.Field -> {
                     obj.str(configured.path)?.let { if (it in configured.incomingValues) TransferDirection.IN else TransferDirection.OUT }
                         ?: direction
-                Direction.Outgoing -> TransferDirection.OUT
+                }
+
+                Direction.Outgoing -> {
+                    TransferDirection.OUT
+                }
             }
         // A gross amount already includes its fee: carve a same-asset fee out so the two sum back to it.
         val amount =

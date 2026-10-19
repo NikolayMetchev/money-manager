@@ -35,7 +35,10 @@ fun computeAuditDiff(
     val attributeChanges =
         entry.attributeChanges.map { attrAudit ->
             when (attrAudit.auditType) {
-                AuditType.INSERT -> AttributeChange.Added(attrAudit.attributeType.name, attrAudit.value)
+                AuditType.INSERT -> {
+                    AttributeChange.Added(attrAudit.attributeType.name, attrAudit.value)
+                }
+
                 AuditType.UPDATE -> {
                     val newValue = newAttributesByType[attrAudit.attributeType.name]
                     if (newValue != null) {
@@ -44,12 +47,15 @@ fun computeAuditDiff(
                         AttributeChange.ModifiedFrom(attrAudit.attributeType.name, attrAudit.value)
                     }
                 }
-                AuditType.DELETE -> AttributeChange.Removed(attrAudit.attributeType.name, attrAudit.value)
+
+                AuditType.DELETE -> {
+                    AttributeChange.Removed(attrAudit.attributeType.name, attrAudit.value)
+                }
             }
         }
 
     return when (entry.auditType) {
-        AuditType.INSERT ->
+        AuditType.INSERT -> {
             AuditEntryDiff(
                 id = entry.id,
                 auditTimestamp = entry.auditTimestamp,
@@ -64,7 +70,9 @@ fun computeAuditDiff(
                 source = entry.source,
                 attributeChanges = attributeChanges,
             )
-        AuditType.DELETE ->
+        }
+
+        AuditType.DELETE -> {
             AuditEntryDiff(
                 id = entry.id,
                 auditTimestamp = entry.auditTimestamp,
@@ -79,6 +87,8 @@ fun computeAuditDiff(
                 source = entry.source,
                 attributeChanges = attributeChanges,
             )
+        }
+
         AuditType.UPDATE -> {
             requireNotNull(newValuesForUpdate) { "UPDATE entry must have new values to compare against" }
             AuditEntryDiff(

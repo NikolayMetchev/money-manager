@@ -32,6 +32,7 @@ fun main(args: Array<String>) {
                 outputDir = File(args[2]),
             )
         }
+
         "import" -> {
             requireArgs(args)
             importFixtures(
@@ -39,7 +40,10 @@ fun main(args: Array<String>) {
                 inputDir = File(args[2]),
             )
         }
-        else -> printUsageAndExit()
+
+        else -> {
+            printUsageAndExit()
+        }
     }
 }
 

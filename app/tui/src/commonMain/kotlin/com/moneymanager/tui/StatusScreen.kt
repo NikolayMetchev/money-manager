@@ -43,12 +43,14 @@ val StatusScreen =
         fun key(event: KeyEvent): Boolean {
             val cloud = model.cloud
             when (event.key) {
-                "l" ->
+                "l" -> {
                     when (model.vault) {
                         is VaultState.Unlocked -> model.eventSink(StatusEvent.LockVault)
                         is VaultState.Locked, is VaultState.NoFile -> model.eventSink(StatusEvent.UnlockVault)
                         VaultState.Unbound -> return false
                     }
+                }
+
                 "c" -> {
                     if (cloud == null || cloud.connected) return false
                     work.scope.launch {
@@ -57,6 +59,7 @@ val StatusScreen =
                             ?.let { model.eventSink(StatusEvent.Connect(it)) }
                     }
                 }
+
                 "s" -> {
                     if (cloud == null || !cloud.connected) return false
                     work.scope.launch {
@@ -68,7 +71,11 @@ val StatusScreen =
                         }
                     }
                 }
-                "r" -> if (cloud != null && cloud.connected) model.eventSink(StatusEvent.CheckRemote) else return false
+
+                "r" -> {
+                    if (cloud != null && cloud.connected) model.eventSink(StatusEvent.CheckRemote) else return false
+                }
+
                 "D" -> {
                     if (cloud == null || !cloud.connected) return false
                     work.scope.launch {
@@ -77,7 +84,10 @@ val StatusScreen =
                         }
                     }
                 }
-                else -> return false
+
+                else -> {
+                    return false
+                }
             }
             return true
         }
@@ -139,8 +149,11 @@ private fun StatusView(
 private fun CloudStatus.describe(): String {
     val state =
         when {
-            !connected -> if (localChanges) "local changes · not connected" else "not connected"
-            else ->
+            !connected -> {
+                if (localChanges) "local changes · not connected" else "not connected"
+            }
+
+            else -> {
                 when (sync.status) {
                     SyncStatus.NO_SESSION -> "not connected"
                     SyncStatus.IN_SYNC -> "in sync"
@@ -148,6 +161,7 @@ private fun CloudStatus.describe(): String {
                     SyncStatus.REMOTE_AHEAD -> "another device uploaded changes · editing locked"
                     SyncStatus.CONFLICT -> "changed here and on another device · editing locked"
                 }
+            }
         }
     return "$remoteName ($providerId) · $state"
 }
@@ -167,7 +181,11 @@ private fun StatusModel.actions(): String {
         buildList {
             when {
                 cloud == null -> {}
-                !cloud.connected -> add("c connect")
+
+                !cloud.connected -> {
+                    add("c connect")
+                }
+
                 else -> {
                     add("s sync now")
                     add("r check")
@@ -175,9 +193,18 @@ private fun StatusModel.actions(): String {
                 }
             }
             when (vault) {
-                is VaultState.Unlocked -> add("l lock vault")
-                is VaultState.Locked -> add("l unlock vault")
-                is VaultState.NoFile -> add("l create vault")
+                is VaultState.Unlocked -> {
+                    add("l lock vault")
+                }
+
+                is VaultState.Locked -> {
+                    add("l unlock vault")
+                }
+
+                is VaultState.NoFile -> {
+                    add("l create vault")
+                }
+
                 VaultState.Unbound -> {}
             }
             add("o open another database")

@@ -285,7 +285,9 @@ internal class CsvStrategyEditorState(
     private val timezoneValid: Boolean
         get() =
             when (timezoneMode) {
-                TimezoneMode.HARDCODED -> true // Always valid, defaults to system timezone
+                TimezoneMode.HARDCODED -> true
+
+                // Always valid, defaults to system timezone
                 TimezoneMode.FROM_COLUMN -> timezoneColumnName != null
             }
 

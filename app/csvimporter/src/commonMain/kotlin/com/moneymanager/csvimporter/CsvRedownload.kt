@@ -264,7 +264,10 @@ private suspend fun redownloadOne(
         val staged = csvImportRepository.getImport(checkNotNull(file.csvImportId)).first() ?: return DirectoryRedownloadResult()
         val redownload = prepareFromSource(staged, file, fileSource, entries, csvImportRepository)
         when (val plan = redownload.plan) {
-            CsvRedownloadPlan.Unchanged -> DirectoryRedownloadResult(unchanged = listOf(name))
+            CsvRedownloadPlan.Unchanged -> {
+                DirectoryRedownloadResult(unchanged = listOf(name))
+            }
+
             is CsvRedownloadPlan.Replace -> {
                 executeCsvRedownload(redownload, importEngine)
                 val columnsChanged = plan.addedColumns.isNotEmpty() || plan.removedColumns.isNotEmpty()
@@ -273,6 +276,7 @@ private suspend fun redownloadOne(
                     reimportSuggested = listOf(name).filter { plan.carriedRows.isNotEmpty() && columnsChanged },
                 )
             }
+
             is CsvRedownloadPlan.Blocked -> {
                 if (unimport == null) return DirectoryRedownloadResult(blocked = listOf(name))
                 unimport(staged.id)

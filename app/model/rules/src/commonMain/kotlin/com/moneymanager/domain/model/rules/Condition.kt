@@ -101,12 +101,19 @@ enum class ConditionOperand {
 val ConditionOp.operand: ConditionOperand
     get() =
         when (this) {
-            ConditionOp.EXISTS, ConditionOp.BLANK, ConditionOp.NOT_BLANK, ConditionOp.EMPTY_OBJECT, ConditionOp.NON_EMPTY_OBJECT ->
+            ConditionOp.EXISTS, ConditionOp.BLANK, ConditionOp.NOT_BLANK, ConditionOp.EMPTY_OBJECT, ConditionOp.NON_EMPTY_OBJECT -> {
                 ConditionOperand.NONE
-            ConditionOp.EQUALS_PATH, ConditionOp.NOT_EQUALS_PATH -> ConditionOperand.OTHER_PATH
+            }
+
+            ConditionOp.EQUALS_PATH, ConditionOp.NOT_EQUALS_PATH -> {
+                ConditionOperand.OTHER_PATH
+            }
+
             ConditionOp.EQUALS, ConditionOp.NOT_EQUALS, ConditionOp.EQUALS_IGNORE_CASE, ConditionOp.IN, ConditionOp.NOT_IN,
             ConditionOp.STARTS_WITH, ConditionOp.MATCHES, ConditionOp.ANY_ELEMENT_STARTS_WITH,
-            -> ConditionOperand.VALUE
+            -> {
+                ConditionOperand.VALUE
+            }
         }
 
 /** The ops that only make sense against structured (JSON) values, not a flat row of columns. */

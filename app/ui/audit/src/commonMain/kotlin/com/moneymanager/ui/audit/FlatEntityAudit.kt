@@ -93,9 +93,15 @@ fun <E : Any, C : Any> computeFlatEntityAuditDiffs(
                 val entryValue = field.fromEntry(entry)
                 val change =
                     when (entryMeta.auditType) {
-                        AuditType.INSERT -> FieldChange.Created(entryValue)
-                        AuditType.DELETE -> FieldChange.Deleted(entryValue)
-                        AuditType.UPDATE ->
+                        AuditType.INSERT -> {
+                            FieldChange.Created(entryValue)
+                        }
+
+                        AuditType.DELETE -> {
+                            FieldChange.Deleted(entryValue)
+                        }
+
+                        AuditType.UPDATE -> {
                             resolveUpdateChange(
                                 index = index,
                                 currentEntry = current,
@@ -104,6 +110,7 @@ fun <E : Any, C : Any> computeFlatEntityAuditDiffs(
                                 currentValue = field.fromCurrent,
                                 previousValue = field.fromEntry,
                             )
+                        }
                     }
                 FlatFieldChange(field.label, field.absent, change)
             }

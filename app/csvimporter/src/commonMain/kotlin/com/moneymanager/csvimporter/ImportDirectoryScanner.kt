@@ -195,11 +195,13 @@ private suspend fun ScanContext.scanFile(entry: ImportFileEntry): FileOutcome {
                         csvImportRepository.findImportsByChecksum(checksum).firstOrNull()?.id
                             ?: stageCsv(importEngine, entry, checkNotNull(content), checksum, lastModified)
                 }
+
                 SupportedKind.QIF -> {
                     qifImportId =
                         qifImportRepository.findImportsByChecksum(checksum).firstOrNull()?.id
                             ?: stageQif(importEngine, entry, checkNotNull(content), checksum, lastModified)
                 }
+
                 SupportedKind.XLSX -> {
                     csvImportId =
                         csvImportRepository.findImportsByChecksum(checksum).firstOrNull()?.id
