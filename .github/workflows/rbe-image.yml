@@ -1,0 +1,31 @@
+# Builds BuildBuddy's executor image (bazel/platforms/rbe/Dockerfile) and publishes it to ghcr.io. The image is
+# public, so the executors pull it without credentials. //bazel/platforms:rbe_linux_x64 pins the digest this
+# prints, so a new image only takes effect when that pin moves.
+name: RBE Image
+
+on:
+  push:
+    branches: [main]
+    paths: [bazel/platforms/rbe/**]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and push
+        run: |
+          image=ghcr.io/${GITHUB_REPOSITORY,,}/rbe-ubuntu24-04
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build -t "$image:${GITHUB_SHA::12}" -t "$image:latest" bazel/platforms/rbe
+          docker push "$image:${GITHUB_SHA::12}"
+          docker push "$image:latest"
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$image:latest")
+          echo "Pin in bazel/platforms/BUILD.bazel: docker://$digest" | tee -a "$GITHUB_STEP_SUMMARY"
