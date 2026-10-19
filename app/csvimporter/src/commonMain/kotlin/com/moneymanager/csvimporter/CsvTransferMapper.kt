@@ -1158,12 +1158,11 @@ class CsvTransferMapper(
         mapping: FieldMapping,
         resolution: AccountResolution,
         applyPersistedMappings: Boolean = true,
-    ): Boolean {
-        if (mapping !is AccountFromRulesMapping) return false
-        return resolution.naming?.unidentified == true &&
+    ): Boolean =
+        mapping is AccountFromRulesMapping &&
+            resolution.naming?.unidentified == true &&
             resolution.accountName.isNotBlank() &&
             !(applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null)
-    }
 
     /**
      * Finds a persisted account mapping whose pattern matches the given account source value

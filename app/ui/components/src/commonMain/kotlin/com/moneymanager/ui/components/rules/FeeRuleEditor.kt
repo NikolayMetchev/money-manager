@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ValueExpr
-import com.moneymanager.domain.model.rules.isComplete
 
 /**
  * Edits a [FeeRule] for any strategy: a blank amount means no fee (null). [movementOptions] offers what
@@ -83,6 +82,3 @@ internal fun ValueExpr?.withPrimaryPath(path: String): ValueExpr? =
         this == null -> ValueExpr(listOf(path))
         else -> copy(paths = listOf(path) + paths.drop(1))
     }
-
-/** Whether [this] fee has every input it needs. */
-fun FeeRule?.isComplete(): Boolean = this == null || conditions.all { it.isComplete() }

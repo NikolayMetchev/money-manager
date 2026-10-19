@@ -209,10 +209,9 @@ class CsvTransferMapperTest {
         assertEquals(setOf("Curve", "Sainsburys"), newNames)
     }
 
-    private fun throughConduit(
-        accountName: String,
-        conditions: List<Condition> = emptyList(),
-    ): StrategyRule = StrategyRule(conditions = conditions, actions = listOf(RuleAction.ThroughConduit(accountName)))
+    /** Every row the [conditions] admit runs through the Curve conduit. */
+    private fun throughCurve(conditions: List<Condition> = emptyList()): StrategyRule =
+        StrategyRule(conditions = conditions, actions = listOf(RuleAction.ThroughConduit("Curve")))
 
     private fun conduitMapper(
         conduit: StrategyRule,
@@ -231,7 +230,7 @@ class CsvTransferMapperTest {
 
     @Test
     fun `mapRow routes every row of a strategy with a conduit through it to the row's counterparty`() {
-        val result = conduitMapper(throughConduit("Curve")).mapRow(CsvRow(1, listOf("15/12/2024", "Tesco", "-10.00", "Tesco")))
+        val result = conduitMapper(throughCurve()).mapRow(CsvRow(1, listOf("15/12/2024", "Tesco", "-10.00", "Tesco")))
 
         assertIs<MappingResult.Success>(result)
         assertEquals(testSourceAccountId, result.transfer.sourceAccountId, "the row's own account funds the chain")
@@ -257,7 +256,7 @@ class CsvTransferMapperTest {
                     ),
             )
         val result =
-            conduitMapper(throughConduit("Curve"), listOf(payPal))
+            conduitMapper(throughCurve(), listOf(payPal))
                 .mapRow(CsvRow(1, listOf("15/12/2024", "Paypal *Thepihut", "-10.00", "Paypal *Thepihut")))
 
         assertIs<MappingResult.Success>(result)
@@ -269,7 +268,7 @@ class CsvTransferMapperTest {
 
     @Test
     fun `mapRow leaves a row out of the strategy conduit when its conditions do not hold`() {
-        val conduit = throughConduit("Curve", listOf(Condition("Payee", ConditionOp.NOT_EQUALS, "Curve Cash")))
+        val conduit = throughCurve(listOf(Condition("Payee", ConditionOp.NOT_EQUALS, "Curve Cash")))
         val result = conduitMapper(conduit).mapRow(CsvRow(1, listOf("15/12/2024", "Points", "-10.00", "Curve Cash")))
 
         assertIs<MappingResult.Success>(result)

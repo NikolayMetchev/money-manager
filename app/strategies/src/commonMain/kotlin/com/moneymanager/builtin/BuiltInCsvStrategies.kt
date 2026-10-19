@@ -729,7 +729,7 @@ object BuiltInCsvStrategies {
      * (see CsvImportApplier.ensureCryptoAssets; any non-fiat currency-lookup value becomes a crypto asset).
      *
      * The Crypto.com account is the SOURCE and the counterparty (from the description, e.g. "Card
-     * Cashback") the TARGET; an amount-sign [AmountParsingMapping.direction] then makes a positive amount
+     * Cashback") the TARGET; an amount-sign direction rule then makes a positive amount
      * (rewards) flow INTO the account and a negative amount (a spend/swap out) flow OUT of it —
      * mirroring the card strategy's sign convention.
      *

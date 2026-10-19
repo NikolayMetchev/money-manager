@@ -27,7 +27,7 @@ fun CsvStrategyConfig<*>.ownedAttributeValues(): Map<String, Set<String>?> {
             is RuleAction.Attribute -> owned.getOrPut(action.typeName) { mutableListOf() } += action.value.constantOrNull()
             is RuleAction.Exclude ->
                 owned.getOrPut(EXCLUDED_ATTRIBUTE_TYPE_NAME) { mutableListOf() } +=
-                    action.reason?.let { it.constantOrNull() } ?: EXCLUDED_ATTRIBUTE_TYPE_NAME
+                    action.reason?.constantOrNull() ?: EXCLUDED_ATTRIBUTE_TYPE_NAME
             else -> Unit
         }
     }

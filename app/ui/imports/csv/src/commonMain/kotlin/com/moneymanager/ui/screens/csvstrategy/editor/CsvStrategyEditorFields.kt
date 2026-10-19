@@ -17,7 +17,6 @@ import com.moneymanager.domain.model.csvstrategy.ReconciliationConfig
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.AssetCodeRules
-import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
 
@@ -47,10 +46,6 @@ internal enum class SourceAccountMode {
 
 /** Null unless this column still exists in the uploaded CSV. */
 internal fun String?.takeIfPresentIn(columns: Set<String>): String? = this?.takeIf { it in columns }
-
-/** Drops conditions referencing columns absent from the uploaded CSV. */
-internal fun List<Condition>?.keepPresentIn(columns: Set<String>): List<Condition> =
-    this.orEmpty().filter { it.path in columns && (it.otherPath == null || it.otherPath in columns) }
 
 /**
  * Builds a [CsvImportStrategy] from the editor's live state. Shared by the save handler and tests so
