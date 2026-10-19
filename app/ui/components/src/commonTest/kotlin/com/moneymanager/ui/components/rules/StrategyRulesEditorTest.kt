@@ -20,10 +20,13 @@ import androidx.compose.ui.test.performScrollTo
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class StrategyRulesEditorTest {
     private val textPath =
@@ -86,4 +89,14 @@ class StrategyRulesEditorTest {
             onNodeWithText("Set the trade side").assertExists()
             onNodeWithText("Flip source and target").assertDoesNotExist()
         }
+
+    @Test
+    fun `rules are complete only when every condition and action has its inputs`() {
+        val payee = StrategyRule(conditions = listOf(Condition("Payee", ConditionOp.EQUALS, "Tesco")), actions = listOf(RuleAction.Skip))
+        assertTrue(listOf(payee).isComplete())
+        assertTrue(emptyList<StrategyRule>().isComplete())
+
+        assertFalse(listOf(payee, payee.copy(conditions = listOf(Condition("", ConditionOp.EQUALS, "Tesco")))).isComplete())
+        assertFalse(listOf(payee.copy(actions = listOf(RuleAction.Attribute("id", RuleValue.read(""))))).isComplete())
+    }
 }
