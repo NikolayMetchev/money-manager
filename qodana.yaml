@@ -357,6 +357,12 @@ exclude:
       - utils/bigdecimal/src/jvmAndroidMain/kotlin/com/moneymanager/bigdecimal/BigDecimal.kt
       - utils/bigdecimal/src/jvmAndroidMain/kotlin/com/moneymanager/bigdecimal/BigInteger.kt
       - utils/currency/src/jvmAndroidMain/kotlin/com/moneymanager/currency/Currency.kt
+      # [5] — and those expects themselves: with expect and actual in one module, a usage binds to either,
+      # and which one varies from run to run, so the other looks unused (ONE, TEN, movePointLeft,
+      # toBigDecimal, getDefaultCurrencyCode are all used).
+      - utils/bigdecimal/src/commonMain/kotlin/com/moneymanager/bigdecimal/BigDecimal.kt
+      - utils/bigdecimal/src/commonMain/kotlin/com/moneymanager/bigdecimal/BigInteger.kt
+      - utils/currency/src/commonMain/kotlin/com/moneymanager/currency/Currency.kt
       - utils/compose/filePicker/src/androidMain/kotlin/com/moneymanager/compose/filepicker/FileSaver.kt
       - utils/compose/filePicker/src/androidMain/kotlin/com/moneymanager/compose/filepicker/FolderPickerLauncher.kt
       - utils/compose/filePicker/src/jvmMain/kotlin/com/moneymanager/compose/filepicker/FilePicker.kt
