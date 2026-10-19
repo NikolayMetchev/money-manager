@@ -178,8 +178,7 @@ internal fun directionFromSign(amountField: String): List<StrategyRule> =
 internal fun counterparty(
     column: String,
     name: String,
-    conditions: List<Condition> = emptyList(),
-): StrategyRule = accounts(AccountSide.COUNTERPARTY, fixedNaming(column, name), conditions = conditions)
+): StrategyRule = accounts(AccountSide.COUNTERPARTY, fixedNaming(column, name))
 
 /**
  * The record's id is [fields]' values joined by "-", for a record with no id of its own. A record missing
