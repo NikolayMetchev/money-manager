@@ -22,7 +22,10 @@ fun main(args: Array<String>) {
     }
 
     when (args[0]) {
-        "generate" -> generateBalancesFixture(dbPath = args[1], outputFile = File(args[2]))
+        "generate" -> {
+            generateBalancesFixture(dbPath = args[1], outputFile = File(args[2]))
+        }
+
         else -> {
             println("Usage: generate <dbPath> <outputFile>")
             exitProcess(1)

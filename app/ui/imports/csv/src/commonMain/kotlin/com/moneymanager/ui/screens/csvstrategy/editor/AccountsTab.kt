@@ -62,7 +62,7 @@ internal fun AccountsTab(
             Text("From the row (rules)")
         }
         when (state.sourceAccountMode) {
-            SourceAccountMode.FIXED_ACCOUNT ->
+            SourceAccountMode.FIXED_ACCOUNT -> {
                 AccountPicker(
                     selectedAccountId = state.selectedAccountId,
                     onAccountSelected = { state.selectedAccountId = it },
@@ -72,7 +72,9 @@ internal fun AccountsTab(
                     personRepository = personRepository,
                     enabled = enabled,
                 )
-            SourceAccountMode.RULES ->
+            }
+
+            SourceAccountMode.RULES -> {
                 AccountRulesEditor(
                     rules = state.sourceRules,
                     onRulesChanged = { state.sourceRules = it },
@@ -82,6 +84,7 @@ internal fun AccountsTab(
                     existingAttributeTypeNames = attributeTypeNames,
                     enabled = enabled,
                 )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))

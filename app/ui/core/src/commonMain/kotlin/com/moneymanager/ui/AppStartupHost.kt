@@ -172,11 +172,16 @@ private fun AppStartupContent(
                     remoteUnlock = RemoteUnlockState(prompt = "Unlock “${binding.remoteName}” from cloud storage")
                 }
             }
+
             // No (usable) local copy — first run on this device, or the user chose not to keep it: the
             // encrypted remote copy is all we have, so restore it, which requires the user's password first.
-            is StartupTarget.NeedsRemoteUnlock ->
+            is StartupTarget.NeedsRemoteUnlock -> {
                 remoteUnlock = RemoteUnlockState(prompt = "Unlock “${target.binding.remoteName}” from cloud storage")
-            StartupTarget.ChooseDatabase -> databaseState = AppDatabaseState.ChoosingDatabase
+            }
+
+            StartupTarget.ChooseDatabase -> {
+                databaseState = AppDatabaseState.ChoosingDatabase
+            }
         }
     }
 
@@ -257,8 +262,12 @@ private fun AppStartupContent(
                 },
             )
         }
-        is AppDatabaseState.Loading -> DatabaseProgressScreen(state.progress, title = "Starting Money Manager")
-        is AppDatabaseState.ChoosingDatabase ->
+
+        is AppDatabaseState.Loading -> {
+            DatabaseProgressScreen(state.progress, title = "Starting Money Manager")
+        }
+
+        is AppDatabaseState.ChoosingDatabase -> {
             // The setup screen (and the Google Drive dialog it reuses) need a schema-aware scope, which
             // MoneyManagerApp only provides once a database is loaded — so provide one here too.
             ProvideSchemaAwareScope {
@@ -273,6 +282,8 @@ private fun AppStartupContent(
                     onErrorLog = onErrorLog,
                 )
             }
+        }
+
         is AppDatabaseState.Error -> {
             // Schema errors are handled by the recovery dialog below; show other failures so the
             // user isn't left on a blank screen.
@@ -532,16 +543,23 @@ private suspend fun switchDatabase(
             onErrorLog = onErrorLog,
         )
     when {
-        error == null -> GlobalSchemaErrorState.clearError()
+        error == null -> {
+            GlobalSchemaErrorState.clearError()
+        }
+
         // Schema-incompatible targets fall through to the schema-error recovery dialog (state stays Error).
-        SchemaErrorDetector.isSchemaError(error) -> Unit
+        SchemaErrorDetector.isSchemaError(error) -> {}
+
         // Any other failure: surface it and revert so the user keeps working in the current database.
         currentState is AppDatabaseState.Loaded -> {
             onInfoLog("Reverting to previously open database: ${currentState.location}")
             databaseStateUpdater(currentState)
             onSwitchFailed(target, error)
         }
-        else -> onSwitchFailed(target, error)
+
+        else -> {
+            onSwitchFailed(target, error)
+        }
     }
 }
 

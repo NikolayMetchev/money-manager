@@ -124,9 +124,11 @@ fun CardLast4Screen(
         error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
         val current = references
         when {
-            current == null ->
+            current == null -> {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            current.isEmpty() ->
+            }
+
+            current.isEmpty() -> {
                 Text(
                     if (strategies.orEmpty().none { it.config.fundingAttributeMatch != null }) {
                         "No import strategy references funding cards."
@@ -135,7 +137,9 @@ fun CardLast4Screen(
                     },
                     style = MaterialTheme.typography.bodyMedium,
                 )
-            else ->
+            }
+
+            else -> {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(current, key = { "${it.attributeTypeName}:${it.value}" }) { reference ->
                         FundingReferenceCard(
@@ -149,6 +153,7 @@ fun CardLast4Screen(
                         )
                     }
                 }
+            }
         }
     }
 }

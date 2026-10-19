@@ -103,9 +103,11 @@ internal object MoneyManagerTestApp {
                     onRequestSwitchDatabase = {},
                 )
             }
+
             is TestDatabaseState.Loading -> {
                 // Loading...
             }
+
             is TestDatabaseState.Error -> {
                 // Error dialog is shown below
             }

@@ -85,14 +85,19 @@ suspend fun RemoteDatabaseController.performClose(
     database.close()
     var keptLocal = true
     when {
-        keepLocal -> Unit
-        remoteCurrent ->
+        keepLocal -> {}
+
+        remoteCurrent -> {
             runCatching { deleteLocalCache() }
                 .onSuccess {
                     keptLocal = false
                     logger.i { "Deleted local working copy; cloud copy is up to date" }
                 }.onFailure { logger.e(it) { "Failed to delete local database on close" } }
-        else -> logger.w { "Kept local database despite delete request: cloud copy is not up to date or unverified" }
+        }
+
+        else -> {
+            logger.w { "Kept local database despite delete request: cloud copy is not up to date or unverified" }
+        }
     }
     return CloseOutcome(syncResult, keptLocal)
 }

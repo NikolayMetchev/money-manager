@@ -92,9 +92,18 @@ private inline fun pump(
                 output.append(buffer, BUFFER_SIZE - stream.avail_out.toInt())
                 finished =
                     when (result) {
-                        Z_STREAM_END -> true
-                        Z_OK -> false
-                        Z_NEED_DICT -> throw IllegalArgumentException("Compressed payload requires a preset dictionary")
+                        Z_STREAM_END -> {
+                            true
+                        }
+
+                        Z_OK -> {
+                            false
+                        }
+
+                        Z_NEED_DICT -> {
+                            throw IllegalArgumentException("Compressed payload requires a preset dictionary")
+                        }
+
                         // No progress was possible. Every round offers a fresh output buffer, so the input ran out
                         // before the end of the stream: fine for an empty payload, a truncated stream otherwise.
                         Z_BUF_ERROR -> {
@@ -102,7 +111,10 @@ private inline fun pump(
                             require(input.isEmpty()) { "Compressed payload is truncated" }
                             true
                         }
-                        else -> throw IllegalStateException("zlib failed with code $result")
+
+                        else -> {
+                            throw IllegalStateException("zlib failed with code $result")
+                        }
                     }
             }
         }

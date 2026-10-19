@@ -87,20 +87,29 @@ fun AccountTransactionCard(
         when {
             // If current account is the source, show the target (where money went)
             runningBalance.sourceAccountId == runningBalance.accountId -> accounts.find { it.id == runningBalance.targetAccountId }
+
             // If current account is the target, show the source (where money came from)
             runningBalance.targetAccountId == runningBalance.accountId -> accounts.find { it.id == runningBalance.sourceAccountId }
+
             // Fallback: shouldn't happen, but if neither matches, show nothing
             else -> null
         }
 
     val cardColors =
         when {
-            isHighlighted -> CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            runningBalance.isExcluded ->
+            isHighlighted -> {
+                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            }
+
+            runningBalance.isExcluded -> {
                 CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
                 )
-            else -> CardDefaults.cardColors()
+            }
+
+            else -> {
+                CardDefaults.cardColors()
+            }
         }
 
     Card(

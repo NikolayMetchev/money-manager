@@ -60,22 +60,65 @@ class RuleEvaluator {
         val trimmed = raw?.trim().orEmpty()
         val operand = condition.value.orEmpty()
         return when (condition.op) {
-            ConditionOp.EXISTS -> record.exists(condition.path)
-            ConditionOp.BLANK -> trimmed.isEmpty()
-            ConditionOp.NOT_BLANK -> trimmed.isNotEmpty()
-            ConditionOp.EQUALS -> raw != null && trimmed == operand.trim()
-            ConditionOp.NOT_EQUALS -> raw == null || trimmed != operand.trim()
-            ConditionOp.EQUALS_IGNORE_CASE -> raw != null && trimmed.equals(operand.trim(), ignoreCase = true)
-            ConditionOp.IN -> raw != null && trimmed in members(operand)
-            ConditionOp.NOT_IN -> raw == null || trimmed !in members(operand)
-            ConditionOp.STARTS_WITH -> raw?.startsWith(operand) == true
-            ConditionOp.MATCHES -> raw != null && regex(operand).containsMatchIn(raw)
-            ConditionOp.EQUALS_PATH -> trimmed == otherValue(condition, record)
-            ConditionOp.NOT_EQUALS_PATH -> trimmed != otherValue(condition, record)
-            ConditionOp.ANY_ELEMENT_STARTS_WITH ->
+            ConditionOp.EXISTS -> {
+                record.exists(condition.path)
+            }
+
+            ConditionOp.BLANK -> {
+                trimmed.isEmpty()
+            }
+
+            ConditionOp.NOT_BLANK -> {
+                trimmed.isNotEmpty()
+            }
+
+            ConditionOp.EQUALS -> {
+                raw != null && trimmed == operand.trim()
+            }
+
+            ConditionOp.NOT_EQUALS -> {
+                raw == null || trimmed != operand.trim()
+            }
+
+            ConditionOp.EQUALS_IGNORE_CASE -> {
+                raw != null && trimmed.equals(operand.trim(), ignoreCase = true)
+            }
+
+            ConditionOp.IN -> {
+                raw != null && trimmed in members(operand)
+            }
+
+            ConditionOp.NOT_IN -> {
+                raw == null || trimmed !in members(operand)
+            }
+
+            ConditionOp.STARTS_WITH -> {
+                raw?.startsWith(operand) == true
+            }
+
+            ConditionOp.MATCHES -> {
+                raw != null && regex(operand).containsMatchIn(raw)
+            }
+
+            ConditionOp.EQUALS_PATH -> {
+                trimmed == otherValue(condition, record)
+            }
+
+            ConditionOp.NOT_EQUALS_PATH -> {
+                trimmed != otherValue(condition, record)
+            }
+
+            ConditionOp.ANY_ELEMENT_STARTS_WITH -> {
                 record.arrayTexts(condition.path)?.any { it.startsWith(operand, ignoreCase = true) } == true
-            ConditionOp.EMPTY_OBJECT -> (record.objectSize(condition.path) ?: 0) == 0
-            ConditionOp.NON_EMPTY_OBJECT -> (record.objectSize(condition.path) ?: 0) > 0
+            }
+
+            ConditionOp.EMPTY_OBJECT -> {
+                (record.objectSize(condition.path) ?: 0) == 0
+            }
+
+            ConditionOp.NON_EMPTY_OBJECT -> {
+                (record.objectSize(condition.path) ?: 0) > 0
+            }
         }
     }
 

@@ -108,13 +108,21 @@ private fun MainWindow(onExit: () -> Unit) {
             val cloudBacked = remoteController.activeBinding() != null
             logger.i { "Window close: database=${database != null}, cloudBacked=$cloudBacked" }
             when {
-                closeProgress != null -> Unit // a close sync is already in progress; ignore repeat clicks
-                closeDecision != null -> Unit // the close dialog is already open
-                database == null || !cloudBacked -> onExit()
-                else ->
+                closeProgress != null -> {}
+
+                // a close sync is already in progress; ignore repeat clicks
+                closeDecision != null -> {}
+
+                // the close dialog is already open
+                database == null || !cloudBacked -> {
+                    onExit()
+                }
+
+                else -> {
                     // Decide the dialog's defaults (is the local copy dirty? do we still need a password?)
                     // off the close click, then show the tickbox dialog.
                     scope.launch { closeDecision = remoteController.closeDecision(database) }
+                }
             }
         },
         title = "Money Manager",

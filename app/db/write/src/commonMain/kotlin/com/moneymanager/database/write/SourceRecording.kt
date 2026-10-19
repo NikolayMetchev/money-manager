@@ -46,6 +46,7 @@ fun MoneyManagerDatabaseWrapper.recordSource(
                 )
             }
         }
+
         is Source.Qif -> {
             val entitySource = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).executeAsOne()
             if (entitySource.source_type_id == SourceType.QIF_IMPORT.id.toLong()) {
@@ -56,6 +57,7 @@ fun MoneyManagerDatabaseWrapper.recordSource(
                 )
             }
         }
+
         is Source.Api -> {
             val requestId = source.requestId
             val jsonPath = source.jsonPath
@@ -81,11 +83,12 @@ fun MoneyManagerDatabaseWrapper.recordSource(
                 }
             }
         }
+
         Source.Manual,
         Source.SampleGenerator,
         Source.System,
         Source.Merge,
         Source.Unmerge,
-        -> Unit
+        -> {}
     }
 }

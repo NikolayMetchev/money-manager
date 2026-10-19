@@ -1982,14 +1982,21 @@ private suspend fun prepareValidTransactionItem(
                 ?.let { foreignCurrency ->
                     val parsed = item.foreignAmount ?: return@let null
                     when {
-                        parsed.minorUnits != null ->
+                        parsed.minorUnits != null -> {
                             minorUnitsToMoney(
                                 parsed.minorUnits.absoluteValue,
                                 foreignCurrency,
                                 setup.strategy.config.minorUnitDecimalPlaces,
                             )
-                        parsed.decimalMajor != null -> Money.fromDisplayValue(parsed.decimalMajor, foreignCurrency)
-                        else -> null
+                        }
+
+                        parsed.decimalMajor != null -> {
+                            Money.fromDisplayValue(parsed.decimalMajor, foreignCurrency)
+                        }
+
+                        else -> {
+                            null
+                        }
                     }
                 }
         }
@@ -2083,10 +2090,17 @@ private suspend fun buildImportFee(
         }
     val feeMoney =
         when {
-            item.feeAmountMinorUnits != null ->
+            item.feeAmountMinorUnits != null -> {
                 minorUnitsToMoney(item.feeAmountMinorUnits.absoluteValue, feeCurrency, setup.strategy.config.minorUnitDecimalPlaces)
-            item.feeAmountDecimalMajor != null -> Money.fromDisplayValue(item.feeAmountDecimalMajor, feeCurrency)
-            else -> return null
+            }
+
+            item.feeAmountDecimalMajor != null -> {
+                Money.fromDisplayValue(item.feeAmountDecimalMajor, feeCurrency)
+            }
+
+            else -> {
+                return null
+            }
         }
     if (feeMoney.isZero()) return null
     val feeAccountKey = setup.accountResolver.resolveNamedAccount("${setup.strategy.name} Fees", source = apiSource.toSource())
@@ -2257,6 +2271,7 @@ private fun parseAmount(
             val sign = resolveSign(obj, mappings, magnitudeSign) ?: return null
             ParsedAmount(minorUnits = value, decimalMajor = null, sign = sign)
         }
+
         ApiAmountFormat.DECIMAL_MAJOR_UNITS -> {
             val decimal = runCatching { BigDecimal(raw) }.getOrNull() ?: return null
             val magnitudeSign = decimal.compareTo(BigDecimal.ZERO).coerceIn(-1, 1)
@@ -2283,6 +2298,7 @@ private fun parseMagnitude(
             if (value == 0L) return null
             ParsedAmount(minorUnits = value.absoluteValue, decimalMajor = null, sign = 0)
         }
+
         ApiAmountFormat.DECIMAL_MAJOR_UNITS -> {
             val decimal = runCatching { BigDecimal(raw) }.getOrNull() ?: return null
             if (decimal.compareTo(BigDecimal.ZERO) == 0) return null
@@ -2303,8 +2319,11 @@ private fun resolveSign(
     magnitudeSign: Int,
 ): Int? =
     when (val direction = mappings.direction ?: Direction.AmountSign()) {
-        is Direction.AmountSign -> if (direction.positiveIsIncoming) magnitudeSign else -magnitudeSign
-        is Direction.Field ->
+        is Direction.AmountSign -> {
+            if (direction.positiveIsIncoming) magnitudeSign else -magnitudeSign
+        }
+
+        is Direction.Field -> {
             if (magnitudeSign == 0) {
                 0
             } else {
@@ -2313,11 +2332,21 @@ private fun resolveSign(
                         logger.w { "Direction field '${direction.path}' missing from transaction; skipping item" }
                         null
                     }
-                    in direction.incomingValues -> 1
-                    else -> -1
+
+                    in direction.incomingValues -> {
+                        1
+                    }
+
+                    else -> {
+                        -1
+                    }
                 }
             }
-        Direction.Outgoing -> -magnitudeSign.absoluteValue
+        }
+
+        Direction.Outgoing -> {
+            -magnitudeSign.absoluteValue
+        }
     }
 
 /** JSON path for the [index]-th item of a response array, accounting for a blank (root-array) key. */
@@ -2461,15 +2490,34 @@ private class ImportUrlContext(
 ) {
     fun resolve(expr: String): String? =
         when {
-            expr == "account.id" -> account?.id
-            expr.startsWith("account.") -> account?.rawJson?.resolveJsonPath(expr.removePrefix("account."))
-            expr == "window.start" -> windowStart
-            expr == "window.end" -> windowEnd
-            expr == "parent.id" ->
+            expr == "account.id" -> {
+                account?.id
+            }
+
+            expr.startsWith("account.") -> {
+                account?.rawJson?.resolveJsonPath(expr.removePrefix("account."))
+            }
+
+            expr == "window.start" -> {
+                windowStart
+            }
+
+            expr == "window.end" -> {
+                windowEnd
+            }
+
+            expr == "parent.id" -> {
                 ancestorVars.entries.lastOrNull { it.key.endsWith(".id") }?.value
                     ?: ancestorItems?.lastOrNull()?.resolveJsonPath("id")
-            expr.startsWith("ancestor[") -> resolveAncestor(expr)
-            else -> ancestorVars[expr]
+            }
+
+            expr.startsWith("ancestor[") -> {
+                resolveAncestor(expr)
+            }
+
+            else -> {
+                ancestorVars[expr]
+            }
         }
 
     private fun resolveAncestor(expr: String): String? {
@@ -2969,11 +3017,14 @@ private class BatchAccountResolver {
             val match =
                 when {
                     counterpartyId != null -> AccountMatchKey.ByExternalId(ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, counterpartyId)
+
                     dedupeKey != null -> AccountMatchKey.ByPersonalCounterparty(dedupeKey)
+
                     // Persist the normalised name key as an attribute and match on it, so an id-less,
                     // bank-less counterparty reconciles onto the same account across separate imports
                     // (not just within this batch) — the engine indexes existing accounts by this attribute.
                     nameKey != null -> AccountMatchKey.ByExternalId(ACCOUNT_COUNTERPARTY_NAME_KEY_ATTR_TYPE_ID, nameKey)
+
                     else -> AccountMatchKey.ByName(normalizedName)
                 }
             val attributes =
@@ -3286,15 +3337,28 @@ internal fun parseApiTimestamp(
     pattern: String? = null,
 ): Instant? =
     when (format) {
-        TimestampFormat.ISO_8601 -> parseIsoInstant(value)
-        TimestampFormat.EPOCH_MS -> value.toLongOrNull()?.let { Instant.fromEpochMilliseconds(it) }
-        TimestampFormat.EPOCH_S -> value.toLongOrNull()?.let { Instant.fromEpochSeconds(it) }
-        TimestampFormat.EPOCH_S_FLOAT ->
+        TimestampFormat.ISO_8601 -> {
+            parseIsoInstant(value)
+        }
+
+        TimestampFormat.EPOCH_MS -> {
+            value.toLongOrNull()?.let { Instant.fromEpochMilliseconds(it) }
+        }
+
+        TimestampFormat.EPOCH_S -> {
+            value.toLongOrNull()?.let { Instant.fromEpochSeconds(it) }
+        }
+
+        TimestampFormat.EPOCH_S_FLOAT -> {
             value.toDoubleOrNull()?.let {
                 val seconds = it.toLong()
                 Instant.fromEpochSeconds(seconds, ((it - seconds) * 1_000_000_000L).toLong())
             }
-        TimestampFormat.PATTERN -> pattern?.let { parsePatternedTimestamp(value, it) }
+        }
+
+        TimestampFormat.PATTERN -> {
+            pattern?.let { parsePatternedTimestamp(value, it) }
+        }
     }
 
 /**

@@ -214,16 +214,43 @@ class ApiRequestSigner(
         for (part in parts) {
             acc +=
                 when (part) {
-                    is SigPart.Literal -> part.text.encodeToByteArray()
-                    SigPart.Method -> methodName.encodeToByteArray()
-                    SigPart.RequestId -> requestId.encodeToByteArray()
-                    SigPart.ApiKey -> apiKey.encodeToByteArray()
-                    SigPart.Nonce -> nonce.encodeToByteArray()
-                    SigPart.Path -> path.encodeToByteArray()
-                    SigPart.QueryString -> queryString.encodeToByteArray()
-                    SigPart.Body -> body.encodeToByteArray()
-                    is SigPart.ParamString -> paramString(params, part.format).encodeToByteArray()
-                    is SigPart.Sha256 ->
+                    is SigPart.Literal -> {
+                        part.text.encodeToByteArray()
+                    }
+
+                    SigPart.Method -> {
+                        methodName.encodeToByteArray()
+                    }
+
+                    SigPart.RequestId -> {
+                        requestId.encodeToByteArray()
+                    }
+
+                    SigPart.ApiKey -> {
+                        apiKey.encodeToByteArray()
+                    }
+
+                    SigPart.Nonce -> {
+                        nonce.encodeToByteArray()
+                    }
+
+                    SigPart.Path -> {
+                        path.encodeToByteArray()
+                    }
+
+                    SigPart.QueryString -> {
+                        queryString.encodeToByteArray()
+                    }
+
+                    SigPart.Body -> {
+                        body.encodeToByteArray()
+                    }
+
+                    is SigPart.ParamString -> {
+                        paramString(params, part.format).encodeToByteArray()
+                    }
+
+                    is SigPart.Sha256 -> {
                         sha256(
                             buildMessageBytes(
                                 part.parts,
@@ -237,6 +264,7 @@ class ApiRequestSigner(
                                 params,
                             ),
                         )
+                    }
                 }
         }
         return acc
@@ -247,10 +275,13 @@ class ApiRequestSigner(
         format: ParamStringFormat,
     ): String =
         when (format) {
-            ParamStringFormat.SORTED_CONCAT ->
+            ParamStringFormat.SORTED_CONCAT -> {
                 params.entries.sortedBy { it.key }.joinToString(separator = "") { "${it.key}${it.value}" }
-            ParamStringFormat.QUERY_STRING ->
+            }
+
+            ParamStringFormat.QUERY_STRING -> {
                 params.entries.joinToString(separator = "&") { "${it.key}=${it.value}" }
+            }
         }
 
     private fun renderBody(
@@ -291,10 +322,15 @@ class ApiRequestSigner(
         for (c in s) {
             when (c) {
                 '"' -> sb.append("\\\"")
+
                 '\\' -> sb.append("\\\\")
+
                 '\n' -> sb.append("\\n")
+
                 '\r' -> sb.append("\\r")
+
                 '\t' -> sb.append("\\t")
+
                 // Per RFC 8259 §7, every other control character (U+0000–U+001F, incl. \b and \f) is escaped as \uXXXX.
                 else -> if (c < ' ') sb.append("\\u").append(c.code.toString(16).padStart(4, '0')) else sb.append(c)
             }
@@ -408,11 +444,17 @@ private suspend fun decodeJwtKey(
     algorithm: JwtAlgorithm,
 ): JwtKey =
     when (algorithm) {
-        JwtAlgorithm.ES256 -> es256Key(decodeP256PrivateKey(secret))
-        JwtAlgorithm.EdDSA -> edDsaKey(decodeEd25519PrivateKey(secret))
+        JwtAlgorithm.ES256 -> {
+            es256Key(decodeP256PrivateKey(secret))
+        }
+
+        JwtAlgorithm.EdDSA -> {
+            edDsaKey(decodeEd25519PrivateKey(secret))
+        }
+
         // Try Ed25519 first only when the secret has an Ed25519 secret's shape, so a malformed EC key
         // still reports why it is not a valid EC key.
-        JwtAlgorithm.DETECT ->
+        JwtAlgorithm.DETECT -> {
             if (looksLikeEd25519Secret(secret)) {
                 edDsaKey(decodeEd25519PrivateKey(secret))
             } else {
@@ -420,6 +462,7 @@ private suspend fun decodeJwtKey(
                     .recoverCatching { ecError -> runCatching { edDsaKey(decodeEd25519PrivateKey(secret)) }.getOrElse { throw ecError } }
                     .getOrThrow()
             }
+        }
     }
 
 private fun es256Key(key: ECDSA.PrivateKey): JwtKey {
@@ -448,12 +491,16 @@ private suspend fun decodeEd25519PrivateKey(secret: String): EdDSA.PrivateKey {
     if (PEM_BLOCK.find(pem) != null) return decoder.decodeFromByteArray(EdDSA.PrivateKey.Format.PEM, pem.encodeToByteArray())
     val bytes = requireNotNull(base64SecretBytes(secret)) { "The API secret is neither a PEM private key nor base64" }
     return when (bytes.size) {
-        ED25519_SECRET_BYTES, ED25519_SEED_BYTES ->
+        ED25519_SECRET_BYTES, ED25519_SEED_BYTES -> {
             decoder.decodeFromByteArray(
                 EdDSA.PrivateKey.Format.RAW,
                 bytes.copyOf(ED25519_SEED_BYTES),
             )
-        else -> decoder.decodeFromByteArray(EdDSA.PrivateKey.Format.DER, bytes)
+        }
+
+        else -> {
+            decoder.decodeFromByteArray(EdDSA.PrivateKey.Format.DER, bytes)
+        }
     }
 }
 

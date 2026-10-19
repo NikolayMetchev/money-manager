@@ -77,6 +77,7 @@ fun CreateCurrencyDialog(
                     else -> nameFocusRequester.requestFocus()
                 }
             }
+
             else -> {
                 saveState.isSaving = true
                 saveState.errorMessage = null

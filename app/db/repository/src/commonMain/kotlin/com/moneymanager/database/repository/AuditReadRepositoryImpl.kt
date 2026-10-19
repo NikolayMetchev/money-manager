@@ -194,8 +194,10 @@ class AuditReadRepositoryImpl(
             val events = mutableListOf<CsvImportHistoryEvent>()
             auditSelectQueries.selectCsvImportApplicationHistory(importId.id.toString()).executeAsList().forEach { row ->
                 when (row.audit_type_id) {
-                    AUDIT_TYPE_INSERT ->
+                    AUDIT_TYPE_INSERT -> {
                         events += CsvImportHistoryEvent.Applied(row.strategy_name, Instant.fromEpochMilliseconds(row.applied_at))
+                    }
+
                     AUDIT_TYPE_DELETE -> {
                         val at = Instant.fromEpochMilliseconds(row.audit_timestamp)
                         // One unimport deletes every application at once: adjacent DELETE rows are one event.

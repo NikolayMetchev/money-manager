@@ -27,6 +27,7 @@ actual fun createRemoteStorageProviderFactory(
             when (providerId) {
                 // config is ignored on Android — auth is tied to the app's registered OAuth client.
                 GOOGLE_DRIVE_PROVIDER_ID -> googleDriveProvider(params.googleTokenSource, subfolder)
+
                 else -> throw IllegalArgumentException("Unknown remote storage provider: $providerId")
             }
     }

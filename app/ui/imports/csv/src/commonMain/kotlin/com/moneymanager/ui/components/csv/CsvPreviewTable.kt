@@ -99,8 +99,14 @@ fun CsvPreviewTable(
                         activeSortKey = key
                         sortDirection = SortDirection.ASC
                     }
-                    sortDirection == SortDirection.ASC -> sortDirection = SortDirection.DESC
-                    else -> activeSortKey = null
+
+                    sortDirection == SortDirection.ASC -> {
+                        sortDirection = SortDirection.DESC
+                    }
+
+                    else -> {
+                        activeSortKey = null
+                    }
                 }
             }
         }
@@ -353,13 +359,17 @@ private fun TransferIdCell(
     val clickAction =
         when {
             transferId == null -> null
+
             isDuplicate && onDuplicateSourceClick != null -> (
                 {
                     onDuplicateSourceClick(transferId, isPositiveAmount)
                 }
             )
+
             isDuplicate -> null
+
             onClick != null -> ({ onClick(transferId, isPositiveAmount) })
+
             else -> null
         }
 

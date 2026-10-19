@@ -90,25 +90,45 @@ fun buildSourceRecord(columns: SourceColumns): SourceRecord? {
  */
 private fun SourceColumns.reconstructSource(sourceType: SourceType): Pair<Source, String?> =
     when (sourceType) {
-        SourceType.MANUAL -> Source.Manual to null
-        SourceType.SAMPLE_GENERATOR -> Source.SampleGenerator to null
-        SourceType.SYSTEM -> Source.System to null
-        SourceType.MERGE -> Source.Merge to null
-        SourceType.MERGE_UNDO -> Source.Unmerge to null
-        SourceType.CSV_IMPORT ->
+        SourceType.MANUAL -> {
+            Source.Manual to null
+        }
+
+        SourceType.SAMPLE_GENERATOR -> {
+            Source.SampleGenerator to null
+        }
+
+        SourceType.SYSTEM -> {
+            Source.System to null
+        }
+
+        SourceType.MERGE -> {
+            Source.Merge to null
+        }
+
+        SourceType.MERGE_UNDO -> {
+            Source.Unmerge to null
+        }
+
+        SourceType.CSV_IMPORT -> {
             Source.Csv(
                 importId = CsvImportId(Uuid.parse(checkNotNull(csvImportId) { "CSV source row missing csv_import_id" })),
                 rowIndex = csvRowIndex,
             ) to csvFileName
-        SourceType.QIF_IMPORT ->
+        }
+
+        SourceType.QIF_IMPORT -> {
             Source.Qif(
                 importId = QifImportId(Uuid.parse(checkNotNull(qifImportId) { "QIF source row missing qif_import_id" })),
                 recordIndex = qifRecordIndex,
             ) to qifFileName
-        SourceType.API ->
+        }
+
+        SourceType.API -> {
             Source.Api(
                 sessionId = ApiSessionId(checkNotNull(apiSessionId) { "API source row missing api_session_id" }),
                 requestId = apiRequestId?.let { ApiRequestId(it) },
                 jsonPath = apiJsonPath?.let { JsonPath(it) },
             ) to null
+        }
     }

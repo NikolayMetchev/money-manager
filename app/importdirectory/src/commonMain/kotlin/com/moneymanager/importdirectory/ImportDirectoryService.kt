@@ -472,10 +472,17 @@ class ImportDirectoryService(
             val strategy = qifStrategies.selectForQifContent(rows, QifCsvAdapter.columns)
             val reason =
                 when {
-                    strategy == null -> NeedsAttentionReason.NO_STRATEGY
-                    file.id !in directoryAccounts && strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT] == null ->
+                    strategy == null -> {
+                        NeedsAttentionReason.NO_STRATEGY
+                    }
+
+                    file.id !in directoryAccounts && strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT] == null -> {
                         NeedsAttentionReason.NEEDS_SOURCE_ACCOUNT
-                    else -> null
+                    }
+
+                    else -> {
+                        null
+                    }
                 }
             if (reason != null) {
                 needsAttention += NeedsAttention(file.originalFileName, reason)

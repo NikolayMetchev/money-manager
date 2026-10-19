@@ -79,13 +79,30 @@ fun TradeEntryDialog(
         val fromValue = parse(fromAmount)
         val toValue = parse(toAmount)
         when {
-            from == null || to == null -> errorMessage = "Select both accounts"
-            from == to -> errorMessage = "A trade must move between two different accounts"
-            fromA == null || toA == null -> errorMessage = "Select both assets"
-            fromA.id == toA.id -> errorMessage = "A trade must exchange two different assets"
-            fromValue == null || toValue == null -> errorMessage = "Enter both amounts"
-            fromValue <= BigDecimal.ZERO || toValue <= BigDecimal.ZERO ->
+            from == null || to == null -> {
+                errorMessage = "Select both accounts"
+            }
+
+            from == to -> {
+                errorMessage = "A trade must move between two different accounts"
+            }
+
+            fromA == null || toA == null -> {
+                errorMessage = "Select both assets"
+            }
+
+            fromA.id == toA.id -> {
+                errorMessage = "A trade must exchange two different assets"
+            }
+
+            fromValue == null || toValue == null -> {
+                errorMessage = "Enter both amounts"
+            }
+
+            fromValue <= BigDecimal.ZERO || toValue <= BigDecimal.ZERO -> {
                 errorMessage = "Amounts must be greater than zero"
+            }
+
             else -> {
                 errorMessage = null
                 isSaving = true

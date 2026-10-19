@@ -280,7 +280,7 @@ fun CsvImportDetailScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         when (val currentImport = import) {
-            null ->
+            null -> {
                 if (isLoading) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -300,6 +300,8 @@ fun CsvImportDetailScreen(
                         )
                     }
                 }
+            }
+
             else -> {
                 // File info header
                 Column {

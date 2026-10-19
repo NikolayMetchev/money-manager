@@ -90,7 +90,10 @@ fun ApiReimportDialog(
                         .verticalScroll(rememberScrollState()),
             ) {
                 when (val currentPlan = plan) {
-                    null -> CircularProgressIndicator()
+                    null -> {
+                        CircularProgressIndicator()
+                    }
+
                     else -> {
                         Text(
                             text =

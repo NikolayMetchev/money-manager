@@ -34,6 +34,7 @@ internal class Output(
                 val envelope = Envelope.of(value, nextCursor)
                 terminal.rawPrint(json.encodeToString(Envelope.serializer(serializer), envelope) + "\n")
             }
+
             OutputFormat.TABLE -> {
                 terminal.println(table(value))
                 nextCursor?.let { note("More: rerun with --cursor $it") }

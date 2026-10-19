@@ -195,26 +195,29 @@ fun DatabaseSizeBreakdownScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             when {
-                isLoading && breakdown.isEmpty() ->
+                isLoading && breakdown.isEmpty() -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
                         CircularProgressIndicator()
                     }
+                }
 
-                errorMessage != null ->
+                errorMessage != null -> {
                     Text(
                         text = errorMessage ?: "",
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                }
 
-                breakdown.isEmpty() ->
+                breakdown.isEmpty() -> {
                     Text(
                         text = "No breakdown available (dbstat may be unavailable in this SQLite build).",
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                }
 
                 else -> {
                     DatabaseSizePieChart(
@@ -304,7 +307,9 @@ private fun DatabaseSizePieChart(
                                             activeSlice = pieSliceAt(position, pieSizePx, slices, totalBytes)
                                         }
 
-                                        PointerEventType.Exit -> activeSlice = null
+                                        PointerEventType.Exit -> {
+                                            activeSlice = null
+                                        }
                                     }
                                 }
                             }

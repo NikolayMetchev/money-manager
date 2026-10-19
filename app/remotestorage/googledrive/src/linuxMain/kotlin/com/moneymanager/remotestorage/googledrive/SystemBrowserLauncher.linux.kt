@@ -48,6 +48,7 @@ internal actual fun openInSystemBrowser(url: String): Boolean =
                 close(writeEnd)
                 false
             }
+
             0 -> {
                 close(readEnd)
                 when (fork()) {
@@ -55,11 +56,15 @@ internal actual fun openInSystemBrowser(url: String): Boolean =
                         execvp("xdg-open", argv)
                         write(writeEnd, failure.ptr, 1u)
                     }
-                    -1 -> write(writeEnd, failure.ptr, 1u)
+
+                    -1 -> {
+                        write(writeEnd, failure.ptr, 1u)
+                    }
                 }
                 _exit(0)
                 false
             }
+
             else -> {
                 close(writeEnd)
                 waitpid(child, null, 0)

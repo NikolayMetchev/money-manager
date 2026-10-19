@@ -127,13 +127,15 @@ fun ConditionRow(
                 isError = condition.value.isNullOrBlank(),
             )
         }
+
         ConditionOperand.OTHER_PATH -> {
             Spacer(modifier = Modifier.height(4.dp))
             pathField.Field("Other ${pathLabel.lowercase()}", condition.otherPath.orEmpty(), {
                 onConditionChanged(condition.copy(otherPath = it))
             }, condition.otherPath.isNullOrBlank())
         }
-        ConditionOperand.NONE -> Unit
+
+        ConditionOperand.NONE -> {}
     }
 }
 

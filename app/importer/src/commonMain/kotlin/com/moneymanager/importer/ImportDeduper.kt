@@ -364,21 +364,29 @@ class ImportDeduper(
             if (unidentifiedCounterpartyTypeId == null) return@run null
             val (window, exclusion, relationship) =
                 when (policy) {
-                    is DedupePolicy.FuzzyAllFields ->
+                    is DedupePolicy.FuzzyAllFields -> {
                         Triple(policy.dateTolerance, policy.reconciledExclusionAttributeTypeId, policy.reconciledRelationshipTypeId)
-                    is DedupePolicy.ApiMultiKey ->
+                    }
+
+                    is DedupePolicy.ApiMultiKey -> {
                         Triple(
                             policy.unidentifiedCounterpartyWindow,
                             policy.reconciledExclusionAttributeTypeId,
                             policy.reconciledRelationshipTypeId,
                         )
-                    is DedupePolicy.UniqueIdentifier ->
+                    }
+
+                    is DedupePolicy.UniqueIdentifier -> {
                         Triple(
                             policy.unidentifiedCounterpartyWindow,
                             policy.reconciledExclusionAttributeTypeId,
                             policy.reconciledRelationshipTypeId,
                         )
-                    DedupePolicy.None -> return@run null
+                    }
+
+                    DedupePolicy.None -> {
+                        return@run null
+                    }
                 }
             if (window == null || exclusion == null || relationship == null) null else PlaceholderSettings(window, exclusion, relationship)
         }
@@ -802,20 +810,23 @@ class ImportDeduper(
             transfer.relationships + NewRelationship(relatedTransferId = found.id, typeId = relationshipTypeId) +
                 found.supersedes.map { NewRelationship(relatedTransferId = it.id, typeId = relationshipTypeId) }
         return when (rule.keeps) {
-            Keeps.EXISTING ->
+            Keeps.EXISTING -> {
                 Classified(
                     transfer.copy(attributes = transfer.withExclusion(exclusionTypeId), relationships = relationships, fee = null),
                     ImportStatus.IMPORTED,
                     existing = null,
                     supersededLegs = found.supersedes.map { ExcludeExistingLeg(it, exclusionTypeId) },
                 )
-            Keeps.INCOMING ->
+            }
+
+            Keeps.INCOMING -> {
                 Classified(
                     transfer.copy(relationships = relationships),
                     ImportStatus.IMPORTED,
                     existing = null,
                     excludeExisting = ExcludeExistingLeg(found.existing, exclusionTypeId),
                 )
+            }
         }
     }
 
@@ -1453,10 +1464,17 @@ class ImportDeduper(
     // Dedupe runs on resolved CREATE transfers, whose fields are present; null indicates a builder error.
     private fun AccountRef?.requireId(): AccountId =
         when (this) {
-            is AccountRef.Existing -> id
-            is AccountRef.Local ->
+            is AccountRef.Existing -> {
+                id
+            }
+
+            is AccountRef.Local -> {
                 error("ImportDeduper requires resolved account references; got unresolved $key")
-            null -> error("ImportDeduper requires a resolved account reference; got null")
+            }
+
+            null -> {
+                error("ImportDeduper requires a resolved account reference; got null")
+            }
         }
 }
 

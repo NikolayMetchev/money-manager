@@ -345,13 +345,15 @@ internal fun TradeMappingsEditor(
             enabled = enabled,
         )
         when (mappings.splitMode) {
-            InstrumentSplitMode.SEPARATOR ->
+            InstrumentSplitMode.SEPARATOR -> {
                 TextFieldRow(
                     "Instrument separator",
                     mappings.instrumentSeparator,
                     { onChange(mappings.copy(instrumentSeparator = it)) },
                     enabled,
                 )
+            }
+
             InstrumentSplitMode.EXPLICIT_FIELDS -> {
                 TextFieldRow(
                     "Base asset field",
@@ -378,13 +380,15 @@ internal fun TradeMappingsEditor(
                     enabled,
                 )
             }
-            InstrumentSplitMode.QUOTE_SUFFIX ->
+
+            InstrumentSplitMode.QUOTE_SUFFIX -> {
                 StringSetEditor(
                     label = "Known quote assets (longest match wins)",
                     values = mappings.quoteAssets.toSet(),
                     onChange = { onChange(mappings.copy(quoteAssets = it.toList())) },
                     enabled = enabled,
                 )
+            }
         }
         EnumDropdown(
             label = "Side",
@@ -630,11 +634,18 @@ private fun ApiTradeMappings.isValidForSave(): Boolean =
         // The base×price / explicit-quote-quantity derivation needs at least one of these.
         (!priceField.isNullOrBlank() || !quoteQuantityField.isNullOrBlank()) &&
         when (splitMode) {
-            InstrumentSplitMode.SEPARATOR -> instrumentSeparator.isNotBlank()
-            InstrumentSplitMode.EXPLICIT_FIELDS ->
+            InstrumentSplitMode.SEPARATOR -> {
+                instrumentSeparator.isNotBlank()
+            }
+
+            InstrumentSplitMode.EXPLICIT_FIELDS -> {
                 (!baseAssetField.isNullOrBlank() || !fixedBaseAsset.isNullOrBlank()) &&
                     (!quoteAssetField.isNullOrBlank() || !fixedQuoteAsset.isNullOrBlank())
-            InstrumentSplitMode.QUOTE_SUFFIX -> quoteAssets.isNotEmpty()
+            }
+
+            InstrumentSplitMode.QUOTE_SUFFIX -> {
+                quoteAssets.isNotEmpty()
+            }
         }
 
 private fun ApiTransactionMappings.isValidForSave(): Boolean =

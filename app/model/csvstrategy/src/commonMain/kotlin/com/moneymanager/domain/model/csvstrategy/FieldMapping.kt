@@ -189,10 +189,12 @@ data class AmountParsingMapping(
 ) : FieldMapping {
     init {
         when (mode) {
-            AmountMode.SINGLE_COLUMN ->
+            AmountMode.SINGLE_COLUMN -> {
                 requireNotNull(amountColumnName) {
                     "amountColumnName is required for SINGLE_COLUMN mode"
                 }
+            }
+
             AmountMode.CREDIT_DEBIT_COLUMNS -> {
                 requireNotNull(creditColumnName) {
                     "creditColumnName is required for CREDIT_DEBIT_COLUMNS mode"

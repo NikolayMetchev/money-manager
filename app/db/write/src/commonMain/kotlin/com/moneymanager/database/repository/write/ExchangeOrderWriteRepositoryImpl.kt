@@ -62,6 +62,7 @@ class ExchangeOrderWriteRepositoryImpl(
                         database.recordSource(deviceId, EntityType.EXCHANGE_ORDER, id, 1L, source)
                         OrderUpsertResult(ExchangeOrderId(id), OrderUpsertResult.Outcome.CREATED)
                     }
+
                     existing.client_oid == clientOid &&
                         existing.side == side &&
                         existing.order_type == orderType &&
@@ -74,6 +75,7 @@ class ExchangeOrderWriteRepositoryImpl(
                         existing.updated_at == updatedAt?.toEpochMilliseconds() -> {
                         OrderUpsertResult(ExchangeOrderId(existing.id), OrderUpsertResult.Outcome.UNCHANGED)
                     }
+
                     else -> {
                         writeQueries.updateByUniqueKey(
                             client_oid = clientOid,

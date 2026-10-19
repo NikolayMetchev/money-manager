@@ -348,16 +348,21 @@ private fun CatalogRow(
             }
             Spacer(modifier = Modifier.weight(0.05f))
             when (item.status) {
-                CatalogItemStatus.INSTALLED ->
+                CatalogItemStatus.INSTALLED -> {
                     Text(
                         "Installed",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                CatalogItemStatus.NOT_INSTALLED ->
+                }
+
+                CatalogItemStatus.NOT_INSTALLED -> {
                     Button(enabled = !busy, onClick = onInstall) { Text("Install") }
-                CatalogItemStatus.UPDATE_AVAILABLE ->
+                }
+
+                CatalogItemStatus.UPDATE_AVAILABLE -> {
                     OutlinedButton(enabled = !busy, onClick = onInstall) { Text("Update") }
+                }
             }
         }
     }

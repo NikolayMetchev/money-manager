@@ -213,26 +213,72 @@ private fun TransactionsView(
         val links = model.detail?.links.orEmpty()
         val at = currentIndex()
         when (event.key) {
-            "a" ->
+            "a" -> {
                 picker =
                     OpenPicker(MultiSelect("Account", accountChoices(snapshot), setOfNotNull(model.accountId), single = true)) {
                         it.firstOrNull()?.let(scope.openAccount)
                     }
-            "f" -> askRange()
-            "x" -> model.eventSink(TransactionsEvent.SetRange(TransactionRange()))
-            "g" -> askJump()
-            "r" -> model.eventSink(TransactionsEvent.Refresh)
-            "Enter" -> detailOpen = !detailOpen && ids.getOrNull(at) != null
-            "Escape" -> if (detailOpen) detailOpen = false else return false
-            "n" -> if (detailOpen && links.isNotEmpty()) link = (link + 1) % links.size
-            "l" -> links.getOrNull(link)?.takeIf { detailOpen }?.let(::follow)
-            "ArrowUp" -> select(at - 1)
-            "ArrowDown" -> select(at + 1)
-            "PageUp" -> select(at - visibleRows)
-            "PageDown" -> select(at + visibleRows)
-            "Home" -> if (model.hasNewer) model.eventSink(TransactionsEvent.SetRange(model.range)) else select(0)
-            "End" -> select(last)
-            else -> return false
+            }
+
+            "f" -> {
+                askRange()
+            }
+
+            "x" -> {
+                model.eventSink(TransactionsEvent.SetRange(TransactionRange()))
+            }
+
+            "g" -> {
+                askJump()
+            }
+
+            "r" -> {
+                model.eventSink(TransactionsEvent.Refresh)
+            }
+
+            "Enter" -> {
+                detailOpen = !detailOpen && ids.getOrNull(at) != null
+            }
+
+            "Escape" -> {
+                if (detailOpen) detailOpen = false else return false
+            }
+
+            "n" -> {
+                if (detailOpen && links.isNotEmpty()) link = (link + 1) % links.size
+            }
+
+            "l" -> {
+                links.getOrNull(link)?.takeIf { detailOpen }?.let(::follow)
+            }
+
+            "ArrowUp" -> {
+                select(at - 1)
+            }
+
+            "ArrowDown" -> {
+                select(at + 1)
+            }
+
+            "PageUp" -> {
+                select(at - visibleRows)
+            }
+
+            "PageDown" -> {
+                select(at + visibleRows)
+            }
+
+            "Home" -> {
+                if (model.hasNewer) model.eventSink(TransactionsEvent.SetRange(model.range)) else select(0)
+            }
+
+            "End" -> {
+                select(last)
+            }
+
+            else -> {
+                return false
+            }
         }
         return true
     }

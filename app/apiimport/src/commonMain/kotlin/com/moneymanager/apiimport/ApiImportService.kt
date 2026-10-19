@@ -404,9 +404,13 @@ class ApiImportService(
                             val outcome = downloaded?.getOrNull()
                             downloads += ApiCredentialDownload(credential, strategyName, outcome, error)
                             when {
-                                error != null -> task.reportIssue("${strategyName ?: "Connection"}: download failed: $error")
-                                outcome is ApiDownloadOutcome.NotDownloaded ->
+                                error != null -> {
+                                    task.reportIssue("${strategyName ?: "Connection"}: download failed: $error")
+                                }
+
+                                outcome is ApiDownloadOutcome.NotDownloaded -> {
                                     task.reportIssue("${strategyName ?: "Connection"}: not downloaded: ${outcome.message}")
+                                }
                             }
                             downloadsLeft--
                             // Queued even when the download failed: sessions left from earlier downloads still
@@ -478,7 +482,10 @@ class ApiImportService(
                 listener.onImported(session.id, result)
                 ApiSessionImport(session, strategy.name, ApiSessionImportStatus.IMPORTED, result)
             }
-            else -> failedImport(task, session, strategy, imported?.exceptionOrNull())
+
+            else -> {
+                failedImport(task, session, strategy, imported?.exceptionOrNull())
+            }
         }
     }
 

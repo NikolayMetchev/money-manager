@@ -179,13 +179,21 @@ fun QifReimportDialog(
             ) {
                 val currentSummary = summary
                 when {
-                    currentSummary != null -> Text(currentSummary, style = MaterialTheme.typography.bodyMedium)
-                    !strategyResolved -> CircularProgressIndicator()
-                    baseStrategy == null ->
+                    currentSummary != null -> {
+                        Text(currentSummary, style = MaterialTheme.typography.bodyMedium)
+                    }
+
+                    !strategyResolved -> {
+                        CircularProgressIndicator()
+                    }
+
+                    baseStrategy == null -> {
                         Text(
                             text = "No QIF strategy matches this import. Create or restore a matching strategy first.",
                             color = MaterialTheme.colorScheme.error,
                         )
+                    }
+
                     else -> {
                         Text(
                             text = "Strategy: ${baseStrategy?.name}",
@@ -218,10 +226,12 @@ fun QifReimportDialog(
                         }
 
                         when (val currentPlan = plan) {
-                            null ->
+                            null -> {
                                 if (errorMessage == null) {
                                     ReimportProgressIndicator(planProgress ?: Progress("Preparing preview"))
                                 }
+                            }
+
                             else -> {
                                 if (isRunning) {
                                     ReimportProgressIndicator(executeProgress ?: Progress("Starting re-import"))

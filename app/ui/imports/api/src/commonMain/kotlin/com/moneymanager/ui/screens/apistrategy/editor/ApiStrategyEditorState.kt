@@ -113,8 +113,11 @@ internal class ApiStrategyEditorState(
     val endpointsHasError: Boolean
         get() =
             when (val accounts = config.accounts) {
-                is ApiAccountsSource.Single -> !accounts.isValidForSave()
-                is ApiAccountsSource.Downloaded ->
+                is ApiAccountsSource.Single -> {
+                    !accounts.isValidForSave()
+                }
+
+                is ApiAccountsSource.Downloaded -> {
                     accounts.endpoint.path.isBlank() ||
                         accounts.identifiersEndpoint?.path?.isBlank() == true ||
                         accounts.ancestorEndpoints.any { it.path.isBlank() } ||
@@ -122,6 +125,7 @@ internal class ApiStrategyEditorState(
                             ?.endpoint
                             ?.path
                             ?.isBlank() != false
+                }
             } ||
                 !config.dataEndpoints.filter { it.kind != ApiEndpointKind.BANK_TRANSACTIONS }.isValidForSave()
 

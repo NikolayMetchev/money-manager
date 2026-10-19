@@ -129,10 +129,12 @@ class PayPalImportE2ETest : DbTest() {
                     }
                     """{ "scope": "https://uri.paypal.com/services/reporting/search/read", "access_token": "$ACCESS_TOKEN", "token_type": "Bearer", "expires_in": 32400 }"""
                 }
+
                 "/v1/reporting/balances" -> {
                     captured.bearerHeaders += request.headers[HttpHeaders.Authorization]
                     BALANCES_JSON
                 }
+
                 "/v1/reporting/transactions" -> {
                     captured.bearerHeaders += request.headers[HttpHeaders.Authorization]
                     captured.transactionUrls += url.toString()
@@ -150,7 +152,10 @@ class PayPalImportE2ETest : DbTest() {
                     }
                     """
                 }
-                else -> error("Unexpected request: $url")
+
+                else -> {
+                    error("Unexpected request: $url")
+                }
             }
         respond(content = json, status = HttpStatusCode.OK, headers = headersOf(HttpHeaders.ContentType, "application/json"))
     }

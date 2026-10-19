@@ -57,6 +57,7 @@ actual fun rememberDatabaseLocationPicker(onResult: (DbLocation?) -> Unit): Data
                 },
             )
         }
+
         DatabasePickerMode.CREATE -> {
             CreateDatabaseDialog(
                 onConfirm = { name ->
@@ -69,6 +70,7 @@ actual fun rememberDatabaseLocationPicker(onResult: (DbLocation?) -> Unit): Data
                 },
             )
         }
+
         DatabasePickerMode.OPEN_OR_CREATE -> {
             val databaseNames =
                 remember {
@@ -93,7 +95,8 @@ actual fun rememberDatabaseLocationPicker(onResult: (DbLocation?) -> Unit): Data
                 },
             )
         }
-        null -> Unit
+
+        null -> {}
     }
 
     return launcher

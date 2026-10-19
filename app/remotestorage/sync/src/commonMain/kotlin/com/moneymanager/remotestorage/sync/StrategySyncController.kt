@@ -280,11 +280,15 @@ class StrategySyncController(
                     store.putBaseline(entry.key, StrategySyncedBaseline(remoteFile.id, remoteFile.revisionId, entry.contentHash))
                     false
                 }
+
                 entry.key in forceUpload -> {
                     upload(provider, entry, remoteFile.id)
                     true
                 }
-                else -> false
+
+                else -> {
+                    false
+                }
             }
         }
         val localChanged = entry.contentHash != baseline.syncedHash

@@ -80,18 +80,29 @@ fun TuiApp(
                 controller.interrupt()
                 true
             }
-            prompter.handleKey(event) -> true
+
+            prompter.handleKey(event) -> {
+                true
+            }
+
             help -> {
                 if (event.key == "?" || event.key == "Escape" || event.key == "q") help = false
                 true
             }
+
             pending != null -> {
                 handleChoiceKey(controller, pending, event)
                 true
             }
+
             // Nothing to act on while a database opens or closes.
-            controller.busy != null || controller.session == null -> true
-            else -> false
+            controller.busy != null || controller.session == null -> {
+                true
+            }
+
+            else -> {
+                false
+            }
         }
     }
 
@@ -159,13 +170,20 @@ private fun handleChoiceKey(
     event: KeyEvent,
 ) {
     when (event.key) {
-        "Enter" ->
+        "Enter" -> {
             choice.editor.text
                 .trim()
                 .takeIf { it.isNotEmpty() }
                 ?.let { controller.open(DbLocation(expandTilde(it))) }
-        "Escape" -> if (choice.cancellable) controller.cancelChoice() else controller.prompter.notice = null
-        else -> choice.editor.handle(event)
+        }
+
+        "Escape" -> {
+            if (choice.cancellable) controller.cancelChoice() else controller.prompter.notice = null
+        }
+
+        else -> {
+            choice.editor.handle(event)
+        }
     }
 }
 
@@ -234,8 +252,10 @@ private fun PromptDialog(
                 LineField(request.editor, inner, request.masked)
                 Text(fit("Enter to confirm · Esc to cancel", inner), textStyle = TextStyle.Dim)
             }
-            is PromptRequest.Confirm ->
+
+            is PromptRequest.Confirm -> {
                 Text(fit(if (request.default) "[Y/n]" else "[y/N]", inner), textStyle = TextStyle.Dim)
+            }
         }
     }
 }

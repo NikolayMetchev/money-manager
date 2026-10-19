@@ -119,7 +119,10 @@ fun ImportTimelineScreen(
                     .date
                     .toEpochDays()
             when (groupMode) {
-                TimelineGroupMode.STRATEGY -> buildTimelineMatrix(strategyRanges, timeZone, todayDay, groupMode)
+                TimelineGroupMode.STRATEGY -> {
+                    buildTimelineMatrix(strategyRanges, timeZone, todayDay, groupMode)
+                }
+
                 TimelineGroupMode.ACCOUNT -> {
                     val filtered =
                         filterAccountRanges(
@@ -350,6 +353,7 @@ private fun TimelineRowBar(
                                     pointer = position
                                     hovered = hoverAt(position.x)
                                 }
+
                                 PointerEventType.Release -> {
                                     val position = event.changes.first().position
                                     if (barSizePx.width > 0) {
@@ -357,7 +361,10 @@ private fun TimelineRowBar(
                                             filesAt(row, dayAt(position.x))
                                                 .filter { it.kind != TimelineSourceKind.MANUAL }
                                         when {
-                                            clickable.size == 1 -> onOpenFile(clickable.single().range)
+                                            clickable.size == 1 -> {
+                                                onOpenFile(clickable.single().range)
+                                            }
+
                                             clickable.size > 1 -> {
                                                 chooserAt = position
                                                 chooser = clickable
@@ -365,7 +372,10 @@ private fun TimelineRowBar(
                                         }
                                     }
                                 }
-                                PointerEventType.Exit -> hovered = null
+
+                                PointerEventType.Exit -> {
+                                    hovered = null
+                                }
                             }
                         }
                     }
@@ -463,7 +473,7 @@ private fun TimelineTooltipContent(hover: TimelineHover) {
     ) {
         Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
             when (hover) {
-                is TimelineHover.Files ->
+                is TimelineHover.Files -> {
                     hover.files.forEach { file ->
                         val range = file.range
                         Text(
@@ -473,6 +483,8 @@ private fun TimelineTooltipContent(hover: TimelineHover) {
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
+                }
+
                 is TimelineHover.Gap -> {
                     val gap = hover.gap
                     val days = gap.endDay - gap.startDay + 1
