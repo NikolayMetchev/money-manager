@@ -357,12 +357,90 @@ exclude:
       - utils/bigdecimal/src/jvmAndroidMain/kotlin/com/moneymanager/bigdecimal/BigDecimal.kt
       - utils/bigdecimal/src/jvmAndroidMain/kotlin/com/moneymanager/bigdecimal/BigInteger.kt
       - utils/currency/src/jvmAndroidMain/kotlin/com/moneymanager/currency/Currency.kt
-      # [5] — and those expects themselves: with expect and actual in one module, a usage binds to either,
-      # and which one varies from run to run, so the other looks unused (ONE, TEN, movePointLeft,
-      # toBigDecimal, getDefaultCurrencyCode are all used).
+      # [5] — every other file declaring an expect or an actual (and the expects of the actuals above). With
+      # expect and actual in one module, a usage binds to either, and which one varies from run to run, so the
+      # other looks unused, and so does whatever only it calls (a private helper of an actual fun). Listed
+      # whole because the flips are random: BigDecimal.ONE/TEN, movePointLeft, toBigDecimal,
+      # getDefaultCurrencyCode and FileSaverLauncher's openSaveDialog have each flipped, all used.
+      - app/apiimport/src/commonMain/kotlin/com/moneymanager/apiimport/CurrentCountry.kt
+      - app/apiimport/src/jvmAndroidMain/kotlin/com/moneymanager/apiimport/CurrentCountry.jvmAndroid.kt
+      - app/cryptodata/src/androidMain/kotlin/com/moneymanager/cryptodata/CryptoCatalogStore.android.kt
+      - app/cryptodata/src/commonMain/kotlin/com/moneymanager/cryptodata/CryptoCatalogStore.kt
+      - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.kt
+      - app/db/di/src/jvmMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.jvm.kt
+      - app/di/params/src/androidMain/kotlin/com/moneymanager/di/params/AppComponentParams.kt
+      - app/di/params/src/commonMain/kotlin/com/moneymanager/di/params/AppComponentParams.kt
+      - app/di/params/src/jvmMain/kotlin/com/moneymanager/di/params/AppComponentParams.kt
+      - app/importfilesource/di/src/androidMain/kotlin/com/moneymanager/importfilesource/di/CreateDriveFolderBrowser.android.kt
+      - app/importfilesource/di/src/androidMain/kotlin/com/moneymanager/importfilesource/di/CreateImportFileSourceFactory.android.kt
+      - app/importfilesource/di/src/commonMain/kotlin/com/moneymanager/importfilesource/di/CreateDriveFolderBrowser.kt
+      - app/importfilesource/di/src/commonMain/kotlin/com/moneymanager/importfilesource/di/CreateImportFileSourceFactory.kt
+      - app/importfilesource/di/src/jvmMain/kotlin/com/moneymanager/importfilesource/di/CreateDriveFolderBrowser.jvm.kt
+      - app/importfilesource/di/src/jvmMain/kotlin/com/moneymanager/importfilesource/di/CreateImportFileSourceFactory.jvm.kt
+      - app/main/cli/src/commonMain/kotlin/com/moneymanager/cli/CliServices.kt
+      - app/main/cli/src/jvmMain/kotlin/com/moneymanager/cli/CliServices.jvm.kt
+      - app/model/core/src/androidMain/kotlin/com/moneymanager/domain/DeviceInfoProvider.android.kt
+      - app/model/core/src/commonMain/kotlin/com/moneymanager/domain/DeviceInfoProvider.kt
+      - app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/RemoteCacheLocation.kt
+      - app/model/core/src/jvmMain/kotlin/com/moneymanager/domain/DeviceInfoProvider.jvm.kt
+      - app/model/core/src/jvmMain/kotlin/com/moneymanager/domain/model/RemoteCacheLocation.kt
+      - app/remotestorage/di/src/androidMain/kotlin/com/moneymanager/remotestorage/di/CreateRemoteStorageProviderFactory.android.kt
+      - app/remotestorage/di/src/commonMain/kotlin/com/moneymanager/remotestorage/di/CreateRemoteStorageProviderFactory.kt
+      - app/remotestorage/di/src/jvmMain/kotlin/com/moneymanager/remotestorage/di/CreateRemoteStorageProviderFactory.jvm.kt
+      - app/terminal/src/commonMain/kotlin/com/moneymanager/terminal/Interrupts.kt
+      - app/terminal/src/commonMain/kotlin/com/moneymanager/terminal/TerminalFacts.kt
+      - app/terminal/src/jvmMain/kotlin/com/moneymanager/terminal/Interrupts.jvm.kt
+      - app/terminal/src/jvmMain/kotlin/com/moneymanager/terminal/TerminalFacts.jvm.kt
+      - app/ui/foundation/src/androidMain/kotlin/com/moneymanager/ui/foundation/CredentialFileLocationPickerLauncher.kt
+      - app/ui/foundation/src/androidMain/kotlin/com/moneymanager/ui/foundation/DatabaseLocationPickerLauncher.kt
+      - app/ui/foundation/src/androidMain/kotlin/com/moneymanager/ui/navigation/LinuxHorizontalScrollWheel.android.kt
+      - app/ui/foundation/src/androidMain/kotlin/com/moneymanager/ui/navigation/MouseButtonNavigation.android.kt
+      - app/ui/foundation/src/androidMain/kotlin/com/moneymanager/ui/util/ClipboardUtils.android.kt
+      - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/foundation/DatabaseLocationPicker.kt
+      - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/navigation/LinuxHorizontalScrollWheel.kt
+      - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/navigation/MouseButtonNavigation.kt
+      - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/util/ClipboardUtils.kt
+      - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/util/NumberFormatting.kt
+      - app/ui/foundation/src/jvmAndroidMain/kotlin/com/moneymanager/ui/util/NumberFormatting.jvmAndroid.kt
+      - app/ui/foundation/src/jvmMain/kotlin/com/moneymanager/ui/foundation/CredentialFileLocationPickerLauncher.kt
+      - app/ui/foundation/src/jvmMain/kotlin/com/moneymanager/ui/foundation/DatabaseLocationPickerLauncher.kt
+      - app/ui/foundation/src/jvmMain/kotlin/com/moneymanager/ui/navigation/LinuxHorizontalScrollWheel.jvm.kt
+      - app/ui/foundation/src/jvmMain/kotlin/com/moneymanager/ui/navigation/MouseButtonNavigation.jvm.kt
+      - app/ui/foundation/src/jvmMain/kotlin/com/moneymanager/ui/util/ClipboardUtils.jvm.kt
+      - test/app/db/src/androidMain/kotlin/com/moneymanager/test/database/TestDatabaseHelper.kt
+      - test/app/db/src/androidMain/kotlin/com/moneymanager/test/database/TestDatabaseManagerFactory.kt
+      - test/app/db/src/commonMain/kotlin/com/moneymanager/test/database/TestDatabaseHelper.kt
+      - test/app/db/src/commonMain/kotlin/com/moneymanager/test/database/TestDatabaseManagerFactory.kt
+      - test/app/db/src/jvmMain/kotlin/com/moneymanager/test/database/TestDatabaseHelper.kt
+      - test/app/db/src/jvmMain/kotlin/com/moneymanager/test/database/TestDatabaseManagerFactory.kt
+      - test/app/ui/src/commonMain/kotlin/com/moneymanager/ui/test/TestDatabaseLoader.kt
+      - test/app/ui/src/jvmMain/kotlin/com/moneymanager/ui/test/TestDatabaseLoader.kt
+      - utils/archive/src/commonMain/kotlin/com/moneymanager/archive/Compression.kt
+      - utils/archive/src/jvmAndroidMain/kotlin/com/moneymanager/archive/Compression.jvmAndroid.kt
       - utils/bigdecimal/src/commonMain/kotlin/com/moneymanager/bigdecimal/BigDecimal.kt
       - utils/bigdecimal/src/commonMain/kotlin/com/moneymanager/bigdecimal/BigInteger.kt
+      - utils/compose/filePicker/src/androidMain/kotlin/com/moneymanager/compose/filepicker/FilePicker.kt
+      - utils/compose/filePicker/src/androidMain/kotlin/com/moneymanager/compose/filepicker/FilePickerLauncher.kt
+      - utils/compose/filePicker/src/androidMain/kotlin/com/moneymanager/compose/filepicker/FileSaverLauncher.kt
+      - utils/compose/filePicker/src/commonMain/kotlin/com/moneymanager/compose/filepicker/FilePicker.kt
+      - utils/compose/filePicker/src/commonMain/kotlin/com/moneymanager/compose/filepicker/FilePickerLauncher.kt
+      - utils/compose/filePicker/src/commonMain/kotlin/com/moneymanager/compose/filepicker/FileSaver.kt
+      - utils/compose/filePicker/src/commonMain/kotlin/com/moneymanager/compose/filepicker/FileSaverLauncher.kt
+      - utils/compose/filePicker/src/commonMain/kotlin/com/moneymanager/compose/filepicker/FolderPickerLauncher.kt
+      - utils/compose/filePicker/src/jvmMain/kotlin/com/moneymanager/compose/filepicker/FilePickerLauncher.kt
+      - utils/compose/filePicker/src/jvmMain/kotlin/com/moneymanager/compose/filepicker/FileSaverLauncher.kt
+      - utils/compose/filePicker/src/jvmMain/kotlin/com/moneymanager/compose/filepicker/FolderPickerLauncher.kt
+      - utils/compose/scrollbar/src/commonMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
+      - utils/credentialvault/di/src/androidMain/kotlin/com/moneymanager/credentialvault/di/CreateVaultPathResolver.android.kt
       - utils/currency/src/commonMain/kotlin/com/moneymanager/currency/Currency.kt
+      - utils/files/src/commonMain/kotlin/com/moneymanager/files/Files.kt
+      - utils/files/src/jvmAndroidMain/kotlin/com/moneymanager/files/Files.jvmAndroid.kt
+      - utils/localsettings/di/src/androidMain/kotlin/com/moneymanager/localsettings/di/CreateLocalSettings.android.kt
+      - utils/localsettings/di/src/commonMain/kotlin/com/moneymanager/localsettings/di/CreateLocalSettings.kt
+      - utils/localsettings/di/src/jvmMain/kotlin/com/moneymanager/localsettings/di/CreateLocalSettings.jvm.kt
+      - utils/parsers/xlsx/src/androidMain/kotlin/com/moneymanager/xlsx/XlsxParser.android.kt
+      - utils/parsers/xlsx/src/commonMain/kotlin/com/moneymanager/xlsx/XlsxParser.kt
+      - utils/parsers/xlsx/src/jvmMain/kotlin/com/moneymanager/xlsx/XlsxParser.jvm.kt
       - utils/compose/filePicker/src/androidMain/kotlin/com/moneymanager/compose/filepicker/FileSaver.kt
       - utils/compose/filePicker/src/androidMain/kotlin/com/moneymanager/compose/filepicker/FolderPickerLauncher.kt
       - utils/compose/filePicker/src/jvmMain/kotlin/com/moneymanager/compose/filepicker/FilePicker.kt
