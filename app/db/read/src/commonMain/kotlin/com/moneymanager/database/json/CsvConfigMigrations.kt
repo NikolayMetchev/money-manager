@@ -21,7 +21,7 @@ internal val csvSharedRulesStep =
         val contentRules =
             (rewritten["contentMatchRules"] as? JsonArray)?.map { rule ->
                 val r = rule as JsonObject
-                conditionJson(path = r.string("columnName")!!, op = "MATCHES", value = r.string("pattern"))
+                conditionJson(path = r.requireString("columnName"), op = "MATCHES", value = r.string("pattern"))
             }
         val assetCodes = assetCodesJson(rewritten["assetAliases"], null)
         JsonObject(
@@ -42,7 +42,7 @@ private fun csvObjectOntoSharedRules(obj: JsonObject): JsonObject =
         obj.isType("DirectColumnMapping", "DirectColumnExport") -> {
             obj.replacingWithValueExpr(
                 key = "value",
-                paths = listOf(obj.string("columnName")!!) + obj.stringList("fallbackColumns"),
+                paths = listOf(obj.requireString("columnName")) + obj.stringList("fallbackColumns"),
                 extractionKey = "extraction",
                 "columnName",
                 "fallbackColumns",
@@ -52,7 +52,7 @@ private fun csvObjectOntoSharedRules(obj: JsonObject): JsonObject =
         obj.isType("CurrencyLookupMapping", "CurrencyLookupExport") -> {
             obj.replacingWithValueExpr(
                 key = "value",
-                paths = listOf(obj.string("columnName")!!),
+                paths = listOf(obj.requireString("columnName")),
                 extractionKey = "extraction",
                 "columnName",
             )
@@ -61,7 +61,7 @@ private fun csvObjectOntoSharedRules(obj: JsonObject): JsonObject =
         obj.isType("AmountParsingMapping", "AmountParsingExport") && obj.string("feeCurrencyColumnName") != null -> {
             obj.replacingWithValueExpr(
                 key = "feeCurrency",
-                paths = listOf(obj.string("feeCurrencyColumnName")!!),
+                paths = listOf(obj.requireString("feeCurrencyColumnName")),
                 extractionKey = "feeCurrencyExtraction",
                 "feeCurrencyColumnName",
             )
@@ -90,9 +90,9 @@ private val ROW_CONDITION_OPS =
     )
 
 private fun rowConditionToCondition(obj: JsonObject): JsonObject {
-    val operator = obj.string("operator")!!
+    val operator = obj.requireString("operator")
     return conditionJson(
-        path = obj.string("columnName")!!,
+        path = obj.requireString("columnName"),
         op = requireNotNull(ROW_CONDITION_OPS[operator]) { "Unknown row condition operator $operator" },
         value = obj.string("value"),
         otherPath = obj.string("otherColumnName"),
@@ -148,7 +148,7 @@ private fun amountOntoDirection(obj: JsonObject): JsonObject {
 private const val VALUE = "{value}"
 
 private fun accountMappingOntoRules(obj: JsonObject): JsonObject {
-    val export = obj.string("type")!!.substringAfterLast('.').endsWith("Export")
+    val export = obj.requireString("type").substringAfterLast('.').endsWith("Export")
     val (rules, category) = legacyAccountRules(obj)
     return JsonObject(
         buildMap {
@@ -170,20 +170,20 @@ private const val CSV_EXPORT_PACKAGE = "$CSV_PACKAGE.export"
 /** The rules a legacy account mapping (or an already-converted one) amounts to, plus its category. */
 private fun legacyAccountRules(obj: JsonObject): Pair<List<JsonObject>, JsonElement?> {
     val category = obj["defaultCategoryId"] ?: obj["defaultCategoryName"]
-    val column = obj.string("columnName")
+    val column by lazy { obj.requireString("columnName") }
     return when {
         obj.isType("AccountRulesMapping", "AccountRulesExport") -> {
             (obj["rules"] as JsonArray).map { it as JsonObject } to category
         }
 
         obj.isType("AccountLookupMapping", "AccountLookupExport") -> {
-            listOf(rule(paths = listOf(column!!) + obj.stringList("fallbackColumns"))) to category
+            listOf(rule(paths = listOf(column) + obj.stringList("fallbackColumns"))) to category
         }
 
         obj.isType("TemplateAccountMapping", "TemplateAccountExport") -> {
             listOf(
                 rule(
-                    paths = listOf(column!!),
+                    paths = listOf(column),
                     extraction = obj["extraction"],
                     trim = true,
                     name = obj.string("prefix").orEmpty() + VALUE + obj.string("suffix").orEmpty(),
@@ -193,7 +193,7 @@ private fun legacyAccountRules(obj: JsonObject): Pair<List<JsonObject>, JsonElem
 
         obj.isType("AttributeMatchAccountMapping", "AttributeMatchAccountExport") -> {
             listOf(
-                rule(paths = listOf(column!!), trim = true, attributeTypeName = obj.string("attributeTypeName")),
+                rule(paths = listOf(column), trim = true, attributeTypeName = obj.string("attributeTypeName")),
                 rule(paths = listOf(column), trim = true),
             ) to category
         }
@@ -204,9 +204,9 @@ private fun legacyAccountRules(obj: JsonObject): Pair<List<JsonObject>, JsonElem
                     val r = element as JsonObject
                     val template = r.string("accountNameTemplate")
                     rule(
-                        paths = listOf(column!!),
+                        paths = listOf(column),
                         pattern = r.string("pattern"),
-                        name = template ?: r.string("accountName")!!,
+                        name = template ?: r.requireString("accountName"),
                         fallbackName = r.string("accountName").takeIf { template != null },
                         extras =
                             buildMap {
@@ -218,7 +218,7 @@ private fun legacyAccountRules(obj: JsonObject): Pair<List<JsonObject>, JsonElem
                             },
                     )
                 }
-            (patternRules + rule(paths = listOf(column!!) + obj.stringList("fallbackColumns"))) to category
+            (patternRules + rule(paths = listOf(column) + obj.stringList("fallbackColumns"))) to category
         }
 
         obj.isType("ConditionalAccountMapping", "ConditionalAccountExport") -> {
@@ -301,14 +301,14 @@ private fun groupingOntoLegGroups(obj: JsonObject): JsonObject {
 }
 
 private fun conversionLegRule(config: JsonObject): JsonObject {
-    val signal = config.string("signalColumn")!!
+    val signal = config.requireString("signalColumn")
     val routing =
         (config["conversionAccountRules"] as? JsonArray).orEmpty().map { element ->
             val rule = element as JsonObject
             accountRuleJson(
                 signal,
-                rule.string("accountName")!!,
-                listOf(conditionJson(rule.string("column")!!, "MATCHES", rule.string("pattern"))),
+                rule.requireString("accountName"),
+                listOf(conditionJson(rule.requireString("column"), "MATCHES", rule.string("pattern"))),
             )
         }
     val fallback = listOfNotNull(config.string("conversionAccountName")?.let { accountRuleJson(signal, it, emptyList()) })
@@ -359,9 +359,9 @@ private fun legRuleJson(
     windowKey: String,
     assembly: Map<String, JsonElement>,
 ): JsonObject {
-    val signal = config.string("signalColumn")!!
-    val debit = config.string("debitPattern")!!
-    val credit = config.string("creditPattern")!!
+    val signal = config.requireString("signalColumn")
+    val debit = config.requireString("debitPattern")
+    val credit = config.requireString("creditPattern")
     val legPattern = if (debit == credit) debit else "(?:$debit)|(?:$credit)"
     val side =
         config.string("sideAmountColumn")?.let { column ->

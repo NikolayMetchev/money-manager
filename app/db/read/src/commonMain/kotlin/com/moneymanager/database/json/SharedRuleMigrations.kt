@@ -23,6 +23,10 @@ internal fun JsonElement.rewriteObjects(transform: (JsonObject) -> JsonObject): 
 
 internal fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.contentOrNull
 
+/** [string], for a key the legacy shape always had: a config without it isn't the shape this step upgrades. */
+internal fun JsonObject.requireString(key: String): String =
+    requireNotNull(string(key)) { "${string("type")?.substringAfterLast('.') ?: "Object"} has no \"$key\"" }
+
 internal fun JsonObject.stringList(key: String): List<String> =
     (this[key] as? JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
 
