@@ -120,7 +120,7 @@ private fun LegGroupRuleEditor(
         }
     }
     when (val assembly = rule.assembly) {
-        is LegAssembly.Trade ->
+        is LegAssembly.Trade -> {
             OutlinedTextField(
                 value = assembly.description,
                 onValueChange = { onRuleChanged(rule.copy(assembly = assembly.copy(description = it))) },
@@ -129,6 +129,8 @@ private fun LegGroupRuleEditor(
                 singleLine = true,
                 enabled = enabled,
             )
+        }
+
         is LegAssembly.ThroughAccount -> {
             Text(
                 "The intermediate account is the rules' \"Intermediate\" account action on each leg. With none, " +

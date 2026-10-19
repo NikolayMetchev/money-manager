@@ -44,17 +44,21 @@ object CsvStrategyExportMapper {
         categoryNameById: (Long) -> String?,
     ): FieldMappingExport =
         when (this) {
-            is HardCodedAccountMapping ->
+            is HardCodedAccountMapping -> {
                 HardCodedAccountExport(
                     fieldType = fieldType,
                     accountName = accountNameById(accountId) ?: "Unknown Account",
                 )
-            is AccountFromRulesMapping ->
+            }
+
+            is AccountFromRulesMapping -> {
                 AccountFromRulesExport(
                     fieldType = fieldType,
                     defaultCategoryName = categoryNameById(defaultCategoryId) ?: Category.UNCATEGORIZED_NAME,
                 )
-            is DateTimeParsingMapping ->
+            }
+
+            is DateTimeParsingMapping -> {
                 DateTimeParsingExport(
                     fieldType = fieldType,
                     dateColumnName = dateColumnName,
@@ -64,12 +68,16 @@ object CsvStrategyExportMapper {
                     defaultTime = defaultTime,
                     dateTimeFormat = dateTimeFormat,
                 )
-            is DirectColumnMapping ->
+            }
+
+            is DirectColumnMapping -> {
                 DirectColumnExport(
                     fieldType = fieldType,
                     value = value,
                 )
-            is AmountParsingMapping ->
+            }
+
+            is AmountParsingMapping -> {
                 AmountParsingExport(
                     fieldType = fieldType,
                     mode = mode,
@@ -77,26 +85,35 @@ object CsvStrategyExportMapper {
                     creditColumnName = creditColumnName,
                     debitColumnName = debitColumnName,
                 )
-            is HardCodedCurrencyMapping ->
+            }
+
+            is HardCodedCurrencyMapping -> {
                 HardCodedCurrencyExport(
                     fieldType = fieldType,
                     currencyCode = currencyCodeById(currencyId) ?: "XXX",
                 )
-            is CurrencyLookupMapping ->
+            }
+
+            is CurrencyLookupMapping -> {
                 CurrencyLookupExport(
                     fieldType = fieldType,
                     value = value,
                 )
-            is HardCodedTimezoneMapping ->
+            }
+
+            is HardCodedTimezoneMapping -> {
                 HardCodedTimezoneExport(
                     fieldType = fieldType,
                     timezoneId = timezoneId,
                 )
-            is TimezoneLookupMapping ->
+            }
+
+            is TimezoneLookupMapping -> {
                 TimezoneLookupExport(
                     fieldType = fieldType,
                     columnName = columnName,
                     aliases = aliases,
                 )
+            }
         }
 }

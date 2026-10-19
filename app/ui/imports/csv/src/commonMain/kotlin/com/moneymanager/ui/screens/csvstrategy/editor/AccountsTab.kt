@@ -52,7 +52,7 @@ internal fun AccountsTab(
             Text("From the row (rules)")
         }
         when (state.sourceAccountMode) {
-            SourceAccountMode.FIXED_ACCOUNT ->
+            SourceAccountMode.FIXED_ACCOUNT -> {
                 AccountPicker(
                     selectedAccountId = state.selectedAccountId,
                     onAccountSelected = { state.selectedAccountId = it },
@@ -62,12 +62,15 @@ internal fun AccountsTab(
                     personRepository = personRepository,
                     enabled = enabled,
                 )
-            SourceAccountMode.RULES ->
+            }
+
+            SourceAccountMode.RULES -> {
                 Text(
                     "Named by the rules' \"Source\" account actions (Rules tab)",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (state.accountsHasError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))

@@ -267,7 +267,7 @@ fun CsvStrategyEditorScreen(
                     .padding(16.dp),
         ) {
             when (state.selectedTab) {
-                EditorTab.GENERAL ->
+                EditorTab.GENERAL -> {
                     GeneralTab(
                         state = state,
                         csvColumns = csvColumns,
@@ -275,7 +275,9 @@ fun CsvStrategyEditorScreen(
                         firstRow = firstRow,
                         enabled = !state.isSaving,
                     )
-                EditorTab.ACCOUNTS ->
+                }
+
+                EditorTab.ACCOUNTS -> {
                     AccountsTab(
                         state = state,
                         enabled = !state.isSaving,
@@ -283,7 +285,9 @@ fun CsvStrategyEditorScreen(
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                     )
-                EditorTab.AMOUNT_DATE ->
+                }
+
+                EditorTab.AMOUNT_DATE -> {
                     AmountDateTab(
                         state = state,
                         csvColumns = csvColumns,
@@ -292,14 +296,18 @@ fun CsvStrategyEditorScreen(
                         enabled = !state.isSaving,
                         currencyRepository = currencyRepository,
                     )
-                EditorTab.RULES ->
+                }
+
+                EditorTab.RULES -> {
                     RulesTab(
                         state = state,
                         csvColumns = csvColumns,
                         firstRow = firstRow,
                         enabled = !state.isSaving,
                     )
-                EditorTab.ADVANCED ->
+                }
+
+                EditorTab.ADVANCED -> {
                     AdvancedTab(
                         state = state,
                         csvColumns = csvColumns,
@@ -321,6 +329,7 @@ fun CsvStrategyEditorScreen(
                         },
                         onAddAccountMapping = { showAddAccountMappingDialog = true },
                     )
+                }
             }
 
             state.errorMessage?.let {

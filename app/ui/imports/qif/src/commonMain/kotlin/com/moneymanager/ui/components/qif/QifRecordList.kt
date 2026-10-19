@@ -190,19 +190,33 @@ private fun isPositiveQifAmount(amount: String?): Boolean {
 private fun RecordBadge(record: QifImportRecord) {
     val (label, container, content) =
         when {
-            !record.supported ->
+            !record.supported -> {
                 Triple("Unsupported", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
-            record.importStatus == ImportStatus.IMPORTED ->
+            }
+
+            record.importStatus == ImportStatus.IMPORTED -> {
                 Triple("Imported", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
-            record.importStatus == ImportStatus.DUPLICATE ->
+            }
+
+            record.importStatus == ImportStatus.DUPLICATE -> {
                 Triple("Duplicate", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
-            record.importStatus == ImportStatus.UPDATED ->
+            }
+
+            record.importStatus == ImportStatus.UPDATED -> {
                 Triple("Updated", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
-            record.importStatus == ImportStatus.ERROR ->
+            }
+
+            record.importStatus == ImportStatus.ERROR -> {
                 Triple("Error", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
-            record.importStatus == ImportStatus.SKIPPED ->
+            }
+
+            record.importStatus == ImportStatus.SKIPPED -> {
                 Triple("Skipped", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
-            else -> return
+            }
+
+            else -> {
+                return
+            }
         }
     Box(
         modifier =

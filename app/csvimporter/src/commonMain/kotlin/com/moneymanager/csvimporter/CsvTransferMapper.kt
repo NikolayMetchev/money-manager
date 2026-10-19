@@ -433,10 +433,14 @@ class CsvTransferMapper(
 
                     newAccounts.addAll(result.newAccounts)
                 }
+
                 is MappingResult.Error -> {
                     errorRows.add(result)
                 }
-                is MappingResult.Skipped -> skippedRowIndexes.add(result.rowIndex)
+
+                is MappingResult.Skipped -> {
+                    skippedRowIndexes.add(result.rowIndex)
+                }
             }
         }
 
@@ -645,14 +649,19 @@ class CsvTransferMapper(
                 }
             val passThrough =
                 when {
-                    strategyConduit == null -> detectedPassThrough
+                    strategyConduit == null -> {
+                        detectedPassThrough
+                    }
+
                     // The strategy conduit forwards to the conduit the description names; that chain goes on.
-                    detectedPassThrough != null ->
+                    detectedPassThrough != null -> {
                         detectedPassThrough.copy(
                             conduitNames = conduitNames,
                             spendDescriptions = listOf(description) + detectedPassThrough.spendDescriptions,
                         )
-                    else ->
+                    }
+
+                    else -> {
                         CsvPassThrough(
                             conduitNames = conduitNames,
                             merchantName =
@@ -664,6 +673,7 @@ class CsvTransferMapper(
                             relationshipTypeId = WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID,
                             incoming = flipAccounts,
                         )
+                    }
                 }
             val effectiveSourceAccountId =
                 if (conduitAccountId != null && flipAccounts) conduitAccountId else sourceAccountId
@@ -710,17 +720,23 @@ class CsvTransferMapper(
             val sourceMapping = strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]
             val unidentifiedCounterpartyAccountId =
                 when {
-                    strategyConduit != null ->
+                    strategyConduit != null -> {
                         ownAccountId.takeIf {
                             sourceAccountOverride == null &&
                                 sourceMapping != null &&
                                 isUnidentifiedCounterparty(sourceMapping, sourceResolution, sourceUsedPersistedMappings)
                         }
-                    passThroughMatch != null || conversionDetection != null || tradeTo != null -> null
-                    else ->
+                    }
+
+                    passThroughMatch != null || conversionDetection != null || tradeTo != null -> {
+                        null
+                    }
+
+                    else -> {
                         counterpartyAccountId.takeIf {
                             isUnidentifiedCounterparty(targetMapping, targetResolution, targetUsedPersistedMappings)
                         }
+                    }
                 }
 
             // A fee is modelled as its own movement (linked to this transfer), not folded into the amount.
@@ -932,8 +948,14 @@ class CsvTransferMapper(
             val group = strategy.config.legGroups.getOrNull(index) ?: return@firstNotNullOfOrNull null
             val side =
                 when (val role = claim.role) {
-                    LegRole.Debit -> GroupLegSide.DEBIT
-                    LegRole.Credit -> GroupLegSide.CREDIT
+                    LegRole.Debit -> {
+                        GroupLegSide.DEBIT
+                    }
+
+                    LegRole.Credit -> {
+                        GroupLegSide.CREDIT
+                    }
+
                     is LegRole.BySign -> {
                         val amount =
                             getColumnValueOrNull(role.path, values)
@@ -950,8 +972,11 @@ class CsvTransferMapper(
             val intermediates = outcome.accountsFor(AccountSide.INTERMEDIATE)
             val throughAccountName =
                 when (group.assembly) {
-                    is LegAssembly.Trade -> null
-                    is LegAssembly.ThroughAccount ->
+                    is LegAssembly.Trade -> {
+                        null
+                    }
+
+                    is LegAssembly.ThroughAccount -> {
                         if (intermediates.isEmpty()) {
                             null
                         } else {
@@ -961,6 +986,7 @@ class CsvTransferMapper(
                                 ?.takeIf { it.isNotBlank() }
                                 ?: return@firstNotNullOfOrNull null
                         }
+                    }
                 }
             val funding =
                 (group.assembly as? LegAssembly.ThroughAccount)
@@ -988,6 +1014,7 @@ class CsvTransferMapper(
                             ?: error("amountColumnName required for SINGLE_COLUMN mode")
                     parseBigDecimal(getColumnValue(columnName, values))
                 }
+
                 AmountMode.CREDIT_DEBIT_COLUMNS -> {
                     val creditColumnName =
                         mapping.creditColumnName
@@ -1141,14 +1168,20 @@ class CsvTransferMapper(
         applyPersistedMappings: Boolean = true,
     ): AccountId =
         when (mapping) {
-            is HardCodedAccountMapping -> mapping.accountId
+            is HardCodedAccountMapping -> {
+                mapping.accountId
+            }
+
             is AccountFromRulesMapping -> {
                 (if (applyPersistedMappings) findPersistedMapping(resolution.sourceValue) else null)
                     ?: resolution.attributeAccountId
                     ?: resolveExistingAccountId(resolution.accountName)
                     ?: UNRESOLVED_ACCOUNT_ID // Placeholder for new accounts
             }
-            else -> throw IllegalArgumentException("Invalid account mapping type: ${mapping::class}")
+
+            else -> {
+                throw IllegalArgumentException("Invalid account mapping type: ${mapping::class}")
+            }
         }
 
     /**
@@ -1197,16 +1230,26 @@ class CsvTransferMapper(
     ): Pair<NewAccount, DiscoveredAccountMapping>? {
         val rulesMapping = mapping as? AccountFromRulesMapping ?: return null
         return when {
-            applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null -> null
-            resolution.attributeAccountId != null -> null
-            resolution.accountName.isBlank() || accountExists(resolution.accountName) -> null
-            else ->
+            applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null -> {
+                null
+            }
+
+            resolution.attributeAccountId != null -> {
+                null
+            }
+
+            resolution.accountName.isBlank() || accountExists(resolution.accountName) -> {
+                null
+            }
+
+            else -> {
                 NewAccount(resolution.accountName, rulesMapping.defaultCategoryId) to
                     DiscoveredAccountMapping(
                         csvValue = resolution.sourceValue,
                         targetAccountName = resolution.accountName,
                         matchedPattern = resolution.naming?.pattern,
                     )
+            }
         }
     }
 
@@ -1260,7 +1303,10 @@ class CsvTransferMapper(
         values: List<String>,
     ): TimeZone =
         when (mapping) {
-            is HardCodedTimezoneMapping -> TimeZone.of(mapping.timezoneId)
+            is HardCodedTimezoneMapping -> {
+                TimeZone.of(mapping.timezoneId)
+            }
+
             is TimezoneLookupMapping -> {
                 val value = getColumnValue(mapping.columnName, values).trim()
                 val tzId =
@@ -1269,7 +1315,10 @@ class CsvTransferMapper(
                         ?.value ?: value
                 if (tzId.isNotBlank()) TimeZone.of(tzId) else TimeZone.currentSystemDefault()
             }
-            else -> TimeZone.currentSystemDefault()
+
+            else -> {
+                TimeZone.currentSystemDefault()
+            }
         }
 
     private fun parseDescription(

@@ -23,28 +23,26 @@ fun CsvStrategyConfig<*>.uniqueIdentifierAttributeTypes(): List<String> =
 fun CsvStrategyConfig<*>.ownedAttributeValues(): Map<String, Set<String>?> {
     val owned = LinkedHashMap<String, MutableList<String?>>()
     for (action in ruleActions()) {
-        when (action) {
-            is RuleAction.Attribute -> owned.getOrPut(action.typeName) { mutableListOf() } += action.value.constantOrNull()
-            // A reason read from the row can be any value; a constant one is written as excludedAttributeValue writes it.
-            is RuleAction.Exclude ->
-                owned.getOrPut(EXCLUDED_ATTRIBUTE_TYPE_NAME) { mutableListOf() } +=
-                    action.reason.let { reason ->
-                        if (reason ==
-                            null
-                        ) {
-                            EXCLUDED_ATTRIBUTE_TYPE_NAME
-                        } else {
-                            reason.constantOrNull()?.let(::excludedAttributeValue)
-                        }
-                    }
-            else -> Unit
-        }
+        val (typeName, value) =
+            when (action) {
+                is RuleAction.Attribute -> action.typeName to action.value.constantOrNull()
+                is RuleAction.Exclude -> EXCLUDED_ATTRIBUTE_TYPE_NAME to action.excludedValueOrNull()
+                else -> continue
+            }
+        owned.getOrPut(typeName) { mutableListOf() } += value
     }
     return owned.mapValues { (_, values) -> if (values.all { it != null }) values.filterNotNull().toSet() else null }
 }
 
 /** The value an exclusion with [reason] writes: the reason, or the type's own name when it has none. */
 fun excludedAttributeValue(reason: String?): String = reason?.takeIf { it.isNotBlank() } ?: EXCLUDED_ATTRIBUTE_TYPE_NAME
+
+/** What [this] exclusion writes: a fixed value, or null (anything) when its reason is read from the row. */
+private fun RuleAction.Exclude.excludedValueOrNull(): String? =
+    when (val reason = reason) {
+        null -> EXCLUDED_ATTRIBUTE_TYPE_NAME
+        else -> reason.constantOrNull()?.let(::excludedAttributeValue)
+    }
 
 private fun CsvStrategyConfig<*>.ruleActions(): Sequence<RuleAction> = rules.asSequence().flatMap { it.actions }
 
