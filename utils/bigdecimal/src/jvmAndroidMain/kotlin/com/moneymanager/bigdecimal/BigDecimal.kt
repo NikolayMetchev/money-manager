@@ -52,7 +52,5 @@ actual class BigDecimal : Comparable<BigDecimal> {
 
     actual companion object {
         actual val ZERO: BigDecimal = BigDecimal(java.math.BigDecimal.ZERO)
-        actual val ONE: BigDecimal = BigDecimal(java.math.BigDecimal.ONE)
-        actual val TEN: BigDecimal = BigDecimal(java.math.BigDecimal.TEN)
     }
 }
