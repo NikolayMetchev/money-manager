@@ -138,15 +138,25 @@ private fun RuleValue.isComplete(): Boolean =
 private fun RuleAction.isComplete(): Boolean =
     when (this) {
         is RuleAction.Account -> naming.value.primaryPath.isNotBlank() && naming.name.isNotBlank()
+
         is RuleAction.SwapValues -> first.isNotBlank() && second.isNotBlank()
+
         is RuleAction.SetValue -> path.isNotBlank() && value.isComplete()
+
         is RuleAction.Exclude -> reason?.isComplete() ?: true
+
         is RuleAction.Attribute -> typeName.isNotBlank() && value.isComplete()
+
         is RuleAction.ExternalId -> value.isComplete()
+
         is RuleAction.Fee -> fee.amount.primaryPath.isNotBlank()
+
         is RuleAction.Foreign -> foreignAmount.amount.primaryPath.isNotBlank() && foreignAmount.currency.primaryPath.isNotBlank()
+
         is RuleAction.ThroughConduit -> accountName.isNotBlank()
+
         is RuleAction.Leg -> group.isNotBlank() && (role as? LegRole.BySign)?.path?.isNotBlank() ?: true
+
         RuleAction.Flip, is RuleAction.SetDirection, RuleAction.Skip, RuleAction.CounterpartyIsPerson,
         RuleAction.IgnoreCounterpartyId, is RuleAction.TradeSide, RuleAction.LedgerTradeLeg,
         -> true
@@ -333,18 +343,23 @@ private fun ActionFields(
             }
             AccountNamingEditor(action.naming, { onActionChanged(action.copy(naming = it)) }, pathField, enabled)
         }
-        is RuleAction.SetDirection ->
+
+        is RuleAction.SetDirection -> {
             ChoiceDropdown("Money moves", action.incoming, listOf(true, false), { if (it) "In" else "Out" }, enabled) {
                 onActionChanged(action.copy(incoming = it))
             }
+        }
+
         is RuleAction.SwapValues -> {
             pathField.Field("First", action.first, { onActionChanged(action.copy(first = it)) }, action.first.isBlank())
             pathField.Field("Second", action.second, { onActionChanged(action.copy(second = it)) }, action.second.isBlank())
         }
+
         is RuleAction.SetValue -> {
             pathField.Field("Value to set", action.path, { onActionChanged(action.copy(path = it)) }, action.path.isBlank())
             RuleValueEditor("New value", action.value, { onActionChanged(action.copy(value = it)) }, pathField, enabled)
         }
+
         is RuleAction.Exclude -> {
             CheckRow("Record a reason", action.reason != null, enabled) {
                 onActionChanged(action.copy(reason = if (it) RuleValue.read("") else null))
@@ -353,6 +368,7 @@ private fun ActionFields(
                 RuleValueEditor("Reason", reason, { onActionChanged(action.copy(reason = it)) }, pathField, enabled)
             }
         }
+
         is RuleAction.Attribute -> {
             TextField("Attribute type", action.typeName, enabled, isError = action.typeName.isBlank()) {
                 onActionChanged(action.copy(typeName = it))
@@ -362,9 +378,12 @@ private fun ActionFields(
                 onActionChanged(action.copy(uniqueIdentifier = it))
             }
         }
-        is RuleAction.ExternalId ->
+
+        is RuleAction.ExternalId -> {
             RuleValueEditor("External id", action.value, { onActionChanged(action.copy(value = it)) }, pathField, enabled)
-        is RuleAction.Fee ->
+        }
+
+        is RuleAction.Fee -> {
             FeeRuleEditor(
                 fee = action.fee,
                 onFeeChanged = { fee -> fee?.let { onActionChanged(action.copy(fee = it)) } },
@@ -373,27 +392,36 @@ private fun ActionFields(
                 movementOptions = context != RuleContext.API_TRADE,
                 showConditions = false,
             )
-        is RuleAction.Foreign ->
+        }
+
+        is RuleAction.Foreign -> {
             ForeignAmountEditor(
                 foreignAmount = action.foreignAmount,
                 onForeignAmountChanged = { foreign -> foreign?.let { onActionChanged(action.copy(foreignAmount = it)) } },
                 pathField = pathField,
             )
-        is RuleAction.ThroughConduit ->
+        }
+
+        is RuleAction.ThroughConduit -> {
             TextField("Conduit account", action.accountName, enabled, isError = action.accountName.isBlank()) {
                 onActionChanged(action.copy(accountName = it))
             }
-        is RuleAction.TradeSide ->
+        }
+
+        is RuleAction.TradeSide -> {
             ChoiceDropdown("Side", action.buy, listOf(true, false), { if (it) "Buy" else "Sell" }, enabled) {
                 onActionChanged(action.copy(buy = it))
             }
+        }
+
         is RuleAction.Leg -> {
             TextField("Group", action.group, enabled, isError = action.group.isBlank()) { onActionChanged(action.copy(group = it)) }
             LegRoleEditor(action.role, { onActionChanged(action.copy(role = it)) }, pathField, enabled)
         }
+
         RuleAction.Flip, RuleAction.Skip, RuleAction.CounterpartyIsPerson, RuleAction.IgnoreCounterpartyId,
         RuleAction.LedgerTradeLeg,
-        -> Unit
+        -> {}
     }
 }
 

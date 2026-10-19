@@ -109,30 +109,74 @@ class RuleEngine(
                 state.rewrite(action.first, second)
                 state.rewrite(action.second, first)
             }
-            is RuleAction.SetValue -> state.rewrite(action.path, compute(action.value, state.current))
-            RuleAction.Flip -> state.flipped = !state.flipped
-            is RuleAction.SetDirection -> state.incoming = state.incoming ?: action.incoming
-            RuleAction.Skip -> state.skipped = true
-            is RuleAction.Exclude ->
+
+            is RuleAction.SetValue -> {
+                state.rewrite(action.path, compute(action.value, state.current))
+            }
+
+            RuleAction.Flip -> {
+                state.flipped = !state.flipped
+            }
+
+            is RuleAction.SetDirection -> {
+                state.incoming = state.incoming ?: action.incoming
+            }
+
+            RuleAction.Skip -> {
+                state.skipped = true
+            }
+
+            is RuleAction.Exclude -> {
                 if (!state.excluded) {
                     state.excluded = true
                     state.excludeReason = action.reason?.let { compute(it, state.current) }.orEmpty()
                 }
-            is RuleAction.Account -> state.accounts.getOrPut(action.side) { mutableListOf() }.add(action.naming)
-            is RuleAction.ExternalId ->
+            }
+
+            is RuleAction.Account -> {
+                state.accounts.getOrPut(action.side) { mutableListOf() }.add(action.naming)
+            }
+
+            is RuleAction.ExternalId -> {
                 state.externalId = state.externalId ?: compute(action.value, state.current).ifBlank { null }
-            RuleAction.CounterpartyIsPerson -> state.counterpartyIsPerson = true
-            RuleAction.IgnoreCounterpartyId -> state.ignoreCounterpartyId = true
+            }
+
+            RuleAction.CounterpartyIsPerson -> {
+                state.counterpartyIsPerson = true
+            }
+
+            RuleAction.IgnoreCounterpartyId -> {
+                state.ignoreCounterpartyId = true
+            }
+
             is RuleAction.Attribute -> {
                 val value = compute(action.value, state.current)
                 if (value.isNotBlank()) state.attributes += RuleAttribute(action.typeName, value, action.uniqueIdentifier)
             }
-            is RuleAction.Fee -> state.fees += action.fee
-            is RuleAction.Foreign -> state.foreignAmount = state.foreignAmount ?: action.foreignAmount
-            is RuleAction.ThroughConduit -> state.conduitAccountName = state.conduitAccountName ?: action.accountName
-            is RuleAction.TradeSide -> state.tradeBuy = state.tradeBuy ?: action.buy
-            is RuleAction.Leg -> state.legs += RuleLeg(action.group, action.role)
-            RuleAction.LedgerTradeLeg -> state.ledgerTradeLeg = true
+
+            is RuleAction.Fee -> {
+                state.fees += action.fee
+            }
+
+            is RuleAction.Foreign -> {
+                state.foreignAmount = state.foreignAmount ?: action.foreignAmount
+            }
+
+            is RuleAction.ThroughConduit -> {
+                state.conduitAccountName = state.conduitAccountName ?: action.accountName
+            }
+
+            is RuleAction.TradeSide -> {
+                state.tradeBuy = state.tradeBuy ?: action.buy
+            }
+
+            is RuleAction.Leg -> {
+                state.legs += RuleLeg(action.group, action.role)
+            }
+
+            RuleAction.LedgerTradeLeg -> {
+                state.ledgerTradeLeg = true
+            }
         }
     }
 
