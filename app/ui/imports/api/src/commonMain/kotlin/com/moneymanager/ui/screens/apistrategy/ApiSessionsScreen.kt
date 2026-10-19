@@ -1706,9 +1706,7 @@ private fun JsonTreeNode(
                 }
             }
 
-            else -> {
-                Unit
-            }
+            else -> {}
         }
     }
 }

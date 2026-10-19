@@ -85,9 +85,7 @@ suspend fun RemoteDatabaseController.performClose(
     database.close()
     var keptLocal = true
     when {
-        keepLocal -> {
-            Unit
-        }
+        keepLocal -> {}
 
         remoteCurrent -> {
             runCatching { deleteLocalCache() }

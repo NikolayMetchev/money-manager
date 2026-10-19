@@ -108,14 +108,10 @@ private fun MainWindow(onExit: () -> Unit) {
             val cloudBacked = remoteController.activeBinding() != null
             logger.i { "Window close: database=${database != null}, cloudBacked=$cloudBacked" }
             when {
-                closeProgress != null -> {
-                    Unit
-                }
+                closeProgress != null -> {}
 
                 // a close sync is already in progress; ignore repeat clicks
-                closeDecision != null -> {
-                    Unit
-                }
+                closeDecision != null -> {}
 
                 // the close dialog is already open
                 database == null || !cloudBacked -> {

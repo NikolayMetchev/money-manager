@@ -181,9 +181,7 @@ internal fun SigPartListEditor(
                             )
                         }
 
-                        else -> {
-                            Unit
-                        }
+                        else -> {}
                     }
                 }
             }

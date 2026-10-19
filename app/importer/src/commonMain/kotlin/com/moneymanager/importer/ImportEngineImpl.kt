@@ -1313,9 +1313,7 @@ class ImportEngineImpl(
                     match.nameKeyFallback?.let { byNameKey.getOrPut(it) { newId } }
                 }
 
-                is PersonMatchKey.ByNameKey -> {
-                    Unit
-                }
+                is PersonMatchKey.ByNameKey -> {}
             }
         }
         return PersonResolution(keyToId, created)

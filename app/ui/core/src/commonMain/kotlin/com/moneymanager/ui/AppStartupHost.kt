@@ -548,9 +548,7 @@ private suspend fun switchDatabase(
         }
 
         // Schema-incompatible targets fall through to the schema-error recovery dialog (state stays Error).
-        SchemaErrorDetector.isSchemaError(error) -> {
-            Unit
-        }
+        SchemaErrorDetector.isSchemaError(error) -> {}
 
         // Any other failure: surface it and revert so the user keeps working in the current database.
         currentState is AppDatabaseState.Loaded -> {

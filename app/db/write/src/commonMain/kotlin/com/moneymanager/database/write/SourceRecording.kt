@@ -89,8 +89,6 @@ fun MoneyManagerDatabaseWrapper.recordSource(
         Source.System,
         Source.Merge,
         Source.Unmerge,
-        -> {
-            Unit
-        }
+        -> {}
     }
 }

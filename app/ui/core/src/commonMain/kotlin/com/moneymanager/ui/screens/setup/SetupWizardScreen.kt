@@ -168,9 +168,7 @@ private fun ColumnScope.StepBody(
 ) {
     when (step) {
         // Chosen before the database existed, so it is never rendered as a body.
-        SetupWizardStep.DATABASE -> {
-            Unit
-        }
+        SetupWizardStep.DATABASE -> {}
 
         SetupWizardStep.CURRENCY -> {
             CurrencyPicker(

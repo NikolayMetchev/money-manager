@@ -128,9 +128,7 @@ suspend fun <T, C> runBulkReimport(
         tracker.itemStarted(index, name)
         try {
             when (val outcome = reimportFile(index, file, context) { tracker.item(index, name, it) }) {
-                is BulkReimportFileOutcome.NoWork -> {
-                    Unit
-                }
+                is BulkReimportFileOutcome.NoWork -> {}
 
                 is BulkReimportFileOutcome.NoStrategy -> {
                     skippedNoStrategy++

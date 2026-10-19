@@ -796,9 +796,7 @@ private fun parseExchangeItem(
                 }?.let(into.transfers::addAll)
         }
 
-        ApiEndpointKind.BANK_TRANSACTIONS -> {
-            Unit
-        }
+        ApiEndpointKind.BANK_TRANSACTIONS -> {}
     }
 }
 

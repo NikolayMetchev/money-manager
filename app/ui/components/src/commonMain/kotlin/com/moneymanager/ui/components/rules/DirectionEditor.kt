@@ -130,9 +130,7 @@ fun DirectionEditor(
                 )
             }
 
-            null, Direction.Outgoing -> {
-                Unit
-            }
+            null, Direction.Outgoing -> {}
         }
     }
 }

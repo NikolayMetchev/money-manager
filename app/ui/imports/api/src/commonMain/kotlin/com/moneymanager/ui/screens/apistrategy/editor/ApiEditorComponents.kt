@@ -798,9 +798,7 @@ internal fun PaginationEditor(
 
     fun paging(updated: ApiPaging) = onChange(config.copy(paging = updated))
     when (val p = config.paging) {
-        ApiPaging.Single -> {
-            Unit
-        }
+        ApiPaging.Single -> {}
 
         is ApiPaging.Offset -> {
             TextFieldRow("Offset param", p.param, { paging(p.copy(param = it)) }, enabled, isError = p.param.isBlank())

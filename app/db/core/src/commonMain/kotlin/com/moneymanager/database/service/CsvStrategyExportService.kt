@@ -192,9 +192,7 @@ class CsvStrategyExportService(
             is CurrencyLookupExport,
             is HardCodedTimezoneExport,
             is TimezoneLookupExport,
-            -> {
-                Unit
-            }
+            -> {}
         }
     }
 
@@ -312,9 +310,7 @@ class CsvStrategyExportService(
                             }
                         }
 
-                        CsvReferenceType.CURRENCY -> {
-                            Unit
-                        }
+                        CsvReferenceType.CURRENCY -> {}
                     }
                 }
 

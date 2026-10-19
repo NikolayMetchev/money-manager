@@ -152,9 +152,7 @@ class CredentialSyncController(
                 upload(provider, remote.id, name, path, local)
             }
 
-            else -> {
-                Unit
-            }
+            else -> {}
         }
     }
 

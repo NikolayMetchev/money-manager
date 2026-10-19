@@ -273,9 +273,7 @@ private fun AccountRuleEditor(
             )
         }
 
-        RuleMatch.ALWAYS -> {
-            Unit
-        }
+        RuleMatch.ALWAYS -> {}
     }
     if (rule.match != RuleMatch.ATTRIBUTE) {
         OutlinedTextField(

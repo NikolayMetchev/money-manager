@@ -93,9 +93,7 @@ internal fun CredentialsCard() {
                     OutlinedButton(onClick = { runAction { vault.requireUnlocked("Create your credential file") } }) { Text("Create…") }
                 }
 
-                VaultState.Unbound -> {
-                    Unit
-                }
+                VaultState.Unbound -> {}
             }
         }
         message?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }

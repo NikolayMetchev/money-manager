@@ -135,9 +135,7 @@ fun ConditionRow(
             }, condition.otherPath.isNullOrBlank())
         }
 
-        ConditionOperand.NONE -> {
-            Unit
-        }
+        ConditionOperand.NONE -> {}
     }
 }
 

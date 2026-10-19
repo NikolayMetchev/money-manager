@@ -96,9 +96,7 @@ actual fun rememberDatabaseLocationPicker(onResult: (DbLocation?) -> Unit): Data
             )
         }
 
-        null -> {
-            Unit
-        }
+        null -> {}
     }
 
     return launcher
