@@ -1,6 +1,6 @@
 # Unified CI on Bazel (#1028): build/test, native tests per host, Android device tests, coverage, the desktop
-# installers, Qodana and auto-format. A single `changes` job decides once whether the push/PR touches anything
-# other than docs/webpage/markdown; every heavy job below `needs` it and is skipped otherwise. A skipped
+# installers and auto-format (Qodana runs in qodana.yml). A single `changes` job decides once whether the push/PR
+# touches anything other than docs/webpage/markdown; every heavy job below `needs` it and is skipped otherwise. A skipped
 # *required* job is treated as a pass by branch protection, so the required checks still report green
 # (skipping at the workflow level via `on.paths` would instead leave them pending forever and block the merge).
 #
@@ -544,104 +544,6 @@ jobs:
 
       - name: Build release APK
         run: bazel build --stamp //app/main/android:release
-
-  qodana:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    needs: changes
-    # Unlike the other heavy jobs this one also runs on workflow_dispatch, so it has no
-    # event-name condition.
-    # Runs the community 2026.2 linter (qodana.yaml). QODANA_TOKEN is a Qodana Cloud
-    # community-tier project token, so results upload to Qodana Cloud; the SARIF also goes to
-    # GitHub Code Scanning and the run artifact.
-    # The IDE inside Qodana builds its project model from a Bazel sync (qodana.yaml installs the JetBrains Bazel
-    # plugin and bazelisk). The sync runs Bazel in the container on the runner's Android SDK, its actions on BuildBuddy (RBE).
-    if: >-
-      needs.changes.outputs.code == 'true'
-    permissions:
-      contents: write
-      pull-requests: write
-      checks: write
-      security-events: write
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          # On PRs check out the actual PR commit, not the merge commit; on
-          # push/workflow_dispatch fall back to the triggered ref.
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0  # a full history is required for pull request analysis
-          persist-credentials: false  # read-only job, no git push
-      # Only for the Android SDK platform and user.bazelrc's BuildBuddy settings: Bazel itself runs in the
-      # container. RBE, not just the cache, so the sync hits the actions Build and Test already ran remotely
-      # (a local action's cache key differs from the same action run on BuildBuddy's executors).
-      - uses: ./.github/actions/bazel-setup
-        with:
-          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          config: rbe
-          cache-name: qodana
-      # The job restores and saves the Qodana cache itself (use-caches: false on the action) so it can
-      # drop the IDE's cached project model first. A scan that finds a model skips the import, but the
-      # model points at files only the import writes (under Gradle, the container's /root/.konan and the
-      # project's .kotlin/metadata klibs; under Bazel, the container's output base). With those gone every
-      # module is unresolved and the scan reports thousands of false findings. Indexes stay cached.
-      - name: Restore Qodana cache
-        uses: actions/cache/restore@v6
-        with:
-          path: ${{ runner.temp }}/qodana/caches
-          key: qodana-2026.2-${{ github.sha }}
-          restore-keys: |
-            qodana-2026.2-main-
-            native-false-qodana-2026.2-refs/heads/main-
-      - name: Drop the cached IDE project model
-        env:
-          CACHES: ${{ runner.temp }}/qodana/caches
-        run: |
-          if [ ! -d "$CACHES" ]; then echo "No Qodana cache restored"; exit 0; fi
-          echo "Cache layout:"
-          find "$CACHES" -mindepth 1 -maxdepth 3 -type d -not -path '*/caches/*/caches/*' | sort | head -80
-          find "$CACHES" -maxdepth 5 -type d \( -name external_build_system -o -name projects \) \
-            -not -path '*gradle*' -not -path '*.m2*' -print -prune -exec rm -rf {} +
-          find "$CACHES" -maxdepth 6 -type f -path '*/workspace/*.cache' -not -path '*gradle*' -print -delete
-          # Plugins too, so the scan runs only the ones qodana.yaml lists: main's cache still holds the Gradle build's
-          # SQLDelight plugin, which can't find the dialect without a Gradle import and rejects valid SQLite.
-          rm -rf "$CACHES/plugins"
-      # The runner image sets ANDROID_HOME in its environment, which the env context below doesn't see.
-      - name: Expose the Android SDK path
-        run: echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
-      - name: 'Qodana Scan'
-        uses: JetBrains/qodana-action@v2026.2
-        env:
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
-          QODANA_ENDPOINT: 'https://qodana.cloud'
-        with:
-          upload-result: true
-          # Full scan on PRs too, not pr-mode: changed-files-only let a PR pass while breaking main
-          # (e.g. a change in one module making another module's code flaggable). Main carries no
-          # accepted findings, so with a fail threshold of 0 a PR fails exactly when main would.
-          pr-mode: false
-          use-caches: false
-          # Sync builds the generated sources (SQLDelight, kotlin_constants) the model needs, and the Bazel plugin opens
-          # the checkout as a Bazel project only with auto-open on (the bootstrap moves .idea aside, see
-          # .qodana/open-as-bazel.sh). The bootstrap installs packages, so the container runs as root.
-          args: --property=bsp.build.project.on.sync=true,--property=idea.is.internal=true,--property=bazel.project.auto.open.if.present=true,--user,root,--volume,${{ env.ANDROID_HOME }}:/opt/android-sdk:ro,--env,ANDROID_HOME=/opt/android-sdk
-      - name: Save Qodana cache
-        if: always() && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/releases/'))
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ runner.temp }}/qodana/caches
-          key: qodana-2026.2-main-${{ github.sha }}
-      - name: Upload SARIF as artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: qodana-sarif
-          path: ${{ runner.temp }}/qodana/results/qodana.sarif.json
-          retention-days: 7
-      - name: Upload SARIF to GitHub Code Scanning
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
 
   lint-format:
     name: Auto-format PR

@@ -32,7 +32,8 @@
 #       to know (and for override params even contradicts its own Java-side exemption).
 
 version: "1.0"
-linter: jetbrains/qodana-jvm-community:2026.2
+# A Docker image goes in `image:`; `linter:` takes a linter name, and the CLI only warns when it gets an image.
+image: jetbrains/qodana-jvm-community:2026.2
 plugins:
   # The IDE's project model comes from a Bazel sync (the JetBrains Bazel plugin, as JetBrains' own Qodana run of
   # that plugin's repository does): each module's `_jvm` target is a module holding its commonMain, jvmAndroidMain
