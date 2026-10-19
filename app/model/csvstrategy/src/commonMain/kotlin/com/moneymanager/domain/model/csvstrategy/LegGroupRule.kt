@@ -10,18 +10,14 @@ import kotlinx.serialization.Serializable
 /**
  * One way a source splits a single movement across several rows — the legs of a trade, or the
  * debited/credited rows of a conversion — and how those rows are put back together. The one grouping
- * vocabulary behind every multi-row CSV movement; a strategy lists as many as its source needs, and a
- * row is a leg of the first rule that claims it.
+ * vocabulary behind every multi-row CSV movement; a strategy lists as many as its source needs.
  *
- * A row is a leg when all of [legWhen] hold. Its [side] says whether it is a debit (an asset leaving the
- * owner account) or a credit (an asset arriving). Legs whose [key] parts agree and that lie within
+ * The strategy's rules decide which rows are legs: a `RuleAction.Leg` naming this group's [name] makes
+ * its row a debit (an asset leaving the owner account) or a credit (an asset arriving), and a row is a
+ * leg of the first group it claims whose role resolves. Legs whose [key] parts agree and that lie within
  * [windowSeconds] of each other describe one event; [assembly] says what that event becomes.
  *
- * Leg conditions see each cell trimmed, as the source's own whitespace says nothing about which leg a
- * row is. Patterns are matched case-insensitively and anywhere ([Regex.containsMatchIn]), so anchor
- * them (`^…$`) unless a prefix match is genuinely wanted — an unanchored `Buy` would also claim
- * `Transaction Buy`. A blank cell is a leg only when a condition explicitly admits it.
- *
+ * @property name The group's name, which the rules' leg actions refer to.
  * @property reconcileWindowSeconds When set, an event another source already recorded — as trades, or as
  *   the individual fills a trade group aggregates — is not booked again. Deliberately **not** the
  *   strategy's `crossSourceReconcileWindowSeconds`: that window has to be wide enough for a bank's
@@ -31,9 +27,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class LegGroupRule(
-    @Serializable(with = SortedConditionListSerializer::class)
-    val legWhen: List<Condition>,
-    val side: LegSide,
+    val name: String,
     // Parts are joined in order to form the key - order is semantic, keeps insertion-order serialization.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val key: List<ValueExpr> = emptyList(),
@@ -52,29 +46,6 @@ data class LegGroupRule(
             "LegGroupRule.reconcileWindowSeconds must not be negative"
         }
     }
-}
-
-/** Which side of its event a leg is on. */
-@Serializable
-sealed interface LegSide {
-    /**
-     * The sign of the value at [path]: negative is a debit, positive a credit, and a zero or unparseable
-     * value is no leg at all — for a source that names both legs identically (Binance's `Transaction
-     * Related`, Bybit's blank Convert type).
-     */
-    @Serializable
-    @SerialName("sign")
-    data class Sign(
-        val path: String,
-    ) : LegSide
-
-    /** A debit when all of [conditions] hold, otherwise a credit. */
-    @Serializable
-    @SerialName("debitWhen")
-    data class DebitWhen(
-        @Serializable(with = SortedConditionListSerializer::class)
-        val conditions: List<Condition>,
-    ) : LegSide
 }
 
 /** What one event's legs become. */
@@ -106,12 +77,12 @@ sealed interface LegAssembly {
      * one-asset-out dust sweep, where no column says which credit came from which debit), so balances stay
      * exact without inventing a pairing.
      *
-     * With no [accounts], each leg keeps the counterparty its own row names and the assembly only links
-     * the legs — for a source that records one movement as two rows through the owner account, such as
-     * PayPal's card deposit and the payment it funded (a `pass-through` pair).
+     * The leg's rule names the intermediate account with a `RuleAction.Account` on the intermediate side;
+     * a leg whose candidates all fail to name one is not a leg. With no such candidate, each leg keeps the
+     * counterparty its own row names and the assembly only links the legs — for a source that records one
+     * movement as two rows through the owner account, such as PayPal's card deposit and the payment it
+     * funded (a `pass-through` pair).
      *
-     * @property accounts Picks the intermediate account: the first applicable rule's name. A leg no rule
-     *   names is not a leg. Empty: legs keep their own counterparties.
      * @property relationshipTypeName Links each debit to its credit (resolved get-or-create).
      * @property fundingWhen When set, an event is one leg matching these conditions (the funding: the
      *   relationship's first transfer) and one leg that doesn't, paired one to one — the funding leg on
@@ -121,8 +92,6 @@ sealed interface LegAssembly {
     @Serializable
     @SerialName("throughAccount")
     data class ThroughAccount(
-        // First applicable rule wins - order is semantic, keeps insertion-order serialization.
-        val accounts: List<AccountRule> = emptyList(),
         val relationshipTypeName: String,
         @EncodeDefault(EncodeDefault.Mode.NEVER)
         @Serializable(with = SortedConditionListSerializer::class)

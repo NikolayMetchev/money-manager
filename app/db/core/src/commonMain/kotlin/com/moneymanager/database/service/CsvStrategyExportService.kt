@@ -9,7 +9,7 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -21,7 +21,7 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.model.csvstrategy.export.AccountRulesExport
+import com.moneymanager.domain.model.csvstrategy.export.AccountFromRulesExport
 import com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExportMapper
@@ -168,11 +168,8 @@ class CsvStrategyExportService(
                     )
                 }
             }
-
-            is AccountRulesExport -> {
+            is AccountFromRulesExport ->
                 addCategoryReferenceIfMissing(mappingExport.defaultCategoryName, fieldType, referenceData, unresolvedReferences)
-            }
-
             is HardCodedCurrencyExport -> {
                 if (referenceData.currenciesByCode[mappingExport.currencyCode] == null) {
                     unresolvedReferences.add(
@@ -184,7 +181,6 @@ class CsvStrategyExportService(
                     )
                 }
             }
-
             // These don't have ID references
             is DateTimeParsingExport,
             is DirectColumnExport,
@@ -192,7 +188,7 @@ class CsvStrategyExportService(
             is CurrencyLookupExport,
             is HardCodedTimezoneExport,
             is TimezoneLookupExport,
-            -> {}
+            -> Unit
         }
     }
 
@@ -242,7 +238,7 @@ class CsvStrategyExportService(
         for ((ref, resolution) in resolutions) {
             if (resolution is CsvResolution.CreateNew) {
                 when (ref.type) {
-                    CsvReferenceType.ACCOUNT -> {
+                    CsvReferenceType.ACCOUNT ->
                         accountIntents[ref.name] =
                             ImportAccountIntent(
                                 key = LocalAccountKey(ref.name),
@@ -251,14 +247,10 @@ class CsvStrategyExportService(
                                 name = resolution.name,
                                 openingDate = Clock.System.now(),
                             )
-                    }
-
-                    CsvReferenceType.CATEGORY -> {
+                    CsvReferenceType.CATEGORY ->
                         categoryIntents[ref.name] =
                             ImportCategoryIntent(key = LocalCategoryKey(ref.name), source = source, name = resolution.name)
-                    }
-
-                    CsvReferenceType.CURRENCY -> {
+                    CsvReferenceType.CURRENCY ->
                         currencyIntents[ref.name] =
                             ImportCurrencyIntent(
                                 key = LocalCurrencyKey(ref.name),
@@ -266,7 +258,6 @@ class CsvStrategyExportService(
                                 code = resolution.name,
                                 name = resolution.name,
                             )
-                    }
                 }
             }
         }
@@ -302,18 +293,15 @@ class CsvStrategyExportService(
                                 accountsByName[ref.name] = account
                             }
                         }
-
                         CsvReferenceType.CATEGORY -> {
                             val category = categories.find { it.id == resolution.id }
                             if (category != null) {
                                 categoriesByName[ref.name] = category
                             }
                         }
-
-                        CsvReferenceType.CURRENCY -> {}
+                        CsvReferenceType.CURRENCY -> Unit
                     }
                 }
-
                 is CsvResolution.MapToExistingCurrency -> {
                     if (ref.type == CsvReferenceType.CURRENCY) {
                         val currency = currencies.find { it.id.id.toString() == resolution.id }
@@ -322,8 +310,7 @@ class CsvStrategyExportService(
                         }
                     }
                 }
-
-                is CsvResolution.CreateNew -> {
+                is CsvResolution.CreateNew ->
                     aliasCreatedEntity(
                         ref,
                         importResult,
@@ -334,7 +321,6 @@ class CsvStrategyExportService(
                         categoriesByName,
                         currenciesByCode,
                     )
-                }
             }
         }
 
@@ -395,12 +381,10 @@ class CsvStrategyExportService(
                 val id = importResult.createdAccountIds[LocalAccountKey(ref.name)] ?: return
                 accounts.find { it.id == id }?.let { accountsByName[ref.name] = it }
             }
-
             CsvReferenceType.CATEGORY -> {
                 val id = importResult.createdCategoryIds[LocalCategoryKey(ref.name)] ?: return
                 categories.find { it.id == id }?.let { categoriesByName[ref.name] = it }
             }
-
             CsvReferenceType.CURRENCY -> {
                 val id = importResult.createdCurrencyIds[LocalCurrencyKey(ref.name)] ?: return
                 currencies.find { it.id == id }?.let { currenciesByCode[ref.name] = it }
@@ -414,26 +398,21 @@ class CsvStrategyExportService(
         categoriesByName: Map<String, Category>,
     ): FieldMapping =
         when (this) {
-            is HardCodedAccountExport -> {
+            is HardCodedAccountExport ->
                 HardCodedAccountMapping(
                     fieldType = fieldType,
                     accountId =
                         accountsByName[accountName]?.id
                             ?: error("Account not found: $accountName"),
                 )
-            }
-
-            is AccountRulesExport -> {
-                AccountRulesMapping(
+            is AccountFromRulesExport ->
+                AccountFromRulesMapping(
                     fieldType = fieldType,
-                    rules = rules,
                     defaultCategoryId =
                         categoriesByName[defaultCategoryName]?.id
                             ?: Category.UNCATEGORIZED_ID,
                 )
-            }
-
-            is DateTimeParsingExport -> {
+            is DateTimeParsingExport ->
                 DateTimeParsingMapping(
                     fieldType = fieldType,
                     dateColumnName = dateColumnName,
@@ -443,57 +422,41 @@ class CsvStrategyExportService(
                     defaultTime = defaultTime,
                     dateTimeFormat = dateTimeFormat,
                 )
-            }
-
-            is DirectColumnExport -> {
+            is DirectColumnExport ->
                 DirectColumnMapping(
                     fieldType = fieldType,
                     value = value,
                 )
-            }
-
-            is AmountParsingExport -> {
+            is AmountParsingExport ->
                 AmountParsingMapping(
                     fieldType = fieldType,
                     mode = mode,
                     amountColumnName = amountColumnName,
                     creditColumnName = creditColumnName,
                     debitColumnName = debitColumnName,
-                    direction = direction,
-                    fee = fee,
-                    foreignAmount = foreignAmount,
                 )
-            }
-
-            is HardCodedCurrencyExport -> {
+            is HardCodedCurrencyExport ->
                 HardCodedCurrencyMapping(
                     fieldType = fieldType,
                     currencyId =
                         currenciesByCode[currencyCode]?.id
                             ?: error("Currency not found: $currencyCode"),
                 )
-            }
-
-            is CurrencyLookupExport -> {
+            is CurrencyLookupExport ->
                 CurrencyLookupMapping(
                     fieldType = fieldType,
                     value = value,
                 )
-            }
-
-            is HardCodedTimezoneExport -> {
+            is HardCodedTimezoneExport ->
                 HardCodedTimezoneMapping(
                     fieldType = fieldType,
                     timezoneId = timezoneId,
                 )
-            }
-
-            is TimezoneLookupExport -> {
+            is TimezoneLookupExport ->
                 TimezoneLookupMapping(
                     fieldType = fieldType,
                     columnName = columnName,
                     aliases = aliases,
                 )
-            }
         }
 }

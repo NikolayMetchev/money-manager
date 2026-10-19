@@ -13,30 +13,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.model.AttributeType
-import com.moneymanager.domain.model.csv.CsvColumn
-import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.ui.components.AccountPicker
 
 /**
- * Accounts tab: how the source and target accounts are resolved per row.
+ * Accounts tab: whether the source account is one fixed account or named per row by the rules. The target
+ * account is always named by the rules (Rules tab).
  */
 @Composable
 internal fun AccountsTab(
     state: CsvStrategyEditorState,
-    csvColumns: List<CsvColumn>,
-    rows: List<CsvRow>,
-    firstRow: CsvRow?,
     enabled: Boolean,
-    existingAttributeTypes: List<AttributeType>,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
 ) {
-    val attributeTypeNames = existingAttributeTypes.map { it.name }
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("Source Account (Optional)", style = MaterialTheme.typography.titleSmall)
         Text(
@@ -53,16 +46,13 @@ internal fun AccountsTab(
             Text("Fixed Account", modifier = Modifier.padding(end = 16.dp))
             RadioButton(
                 selected = state.sourceAccountMode == SourceAccountMode.RULES,
-                onClick = {
-                    state.sourceAccountMode = SourceAccountMode.RULES
-                    if (state.sourceRules.isEmpty()) state.sourceRules = listOf(defaultAccountRule(csvColumns.firstOrNull()?.originalName))
-                },
+                onClick = { state.sourceAccountMode = SourceAccountMode.RULES },
                 enabled = enabled,
             )
             Text("From the row (rules)")
         }
         when (state.sourceAccountMode) {
-            SourceAccountMode.FIXED_ACCOUNT -> {
+            SourceAccountMode.FIXED_ACCOUNT ->
                 AccountPicker(
                     selectedAccountId = state.selectedAccountId,
                     onAccountSelected = { state.selectedAccountId = it },
@@ -72,36 +62,20 @@ internal fun AccountsTab(
                     personRepository = personRepository,
                     enabled = enabled,
                 )
-            }
-
-            SourceAccountMode.RULES -> {
-                AccountRulesEditor(
-                    rules = state.sourceRules,
-                    onRulesChanged = { state.sourceRules = it },
-                    columns = csvColumns,
-                    rows = rows,
-                    firstRow = firstRow,
-                    existingAttributeTypeNames = attributeTypeNames,
-                    enabled = enabled,
+            SourceAccountMode.RULES ->
+                Text(
+                    "Named by the rules' \"Source\" account actions (Rules tab)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (state.accountsHasError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
         Text("Target Account", style = MaterialTheme.typography.titleSmall)
         Text(
-            "How the target (counterparty) account is named for each row",
+            "Named for each row by the rules' \"Target\" account actions (Rules tab)",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        AccountRulesEditor(
-            rules = state.targetRules,
-            onRulesChanged = { state.targetRules = it },
-            columns = csvColumns,
-            rows = rows,
-            firstRow = firstRow,
-            existingAttributeTypeNames = attributeTypeNames,
-            enabled = enabled,
         )
     }
 }

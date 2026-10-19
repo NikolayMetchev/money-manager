@@ -10,8 +10,7 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.AccountRule
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -21,6 +20,9 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -167,6 +169,20 @@ class CsvImportErrorHandlingTest {
             name = "Test Strategy",
             config =
                 CsvStrategyConfig(
+                    rules =
+                        listOf(
+                            StrategyRule.accounts(
+                                AccountSide.TARGET,
+                                listOf(
+                                    AccountNaming(
+                                        value =
+                                            ValueExpr(
+                                                listOf("Name") + fallbackColumns,
+                                            ),
+                                    ),
+                                ),
+                            ),
+                        ),
                     identificationColumns = setOf("Date", "Name", "Amount"),
                     fieldMappings =
                         mapOf(
@@ -176,18 +192,7 @@ class CsvImportErrorHandlingTest {
                                     accountId = testSourceAccountId,
                                 ),
                             TransferField.TARGET_ACCOUNT to
-                                AccountRulesMapping(
-                                    fieldType = TransferField.TARGET_ACCOUNT,
-                                    rules =
-                                        listOf(
-                                            AccountRule(
-                                                value =
-                                                    ValueExpr(
-                                                        listOf("Name") + fallbackColumns,
-                                                    ),
-                                            ),
-                                        ),
-                                ),
+                                AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                             TransferField.TIMESTAMP to
                                 DateTimeParsingMapping(
                                     fieldType = TransferField.TIMESTAMP,

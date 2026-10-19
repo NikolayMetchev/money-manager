@@ -31,8 +31,13 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.domain.model.csvstrategy.AccountRule
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -173,12 +178,23 @@ fun CsvStrategyEditorScreen(
             if (state.amountColumnName == null) {
                 state.amountColumnName = ColumnDetector.suggestAmountColumn(csvColumns, sampleValues)
             }
-            if (state.targetRules.isEmpty()) {
-                // A payee column with its own fallbacks, named after its value: the common bank-export shape.
-                ColumnDetector.suggestPayeeColumn(csvColumns)?.let { payee ->
-                    val fallbacks = if (rows.isEmpty()) emptyList() else ColumnDetector.suggestFallbackColumns(payee, csvColumns, rows)
-                    state.targetRules = listOf(AccountRule(value = ValueExpr(listOf(payee) + fallbacks)))
-                }
+            if (state.rules.isEmpty()) {
+                // The common bank-export shape: a signed amount (positive = money in), and a payee column with
+                // its own fallbacks naming the target account.
+                val direction =
+                    state.amountColumnName?.let {
+                        StrategyRule(
+                            conditions = listOf(Condition(it, ConditionOp.POSITIVE)),
+                            actions = listOf(RuleAction.SetDirection(true)),
+                        )
+                    }
+                val target =
+                    ColumnDetector.suggestPayeeColumn(csvColumns)?.let { payee ->
+                        val fallbacks = if (rows.isEmpty()) emptyList() else ColumnDetector.suggestFallbackColumns(payee, csvColumns, rows)
+                        val naming = AccountNaming(value = ValueExpr(listOf(payee) + fallbacks))
+                        StrategyRule(actions = listOf(RuleAction.Account(AccountSide.TARGET, naming)))
+                    }
+                state.rules = listOfNotNull(direction, target)
             }
             if (state.currencyColumnName == null) {
                 state.currencyColumnName = ColumnDetector.suggestCurrencyColumn(csvColumns, sampleValues)
@@ -251,7 +267,7 @@ fun CsvStrategyEditorScreen(
                     .padding(16.dp),
         ) {
             when (state.selectedTab) {
-                EditorTab.GENERAL -> {
+                EditorTab.GENERAL ->
                     GeneralTab(
                         state = state,
                         csvColumns = csvColumns,
@@ -259,23 +275,15 @@ fun CsvStrategyEditorScreen(
                         firstRow = firstRow,
                         enabled = !state.isSaving,
                     )
-                }
-
-                EditorTab.ACCOUNTS -> {
+                EditorTab.ACCOUNTS ->
                     AccountsTab(
                         state = state,
-                        csvColumns = csvColumns,
-                        rows = rows,
-                        firstRow = firstRow,
                         enabled = !state.isSaving,
-                        existingAttributeTypes = existingAttributeTypes,
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                     )
-                }
-
-                EditorTab.AMOUNT_DATE -> {
+                EditorTab.AMOUNT_DATE ->
                     AmountDateTab(
                         state = state,
                         csvColumns = csvColumns,
@@ -284,9 +292,14 @@ fun CsvStrategyEditorScreen(
                         enabled = !state.isSaving,
                         currencyRepository = currencyRepository,
                     )
-                }
-
-                EditorTab.ADVANCED -> {
+                EditorTab.RULES ->
+                    RulesTab(
+                        state = state,
+                        csvColumns = csvColumns,
+                        firstRow = firstRow,
+                        enabled = !state.isSaving,
+                    )
+                EditorTab.ADVANCED ->
                     AdvancedTab(
                         state = state,
                         csvColumns = csvColumns,
@@ -308,7 +321,6 @@ fun CsvStrategyEditorScreen(
                         },
                         onAddAccountMapping = { showAddAccountMappingDialog = true },
                     )
-                }
             }
 
             state.errorMessage?.let {

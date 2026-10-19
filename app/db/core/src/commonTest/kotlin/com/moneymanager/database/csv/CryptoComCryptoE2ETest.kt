@@ -5,9 +5,11 @@ import com.moneymanager.csvimporter.bulkReimportCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.AccountRule
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.test.database.DbTest
@@ -332,25 +334,23 @@ class CryptoComCryptoE2ETest : DbTest() {
                         current.config.copy(
                             fieldMappings =
                                 current.config.fieldMappings
-                                    .filterKeys { it != TransferField.TO_CURRENCY && it != TransferField.TO_AMOUNT }
-                                    .mapValues { (field, mapping) ->
-                                        if (field == TransferField.TARGET_ACCOUNT) {
-                                            AccountRulesMapping(
-                                                fieldType = TransferField.TARGET_ACCOUNT,
-                                                rules =
-                                                    listOf(
-                                                        AccountRule(
-                                                            value = ValueExpr(listOf("Transaction Description")),
-                                                            pattern = "App wallet",
-                                                            name = "Crypto.com Exchange",
-                                                        ),
-                                                        AccountRule(value = ValueExpr(listOf("Transaction Description"))),
-                                                    ),
-                                            )
-                                        } else {
-                                            mapping
-                                        }
-                                    },
+                                    .filterKeys { it != TransferField.TO_CURRENCY && it != TransferField.TO_AMOUNT },
+                            // The old definition named the target from the description alone.
+                            rules =
+                                current.config.rules.filterNot { rule ->
+                                    rule.actions.any { it is RuleAction.Account && it.side == AccountSide.TARGET }
+                                } +
+                                    StrategyRule.accounts(
+                                        AccountSide.TARGET,
+                                        listOf(
+                                            AccountNaming(
+                                                value = ValueExpr(listOf("Transaction Description")),
+                                                pattern = "App wallet",
+                                                name = "Crypto.com Exchange",
+                                            ),
+                                            AccountNaming(value = ValueExpr(listOf("Transaction Description"))),
+                                        ),
+                                    ),
                         ),
                 )
             repositories.importEngine.updateCsvStrategy(old)

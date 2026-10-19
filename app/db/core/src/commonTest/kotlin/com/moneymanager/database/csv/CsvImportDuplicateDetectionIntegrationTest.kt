@@ -16,7 +16,6 @@ import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
-import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
@@ -25,6 +24,10 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.csvstrategy.uniqueIdentifierAttributeTypes
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleValue
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
@@ -128,12 +131,13 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                                     timezoneId = "UTC",
                                 ),
                         ),
-                    attributeMappings =
+                    rules =
                         listOf(
-                            AttributeColumnMapping(
-                                columnName = "Transaction ID",
-                                attributeTypeName = "Transaction ID",
-                                isUniqueIdentifier = true,
+                            StrategyRule(
+                                actions =
+                                    listOf(
+                                        RuleAction.Attribute("Transaction ID", RuleValue.read("Transaction ID"), uniqueIdentifier = true),
+                                    ),
                             ),
                         ),
                 ),
@@ -222,16 +226,12 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                         }
 
                     val uniqueIdValues =
-                        strategy.config.attributeMappings
-                            .filter { it.isUniqueIdentifier }
-                            .associate { mapping ->
-                                val attributeValue =
-                                    transfer.attributes
-                                        .firstOrNull { it.attributeType.name == mapping.attributeTypeName }
-                                        ?.value
-                                        .orEmpty()
-                                mapping.columnName to attributeValue
-                            }
+                        strategy.config.uniqueIdentifierAttributeTypes().associateWith { typeName ->
+                            transfer.attributes
+                                .firstOrNull { it.attributeType.name == typeName }
+                                ?.value
+                                .orEmpty()
+                        }
 
                     ExistingTransferInfo(
                         transferId = transfer.id,
@@ -336,7 +336,7 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                         CsvStrategyConfig(
                             identificationColumns = setOf("Date", "Description", "Amount"),
                             fieldMappings = createTestStrategy().config.fieldMappings,
-                            attributeMappings = emptyList(),
+                            rules = emptyList(),
                         ),
                     createdAt = Clock.System.now(),
                     updatedAt = Clock.System.now(),

@@ -4,7 +4,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -44,22 +44,17 @@ object CsvStrategyExportMapper {
         categoryNameById: (Long) -> String?,
     ): FieldMappingExport =
         when (this) {
-            is HardCodedAccountMapping -> {
+            is HardCodedAccountMapping ->
                 HardCodedAccountExport(
                     fieldType = fieldType,
                     accountName = accountNameById(accountId) ?: "Unknown Account",
                 )
-            }
-
-            is AccountRulesMapping -> {
-                AccountRulesExport(
+            is AccountFromRulesMapping ->
+                AccountFromRulesExport(
                     fieldType = fieldType,
-                    rules = rules,
                     defaultCategoryName = categoryNameById(defaultCategoryId) ?: Category.UNCATEGORIZED_NAME,
                 )
-            }
-
-            is DateTimeParsingMapping -> {
+            is DateTimeParsingMapping ->
                 DateTimeParsingExport(
                     fieldType = fieldType,
                     dateColumnName = dateColumnName,
@@ -69,55 +64,39 @@ object CsvStrategyExportMapper {
                     defaultTime = defaultTime,
                     dateTimeFormat = dateTimeFormat,
                 )
-            }
-
-            is DirectColumnMapping -> {
+            is DirectColumnMapping ->
                 DirectColumnExport(
                     fieldType = fieldType,
                     value = value,
                 )
-            }
-
-            is AmountParsingMapping -> {
+            is AmountParsingMapping ->
                 AmountParsingExport(
                     fieldType = fieldType,
                     mode = mode,
                     amountColumnName = amountColumnName,
                     creditColumnName = creditColumnName,
                     debitColumnName = debitColumnName,
-                    direction = direction,
-                    fee = fee,
-                    foreignAmount = foreignAmount,
                 )
-            }
-
-            is HardCodedCurrencyMapping -> {
+            is HardCodedCurrencyMapping ->
                 HardCodedCurrencyExport(
                     fieldType = fieldType,
                     currencyCode = currencyCodeById(currencyId) ?: "XXX",
                 )
-            }
-
-            is CurrencyLookupMapping -> {
+            is CurrencyLookupMapping ->
                 CurrencyLookupExport(
                     fieldType = fieldType,
                     value = value,
                 )
-            }
-
-            is HardCodedTimezoneMapping -> {
+            is HardCodedTimezoneMapping ->
                 HardCodedTimezoneExport(
                     fieldType = fieldType,
                     timezoneId = timezoneId,
                 )
-            }
-
-            is TimezoneLookupMapping -> {
+            is TimezoneLookupMapping ->
                 TimezoneLookupExport(
                     fieldType = fieldType,
                     columnName = columnName,
                     aliases = aliases,
                 )
-            }
         }
 }

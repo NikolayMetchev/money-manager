@@ -20,29 +20,34 @@ import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.AccountRule
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
-import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
+import com.moneymanager.domain.model.csvstrategy.EXCLUDED_ATTRIBUTE_TYPE_NAME
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
-import com.moneymanager.domain.model.csvstrategy.LegSide
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.csvstrategy.excludedAttributeValue
+import com.moneymanager.domain.model.csvstrategy.uniqueIdentifierAttributeTypes
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.ColumnRecord
-import com.moneymanager.domain.model.rules.Condition
-import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Extraction
-import com.moneymanager.domain.model.rules.RuleEvaluator
+import com.moneymanager.domain.model.rules.FeeRule
+import com.moneymanager.domain.model.rules.ForeignAmount
+import com.moneymanager.domain.model.rules.LegRole
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleEngine
+import com.moneymanager.domain.model.rules.RuleOutcome
 import com.moneymanager.domain.model.rules.substituteTemplate
 import com.moneymanager.importengineapi.DESCRIPTION_SIMILARITY_THRESHOLD
 import com.moneymanager.importengineapi.ImportConversion
@@ -119,6 +124,11 @@ sealed interface MappingResult {
         /** Convenience for flows where only the target side can discover a new account. */
         val discoveredMapping: DiscoveredAccountMapping? get() = discoveredMappings.firstOrNull()
     }
+
+    /** A row a strategy rule skipped ([com.moneymanager.domain.model.rules.RuleAction.Skip]): nothing is imported for it. */
+    data class Skipped(
+        val rowIndex: Long,
+    ) : MappingResult
 
     data class Error(
         val rowIndex: Long,
@@ -232,7 +242,7 @@ data class CsvTransferWithAttributes(
     val unidentifiedCounterpartyAccountId: AccountId? = null,
     /**
      * The statement account's conversion, when [transfer] is booked in the foreign currency it paid or
-     * received (see `AmountParsingMapping.foreignAmount`); null otherwise.
+     * received (see `RuleAction.Foreign`); null otherwise.
      */
     val conversion: ImportConversion? = null,
 )
@@ -329,8 +339,9 @@ class CsvTransferMapper(
 
     private val passThroughDetector: PassThroughDetector? = passThroughDetector.takeUnless { isReconciliationSource }
 
-    // Holds the compiled-pattern cache: account rules, conditions and extractions run against every row.
-    private val rules = RuleEvaluator()
+    // Holds the compiled-pattern cache: the strategy's rules, conditions and extractions run against every row.
+    private val engine = RuleEngine()
+    private val rules = engine.evaluator
 
     private fun compiledPattern(pattern: String): Regex = rules.regex(pattern)
 
@@ -355,15 +366,12 @@ class CsvTransferMapper(
             LocalTime.Format { byUnicodePattern(pattern) }
         }
 
-    // Extract unique identifier column names from strategy
-    private val uniqueIdentifierColumns: List<String> =
-        strategy.config.attributeMappings
-            .filter { it.isUniqueIdentifier }
-            .map { it.columnName }
+    // The attribute types the strategy's rules mark as identifying a row across imports.
+    private val uniqueIdentifierTypes: List<String> = strategy.config.uniqueIdentifierAttributeTypes()
 
     // Index existing transfers by their unique identifier values for fast lookup
     private val existingTransfersByUniqueId: Map<Map<String, String>, ExistingTransferInfo> =
-        if (uniqueIdentifierColumns.isNotEmpty()) {
+        if (uniqueIdentifierTypes.isNotEmpty()) {
             existingTransfers.associateBy { it.uniqueIdentifierValues }
         } else {
             emptyMap()
@@ -422,10 +430,10 @@ class CsvTransferMapper(
 
                     newAccounts.addAll(result.newAccounts)
                 }
-
                 is MappingResult.Error -> {
                     errorRows.add(result)
                 }
+                is MappingResult.Skipped -> Unit
             }
         }
 
@@ -442,10 +450,15 @@ class CsvTransferMapper(
      */
     fun mapRow(row: CsvRow): MappingResult {
         return try {
-            // Attribute extraction and unique-id dedup use the original values so they stay
-            // faithful to the CSV; field parsing uses the preprocessed (possibly swapped) values.
+            // The rules see the row as the CSV has it; field parsing reads the row as they left it (cells
+            // swapped or set). Attributes are claimed by whichever rule tags them, so a strategy that wants
+            // the original cells tags them before rewriting any.
             val originalValues = row.values
-            val (values, rulesFlip) = applyRowPreprocessing(originalValues)
+            val outcome = engine.evaluate(strategy.config.rules, ColumnRecord(originalValues, columnIndexByName))
+            if (outcome.skipped) return MappingResult.Skipped(row.rowIndex)
+            val values = rewrittenValues(originalValues, outcome)
+            val sourceResolution by lazy { resolveAccount(AccountSide.SOURCE, outcome, values) }
+            val targetResolution by lazy { resolveAccount(AccountSide.TARGET, outcome, values) }
             val targetMapping =
                 strategy.config.fieldMappings[TransferField.TARGET_ACCOUNT]
                     ?: return MappingResult.Error(row.rowIndex, "Missing TARGET_ACCOUNT mapping")
@@ -487,9 +500,8 @@ class CsvTransferMapper(
                     Money.fromDisplayValue(toRaw, toAsset)
                 }
 
-            // Determine if we need to flip accounts (sign-based flip XOR preprocessing flip)
-            val amountFlip = (amountMapping as? AmountParsingMapping)?.let { isIncoming(it.direction, rawAmount, values) } == true
-            val flipAccounts = amountFlip xor rulesFlip
+            // An incoming row swaps the source and target the mappings resolved; a rule's flip toggles that.
+            val flipAccounts = (outcome.incoming == true) xor outcome.flipped
 
             // Resolve the source account: use override if provided, otherwise fall back to the
             // strategy's SOURCE_ACCOUNT mapping (if present), or return an error.
@@ -503,18 +515,18 @@ class CsvTransferMapper(
                                 row.rowIndex,
                                 "No source account selected. Please choose a source account before importing.",
                             )
-                    parseAccount(sourceMapping, values)
+                    parseAccount(sourceMapping, sourceResolution)
                 }
 
             // Parse accounts with potential flipping
             var sourceAccountId = resolvedSourceAccountId
-            var targetAccountId = parseAccount(targetMapping, values)
+            var targetAccountId = parseAccount(targetMapping, targetResolution)
 
             // Asset-conversion leg: route the counterparty side to the shared conversion account so both
             // the debit and credit legs parse as valid single-asset transfers (owner account <-> conversion
             // account). The amount-sign flip below then places the owner on the correct side (owner is the
             // source of a debit, the target of a credit). The applier pairs and links the legs afterwards.
-            val legDetection = detectGroupLeg(values)
+            val legDetection = detectGroupLeg(outcome, values)
             val conversionDetection = legDetection?.takeIf { it.throughAccountName != null }
             if (conversionDetection != null) {
                 targetAccountId = resolveExistingAccountId(conversionDetection.accountName) ?: UNRESOLVED_ACCOUNT_ID
@@ -535,7 +547,7 @@ class CsvTransferMapper(
                 sourceAccountId != UNRESOLVED_ACCOUNT_ID
             ) {
                 strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]?.let {
-                    sourceAccountId = parseAccount(it, values, applyPersistedMappings = false)
+                    sourceAccountId = parseAccount(it, sourceResolution, applyPersistedMappings = false)
                     sourceUsedPersistedMappings = false
                 }
             }
@@ -550,12 +562,12 @@ class CsvTransferMapper(
                 sourceAccountId == targetAccountId &&
                 sourceAccountId != UNRESOLVED_ACCOUNT_ID
             ) {
-                targetAccountId = parseAccount(targetMapping, values, applyPersistedMappings = false)
+                targetAccountId = parseAccount(targetMapping, targetResolution, applyPersistedMappings = false)
                 // A broad mapping (".*") can claim a blank counterparty; without it the rules name nothing
                 // to create, so the placeholder would never resolve.
                 if (targetAccountId == UNRESOLVED_ACCOUNT_ID &&
-                    targetMapping is AccountRulesMapping &&
-                    resolveAccount(targetMapping, values).accountName.isBlank()
+                    targetMapping is AccountFromRulesMapping &&
+                    targetResolution.accountName.isBlank()
                 ) {
                     return MappingResult.Error(row.rowIndex, "Failed to resolve target account")
                 }
@@ -596,15 +608,12 @@ class CsvTransferMapper(
             // name, then historical name): resolving it any more narrowly would leave the conduit side
             // dangling at AccountId(-1) for a conduit that was never created because it already exists.
             val passThroughMatch = passThroughDetector?.detect(description)
-            // A strategy whose rows all run through one conduit (see StrategyConduit): the row's counterparty
-            // becomes the merchant at the end of the chain and the conduit takes its place on the transfer,
-            // ahead of any conduits the description itself names.
-            val strategyConduit =
-                strategy.config.conduit?.takeIf {
-                    tradeTo == null && legDetection == null && rules.all(it.conditions, ColumnRecord(values, columnIndexByName))
-                }
+            // A row a rule runs through a conduit (RuleAction.ThroughConduit): the row's counterparty becomes
+            // the merchant at the end of the chain and the conduit takes its place on the transfer, ahead of
+            // any conduits the description itself names.
+            val strategyConduit = outcome.conduitAccountName?.takeIf { tradeTo == null && legDetection == null }
             val conduitNames =
-                listOfNotNull(strategyConduit?.accountName) + passThroughMatch?.accounts?.map { it.conduitAccountName }.orEmpty()
+                listOfNotNull(strategyConduit) + passThroughMatch?.accounts?.map { it.conduitAccountName }.orEmpty()
             val chainConduitIds = conduitNames.mapNotNull { resolveExistingAccountId(it) }
             val conduitAccountId =
                 conduitNames.firstOrNull()?.let { resolveExistingAccountId(it) ?: UNRESOLVED_ACCOUNT_ID }
@@ -632,31 +641,25 @@ class CsvTransferMapper(
                 }
             val passThrough =
                 when {
-                    strategyConduit == null -> {
-                        detectedPassThrough
-                    }
-
+                    strategyConduit == null -> detectedPassThrough
                     // The strategy conduit forwards to the conduit the description names; that chain goes on.
-                    detectedPassThrough != null -> {
+                    detectedPassThrough != null ->
                         detectedPassThrough.copy(
                             conduitNames = conduitNames,
                             spendDescriptions = listOf(description) + detectedPassThrough.spendDescriptions,
                         )
-                    }
-
-                    else -> {
+                    else ->
                         CsvPassThrough(
                             conduitNames = conduitNames,
                             merchantName =
                                 accountsById[counterpartyAccountId]?.name
-                                    ?: discoverNewAccount(targetMapping, values)?.first?.name
-                                    ?: (targetMapping as? AccountRulesMapping)?.let { resolveAccount(it, values).accountName }.orEmpty(),
+                                    ?: discoverNewAccount(targetMapping, targetResolution)?.first?.name
+                                    ?: targetResolution.accountName,
                             merchantAccountId = counterpartyAccountId.takeIf { it != UNRESOLVED_ACCOUNT_ID },
                             spendDescriptions = listOf(description),
                             relationshipTypeId = WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID,
                             incoming = flipAccounts,
                         )
-                    }
                 }
             val effectiveSourceAccountId =
                 if (conduitAccountId != null && flipAccounts) conduitAccountId else sourceAccountId
@@ -690,7 +693,7 @@ class CsvTransferMapper(
                 if (passThroughMatch != null || conversionDetection != null) {
                     null
                 } else {
-                    resolvePersonalCounterparty(targetMapping, values, targetUsedPersistedMappings)
+                    resolvePersonalCounterparty(targetMapping, targetResolution, targetUsedPersistedMappings)
                 }
 
             // A counterparty the strategy could not identify — no rule matched, no persisted mapping, so
@@ -703,26 +706,22 @@ class CsvTransferMapper(
             val sourceMapping = strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]
             val unidentifiedCounterpartyAccountId =
                 when {
-                    strategyConduit != null -> {
+                    strategyConduit != null ->
                         ownAccountId.takeIf {
                             sourceAccountOverride == null &&
                                 sourceMapping != null &&
-                                isUnidentifiedCounterparty(sourceMapping, values, sourceUsedPersistedMappings)
+                                isUnidentifiedCounterparty(sourceMapping, sourceResolution, sourceUsedPersistedMappings)
                         }
-                    }
-
-                    passThroughMatch != null || conversionDetection != null || tradeTo != null -> {
-                        null
-                    }
-
-                    else -> {
-                        counterpartyAccountId.takeIf { isUnidentifiedCounterparty(targetMapping, values, targetUsedPersistedMappings) }
-                    }
+                    passThroughMatch != null || conversionDetection != null || tradeTo != null -> null
+                    else ->
+                        counterpartyAccountId.takeIf {
+                            isUnidentifiedCounterparty(targetMapping, targetResolution, targetUsedPersistedMappings)
+                        }
                 }
 
             // A fee is modelled as its own movement (linked to this transfer), not folded into the amount.
             val rowFee =
-                when (val parsed = parseFee(amountMapping, values, currency)) {
+                when (val parsed = parseFee(outcome.fees, values, currency)) {
                     FeeParse.UnknownCurrency -> return MappingResult.Error(row.rowIndex, "Fee currency not found")
                     is FeeParse.Charged -> parsed
                     FeeParse.None -> null
@@ -742,7 +741,7 @@ class CsvTransferMapper(
             val settled = Money.fromDisplayValue(netMagnitude, currency)
             val foreign =
                 if (tradeTo == null && legDetection == null) {
-                    when (val parsed = parseForeignAmount(amountMapping, values, currency)) {
+                    when (val parsed = parseForeignAmount(outcome.foreignAmount, values, currency)) {
                         ForeignParse.UnknownCurrency -> return MappingResult.Error(row.rowIndex, "Foreign currency not found")
                         is ForeignParse.Foreign -> parsed.amount
                         ForeignParse.None -> null
@@ -763,13 +762,12 @@ class CsvTransferMapper(
                     amount = amount,
                 )
 
-            // Extract attributes from mapped columns (original, pre-swap values)
-            val attributes = extractAttributes(originalValues)
+            val attributes = attributesOf(outcome)
 
             // Check for duplicates using unique identifiers if configured, otherwise check by all fields
             val (importStatus, existingTransferId) =
-                if (uniqueIdentifierColumns.isNotEmpty()) {
-                    checkForDuplicateByUniqueId(originalValues, transfer, attributes)
+                if (uniqueIdentifierTypes.isNotEmpty()) {
+                    checkForDuplicateByUniqueId(attributes, transfer)
                 } else {
                     checkForDuplicateByAllFields(transfer, attributes)
                 }
@@ -786,7 +784,7 @@ class CsvTransferMapper(
                         // genuinely new source account must still be discovered/created rather than suppressed
                         // by a persisted mapping — otherwise it would dangle unresolved.
                         strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]?.let {
-                            add(discoverNewAccount(it, values, applyPersistedMappings = sourceUsedPersistedMappings))
+                            add(discoverNewAccount(it, sourceResolution, applyPersistedMappings = sourceUsedPersistedMappings))
                         }
                     }
                     // A conversion leg's counterparty is the shared conversion account (added below), not
@@ -794,10 +792,10 @@ class CsvTransferMapper(
                     if (passThroughMatch == null &&
                         conversionDetection == null
                     ) {
-                        add(discoverNewAccount(targetMapping, values, applyPersistedMappings = targetUsedPersistedMappings))
+                        add(discoverNewAccount(targetMapping, targetResolution, applyPersistedMappings = targetUsedPersistedMappings))
                     }
                 }
-            val targetCategoryId = (targetMapping as? AccountRulesMapping)?.defaultCategoryId ?: Category.UNCATEGORIZED_ID
+            val targetCategoryId = (targetMapping as? AccountFromRulesMapping)?.defaultCategoryId ?: Category.UNCATEGORIZED_ID
             val newAccounts =
                 buildList {
                     addAll(discoveries.mapNotNull { it?.first })
@@ -844,27 +842,26 @@ class CsvTransferMapper(
     }
 
     /**
-     * Extracts attribute values from CSV row based on strategy.config.attributeMappings.
-     * Skips attributes with blank values, and those whose conditions don't hold for the row.
+     * The row's attributes as its rules tagged them, plus the `excluded` attribute (carrying the reason)
+     * when a rule excluded the row.
      */
-    private fun extractAttributes(values: List<String>): List<Pair<String, String>> {
-        val record = ColumnRecord(values, columnIndexByName)
-        return strategy.config.attributeMappings.mapNotNull { mapping ->
-            if (!rules.all(mapping.conditions, record)) return@mapNotNull null
-            val value = getColumnValueOrNull(mapping.columnName, values)?.trim()
-            if (value.isNullOrBlank()) {
-                return@mapNotNull null
-            }
-            val extraction = mapping.extraction
-            // Unique-identifier columns always use the whole column value so the dedup key (which reads
-            // the raw column directly) and the stored attribute value never diverge.
-            if (extraction == null || mapping.isUniqueIdentifier) {
-                mapping.attributeTypeName to value
-            } else {
-                val extracted = applyExtraction(value, extraction) ?: return@mapNotNull null
-                mapping.attributeTypeName to (mapping.emitWhenMatched ?: extracted)
-            }
+    private fun attributesOf(outcome: RuleOutcome): List<Pair<String, String>> =
+        outcome.attributes.map { it.typeName to it.value } +
+            listOfNotNull((EXCLUDED_ATTRIBUTE_TYPE_NAME to excludedAttributeValue(outcome.excludeReason)).takeIf { outcome.excluded })
+
+    /** [original] as the rules left it: every cell a rule swapped or set rewritten (a short row padded). */
+    private fun rewrittenValues(
+        original: List<String>,
+        outcome: RuleOutcome,
+    ): List<String> {
+        val record = outcome.record
+        if (record is ColumnRecord) return original
+        val rewritten = original.toMutableList()
+        for ((name, index) in columnIndexByName) {
+            while (rewritten.size <= index) rewritten.add("")
+            rewritten[index] = record.text(name).orEmpty()
         }
+        return rewritten
     }
 
     /**
@@ -889,15 +886,15 @@ class CsvTransferMapper(
     }
 
     /**
-     * The row's foreign amount (see `AmountParsingMapping.foreignAmount`): [ForeignParse.None] when the
-     * strategy declares none, the cells are blank, the amount is zero or the currency is the settled one.
+     * The row's foreign amount (see [RuleAction.Foreign]): [ForeignParse.None] when no rule declares one, the cells are
+     * blank, the amount is zero or the currency is the settled one.
      */
     private fun parseForeignAmount(
-        amountMapping: FieldMapping,
+        foreign: ForeignAmount?,
         values: List<String>,
         settledCurrency: Asset,
     ): ForeignParse {
-        val foreign = (amountMapping as? AmountParsingMapping)?.foreignAmount ?: return ForeignParse.None
+        if (foreign == null) return ForeignParse.None
         val lookup: (String) -> String? = { getColumnValueOrNull(it, values)?.trim() }
         val code = rules.resolve(foreign.currency, lookup).trim()
         val rawAmount = rules.resolve(foreign.amount, lookup).trim()
@@ -917,24 +914,25 @@ class CsvTransferMapper(
     }
 
     /**
-     * The leg [values] is of the first of the strategy's `legGroups` that claims it: its leg conditions hold
-     * (against trimmed cells), its side resolves, and — for a through-account rule — an account rule names
-     * the intermediate account. Null when no rule claims the row.
+     * The leg this row is: the first of the rules' leg claims whose group exists and whose role resolves,
+     * and — for a through-account group whose rules name an intermediate account — whose intermediate
+     * account resolves. Null when no claim does.
      */
-    private fun detectGroupLeg(values: List<String>): LegDetection? {
-        val record = ColumnRecord(values, columnIndexByName)
-        val trimmed = ColumnRecord(values.map { it.trim() }, columnIndexByName)
-        return strategy.config.legGroups.withIndex().firstNotNullOfOrNull { (index, rule) ->
-            if (!rules.all(rule.legWhen, trimmed)) return@firstNotNullOfOrNull null
+    private fun detectGroupLeg(
+        outcome: RuleOutcome,
+        values: List<String>,
+    ): LegDetection? {
+        val trimmed by lazy { ColumnRecord(values.map { it.trim() }, columnIndexByName) }
+        return outcome.legs.firstNotNullOfOrNull { claim ->
+            val index = strategy.config.legGroups.indexOfFirst { it.name == claim.group }
+            val group = strategy.config.legGroups.getOrNull(index) ?: return@firstNotNullOfOrNull null
             val side =
-                when (val legSide = rule.side) {
-                    is LegSide.DebitWhen -> {
-                        if (rules.all(legSide.conditions, trimmed)) GroupLegSide.DEBIT else GroupLegSide.CREDIT
-                    }
-
-                    is LegSide.Sign -> {
+                when (val role = claim.role) {
+                    LegRole.Debit -> GroupLegSide.DEBIT
+                    LegRole.Credit -> GroupLegSide.CREDIT
+                    is LegRole.BySign -> {
                         val amount =
-                            getColumnValueOrNull(legSide.path, values)
+                            getColumnValueOrNull(role.path, values)
                                 ?.takeIf { it.isNotBlank() }
                                 ?.let { runCatching { parseBigDecimal(it) }.getOrNull() }
                         when {
@@ -945,31 +943,28 @@ class CsvTransferMapper(
                         }
                     }
                 } ?: return@firstNotNullOfOrNull null
+            val intermediates = outcome.accountsFor(AccountSide.INTERMEDIATE)
             val throughAccountName =
-                when (val assembly = rule.assembly) {
-                    is LegAssembly.Trade -> {
-                        null
-                    }
-
-                    is LegAssembly.ThroughAccount -> {
-                        if (assembly.accounts.isEmpty()) {
+                when (group.assembly) {
+                    is LegAssembly.Trade -> null
+                    is LegAssembly.ThroughAccount ->
+                        if (intermediates.isEmpty()) {
                             null
                         } else {
-                            assembly.accounts
-                                .firstNotNullOfOrNull { applyAccountRule(it, record, values) }
+                            intermediates
+                                .firstNotNullOfOrNull { applyAccountNaming(it, values) }
                                 ?.accountName
                                 ?.takeIf { it.isNotBlank() }
                                 ?: return@firstNotNullOfOrNull null
                         }
-                    }
                 }
             val funding =
-                (rule.assembly as? LegAssembly.ThroughAccount)
+                (group.assembly as? LegAssembly.ThroughAccount)
                     ?.fundingWhen
                     ?.takeIf { it.isNotEmpty() }
                     ?.let { rules.all(it, trimmed) } == true
             val key =
-                rule.key.joinToString(
+                group.key.joinToString(
                     PAIRING_KEY_SEPARATOR,
                 ) { part -> rules.resolve(part) { getColumnValueOrNull(it, values)?.trim() } }
             LegDetection(GroupLeg(index, side, key, funding), throughAccountName)
@@ -989,7 +984,6 @@ class CsvTransferMapper(
                             ?: error("amountColumnName required for SINGLE_COLUMN mode")
                     parseBigDecimal(getColumnValue(columnName, values))
                 }
-
                 AmountMode.CREDIT_DEBIT_COLUMNS -> {
                     val creditColumnName =
                         mapping.creditColumnName
@@ -1007,21 +1001,6 @@ class CsvTransferMapper(
         return baseAmount
     }
 
-    /**
-     * Whether the row's money comes INTO the source (statement) account per [direction], which swaps
-     * the source and target the mappings resolved.
-     */
-    private fun isIncoming(
-        direction: Direction,
-        rawAmount: BigDecimal,
-        values: List<String>,
-    ): Boolean =
-        when (direction) {
-            is Direction.AmountSign -> if (direction.positiveIsIncoming) rawAmount > BigDecimal.ZERO else rawAmount < BigDecimal.ZERO
-            is Direction.Field -> getColumnValueOrNull(direction.path, values)?.trim() in direction.incomingValues
-            Direction.Outgoing -> false
-        }
-
     /** What a row's [com.moneymanager.domain.model.rules.FeeRule] came to. */
     private sealed interface FeeParse {
         data object None : FeeParse
@@ -1036,18 +1015,24 @@ class CsvTransferMapper(
         ) : FeeParse
     }
 
-    /**
-     * The fee a row carries per the amount mapping's [com.moneymanager.domain.model.rules.FeeRule]: none when there is no rule, its conditions
-     * don't hold, it is charged on another asset, or the amount is blank or zero. Its sign is ignored — a
-     * fee is a movement out of the transaction's source account. The fee is in [rowCurrency] unless the
-     * rule's currency reads a non-blank code of its own.
-     */
+    /** The fee the first of [fees] that charges one comes to (see [chargedFee]). */
     private fun parseFee(
-        amountMapping: FieldMapping,
+        fees: List<FeeRule>,
+        values: List<String>,
+        rowCurrency: Asset,
+    ): FeeParse = fees.asSequence().map { chargedFee(it, values, rowCurrency) }.firstOrNull { it != FeeParse.None } ?: FeeParse.None
+
+    /**
+     * The fee [fee] charges on this row: none when its conditions don't hold, it is charged on another
+     * asset, or the amount is blank or zero. Its sign is ignored — a fee is a movement out of the
+     * transaction's source account. The fee is in [rowCurrency] unless the rule's currency reads a
+     * non-blank code of its own.
+     */
+    private fun chargedFee(
+        fee: FeeRule,
         values: List<String>,
         rowCurrency: Asset,
     ): FeeParse {
-        val fee = (amountMapping as? AmountParsingMapping)?.fee ?: return FeeParse.None
         val lookup = { path: String -> getColumnValueOrNull(path, values)?.trim() }
         if (!rules.all(fee.conditions, ColumnRecord(values, columnIndexByName))) return FeeParse.None
         if (fee.chargedOnAsset?.let { !rules.resolve(it, lookup).equals(rowCurrency.code, ignoreCase = true) } == true) {
@@ -1068,136 +1053,73 @@ class CsvTransferMapper(
     }
 
     /**
-     * Applies the strategy's row preprocessing rules to the raw row values.
-     * Returns the (possibly column-swapped) values and whether source/target accounts must flip.
-     */
-    private fun applyRowPreprocessing(values: List<String>): Pair<List<String>, Boolean> {
-        var effective = values
-        var flip = false
-        for (rule in strategy.config.rowPreprocessingRules) {
-            if (rule.conditions.all { evaluateCondition(it, effective) }) {
-                effective = applyColumnSwaps(rule.columnSwaps, effective)
-                if (rule.flipSourceAndTarget) flip = !flip
-            }
-        }
-        return effective to flip
-    }
-
-    private fun applyColumnSwaps(
-        swaps: List<ColumnPairSwap>,
-        values: List<String>,
-    ): List<String> {
-        if (swaps.isEmpty()) return values
-        val mutable = values.toMutableList()
-        for (swap in swaps) {
-            val firstIndex = columnIndexByName[swap.firstColumn]
-            val secondIndex = columnIndexByName[swap.secondColumn]
-            if (firstIndex != null && secondIndex != null) {
-                // Rows may have fewer values than columns; pad so both indices are addressable
-                while (mutable.size <= maxOf(firstIndex, secondIndex)) {
-                    mutable.add("")
-                }
-                val temp = mutable[firstIndex]
-                mutable[firstIndex] = mutable[secondIndex]
-                mutable[secondIndex] = temp
-            }
-        }
-        return mutable
-    }
-
-    private fun evaluateCondition(
-        condition: Condition,
-        values: List<String>,
-    ): Boolean = rules.matches(condition, ColumnRecord(values, columnIndexByName))
-
-    /**
-     * How one side's [AccountRulesMapping] named the account for a row: the [rule] that applied, the
+     * How the rules named the account on one side for a row: the [naming] candidate that applied, the
      * [sourceValue] it read (what persisted account mappings match against), and the account it names —
-     * [attributeAccountId] when an attribute rule matched an account, otherwise [accountName] (blank when
-     * no rule applied or the value was blank).
+     * [attributeAccountId] when an attribute candidate matched an account, otherwise [accountName] (blank
+     * when no candidate applied or the value was blank).
      */
     private data class AccountResolution(
-        val rule: AccountRule?,
+        val naming: AccountNaming?,
         val sourceValue: String,
         val accountName: String,
         val attributeAccountId: AccountId? = null,
         val personName: String? = null,
     )
 
-    // A row resolves each side several times (id, discovery, person, unidentified); the rules are
-    // re-evaluated only when the row (or side) changes.
-    private var lastResolution: Triple<List<String>, AccountRulesMapping, AccountResolution>? = null
-    private var previousResolution: Triple<List<String>, AccountRulesMapping, AccountResolution>? = null
-
+    /** The first of the rules' [side] candidates that applies to the row. */
     private fun resolveAccount(
-        mapping: AccountRulesMapping,
+        side: AccountSide,
+        outcome: RuleOutcome,
         values: List<String>,
-    ): AccountResolution {
-        for (cached in listOfNotNull(lastResolution, previousResolution)) {
-            if (cached.first === values && cached.second === mapping) return cached.third
-        }
-        val resolution = evaluateAccountRules(mapping, values)
-        previousResolution = lastResolution
-        lastResolution = Triple(values, mapping, resolution)
-        return resolution
-    }
+    ): AccountResolution =
+        outcome.accountsFor(side).firstNotNullOfOrNull { applyAccountNaming(it, values) }
+            ?: AccountResolution(naming = null, sourceValue = "", accountName = "")
 
-    private fun evaluateAccountRules(
-        mapping: AccountRulesMapping,
-        values: List<String>,
-    ): AccountResolution {
-        val record = ColumnRecord(values, columnIndexByName)
-        return mapping.rules.firstNotNullOfOrNull { rule -> applyAccountRule(rule, record, values) }
-            ?: AccountResolution(rule = null, sourceValue = "", accountName = "")
-    }
-
-    /** What [rule] resolves this row to, or null when the rule doesn't apply and the next one should be tried. */
-    private fun applyAccountRule(
-        rule: AccountRule,
-        record: ColumnRecord,
+    /** What [naming] resolves this row to, or null when it doesn't apply and the next candidate should be tried. */
+    private fun applyAccountNaming(
+        naming: AccountNaming,
         values: List<String>,
     ): AccountResolution? {
-        if (!rules.all(rule.conditions, record)) return null
         val read =
-            rule.value.paths
+            naming.value.paths
                 .asSequence()
                 .map { getColumnValue(it, values) }
                 .firstOrNull { it.isNotBlank() }
                 .orEmpty()
-        val value = if (rule.trim) read.trim() else read
-        val match = rule.pattern?.let { pattern -> value.takeIf { it.isNotBlank() }?.let { compiledPattern(pattern).find(it) } }
-        if (rule.pattern != null && match == null) return null
-        if (rule.attributeTypeName != null) {
+        val value = if (naming.trim) read.trim() else read
+        val match = naming.pattern?.let { pattern -> value.takeIf { it.isNotBlank() }?.let { compiledPattern(pattern).find(it) } }
+        if (naming.pattern != null && match == null) return null
+        if (naming.attributeTypeName != null) {
             val matched =
-                value.takeIf { it.isNotBlank() }?.let { attributeAccountMatchers[rule.attributeTypeName]?.match(it) } ?: return null
-            return AccountResolution(rule, value, value, attributeAccountId = matched)
+                value.takeIf { it.isNotBlank() }?.let { attributeAccountMatchers[naming.attributeTypeName]?.match(it) } ?: return null
+            return AccountResolution(naming, value, value, attributeAccountId = matched)
         }
-        val accountName = renderAccountName(rule, rule.name, value, match).ifBlank { rule.fallbackName.orEmpty() }
+        val accountName = renderAccountName(naming, naming.name, value, match).ifBlank { naming.fallbackName.orEmpty() }
         val personName =
-            if (rule.counterpartyIsPerson) {
-                rule.personName?.let { renderAccountName(rule, it, value, match) }?.takeIf { it.isNotBlank() } ?: accountName
+            if (naming.person) {
+                naming.personName?.let { renderAccountName(naming, it, value, match) }?.takeIf { it.isNotBlank() } ?: accountName
             } else {
                 null
             }
-        return AccountResolution(rule, value, accountName, personName = personName)
+        return AccountResolution(naming, value, accountName, personName = personName)
     }
 
     /**
-     * [template] rendered for [rule]: with a pattern, `$n`/`${name}` captures substituted (whitespace runs
-     * collapsed when any were); `{value}` replaced by the value cleaned through the rule's extraction. A
-     * pattern-less rule reading a blank value names nothing.
+     * [template] rendered for [naming]: with a pattern, `$n`/`${name}` captures substituted (whitespace runs
+     * collapsed when any were); `{value}` replaced by the value cleaned through the naming's extraction. A
+     * pattern-less naming reading a blank value names nothing.
      */
     private fun renderAccountName(
-        rule: AccountRule,
+        naming: AccountNaming,
         template: String,
         value: String,
         match: MatchResult?,
     ): String {
         if (match == null && value.isBlank()) return ""
         val cleaned =
-            (rule.value.extraction?.let { applyExtraction(value, it) } ?: value).let { if (rule.trim) it.trim() else it }
+            (naming.value.extraction?.let { applyExtraction(value, it) } ?: value).let { if (naming.trim) it.trim() else it }
         val substituted = match?.let { substituteTemplate(template, it) } ?: template
-        val named = substituted.replace(AccountRule.VALUE_PLACEHOLDER, cleaned)
+        val named = substituted.replace(AccountNaming.VALUE_PLACEHOLDER, cleaned)
         return if (match != null && '$' in template) named.replace(WHITESPACE_RUN_REGEX, " ").trim() else named
     }
 
@@ -1211,41 +1133,34 @@ class CsvTransferMapper(
      */
     private fun parseAccount(
         mapping: FieldMapping,
-        values: List<String>,
+        resolution: AccountResolution,
         applyPersistedMappings: Boolean = true,
     ): AccountId =
         when (mapping) {
-            is HardCodedAccountMapping -> {
-                mapping.accountId
-            }
-
-            is AccountRulesMapping -> {
-                val resolution = resolveAccount(mapping, values)
+            is HardCodedAccountMapping -> mapping.accountId
+            is AccountFromRulesMapping -> {
                 (if (applyPersistedMappings) findPersistedMapping(resolution.sourceValue) else null)
                     ?: resolution.attributeAccountId
                     ?: resolveExistingAccountId(resolution.accountName)
                     ?: UNRESOLVED_ACCOUNT_ID // Placeholder for new accounts
             }
-
-            else -> {
-                throw IllegalArgumentException("Invalid account mapping type: ${mapping::class}")
-            }
+            else -> throw IllegalArgumentException("Invalid account mapping type: ${mapping::class}")
         }
 
     /**
-     * True when the rule that named [mapping]'s account for this row declares the counterparty
-     * unidentified (see [AccountRule.counterpartyIsUnidentified]) and no persisted mapping claimed the
+     * True when the candidate that named [mapping]'s account for this row declares the counterparty
+     * unidentified (see [AccountNaming.unidentified]) and no persisted mapping claimed the
      * value — the user mapping the value to a real account is exactly what makes the counterparty known.
      * The account is then a placeholder for an unknown other end; see
      * `ImportTransfer.unidentifiedCounterpartyAccountId`.
      */
     private fun isUnidentifiedCounterparty(
         mapping: FieldMapping,
-        values: List<String>,
+        resolution: AccountResolution,
         applyPersistedMappings: Boolean = true,
     ): Boolean {
-        val resolution = (mapping as? AccountRulesMapping)?.let { resolveAccount(it, values) } ?: return false
-        return resolution.rule?.counterpartyIsUnidentified == true &&
+        if (mapping !is AccountFromRulesMapping) return false
+        return resolution.naming?.unidentified == true &&
             resolution.accountName.isNotBlank() &&
             !(applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null)
     }
@@ -1274,32 +1189,21 @@ class CsvTransferMapper(
      */
     private fun discoverNewAccount(
         mapping: FieldMapping,
-        values: List<String>,
+        resolution: AccountResolution,
         applyPersistedMappings: Boolean = true,
     ): Pair<NewAccount, DiscoveredAccountMapping>? {
-        val rulesMapping = mapping as? AccountRulesMapping ?: return null
-        val resolution = resolveAccount(rulesMapping, values)
+        val rulesMapping = mapping as? AccountFromRulesMapping ?: return null
         return when {
-            applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null -> {
-                null
-            }
-
-            resolution.attributeAccountId != null -> {
-                null
-            }
-
-            resolution.accountName.isBlank() || accountExists(resolution.accountName) -> {
-                null
-            }
-
-            else -> {
+            applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null -> null
+            resolution.attributeAccountId != null -> null
+            resolution.accountName.isBlank() || accountExists(resolution.accountName) -> null
+            else ->
                 NewAccount(resolution.accountName, rulesMapping.defaultCategoryId) to
                     DiscoveredAccountMapping(
                         csvValue = resolution.sourceValue,
                         targetAccountName = resolution.accountName,
-                        matchedPattern = resolution.rule?.pattern,
+                        matchedPattern = resolution.naming?.pattern,
                     )
-            }
         }
     }
 
@@ -1353,10 +1257,7 @@ class CsvTransferMapper(
         values: List<String>,
     ): TimeZone =
         when (mapping) {
-            is HardCodedTimezoneMapping -> {
-                TimeZone.of(mapping.timezoneId)
-            }
-
+            is HardCodedTimezoneMapping -> TimeZone.of(mapping.timezoneId)
             is TimezoneLookupMapping -> {
                 val value = getColumnValue(mapping.columnName, values).trim()
                 val tzId =
@@ -1365,10 +1266,7 @@ class CsvTransferMapper(
                         ?.value ?: value
                 if (tzId.isNotBlank()) TimeZone.of(tzId) else TimeZone.currentSystemDefault()
             }
-
-            else -> {
-                TimeZone.currentSystemDefault()
-            }
+            else -> TimeZone.currentSystemDefault()
         }
 
     private fun parseDescription(
@@ -1395,10 +1293,10 @@ class CsvTransferMapper(
      */
     private fun resolvePersonalCounterparty(
         mapping: FieldMapping,
-        values: List<String>,
+        resolution: AccountResolution,
         applyPersistedMappings: Boolean = true,
     ): String? {
-        val resolution = (mapping as? AccountRulesMapping)?.let { resolveAccount(it, values) } ?: return null
+        if (mapping !is AccountFromRulesMapping) return null
         return resolution.personName
             ?.takeIf { it.isNotBlank() && !(applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null) }
     }
@@ -1458,20 +1356,18 @@ class CsvTransferMapper(
     /**
      * Checks if a transfer is a duplicate or update of an existing transfer using unique identifiers.
      *
-     * @param values CSV row values
-     * @param transfer The newly mapped transfer
      * @param attributes The newly mapped attributes
+     * @param transfer The newly mapped transfer
      * @return Pair of (import status, existing transfer ID if found)
      */
     private fun checkForDuplicateByUniqueId(
-        values: List<String>,
-        transfer: Transfer,
         attributes: List<Pair<String, String>>,
+        transfer: Transfer,
     ): Pair<ImportStatus, TransferId?> {
-        // Extract unique identifier values from current row
+        // The row's value of each identifying attribute type
         val uniqueIdValues =
-            uniqueIdentifierColumns.associateWith { columnName ->
-                getColumnValueOrNull(columnName, values)?.trim().orEmpty()
+            uniqueIdentifierTypes.associateWith { typeName ->
+                attributes.firstOrNull { it.first == typeName }?.second.orEmpty()
             }
 
         // Look up existing transfer by unique identifiers

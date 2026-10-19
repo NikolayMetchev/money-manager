@@ -13,9 +13,6 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
-import com.moneymanager.domain.model.csvstrategy.LegSide
-import com.moneymanager.domain.model.rules.Condition
-import com.moneymanager.domain.model.rules.ConditionOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -31,15 +28,7 @@ import kotlin.time.Instant
 class CsvLegGroupsTest {
     private val config =
         LegGroupRule(
-            legWhen =
-                listOf(
-                    Condition(
-                        "Operation",
-                        ConditionOp.MATCHES,
-                        "(?:^(Sell|Transaction (Spend|Sold))$)|(?:^(Buy|Transaction (Buy|Revenue))$)",
-                    ),
-                ),
-            side = LegSide.Sign("Change"),
+            name = "trade",
             // The window and description keep their defaults (0 / "Buy {to}/{from}"), which is what the
             // Binance strategy uses.
             assembly = LegAssembly.Trade(),

@@ -202,7 +202,9 @@ class ImportMonzoCsvE2ETest {
             // Verify the account was selected in the AccountPicker
             waitUntilExactlyOneExists(hasText("Monzo Current Account"), timeoutMillis = 10000)
 
-            // The Target Account column should be auto-detected as "Name" on the Accounts tab
+            // The target account is named by a rule: auto-detection seeds one reading the "Name" column.
+            onNodeWithText("Rules", substring = false).performClick()
+            waitForIdle()
             waitUntilAtLeastOneExists(hasText("Name", substring = false), timeoutMillis = 10000)
 
             // Step 6: Amount & Date tab - verify column auto-detection.

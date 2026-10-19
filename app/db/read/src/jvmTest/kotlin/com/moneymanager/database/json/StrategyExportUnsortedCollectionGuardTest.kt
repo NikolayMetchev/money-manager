@@ -12,12 +12,10 @@ import com.moneymanager.domain.model.apistrategy.JwtSigningConfig
 import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExport
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
-import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
-import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
-import com.moneymanager.domain.model.csvstrategy.export.AccountRulesExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.passthrough.export.PassThroughExport
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlinx.serialization.Serializable
 import kotlin.reflect.KClass
@@ -66,19 +64,16 @@ class StrategyExportUnsortedCollectionGuardTest {
             ApiTradeMappings::class to "compositeIdFields",
             ApiTransactionMappings::class to "compositeIdFields",
             ApiValueSet.Union::class to "sets",
-            CsvStrategyConfig::class to "rowPreprocessingRules",
-            // Account rules are first-applicable-wins.
-            AccountRulesExport::class to "rules",
+            // Rules run in order (first claim wins, rewrites are seen by later rules), and so do a rule's actions.
+            CsvStrategyConfig::class to "rules",
+            StrategyRule::class to "actions",
             // A value's paths are tried in order until one is non-blank; decline conditions are
             // first-match-wins (the match picks the decline reason).
             ValueExpr::class to "paths",
             ApiTransactionMappings::class to "declinedWhen",
-            RowPreprocessingRule::class to "columnSwaps",
-            // A row is a leg of the first rule that claims it; a key's parts are joined in order; an
-            // intermediate account is named by the first applicable rule.
+            // A key's parts are joined in order.
             CsvStrategyConfig::class to "legGroups",
             LegGroupRule::class to "key",
-            LegAssembly.ThroughAccount::class to "accounts",
             PassThroughExport::class to "rules",
         )
 

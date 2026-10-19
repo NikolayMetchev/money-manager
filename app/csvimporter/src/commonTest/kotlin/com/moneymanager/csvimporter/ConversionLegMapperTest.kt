@@ -9,8 +9,7 @@ import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.domain.model.csvstrategy.AccountRule
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -20,12 +19,15 @@ import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
-import com.moneymanager.domain.model.csvstrategy.LegSide
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
-import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Extraction
+import com.moneymanager.domain.model.rules.LegRole
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -53,39 +55,63 @@ class ConversionLegMapperTest {
         listOf("Kind", "Amount", "Asset", "Date", "Memo")
             .mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }
 
+    private val legWhen =
+        listOf(
+            Condition("Kind", ConditionOp.MATCHES, "(?:^swap_out$)|(?:^swap_in$)"),
+            Condition("Kind", ConditionOp.NOT_BLANK),
+        )
+
+    private val conversions =
+        RuleAction.Account(AccountSide.INTERMEDIATE, AccountNaming(value = ValueExpr(listOf("Kind")), name = "Conversions"))
+
     private val strategy =
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = "Synthetic",
             config =
                 CsvStrategyConfig(
+                    rules =
+                        listOf(
+                            StrategyRule(
+                                conditions = listOf(Condition("Amount", ConditionOp.POSITIVE)),
+                                actions = listOf(RuleAction.SetDirection(incoming = true)),
+                            ),
+                            StrategyRule.accounts(
+                                AccountSide.SOURCE,
+                                listOf(
+                                    AccountNaming(value = ValueExpr(listOf("Memo")), pattern = "^", name = "Wallet"),
+                                    AccountNaming(value = ValueExpr(listOf("Memo"))),
+                                ),
+                            ),
+                            StrategyRule.accounts(
+                                AccountSide.TARGET,
+                                listOf(
+                                    AccountNaming(value = ValueExpr(listOf("Memo")), pattern = "^", name = "Counterparty"),
+                                    AccountNaming(value = ValueExpr(listOf("Memo"))),
+                                ),
+                            ),
+                            // A swap_out row claims the debit first; every other leg row is a credit.
+                            StrategyRule(
+                                conditions = legWhen + Condition("Kind", ConditionOp.MATCHES, "^swap_out$"),
+                                actions = listOf(RuleAction.Leg("conversion", LegRole.Debit), conversions),
+                            ),
+                            StrategyRule(
+                                conditions = legWhen,
+                                actions = listOf(RuleAction.Leg("conversion", LegRole.Credit), conversions),
+                            ),
+                        ),
                     identificationColumns = setOf("Kind", "Amount", "Asset", "Date", "Memo"),
                     fieldMappings =
                         mapOf(
                             TransferField.SOURCE_ACCOUNT to
-                                AccountRulesMapping(
-                                    fieldType = TransferField.SOURCE_ACCOUNT,
-                                    rules =
-                                        listOf(
-                                            AccountRule(value = ValueExpr(listOf("Memo")), pattern = "^", name = "Wallet"),
-                                            AccountRule(value = ValueExpr(listOf("Memo"))),
-                                        ),
-                                ),
+                                AccountFromRulesMapping(TransferField.SOURCE_ACCOUNT),
                             TransferField.TARGET_ACCOUNT to
-                                AccountRulesMapping(
-                                    fieldType = TransferField.TARGET_ACCOUNT,
-                                    rules =
-                                        listOf(
-                                            AccountRule(value = ValueExpr(listOf("Memo")), pattern = "^", name = "Counterparty"),
-                                            AccountRule(value = ValueExpr(listOf("Memo"))),
-                                        ),
-                                ),
+                                AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                             TransferField.AMOUNT to
                                 AmountParsingMapping(
                                     fieldType = TransferField.AMOUNT,
                                     mode = AmountMode.SINGLE_COLUMN,
                                     amountColumnName = "Amount",
-                                    direction = Direction.AmountSign(),
                                 ),
                             TransferField.CURRENCY to
                                 CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Asset"))),
@@ -102,19 +128,11 @@ class ConversionLegMapperTest {
                     legGroups =
                         listOf(
                             LegGroupRule(
-                                legWhen =
-                                    listOf(
-                                        Condition("Kind", ConditionOp.MATCHES, "(?:^swap_out$)|(?:^swap_in$)"),
-                                        Condition("Kind", ConditionOp.NOT_BLANK),
-                                    ),
-                                side = LegSide.DebitWhen(listOf(Condition("Kind", ConditionOp.MATCHES, "^swap_out$"))),
+                                name = "conversion",
                                 key = listOf(ValueExpr(listOf("Kind"), Extraction("^(swap)_", "$1"))),
                                 windowSeconds = 5,
                                 assembly =
-                                    LegAssembly.ThroughAccount(
-                                        accounts = listOf(AccountRule(value = ValueExpr(listOf("Kind")), name = "Conversions")),
-                                        relationshipTypeName = "conversion",
-                                    ),
+                                    LegAssembly.ThroughAccount(relationshipTypeName = "conversion"),
                             ),
                         ),
                 ),

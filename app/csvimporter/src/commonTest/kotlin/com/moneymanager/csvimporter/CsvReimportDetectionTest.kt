@@ -16,8 +16,7 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.AccountRule
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -31,7 +30,12 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.passthrough.PassThroughRule
-import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.PassThroughDetector
@@ -72,6 +76,14 @@ class CsvReimportDetectionTest {
             name = "Test Strategy",
             config =
                 CsvStrategyConfig(
+                    rules =
+                        listOfNotNull(
+                            StrategyRule(
+                                conditions = listOf(Condition("Amount", ConditionOp.POSITIVE)),
+                                actions = listOf(RuleAction.SetDirection(incoming = true)),
+                            ).takeIf { flipAccountsOnPositive },
+                            StrategyRule.accounts(AccountSide.TARGET, listOf(AccountNaming(value = ValueExpr(listOf("Payee"))))),
+                        ),
                     identificationColumns = setOf("Date", "Description", "Amount"),
                     fieldMappings =
                         mapOf(
@@ -81,10 +93,7 @@ class CsvReimportDetectionTest {
                                     accountId = sourceAccountId,
                                 ),
                             TransferField.TARGET_ACCOUNT to
-                                AccountRulesMapping(
-                                    fieldType = TransferField.TARGET_ACCOUNT,
-                                    rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
-                                ),
+                                AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                             TransferField.TIMESTAMP to
                                 DateTimeParsingMapping(
                                     fieldType = TransferField.TIMESTAMP,
@@ -98,7 +107,6 @@ class CsvReimportDetectionTest {
                                     fieldType = TransferField.AMOUNT,
                                     mode = AmountMode.SINGLE_COLUMN,
                                     amountColumnName = "Amount",
-                                    direction = if (flipAccountsOnPositive) Direction.AmountSign() else Direction.Outgoing,
                                 ),
                             TransferField.CURRENCY to
                                 HardCodedCurrencyMapping(

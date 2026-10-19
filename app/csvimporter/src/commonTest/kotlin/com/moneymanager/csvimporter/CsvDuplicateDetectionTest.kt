@@ -15,7 +15,6 @@ import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
-import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
@@ -24,6 +23,9 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleValue
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
@@ -57,7 +59,7 @@ class CsvDuplicateDetectionTest {
             CsvColumn(CsvColumnId(Uuid.random()), 3, "Amount"),
         )
 
-    private fun createStrategy(attributeMappings: List<AttributeColumnMapping> = emptyList()): CsvImportStrategy =
+    private fun createStrategy(rules: List<StrategyRule> = emptyList()): CsvImportStrategy =
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = "Test Strategy",
@@ -101,7 +103,7 @@ class CsvDuplicateDetectionTest {
                                     timezoneId = "UTC",
                                 ),
                         ),
-                    attributeMappings = attributeMappings,
+                    rules = rules,
                 ),
             createdAt = Clock.System.now(),
             updatedAt = Clock.System.now(),
@@ -137,10 +139,8 @@ class CsvDuplicateDetectionTest {
         val strategy =
             createStrategy(
                 listOf(
-                    AttributeColumnMapping(
-                        columnName = "Transaction ID",
-                        attributeTypeName = "Transaction ID",
-                        isUniqueIdentifier = true,
+                    StrategyRule(
+                        actions = listOf(RuleAction.Attribute("Transaction ID", RuleValue.read("Transaction ID"), uniqueIdentifier = true)),
                     ),
                 ),
             )
@@ -182,10 +182,8 @@ class CsvDuplicateDetectionTest {
         val strategy =
             createStrategy(
                 listOf(
-                    AttributeColumnMapping(
-                        columnName = "Transaction ID",
-                        attributeTypeName = "Transaction ID",
-                        isUniqueIdentifier = true,
+                    StrategyRule(
+                        actions = listOf(RuleAction.Attribute("Transaction ID", RuleValue.read("Transaction ID"), uniqueIdentifier = true)),
                     ),
                 ),
             )
@@ -243,10 +241,8 @@ class CsvDuplicateDetectionTest {
         val strategy =
             createStrategy(
                 listOf(
-                    AttributeColumnMapping(
-                        columnName = "Transaction ID",
-                        attributeTypeName = "Transaction ID",
-                        isUniqueIdentifier = true,
+                    StrategyRule(
+                        actions = listOf(RuleAction.Attribute("Transaction ID", RuleValue.read("Transaction ID"), uniqueIdentifier = true)),
                     ),
                 ),
             )
@@ -308,10 +304,8 @@ class CsvDuplicateDetectionTest {
         val strategy =
             createStrategy(
                 listOf(
-                    AttributeColumnMapping(
-                        columnName = "Transaction ID",
-                        attributeTypeName = "Transaction ID",
-                        isUniqueIdentifier = true,
+                    StrategyRule(
+                        actions = listOf(RuleAction.Attribute("Transaction ID", RuleValue.read("Transaction ID"), uniqueIdentifier = true)),
                     ),
                 ),
             )
@@ -352,10 +346,8 @@ class CsvDuplicateDetectionTest {
         val strategy =
             createStrategy(
                 listOf(
-                    AttributeColumnMapping(
-                        columnName = "Transaction ID",
-                        attributeTypeName = "Transaction ID",
-                        isUniqueIdentifier = true,
+                    StrategyRule(
+                        actions = listOf(RuleAction.Attribute("Transaction ID", RuleValue.read("Transaction ID"), uniqueIdentifier = true)),
                     ),
                 ),
             )
@@ -395,10 +387,8 @@ class CsvDuplicateDetectionTest {
         val strategy =
             createStrategy(
                 listOf(
-                    AttributeColumnMapping(
-                        columnName = "Transaction ID",
-                        attributeTypeName = "Transaction ID",
-                        isUniqueIdentifier = true,
+                    StrategyRule(
+                        actions = listOf(RuleAction.Attribute("Transaction ID", RuleValue.read("Transaction ID"), uniqueIdentifier = true)),
                     ),
                 ),
             )
@@ -438,10 +428,8 @@ class CsvDuplicateDetectionTest {
         val strategy =
             createStrategy(
                 listOf(
-                    AttributeColumnMapping(
-                        columnName = "Transaction ID",
-                        attributeTypeName = "Transaction ID",
-                        isUniqueIdentifier = true,
+                    StrategyRule(
+                        actions = listOf(RuleAction.Attribute("Transaction ID", RuleValue.read("Transaction ID"), uniqueIdentifier = true)),
                     ),
                 ),
             )
@@ -532,17 +520,23 @@ class CsvDuplicateDetectionTest {
                                         timezoneId = "UTC",
                                     ),
                             ),
-                        attributeMappings =
+                        rules =
                             listOf(
-                                AttributeColumnMapping(
-                                    columnName = "Transaction ID",
-                                    attributeTypeName = "Transaction ID",
-                                    isUniqueIdentifier = true,
+                                StrategyRule(
+                                    actions =
+                                        listOf(
+                                            RuleAction.Attribute(
+                                                "Transaction ID",
+                                                RuleValue.read("Transaction ID"),
+                                                uniqueIdentifier = true,
+                                            ),
+                                        ),
                                 ),
-                                AttributeColumnMapping(
-                                    columnName = "External ID",
-                                    attributeTypeName = "External ID",
-                                    isUniqueIdentifier = true,
+                                StrategyRule(
+                                    actions =
+                                        listOf(
+                                            RuleAction.Attribute("External ID", RuleValue.read("External ID"), uniqueIdentifier = true),
+                                        ),
                                 ),
                             ),
                     ),
@@ -599,10 +593,8 @@ class CsvDuplicateDetectionTest {
         val strategy =
             createStrategy(
                 listOf(
-                    AttributeColumnMapping(
-                        columnName = "Transaction ID",
-                        attributeTypeName = "Transaction ID",
-                        isUniqueIdentifier = true,
+                    StrategyRule(
+                        actions = listOf(RuleAction.Attribute("Transaction ID", RuleValue.read("Transaction ID"), uniqueIdentifier = true)),
                     ),
                 ),
             )

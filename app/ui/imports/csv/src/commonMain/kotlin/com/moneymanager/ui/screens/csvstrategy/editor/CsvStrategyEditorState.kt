@@ -7,7 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.WellKnownIds
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -20,7 +20,8 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.AccountSide
+import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.isComplete
 import com.moneymanager.ui.components.rules.isComplete
 import kotlinx.datetime.TimeZone
@@ -34,6 +35,7 @@ internal enum class EditorTab(
     GENERAL("General"),
     ACCOUNTS("Accounts"),
     AMOUNT_DATE("Amount & Date"),
+    RULES("Rules"),
     ADVANCED("Advanced"),
 }
 
@@ -108,43 +110,22 @@ internal class CsvStrategyEditorState(
     var creditColumnName by mutableStateOf(amountMapping?.creditColumnName.takeIfPresentIn(availableColumnNames))
     var debitColumnName by mutableStateOf(amountMapping?.debitColumnName.takeIfPresentIn(availableColumnNames))
 
-    // A new strategy defaults to a signed amount (positive = money in): most bank statements are.
-    var direction: Direction by mutableStateOf(amountMapping?.direction ?: Direction.AmountSign())
-
-    // A fee whose amount column the file lacks can't be read, so it is dropped; so are conditions on
-    // columns the file lacks.
-    var fee by mutableStateOf(
-        amountMapping
-            ?.fee
-            ?.takeIf { it.amount.primaryPath in availableColumnNames }
-            ?.let { it.copy(conditions = it.conditions.keepPresentIn(availableColumnNames)) },
-    )
-
-    // Dropped when either column is missing from the file, like the fee.
-    var foreignAmount by mutableStateOf(
-        amountMapping?.foreignAmount?.takeIf {
-            it.amount.primaryPath in availableColumnNames && it.currency.primaryPath in availableColumnNames
-        },
-    )
-
     private val sourceMapping = config?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
 
     // The credited-leg mappings that turn a row into a trade (TO_AMOUNT/TO_CURRENCY) have no widget
     // either; carried through so saving an edited strategy keeps its trade detection.
     val tradeCreditMappings: Map<TransferField, FieldMapping> =
         config?.fieldMappings.orEmpty().filterKeys { it == TransferField.TO_AMOUNT || it == TransferField.TO_CURRENCY }
-    private val sourceRulesMapping = sourceMapping as? AccountRulesMapping
+    private val sourceRulesMapping = sourceMapping as? AccountFromRulesMapping
     var sourceAccountMode by
         mutableStateOf(if (sourceRulesMapping != null) SourceAccountMode.RULES else SourceAccountMode.FIXED_ACCOUNT)
     var selectedAccountId by mutableStateOf((sourceMapping as? HardCodedAccountMapping)?.accountId)
-    var sourceRules by mutableStateOf(sourceRulesMapping?.rules.orEmpty().keepColumnsPresentIn(availableColumnNames))
 
     // The category given to accounts the mapping has to create. No widget yet, so it is carried
     // verbatim; rebuilding it as UNCATEGORIZED would quietly re-file every account a future import creates.
     var sourceDefaultCategoryId by mutableStateOf(sourceRulesMapping?.defaultCategoryId ?: Category.UNCATEGORIZED_ID)
 
-    private val targetRulesMapping = config?.fieldMappings?.get(TransferField.TARGET_ACCOUNT) as? AccountRulesMapping
-    var targetRules by mutableStateOf(targetRulesMapping?.rules.orEmpty().keepColumnsPresentIn(availableColumnNames))
+    private val targetRulesMapping = config?.fieldMappings?.get(TransferField.TARGET_ACCOUNT) as? AccountFromRulesMapping
 
     /** See [sourceDefaultCategoryId]. */
     var targetDefaultCategoryId by mutableStateOf(targetRulesMapping?.defaultCategoryId ?: Category.UNCATEGORIZED_ID)
@@ -165,22 +146,9 @@ internal class CsvStrategyEditorState(
     var timezoneColumnName by mutableStateOf((timezoneMapping as? TimezoneLookupMapping)?.columnName.takeIfPresentIn(availableColumnNames))
     var timezoneAliasesText by mutableStateOf(formatAliases((timezoneMapping as? TimezoneLookupMapping)?.aliases.orEmpty()))
 
-    var attributeMappings by mutableStateOf(config?.attributeMappings.orEmpty().filter { it.columnName in availableColumnNames })
-
-    // Keep only preprocessing rules whose referenced columns all still exist.
-    var rowPreprocessingRules by
-        mutableStateOf(
-            config?.rowPreprocessingRules.orEmpty().mapNotNull { rule ->
-                val swaps =
-                    rule.columnSwaps.filter {
-                        it.firstColumn in availableColumnNames && it.secondColumn in availableColumnNames
-                    }
-                val conditions = rule.conditions.keepPresentIn(availableColumnNames)
-                rule
-                    .copy(conditions = conditions, columnSwaps = swaps)
-                    .takeIf { conditions.size == rule.conditions.size && swaps.size == rule.columnSwaps.size }
-            },
-        )
+    // Carried through verbatim, like the leg groups: a rule may test or read a column the uploaded sample
+    // lacks, and dropping it would silently change what the strategy imports.
+    var rules by mutableStateOf(config?.rules.orEmpty())
 
     var companionTransactionRules by mutableStateOf(config?.companionTransactionRules.orEmpty())
     var fileNamePattern by mutableStateOf(config?.fileNamePattern.orEmpty())
@@ -196,10 +164,6 @@ internal class CsvStrategyEditorState(
     var fundingMatchColumn by mutableStateOf(config?.fundingAttributeMatch?.column)
     var fundingMatchAttributeTypeName by
         mutableStateOf(config?.fundingAttributeMatch?.attributeTypeName ?: WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME)
-
-    // Conduit every row runs through (e.g. Curve); saved only when an account name is given.
-    var conduitAccountName by mutableStateOf(config?.conduit?.accountName.orEmpty())
-    var conduitConditions by mutableStateOf(config?.conduit?.conditions.orEmpty())
 
     var contentMatchRules by mutableStateOf(config?.contentMatchRules.orEmpty())
     var crossSourceReconcileWindowSeconds by mutableStateOf(config?.crossSourceReconcileWindowSeconds)
@@ -231,11 +195,18 @@ internal class CsvStrategyEditorState(
     // Initial primary column, used to avoid clobbering saved fallbacks on edit-mode load.
     val initialDescriptionColumnName: String? = descriptionColumnName
 
+    private fun rulesName(side: AccountSide): Boolean =
+        rules.any { rule -> rule.actions.any { it is RuleAction.Account && it.side == side } }
+
+    // The target account always comes from the rules, so some rule must name it.
     private val targetAccountValid: Boolean
-        get() = targetRules.isNotEmpty() && targetRules.all { it.isComplete() }
+        get() = rulesName(AccountSide.TARGET)
 
     private val sourceAccountValid: Boolean
-        get() = sourceAccountMode != SourceAccountMode.RULES || (sourceRules.isNotEmpty() && sourceRules.all { it.isComplete() })
+        get() = sourceAccountMode != SourceAccountMode.RULES || rulesName(AccountSide.SOURCE)
+
+    private val rulesValid: Boolean
+        get() = rules.isComplete()
 
     /** Whether the columns the chosen [amountMode] requires have all been picked. */
     private val amountValid: Boolean
@@ -245,19 +216,9 @@ internal class CsvStrategyEditorState(
                 AmountMode.CREDIT_DEBIT_COLUMNS -> creditColumnName != null && debitColumnName != null
             }
 
-    private val feeValid: Boolean
-        get() = fee.isComplete()
-
     // A funding match is opt-in: valid when no column is chosen, otherwise its attribute type must be set.
     private val fundingMatchValid: Boolean
         get() = fundingMatchColumn.isNullOrBlank() || fundingMatchAttributeTypeName.isNotBlank()
-
-    private val rowPreprocessingValid: Boolean
-        get() =
-            rowPreprocessingRules.all { rule ->
-                rule.conditions.all { it.isComplete() } &&
-                    rule.columnSwaps.all { it.firstColumn.isNotBlank() && it.secondColumn.isNotBlank() }
-            }
 
     private val companionRulesValid: Boolean
         get() =
@@ -270,10 +231,6 @@ internal class CsvStrategyEditorState(
 
     private val legGroupsValid: Boolean
         get() = legGroups.all { it.isComplete() }
-
-    // Conditions only take effect (and are only saved) once a conduit account is named.
-    private val conduitValid: Boolean
-        get() = conduitAccountName.isBlank() || conduitConditions.all { it.isComplete() }
 
     private val currencyValid: Boolean
         get() =
@@ -297,7 +254,11 @@ internal class CsvStrategyEditorState(
 
     /** Whether the Accounts tab has an unsatisfied required field. */
     val accountsHasError: Boolean
-        get() = !targetAccountValid || !sourceAccountValid
+        get() = !sourceAccountValid
+
+    /** Whether the Rules tab has an unsatisfied required field: an incomplete rule, or no rule naming the target. */
+    val rulesHaveError: Boolean
+        get() = !rulesValid || !targetAccountValid
 
     private val dateTimeFormatValid: Boolean
         get() = if (dateTimeInOneColumn) dateTimeFormat.isNotBlank() else dateFormat.isNotBlank()
@@ -306,28 +267,25 @@ internal class CsvStrategyEditorState(
     val amountDateHasError: Boolean
         get() =
             !amountValid ||
-                !direction.isComplete() ||
                 dateColumnName == null ||
                 !dateTimeFormatValid ||
-                !feeValid ||
                 !currencyValid ||
                 !timezoneValid
 
     /** Whether the Advanced tab has an unsatisfied required field. */
     val advancedHasError: Boolean
         get() =
-            !rowPreprocessingValid ||
-                !companionRulesValid ||
+            !companionRulesValid ||
                 !fundingMatchValid ||
                 !contentMatchValid ||
-                !legGroupsValid ||
-                !conduitValid
+                !legGroupsValid
 
     fun tabHasError(tab: EditorTab): Boolean =
         when (tab) {
             EditorTab.GENERAL -> generalHasError
             EditorTab.ACCOUNTS -> accountsHasError
             EditorTab.AMOUNT_DATE -> amountDateHasError
+            EditorTab.RULES -> rulesHaveError
             EditorTab.ADVANCED -> advancedHasError
         }
 
@@ -342,14 +300,11 @@ internal class CsvStrategyEditorState(
                 dateTimeFormatValid &&
                 descriptionColumnName != null &&
                 amountValid &&
-                direction.isComplete() &&
-                feeValid &&
-                rowPreprocessingValid &&
+                rulesValid &&
                 companionRulesValid &&
                 fundingMatchValid &&
                 contentMatchValid &&
                 legGroupsValid &&
-                conduitValid &&
                 currencyValid &&
                 timezoneValid
 }

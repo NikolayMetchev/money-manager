@@ -21,16 +21,12 @@ import com.moneymanager.csvimporter.DateFormatDetector
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.AmountMode
-import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.ui.components.CurrencyPicker
-import com.moneymanager.ui.components.rules.DirectionEditor
-import com.moneymanager.ui.components.rules.FeeRuleEditor
-import com.moneymanager.ui.components.rules.ForeignAmountEditor
 import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
 /**
- * Amount & Date tab: amount + fee, currency, timezone, and date/time parsing.
+ * Amount & Date tab: amount, currency, timezone, and date/time parsing.
  *
  * The amount comes either from one signed column or from a credit/debit column pair; a radio pair
  * picks the mode and only that mode's column dropdowns are shown.
@@ -96,47 +92,10 @@ internal fun AmountDateTab(
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
-        DirectionEditor(
-            direction = state.direction,
-            onDirectionChanged = { state.direction = it ?: Direction.AmountSign() },
-            pathField = { label, value, onValueChange, isError ->
-                ColumnDropdown(
-                    columns = csvColumns,
-                    selectedColumn = value.takeIf { it.isNotBlank() },
-                    onColumnSelected = onValueChange,
-                    label = label,
-                    sampleValue = getSampleValue(csvColumns, firstRow, value),
-                    enabled = enabled,
-                    isError = isError,
-                )
-            },
-            enabled = enabled,
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
         Text(
-            "A fee the row reports is imported as its own movement out of the account, linked to the transaction",
+            "Which way the money moves, any fee and a foreign-currency amount are set by rules on the Rules tab",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        FeeRuleEditor(
-            fee = state.fee,
-            onFeeChanged = { state.fee = it },
-            pathField = columnPathField(csvColumns, firstRow, enabled),
-            enabled = enabled,
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            "When the account settled a payment in another currency (a card abroad), the movement is booked in " +
-                "that currency and the account's conversion as a trade",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        ForeignAmountEditor(
-            foreignAmount = state.foreignAmount,
-            onForeignAmountChanged = { state.foreignAmount = it },
-            pathField = columnPathField(csvColumns, firstRow, enabled),
         )
 
         Spacer(modifier = Modifier.height(16.dp))

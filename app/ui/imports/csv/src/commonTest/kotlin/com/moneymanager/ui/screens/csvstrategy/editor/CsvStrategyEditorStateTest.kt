@@ -1,8 +1,7 @@
 package com.moneymanager.ui.screens.csvstrategy.editor
 
 import com.moneymanager.domain.model.CsvImportStrategyId
-import com.moneymanager.domain.model.csvstrategy.AccountRule
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -11,7 +10,9 @@ import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,6 +27,8 @@ import kotlin.uuid.Uuid
  * uploaded CSV no longer has.
  */
 class CsvStrategyEditorStateTest {
+    private val payeeRule = StrategyRule.accounts(AccountSide.TARGET, listOf(AccountNaming(value = ValueExpr(listOf("Payee")))))
+
     @Test
     fun `state holder seeds itself from a strategy and drops missing columns`() {
         val now = Instant.fromEpochMilliseconds(1_000)
@@ -39,10 +42,7 @@ class CsvStrategyEditorStateTest {
                         fieldMappings =
                             mapOf(
                                 TransferField.TARGET_ACCOUNT to
-                                    AccountRulesMapping(
-                                        fieldType = TransferField.TARGET_ACCOUNT,
-                                        rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
-                                    ),
+                                    AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                                 TransferField.TIMESTAMP to
                                     DateTimeParsingMapping(
                                         fieldType = TransferField.TIMESTAMP,
@@ -60,6 +60,7 @@ class CsvStrategyEditorStateTest {
                                 TransferField.TIMEZONE to
                                     HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London"),
                             ),
+                        rules = listOf(payeeRule),
                     ),
                 createdAt = now,
                 updatedAt = now,
@@ -71,7 +72,7 @@ class CsvStrategyEditorStateTest {
 
         assertEquals("Simple", state.name)
         assertEquals(setOf("Date", "Payee"), state.identificationColumns)
-        assertEquals(listOf(AccountRule(value = ValueExpr(listOf("Payee")))), state.targetRules)
+        assertEquals(listOf(payeeRule), state.rules)
         assertEquals("Date", state.dateColumnName)
         assertEquals("yyyy-MM-dd", state.dateFormat)
         assertEquals("Amount", state.amountColumnName)
@@ -80,18 +81,18 @@ class CsvStrategyEditorStateTest {
     }
 
     @Test
-    fun `a direction column needs its column and incoming values before saving`() {
-        val state = CsvStrategyEditorState(strategy = null, availableColumnNames = setOf("Amount", "Type"))
-        val baseline = state.amountDateHasError
+    fun `the rules must name the target account and be complete before saving`() {
+        val state = CsvStrategyEditorState(strategy = null, availableColumnNames = setOf("Amount", "Payee"))
 
-        state.direction = Direction.Field(path = "", incomingValues = setOf("IN"))
-        assertTrue(state.amountDateHasError)
+        state.rules = emptyList()
+        assertTrue(state.rulesHaveError, "no rule names the target account")
         assertFalse(state.isValid)
-        state.direction = Direction.Field(path = "Type", incomingValues = emptySet())
-        assertTrue(state.amountDateHasError)
 
-        state.direction = Direction.Field(path = "Type", incomingValues = setOf("IN"))
-        assertEquals(baseline, state.amountDateHasError)
+        state.rules = listOf(StrategyRule.accounts(AccountSide.TARGET, listOf(AccountNaming(value = ValueExpr(listOf(""))))))
+        assertTrue(state.rulesHaveError, "a naming with no column is incomplete")
+
+        state.rules = listOf(payeeRule)
+        assertFalse(state.rulesHaveError)
     }
 
     @Test

@@ -2,13 +2,9 @@ package com.moneymanager.domain.model.csvstrategy.export
 
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.accountmapping.export.SortedAccountMappingListSerializer
-import com.moneymanager.domain.model.csvstrategy.AccountRule
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.model.rules.Direction
-import com.moneymanager.domain.model.rules.FeeRule
-import com.moneymanager.domain.model.rules.ForeignAmount
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
 import kotlinx.serialization.EncodeDefault
@@ -60,14 +56,12 @@ data class HardCodedAccountExport(
 ) : FieldMappingExport
 
 /**
- * Export format for [com.moneymanager.domain.model.csvstrategy.AccountRulesMapping].
- * Uses category name instead of category ID; the rules themselves are already portable.
+ * Export format for [com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping].
+ * Uses category name instead of category ID.
  */
 @Serializable
-data class AccountRulesExport(
+data class AccountFromRulesExport(
     override val fieldType: TransferField,
-    // First applicable rule wins - order is semantic, keeps default insertion-order serialization.
-    val rules: List<AccountRule>,
     val defaultCategoryName: String,
 ) : FieldMappingExport
 
@@ -107,11 +101,6 @@ data class AmountParsingExport(
     val amountColumnName: String? = null,
     val creditColumnName: String? = null,
     val debitColumnName: String? = null,
-    val direction: Direction = Direction.Outgoing,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val fee: FeeRule? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val foreignAmount: ForeignAmount? = null,
 ) : FieldMappingExport
 
 /**

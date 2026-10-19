@@ -20,14 +20,17 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
+import com.moneymanager.domain.model.csvstrategy.EXCLUDED_ATTRIBUTE_TYPE_NAME
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.csvstrategy.ownedAttributeValues
+import com.moneymanager.domain.model.csvstrategy.uniqueIdentifierAttributeTypes
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.rules.ColumnRecord
+import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleEvaluator
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -99,9 +102,6 @@ internal fun collapsePassThroughChain(
     return if (keptNodes.size < 2) null else keptNodes to keptDescriptions
 }
 
-/** The attribute a strategy maps to exclude a row (the `excluded` well-known type, by name). */
-private const val EXCLUDED_ATTRIBUTE_NAME = "excluded"
-
 /** Links each debit leg to the nearest credit leg of the same key within [window] (credits may be shared). */
 private fun pairDebitsToCredits(
     legs: List<CsvTransferWithAttributes>,
@@ -132,7 +132,7 @@ private fun pairFundingLegs(
     window: Duration,
     relationshipTypeName: String,
 ): List<Pair<Long, BatchRelationship>> {
-    val counted = legs.filter { leg -> leg.attributes.none { (name, _) -> name == EXCLUDED_ATTRIBUTE_NAME } }
+    val counted = legs.filter { leg -> leg.attributes.none { (name, _) -> name == EXCLUDED_ATTRIBUTE_TYPE_NAME } }
     val (funding, others) = counted.partition { it.groupLeg!!.funding }
     val claimed = mutableSetOf<Long>()
     return funding.sortedBy { it.transfer.timestamp }.mapNotNull { leg ->
@@ -245,7 +245,10 @@ private fun collectCryptoCodes(
     val lookups = listOf(TransferField.CURRENCY, TransferField.TO_CURRENCY).mapNotNull { strategy.config.fieldMappings[it] }
     val codeExprs =
         lookups.filterIsInstance<CurrencyLookupMapping>().map { it.value } +
-            listOfNotNull((strategy.config.fieldMappings[TransferField.AMOUNT] as? AmountParsingMapping)?.fee?.currency)
+            strategy.config.rules
+                .flatMap { it.actions }
+                .filterIsInstance<RuleAction.Fee>()
+                .mapNotNull { it.fee.currency }
     val readableExprs = codeExprs.filter { expr -> expr.paths.any { it in indexByName } }
     if (readableExprs.isEmpty()) return emptySet()
 
@@ -835,24 +838,20 @@ suspend fun runCsvImport(
     // needs it, to recognise (and supersede) the placeholder legs an earlier export left behind.
     // Every mapped type is resolved, not only those some row carries: the strategy owns them all, and a
     // re-import must be able to remove one a row no longer reports (e.g. `excluded` on an un-deleted row).
-    val mappedAttributeTypeNames = strategy.config.attributeMappings.mapTo(mutableSetOf()) { it.attributeTypeName }
+    val ownedAttributeValues = strategy.config.ownedAttributeValues()
     val allAttributeTypeNames =
         finalPrep.validTransfers
             .flatMap { it.attributes }
             .map { it.first }
-            .toSet() + mappedAttributeTypeNames + WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME
+            .toSet() + ownedAttributeValues.keys + WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME
     val attributeTypeIdByName = importEngine.getOrCreateAttributeTypes(allAttributeTypeNames.toList())
     val unidentifiedCounterpartyTypeId = attributeTypeIdByName[WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME]
-    // The values each mapped type can take: a fixed `emitWhenMatched` label, or anything (null) when some
-    // mapping copies the column's content. A re-import only removes an owned value it could have written.
+    // The values each owned type can take (see ownedAttributeValues): a re-import only removes an owned
+    // value it could have written.
     val ownedAttributes: Map<AttributeTypeId, Set<String>?> =
-        strategy.config.attributeMappings
-            .groupBy { it.attributeTypeName }
-            .mapNotNull { (name, mappings) ->
-                val typeId = attributeTypeIdByName[name] ?: return@mapNotNull null
-                val fixed = mappings.map { it.emitWhenMatched }
-                typeId to (if (fixed.all { it != null }) fixed.filterNotNull().toSet() else null)
-            }.toMap()
+        ownedAttributeValues
+            .mapNotNull { (name, values) -> attributeTypeIdByName[name]?.let { it to values } }
+            .toMap()
 
     logger.i { "Starting to import $validCount transfers" }
 
@@ -866,11 +865,7 @@ suspend fun runCsvImport(
     // Build the unified import batch. Accounts were already resolved/created
     // above, so transfers carry Existing refs and the central engine only
     // dedupes, writes transfers, applies updates and records sources.
-    val uniqueIdTypeNames =
-        strategy.config.attributeMappings
-            .filter { it.isUniqueIdentifier }
-            .map { it.attributeTypeName }
-            .toSet()
+    val uniqueIdTypeNames = strategy.config.uniqueIdentifierAttributeTypes().toSet()
 
     // Resolve a single consolidated "<strategy> Fees" account when any row carries a fee, so per-row
     // fees are modelled as their own movements linked to the main transfer.
@@ -1077,8 +1072,8 @@ suspend fun runCsvImport(
                 )
             }
 
-    // Personal counterparties (resolved via person-flagged strategy rules, e.g. an AccountRule with
-    // counterpartyIsPerson) become People with an ownership link to their counterparty account, in
+    // Personal counterparties (resolved via person-flagged account namings in the strategy's
+    // rules) become People with an ownership link to their counterparty account, in
     // addition to the account itself. The engine dedups people by name key and ownerships by
     // (person, account), so repeats across rows/files and re-imports collapse. Mirrors the QIF importer,
     // which reuses this same CsvTransferMapper-computed signal.

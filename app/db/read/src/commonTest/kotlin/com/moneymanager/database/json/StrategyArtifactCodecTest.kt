@@ -2,14 +2,17 @@ package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingsExport
-import com.moneymanager.domain.model.csvstrategy.AccountRule
-import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.model.csvstrategy.export.AccountRulesExport
+import com.moneymanager.domain.model.csvstrategy.export.AccountFromRulesExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.export.FieldMappingExport
 import com.moneymanager.domain.model.csvstrategy.export.HardCodedAccountExport
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleValue
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.strategy.StrategyKind
 import kotlin.test.Test
@@ -19,16 +22,17 @@ import kotlin.test.assertNotEquals
 class StrategyArtifactCodecTest {
     private val sourceMapping =
         HardCodedAccountExport(fieldType = TransferField.SOURCE_ACCOUNT, accountName = "My Account")
-    private val targetMapping =
-        AccountRulesExport(
-            fieldType = TransferField.TARGET_ACCOUNT,
-            rules =
-                listOf(
-                    AccountRule(value = ValueExpr(listOf("Payee")), pattern = "TESCO", name = "Tesco"),
-                    AccountRule(value = ValueExpr(listOf("Payee")), pattern = "T.*", name = "Other T"),
-                    AccountRule(value = ValueExpr(listOf("Payee"))),
-                ),
-            defaultCategoryName = "Uncategorized",
+    private val targetMapping = AccountFromRulesExport(fieldType = TransferField.TARGET_ACCOUNT, defaultCategoryName = "Uncategorized")
+    private val targetNamings =
+        listOf(
+            AccountNaming(value = ValueExpr(listOf("Payee")), pattern = "TESCO", name = "Tesco"),
+            AccountNaming(value = ValueExpr(listOf("Payee")), pattern = "T.*", name = "Other T"),
+            AccountNaming(value = ValueExpr(listOf("Payee"))),
+        )
+    private val attributeRules =
+        listOf(
+            StrategyRule(actions = listOf(RuleAction.Attribute("kind", RuleValue.read("Kind")))),
+            StrategyRule(actions = listOf(RuleAction.Attribute("hash", RuleValue.read("Hash")))),
         )
 
     private fun csvExport(
@@ -36,11 +40,7 @@ class StrategyArtifactCodecTest {
         identificationColumns: Set<String> = setOf("Amount", "Date"),
         fieldMappings: Map<TransferField, FieldMappingExport> =
             mapOf(TransferField.SOURCE_ACCOUNT to sourceMapping, TransferField.TARGET_ACCOUNT to targetMapping),
-        attributeMappings: List<AttributeColumnMapping> =
-            listOf(
-                AttributeColumnMapping(columnName = "Kind", attributeTypeName = "kind"),
-                AttributeColumnMapping(columnName = "Hash", attributeTypeName = "hash"),
-            ),
+        rules: List<StrategyRule> = attributeRules + StrategyRule.accounts(AccountSide.TARGET, targetNamings),
         accountMappings: List<AccountMappingExport> =
             listOf(
                 AccountMappingExport(valuePattern = "TESCO", accountName = "Tesco"),
@@ -53,7 +53,7 @@ class StrategyArtifactCodecTest {
             CsvStrategyConfig(
                 identificationColumns = identificationColumns,
                 fieldMappings = fieldMappings,
-                attributeMappings = attributeMappings,
+                rules = rules,
             ),
         accountMappings = accountMappings,
     )
@@ -68,7 +68,6 @@ class StrategyArtifactCodecTest {
             csvExport(
                 identificationColumns = setOf("Date", "Amount"),
                 fieldMappings = mapOf(TransferField.TARGET_ACCOUNT to targetMapping, TransferField.SOURCE_ACCOUNT to sourceMapping),
-                attributeMappings = csvExport().config.attributeMappings.reversed(),
                 accountMappings = csvExport().accountMappings.reversed(),
             )
 
@@ -83,10 +82,8 @@ class StrategyArtifactCodecTest {
 
     @Test
     fun `csv hash still distinguishes regex rule order because rules are first-match-wins`() {
-        val reorderedRules = targetMapping.copy(rules = targetMapping.rules.reversed())
         val original = csvExport()
-        val changed =
-            csvExport(fieldMappings = mapOf(TransferField.SOURCE_ACCOUNT to sourceMapping, TransferField.TARGET_ACCOUNT to reorderedRules))
+        val changed = csvExport(rules = attributeRules + StrategyRule.accounts(AccountSide.TARGET, targetNamings.reversed()))
 
         assertNotEquals(hash(original), hash(changed))
     }
@@ -123,7 +120,7 @@ class StrategyArtifactCodecTest {
             decoded.config.fieldMappings.keys
                 .map { it.name }
         assertEquals(decodedFieldOrder.sorted(), decodedFieldOrder)
-        assertEquals(decoded.config.attributeMappings, decoded.config.attributeMappings.sorted())
+        assertEquals(reordered.config.rules, decoded.config.rules, "rules are ordered, so they keep their order")
         assertEquals(decoded.accountMappings, decoded.accountMappings.sorted())
     }
 }

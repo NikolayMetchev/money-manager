@@ -87,13 +87,16 @@ class RuleEngine(
         return state.toOutcome()
     }
 
-    /** [value] computed against [record]: blank when it reads nothing. */
+    /**
+     * [value] computed against [record]: blank when it reads nothing. A read value is trimmed before its
+     * extraction runs, as a source's own padding is never part of the value.
+     */
     fun compute(
         value: RuleValue,
         record: Record,
     ): String =
         when (value) {
-            is RuleValue.Read -> evaluator.resolve(value.expr, record::text)
+            is RuleValue.Read -> evaluator.resolve(value.expr) { record.text(it)?.trim() }.trim()
             is RuleValue.Template -> renderTemplate(value.template, record)
         }
 
