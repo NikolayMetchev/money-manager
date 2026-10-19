@@ -266,6 +266,17 @@ BUILDS_ON = {
     "macosArm64": ["@platforms//os:macos"],
 }
 
+# Where a target's links, cinterop and C compiles run, when its klibs compile elsewhere too: a macos_arm64
+# klib compiles on a Linux executor (`KLIB_ONLY_TARGETS`), the rest needs the Mac's SDK, so it also stays
+# off remote executors (#1089).
+EXEC_ON = {
+    "macosArm64": ["@platforms//os:macos", "@platforms//cpu:aarch64"],
+}
+
+def exec_tags(target):
+    """The tags that keep a target's actions on its `EXEC_ON` host."""
+    return ["no-remote-exec"] if target in EXEC_ON else []
+
 # Where a target's test executable can run.
 RUNS_ON = {
     "linuxArm64": ["@platforms//os:linux", "@platforms//cpu:aarch64"],

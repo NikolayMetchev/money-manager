@@ -62,5 +62,13 @@ common:rbe --host_platform=//bazel/platforms:rbe_linux_x64
 common:rbe --extra_execution_platforms=//bazel/platforms:rbe_linux_x64
 common:rbe --jobs=100
 
+# `rbe-mac`: CI's macOS job (#1089). Its actions run on BuildBuddy's Linux executors, macosArm64 klib compiles
+# included; what needs the Mac's SDK (cinterop, C, links, the macOS tests) is tagged `no-remote-exec` and
+# runs on the Mac, which stays the host and target platform.
+common:rbe-mac --config=cache
+common:rbe-mac --remote_executor=grpcs://remote.buildbuddy.io
+common:rbe-mac --extra_execution_platforms=//bazel/platforms:rbe_linux_x64
+common:rbe-mac --jobs=100
+
 # Personal overrides (disk cache, jobs, …), not checked in. user.bazelrc.example turns BuildBuddy on locally.
 try-import %workspace%/user.bazelrc

@@ -5,13 +5,13 @@ package(default_visibility = ["//visibility:public"])
 
 toolchain_type(name = "toolchain_type")
 
-# One toolchain per exec host Kotlin/Native runs on. @kotlin_native is only ever the current host's
-# distribution, and it's only fetched once a native target selects one of these.
+# One toolchain per exec host Kotlin/Native runs on, each over that host's distribution
+# (@kotlin_native_<host>), which is only fetched once a native target selects its toolchain.
 [
     toolchain(
         name = "toolchain_" + host,
         exec_compatible_with = constraints,
-        toolchain = "@kotlin_native//:toolchain_impl",
+        toolchain = "@kotlin_native_%s//:toolchain_impl" % host,
         toolchain_type = ":toolchain_type",
     )
     for host, constraints in {

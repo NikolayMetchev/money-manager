@@ -175,11 +175,13 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
 
 ## Kotlin/Native
 
-The `kotlin_native` module extension (`kmp/native`) downloads the host's `kotlin-native-prebuilt` and every konan
+The `kotlin_native` module extension (`kmp/native`) downloads an exec host's `kotlin-native-prebuilt` and every konan
 dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2, libffi), all sha256-pinned in `pins.bzl`, into
-`@kotlin_native` with konan's data dir inside it. Rules call konan through `run_konan` (`toolchain.bzl`), which
+`@kotlin_native_<host>` with konan's data dir inside it: one repository per exec host, fetched only once a toolchain on
+that host is selected. Rules call konan through `run_konan` (`toolchain.bzl`), which
 passes `airplaneMode=true`, so nothing is fetched at build time. One toolchain per exec host carries every target it
-builds (Linux and Windows hosts: linuxX64, linuxArm64, mingwX64; macOS adds macosArm64), picked by name rather than
+builds (Linux and Windows hosts: linuxX64, linuxArm64, mingwX64; macOS adds macosArm64; Linux also compiles macosArm64
+klibs, from the macOS distribution's platform klibs, but can't cinterop or link them: `KLIB_ONLY_TARGETS`), picked by name rather than
 by platform, which is how a Linux x64 host cross-links for `//bazel/platforms:linux_arm64`: `kmp_test`'s `:<name>_<target>_cross`
 (manual, for linuxArm64 and mingwX64: `CROSS_PLATFORMS`) transitions that target's test binary to its platform, so CI
 links them in its one `bazel build` and only runs them on an arm64 and a Windows runner.
@@ -278,7 +280,9 @@ release's `mm-<os>-<arch>` (`pkg_tar` keeping the exec bit; a copied `.exe` on W
 
 Every workflow sets Bazel up through `.github/actions/bazel-setup` (bazelisk, disk and repository caches, the Android
 SDK platform, and `user.bazelrc`). CI uses BuildBuddy: the Linux jobs run every action on its executors
-(`--config=rbe`), macOS and Windows build on their runners with its remote cache (`--config=cache`). To use it
+(`--config=rbe`), Windows builds on its runner with its remote cache (`--config=cache`), and macOS
+(`--config=rbe-mac`) sends every action to the executors except what needs Xcode: `EXEC_ON` (`kmp/native.bzl`) keeps
+macosArm64's cinterop, C compiles, links and test runs on the Mac (`no-remote-exec`), while its klibs compile on Linux. To use it
 locally, copy `user.bazelrc.example` to `user.bazelrc` and put your API key in `~/.bazelrc`
 (`common --remote_header=x-buildbuddy-api-key=…`). Without a key, pass neither config: invocations would still stream
 to BuildBuddy, anonymously. The executors run our image, `bazel/platforms/rbe/Dockerfile`: BuildBuddy's Ubuntu 24.04

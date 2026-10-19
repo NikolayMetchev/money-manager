@@ -14,6 +14,14 @@ HOST_TARGETS = {
     "mingw_x64": ["linux_x64", "linux_arm64", "mingw_x64"],
 }
 
+# Targets a host compiles klibs for but can't cinterop, compile C for or link (#1089), each → the host whose
+# distribution ships its platform klibs. konan compiles a macos_arm64 klib on Linux given those klibs; the
+# SDK that cinterop, clang and the linker need is `remote:internal`. So CI's macOS job sends its klib
+# compiles to BuildBuddy's Linux executors and keeps the rest on the Mac.
+KLIB_ONLY_TARGETS = {
+    "linux_x64": {"macos_arm64": "macos_arm64"},
+}
+
 DEPENDENCIES_URL = "https://download.jetbrains.com/kotlin/native"
 
 def parse_properties(text):

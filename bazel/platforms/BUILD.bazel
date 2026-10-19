@@ -36,3 +36,14 @@ platform(
     ],
     visibility = ["//visibility:public"],
 )
+
+# macOS arm64, as a target: a Linux host compiles macosArm64 klibs for it (#1089), as CI's macOS job does on
+# BuildBuddy's executors.
+platform(
+    name = "macos_arm64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:macos",
+    ],
+    visibility = ["//visibility:public"],
+)

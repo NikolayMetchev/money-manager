@@ -12,7 +12,7 @@ live in `//bazel/kmp/native`, so resolving toolchains for a build that has no na
 fetches the distribution.
 """
 
-load(":properties.bzl", "HOST_TARGETS", "dependencies", "dependency_url", "parse_properties")
+load(":properties.bzl", "HOST_TARGETS", "KLIB_ONLY_TARGETS", "dependencies", "dependency_url", "parse_properties")
 
 # konan's name for a host → the suffix of its distribution archive on Maven Central.
 DIST_HOSTS = {
@@ -68,7 +68,7 @@ filegroup(
     name = "{target}",
     srcs = glob(["dist/klib/platform/{target}/**"]) + glob([
 {deps}
-    ]) + ["data/dependencies/.extracted"],
+    ], allow_empty = True) + ["data/dependencies/.extracted"],
 )
 """
 
@@ -86,10 +86,6 @@ kotlin_native_stale_toolchain(
 def _impl(rctx):
     host = rctx.attr.host
     version = rctx.attr.version
-    if not host:
-        message = "Kotlin/Native doesn't run on this host (%s %s)." % (rctx.os.name, rctx.os.arch)
-        rctx.file("BUILD.bazel", _STALE_BUILD.format(message = repr(message)))
-        return
     if rctx.attr.pinned_version != version:
         message = ("bazel/kmp/native/pins.bzl pins Kotlin/Native %r but rules_kotlin compiles with Kotlin %s. " +
                    "Repin with `bazel run @kotlin_native_repin//:repin`.") % (rctx.attr.pinned_version, version)
@@ -129,10 +125,26 @@ def _impl(rctx):
     for unused in ["dist/sources", "dist/klib/commonized", "dist/klib/cache"]:
         rctx.delete(unused)
 
+    # A klib-only target's platform klibs come from the distribution of a host that builds it, unpacked where
+    # konan looks for them (`konan.home/klib/platform/<target>`), so its compile command is the same.
+    klib_only = KLIB_ONLY_TARGETS.get(host, {})
+    for target, source_host in klib_only.items():
+        rctx.report_progress("Kotlin/Native %s platform klibs from the %s distribution" % (target, source_host))
+        rctx.download_and_extract(
+            url = _dist_url(version, source_host),
+            output = "klibs_" + target,
+            sha256 = rctx.attr.klib_only_dist_sha256[source_host],
+            stripPrefix = _dist_prefix(version, source_host),
+        )
+        rctx.rename("klibs_%s/klib/platform/%s" % (target, target), "dist/klib/platform/" + target)
+        rctx.delete("klibs_" + target)
+
     target_blocks = []
     target_dict = []
-    for target in targets:
-        deps = "\n".join(['        "data/dependencies/%s/**",' % d for d in dependencies(props, host, [target])])
+    for target in targets + klib_only.keys():
+        # A klib compile reads no konan dependency, so a klib-only target carries only its platform klibs.
+        names = dependencies(props, host, [target]) if target in targets else []
+        deps = "\n".join(['        "data/dependencies/%s/**",' % d for d in names])
         target_blocks.append(_TARGET.format(target = target, deps = deps))
         target_dict.append('        ":%s": "%s",' % (target, target))
     rctx.file("BUILD.bazel", _BUILD.format(
@@ -147,7 +159,8 @@ kotlin_native_repository = repository_rule(
     attrs = {
         "dependency_sha256": attr.string_dict(doc = "konan dependency name → archive sha256, for this host."),
         "dist_sha256": attr.string(),
-        "host": attr.string(doc = "konan's host name, or empty when the host can't run Kotlin/Native."),
+        "host": attr.string(mandatory = True, doc = "konan's name for the exec host the distribution runs on."),
+        "klib_only_dist_sha256": attr.string_dict(doc = "host → distribution sha256, for the hosts whose platform klibs `KLIB_ONLY_TARGETS` borrows."),
         "pinned_version": attr.string(doc = "The version pins.bzl was generated for."),
         "version": attr.string(mandatory = True),
     },
