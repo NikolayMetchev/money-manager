@@ -119,7 +119,7 @@ PR, and `renovate-pins.yml` runs the script on it. 3 is by hand.
   `kmp_export <label> [sourceSet]` (an API dep: always a dep, and exported), `kmp_keep_dep <label> [sourceSet]` (a dep
   no import explains: Metro contributors, runtime-only libraries), `kmp_plugins`, `kmp_sqldelight_package`,
   `kmp_sqldelight_dep`, `kmp_cinterops`, `kmp_generated_srcs`, `kmp_test_size`, `kmp_test_data`,
-  `kmp_test_jvm_flags`, `kmp_test_jvm_tags`, `kmp_test_flaky`, `kmp_android_host_tests`, `kmp_device_test_srcs`,
+  `kmp_test_jvm_flags`, `kmp_test_flaky`, `kmp_android_host_tests`, `kmp_device_test_srcs`,
   `kmp_device_test_resources`, `kmp_main_platform`, and the checks below. `# keep` on a dep keeps it too.
 - A run fails when two modules' main sources declare one package (one package, one module).
 - `//bazel/gazelle/kmp:generation_test` holds golden workspaces (`testdata/<case>`, `BUILD.in` → `BUILD.out`; refresh
@@ -194,9 +194,9 @@ release's `mm-<os>-<arch>` (`pkg_tar` keeping the exec bit; a copied `.exe` on W
 - **Compose UI**: `app/ui/*`, `utils/compose/*` and `test/app/ui` are JVM-only (no native `kmp_targets`). JVM
   classpath resources are one jar per compilation (`kmp_resource_jar`, `kmp/resources.bzl`),
   `src/{common,jvmAndroid,jvm}{Main,Test}/resources` merged with the later source set winning a clash.
-  `kmp_test_jvm_flags` are the headless system properties, `kmp_test_flaky true` retries (`flaky`, up to 3 runs), and
-  `kmp_test_jvm_tags no-remote-exec` keeps those tests off BuildBuddy: Skiko needs libGL, which its executor image
-  doesn't have. `compose.desktop.currentOs` is `//bazel/kmp/deps:compose_desktop_current_os`, a `select` on the
+  `kmp_test_jvm_flags` are the headless system properties, `kmp_test_flaky true` retries (`flaky`, up to 3 runs). They run on BuildBuddy
+  too: its executors use our image (`bazel/platforms/rbe`), which adds the libGL, X11 and fontconfig Skiko loads.
+  `compose.desktop.currentOs` is `//bazel/kmp/deps:compose_desktop_current_os`, a `select` on the
   target OS and CPU, kept on jvmTest with `kmp_keep_dep`. Test JVMs set `skiko.data.path` under `TEST_TMPDIR`, since
   the sandbox keeps `~/.skiko` read-only.
 - **The app and ProGuard** (`kmp/proguard`): `//app/main/jvm:app` is a hand-written `java_binary` adding the runtime-only
@@ -279,5 +279,7 @@ SDK platform, and `user.bazelrc`). CI uses BuildBuddy: the Linux jobs run every 
 (`--config=rbe`), macOS and Windows build on their runners with its remote cache (`--config=cache`). To use it
 locally, copy `user.bazelrc.example` to `user.bazelrc` and put your API key in `~/.bazelrc`
 (`common --remote_header=x-buildbuddy-api-key=…`). Without a key, pass neither config: invocations would still stream
-to BuildBuddy, anonymously. Go targets (Gazelle, the resolver) don't link remotely; run them with
-`--remote_executor=`.
+to BuildBuddy, anonymously. The executors run our image, `bazel/platforms/rbe/Dockerfile`: BuildBuddy's Ubuntu 24.04
+one plus Skiko's libraries (so the Compose UI tests run remotely) and lld (a C toolchain configured on a machine with
+lld links with it). `.github/workflows/rbe-image.yml` publishes it to ghcr.io from any branch that changes it and
+prints the digest that `//bazel/platforms:rbe_linux_x64` pins.

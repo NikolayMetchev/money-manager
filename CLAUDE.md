@@ -75,7 +75,8 @@ Flags and configs:
 - `--config=rbe` runs every action on BuildBuddy (Linux), `--config=cache` only uses its cache (any OS). Copy
   `user.bazelrc.example` to `user.bazelrc` and put your API key in `~/.bazelrc`
   (`common --remote_header=x-buildbuddy-api-key=…`). Without a key pass neither: invocations would still stream to
-  BuildBuddy, anonymously. Go targets (`//:gazelle`, the resolver) don't link remotely; add `--remote_executor=`.
+  BuildBuddy, anonymously. The executors run our image (`bazel/platforms/rbe/Dockerfile`, published by
+  `rbe-image.yml`, its digest pinned in `//bazel/platforms:rbe_linux_x64`), so the Compose UI tests run remotely too.
 - `--stamp` writes the git commit into the release APK (`META-INF/version-control-info.textproto`); releases pass it.
 - `--define=proguard_optimize=false` skips ProGuard's optimizer in `//app/main/jvm:release` (shrinking alone checks
   the keep rules, and the optimizer is most of ProGuard's ~15 minutes); CI's Desktop ProGuard check passes it.

@@ -64,7 +64,7 @@ func (*kmpLang) Kinds() map[string]rule.KindInfo {
 		},
 		"kmp_test": {
 			NonEmptyAttrs:  map[string]bool{"associate": true},
-			MergeableAttrs: mergeable("associate", "data", "size", "forbidden_deps", "keep_deps", "jvm_flags", "flaky", "jvm_tags", "device_manifest"),
+			MergeableAttrs: mergeable("associate", "data", "size", "forbidden_deps", "keep_deps", "jvm_flags", "flaky", "device_manifest"),
 			ResolveAttrs:   resolvedAttrs,
 		},
 		"sqldelight_library": {
