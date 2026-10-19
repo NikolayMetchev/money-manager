@@ -1,3 +1,4 @@
+load("@rules_java//java:java_binary.bzl", "java_binary")
 load("@rules_java//java:java_library.bzl", "java_library")
 
 package(default_visibility = ["//visibility:public"])
@@ -23,4 +24,12 @@ java_library(
     name = "native_launcher_lib",
     srcs = ["src/com/moneymanager/bazel/kmp/testing/KnTestLauncher.java"],
     deps = [":junit_xml"],
+)
+
+# The same launcher outside Bazel: CI runs the cross-linked linuxArm64 and mingwX64 test binaries through its deploy
+# jar on their own runners, so they report JUnit XML too.
+java_binary(
+    name = "native_launcher",
+    main_class = "com.moneymanager.bazel.kmp.testing.KnTestLauncher",
+    runtime_deps = [":native_launcher_lib"],
 )

@@ -75,6 +75,10 @@ jobs:
     env:
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+      # On every command, so they share one analysis cache; they only change ProGuard and the installer. Shrink
+      # only: the keep rules and ServiceLoader providers don't depend on ProGuard's optimizer, which takes most of
+      # its time (release builds optimize). The installer bundles the native mm, as release.yml's does.
+      BAZEL_FLAGS: --define=proguard_optimize=false --define=bundle_native_cli=true
 
     steps:
       - name: Checkout code
@@ -88,11 +92,90 @@ jobs:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
           cache-name: linux
 
-      - name: Build
-        run: bazel build //... 2>&1 | tee build.log
+      # jpackage's deb needs fakeroot; the installer smoke test's display is Xvfb.
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y fakeroot xvfb
 
+      # Also the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`, manual so local builds skip
+      # them) and the launcher that turns their output into JUnit XML, for Native Tests to run on their own
+      # runners, and the Linux desktop installer.
+      - name: Build
+        run: >-
+          bazel build $BAZEL_FLAGS //... //app/main/jvm:installer //bazel/kmp/testing:native_launcher_deploy.jar
+          $(bazel query 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') 2>&1 | tee build.log
+
+      # Every test but the Kotlin JVM and Android ones, which Coverage runs, plus the desktop ProGuard check:
+      # `//...` never runs ProGuard (its targets are manual), so a new dependency that needs keep/dontwarn rules
+      # would otherwise surface only when release.yml ran. It shrinks the desktop app and checks every
+      # ServiceLoader provider survived.
       - name: Test
-        run: bazel test //... 2>&1 | tee test.log
+        run: >-
+          bazel test $BAZEL_FLAGS -- //... //app/main/jvm:release_service_providers_test
+          $(bazel query 'attr(name, "^test_(jvm|android)$", tests(//...))' | sed 's/^/-/') 2>&1 | tee test.log
+
+      # Kover's replacement (#1026): the Kotlin JVM and Android tests under `bazel coverage`, with .bazelrc's JaCoCo
+      # filter, merged into one LCOV report. It credits code to every test that runs it, so it reads higher than
+      # Kover's per-module reports did. A command of its own, as coverage instruments what it builds (the
+      # installer and ProGuard must see the real jars), and the Go tests can't link under it.
+      - name: Coverage
+        if: ${{ !cancelled() }}
+        run: >-
+          bazel coverage $BAZEL_FLAGS $(bazel query 'attr(name, "^test_(jvm|android)$", tests(//...))')
+          2>&1 | tee coverage.log
+
+      - name: Coverage summary
+        run: |
+          cp bazel-out/_coverage/_coverage_report.dat coverage.lcov
+          awk -F: '/^SF:/{f++} /^LF:/{lf+=$2} /^LH:/{lh+=$2}
+            END{printf "### Coverage\n%d files, %d of %d lines (%.1f%%)\n", f, lh, lf, 100*lh/lf}' \
+            coverage.lcov >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unit
+          name: unit
+          files: coverage.lcov
+          disable_search: true
+          fail_ci_if_error: false
+
+      - name: Install and start the desktop installer
+        run: bazel/kmp/jpackage/install_smoke_test.sh bazel-bin/app/main/jvm/installer "$(cat VERSION)"
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: installer-Linux
+          path: bazel-bin/app/main/jvm/installer/*
+          retention-days: 7
+
+      - name: Collect native test binaries
+        run: |
+          for target in linuxArm64 mingwX64; do
+            for binary in $(bazel cquery $BAZEL_FLAGS --output=files "attr(name, \"_${target}_cross\$\", //...)"); do
+              dir="native-tests/$target/$(dirname "${binary#bazel-out/*/bin/}")"
+              mkdir -p "$dir" && cp "$binary" "$dir/"
+            done
+            cp bazel-bin/bazel/kmp/testing/native_launcher_deploy.jar "native-tests/$target/"
+          done
+          find native-tests -type f | sort
+
+      - name: Upload linuxArm64 test binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: linuxArm64-test-binaries
+          path: native-tests/linuxArm64
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload mingwX64 test binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: mingwX64-test-binaries
+          path: native-tests/mingwX64
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Build results
         if: always()
@@ -118,100 +201,24 @@ jobs:
           disable_search: true
           fail_ci_if_error: false
 
-  # Kover's replacement (#1026): `bazel coverage` over the Kotlin tests, with .bazelrc's JaCoCo filter, merged into
-  # one LCOV report. It credits code to every test that runs it, so it reads higher than Kover's per-module reports
-  # did. The Go tests can't link under coverage, so the Kotlin tests are picked by query.
-  coverage:
-    name: Coverage
-    runs-on: ubuntu-latest
-    needs: changes
-    if: >-
-      needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
-       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false  # read-only job, no git push
-
-      - name: Set up Bazel
-        uses: ./.github/actions/bazel-setup
-        with:
-          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          cache-name: coverage
-
-      - name: Coverage
-        run: bazel coverage $(bazel query 'attr(name, "^test_(jvm|android)$", tests(//...))')
-
-      - name: Summary
-        run: |
-          cp bazel-out/_coverage/_coverage_report.dat coverage.lcov
-          awk -F: '/^SF:/{f++} /^LF:/{lf+=$2} /^LH:/{lh+=$2}
-            END{printf "### Coverage\n%d files, %d of %d lines (%.1f%%)\n", f, lh, lf, 100*lh/lf}' \
-            coverage.lcov >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: unit
-          name: unit
-          files: coverage.lcov
-          disable_search: true
-          fail_ci_if_error: false
-
   # Kotlin/Native: each target's common tests run natively on a host of that platform. linuxX64's run in the
-  # Build and Test job. There is no Kotlin/Native compiler for Linux arm64 hosts, so linuxArm64's test binaries
-  # are cross-linked on x64 and run on an arm64 runner.
-  native-linux-arm64-link:
-    name: Native Link (linuxArm64)
-    runs-on: ubuntu-latest
-    needs: changes
-    if: >-
-      needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
-       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false  # read-only job, no git push
-
-      - name: Set up Bazel
-        uses: ./.github/actions/bazel-setup
-        with:
-          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          cache-name: linux-arm64
-          android-sdk: 'false'
-
-      # A test binary only builds where it runs (RUNS_ON), so the target platform is set to Linux arm64.
-      - name: Cross-link linuxArm64 test binaries
-        run: |
-          bazel build --platforms=//bazel/platforms:linux_arm64 --remote_download_outputs=toplevel \
-            $(bazel query 'attr(name, "_linuxArm64_bin$", //...)')
-          mkdir -p linux-arm64-tests
-          for binary in $(bazel cquery --platforms=//bazel/platforms:linux_arm64 --output=files \
-              'attr(name, "_linuxArm64_bin$", //...)'); do
-            dir="linux-arm64-tests/$(dirname "${binary#bazel-out/*/bin/}")"
-            mkdir -p "$dir" && cp "$binary" "$dir/"
-          done
-          find linux-arm64-tests -name '*.kexe' | sort
-
-      - name: Upload linuxArm64 test binaries
-        uses: actions/upload-artifact@v7
-        with:
-          name: linux-arm64-test-binaries
-          path: linux-arm64-tests
-          if-no-files-found: error
-          retention-days: 1
-
-  native-linux-arm64:
-    name: Native Tests (linuxArm64)
-    runs-on: ubuntu-26.04-arm
-    needs: native-linux-arm64-link
+  # Build and Test job, which also cross-links linuxArm64's (there is no Kotlin/Native compiler for Linux arm64
+  # hosts) and mingwX64's (a Windows runner builds far slower than BuildBuddy); these jobs only run them.
+  native-cross:
+    name: Native Tests (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linuxArm64
+            os: ubuntu-26.04-arm
+          - target: mingwX64
+            os: windows-latest
+    defaults:
+      run:
+        shell: bash
 
     steps:
       # Some tests read files from the tree at run time, from the workspace root (the runfiles' working directory).
@@ -220,26 +227,57 @@ jobs:
         with:
           persist-credentials: false  # read-only job, no git push
 
-      - name: Download linuxArm64 test binaries
+      - name: Download test binaries
         uses: actions/download-artifact@v8
         with:
-          name: linux-arm64-test-binaries
-          path: ${{ runner.temp }}/linux-arm64-tests
+          name: ${{ matrix.target }}-test-binaries
+          path: ${{ runner.temp }}/native-tests
 
+      # For the launcher, which Bazel compiles for Java 25.
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # Through Bazel's own launcher (`//bazel/kmp/testing:native_launcher`), so each binary writes the JUnit XML a
+      # `bazel test` run would. Java on Windows needs Windows paths.
       - name: Run test binaries
-        shell: bash
         run: |
+          native_path() { if command -v cygpath > /dev/null; then cygpath -w "$1"; else echo "$1"; fi; }
+          tests="$RUNNER_TEMP/native-tests"
+          launcher="$(native_path "$tests/native_launcher_deploy.jar")"
           status=0
           while IFS= read -r -d '' binary; do
-            echo "::group::$binary"
+            rel="${binary#"$tests"/}"
+            echo "::group::$rel"
             chmod +x "$binary"
-            "$binary" || status=1
+            mkdir -p "native-test-results/$(dirname "$rel")"
+            XML_OUTPUT_FILE="$(native_path "$PWD/native-test-results/$(dirname "$rel")/test.xml")" \
+              java -jar "$launcher" "$(native_path "$binary")" || status=1
             echo "::endgroup::"
-          done < <(find "$RUNNER_TEMP/linux-arm64-tests" -name '*.kexe' -print0)
+          done < <(find "$tests" -type f \( -name '*.kexe' -o -name '*.exe' \) -print0)
           exit $status
 
-  # macOS and Windows: every compile their host builds (macosArm64 only builds on a Mac), the host's `mm`, and the
-  # host's native tests. The JVM tests ran on Linux.
+      - name: List test reports
+        id: test-reports
+        if: ${{ !cancelled() }}
+        run: echo "files=$(find native-test-results -name test.xml | paste -sd, -)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && steps.test-reports.outputs.files != '' }}
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: native
+          name: native-${{ matrix.target }}-test-results
+          report_type: test_results
+          files: ${{ steps.test-reports.outputs.files }}
+          disable_search: true
+          fail_ci_if_error: false
+
+  # macOS: every compile a Mac builds (macosArm64 only builds there: it needs Xcode), its `mm`, and its native
+  # tests. The JVM tests ran on Linux.
   native-macos:
     name: Native Tests (macosArm64)
     runs-on: macos-latest
@@ -277,42 +315,23 @@ jobs:
         with:
           title: macOS
 
-  native-windows:
-    name: Native Tests (mingwX64)
-    runs-on: windows-latest
-    needs: changes
-    if: >-
-      needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
-       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
-    defaults:
-      run:
-        shell: bash
+      # Codecov's `files` takes paths, not globs, so list the reports (bazel-testlogs is a symlink).
+      - name: List test reports
+        id: test-reports
+        if: ${{ !cancelled() }}
+        run: echo "files=$(find -L bazel-testlogs/ -name test.xml | paste -sd, -)" >> "$GITHUB_OUTPUT"
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && steps.test-reports.outputs.files != '' }}
+        uses: codecov/codecov-action@v7
         with:
-          persist-credentials: false  # read-only job, no git push
-
-      - name: Set up Bazel
-        uses: ./.github/actions/bazel-setup
-        with:
-          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          config: cache
-          cache-name: windows
-
-      - name: Build
-        run: bazel build //... 2>&1 | tee build.log
-
-      - name: Test
-        run: bazel test $(bazel query 'attr(name, "_mingwX64$", tests(//...))') 2>&1 | tee test.log
-
-      - name: Build results
-        if: always()
-        uses: ./.github/actions/bazel-summary
-        with:
-          title: Windows
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: native
+          name: native-macosArm64-test-results
+          report_type: test_results
+          files: ${{ steps.test-reports.outputs.files }}
+          disable_search: true
+          fail_ci_if_error: false
 
   # The device tests (#1024): kmp_test's `:<name>_device` targets and the release smoke test, run through adb on
   # an emulator. They're `manual`, so `bazel test //...` leaves them out; this job runs everything tagged
@@ -440,42 +459,9 @@ jobs:
             bazel-testlogs/**/test.xml
           retention-days: 7
 
-  desktop-proguard:
-    name: Desktop ProGuard
-    runs-on: ubuntu-latest
-    needs: changes
-    # `bazel build //...` never runs ProGuard (its targets are manual), so a new dependency that needs
-    # keep/dontwarn rules would surface only when release.yml ran. This shrinks the desktop app and checks
-    # every ServiceLoader provider survived, in parallel with the main build.
-    if: >-
-      needs.changes.outputs.code == 'true' &&
-      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
-       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
-    env:
-      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
-      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false  # read-only job, no git push
-
-      - name: Set up Bazel
-        uses: ./.github/actions/bazel-setup
-        with:
-          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          cache-name: proguard
-          android-sdk: 'false'
-
-      # Shrink only: the keep rules and ServiceLoader providers don't depend on the optimizer, which takes most
-      # of ProGuard's time. Release builds still optimize.
-      - name: Run ProGuard
-        run: bazel test --define=proguard_optimize=false //app/main/jvm:release_service_providers_test
-
-  # jpackage packages only for its host, so each OS builds its own installer (#1020): a deb, dmg or msi with the
-  # native mm bundled, as release.yml builds them. Then it installs it and starts the app, mm-jvm and mm.
-  # ProGuard's optimizer is off, as in the Desktop ProGuard check.
+  # jpackage packages only for its host, so each OS builds its own installer (#1020): a dmg or msi here (Build and
+  # Test builds the deb) with the native mm bundled, as release.yml builds them. Then it installs it and starts the
+  # app, mm-jvm and mm. ProGuard's optimizer is off, as in Build and Test's ProGuard check.
   desktop-installer:
     name: Desktop Installer (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
@@ -488,9 +474,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Linux
-            os: ubuntu-latest
-            config: rbe
           - name: macOS
             os: macos-latest
             config: cache
@@ -514,11 +497,6 @@ jobs:
           config: ${{ matrix.config }}
           cache-name: installer-${{ matrix.name }}
           android-sdk: 'false'
-
-      # jpackage's deb needs fakeroot; the smoke test's display is Xvfb.
-      - name: Install packaging tools
-        if: matrix.name == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y fakeroot xvfb
 
       - name: Build the installer
         run: >-

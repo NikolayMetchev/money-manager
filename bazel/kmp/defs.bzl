@@ -28,7 +28,7 @@ load("//bazel/kmp/dokka:dokka.bzl", "dokka_module")
 load("//bazel/kmp/checks:checks.bzl", "kmp_forbidden_deps", "kmp_reference_check", "kmp_unused_deps")
 load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
 load(":resources.bzl", "kmp_resource_jar")
-load(":native.bzl", "BUILDS_ON", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_executable", "kt_native_klib", "kt_native_test_binary")
+load(":native.bzl", "BUILDS_ON", "CROSS_PLATFORMS", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_cross_test_binary", "kt_native_executable", "kt_native_klib", "kt_native_test_binary")
 load("//bazel/kmp/plugins:plugins.bzl", "plugin_deps", "plugin_labels")
 load("//bazel/kmp/android:apk.bzl", "android_apk")
 load("//bazel/kmp/android:device_test.bzl", "INSTRUMENTATION_RUNNER", "android_device_test")
@@ -404,7 +404,8 @@ def kmp_test(
         device_deps = [],
         device_manifest = None,
         device_resources = []):
-    """A module's tests. Emits `:<name>_jvm`, `:<name>_android`, `:<name>_device` and `:<name>_<target>` per native target.
+    """A module's tests. Emits `:<name>_jvm`, `:<name>_android`, `:<name>_device`, `:<name>_<target>` per native target
+    and `:<name>_<target>_cross` (manual) per target in `CROSS_PLATFORMS`, its test binary built for that platform.
 
     JVM tests are JUnit 4, run by `//bazel/kmp/testing:KmpJUnitRunner`. Android host tests (AGP's
     `testAndroidHostTest`) are `commonTest ← jvmAndroidTest ← androidHostTest` compiled against the module's
@@ -533,6 +534,14 @@ def kmp_test(
             target_compatible_with = RUNS_ON[target],
             runtime_deps = [Label("//bazel/kmp/testing:native_launcher_lib")],
         )
+        if target in CROSS_PLATFORMS:
+            kt_native_cross_test_binary(
+                name = "%s_%s_cross" % (name, target),
+                testonly = True,
+                binary = ":" + binary,
+                platform = CROSS_PLATFORMS[target],
+                tags = ["manual"],
+            )
 
 def _device_test(name, associate, srcs, deps_of_plugins, plugins, deps, manifest, resources):
     """`:<name>_device`: a library's device tests, as AGP builds and runs them (its `androidDeviceTest`)."""

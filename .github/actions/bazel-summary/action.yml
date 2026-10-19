@@ -1,5 +1,5 @@
 name: 'Bazel Summary'
-description: 'Writes the BuildBuddy links and action counts of build.log and test.log to the job summary'
+description: 'Writes the BuildBuddy links and action counts of build.log, test.log and coverage.log to the job summary'
 
 inputs:
   title:
@@ -12,7 +12,7 @@ runs:
     - name: Summary
       shell: bash
       run: |
-        for step in build test; do
+        for step in build test coverage; do
           [ -f "$step.log" ] || continue
           {
             echo "### ${{ inputs.title }} $step"
