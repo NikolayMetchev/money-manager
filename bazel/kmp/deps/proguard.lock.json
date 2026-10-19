@@ -3,7 +3,7 @@
   "inputs": {
     "libraries": {
       "compose-gradle-plugin": "org.jetbrains.compose:compose-gradle-plugin:1.12.2",
-      "proguard-base": "com.guardsquare:proguard-base:7.8.2"
+      "proguard-base": "com.guardsquare:proguard-base:7.10.0"
     },
     "forces": {
       "ch.qos.logback:logback-classic": "1.6.5",
@@ -61,6 +61,7 @@
     "resolve_stdlib": true
   },
   "names": {
+    "biz.aQute.bnd:biz.aQute.bnd.annotation": "biz_aQute_bnd_biz_aQute_bnd_annotation",
     "com.google.code.gson:gson": "com_google_code_gson_gson",
     "com.google.errorprone:error_prone_annotations": "com_google_errorprone_error_prone_annotations",
     "com.guardsquare:proguard-base": "proguard_base",
@@ -71,9 +72,26 @@
     "org.jetbrains.kotlin:kotlin-metadata-jvm": "org_jetbrains_kotlin_kotlin_metadata_jvm",
     "org.jetbrains.kotlin:kotlin-stdlib": "org_jetbrains_kotlin_kotlin_stdlib",
     "org.jetbrains:annotations": "org_jetbrains_annotations",
-    "org.json:json": "org_json_json"
+    "org.json:json": "org_json_json",
+    "org.jspecify:jspecify": "org_jspecify_jspecify",
+    "org.osgi:org.osgi.annotation.bundle": "org_osgi_org_osgi_annotation_bundle",
+    "org.osgi:org.osgi.annotation.versioning": "org_osgi_org_osgi_annotation_versioning",
+    "org.osgi:org.osgi.resource": "org_osgi_org_osgi_resource",
+    "org.osgi:org.osgi.service.serviceloader": "org_osgi_org_osgi_service_serviceloader"
   },
   "packages": {
+    "biz.aQute.bnd:biz.aQute.bnd.annotation": [
+      "aQute.bnd.annotation",
+      "aQute.bnd.annotation.baseline",
+      "aQute.bnd.annotation.headers",
+      "aQute.bnd.annotation.jpms",
+      "aQute.bnd.annotation.licenses",
+      "aQute.bnd.annotation.metatype",
+      "aQute.bnd.annotation.plugin",
+      "aQute.bnd.annotation.service",
+      "aQute.bnd.annotation.spi",
+      "aQute.bnd.annotation.xml"
+    ],
     "com.google.code.gson:gson": [
       "com.google.gson",
       "com.google.gson.annotations",
@@ -218,6 +236,7 @@
     "org.apache.logging.log4j:log4j-api": [
       "org.apache.logging.log4j",
       "org.apache.logging.log4j.internal",
+      "org.apache.logging.log4j.internal.annotation",
       "org.apache.logging.log4j.internal.map",
       "org.apache.logging.log4j.message",
       "org.apache.logging.log4j.simple",
@@ -250,6 +269,7 @@
       "org.apache.logging.log4j.core.config.plugins",
       "org.apache.logging.log4j.core.config.plugins.convert",
       "org.apache.logging.log4j.core.config.plugins.processor",
+      "org.apache.logging.log4j.core.config.plugins.processor.internal",
       "org.apache.logging.log4j.core.config.plugins.util",
       "org.apache.logging.log4j.core.config.plugins.validation",
       "org.apache.logging.log4j.core.config.plugins.validation.constraints",
@@ -263,6 +283,7 @@
       "org.apache.logging.log4j.core.filter",
       "org.apache.logging.log4j.core.filter.mutable",
       "org.apache.logging.log4j.core.impl",
+      "org.apache.logging.log4j.core.internal.annotation",
       "org.apache.logging.log4j.core.jackson",
       "org.apache.logging.log4j.core.jmx",
       "org.apache.logging.log4j.core.jmx.internal",
@@ -283,7 +304,8 @@
       "org.apache.logging.log4j.core.tools.picocli",
       "org.apache.logging.log4j.core.util",
       "org.apache.logging.log4j.core.util.datetime",
-      "org.apache.logging.log4j.core.util.internal"
+      "org.apache.logging.log4j.core.util.internal",
+      "org.apache.logging.log4j.core.util.internal.instant"
     ],
     "org.jetbrains.compose:compose-gradle-plugin": [
       "org.jetbrains.compose",
@@ -458,9 +480,41 @@
     ],
     "org.json:json": [
       "org.json"
+    ],
+    "org.jspecify:jspecify": [
+      "org.jspecify.annotations"
+    ],
+    "org.osgi:org.osgi.annotation.bundle": [
+      "org.osgi.annotation.bundle"
+    ],
+    "org.osgi:org.osgi.annotation.versioning": [
+      "org.osgi.annotation.versioning"
+    ],
+    "org.osgi:org.osgi.resource": [
+      "org.osgi.resource",
+      "org.osgi.resource.dto"
+    ],
+    "org.osgi:org.osgi.service.serviceloader": [
+      "org.osgi.service.serviceloader"
     ]
   },
   "artifacts": {
+    "biz.aQute.bnd:biz.aQute.bnd.annotation": {
+      "jvm": {
+        "version": "7.1.0",
+        "files": [
+          {
+            "name": "biz.aQute.bnd.annotation-7.1.0.jar",
+            "url": "https://repo1.maven.org/maven2/biz/aQute/bnd/biz.aQute.bnd.annotation/7.1.0/biz.aQute.bnd.annotation-7.1.0.jar",
+            "sha256": "f69c2de3a695c113d125ac8053c92a680a3ce9d02ea25845095cf2d4626a7663"
+          }
+        ],
+        "deps": [
+          "org.osgi:org.osgi.resource",
+          "org.osgi:org.osgi.service.serviceloader"
+        ]
+      }
+    },
     "com.google.code.gson:gson": {
       "jvm": {
         "version": "2.14.0",
@@ -490,12 +544,12 @@
     },
     "com.guardsquare:proguard-base": {
       "jvm": {
-        "version": "7.8.2",
+        "version": "7.10.0",
         "files": [
           {
-            "name": "proguard-base-7.8.2.jar",
-            "url": "https://repo1.maven.org/maven2/com/guardsquare/proguard-base/7.8.2/proguard-base-7.8.2.jar",
-            "sha256": "177b00e0a07a82917d1f9ec7911bcbfc2194faa71cf940debd3bbdd3dcf8f9c0"
+            "name": "proguard-base-7.10.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/guardsquare/proguard-base/7.10.0/proguard-base-7.10.0.jar",
+            "sha256": "022854eb4c6f4bd761b2e3ff19d832e98227ff498fd8fcc788b313f55810a555"
           }
         ],
         "deps": [
@@ -512,49 +566,61 @@
     },
     "com.guardsquare:proguard-core": {
       "jvm": {
-        "version": "9.2.0",
+        "version": "9.4.0",
         "files": [
           {
-            "name": "proguard-core-9.2.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/guardsquare/proguard-core/9.2.0/proguard-core-9.2.0.jar",
-            "sha256": "485fff6cd365ffcd60a433b2108405dab44999901fab6be3197a797eeed1e989"
+            "name": "proguard-core-9.4.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/guardsquare/proguard-core/9.4.0/proguard-core-9.4.0.jar",
+            "sha256": "7af7c47c173711aca9edee7482ec27b33eb0a20345279d88022cb34f71710407"
           }
-        ],
-        "deps": [
-          "org.jetbrains.kotlin:kotlin-metadata-jvm",
-          "org.jetbrains.kotlin:kotlin-stdlib"
         ],
         "runtime_deps": [
           "org.apache.logging.log4j:log4j-api",
           "org.apache.logging.log4j:log4j-core",
+          "org.jetbrains.kotlin:kotlin-metadata-jvm",
+          "org.jetbrains.kotlin:kotlin-stdlib",
           "org.jetbrains:annotations"
         ]
       }
     },
     "org.apache.logging.log4j:log4j-api": {
       "jvm": {
-        "version": "2.24.2",
+        "version": "2.26.1",
         "files": [
           {
-            "name": "log4j-api-2.24.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-api/2.24.2/log4j-api-2.24.2.jar",
-            "sha256": "0ca3ecbd4c315bdd5f2ef6af127712df718c78334cce5bf6fb7b4aa17fdab126"
+            "name": "log4j-api-2.26.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-api/2.26.1/log4j-api-2.26.1.jar",
+            "sha256": "f1810a4704ccce019d02bba029dc02a4f2ac0c997f647b465e7d409c1927f822"
           }
+        ],
+        "compile_only_deps": [
+          "biz.aQute.bnd:biz.aQute.bnd.annotation",
+          "com.google.errorprone:error_prone_annotations",
+          "org.jspecify:jspecify",
+          "org.osgi:org.osgi.annotation.bundle",
+          "org.osgi:org.osgi.annotation.versioning"
         ]
       }
     },
     "org.apache.logging.log4j:log4j-core": {
       "jvm": {
-        "version": "2.24.2",
+        "version": "2.26.1",
         "files": [
           {
-            "name": "log4j-core-2.24.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-core/2.24.2/log4j-core-2.24.2.jar",
-            "sha256": "7a7b90db866c86a1093b3fde758ca28398ebb2a533da0d79a30cc0a78506b9df"
+            "name": "log4j-core-2.26.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-core/2.26.1/log4j-core-2.26.1.jar",
+            "sha256": "2ec8c3bf5a6d7c89be8620116a2fc973f7dda1ad0261ad393c4d4726edfd3dcb"
           }
         ],
         "deps": [
           "org.apache.logging.log4j:log4j-api"
+        ],
+        "compile_only_deps": [
+          "biz.aQute.bnd:biz.aQute.bnd.annotation",
+          "com.google.errorprone:error_prone_annotations",
+          "org.jspecify:jspecify",
+          "org.osgi:org.osgi.annotation.bundle",
+          "org.osgi:org.osgi.annotation.versioning"
         ]
       }
     },
@@ -572,12 +638,12 @@
     },
     "org.jetbrains.kotlin:kotlin-metadata-jvm": {
       "jvm": {
-        "version": "2.2.0",
+        "version": "2.4.0",
         "files": [
           {
-            "name": "kotlin-metadata-jvm-2.2.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-metadata-jvm/2.2.0/kotlin-metadata-jvm-2.2.0.jar",
-            "sha256": "501222ae7d63527e55f2e5e645f18d4eff2c19074c85b9bc055866e3ed2b17bf"
+            "name": "kotlin-metadata-jvm-2.4.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-metadata-jvm/2.4.0/kotlin-metadata-jvm-2.4.0.jar",
+            "sha256": "9aadc51c588e76c8cf3d83d4090e46a4b687f2edaa1fdf65aa9fe44223294927"
           }
         ],
         "deps": [
@@ -587,12 +653,12 @@
     },
     "org.jetbrains.kotlin:kotlin-stdlib": {
       "jvm": {
-        "version": "2.2.0",
+        "version": "2.4.0",
         "files": [
           {
-            "name": "kotlin-stdlib-2.2.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.2.0/kotlin-stdlib-2.2.0.jar",
-            "sha256": "65d12d85a3b865c160db9147851712a64b10dadd68b22eea22a95bf8a8670dca"
+            "name": "kotlin-stdlib-2.4.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.0/kotlin-stdlib-2.4.0.jar",
+            "sha256": "ccb14ff83fabcb11458b798dbc9824748ccdffeec79c9aba789e6ed1cda86b1c"
           }
         ],
         "deps": [
@@ -620,6 +686,69 @@
             "name": "json-20231013.jar",
             "url": "https://repo1.maven.org/maven2/org/json/json/20231013/json-20231013.jar",
             "sha256": "0f18192df289114e17aa1a0d0a7f8372cc9f5c7e4f7e39adcf8906fe714fa7d3"
+          }
+        ]
+      }
+    },
+    "org.jspecify:jspecify": {
+      "jvm": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "jspecify-1.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar",
+            "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab"
+          }
+        ]
+      }
+    },
+    "org.osgi:org.osgi.annotation.bundle": {
+      "jvm": {
+        "version": "2.0.0",
+        "files": [
+          {
+            "name": "org.osgi.annotation.bundle-2.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/osgi/org.osgi.annotation.bundle/2.0.0/org.osgi.annotation.bundle-2.0.0.jar",
+            "sha256": "b9c9546ec5be3ebc2e85ba4919150ad76d64594805282fc895133a47d264a7ae"
+          }
+        ],
+        "deps": [
+          "org.osgi:org.osgi.annotation.versioning"
+        ]
+      }
+    },
+    "org.osgi:org.osgi.annotation.versioning": {
+      "jvm": {
+        "version": "1.1.2",
+        "files": [
+          {
+            "name": "org.osgi.annotation.versioning-1.1.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/osgi/org.osgi.annotation.versioning/1.1.2/org.osgi.annotation.versioning-1.1.2.jar",
+            "sha256": "f51f235e80df8ffbc30ef1b557b6ea38a696632d675404ec117e952978b8b863"
+          }
+        ]
+      }
+    },
+    "org.osgi:org.osgi.resource": {
+      "jvm": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "org.osgi.resource-1.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/osgi/org.osgi.resource/1.0.0/org.osgi.resource-1.0.0.jar",
+            "sha256": "81fc50f1f1d38a4af28e131907d4afe213249aab05060484edca0e60c4af9b4a"
+          }
+        ]
+      }
+    },
+    "org.osgi:org.osgi.service.serviceloader": {
+      "jvm": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "org.osgi.service.serviceloader-1.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/osgi/org.osgi.service.serviceloader/1.0.0/org.osgi.service.serviceloader-1.0.0.jar",
+            "sha256": "8f876ce2a9aa4e95b1f1952950255103e2487425050a654f3285447ba601c154"
           }
         ]
       }
