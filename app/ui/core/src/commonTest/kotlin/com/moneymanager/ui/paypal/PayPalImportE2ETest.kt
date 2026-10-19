@@ -9,7 +9,9 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.model.rules.Extraction
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleValue
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
@@ -311,7 +313,12 @@ class PayPalImportE2ETest : DbTest() {
                                 accounts.copy(
                                     mappings =
                                         accounts.mappings.copy(
-                                            idExtraction = Extraction(pattern = "^(.+)$", outputTemplate = "paypal"),
+                                            // Every account gets the same id: the first claim wins, so this one beats the built-in's.
+                                            rules =
+                                                listOf(
+                                                    StrategyRule(actions = listOf(RuleAction.ExternalId(RuleValue.constant("paypal")))),
+                                                ) +
+                                                    accounts.mappings.rules,
                                         ),
                                 ),
                         ),

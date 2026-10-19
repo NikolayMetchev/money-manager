@@ -99,6 +99,8 @@ enum class AccountSide {
  * @property person The account belongs to a person, named [personName] (else the account name).
  * @property unidentified The record names the counterparty but not its identity (a "GBP Deposit"), so
  *   the import engine reconciles it against a real record of the same movement.
+ * @property builtIn A well-known counterparty such as "ATM": every record naming it consolidates into one
+ *   account, whatever counterparty id or merchant the record carries (API transactions).
  */
 @Serializable
 data class AccountNaming(
@@ -118,6 +120,8 @@ data class AccountNaming(
     val personName: String? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val unidentified: Boolean = false,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val builtIn: Boolean = false,
 ) {
     companion object {
         /** In [name], the (cleaned) value the naming read. */
@@ -214,7 +218,10 @@ sealed interface RuleAction {
     @SerialName("counterpartyIsPerson")
     data object CounterpartyIsPerson : RuleAction
 
-    /** The counterparty id the record carries is throwaway, so it never identifies the counterparty. */
+    /**
+     * The counterparty user id the record carries is throwaway (Monzo mints a fresh `anonuser_…` per bank
+     * transfer), so it never identifies the counterparty, which is then matched by name.
+     */
     @Serializable
     @SerialName("ignoreCounterpartyId")
     data object IgnoreCounterpartyId : RuleAction

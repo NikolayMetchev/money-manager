@@ -115,7 +115,7 @@ private val AUDIT_E2E_TRANSACTIONS_JSON =
  *
  * Account ordering note: the DB orders accounts by name (SQLite binary collation), so among the
  * fixture's accounts — "Alice Example", "Coffee Shop Ltd", "Monzo" (the own account, named via the
- * strategy's staticAccountName), "Void" — "Alice Example" is always first, which Part 2 relies on.
+ * strategy's account rules), "Void" — "Alice Example" is always first, which Part 2 relies on.
  */
 private class AuditTestDatabaseManager(
     private val databaseManager: DatabaseManager,

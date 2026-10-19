@@ -29,7 +29,6 @@ internal enum class EditorTab(
     ACCOUNT_MAPPINGS("Accounts"),
     TRANSACTION_MAPPINGS("Transactions"),
     PEOPLE("People"),
-    RULES("Rules"),
     ADVANCED("Advanced"),
 }
 
@@ -79,9 +78,7 @@ internal fun ApiStrategyConfig.withTransactionMappings(mappings: ApiTransactionM
  * [config] is the domain [ApiStrategyConfig] itself rather than a field-for-field mirror of it, so
  * the tabs edit it with `copy` and a config field that no tab knows about — a newly added one, or
  * `valueEndpoints` — keeps its persisted value instead of silently resetting on the next save.
- * The only genuinely projected state is [name] (trimmed on save) and the two custom-field lists: a
- * mapping's `customFields` map plus its `uniqueIdentifierFields` companion set become one editable
- * row list, so the mappings inside [config] carry both normalized to empty until [buildStrategy].
+ * The only projected state is [name], trimmed on save.
  */
 internal class ApiStrategyEditorState(
     strategy: ApiImportStrategy?,
@@ -92,10 +89,7 @@ internal class ApiStrategyEditorState(
 
     var name by mutableStateOf(strategy?.name.orEmpty())
 
-    var config by mutableStateOf(strategy?.config?.withoutCustomFields() ?: NEW_CONFIG)
-
-    var accountCustomFields by mutableStateOf(strategy?.config?.editedAccountMappings.customFieldStates())
-    var txCustomFields by mutableStateOf(strategy?.config?.editedTransactionMappings.customFieldStates())
+    var config by mutableStateOf(strategy?.config ?: NEW_CONFIG)
 
     /** Replaces [config] with the result of [block] applied to its current value. */
     fun updateConfig(block: ApiStrategyConfig.() -> ApiStrategyConfig) {
@@ -140,8 +134,7 @@ internal class ApiStrategyEditorState(
             config.editedAccountMappings.let { mappings ->
                 mappings.idField.isBlank() ||
                     mappings.descriptionField.isBlank() ||
-                    mappings.idExtraction?.isValid == false ||
-                    mappings.descriptionExtraction?.isValid == false
+                    !mappings.rules.isComplete()
             }
 
     val transactionMappingsHasError: Boolean
@@ -153,20 +146,12 @@ internal class ApiStrategyEditorState(
                         mappings.currencyField.isBlank() ||
                         mappings.descriptionField.isBlank() ||
                         mappings.idField.isBlank() ||
-                        !mappings.direction.isComplete() ||
-                        !mappings.conditionsComplete()
+                        !mappings.rules.isComplete()
                 }
 
     val peopleHasError: Boolean
         get() =
             config.peopleDownload?.let { it.endpoint.path.isBlank() || it.firstNameField.isBlank() || !it.ownershipValid() } == true
-
-    val rulesHasError: Boolean
-        get() =
-            config.builtInCounterpartyRules.any { rule ->
-                rule.name.isBlank() ||
-                    rule.predicates.any { !it.isComplete() }
-            }
 
     fun tabHasError(tab: EditorTab): Boolean =
         when (tab) {
@@ -175,7 +160,6 @@ internal class ApiStrategyEditorState(
             EditorTab.ACCOUNT_MAPPINGS -> accountMappingsHasError
             EditorTab.TRANSACTION_MAPPINGS -> transactionMappingsHasError
             EditorTab.PEOPLE -> peopleHasError
-            EditorTab.RULES -> rulesHasError
             EditorTab.ADVANCED -> advancedHasError
         }
 
@@ -186,7 +170,6 @@ internal class ApiStrategyEditorState(
                 !accountMappingsHasError &&
                 !transactionMappingsHasError &&
                 !peopleHasError &&
-                !rulesHasError &&
                 !advancedHasError
 
     /** Reassembles an [ApiImportStrategy] from the edited state. The DB regenerates revisionId/configJson. */
@@ -199,24 +182,13 @@ internal class ApiStrategyEditorState(
             id = id,
             name = name.trim(),
             config =
-                config
-                    .withAccountMappings(
-                        config.editedAccountMappings.copy(
-                            customFields = accountCustomFields.toCustomFieldMap(),
-                            uniqueIdentifierFields = accountCustomFields.toUniqueIdentifierFields(),
-                        ),
-                    ).withTransactionMappings(
-                        config.editedTransactionMappings.copy(
-                            customFields = txCustomFields.toCustomFieldMap(),
-                            uniqueIdentifierFields = txCustomFields.toUniqueIdentifierFields(),
-                        ),
-                    ).copy(
-                        baseUrl = config.baseUrl.trim(),
-                        personExternalIdAttribute = config.personExternalIdAttribute?.trim()?.ifBlank { null },
-                        tokenPageUrl = config.tokenPageUrl?.trim()?.ifBlank { null },
-                        connectInstructions = config.connectInstructions.map { it.trim() }.filter { it.isNotEmpty() },
-                        rateLimitErrorSubstrings = config.rateLimitErrorSubstrings.map { it.trim() }.filter { it.isNotEmpty() },
-                    ),
+                config.copy(
+                    baseUrl = config.baseUrl.trim(),
+                    personExternalIdAttribute = config.personExternalIdAttribute?.trim()?.ifBlank { null },
+                    tokenPageUrl = config.tokenPageUrl?.trim()?.ifBlank { null },
+                    connectInstructions = config.connectInstructions.map { it.trim() }.filter { it.isNotEmpty() },
+                    rateLimitErrorSubstrings = config.rateLimitErrorSubstrings.map { it.trim() }.filter { it.isNotEmpty() },
+                ),
             createdAt = createdAt,
             updatedAt = updatedAt,
         )
@@ -224,30 +196,6 @@ internal class ApiStrategyEditorState(
 
 /** `ownsAllAccounts` and `accountOwnerAncestorExpr` are mutually exclusive. */
 private fun ApiPersonImportConfig.ownershipValid(): Boolean = !(ownsAllAccounts && !accountOwnerAncestorExpr.isNullOrBlank())
-
-/** Clears the two fields the editor projects onto [CustomFieldState] rows; `buildStrategy` puts them back. */
-private fun ApiStrategyConfig.withoutCustomFields(): ApiStrategyConfig =
-    withAccountMappings(editedAccountMappings.copy(customFields = emptyMap(), uniqueIdentifierFields = emptySet()))
-        .withTransactionMappings(editedTransactionMappings.copy(customFields = emptyMap(), uniqueIdentifierFields = emptySet()))
-
-/** Projects a mapping's `customFields` map + `uniqueIdentifierFields` set onto editable rows. */
-private fun ApiAccountMappings?.customFieldStates(): List<CustomFieldState> =
-    customFieldStates(this?.customFields, this?.uniqueIdentifierFields)
-
-private fun ApiTransactionMappings?.customFieldStates(): List<CustomFieldState> =
-    customFieldStates(this?.customFields, this?.uniqueIdentifierFields)
-
-private fun customFieldStates(
-    customFields: Map<String, String>?,
-    uniqueIdentifierFields: Set<String>?,
-): List<CustomFieldState> =
-    customFields.orEmpty().map { (name, path) -> CustomFieldState(name, path, name in uniqueIdentifierFields.orEmpty()) }
-
-private fun List<CustomFieldState>.toCustomFieldMap(): Map<String, String> =
-    filter { it.name.isNotBlank() }.associate { it.name.trim() to it.path.trim() }
-
-private fun List<CustomFieldState>.toUniqueIdentifierFields(): Set<String> =
-    filter { it.name.isNotBlank() && it.isUniqueId }.map { it.name.trim() }.toSet()
 
 /**
  * Remembers an [ApiStrategyEditorState], keyed on [editKey] so it survives recompositions and tab

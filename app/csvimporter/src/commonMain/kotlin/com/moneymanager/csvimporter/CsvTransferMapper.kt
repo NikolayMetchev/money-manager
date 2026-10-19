@@ -41,14 +41,12 @@ import com.moneymanager.domain.model.csvstrategy.uniqueIdentifierAttributeTypes
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.ColumnRecord
-import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ForeignAmount
 import com.moneymanager.domain.model.rules.LegRole
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleEngine
 import com.moneymanager.domain.model.rules.RuleOutcome
-import com.moneymanager.domain.model.rules.substituteTemplate
 import com.moneymanager.importengineapi.DESCRIPTION_SIMILARITY_THRESHOLD
 import com.moneymanager.importengineapi.ImportConversion
 import com.moneymanager.importengineapi.PassThroughDetector
@@ -344,8 +342,6 @@ class CsvTransferMapper(
     // Holds the compiled-pattern cache: the strategy's rules, conditions and extractions run against every row.
     private val engine = RuleEngine()
     private val rules = engine.evaluator
-
-    private fun compiledPattern(pattern: String): Regex = rules.regex(pattern)
 
     // Likewise for date/time formats: building a kotlinx-datetime Format compiles a parser, which is
     // far more expensive than the parse itself.
@@ -1111,47 +1107,14 @@ class CsvTransferMapper(
         naming: AccountNaming,
         values: List<String>,
     ): AccountResolution? {
-        val read =
-            naming.value.paths
-                .asSequence()
-                .map { getColumnValue(it, values) }
-                .firstOrNull { it.isNotBlank() }
-                .orEmpty()
-        val value = if (naming.trim) read.trim() else read
-        val match = naming.pattern?.let { pattern -> value.takeIf { it.isNotBlank() }?.let { compiledPattern(pattern).find(it) } }
-        if (naming.pattern != null && match == null) return null
+        val named = rules.name(naming) { getColumnValue(it, values) } ?: return null
+        val value = named.value
         if (naming.attributeTypeName != null) {
             val matched =
                 value.takeIf { it.isNotBlank() }?.let { attributeAccountMatchers[naming.attributeTypeName]?.match(it) } ?: return null
             return AccountResolution(naming, value, value, attributeAccountId = matched)
         }
-        val accountName = renderAccountName(naming, naming.name, value, match).ifBlank { naming.fallbackName.orEmpty() }
-        val personName =
-            if (naming.person) {
-                naming.personName?.let { renderAccountName(naming, it, value, match) }?.takeIf { it.isNotBlank() } ?: accountName
-            } else {
-                null
-            }
-        return AccountResolution(naming, value, accountName, personName = personName)
-    }
-
-    /**
-     * [template] rendered for [naming]: with a pattern, `$n`/`${name}` captures substituted (whitespace runs
-     * collapsed when any were); `{value}` replaced by the value cleaned through the naming's extraction. A
-     * pattern-less naming reading a blank value names nothing.
-     */
-    private fun renderAccountName(
-        naming: AccountNaming,
-        template: String,
-        value: String,
-        match: MatchResult?,
-    ): String {
-        if (match == null && value.isBlank()) return ""
-        val cleaned =
-            (naming.value.extraction?.let { applyExtraction(value, it) } ?: value).let { if (naming.trim) it.trim() else it }
-        val substituted = match?.let { substituteTemplate(template, it) } ?: template
-        val named = substituted.replace(AccountNaming.VALUE_PLACEHOLDER, cleaned)
-        return if (match != null && '$' in template) named.replace(WHITESPACE_RUN_REGEX, " ").trim() else named
+        return AccountResolution(naming, value, named.name, personName = named.personName)
     }
 
     /**
@@ -1353,12 +1316,6 @@ class CsvTransferMapper(
             ?.takeIf { it.isNotBlank() && !(applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null) }
     }
 
-    /** [extraction] applied to [value], or null when its pattern doesn't match. */
-    private fun applyExtraction(
-        value: String,
-        extraction: Extraction,
-    ): String? = rules.extract(value, extraction)
-
     private fun parseCurrency(
         mapping: FieldMapping,
         values: List<String>,
@@ -1542,8 +1499,5 @@ class CsvTransferMapper(
     private companion object {
         /** Posting dates of the same transaction can drift between bank exports by a day or two. */
         val DUPLICATE_DATE_TOLERANCE: Duration = 3.days
-
-        /** Collapses whitespace runs in template-derived account names. */
-        val WHITESPACE_RUN_REGEX = Regex("\\s+")
     }
 }

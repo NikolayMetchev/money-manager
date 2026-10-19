@@ -21,7 +21,6 @@ import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
-import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
@@ -30,17 +29,22 @@ import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
-import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
-import com.moneymanager.domain.model.apistrategy.RuleSign
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.Condition
-import com.moneymanager.domain.model.rules.Direction
-import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
+import com.moneymanager.domain.model.rules.NamedAccount
 import com.moneymanager.domain.model.rules.Record
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleAttribute
+import com.moneymanager.domain.model.rules.RuleEngine
 import com.moneymanager.domain.model.rules.RuleEvaluator
+import com.moneymanager.domain.model.rules.RuleOutcome
+import com.moneymanager.domain.model.rules.RuleValue
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
@@ -685,7 +689,6 @@ suspend fun importApiSessionTransactions(
         accountResolver = setup.accountResolver,
         counterpartyIdField = setup.counterpartyIdField,
         counterpartyAccountNames = counterpartyAccountNames,
-        nameMappings = setup.nameMappings,
     )
     onProgress(Progress(detail = "Counterparties prepared.", fraction = 0.2f))
     val preparedTransfers = prepareTransactionTransfers(setup)
@@ -755,9 +758,10 @@ private data class ImportSetup(
     val transactionResponses: List<ApiResponse>,
     val requestsById: Map<ApiRequestId, ApiRequest>,
     val counterpartyIdField: String?,
-    val nameMappings: CounterpartyNameMappings,
-    val customTxFields: Map<String, String>,
-    val uniqueIdTxFields: Set<String>,
+    /** The attribute types the bank feed's rules key an item by (unique-identifier attributes), in rule order. */
+    val uniqueAttributeNames: List<String>,
+    /** The attribute type whose value is the item's own `id`, so an existing transfer's api id can be read back. */
+    val transactionIdAttributeName: String?,
     val accountResolver: BatchAccountResolver,
     val peopleResolver: BatchPeopleResolver,
     val currencyCache: CurrencyCache,
@@ -828,14 +832,19 @@ private suspend fun setupImportSession(
 
     val currencyCache = CurrencyCache(currencyRepository)
     val attributeTypeCache = AttributeTypeCache(importEngine)
-    val customTxFields = strategy.config.bankFeedMappings().customFields
-    val uniqueIdTxFields = strategy.config.bankFeedMappings().uniqueIdentifierFields
+    val transactionRules = strategy.config.bankFeedMappings().rules
     val counterpartyIdField = strategy.config.bankFeedMappings().counterpartyIdField
-    val nameMappings = CounterpartyNameMappings.from(strategy)
 
-    // Pre-create transaction attribute types before the concurrent section so that
-    // no two coroutines race to write the same type, which causes SQLITE_BUSY.
-    for (fieldName in customTxFields.keys) attributeTypeCache.getOrCreate(fieldName)
+    // Pre-create attribute types before the concurrent section so that no two coroutines race to write
+    // the same type, which causes SQLITE_BUSY.
+    for (rules in listOf(
+        transactionRules,
+        strategy.config
+            .downloadedAccounts()
+            .mappings.rules,
+    )) {
+        for (attribute in rules.attributeActions()) attributeTypeCache.getOrCreate(attribute.typeName)
+    }
 
     onProgress(Progress(detail = "Reading downloaded API responses..."))
 
@@ -847,9 +856,14 @@ private suspend fun setupImportSession(
         transactionResponses = transactionResponses,
         requestsById = requestsById,
         counterpartyIdField = counterpartyIdField,
-        nameMappings = nameMappings,
-        customTxFields = customTxFields,
-        uniqueIdTxFields = uniqueIdTxFields,
+        uniqueAttributeNames =
+            transactionRules
+                .attributeActions()
+                .filter { it.uniqueIdentifier }
+                .map { it.typeName }
+                .distinct(),
+        transactionIdAttributeName =
+            transactionRules.attributeActions().firstOrNull { (it.value as? RuleValue.Read)?.expr?.paths == listOf("id") }?.typeName,
         accountResolver = BatchAccountResolver(),
         peopleResolver = BatchPeopleResolver(),
         currencyCache = currencyCache,
@@ -861,19 +875,12 @@ private suspend fun setupImportSession(
     )
 }
 
-/** Adds each strategy custom account-field value as an attribute on its source account's intent. */
+/** Adds the attributes the account rules set on each downloaded account to its source account's intent. */
 private suspend fun addCustomAccountFieldAttributes(setup: ImportSetup) {
-    val customAccountFields =
-        setup.strategy.config
-            .downloadedAccounts()
-            .mappings.customFields
-    if (customAccountFields.isEmpty()) return
     for (account in setup.accountsById.values) {
-        val rawJson = account.rawJson ?: continue
-        for ((fieldName, jsonPath) in customAccountFields) {
-            val value = rawJson.resolveJsonPath(jsonPath) ?: continue
-            val typeId = setup.attributeTypeCache.getOrCreate(fieldName)
-            setup.accountResolver.addSourceAttribute(account.externalId, NewAttribute(typeId = typeId, value = value))
+        for (attribute in account.attributes) {
+            val typeId = setup.attributeTypeCache.getOrCreate(attribute.typeName)
+            setup.accountResolver.addSourceAttribute(account.externalId, NewAttribute(typeId = typeId, value = attribute.value))
         }
     }
 }
@@ -939,13 +946,12 @@ private suspend fun linkCounterpartyOwner(
     request: ApiRequest,
     item: ApiTransactionPageItem,
 ) {
-    val isBuiltIn = item.rawJson?.resolveBuiltInCounterpartyType(setup.strategy.config.builtInCounterpartyRules, item.amountSign) != null
-    if (item.isZeroAmount || isBuiltIn) return
+    if (item.isZeroAmount || item.builtInCounterparty != null) return
     val owner = item.personalCounterpartyOwner(setup.strategy.config.peopleMappings) ?: return
     val identity = owner.personalCounterpartyIdentity()
-    val counterpartyId = item.rawJson?.resolveCounterpartyIdentity(setup.counterpartyIdField, setup.strategy.config.peopleMappings)
+    val counterpartyId = item.counterpartyIdentity(setup.counterpartyIdField, setup.strategy.config.peopleMappings)
     val counterpartyName =
-        identity?.name ?: owner.preferredName?.takeIf { it.isNotBlank() } ?: item.counterpartyName(setup.nameMappings)
+        identity?.name ?: owner.preferredName?.takeIf { it.isNotBlank() } ?: item.counterpartyName()
     if (counterpartyId == null && identity == null && counterpartyName.isBlank()) return
     val counterpartyApiSource =
         AccountApiSource(setup.sessionId, request.id, item.counterpartyJsonPath(setup.strategy.config.peopleMappings))
@@ -1002,12 +1008,12 @@ private suspend fun buildGlobalHolderOwnerships(
 
 /**
  * Resolves (allocating if needed) the [LocalAccountKey] for a downloaded own account, with its bank
- * details. When [ApiAccountMappings.staticAccountName] is set and this account has no bank details to
- * disambiguate it, the import engine's own-account matching falls back to reusing an existing
+ * details. When the account rules give two accounts the same name and they have no bank details to
+ * disambiguate them, the import engine's own-account matching falls back to reusing an existing
  * same-named account from this batch (a heuristic meant for merchant/counterparty dedup, e.g. one
  * provider minting two external ids for one merchant) — which would wrongly merge two genuinely
- * distinct own accounts that share the static name. `siblingAccounts` lets [displayName] detect that
- * and append a short disambiguator only when it's actually needed.
+ * distinct own accounts. The sibling accounts let [displayName] detect that and append a short
+ * disambiguator only when it's actually needed.
  */
 private suspend fun resolveOwnAccountKey(
     setup: ImportSetup,
@@ -1016,13 +1022,7 @@ private suspend fun resolveOwnAccountKey(
     val (sortCode, accountNumber) = account.bankDetails()
     return setup.accountResolver.resolveSourceAccount(
         externalId = account.externalId,
-        name =
-            account.displayName(
-                setup.strategy.config
-                    .downloadedAccounts()
-                    .mappings,
-                setup.accountsById.values,
-            ),
+        name = account.displayName(setup.accountsById.values),
         sortCode = sortCode,
         accountNumber = accountNumber,
         source = setup.accountApiSourceByExternalId[account.id]?.toSource() ?: Source.Api(setup.sessionId),
@@ -1058,7 +1058,6 @@ suspend fun discoverApiCounterpartiesToCreate(
         responses = transactionResponses,
         strategy = strategy,
         counterpartyIdField = counterpartyIdField,
-        nameMappings = CounterpartyNameMappings.from(strategy),
         onResponseProcessed = { done, total ->
             onProgress(Progress(detail = "Finding new counterparties ($done/$total)..."))
         },
@@ -1086,7 +1085,6 @@ private suspend fun precreateCounterparties(
     accountResolver: BatchAccountResolver,
     counterpartyIdField: String?,
     counterpartyAccountNames: Map<String, String>,
-    nameMappings: CounterpartyNameMappings,
 ) {
     if (counterpartyIdField == null) return
 
@@ -1099,19 +1097,17 @@ private suspend fun precreateCounterparties(
                     async {
                         val request = requestsById[response.requestId] ?: return@async emptyList()
                         parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
-                            if (item.rawJson?.resolveBuiltInCounterpartyType(config.builtInCounterpartyRules, item.amountSign) != null) {
-                                return@mapNotNull null
-                            }
+                            if (item.builtInCounterparty != null) return@mapNotNull null
                             val counterpartyId =
-                                item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField, config.peopleMappings)
+                                item.counterpartyIdentity(counterpartyIdField, config.peopleMappings)
                                     ?: return@mapNotNull null
-                            val downloadedName = item.cleanCounterpartyName(nameMappings) ?: item.counterpartyName(nameMappings)
+                            val downloadedName = item.counterpartyName()
                             CounterpartyImportCandidate(
                                 counterpartyId = counterpartyId,
                                 downloadedName = downloadedName,
                                 apiSource = AccountApiSource(sessionId, request.id, item.counterpartyJsonPath(config.peopleMappings)),
                                 dedupeKey =
-                                    item.rawJson.personalCounterpartyIdentity(config.peopleMappings)?.dedupeKey
+                                    item.personalCounterpartyIdentity(config.peopleMappings)?.dedupeKey
                                         ?: bankDedupeKeyFromCounterpartyId(counterpartyId),
                             )
                         }
@@ -1141,7 +1137,6 @@ private suspend fun collectCounterpartiesFromResponses(
     responses: List<ApiResponse>,
     strategy: ApiImportStrategy,
     counterpartyIdField: String,
-    nameMappings: CounterpartyNameMappings,
     onResponseProcessed: suspend (done: Int, total: Int) -> Unit = { _, _ -> },
 ): Map<String, List<String>> =
     responses
@@ -1150,17 +1145,14 @@ private suspend fun collectCounterpartiesFromResponses(
             parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
                 // Skip transactions handled by built-in type logic — their counterpartyId is
                 // irrelevant because they all route to a single built-in account.
-                if (item.rawJson?.resolveBuiltInCounterpartyType(strategy.config.builtInCounterpartyRules, item.amountSign) != null) {
-                    return@mapNotNull null
-                }
+                if (item.builtInCounterparty != null) return@mapNotNull null
                 val counterpartyId =
-                    item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField, strategy.config.peopleMappings)
+                    item.counterpartyIdentity(counterpartyIdField, strategy.config.peopleMappings)
                         ?: return@mapNotNull null
-                // Use only the proper name (merchant/counterparty name field), not the
-                // description fallback. Description-based names are per-transaction references
-                // that would corrupt the name suggestion when the same counterpartyId appears
-                // in transactions with and without a proper name.
-                counterpartyId to item.cleanCounterpartyName(nameMappings)
+                // Use only the name the rules give, not the description fallback. Description-based
+                // names are per-transaction references that would corrupt the name suggestion when the
+                // same counterpartyId appears in transactions with and without a proper name.
+                counterpartyId to item.counterpartyAccountName
             }
         }.groupBy(
             keySelector = { it.first },
@@ -1245,9 +1237,12 @@ class ApiSessionImportException(
 private data class ApiImportAccount(
     /** The provider's id, as requests carry it (`{account.id}`). */
     val id: String,
-    /** The id stored on (and matched against) the account: [id] through [ApiAccountMappings.idExtraction]. */
+    /** The id stored on (and matched against) the account: the rules' [RuleAction.ExternalId], else [id]. */
     val externalId: String = id,
     val description: String,
+    /** The name the account rules give it, or null when they name none. */
+    val ruleName: String? = null,
+    val attributes: List<RuleAttribute> = emptyList(),
     val owners: List<ApiImportAccountOwner> = emptyList(),
     val source: AccountApiSource? = null,
     val sortCode: String? = null,
@@ -1287,13 +1282,6 @@ private fun ApiImportAccountOwner.bankKey(): String? {
     return identity.dedupeKey
 }
 
-/** Whether [type] marks a counterparty as a person, per the single or multi-value personal config. */
-private fun ApiPeopleMappings.isPersonalBeneficiaryType(type: String?): Boolean {
-    if (type == null) return false
-    if (type.equals(personalBeneficiaryAccountTypeValue, ignoreCase = true)) return true
-    return personalBeneficiaryAccountTypeValues.any { it.equals(type, ignoreCase = true) }
-}
-
 /**
  * The JSON path to the counterparty within this transaction item, for linking an imported account
  * back to its API-traffic origin. Points at the nested counterparty object when one exists
@@ -1308,16 +1296,9 @@ private fun ApiTransactionPageItem.counterpartyJsonPath(peopleMappings: ApiPeopl
         JsonPath("${jsonPath.value}.${peopleMappings.counterpartyObjectField}")
     }
 
-/** Whether this transaction's counterparty is flagged a person (vs a merchant/business) by the strategy. */
-private fun ApiTransactionPageItem.isPersonalCounterparty(peopleMappings: ApiPeopleMappings): Boolean {
-    val counterparty = rawJson?.resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return false
-    return peopleMappings.isPersonalBeneficiaryType(counterparty.stringOrNull(peopleMappings.beneficiaryAccountTypeField))
-}
-
 private fun ApiTransactionPageItem.personalCounterpartyOwner(peopleMappings: ApiPeopleMappings): ApiImportAccountOwner? {
+    if (!isPersonCounterparty) return null
     val counterparty = rawJson?.resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return null
-    val beneficiaryAccountType = counterparty.stringOrNull(peopleMappings.beneficiaryAccountTypeField)
-    if (!peopleMappings.isPersonalBeneficiaryType(beneficiaryAccountType)) return null
 
     val name = counterparty.stringOrNull(peopleMappings.counterpartyNameField)?.takeIf { it.isNotBlank() }
     val userId = counterparty.stringOrNull(peopleMappings.counterpartyUserIdField)?.takeIf { it.isNotBlank() }.orEmpty()
@@ -1333,10 +1314,9 @@ private fun ApiTransactionPageItem.personalCounterpartyOwner(peopleMappings: Api
     )
 }
 
-private fun JsonObject.personalCounterpartyIdentity(peopleMappings: ApiPeopleMappings): PersonalCounterpartyIdentity? {
-    val counterparty = resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return null
-    val beneficiaryAccountType = counterparty.stringOrNull(peopleMappings.beneficiaryAccountTypeField)
-    if (!peopleMappings.isPersonalBeneficiaryType(beneficiaryAccountType)) return null
+private fun ApiTransactionPageItem.personalCounterpartyIdentity(peopleMappings: ApiPeopleMappings): PersonalCounterpartyIdentity? {
+    if (!isPersonCounterparty) return null
+    val counterparty = rawJson?.resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return null
     val sortCode = counterparty.stringOrNull(peopleMappings.counterpartySortCodeField)?.takeIf { it.isNotBlank() } ?: return null
     val accountNumber = counterparty.stringOrNull(peopleMappings.counterpartyAccountNumberField)?.takeIf { it.isNotBlank() } ?: return null
     val name = counterparty.stringOrNull(peopleMappings.counterpartyNameField)?.takeIf { it.isNotBlank() } ?: return null
@@ -1364,27 +1344,8 @@ private fun parseAccounts(
     }
 
 /**
- * [value] through [extraction]; kept as is when there is no extraction, the pattern doesn't match or the
- * result is blank (a blank external id would merge every account onto one).
- *
- * @throws ApiSessionImportException when the persisted pattern doesn't compile.
- */
-private fun rewriteAccountValue(
-    value: String,
-    extraction: Extraction?,
-    what: String,
-    strategy: ApiImportStrategy,
-): String {
-    if (extraction == null || value.isBlank()) return value
-    if (!extraction.isValid) {
-        throw ApiSessionImportException("Strategy '${strategy.name}' has an invalid $what rewrite pattern: ${extraction.pattern}")
-    }
-    return RuleEvaluator().extract(value, extraction)?.takeIf { it.isNotBlank() } ?: value
-}
-
-/**
- * Fails when [ApiAccountMappings.idExtraction] gives two distinct provider accounts the same stored id:
- * they would be imported as one account.
+ * Fails when the account rules' [RuleAction.ExternalId] gives two distinct provider accounts the same
+ * stored id: they would be imported as one account.
  */
 private fun requireDistinctExternalIds(
     accounts: Collection<ApiImportAccount>,
@@ -1458,11 +1419,14 @@ private fun parseAccount(
 ): ApiImportAccount? {
     val mappings = strategy.config.downloadedAccounts().mappings
     val id = account.resolveJsonPath(mappings.idField) ?: return null
-    val description = account.resolveJsonPath(mappings.descriptionField).orEmpty()
+    val engine = RuleEngine()
+    val outcome = engine.evaluate(mappings.rules, JsonRecord(account))
     return ApiImportAccount(
         id = id,
-        externalId = rewriteAccountValue(id, mappings.idExtraction, "account ID", strategy),
-        description = rewriteAccountValue(description, mappings.descriptionExtraction, "description", strategy),
+        externalId = outcome.externalId ?: id,
+        description = account.resolveJsonPath(mappings.descriptionField).orEmpty(),
+        ruleName = outcome.namedAccount(AccountSide.OWN, engine)?.name?.ifBlank { null },
+        attributes = outcome.attributes,
         owners = parseAccountOwners(account, strategy, accountJsonPath),
         sortCode = account.stringOrNull(mappings.sortCodeField),
         accountNumber = account.stringOrNull(mappings.accountNumberField),
@@ -1533,14 +1497,18 @@ private data class ApiTransactionPageItem(
     val currencyCode: String,
     val description: String,
     val jsonPath: JsonPath,
-    val merchantName: String?,
-    val counterpartyName: String?,
-    val declineReason: String?,
+    /** What the bank feed's rules decided for this item. */
+    val outcome: RuleOutcome,
+    /** The counterparty name the rules give (never a built-in one), or null when they name none. */
+    val counterpartyAccountName: String? = null,
+    /** The built-in counterparty (e.g. "ATM") the rules route this item to, consolidating every match. */
+    val builtInCounterparty: String? = null,
     val rawJson: JsonObject? = null,
     // What the counterparty was paid when the own account settled in another currency (magnitude only).
     val foreignAmount: ParsedAmount? = null,
     val foreignCurrencyCode: String? = null,
     // Fee charged on the transaction (magnitude only; a fee is always money out of the own account).
+    val feeRule: FeeRule? = null,
     val feeAmountMinorUnits: Long? = null,
     val feeAmountDecimalMajor: BigDecimal? = null,
     val feeCurrencyCode: String? = null,
@@ -1549,19 +1517,11 @@ private data class ApiTransactionPageItem(
     val isZeroAmount: Boolean get() = amountSign == 0
     val isIncoming: Boolean get() = amountSign > 0
     val hasFee: Boolean get() = feeAmountMinorUnits != null || feeAmountDecimalMajor != null
-}
 
-private data class CounterpartyNameMappings(
-    val merchantNameField: String?,
-    val counterpartyNameField: String?,
-) {
-    companion object {
-        fun from(strategy: ApiImportStrategy): CounterpartyNameMappings =
-            CounterpartyNameMappings(
-                merchantNameField = strategy.config.bankFeedMappings().merchantNameField,
-                counterpartyNameField = strategy.config.bankFeedMappings().counterpartyNameField,
-            )
-    }
+    /** Why the item was declined (imported, but excluded from balances), or null when it wasn't. */
+    val declineReason: String? get() = if (outcome.excluded) outcome.excludeReason?.ifBlank { null } ?: "excluded" else null
+
+    val isPersonCounterparty: Boolean get() = outcome.counterpartyIsPerson
 }
 
 private data class ApiImportPageContext(
@@ -1707,10 +1667,7 @@ private suspend fun runImportEngine(
     prepared: PreparedTransfers,
 ): ImportResult {
     val orderedPrepared = prepared.orderedPrepared
-    val transactionIdAttributeName =
-        setup.customTxFields.entries
-            .firstOrNull { it.value == "id" }
-            ?.key
+    val transactionIdAttributeName = setup.transactionIdAttributeName
 
     val importTransfers =
         orderedPrepared.map { p ->
@@ -1742,7 +1699,7 @@ private suspend fun runImportEngine(
             (ownership.account as? AccountRef.Local)?.key in prunedAccountKeys
         }
 
-    val uniqueIdTxFields = setup.uniqueIdTxFields
+    val uniqueIdTxFields = setup.uniqueAttributeNames
     val batch =
         ImportBatch(
             transfers = importTransfers,
@@ -1913,17 +1870,16 @@ private suspend fun prepareValidTransactionItem(
                 source = counterpartyApiSource.toSource(),
             )
         } else {
-            val builtInCounterpartyType =
-                item.rawJson?.resolveBuiltInCounterpartyType(setup.strategy.config.builtInCounterpartyRules, item.amountSign)
-            val counterpartyId = item.rawJson?.resolveCounterpartyIdentity(setup.counterpartyIdField, setup.strategy.config.peopleMappings)
-            val personalCounterpartyIdentity = item.rawJson?.personalCounterpartyIdentity(setup.strategy.config.peopleMappings)
+            val builtInCounterpartyType = item.builtInCounterparty
+            val counterpartyId = item.counterpartyIdentity(setup.counterpartyIdField, setup.strategy.config.peopleMappings)
+            val personalCounterpartyIdentity = item.personalCounterpartyIdentity(setup.strategy.config.peopleMappings)
             setup.accountResolver.resolveCounterpartyAccount(
                 counterpartyId = counterpartyId,
                 dedupeKey = personalCounterpartyIdentity?.dedupeKey ?: bankDedupeKeyFromCounterpartyId(counterpartyId),
                 builtInType = builtInCounterpartyType,
-                name = builtInCounterpartyType ?: item.counterpartyName(setup.nameMappings),
+                name = builtInCounterpartyType ?: item.counterpartyName(),
                 personalIdentity = personalCounterpartyIdentity,
-                personalCounterparty = item.isPersonalCounterparty(setup.strategy.config.peopleMappings),
+                personalCounterparty = item.isPersonCounterparty,
                 source = counterpartyApiSource.toSource(),
             )
         }
@@ -1936,9 +1892,12 @@ private suspend fun prepareValidTransactionItem(
                     .idField,
             )?.takeIf { it.isNotBlank() }
     val uniqueKey =
-        if (setup.uniqueIdTxFields.isNotEmpty() && item.rawJson != null) {
-            setup.uniqueIdTxFields.associateWith { fieldName ->
-                setup.customTxFields[fieldName]?.let { item.rawJson.resolveJsonPath(it) } ?: ""
+        if (setup.uniqueAttributeNames.isNotEmpty() && item.rawJson != null) {
+            setup.uniqueAttributeNames.associateWith { typeName ->
+                item.outcome.attributes
+                    .firstOrNull { it.typeName == typeName }
+                    ?.value
+                    .orEmpty()
             }
         } else {
             null
@@ -1958,10 +1917,7 @@ private suspend fun prepareValidTransactionItem(
     // back to the original amount instead of double-charging the fee.
     val amount =
         if (fee != null &&
-            setup.strategy.config
-                .bankFeedMappings()
-                .fee
-                ?.includedInAmount == true &&
+            item.feeRule?.includedInAmount == true &&
             fee.amount.asset.id == data.money.asset.id
         ) {
             Money((data.money.amount - fee.amount.amount).coerceAtLeast(BigInteger.ZERO), data.money.asset)
@@ -2051,7 +2007,6 @@ private suspend fun prepareValidTransactionItem(
         attributes =
             buildApiTransferAttributes(
                 item = item,
-                customTxFields = setup.customTxFields,
                 attributeTypeCache = setup.attributeTypeCache,
             ),
         transactionApiId = transactionApiId,
@@ -2109,9 +2064,7 @@ private suspend fun buildImportFee(
     // the fee field's parent (its last `.`-segment dropped). A flat fee field (no parent) falls back to
     // the transaction node.
     val feeNodePath =
-        setup.strategy.config
-            .bankFeedMappings()
-            .fee
+        item.feeRule
             ?.amount
             ?.primaryPath
             ?.substringBeforeLast('.', missingDelimiterValue = "")
@@ -2130,18 +2083,14 @@ private suspend fun buildImportFee(
 
 private suspend fun buildApiTransferAttributes(
     item: ApiTransactionPageItem,
-    customTxFields: Map<String, String>,
     attributeTypeCache: AttributeTypeCache,
 ): List<NewAttribute> =
     buildList {
         if (!item.declineReason.isNullOrBlank()) {
             add(NewAttribute(typeId = AttributeTypeId(-1), value = "declined: ${item.declineReason}"))
         }
-        if (customTxFields.isNotEmpty() && item.rawJson != null) {
-            for ((fieldName, jsonPath) in customTxFields) {
-                val value = item.rawJson.resolveJsonPath(jsonPath) ?: continue
-                add(NewAttribute(typeId = attributeTypeCache.getOrCreate(fieldName), value = value))
-            }
+        for (attribute in item.outcome.attributes) {
+            add(NewAttribute(typeId = attributeTypeCache.getOrCreate(attribute.typeName), value = attribute.value))
         }
     }
 
@@ -2175,25 +2124,13 @@ private fun ApiTransactionPageItem.errorRecord(
         errorMessage = message,
     )
 
-/**
- * Resolves a transaction's decline reason, used downstream to exclude it from balances: the value at
- * the path of the first [ApiTransactionMappings.declinedWhen] condition that holds — Monzo's
- * `decline_reason` itself, or Starling's `status` ("DECLINED"), which doubles as the reason.
- */
-private fun resolveDeclineReason(
-    obj: JsonObject,
-    mappings: ApiTransactionMappings,
-): String? {
-    val matched = mappings.declinedWhen.firstOrNull { obj.matches(it) } ?: return null
-    return obj.resolveJsonPath(matched.path)?.takeIf { it.isNotBlank() } ?: matched.path
-}
-
 private fun parseTransactionsWithPath(
     json: String,
     strategy: ApiImportStrategy,
 ): List<ApiTransactionPageItem> =
     try {
         val mappings = strategy.config.bankFeedMappings()
+        val engine = RuleEngine()
         responseItemsArray(
             json,
             strategy.config
@@ -2201,13 +2138,17 @@ private fun parseTransactionsWithPath(
                 .endpoint.responseArrayKey,
         )?.mapIndexedNotNull { index, element ->
             val obj = element as? JsonObject ?: return@mapIndexedNotNull null
+            val outcome = engine.evaluate(mappings.rules, JsonRecord(obj))
+            if (outcome.skipped) return@mapIndexedNotNull null
             val created = obj.resolveJsonPath(mappings.timestampField)?.let { parseApiTimestamp(it, mappings.timestampFormat) }
-            val amount = parseAmount(obj, mappings)
+            val amount = parseAmount(obj, mappings, outcome.incoming)
             val currency = obj.resolveJsonPath(mappings.currencyField)
-            val declineReason = resolveDeclineReason(obj, mappings)
-            val foreignAmount = mappings.foreignAmount?.let { parseMagnitude(obj, it.amount, mappings.amountFormat) }
-            val foreignCurrency = mappings.foreignAmount?.let { obj.resolve(it.currency) }?.takeIf { it.isNotBlank() }
-            val feeRule = mappings.fee?.takeIf { obj.carriesFee(it, currency) }
+            val foreignAmount = outcome.foreignAmount?.let { parseMagnitude(obj, it.amount, mappings.amountFormat) }
+            val foreignCurrency = outcome.foreignAmount?.let { obj.resolve(it.currency) }?.takeIf { it.isNotBlank() }
+            val counterparty = outcome.namedAccountWithNaming(AccountSide.COUNTERPARTY, engine)
+            val counterpartyName = counterparty?.first?.name?.ifBlank { null }
+            val builtIn = counterparty?.second?.builtIn == true
+            val feeRule = outcome.fees.firstOrNull { obj.carriesFee(it, currency) }
             val fee = feeRule?.let { parseMagnitude(obj, it.amount, mappings.amountFormat) }
             val feeCurrency = feeRule?.currency?.let { obj.resolve(it) }
             val feeDescription = feeRule?.description?.let { obj.resolve(it) }
@@ -2226,12 +2167,13 @@ private fun parseTransactionsWithPath(
                                 .endpoint.responseArrayKey,
                             index,
                         ),
-                    merchantName = mappings.merchantNameField?.let { obj.resolveJsonPath(it) },
-                    counterpartyName = mappings.counterpartyNameField?.let { obj.resolveJsonPath(it) },
-                    declineReason = declineReason,
+                    outcome = outcome,
+                    counterpartyAccountName = counterpartyName.takeUnless { builtIn },
+                    builtInCounterparty = counterpartyName.takeIf { builtIn },
                     rawJson = obj,
                     foreignAmount = foreignAmount,
                     foreignCurrencyCode = foreignCurrency?.uppercase(),
+                    feeRule = feeRule,
                     feeAmountMinorUnits = fee?.minorUnits,
                     feeAmountDecimalMajor = fee?.decimalMajor,
                     feeCurrencyCode = feeCurrency?.uppercase(),
@@ -2258,25 +2200,25 @@ private data class ParsedAmount(
     val sign: Int,
 )
 
-/** Parses a transaction amount per the strategy's amount format and sign source. */
+/**
+ * Parses a transaction amount per the strategy's amount format. The sign is the direction the rules
+ * claimed ([incoming]), else the amount's own; a zero amount has none.
+ */
 private fun parseAmount(
     obj: JsonObject,
     mappings: ApiTransactionMappings,
+    incoming: Boolean?,
 ): ParsedAmount? {
     val raw = obj.resolveJsonPath(mappings.amountField) ?: return null
     return when (mappings.amountFormat) {
         ApiAmountFormat.MINOR_UNITS_INTEGER -> {
             val value = raw.toLongOrNull() ?: return null
-            val magnitudeSign = value.compareTo(0L).coerceIn(-1, 1)
-            val sign = resolveSign(obj, mappings, magnitudeSign) ?: return null
-            ParsedAmount(minorUnits = value, decimalMajor = null, sign = sign)
+            ParsedAmount(minorUnits = value, decimalMajor = null, sign = resolveSign(value.compareTo(0L), incoming))
         }
 
         ApiAmountFormat.DECIMAL_MAJOR_UNITS -> {
             val decimal = runCatching { BigDecimal(raw) }.getOrNull() ?: return null
-            val magnitudeSign = decimal.compareTo(BigDecimal.ZERO).coerceIn(-1, 1)
-            val sign = resolveSign(obj, mappings, magnitudeSign) ?: return null
-            ParsedAmount(minorUnits = null, decimalMajor = decimal.abs(), sign = sign)
+            ParsedAmount(minorUnits = null, decimalMajor = decimal.abs(), sign = resolveSign(decimal.compareTo(BigDecimal.ZERO), incoming))
         }
     }
 }
@@ -2307,47 +2249,19 @@ private fun parseMagnitude(
     }
 }
 
-/**
- * Resolves the transaction sign (-1/0/1) from the mappings' [Direction] (the amount's own sign by default).
- * Returns null when a [Direction.Field] is configured but the field is absent: a missing direction
- * indicator is unexpected data, so the caller skips the item rather than silently defaulting it to a
- * debit. A present value that is simply not in `incomingValues` is a debit.
- */
+/** The transaction sign (-1/0/1): [incoming] when the rules claimed a direction, else the amount's own. */
 private fun resolveSign(
-    obj: JsonObject,
-    mappings: ApiTransactionMappings,
-    magnitudeSign: Int,
-): Int? =
-    when (val direction = mappings.direction ?: Direction.AmountSign()) {
-        is Direction.AmountSign -> {
-            if (direction.positiveIsIncoming) magnitudeSign else -magnitudeSign
-        }
-
-        is Direction.Field -> {
-            if (magnitudeSign == 0) {
-                0
-            } else {
-                when (val value = obj.resolveJsonPath(direction.path)) {
-                    null -> {
-                        logger.w { "Direction field '${direction.path}' missing from transaction; skipping item" }
-                        null
-                    }
-
-                    in direction.incomingValues -> {
-                        1
-                    }
-
-                    else -> {
-                        -1
-                    }
-                }
-            }
-        }
-
-        Direction.Outgoing -> {
-            -magnitudeSign.absoluteValue
-        }
+    magnitudeComparison: Int,
+    incoming: Boolean?,
+): Int {
+    val magnitudeSign = magnitudeComparison.coerceIn(-1, 1)
+    return when {
+        magnitudeSign == 0 -> 0
+        incoming == null -> magnitudeSign
+        incoming -> 1
+        else -> -1
     }
+}
 
 /** JSON path for the [index]-th item of a response array, accounting for a blank (root-array) key. */
 internal fun arrayItemJsonPath(
@@ -3190,58 +3104,19 @@ private class CurrencyCache(
 }
 
 /**
- * Resolves [ApiAccountMappings.staticAccountName] plus a distinguishing suffix: the first matching
- * [ApiAccountMappings.accountNameRules] entry (evaluated against the account's raw JSON), else the
- * existing "more than one owner" -> "Joint" rule, else the bare static name.
+ * Display name for a downloaded own account: the name its rules give, else its description (else its id).
+ * Two genuinely distinct accounts can land on the identical rule-given name (e.g. two personal accounts
+ * with no bank details to tell them apart) — appending a short id suffix only in that case keeps every
+ * account uniquely named without cluttering the common single-account case (see [resolveOwnAccountKey]).
  */
-private fun ApiImportAccount.staticDisplayName(
-    staticName: String,
-    mappings: ApiAccountMappings,
-): String {
-    val ruleSuffix =
-        rawJson
-            ?.let { json -> mappings.accountNameRules.firstOrNull { rule -> json.matchesAll(rule.predicates) } }
-            ?.suffix
-    val suffix = ruleSuffix ?: "Joint".takeIf { owners.size > 1 }
-    return if (suffix != null) "$staticName $suffix" else staticName
-}
-
-/**
- * Display name for a downloaded own account. When [ApiAccountMappings.staticAccountName] is set, two
- * genuinely distinct accounts can still land on the identical name (e.g. two personal accounts with no
- * bank details to tell them apart) — appending a short id suffix only in that case keeps every account
- * uniquely named without cluttering the common single-account case (see [resolveOwnAccountKey]).
- */
-private fun ApiImportAccount.displayName(
-    mappings: ApiAccountMappings,
-    siblingAccounts: Collection<ApiImportAccount>,
-): String {
-    val staticName = mappings.staticAccountName ?: return description.ifBlank { id }
-    val name = staticDisplayName(staticName, mappings)
-    val collides = siblingAccounts.any { it.id != id && it.staticDisplayName(staticName, mappings) == name }
+private fun ApiImportAccount.displayName(siblingAccounts: Collection<ApiImportAccount>): String {
+    val name = ruleName ?: return description.ifBlank { id }
+    val collides = siblingAccounts.any { it.id != id && it.ruleName == name }
     return if (collides) "$name (${id.takeLast(6)})" else name
 }
 
-private fun ApiTransactionPageItem.counterpartyName(nameMappings: CounterpartyNameMappings): String =
-    cleanCounterpartyName(nameMappings) ?: description.ifBlank { "Unknown" }
-
-/**
- * Returns the counterparty's proper name (merchant or counterparty field), or null if no
- * configured name field has a value. Unlike [counterpartyName], this never falls back to the
- * transaction description, so it is safe to use when building name suggestions for the
- * counterparty-confirmation dialog — description-based fallbacks are often per-transaction
- * references that should not be used as account names.
- */
-private fun ApiTransactionPageItem.cleanCounterpartyName(nameMappings: CounterpartyNameMappings): String? =
-    rawJson?.let { rawJson ->
-        nameMappings.merchantNameField
-            ?.let { rawJson.resolveJsonPath(it) }
-            ?.takeIf { it.isNotBlank() }
-            ?: nameMappings.counterpartyNameField
-                ?.let { rawJson.resolveJsonPath(it) }
-                ?.takeIf { it.isNotBlank() }
-    } ?: merchantName?.takeIf { it.isNotBlank() }
-        ?: counterpartyName?.takeIf { it.isNotBlank() }
+/** The counterparty's account name: the rules' name, else the description, else "Unknown". */
+private fun ApiTransactionPageItem.counterpartyName(): String = counterpartyAccountName ?: description.ifBlank { "Unknown" }
 
 /** The amount, description and direction of a transaction, independent of account identity. */
 private data class TransferData(
@@ -3282,11 +3157,7 @@ private fun ApiTransactionPageItem.toTransferData(
         }
     return TransferData(
         money = money,
-        description =
-            description.ifBlank {
-                merchantName?.takeIf { it.isNotBlank() } ?: counterpartyName?.takeIf { it.isNotBlank() }
-                    ?: "Unknown"
-            },
+        description = description.ifBlank { counterpartyAccountName ?: "Unknown" },
         isIncoming = isIncoming,
     )
 }
@@ -3443,9 +3314,16 @@ private fun daysFromCivil(
     return era * 146_097 + doe - 719_468
 }
 
+/** This item's counterparty identity, its user id dropped when the rules call that id throwaway. */
+private fun ApiTransactionPageItem.counterpartyIdentity(
+    counterpartyIdField: String?,
+    peopleMappings: ApiPeopleMappings,
+): String? = rawJson?.resolveCounterpartyIdentity(counterpartyIdField, peopleMappings, ignoreUserId = outcome.ignoreCounterpartyId)
+
 private fun JsonObject.resolveCounterpartyIdentity(
     counterpartyIdField: String?,
     peopleMappings: ApiPeopleMappings,
+    ignoreUserId: Boolean,
 ): String? {
     // The bank sub-entity (sort code + account number) is the most reliable account identity for
     // providers like Starling, where a single real account can otherwise be split across several
@@ -3479,7 +3357,7 @@ private fun JsonObject.resolveCounterpartyIdentity(
     // An ephemeral user id (e.g. Monzo's per-transaction "anonuser_…") is not a stable identity, so it
     // must not key the counterparty account — leaving it to be matched by name keeps the same real
     // person from fragmenting into one account per transaction.
-    if (userId != null && peopleMappings.ephemeralCounterpartyIdPrefixes.none { userId.startsWith(it) }) {
+    if (userId != null && !ignoreUserId) {
         return "user:$userId"
     }
 
@@ -3539,28 +3417,24 @@ internal fun JsonObject.resolveJsonObjectPath(dotPath: String): JsonObject? {
     return current as? JsonObject
 }
 
-/**
- * Evaluates the strategy's declarative [rules] against this transaction's raw JSON, returning the
- * name of the first matching built-in counterparty type (e.g. "ATM"), or null when none match.
- * [amountSign] (-1/0/1) drives each rule's sign gate.
- */
-private fun JsonObject.resolveBuiltInCounterpartyType(
-    rules: List<BuiltInCounterpartyRule>,
-    amountSign: Int,
-): String? {
-    for (rule in rules) {
-        if (!rule.onlyWhenSign.matches(amountSign)) continue
-        if (matchesAll(rule.predicates)) return rule.name
-    }
-    return null
-}
+/** Every attribute action in these rules, in order. */
+private fun List<StrategyRule>.attributeActions(): List<RuleAction.Attribute> =
+    flatMap {
+        it.actions
+    }.filterIsInstance<RuleAction.Attribute>()
 
-private fun RuleSign.matches(sign: Int): Boolean =
-    when (this) {
-        RuleSign.ANY -> true
-        RuleSign.NEGATIVE -> sign < 0
-        RuleSign.POSITIVE -> sign > 0
-    }
+/** What the first of the rules' [side] candidates that applies to the record names, with that candidate. */
+private fun RuleOutcome.namedAccountWithNaming(
+    side: AccountSide,
+    engine: RuleEngine,
+): Pair<NamedAccount, AccountNaming>? =
+    accountsFor(side).firstNotNullOfOrNull { naming -> engine.evaluator.name(naming) { record.text(it) }?.let { it to naming } }
+
+/** What the first of the rules' [side] candidates that applies to the record names. */
+private fun RuleOutcome.namedAccount(
+    side: AccountSide,
+    engine: RuleEngine,
+): NamedAccount? = namedAccountWithNaming(side, engine)?.first
 
 /** Whether [condition] holds for this item (see [JsonRecord]). */
 internal fun JsonObject.matches(condition: Condition): Boolean = RuleEvaluator().matches(condition, JsonRecord(this))

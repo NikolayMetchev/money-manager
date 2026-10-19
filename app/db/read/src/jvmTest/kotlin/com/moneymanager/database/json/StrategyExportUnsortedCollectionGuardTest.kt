@@ -50,8 +50,6 @@ class StrategyExportUnsortedCollectionGuardTest {
         setOf(
             // Positional ("ancestor[N]." expressions) / first-match-wins / sequential-mutation semantics.
             ApiAccountsSource.Downloaded::class to "ancestorEndpoints",
-            ApiStrategyConfig::class to "builtInCounterpartyRules",
-            ApiAccountMappings::class to "accountNameRules",
             ApiStrategyConfig::class to "connectInstructions",
             ApiRequestSigningConfig::class to "message",
             SigPart.Sha256::class to "parts",
@@ -66,11 +64,11 @@ class StrategyExportUnsortedCollectionGuardTest {
             ApiValueSet.Union::class to "sets",
             // Rules run in order (first claim wins, rewrites are seen by later rules), and so do a rule's actions.
             CsvStrategyConfig::class to "rules",
+            ApiAccountMappings::class to "rules",
+            ApiTransactionMappings::class to "rules",
             StrategyRule::class to "actions",
-            // A value's paths are tried in order until one is non-blank; decline conditions are
-            // first-match-wins (the match picks the decline reason).
+            // A value's paths are tried in order until one is non-blank.
             ValueExpr::class to "paths",
-            ApiTransactionMappings::class to "declinedWhen",
             // A key's parts are joined in order.
             CsvStrategyConfig::class to "legGroups",
             LegGroupRule::class to "key",

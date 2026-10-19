@@ -15,6 +15,8 @@ import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInApiStrategies
 import kotlinx.coroutines.flow.first
@@ -328,19 +330,25 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             with(checkNotNull(starling.config.bankTransactions?.transactionMappings)) {
                 assertEquals("amount.minorUnits", amountField)
                 assertEquals(ApiAmountFormat.MINOR_UNITS_INTEGER, amountFormat)
-                assertEquals(Direction.Field(path = "direction", incomingValues = setOf("IN")), direction)
                 assertEquals("feedItemUid", idField)
-                assertEquals(listOf(Condition("status", ConditionOp.IN, value = "DECLINED")), declinedWhen)
                 assertEquals("counterPartyUid", counterpartyIdField)
-                assertEquals(mapOf("starling-transaction-id" to "feedItemUid"), customFields)
-                assertEquals(setOf("starling-transaction-id"), uniqueIdentifierFields)
+                val actions = rules.flatMap { it.actions }
+                assertTrue(RuleAction.SetDirection(incoming = true) in actions)
+                assertTrue(
+                    rules.any {
+                        it.conditions == listOf(Condition("status", ConditionOp.IN, value = "DECLINED")) &&
+                            it.actions == listOf(RuleAction.Exclude(RuleValue.read("status")))
+                    },
+                )
+                assertTrue(
+                    RuleAction.Attribute("starling-transaction-id", RuleValue.read("feedItemUid"), uniqueIdentifier = true) in actions,
+                )
+                assertTrue(RuleAction.CounterpartyIsPerson in actions)
             }
 
-            // PAYEE/SENDER counterparties are treated as people, read from flat feed-item fields.
+            // Counterparties are read from flat feed-item fields.
             with(starling.config.peopleMappings) {
                 assertEquals("", counterpartyObjectField)
-                assertEquals("counterPartyType", beneficiaryAccountTypeField)
-                assertEquals(setOf("PAYEE", "SENDER"), personalBeneficiaryAccountTypeValues)
                 assertEquals("counterPartyName", counterpartyNameField)
                 assertEquals("counterPartyUid", counterpartyUserIdField)
                 assertEquals("counterPartySubEntityIdentifier", counterpartySortCodeField)

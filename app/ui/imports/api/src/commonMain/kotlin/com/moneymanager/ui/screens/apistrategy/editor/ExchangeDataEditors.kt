@@ -247,12 +247,6 @@ internal fun TransactionMappingsFields(
             enabled = enabled,
         )
         TextFieldRow(
-            "Counterparty name field (optional)",
-            mappings.counterpartyNameField.orEmpty(),
-            { onChange(mappings.copy(counterpartyNameField = it.ifBlank { null })) },
-            enabled,
-        )
-        TextFieldRow(
             "Txid field (optional)",
             mappings.txidField.orEmpty(),
             { onChange(mappings.copy(txidField = it.ifBlank { null })) },
@@ -659,10 +653,10 @@ private fun ApiTransactionMappings.isValidForSave(): Boolean =
         conditionsComplete()
 
 /**
- * Whether every exclusion, filter and decline condition names its path and operand. An incomplete one
+ * Whether every exclusion and filter condition names its path and operand. An incomplete one
  * is not inert: a path-less "is blank" exclusion holds for every item and would exclude them all.
  */
-internal fun ApiTransactionMappings.conditionsComplete(): Boolean = (excludeWhen + itemFilters + declinedWhen).all { it.isComplete() }
+internal fun ApiTransactionMappings.conditionsComplete(): Boolean = (excludeWhen + itemFilters).all { it.isComplete() }
 
 /** Whether an [ApiEndpointConfig] is complete enough to save, independent of what kind of record it produces. */
 private fun ApiEndpointConfig.isValidForSave(): Boolean {

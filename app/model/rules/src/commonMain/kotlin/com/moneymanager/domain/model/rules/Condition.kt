@@ -15,6 +15,9 @@ enum class ConditionOp {
     /** The path is present (a CSV column the file has; a JSON field that isn't `null`). */
     EXISTS,
 
+    /** The path is absent: the negation of [EXISTS] (a present but blank value isn't missing). */
+    MISSING,
+
     /** The value is absent or blank. */
     BLANK,
 
@@ -107,7 +110,8 @@ enum class ConditionOperand {
 val ConditionOp.operand: ConditionOperand
     get() =
         when (this) {
-            ConditionOp.EXISTS, ConditionOp.BLANK, ConditionOp.NOT_BLANK, ConditionOp.EMPTY_OBJECT, ConditionOp.NON_EMPTY_OBJECT,
+            ConditionOp.EXISTS, ConditionOp.MISSING, ConditionOp.BLANK, ConditionOp.NOT_BLANK,
+            ConditionOp.EMPTY_OBJECT, ConditionOp.NON_EMPTY_OBJECT,
             ConditionOp.POSITIVE, ConditionOp.NEGATIVE,
             -> {
                 ConditionOperand.NONE

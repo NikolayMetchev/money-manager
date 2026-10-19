@@ -17,11 +17,14 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.StrategyRule
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -89,6 +92,27 @@ class StrategyRulesEditorTest {
             onNodeWithText("Set the trade side").assertExists()
             onNodeWithText("Flip source and target").assertDoesNotExist()
         }
+
+    @Test
+    fun anAddedAccountActionNamesTheSideOfItsContext() =
+        runEditor(listOf(StrategyRule(actions = emptyList())), context = RuleContext.API_ACCOUNT) { rules ->
+            onNodeWithText("Add action").performClick()
+            waitForIdle()
+            onNodeWithText("Name an account").performClick()
+            waitForIdle()
+            assertEquals(AccountSide.OWN, (rules().single().actions.single() as RuleAction.Account).side)
+        }
+
+    @Test
+    fun anApiTransactionCounterpartyCanBeMarkedBuiltIn() {
+        val atm =
+            StrategyRule(actions = listOf(RuleAction.Account(AccountSide.COUNTERPARTY, AccountNaming(ValueExpr.of("id"), name = "ATM"))))
+        runEditor(listOf(atm), context = RuleContext.API_TRANSACTION) { rules ->
+            onNodeWithText("Built-in counterparty: every record naming it shares one account").performScrollTo().performClick()
+            waitForIdle()
+            assertTrue((rules().single().actions.single() as RuleAction.Account).naming.builtIn)
+        }
+    }
 
     @Test
     fun `rules are complete only when every condition and action has its inputs`() {

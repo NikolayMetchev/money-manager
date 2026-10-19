@@ -41,21 +41,6 @@ internal fun PeopleTab(
         path("Counterparty object field", p.counterpartyObjectField) { v ->
             state.updatePeopleMappings { copy(counterpartyObjectField = v) }
         }
-        path("Beneficiary account-type field", p.beneficiaryAccountTypeField) { v ->
-            state.updatePeopleMappings { copy(beneficiaryAccountTypeField = v) }
-        }
-        TextFieldRow(
-            label = "Personal beneficiary value",
-            value = p.personalBeneficiaryAccountTypeValue,
-            onValueChange = { v -> state.updatePeopleMappings { copy(personalBeneficiaryAccountTypeValue = v) } },
-            enabled = enabled,
-        )
-        StringSetEditor(
-            label = "Additional personal beneficiary values",
-            values = p.personalBeneficiaryAccountTypeValues,
-            onChange = { v -> state.updatePeopleMappings { copy(personalBeneficiaryAccountTypeValues = v) } },
-            enabled = enabled,
-        )
         path("Counterparty name field", p.counterpartyNameField) { v -> state.updatePeopleMappings { copy(counterpartyNameField = v) } }
         path("Counterparty user-id field", p.counterpartyUserIdField) { v ->
             state.updatePeopleMappings { copy(counterpartyUserIdField = v) }

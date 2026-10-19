@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -35,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
@@ -71,7 +73,7 @@ enum class RuleActionKind(
     SET("Set a value", RuleContext.entries.toSet(), { RuleAction.SetValue("", RuleValue.constant("")) }),
     SKIP("Skip the record", RuleContext.entries.toSet(), { RuleAction.Skip }),
     EXCLUDE("Exclude from balances", setOf(RuleContext.CSV_ROW, RuleContext.API_TRANSACTION), { RuleAction.Exclude() }),
-    ATTRIBUTE("Add an attribute", setOf(RuleContext.CSV_ROW, RuleContext.API_TRANSACTION), {
+    ATTRIBUTE("Add an attribute", setOf(RuleContext.CSV_ROW, RuleContext.API_TRANSACTION, RuleContext.API_ACCOUNT), {
         RuleAction.Attribute("", RuleValue.read(""))
     }),
     EXTERNAL_ID("Set the external id", RuleContext.entries.toSet(), { RuleAction.ExternalId(RuleValue.read("")) }),
@@ -296,7 +298,7 @@ private fun AddActionButton(
                 DropdownMenuItem(
                     text = { Text(kind.label) },
                     onClick = {
-                        onAdd(kind.create())
+                        onAdd(kind.create().forContext(context))
                         expanded = false
                     },
                 )
@@ -304,6 +306,10 @@ private fun AddActionButton(
         }
     }
 }
+
+/** An added account action names the context's first side rather than one the context doesn't offer. */
+private fun RuleAction.forContext(context: RuleContext): RuleAction =
+    if (this is RuleAction.Account) copy(side = context.accountSides().first()) else this
 
 @Composable
 private fun ActionCard(
@@ -341,7 +347,13 @@ private fun ActionFields(
             ChoiceDropdown("Account", action.side, context.accountSides(), { it.label() }, enabled) {
                 onActionChanged(action.copy(side = it))
             }
-            AccountNamingEditor(action.naming, { onActionChanged(action.copy(naming = it)) }, pathField, enabled)
+            AccountNamingEditor(
+                action.naming,
+                { onActionChanged(action.copy(naming = it)) },
+                pathField,
+                enabled,
+                builtInOption = context == RuleContext.API_TRANSACTION,
+            )
         }
 
         is RuleAction.SetDirection -> {
@@ -434,13 +446,17 @@ private fun AccountSide.label(): String =
         AccountSide.INTERMEDIATE -> "Intermediate (group)"
     }
 
-/** Edits an [AccountNaming]: what it reads, when it applies, and the name it gives. */
+/**
+ * Edits an [AccountNaming]: what it reads, when it applies, and the name it gives. [builtInOption] offers
+ * [AccountNaming.builtIn], which only an API transaction's counterparty honours.
+ */
 @Composable
 fun AccountNamingEditor(
     naming: AccountNaming,
     onNamingChanged: (AccountNaming) -> Unit,
     pathField: ConditionPathField,
     enabled: Boolean,
+    builtInOption: Boolean = false,
 ) {
     ValueExprEditor("Read value from", naming.value, { onNamingChanged(naming.copy(value = it)) }, pathField, enabled)
     CheckRow("Trim the value", naming.trim, enabled) { onNamingChanged(naming.copy(trim = it)) }
@@ -464,6 +480,11 @@ fun AccountNamingEditor(
     }
     CheckRow("Placeholder: reconcile against the real record", naming.unidentified, enabled) {
         onNamingChanged(naming.copy(unidentified = it))
+    }
+    if (builtInOption || naming.builtIn) {
+        CheckRow("Built-in counterparty: every record naming it shares one account", naming.builtIn, enabled) {
+            onNamingChanged(naming.copy(builtIn = it))
+        }
     }
 }
 
@@ -565,8 +586,11 @@ private fun CheckRow(
     enabled: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+    Row(
+        modifier = Modifier.toggleable(value = checked, enabled = enabled, role = Role.Checkbox, onValueChange = onCheckedChange),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
         Text(label, modifier = Modifier.padding(start = 4.dp))
     }
 }

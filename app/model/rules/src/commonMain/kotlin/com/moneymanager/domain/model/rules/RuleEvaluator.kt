@@ -66,6 +66,10 @@ class RuleEvaluator {
                 record.exists(condition.path)
             }
 
+            ConditionOp.MISSING -> {
+                !record.exists(condition.path)
+            }
+
             ConditionOp.BLANK -> {
                 trimmed.isEmpty()
             }
@@ -159,6 +163,49 @@ class RuleEvaluator {
         return expr.extraction?.let { extract(raw, it) } ?: raw
     }
 
+    /**
+     * What [naming] names when its values are read through [lookup], or null when its pattern doesn't
+     * match, so the next candidate should be tried. The value is the first non-blank of its paths. The name
+     * is [AccountNaming.name] rendered: with a pattern, `$n`/`${name}` captures substituted (whitespace runs
+     * collapsed when any were); `{value}` replaced by the value cleaned through the naming's extraction; the
+     * fallback when that's blank. A pattern-less naming reading a blank value names nothing.
+     */
+    fun name(
+        naming: AccountNaming,
+        lookup: (String) -> String?,
+    ): NamedAccount? {
+        val read =
+            naming.value.paths
+                .asSequence()
+                .map { lookup(it).orEmpty() }
+                .firstOrNull { it.isNotBlank() }
+                .orEmpty()
+        val value = if (naming.trim) read.trim() else read
+        val match = naming.pattern?.let { pattern -> value.takeIf { it.isNotBlank() }?.let { regex(pattern).find(it) } }
+        if (naming.pattern != null && match == null) return null
+        val accountName = renderName(naming, naming.name, value, match).ifBlank { naming.fallbackName.orEmpty() }
+        val personName =
+            if (naming.person) {
+                naming.personName?.let { renderName(naming, it, value, match) }?.takeIf { it.isNotBlank() } ?: accountName
+            } else {
+                null
+            }
+        return NamedAccount(value, accountName, personName)
+    }
+
+    private fun renderName(
+        naming: AccountNaming,
+        template: String,
+        value: String,
+        match: MatchResult?,
+    ): String {
+        if (match == null && value.isBlank()) return ""
+        val cleaned = (naming.value.extraction?.let { extract(value, it) } ?: value).let { if (naming.trim) it.trim() else it }
+        val substituted = match?.let { substituteTemplate(template, it) } ?: template
+        val named = substituted.replace(AccountNaming.VALUE_PLACEHOLDER, cleaned)
+        return if (match != null && '$' in template) named.replace(WHITESPACE_RUN, " ").trim() else named
+    }
+
     /** [extraction] applied to [value]: the substituted template, or null when the pattern doesn't match. */
     fun extract(
         value: String,
@@ -184,6 +231,18 @@ fun parseDecimalOrNull(value: String): BigDecimal? {
 }
 
 private val AMOUNT_NOISE = Regex("[, $€£]")
+
+private val WHITESPACE_RUN = Regex("\\s+")
+
+/**
+ * What an [AccountNaming] named: the [value] it read, the account [name] (blank when it names nothing) and,
+ * for a person naming, the [personName].
+ */
+data class NamedAccount(
+    val value: String,
+    val name: String,
+    val personName: String?,
+)
 
 /**
  * Substitutes capture-group references in [template] from [match]. Supports `$0` (whole match),

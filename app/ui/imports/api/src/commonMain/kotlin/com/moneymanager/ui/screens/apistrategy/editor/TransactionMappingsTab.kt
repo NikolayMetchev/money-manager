@@ -8,12 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
-import com.moneymanager.domain.model.rules.Condition
-import com.moneymanager.domain.model.rules.ConditionOp
-import com.moneymanager.ui.components.rules.ConditionsEditor
-import com.moneymanager.ui.components.rules.DirectionEditor
-import com.moneymanager.ui.components.rules.FeeRuleEditor
-import com.moneymanager.ui.components.rules.ForeignAmountEditor
+import com.moneymanager.ui.components.rules.RuleContext
+import com.moneymanager.ui.components.rules.StrategyRulesEditor
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /** Edits the top-level [ApiTransactionMappings] in place inside the strategy config. */
@@ -54,67 +50,18 @@ internal fun TransactionMappingsTab(
             optionLabel = { it.name },
             enabled = enabled,
         )
-        // A bank feed's own direction is its signed amount.
-        DirectionEditor(
-            direction = m.direction,
-            onDirectionChanged = { v -> state.updateTransactionMappings { copy(direction = v) } },
-            pathField = jsonPathField(txJsonPaths, onRequestPick, enabled),
-            enabled = enabled,
-            allowDefault = true,
-        )
-
-        path("Merchant name field (optional)", m.merchantNameField.orEmpty()) { v ->
-            state.updateTransactionMappings { copy(merchantNameField = v.ifBlank { null }) }
-        }
-        path("Counterparty name field (optional)", m.counterpartyNameField.orEmpty()) { v ->
-            state.updateTransactionMappings { copy(counterpartyNameField = v.ifBlank { null }) }
-        }
         path("Counterparty ID field (optional)", m.counterpartyIdField.orEmpty()) { v ->
             state.updateTransactionMappings { copy(counterpartyIdField = v.ifBlank { null }) }
         }
-        val conditionPath = jsonPathField(txJsonPaths, onRequestPick, enabled)
-        ConditionsEditor(
-            title = "Declined when (the first that holds wins; its field's value is the decline reason)",
-            conditions = m.declinedWhen,
-            onConditionsChanged = { v -> state.updateTransactionMappings { copy(declinedWhen = v) } },
-            pathField = conditionPath,
+        StrategyRulesEditor(
+            rules = m.rules,
+            onRulesChanged = { v -> state.updateTransactionMappings { copy(rules = v) } },
+            context = RuleContext.API_TRANSACTION,
+            pathField = jsonPathField(txJsonPaths, onRequestPick, enabled),
             enabled = enabled,
-            newCondition = { Condition("", ConditionOp.NOT_BLANK) },
-            pathLabel = "Path",
-        )
-        ConditionsEditor(
-            title = "Only import items where (all must match; none = every item)",
-            conditions = m.itemFilters,
-            onConditionsChanged = { v -> state.updateTransactionMappings { copy(itemFilters = v) } },
-            pathField = conditionPath,
-            enabled = enabled,
-            pathLabel = "Path",
-        )
-        ConditionsEditor(
-            title = "Skip items where (all must match; none = skip nothing)",
-            conditions = m.excludeWhen,
-            onConditionsChanged = { v -> state.updateTransactionMappings { copy(excludeWhen = v) } },
-            pathField = conditionPath,
-            enabled = enabled,
-            pathLabel = "Path",
-        )
-        ForeignAmountEditor(
-            foreignAmount = m.foreignAmount,
-            onForeignAmountChanged = { foreign -> state.updateTransactionMappings { copy(foreignAmount = foreign) } },
-            pathField = conditionPath,
-        )
-        FeeRuleEditor(
-            fee = m.fee,
-            onFeeChanged = { fee -> state.updateTransactionMappings { copy(fee = fee) } },
-            pathField = conditionPath,
-            enabled = enabled,
-        )
-        CustomFieldsSection(
-            fields = state.txCustomFields,
-            onFieldsChange = { state.txCustomFields = it },
-            paths = txJsonPaths,
-            onRequestPick = onRequestPick,
-            enabled = enabled,
+            title =
+                "Rules (top to bottom; the first rule to claim a value wins). They name the counterparty, set " +
+                    "the direction (else the amount's sign), decline or skip items, and add fees and attributes.",
         )
     }
 }
