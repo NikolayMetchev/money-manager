@@ -3,10 +3,10 @@
 # prints, so a new image only takes effect when that pin moves.
 name: RBE Image
 
+# Any branch, so a PR that changes the image can publish it and pin the result.
 on:
   push:
-    branches: [main]
-    paths: [bazel/platforms/rbe/**]
+    paths: [bazel/platforms/rbe/**, .github/workflows/rbe-image.yml]
   workflow_dispatch:
 
 permissions:
