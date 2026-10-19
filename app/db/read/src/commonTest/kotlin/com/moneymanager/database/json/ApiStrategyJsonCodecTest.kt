@@ -335,32 +335,4 @@ class ApiStrategyJsonCodecTest {
             decoded.dataEndpoints[0].transactionMappings?.compositeIdFields,
         )
     }
-
-    @Test
-    fun `legacy pagination without a mode discriminator decodes as cursor`() {
-        // Pagination JSON persisted before the `mode` field existed: a flat cursor object.
-        val legacyJson =
-            """
-            {
-              "baseUrl": "https://example.com",
-              "authType": "BEARER_TOKEN",
-              "accountsEndpoint": { "path": "/accounts", "responseArrayKey": "accounts" },
-              "transactionsEndpoint": {
-                "path": "/transactions",
-                "responseArrayKey": "transactions",
-                "queryParams": [ { "name": "account_id", "dynamicSource": "account.id" } ],
-                "pagination": { "limitParam": "limit", "limitValue": 100, "cursorParam": "before", "cursorResponseField": "created" }
-              },
-              "accountMappings": {},
-              "transactionMappings": {}
-            }
-            """.trimIndent()
-
-        val decoded = ApiStrategyJsonCodec.decode(legacyJson)
-        val pagination = decoded.bankTransactions?.endpoint?.pagination
-        // A legacy bank feed's default CURSOR mode is a before-cursor walk that always sent the page size.
-        assertEquals(ApiPaging.BeforeCursor(), pagination?.paging)
-        assertEquals(true, pagination?.sendLimitParam)
-        assertEquals(100, pagination?.limitValue)
-    }
 }

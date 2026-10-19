@@ -28,8 +28,8 @@ nothing) and features that only built-ins could configure. Don't recreate that d
   missing *generic* capability and add it in a way every source can use, for CSV and API alike. Never
   put source-specific code outside a built-in strategy's config.
 - If an existing feature is too narrow, replace it with the more general one and **retire the old one
-  completely**: no parallel code paths and no legacy fields kept "just in case". Persisted strategy
-  configs are upgraded through `StrategyConfigMigrations`, so retiring a field is safe.
+  completely**: no parallel code paths and no legacy fields kept "just in case". Strategy configs aren't
+  versioned (see **Import Strategies**), so a retired field is simply deleted.
 - Keep vocabularies small and orthogonal so they compose: one way to ask "does this match?", one way
   to compute a value, one ordered rule list, one shared editor for each concept.
 - Everything a built-in strategy can do must be configurable in the UI. If no editor can set it, it
@@ -162,7 +162,7 @@ workflow because label events start it: any other label's run skips, without can
 | `app/ui/core/` | Compose UI shell: app, navigation, setup wizard (JVM/Android only) |
 | `app/ui/{foundation,components}/` | Platform UI helpers; shared widgets and editors (pickers, `ConditionsEditor`, `DirectionEditor`, …) |
 | `app/ui/{accounts,audit,categories,currencies,people,settings,transactions}/`, `app/ui/imports/{api,csv,qif,importDirectory,reconciliation,timeline}/` | One module per feature screen |
-| `tools/{strategy-catalog,crypto-dataset}/` | Build-time tools: catalog site renderer (also hosts `LegacyStrategyUpgradeTest`); crypto dataset builder |
+| `tools/{strategy-catalog,crypto-dataset}/` | Build-time tools: catalog site renderer; crypto dataset builder |
 | `test/{app/db,app/ui,app/remotestorage,utils/credentialvault}/` | Test fixtures only (see **Testing**); `app/remotestorage` is the in-memory cloud store (`InMemoryStorageProvider`, `SingleProviderFactory`) |
 | `app/main/jvm/` | JVM Desktop entry point |
 | `app/main/android/` | Android entry point |
@@ -208,7 +208,6 @@ implemented (tracked in [issue #426](https://github.com/NikolayMetchev/money-man
 Until that lands, **do not make backward-compatible DB changes or write migration code**. The
 database is recreated from scratch on schema changes (seeding runs only on fresh-database creation),
 so existing local databases are expected to be deleted/recreated rather than migrated.
-(Strategy *config JSON* is the exception: it is versioned and migrated — see **Import Strategies**.)
 
 **Important**: Store booleans as INTEGER (0/1). Don't use `AS Boolean` in .sq files.
 
@@ -356,15 +355,9 @@ guessed ones, in either import order, so a conduit always nets to zero.
 use genuinely different assignment rules, and `app/reconciliation`'s `LegMatcher` is a read-only report.
 Merging any of them would change built-in outcomes.
 
-**Strategy config versioning (this is not DB versioning):** CSV and API configs carry a `configVersion`.
-`StrategyConfigMigrations` (`app/db/read/.../json/`) upgrades older JSON on decode, one raw-JSON step per
-version, so a retired field can still be read after its Kotlin property is gone. Each step must accept
-**both** persisted shapes: the DB form (ids) and the export/catalog form (names). Configs in old databases,
-on Drive and in the published catalog keep working. To reshape a config, add a step and bump the version.
-`LegacyStrategyUpgradeTest` (`tools/strategy-catalog`) decodes the `legacy-v0` snapshots of every built-in
-CSV and API strategy (DB and export form) and checks each upgrades to the current built-in. Pass-through
-rules (`.passthrough.json`) aren't versioned, so the test skips them. When you rewrite a built-in, make it
-equal the migration output.
+**Strategy configs aren't versioned either:** like the database, they carry no version and have no
+migrations. A reshaped config simply stops decoding its old fields (`ignoreUnknownKeys`), so a database,
+Drive library or catalog install from before the change is reinstalled rather than upgraded.
 
 **Changing the engine:** the contract is that every built-in strategy imports exactly as before. Don't edit
 an expected test result to make a refactor pass; report the divergence instead. Built-in configs don't

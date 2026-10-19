@@ -56,6 +56,12 @@ enum class ConditionOp {
 
     /** The path holds a non-empty object. */
     NON_EMPTY_OBJECT,
+
+    /** The value is a number above zero (see [parseDecimalOrNull]). */
+    POSITIVE,
+
+    /** The value is a number below zero (see [parseDecimalOrNull]). */
+    NEGATIVE,
 }
 
 /**
@@ -101,7 +107,9 @@ enum class ConditionOperand {
 val ConditionOp.operand: ConditionOperand
     get() =
         when (this) {
-            ConditionOp.EXISTS, ConditionOp.BLANK, ConditionOp.NOT_BLANK, ConditionOp.EMPTY_OBJECT, ConditionOp.NON_EMPTY_OBJECT -> {
+            ConditionOp.EXISTS, ConditionOp.BLANK, ConditionOp.NOT_BLANK, ConditionOp.EMPTY_OBJECT, ConditionOp.NON_EMPTY_OBJECT,
+            ConditionOp.POSITIVE, ConditionOp.NEGATIVE,
+            -> {
                 ConditionOperand.NONE
             }
 

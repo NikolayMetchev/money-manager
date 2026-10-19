@@ -2,8 +2,6 @@ package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 
 /**
  * Codec for the portable JSON representation of an
@@ -17,15 +15,7 @@ object ApiStrategyJsonCodec {
             encodeDefaults = true
         }
 
-    fun encode(config: ApiStrategyConfig): String =
-        json.encodeToString(
-            JsonObject.serializer(),
-            StrategyConfigMigrations.stampApi(json.encodeToJsonElement(ApiStrategyConfig.serializer(), config).jsonObject),
-        )
+    fun encode(config: ApiStrategyConfig): String = json.encodeToString(ApiStrategyConfig.serializer(), config)
 
-    fun decode(jsonString: String): ApiStrategyConfig =
-        json.decodeFromJsonElement(
-            ApiStrategyConfig.serializer(),
-            StrategyConfigMigrations.upgradeApi(json.parseToJsonElement(jsonString).jsonObject),
-        )
+    fun decode(jsonString: String): ApiStrategyConfig = json.decodeFromString(ApiStrategyConfig.serializer(), jsonString)
 }

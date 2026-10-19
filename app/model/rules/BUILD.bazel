@@ -22,6 +22,7 @@ kmp_library(
         "//app/model/core",
         "@maven_kmp//:kotlinx_serialization_core",
     ],
+    deps = ["//utils/bigdecimal"],
 )
 
 kmp_test(
@@ -36,5 +37,8 @@ kmp_test(
         "mingwX64",
     ],
     plugins = ["serialization"],
-    deps = ["//bazel/kmp/deps:kotlin_test"],
+    deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:kotlinx_serialization_json",
+    ],
 )
