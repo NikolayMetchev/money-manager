@@ -6,7 +6,6 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 # gazelle:kmp_keep_dep //bazel/kmp/deps:compose_desktop_current_os jvmTest
 # gazelle:kmp_test_jvm_flags -Djava.awt.headless=true -Dskiko.test.harness=true
 # gazelle:kmp_test_flaky true
-# gazelle:kmp_test_jvm_tags no-remote-exec
 # NoDirectRepositoryWritesArchitectureTest scans the module's own commonMain sources.
 # gazelle:kmp_test_data :common_main_sources
 # gazelle:kmp_keep_dep @maven_kmp//:kotlinx_coroutines_android androidMain
@@ -133,7 +132,6 @@ kmp_test(
         "-Dskiko.test.harness=true",
     ],
     jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
-    jvm_tags = ["no-remote-exec"],
     keep_deps = ["//bazel/kmp/deps:compose_desktop_current_os"],
     plugins = [
         "compose",

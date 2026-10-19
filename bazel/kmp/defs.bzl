@@ -399,7 +399,6 @@ def kmp_test(
         resources = [],
         jvm_flags = [],
         flaky = False,
-        jvm_tags = [],
         device_srcs = [],
         device_deps = [],
         device_manifest = None,
@@ -446,7 +445,6 @@ def kmp_test(
         jvm_flags: more JVM flags for the JVM test (Gradle's `systemProperty`s: headless Compose Desktop tests).
         flaky: retry a failing JVM test up to twice more, as the Gradle test-retry plugin does for the Compose
             modules (`maxRetries = 2`).
-        jvm_tags: Bazel tags on the JVM test (`no-remote-exec` for Skiko, which needs the host's libGL).
         device_srcs: `androidDeviceTest`'s sources: `src/androidDeviceTest/kotlin` and whatever `srcDir`s the
             module's Gradle build adds to it (the Compose UI modules share `src/commonTest/kotlin`).
         device_deps: `androidDeviceTest` dependencies, by module label.
@@ -476,7 +474,7 @@ def kmp_test(
             resource_jars = _resource_jars(name, "Test", resources),
         )
         _unused_deps(name, lib, declared, keep_deps)
-        _jvm_test(name + "_jvm", lib, size, flaky, jvm_tags, jvm_flags, data, [])
+        _jvm_test(name + "_jvm", lib, size, flaky, jvm_flags, data, [])
     android_fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, android_srcs, "androidHost")
     if android and android_fragments.srcs:
         lib = name + "_android_lib"
@@ -496,7 +494,7 @@ def kmp_test(
                 [r for r in resources if "/src/jvmTest/" not in "/" + r],
             ),
         )
-        _jvm_test(name + "_android", lib, size, flaky, [], [], data, [Label("//bazel/kmp/android:mockable_android_jar")])
+        _jvm_test(name + "_android", lib, size, flaky, [], data, [Label("//bazel/kmp/android:mockable_android_jar")])
     if device_srcs:
         _device_test(name, associate, device_srcs, deps_of_plugins = brought, plugins = plugins, deps = device_deps,
                      manifest = device_manifest, resources = device_resources)
@@ -589,13 +587,12 @@ def _device_test(name, associate, srcs, deps_of_plugins, plugins, deps, manifest
         package = application_id,
     )
 
-def _jvm_test(name, lib, size, flaky, tags, jvm_flags, data, runtime_deps):
+def _jvm_test(name, lib, size, flaky, jvm_flags, data, runtime_deps):
     """A JUnit 4 test over `lib`'s classes, run by KmpJUnitRunner (the JVM tests and the Android host tests)."""
     java_test(
         name = name,
         size = size,
         flaky = flaky,
-        tags = tags,
         main_class = "com.moneymanager.bazel.kmp.testing.KmpJUnitRunner",
         use_testrunner = False,
         jvm_flags = [
