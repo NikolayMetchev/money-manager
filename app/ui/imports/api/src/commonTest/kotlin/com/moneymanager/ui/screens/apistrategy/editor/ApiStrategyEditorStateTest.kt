@@ -32,7 +32,6 @@ import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
-import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.StrategyRule
 import kotlin.test.Test

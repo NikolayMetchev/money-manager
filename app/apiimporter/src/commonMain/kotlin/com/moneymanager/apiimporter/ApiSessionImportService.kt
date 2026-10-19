@@ -1425,7 +1425,7 @@ private fun parseAccount(
         id = id,
         externalId = outcome.externalId ?: id,
         description = account.resolveJsonPath(mappings.descriptionField).orEmpty(),
-        ruleName = outcome.namedAccount(AccountSide.OWN, engine)?.name?.ifBlank { null },
+        ruleName = outcome.ownAccount(engine)?.name?.ifBlank { null },
         attributes = outcome.attributes,
         owners = parseAccountOwners(account, strategy, accountJsonPath),
         sortCode = account.stringOrNull(mappings.sortCodeField),
@@ -3430,11 +3430,8 @@ private fun RuleOutcome.namedAccountWithNaming(
 ): Pair<NamedAccount, AccountNaming>? =
     accountsFor(side).firstNotNullOfOrNull { naming -> engine.evaluator.name(naming) { record.text(it) }?.let { it to naming } }
 
-/** What the first of the rules' [side] candidates that applies to the record names. */
-private fun RuleOutcome.namedAccount(
-    side: AccountSide,
-    engine: RuleEngine,
-): NamedAccount? = namedAccountWithNaming(side, engine)?.first
+/** What the first of the rules' own-account candidates that applies to the record names. */
+private fun RuleOutcome.ownAccount(engine: RuleEngine): NamedAccount? = namedAccountWithNaming(AccountSide.OWN, engine)?.first
 
 /** Whether [condition] holds for this item (see [JsonRecord]). */
 internal fun JsonObject.matches(condition: Condition): Boolean = RuleEvaluator().matches(condition, JsonRecord(this))

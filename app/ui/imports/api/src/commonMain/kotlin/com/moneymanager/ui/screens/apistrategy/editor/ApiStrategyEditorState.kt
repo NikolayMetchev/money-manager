@@ -16,7 +16,6 @@ import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
-import com.moneymanager.domain.model.rules.isComplete
 import com.moneymanager.ui.components.rules.isComplete
 import kotlin.time.Instant
 
@@ -66,10 +65,6 @@ internal fun ApiStrategyConfig.withAccountMappings(mappings: ApiAccountMappings)
 /** The transaction mappings the Transactions tab edits: the bank feed's, else the defaults. */
 internal val ApiStrategyConfig.editedTransactionMappings: ApiTransactionMappings
     get() = bankTransactions?.transactionMappings ?: ApiTransactionMappings()
-
-/** This config with [mappings] as its bank feed's mappings (unchanged without a bank feed). */
-internal fun ApiStrategyConfig.withTransactionMappings(mappings: ApiTransactionMappings): ApiStrategyConfig =
-    mapBankTransactionMappings { mappings }
 
 /**
  * Full mutable editing state of the API strategy editor, held across tab switches. Seeded straight
