@@ -2,7 +2,7 @@
   "version": 1,
   "inputs": {
     "libraries": {
-      "ktlint-cli": "com.pinterest.ktlint:ktlint-cli:1.5.0"
+      "ktlint-cli": "com.pinterest.ktlint:ktlint-cli:1.8.0"
     },
     "forces": {
       "ch.qos.logback:logback-classic": "1.6.5",
@@ -88,7 +88,6 @@
     "io.github.oshai:kotlin-logging-jvm": "io_github_oshai_kotlin_logging_jvm",
     "net.java.dev.jna:jna": "net_java_dev_jna_jna",
     "org.ec4j.core:ec4j-core": "org_ec4j_core_ec4j_core",
-    "org.jetbrains.intellij.deps:trove4j": "org_jetbrains_intellij_deps_trove4j",
     "org.jetbrains.kotlin:kotlin-compiler-embeddable": "org_jetbrains_kotlin_kotlin_compiler_embeddable",
     "org.jetbrains.kotlin:kotlin-daemon-embeddable": "org_jetbrains_kotlin_kotlin_daemon_embeddable",
     "org.jetbrains.kotlin:kotlin-reflect": "org_jetbrains_kotlin_kotlin_reflect",
@@ -312,19 +311,10 @@
       "org.ec4j.core.model",
       "org.ec4j.core.parser"
     ],
-    "org.jetbrains.intellij.deps:trove4j": [
-      "gnu.trove",
-      "gnu.trove.decorator"
-    ],
     "org.jetbrains.kotlin:kotlin-compiler-embeddable": [
-      "io.vavr",
-      "io.vavr.collection",
-      "io.vavr.concurrent",
-      "io.vavr.control",
       "org.jetbrains.concurrency",
       "org.jetbrains.kotlin",
       "org.jetbrains.kotlin.analysis.decompiled.light.classes",
-      "org.jetbrains.kotlin.analysis.decompiled.light.classes.fe10",
       "org.jetbrains.kotlin.analysis.decompiled.light.classes.origin",
       "org.jetbrains.kotlin.analysis.decompiler.js",
       "org.jetbrains.kotlin.analysis.decompiler.konan",
@@ -344,12 +334,17 @@
       "org.jetbrains.kotlin.backend.common",
       "org.jetbrains.kotlin.backend.common.actualizer",
       "org.jetbrains.kotlin.backend.common.actualizer.checker",
-      "org.jetbrains.kotlin.backend.common.bridges",
       "org.jetbrains.kotlin.backend.common.checkers",
+      "org.jetbrains.kotlin.backend.common.checkers.context",
+      "org.jetbrains.kotlin.backend.common.checkers.declaration",
+      "org.jetbrains.kotlin.backend.common.checkers.expression",
+      "org.jetbrains.kotlin.backend.common.checkers.symbol",
+      "org.jetbrains.kotlin.backend.common.checkers.type",
       "org.jetbrains.kotlin.backend.common.descriptors",
       "org.jetbrains.kotlin.backend.common.diagnostics",
       "org.jetbrains.kotlin.backend.common.extensions",
       "org.jetbrains.kotlin.backend.common.ir",
+      "org.jetbrains.kotlin.backend.common.linkage",
       "org.jetbrains.kotlin.backend.common.linkage.issues",
       "org.jetbrains.kotlin.backend.common.linkage.partial",
       "org.jetbrains.kotlin.backend.common.lower",
@@ -367,9 +362,9 @@
       "org.jetbrains.kotlin.backend.common.serialization.mangle.descriptor",
       "org.jetbrains.kotlin.backend.common.serialization.mangle.ir",
       "org.jetbrains.kotlin.backend.common.serialization.metadata",
-      "org.jetbrains.kotlin.backend.common.serialization.metadata.impl",
       "org.jetbrains.kotlin.backend.common.serialization.proto",
       "org.jetbrains.kotlin.backend.common.serialization.signature",
+      "org.jetbrains.kotlin.backend.js",
       "org.jetbrains.kotlin.backend.jvm",
       "org.jetbrains.kotlin.backend.jvm.caches",
       "org.jetbrains.kotlin.backend.jvm.codegen",
@@ -383,9 +378,17 @@
       "org.jetbrains.kotlin.backend.jvm.overrides",
       "org.jetbrains.kotlin.backend.jvm.serialization",
       "org.jetbrains.kotlin.backend.jvm.serialization.proto",
+      "org.jetbrains.kotlin.backend.konan",
+      "org.jetbrains.kotlin.backend.konan.descriptors",
+      "org.jetbrains.kotlin.backend.konan.ir",
+      "org.jetbrains.kotlin.backend.konan.lower",
       "org.jetbrains.kotlin.backend.konan.serialization",
       "org.jetbrains.kotlin.backend.wasm",
       "org.jetbrains.kotlin.backend.wasm.dce",
+      "org.jetbrains.kotlin.backend.wasm.dwarf",
+      "org.jetbrains.kotlin.backend.wasm.dwarf.entries",
+      "org.jetbrains.kotlin.backend.wasm.dwarf.lines",
+      "org.jetbrains.kotlin.backend.wasm.dwarf.utils",
       "org.jetbrains.kotlin.backend.wasm.export",
       "org.jetbrains.kotlin.backend.wasm.ic",
       "org.jetbrains.kotlin.backend.wasm.ir2wasm",
@@ -398,6 +401,8 @@
       "org.jetbrains.kotlin.build.report.statistics",
       "org.jetbrains.kotlin.build.report.statistics.file",
       "org.jetbrains.kotlin.buildtools.api",
+      "org.jetbrains.kotlin.buildtools.api.internal",
+      "org.jetbrains.kotlin.buildtools.api.internal.wrappers",
       "org.jetbrains.kotlin.buildtools.api.jvm",
       "org.jetbrains.kotlin.buildtools.internal",
       "org.jetbrains.kotlin.builtins",
@@ -429,22 +434,25 @@
       "org.jetbrains.kotlin.cli.common.profiling",
       "org.jetbrains.kotlin.cli.common.repl",
       "org.jetbrains.kotlin.cli.js",
-      "org.jetbrains.kotlin.cli.js.internal",
       "org.jetbrains.kotlin.cli.js.klib",
       "org.jetbrains.kotlin.cli.jvm",
       "org.jetbrains.kotlin.cli.jvm.compiler",
       "org.jetbrains.kotlin.cli.jvm.compiler.jarfs",
-      "org.jetbrains.kotlin.cli.jvm.compiler.pipeline",
+      "org.jetbrains.kotlin.cli.jvm.compiler.legacy.pipeline",
       "org.jetbrains.kotlin.cli.jvm.config",
       "org.jetbrains.kotlin.cli.jvm.index",
       "org.jetbrains.kotlin.cli.jvm.javac",
       "org.jetbrains.kotlin.cli.jvm.modules",
       "org.jetbrains.kotlin.cli.jvm.plugins",
       "org.jetbrains.kotlin.cli.metadata",
+      "org.jetbrains.kotlin.cli.pipeline",
+      "org.jetbrains.kotlin.cli.pipeline.jvm",
+      "org.jetbrains.kotlin.cli.pipeline.metadata",
+      "org.jetbrains.kotlin.cli.pipeline.web",
+      "org.jetbrains.kotlin.cli.pipeline.web.js",
+      "org.jetbrains.kotlin.cli.pipeline.web.wasm",
       "org.jetbrains.kotlin.cli.plugins",
       "org.jetbrains.kotlin.codegen",
-      "org.jetbrains.kotlin.codegen.binding",
-      "org.jetbrains.kotlin.codegen.context",
       "org.jetbrains.kotlin.codegen.coroutines",
       "org.jetbrains.kotlin.codegen.extensions",
       "org.jetbrains.kotlin.codegen.inline",
@@ -458,10 +466,6 @@
       "org.jetbrains.kotlin.codegen.optimization.temporaryVals",
       "org.jetbrains.kotlin.codegen.optimization.transformer",
       "org.jetbrains.kotlin.codegen.pseudoInsns",
-      "org.jetbrains.kotlin.codegen.range",
-      "org.jetbrains.kotlin.codegen.range.comparison",
-      "org.jetbrains.kotlin.codegen.range.forLoop",
-      "org.jetbrains.kotlin.codegen.range.inExpression",
       "org.jetbrains.kotlin.codegen.serialization",
       "org.jetbrains.kotlin.codegen.signature",
       "org.jetbrains.kotlin.codegen.state",
@@ -571,6 +575,8 @@
       "org.jetbrains.kotlin.com.intellij.patterns",
       "org.jetbrains.kotlin.com.intellij.patterns.compiler",
       "org.jetbrains.kotlin.com.intellij.platform.backend.navigation",
+      "org.jetbrains.kotlin.com.intellij.platform.diagnostic.telemetry",
+      "org.jetbrains.kotlin.com.intellij.platform.diagnostic.telemetry.helpers",
       "org.jetbrains.kotlin.com.intellij.pom",
       "org.jetbrains.kotlin.com.intellij.pom.core.impl",
       "org.jetbrains.kotlin.com.intellij.pom.event",
@@ -673,6 +679,7 @@
       "org.jetbrains.kotlin.compiler.plugin",
       "org.jetbrains.kotlin.compilerRunner",
       "org.jetbrains.kotlin.config",
+      "org.jetbrains.kotlin.config.phaser",
       "org.jetbrains.kotlin.constant",
       "org.jetbrains.kotlin.container",
       "org.jetbrains.kotlin.context",
@@ -790,6 +797,7 @@
       "org.jetbrains.kotlin.fir.resolve",
       "org.jetbrains.kotlin.fir.resolve.calls",
       "org.jetbrains.kotlin.fir.resolve.calls.candidate",
+      "org.jetbrains.kotlin.fir.resolve.calls.js",
       "org.jetbrains.kotlin.fir.resolve.calls.jvm",
       "org.jetbrains.kotlin.fir.resolve.calls.overloads",
       "org.jetbrains.kotlin.fir.resolve.calls.stages",
@@ -831,7 +839,11 @@
       "org.jetbrains.kotlin.idea.references",
       "org.jetbrains.kotlin.incremental",
       "org.jetbrains.kotlin.incremental.classpathDiff",
+      "org.jetbrains.kotlin.incremental.classpathDiff.impl",
       "org.jetbrains.kotlin.incremental.components",
+      "org.jetbrains.kotlin.incremental.dirtyFiles",
+      "org.jetbrains.kotlin.incremental.impl",
+      "org.jetbrains.kotlin.incremental.javaInterop",
       "org.jetbrains.kotlin.incremental.js",
       "org.jetbrains.kotlin.incremental.multiproject",
       "org.jetbrains.kotlin.incremental.parsing",
@@ -839,6 +851,16 @@
       "org.jetbrains.kotlin.incremental.storage",
       "org.jetbrains.kotlin.incremental.util",
       "org.jetbrains.kotlin.inline",
+      "org.jetbrains.kotlin.io.opentelemetry.api",
+      "org.jetbrains.kotlin.io.opentelemetry.api.common",
+      "org.jetbrains.kotlin.io.opentelemetry.api.internal",
+      "org.jetbrains.kotlin.io.opentelemetry.api.logs",
+      "org.jetbrains.kotlin.io.opentelemetry.api.metrics",
+      "org.jetbrains.kotlin.io.opentelemetry.api.trace",
+      "org.jetbrains.kotlin.io.vavr",
+      "org.jetbrains.kotlin.io.vavr.collection",
+      "org.jetbrains.kotlin.io.vavr.concurrent",
+      "org.jetbrains.kotlin.io.vavr.control",
       "org.jetbrains.kotlin.ir",
       "org.jetbrains.kotlin.ir.backend.js",
       "org.jetbrains.kotlin.ir.backend.js.checkers",
@@ -868,6 +890,7 @@
       "org.jetbrains.kotlin.ir.expressions",
       "org.jetbrains.kotlin.ir.expressions.impl",
       "org.jetbrains.kotlin.ir.inline",
+      "org.jetbrains.kotlin.ir.inline.konan",
       "org.jetbrains.kotlin.ir.interpreter",
       "org.jetbrains.kotlin.ir.interpreter.builtins",
       "org.jetbrains.kotlin.ir.interpreter.checker",
@@ -880,8 +903,6 @@
       "org.jetbrains.kotlin.ir.interpreter.state",
       "org.jetbrains.kotlin.ir.interpreter.state.reflection",
       "org.jetbrains.kotlin.ir.interpreter.transformer",
-      "org.jetbrains.kotlin.ir.linkage",
-      "org.jetbrains.kotlin.ir.linkage.partial",
       "org.jetbrains.kotlin.ir.objcinterop",
       "org.jetbrains.kotlin.ir.overrides",
       "org.jetbrains.kotlin.ir.symbols",
@@ -914,45 +935,19 @@
       "org.jetbrains.kotlin.js.backend.ast.metadata",
       "org.jetbrains.kotlin.js.common",
       "org.jetbrains.kotlin.js.config",
-      "org.jetbrains.kotlin.js.coroutine",
-      "org.jetbrains.kotlin.js.dce",
       "org.jetbrains.kotlin.js.descriptorUtils",
-      "org.jetbrains.kotlin.js.facade",
-      "org.jetbrains.kotlin.js.facade.exceptions",
-      "org.jetbrains.kotlin.js.inline",
       "org.jetbrains.kotlin.js.inline.clean",
-      "org.jetbrains.kotlin.js.inline.context",
       "org.jetbrains.kotlin.js.inline.util",
       "org.jetbrains.kotlin.js.inline.util.collectors",
-      "org.jetbrains.kotlin.js.inline.util.rewriters",
       "org.jetbrains.kotlin.js.naming",
       "org.jetbrains.kotlin.js.parser",
       "org.jetbrains.kotlin.js.parser.sourcemaps",
       "org.jetbrains.kotlin.js.patterns",
-      "org.jetbrains.kotlin.js.patterns.typePredicates",
       "org.jetbrains.kotlin.js.resolve",
       "org.jetbrains.kotlin.js.resolve.diagnostics",
       "org.jetbrains.kotlin.js.sourceMap",
-      "org.jetbrains.kotlin.js.translate.callTranslator",
       "org.jetbrains.kotlin.js.translate.context",
-      "org.jetbrains.kotlin.js.translate.context.generator",
-      "org.jetbrains.kotlin.js.translate.declaration",
-      "org.jetbrains.kotlin.js.translate.expression",
-      "org.jetbrains.kotlin.js.translate.extensions",
-      "org.jetbrains.kotlin.js.translate.general",
-      "org.jetbrains.kotlin.js.translate.initializer",
-      "org.jetbrains.kotlin.js.translate.intrinsic",
-      "org.jetbrains.kotlin.js.translate.intrinsic.functions",
-      "org.jetbrains.kotlin.js.translate.intrinsic.functions.basic",
-      "org.jetbrains.kotlin.js.translate.intrinsic.functions.factories",
-      "org.jetbrains.kotlin.js.translate.intrinsic.objects",
-      "org.jetbrains.kotlin.js.translate.intrinsic.operation",
-      "org.jetbrains.kotlin.js.translate.operation",
-      "org.jetbrains.kotlin.js.translate.reference",
-      "org.jetbrains.kotlin.js.translate.test",
       "org.jetbrains.kotlin.js.translate.utils",
-      "org.jetbrains.kotlin.js.translate.utils.jsAstUtils",
-      "org.jetbrains.kotlin.js.translate.utils.mutator",
       "org.jetbrains.kotlin.js.util",
       "org.jetbrains.kotlin.kapt3.diagnostic",
       "org.jetbrains.kotlin.kdoc.lexer",
@@ -974,18 +969,18 @@
       "org.jetbrains.kotlin.kotlinx.collections.immutable.implementations.persistentOrderedMap",
       "org.jetbrains.kotlin.kotlinx.collections.immutable.implementations.persistentOrderedSet",
       "org.jetbrains.kotlin.kotlinx.collections.immutable.internal",
+      "org.jetbrains.kotlin.lang",
       "org.jetbrains.kotlin.lexer",
       "org.jetbrains.kotlin.library",
       "org.jetbrains.kotlin.library.abi",
       "org.jetbrains.kotlin.library.abi.impl",
       "org.jetbrains.kotlin.library.encodings",
       "org.jetbrains.kotlin.library.impl",
+      "org.jetbrains.kotlin.library.loader",
       "org.jetbrains.kotlin.library.metadata",
       "org.jetbrains.kotlin.library.metadata.impl",
       "org.jetbrains.kotlin.library.metadata.resolver",
       "org.jetbrains.kotlin.library.metadata.resolver.impl",
-      "org.jetbrains.kotlin.library.resolver",
-      "org.jetbrains.kotlin.library.resolver.impl",
       "org.jetbrains.kotlin.load.java",
       "org.jetbrains.kotlin.load.java.components",
       "org.jetbrains.kotlin.load.java.descriptors",
@@ -1029,6 +1024,7 @@
       "org.jetbrains.kotlin.org.fusesource.jansi.internal",
       "org.jetbrains.kotlin.org.fusesource.jansi.io",
       "org.jetbrains.kotlin.org.jdom",
+      "org.jetbrains.kotlin.org.jdom.filter2",
       "org.jetbrains.kotlin.org.jdom.output",
       "org.jetbrains.kotlin.org.jline.builtins",
       "org.jetbrains.kotlin.org.jline.console",
@@ -1055,17 +1051,20 @@
       "org.jetbrains.kotlin.psi.codeFragmentUtil",
       "org.jetbrains.kotlin.psi.debugText",
       "org.jetbrains.kotlin.psi.findDocComment",
+      "org.jetbrains.kotlin.psi.impl",
       "org.jetbrains.kotlin.psi.psiUtil",
       "org.jetbrains.kotlin.psi.stubs",
       "org.jetbrains.kotlin.psi.stubs.elements",
       "org.jetbrains.kotlin.psi.stubs.impl",
       "org.jetbrains.kotlin.psi.synthetics",
       "org.jetbrains.kotlin.psi.typeRefHelpers",
+      "org.jetbrains.kotlin.psi.utils",
       "org.jetbrains.kotlin.psi2ir",
       "org.jetbrains.kotlin.psi2ir.descriptors",
       "org.jetbrains.kotlin.psi2ir.generators",
       "org.jetbrains.kotlin.psi2ir.generators.fragments",
       "org.jetbrains.kotlin.psi2ir.intermediate",
+      "org.jetbrains.kotlin.psi2ir.lazy",
       "org.jetbrains.kotlin.psi2ir.preprocessing",
       "org.jetbrains.kotlin.psi2ir.transformations",
       "org.jetbrains.kotlin.renderer",
@@ -1125,14 +1124,12 @@
       "org.jetbrains.kotlin.resolve.source",
       "org.jetbrains.kotlin.resolve.typeBinding",
       "org.jetbrains.kotlin.serialization",
-      "org.jetbrains.kotlin.serialization.builtins",
       "org.jetbrains.kotlin.serialization.deserialization",
       "org.jetbrains.kotlin.serialization.deserialization.builtins",
       "org.jetbrains.kotlin.serialization.deserialization.descriptors",
       "org.jetbrains.kotlin.serialization.js",
       "org.jetbrains.kotlin.serialization.js.ast",
-      "org.jetbrains.kotlin.serialization.konan",
-      "org.jetbrains.kotlin.serialization.konan.impl",
+      "org.jetbrains.kotlin.stats",
       "org.jetbrains.kotlin.storage",
       "org.jetbrains.kotlin.synthetic",
       "org.jetbrains.kotlin.type",
@@ -1156,7 +1153,6 @@
       "org.jetbrains.kotlin.utils.concurrent.block",
       "org.jetbrains.kotlin.utils.exceptions",
       "org.jetbrains.kotlin.utils.fileUtils",
-      "org.jetbrains.kotlin.utils.intellij",
       "org.jetbrains.kotlin.utils.kapt",
       "org.jetbrains.kotlin.utils.repl",
       "org.jetbrains.kotlin.utils.strings",
@@ -1306,17 +1302,21 @@
     "org.jetbrains.kotlin:kotlin-stdlib-jdk7": null,
     "org.jetbrains.kotlin:kotlin-stdlib-jdk8": null,
     "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": [
+      "_COROUTINE",
       "kotlinx.coroutines",
       "kotlinx.coroutines.channels",
       "kotlinx.coroutines.debug",
       "kotlinx.coroutines.debug.internal",
       "kotlinx.coroutines.flow",
       "kotlinx.coroutines.flow.internal",
+      "kotlinx.coroutines.future",
       "kotlinx.coroutines.internal",
       "kotlinx.coroutines.intrinsics",
       "kotlinx.coroutines.scheduling",
       "kotlinx.coroutines.selects",
-      "kotlinx.coroutines.sync"
+      "kotlinx.coroutines.stream",
+      "kotlinx.coroutines.sync",
+      "kotlinx.coroutines.time"
     ],
     "org.jetbrains.kotlinx:kotlinx-serialization-core": [
       "kotlinx.serialization",
@@ -1372,12 +1372,12 @@
     },
     "com.github.ajalt.clikt:clikt": {
       "jvm": {
-        "version": "5.0.2",
+        "version": "5.0.3",
         "files": [
           {
             "name": "clikt-mordant-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-jvm/5.0.2/clikt-jvm-5.0.2.jar",
-            "sha256": "0835107b51d57214d5a2e15d4b214fdd66b3eee5bb3acf96ff35b23bd4a36cde"
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-jvm/5.0.3/clikt-jvm-5.0.3.jar",
+            "sha256": "9cd19e04782f461dffeb183d17e576984febb7934932cb406646ac41e428863b"
           }
         ],
         "deps": [
@@ -1389,12 +1389,12 @@
     },
     "com.github.ajalt.clikt:clikt-core": {
       "jvm": {
-        "version": "5.0.2",
+        "version": "5.0.3",
         "files": [
           {
             "name": "clikt-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-jvm/5.0.2/clikt-core-jvm-5.0.2.jar",
-            "sha256": "18b2df30a3395a37823ec432375a15b485d292b6575e30ef184cc9e7c07d8b87"
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-jvm/5.0.3/clikt-core-jvm-5.0.3.jar",
+            "sha256": "69cba94a2291f74b78c88239cd8b67eaf3f08e0dad297749abe6477b3e9b81b1"
           }
         ],
         "deps": [
@@ -1511,12 +1511,12 @@
     },
     "com.pinterest.ktlint:ktlint-cli": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-cli-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli/1.5.0/ktlint-cli-1.5.0.jar",
-            "sha256": "df984c24eecebc2c0bc5f20c4676dbbb341795dccf0e1820052157022da0e6df"
+            "name": "ktlint-cli-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli/1.8.0/ktlint-cli-1.8.0.jar",
+            "sha256": "eb540f5ad442ba0b3392c7947c87929dab709ac056fdde7e300beaffcb86e243"
           }
         ],
         "deps": [
@@ -1543,12 +1543,12 @@
     },
     "com.pinterest.ktlint:ktlint-cli-reporter-baseline": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-cli-reporter-baseline-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-baseline/1.5.0/ktlint-cli-reporter-baseline-1.5.0.jar",
-            "sha256": "e1cb88427d52cbb398b555ae90854d4a56581daf149abdf81e318b165448aae1"
+            "name": "ktlint-cli-reporter-baseline-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-baseline/1.8.0/ktlint-cli-reporter-baseline-1.8.0.jar",
+            "sha256": "be11607d9cebcc1456ab6ccb2578484c0f63c0288ad0fff278813d7251b8f6ed"
           }
         ],
         "deps": [
@@ -1564,12 +1564,12 @@
     },
     "com.pinterest.ktlint:ktlint-cli-reporter-checkstyle": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-cli-reporter-checkstyle-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-checkstyle/1.5.0/ktlint-cli-reporter-checkstyle-1.5.0.jar",
-            "sha256": "be3359300acb8c12bea8e971388d28c2c9d08cc2d4f972bf6532de1bf4a1f024"
+            "name": "ktlint-cli-reporter-checkstyle-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-checkstyle/1.8.0/ktlint-cli-reporter-checkstyle-1.8.0.jar",
+            "sha256": "c8c0789cf5e146d9bf8f57b1e8d1af928f1eac5653a4fbc0ccfcbe5d7906e427"
           }
         ],
         "deps": [
@@ -1583,12 +1583,12 @@
     },
     "com.pinterest.ktlint:ktlint-cli-reporter-core": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-cli-reporter-core-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-core/1.5.0/ktlint-cli-reporter-core-1.5.0.jar",
-            "sha256": "cc3f47e736051f36ad6525931c057971a158bd4c39b6d34fc03cd328ae0c5746"
+            "name": "ktlint-cli-reporter-core-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-core/1.8.0/ktlint-cli-reporter-core-1.8.0.jar",
+            "sha256": "554d980c1e8b0afd6404dcc77e6022e0466273d1300fda5a6d25a85759cbafaa"
           }
         ],
         "deps": [
@@ -1601,12 +1601,12 @@
     },
     "com.pinterest.ktlint:ktlint-cli-reporter-format": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-cli-reporter-format-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-format/1.5.0/ktlint-cli-reporter-format-1.5.0.jar",
-            "sha256": "0ce520848775801dba2413e58903ca5efe0084698228e4e57c6dfa7350093543"
+            "name": "ktlint-cli-reporter-format-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-format/1.8.0/ktlint-cli-reporter-format-1.8.0.jar",
+            "sha256": "0f6639379e3341ffea2ca6aff2b72e904e778cdcba31f885edb412270e591bb8"
           }
         ],
         "deps": [
@@ -1620,12 +1620,12 @@
     },
     "com.pinterest.ktlint:ktlint-cli-reporter-html": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-cli-reporter-html-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-html/1.5.0/ktlint-cli-reporter-html-1.5.0.jar",
-            "sha256": "5b666af72b28e9a3ad043049fb2158c83a39e2224f0674491b899b0ead174331"
+            "name": "ktlint-cli-reporter-html-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-html/1.8.0/ktlint-cli-reporter-html-1.8.0.jar",
+            "sha256": "9c45e72d24ae81b2b1c028fcf95c8d8f914a050fcf6029e2d4c2cd9c55340d72"
           }
         ],
         "deps": [
@@ -1639,12 +1639,12 @@
     },
     "com.pinterest.ktlint:ktlint-cli-reporter-json": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-cli-reporter-json-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-json/1.5.0/ktlint-cli-reporter-json-1.5.0.jar",
-            "sha256": "dcb8a9109b452f0934cf04d56b0e98031595be6cad062ff61ed4c0c6c703c519"
+            "name": "ktlint-cli-reporter-json-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-json/1.8.0/ktlint-cli-reporter-json-1.8.0.jar",
+            "sha256": "115db6ad3a6eb18b33bb44a0f7b8dc7639b429ba1fa4fc39863d163a3003efb5"
           }
         ],
         "deps": [
@@ -1658,12 +1658,12 @@
     },
     "com.pinterest.ktlint:ktlint-cli-reporter-plain": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-cli-reporter-plain-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-plain/1.5.0/ktlint-cli-reporter-plain-1.5.0.jar",
-            "sha256": "bd664d42947e1006ff402364ba53a20d2221b83cd666c74da7969d09858af265"
+            "name": "ktlint-cli-reporter-plain-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-plain/1.8.0/ktlint-cli-reporter-plain-1.8.0.jar",
+            "sha256": "05bd03b465fe6bfe885777adf8c251bfe6ddc004086dbfcdfacb0061936b111d"
           }
         ],
         "deps": [
@@ -1677,12 +1677,12 @@
     },
     "com.pinterest.ktlint:ktlint-cli-reporter-plain-summary": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-cli-reporter-plain-summary-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-plain-summary/1.5.0/ktlint-cli-reporter-plain-summary-1.5.0.jar",
-            "sha256": "a2375aa50052093c40a0fce8d094f27e36a11d04526163035aec49d149a733d3"
+            "name": "ktlint-cli-reporter-plain-summary-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-plain-summary/1.8.0/ktlint-cli-reporter-plain-summary-1.8.0.jar",
+            "sha256": "003eb83d33467f43bf32b6cb7390d387a823301344fd0705750f9cf4fa42fb28"
           }
         ],
         "deps": [
@@ -1696,12 +1696,12 @@
     },
     "com.pinterest.ktlint:ktlint-cli-reporter-sarif": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-cli-reporter-sarif-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-sarif/1.5.0/ktlint-cli-reporter-sarif-1.5.0.jar",
-            "sha256": "a6e2721d202363a8c4b609255842e615844bfe42d45febba9a4d5bb980331742"
+            "name": "ktlint-cli-reporter-sarif-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-reporter-sarif/1.8.0/ktlint-cli-reporter-sarif-1.8.0.jar",
+            "sha256": "8dd41428e258947f9731e7c14f80b795b7d19321c3b4f8eac7549dc335824f35"
           }
         ],
         "deps": [
@@ -1716,12 +1716,12 @@
     },
     "com.pinterest.ktlint:ktlint-cli-ruleset-core": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-cli-ruleset-core-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-ruleset-core/1.5.0/ktlint-cli-ruleset-core-1.5.0.jar",
-            "sha256": "64d39075bdeda74782fc5c1ba95284c116f336e5606f4d1c645012d003224e1b"
+            "name": "ktlint-cli-ruleset-core-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-cli-ruleset-core/1.8.0/ktlint-cli-ruleset-core-1.8.0.jar",
+            "sha256": "3cde07dd36b3d2b0ad9bf6320a15d74a1d16999361a2943ec89a77035f88cef8"
           }
         ],
         "deps": [
@@ -1735,12 +1735,12 @@
     },
     "com.pinterest.ktlint:ktlint-logger": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-logger-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-logger/1.5.0/ktlint-logger-1.5.0.jar",
-            "sha256": "c067c999baa41a68041ba04f9cbfa4c53ba5320eaaddc8dd3d29e2401463c202"
+            "name": "ktlint-logger-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-logger/1.8.0/ktlint-logger-1.8.0.jar",
+            "sha256": "323a2587bc5d658acac2ab84081be1a91ec272447ddae23e889ffeeea03a6a19"
           }
         ],
         "deps": [
@@ -1754,12 +1754,12 @@
     },
     "com.pinterest.ktlint:ktlint-rule-engine": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-rule-engine-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-rule-engine/1.5.0/ktlint-rule-engine-1.5.0.jar",
-            "sha256": "7cdaee5290f8c24eff02aa7e831d98d9cb584176854376bca2c6977ab0f466be"
+            "name": "ktlint-rule-engine-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-rule-engine/1.8.0/ktlint-rule-engine-1.8.0.jar",
+            "sha256": "26b2bc7b840dad219d56a276f11fe4a39c35e567a061d719a50914b30f403772"
           }
         ],
         "deps": [
@@ -1776,12 +1776,12 @@
     },
     "com.pinterest.ktlint:ktlint-rule-engine-core": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-rule-engine-core-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-rule-engine-core/1.5.0/ktlint-rule-engine-core-1.5.0.jar",
-            "sha256": "750cf41707927f59290d07191dacad418e101f468dbfb3b0a9f29cae2af75903"
+            "name": "ktlint-rule-engine-core-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-rule-engine-core/1.8.0/ktlint-rule-engine-core-1.8.0.jar",
+            "sha256": "bd99dbc888be66aea31db45f4dce5ca56f465afbf02fee639bd2346d2cd864ec"
           }
         ],
         "deps": [
@@ -1797,12 +1797,12 @@
     },
     "com.pinterest.ktlint:ktlint-ruleset-standard": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "ktlint-ruleset-standard-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-ruleset-standard/1.5.0/ktlint-ruleset-standard-1.5.0.jar",
-            "sha256": "ecae0c3356612244a8e0d901fe431c4a25a1edf5d7c674783b947511ebd167a8"
+            "name": "ktlint-ruleset-standard-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/pinterest/ktlint/ktlint-ruleset-standard/1.8.0/ktlint-ruleset-standard-1.8.0.jar",
+            "sha256": "82972b4cb2e9cd682840061b2de9d342044846f0d816ecc58f50958824760d69"
           }
         ],
         "deps": [
@@ -1849,12 +1849,12 @@
     },
     "io.github.oshai:kotlin-logging-jvm": {
       "jvm": {
-        "version": "7.0.3",
+        "version": "7.0.13",
         "files": [
           {
-            "name": "kotlin-logging-jvm-7.0.3.jar",
-            "url": "https://repo1.maven.org/maven2/io/github/oshai/kotlin-logging-jvm/7.0.3/kotlin-logging-jvm-7.0.3.jar",
-            "sha256": "241daa21665dd0ca55576a4bc4d8e9ace8891ae3c698cc77f13bb4bdac372e94"
+            "name": "kotlin-logging-jvm-7.0.13.jar",
+            "url": "https://repo1.maven.org/maven2/io/github/oshai/kotlin-logging-jvm/7.0.13/kotlin-logging-jvm-7.0.13.jar",
+            "sha256": "c373f7f4c9efc85c4f70f11519f2a1b7878bc0ed75a325364d034af3fa21f776"
           }
         ],
         "deps": [
@@ -1876,40 +1876,27 @@
     },
     "org.ec4j.core:ec4j-core": {
       "jvm": {
-        "version": "1.1.0",
+        "version": "1.1.1",
         "files": [
           {
-            "name": "ec4j-core-1.1.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/ec4j/core/ec4j-core/1.1.0/ec4j-core-1.1.0.jar",
-            "sha256": "3424a9c2632a8433c00ab0b7cc10489eb732675c97fe333aff5b5272c5e861f6"
-          }
-        ]
-      }
-    },
-    "org.jetbrains.intellij.deps:trove4j": {
-      "jvm": {
-        "version": "1.0.20200330",
-        "files": [
-          {
-            "name": "trove4j-1.0.20200330.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/intellij/deps/trove4j/1.0.20200330/trove4j-1.0.20200330.jar",
-            "sha256": "c5fd725bffab51846bf3c77db1383c60aaaebfe1b7fe2f00d23fe1b7df0a439d"
+            "name": "ec4j-core-1.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/ec4j/core/ec4j-core/1.1.1/ec4j-core-1.1.1.jar",
+            "sha256": "d73dee44fefb725dfc658267465fe5a768a666313d8acd701209f5836f1431d8"
           }
         ]
       }
     },
     "org.jetbrains.kotlin:kotlin-compiler-embeddable": {
       "jvm": {
-        "version": "2.1.0",
+        "version": "2.2.21",
         "files": [
           {
-            "name": "kotlin-compiler-embeddable-2.1.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.1.0/kotlin-compiler-embeddable-2.1.0.jar",
-            "sha256": "c1b139a6f251c3b99e92befa326cb75d93a001d74c3ac601155a8cdb0d253783"
+            "name": "kotlin-compiler-embeddable-2.2.21.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.2.21/kotlin-compiler-embeddable-2.2.21.jar",
+            "sha256": "9588fa696ac5507af764fd5660df6894185e12704ec1bc3f5cb772af4987f295"
           }
         ],
         "runtime_deps": [
-          "org.jetbrains.intellij.deps:trove4j",
           "org.jetbrains.kotlin:kotlin-daemon-embeddable",
           "org.jetbrains.kotlin:kotlin-reflect",
           "org.jetbrains.kotlin:kotlin-script-runtime",
@@ -1920,12 +1907,12 @@
     },
     "org.jetbrains.kotlin:kotlin-daemon-embeddable": {
       "jvm": {
-        "version": "2.1.0",
+        "version": "2.2.21",
         "files": [
           {
-            "name": "kotlin-daemon-embeddable-2.1.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-daemon-embeddable/2.1.0/kotlin-daemon-embeddable-2.1.0.jar",
-            "sha256": "6aa581bd53c3500e380e4bb6b2407f6d233910012f425349c2ed5a8ddbe29eac"
+            "name": "kotlin-daemon-embeddable-2.2.21.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-daemon-embeddable/2.2.21/kotlin-daemon-embeddable-2.2.21.jar",
+            "sha256": "91c0673c22e44b054ae0314d323860ebe1f3aff3f0ebc74fff82c4733dde09be"
           }
         ]
       }
@@ -1947,12 +1934,12 @@
     },
     "org.jetbrains.kotlin:kotlin-script-runtime": {
       "jvm": {
-        "version": "2.1.0",
+        "version": "2.2.21",
         "files": [
           {
-            "name": "kotlin-script-runtime-2.1.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-script-runtime/2.1.0/kotlin-script-runtime-2.1.0.jar",
-            "sha256": "15a2b82119e9f145ea028029bd31166584648a419157c20948c124fa33d40e50"
+            "name": "kotlin-script-runtime-2.2.21.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-script-runtime/2.2.21/kotlin-script-runtime-2.2.21.jar",
+            "sha256": "2b1519b427b514d1536c1b425674b03fe914af637924028e9959c6625442df51"
           }
         ]
       }
@@ -2014,17 +2001,17 @@
     },
     "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": {
       "jvm": {
-        "version": "1.6.4",
+        "version": "1.8.0",
         "files": [
           {
-            "name": "kotlinx-coroutines-core-jvm-1.6.4.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.6.4/kotlinx-coroutines-core-jvm-1.6.4.jar",
-            "sha256": "c24c8bb27bb320c4a93871501a7e5e0c61607638907b197aef675513d4c820be"
+            "name": "kotlinx-coroutines-core-jvm-1.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.8.0/kotlinx-coroutines-core-jvm-1.8.0.jar",
+            "sha256": "9860906a1937490bf5f3b06d2f0e10ef451e65b95b269f22daf68a3d1f5065c5"
           }
         ],
         "deps": [
-          "org.jetbrains.kotlin:kotlin-stdlib-common",
-          "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+          "org.jetbrains.kotlin:kotlin-stdlib",
+          "org.jetbrains:annotations"
         ]
       }
     },
@@ -2065,12 +2052,12 @@
     },
     "org.jetbrains:annotations": {
       "jvm": {
-        "version": "13.0",
+        "version": "23.0.0",
         "files": [
           {
-            "name": "annotations-13.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/13.0/annotations-13.0.jar",
-            "sha256": "ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478"
+            "name": "annotations-23.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/23.0.0/annotations-23.0.0.jar",
+            "sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05"
           }
         ]
       }
