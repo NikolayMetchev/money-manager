@@ -231,7 +231,7 @@ private fun paginationToV2(
             }
         }
     val pages = paging.string("type") != "single"
-    val sendLimit = bankFeed && pages || pages && old.string("sendLimitParam") == "true"
+    val sendLimit = (bankFeed && pages) || (pages && old.string("sendLimitParam") == "true")
     return JsonObject(
         buildMap {
             if (window != null) put("window", window)
