@@ -152,3 +152,52 @@ internal fun declinedWhen(
     condition: Condition,
     reasonField: String = condition.path,
 ): StrategyRule = rule(RuleAction.Exclude(RuleValue.read(reasonField)), conditions = listOf(condition))
+
+/** Skips every record that fails one of [conditions], so only records meeting them all are imported. */
+internal fun onlyWhen(vararg conditions: Condition): List<StrategyRule> =
+    conditions.map { condition -> rule(RuleAction.Skip, conditions = listOf(condition.negated())) }
+
+private fun Condition.negated(): Condition =
+    when (op) {
+        ConditionOp.EQUALS -> copy(op = ConditionOp.NOT_EQUALS)
+        ConditionOp.IN -> copy(op = ConditionOp.NOT_IN)
+        else -> error("No negation for $op")
+    }
+
+/** Money comes in when [amountField] isn't negative, and goes out when it is. */
+internal fun directionFromSign(amountField: String): List<StrategyRule> =
+    listOf(
+        rule(RuleAction.SetDirection(incoming = false), conditions = listOf(Condition(amountField, ConditionOp.NEGATIVE))),
+        rule(RuleAction.SetDirection(incoming = true)),
+    )
+
+/**
+ * The counterparty is the account [name]. It reads [column], which every record has, only so that the
+ * naming applies.
+ */
+internal fun counterparty(
+    column: String,
+    name: String,
+    conditions: List<Condition> = emptyList(),
+): StrategyRule = accounts(AccountSide.COUNTERPARTY, fixedNaming(column, name), conditions = conditions)
+
+/**
+ * The record's id is [fields]' values joined by "-", for a record with no id of its own. A record missing
+ * any of them is skipped, as it can't be told apart from another.
+ */
+internal fun compositeId(vararg fields: String): List<StrategyRule> =
+    fields.map { rule(RuleAction.Skip, conditions = listOf(Condition(it, ConditionOp.MISSING))) } +
+        rule(RuleAction.ExternalId(RuleValue.constant(fields.joinToString("-") { "{$it}" })))
+
+/** A trade buys when [field] is one of [buyValues] (comma-separated), and sells for any other value. */
+internal fun tradeSideFrom(
+    field: String,
+    buyValues: String,
+): List<StrategyRule> =
+    listOf(
+        rule(RuleAction.TradeSide(buy = true), conditions = listOf(Condition(field, ConditionOp.IN, buyValues))),
+        rule(RuleAction.TradeSide(buy = false), conditions = listOf(Condition(field, ConditionOp.EXISTS))),
+    )
+
+/** Every trade of the endpoint buys ([buy]) or sells its base asset. */
+internal fun tradeSide(buy: Boolean): StrategyRule = rule(RuleAction.TradeSide(buy))

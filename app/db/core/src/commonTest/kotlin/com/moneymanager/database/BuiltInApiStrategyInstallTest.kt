@@ -14,7 +14,6 @@ import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
-import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.test.database.DbTest
@@ -133,7 +132,11 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                 "pre-encoded cursor flag persisted",
             )
             val earn = bybit.config.dataEndpoints.first { it.endpoint.path == "v5/earn/order" }
-            assertIs<Direction.Field>(assertNotNull(earn.transactionMappings).direction)
+            // Stake/Redeem orders are unsigned, so the order type names the direction.
+            assertTrue(
+                assertNotNull(earn.transactionMappings).rules.any { rule -> rule.actions.any { it is RuleAction.SetDirection } },
+                "direction rules persisted",
+            )
             val ledgers = bybit.config.dataEndpoints.filter { it.endpoint.path == "v5/account/transaction-log" }
             assertEquals(2, ledgers.size, "linear and inverse ledgers share a path, disambiguated by category")
         }
@@ -290,8 +293,8 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             // like ApiTradeMappings.quoteAssets/dataEndpoints elsewhere in these round-trip assertions.
             assertEquals(originalMyTrades.endpoint.fanOut != null, rebuiltMyTrades.endpoint.fanOut != null)
             assertEquals(
-                assertNotNull(originalMyTrades.tradeMappings).compositeIdFields,
-                assertNotNull(rebuiltMyTrades.tradeMappings).compositeIdFields,
+                assertNotNull(originalMyTrades.tradeMappings).rules,
+                assertNotNull(rebuiltMyTrades.tradeMappings).rules,
             )
         }
 

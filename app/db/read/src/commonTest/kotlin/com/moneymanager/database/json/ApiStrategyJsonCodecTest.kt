@@ -158,12 +158,19 @@ class ApiStrategyJsonCodecTest {
                             tradeMappings =
                                 ApiTradeMappings(
                                     instrumentField = "instrument_name",
-                                    sideField = "side",
                                     baseQuantityField = "traded_quantity",
                                     priceField = "traded_price",
                                     timestampField = "create_time",
                                     timestampFormat = TimestampFormat.EPOCH_MS,
                                     idField = "trade_id",
+                                    rules =
+                                        listOf(
+                                            StrategyRule(
+                                                conditions = listOf(Condition("side", ConditionOp.IN, "BUY")),
+                                                actions = listOf(RuleAction.TradeSide(buy = true)),
+                                            ),
+                                            StrategyRule(actions = listOf(RuleAction.TradeSide(buy = false))),
+                                        ),
                                 ),
                         ),
                     ),
@@ -234,8 +241,20 @@ class ApiStrategyJsonCodecTest {
                                 ApiTransactionMappings(
                                     idField = "ledger_id",
                                     joinKeyField = "refid",
-                                    counterpartyAliasField = "address",
-                                    counterpartyAccountAliases = mapOf("INTERNAL_DEPOSIT" to "Kraken App"),
+                                    rules =
+                                        listOf(
+                                            StrategyRule(
+                                                conditions = listOf(Condition("address", ConditionOp.EQUALS, "INTERNAL_DEPOSIT")),
+                                                actions =
+                                                    listOf(
+                                                        RuleAction.SetValue("address", RuleValue.constant("")),
+                                                        RuleAction.Account(
+                                                            AccountSide.COUNTERPARTY,
+                                                            AccountNaming(ValueExpr.of("asset"), pattern = "^", name = "Kraken App"),
+                                                        ),
+                                                    ),
+                                            ),
+                                        ),
                                 ),
                         ),
                         ApiDataEndpoint(
@@ -263,12 +282,18 @@ class ApiStrategyJsonCodecTest {
                             tradeMappings =
                                 ApiTradeMappings(
                                     instrumentField = "pair",
-                                    sideField = "type",
                                     baseQuantityField = "vol",
                                     quoteQuantityField = "cost",
                                     timestampField = "time",
                                     timestampFormat = TimestampFormat.EPOCH_S_FLOAT,
                                     idField = "trade_id",
+                                    rules =
+                                        listOf(
+                                            StrategyRule(
+                                                conditions = listOf(Condition("type", ConditionOp.EXISTS)),
+                                                actions = listOf(RuleAction.TradeSide(buy = false)),
+                                            ),
+                                        ),
                                 ),
                         ),
                     ),
@@ -296,7 +321,8 @@ class ApiStrategyJsonCodecTest {
     }
 
     @Test
-    fun `nested items - fixed trade assets and a composite transfer id round-trip`() {
+    fun `nested items - a set trade asset and a composite transfer id round-trip`() {
+        val compositeId = "{asset}-{projectId}-{type}-{time}-{rewards}"
         val original =
             config(null).copy(
                 accounts = ApiAccountsSource.Single(name = "Binance", externalId = "binance"),
@@ -311,12 +337,27 @@ class ApiStrategyJsonCodecTest {
                                     queryParams = listOf(ApiQueryParam(name = "type", value = "BONUS")),
                                 ),
                             kind = ApiEndpointKind.DEPOSITS,
-                            counterpartyAccountName = "Binance Earn Rewards",
                             transactionMappings =
                                 ApiTransactionMappings(
                                     amountField = "rewards",
                                     currencyField = "asset",
-                                    compositeIdFields = listOf("asset", "projectId", "type", "time", "rewards"),
+                                    rules =
+                                        listOf(
+                                            StrategyRule(actions = listOf(RuleAction.ExternalId(RuleValue.constant(compositeId)))),
+                                            StrategyRule(
+                                                actions =
+                                                    listOf(
+                                                        RuleAction.Account(
+                                                            AccountSide.COUNTERPARTY,
+                                                            AccountNaming(
+                                                                ValueExpr.of("asset"),
+                                                                pattern = "^",
+                                                                name = "Binance Earn Rewards",
+                                                            ),
+                                                        ),
+                                                    ),
+                                            ),
+                                        ),
                                 ),
                         ),
                         ApiDataEndpoint(
@@ -331,13 +372,22 @@ class ApiStrategyJsonCodecTest {
                                 ApiTradeMappings(
                                     instrumentField = "unused",
                                     splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
-                                    fixedBaseAsset = "BNB",
+                                    baseAssetField = "toAsset",
                                     quoteAssetField = "fromAsset",
-                                    fixedSideBuy = true,
                                     baseQuantityField = "transferedAmount",
                                     quoteQuantityField = "amount",
                                     timestampField = "operateTime",
                                     idField = "transId",
+                                    rules =
+                                        listOf(
+                                            StrategyRule(
+                                                actions =
+                                                    listOf(
+                                                        RuleAction.SetValue("toAsset", RuleValue.constant("BNB")),
+                                                        RuleAction.TradeSide(buy = true),
+                                                    ),
+                                            ),
+                                        ),
                                 ),
                         ),
                     ),
@@ -345,11 +395,14 @@ class ApiStrategyJsonCodecTest {
         val decoded = ApiStrategyJsonCodec.decode(ApiStrategyJsonCodec.encode(original))
         assertEquals(original, decoded)
         assertEquals("userAssetDribbletDetails", decoded.dataEndpoints[1].endpoint.nestedItemsKey)
-        assertEquals("BNB", decoded.dataEndpoints[1].tradeMappings?.fixedBaseAsset)
-        assertEquals("Binance Earn Rewards", decoded.dataEndpoints[0].counterpartyAccountName)
         assertEquals(
-            listOf("asset", "projectId", "type", "time", "rewards"),
-            decoded.dataEndpoints[0].transactionMappings?.compositeIdFields,
+            RuleAction.ExternalId(RuleValue.constant(compositeId)),
+            decoded.dataEndpoints[0]
+                .transactionMappings
+                ?.rules
+                ?.first()
+                ?.actions
+                ?.single(),
         )
     }
 }

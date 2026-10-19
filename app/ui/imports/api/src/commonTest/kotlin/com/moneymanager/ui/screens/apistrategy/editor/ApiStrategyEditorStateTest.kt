@@ -78,12 +78,12 @@ class ApiStrategyEditorStateTest {
                                 tradeMappings =
                                     ApiTradeMappings(
                                         instrumentField = "instrument_name",
-                                        sideField = "side",
                                         baseQuantityField = "quantity",
                                         priceField = "price",
                                         timestampField = "create_time",
                                         idField = "trade_id",
                                         orderIdField = "order_id",
+                                        rules = listOf(StrategyRule(actions = listOf(RuleAction.TradeSide(buy = true)))),
                                     ),
                             ),
                             ApiDataEndpoint(
@@ -92,8 +92,6 @@ class ApiStrategyEditorStateTest {
                                 transactionMappings =
                                     ApiTransactionMappings(
                                         joinKeyField = "refid",
-                                        counterpartyAliasField = "address",
-                                        counterpartyAccountAliases = mapOf("INTERNAL_DEPOSIT" to "Crypto.com"),
                                         rules =
                                             listOf(
                                                 StrategyRule(
@@ -106,7 +104,6 @@ class ApiStrategyEditorStateTest {
                                                 ),
                                             ),
                                     ),
-                                counterpartyAccountName = "Crypto.com Exchange Funding",
                             ),
                             ApiDataEndpoint(
                                 endpoint = ApiEndpointConfig(path = "/private/deposit-status", responseArrayKey = "result"),

@@ -56,16 +56,15 @@ class StrategyExportUnsortedCollectionGuardTest {
             // A JWT's header/claims serialise in list order; first non-blank trade-group field wins.
             JwtSigningConfig::class to "header",
             JwtSigningConfig::class to "claims",
-            // Order-carrying by design: readable composite-key construction / template substitution
-            // order. Neither is authored through a row-based UI editor (built-in-strategy code only),
-            // so the false-conflict risk the guard protects against doesn't apply.
-            ApiTradeMappings::class to "compositeIdFields",
-            ApiTransactionMappings::class to "compositeIdFields",
+            // Order-carrying by design: template substitution order. Not authored through a row-based UI
+            // editor (built-in-strategy code only), so the false-conflict risk the guard protects against
+            // doesn't apply.
             ApiValueSet.Union::class to "sets",
             // Rules run in order (first claim wins, rewrites are seen by later rules), and so do a rule's actions.
             CsvStrategyConfig::class to "rules",
             ApiAccountMappings::class to "rules",
             ApiTransactionMappings::class to "rules",
+            ApiTradeMappings::class to "rules",
             StrategyRule::class to "actions",
             // A value's paths are tried in order until one is non-blank.
             ValueExpr::class to "paths",

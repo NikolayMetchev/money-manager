@@ -1,12 +1,9 @@
 package com.moneymanager.domain.model.apistrategy
 
 import com.moneymanager.domain.model.rules.AssetCodeRules
-import com.moneymanager.domain.model.rules.Condition
-import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ForeignAmount
 import com.moneymanager.domain.model.rules.RuleAction
-import com.moneymanager.domain.model.rules.SortedConditionListSerializer
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.model.serialization.SortedListSerializer
@@ -326,7 +323,7 @@ enum class ApiAmountFormat {
 }
 
 /**
- * How a ledger's trade-type rows — the rows [ApiTransactionMappings.excludeWhen] drops as transfers —
+ * How a ledger's trade-type rows — the rows a [RuleAction.LedgerTradeLeg] rule takes out of the transfers —
  * group back into trades: rows whose [key] agrees are one trade's legs.
  *
  * Each group's signed amounts are authoritative: a trade another endpoint reports with the same id (or,
@@ -364,25 +361,23 @@ data class ApiLedgerTrades(
  * @property currencyField Dot-path to the ISO-4217 currency code (e.g. "currency", "amount.currency")
  * @property descriptionField Dot-path to the transaction description
  * @property amountFormat How [amountField] is encoded; see [ApiAmountFormat]
- * @property direction Which way a deposit or withdrawal moves (a bank feed claims its direction through
- *                  [rules]). Null takes the endpoint's own: a deposit endpoint's in, a withdrawal
- *                  endpoint's out. [Direction.Field] reads it from a field (Bybit Earn orders listing
- *                  both directions). [Direction.AmountSign] follows the raw amount's
- *                  sign instead: Kraken books a failed deposit or withdrawal as a second ledger entry of
- *                  the opposite sign, so the movement nets to zero rather than double-booking.
  * @property idField Dot-path to the transaction's stable id, used for de-duplication
- * @property fee A fee charged on a deposit or withdrawal, imported as its own transfer linked to it via a
- *            `fee` relationship (see [FeeRule]); its amount is encoded using [amountFormat]. A bank feed
- *            books its fees through [rules] instead.
  * @property ledgerTrades How a ledger's trade-type rows group into trades (see [ApiLedgerTrades]).
- * @property rules What a bank feed's items decide, run over each item's raw JSON in order (first claim
- *            wins): the direction ([RuleAction.SetDirection]; unclaimed, the amount's sign), a decline
- *            ([RuleAction.Exclude], its reason recorded), the counterparty account (the first
- *            [com.moneymanager.domain.model.rules.AccountSide.COUNTERPARTY] candidate that names one, a
- *            built-in one such as "ATM" consolidating every match; none, the description), whether the
- *            counterparty is a person, whether its user id is throwaway, attributes (a unique-identifier
- *            one also identifies the item), a fee (amount in [amountFormat]; Monzo's `atm_fees_detailed`
- *            is [FeeRule.includedInAmount]) and a foreign amount (see [ForeignAmount]).
+ * @property rules What an item decides, run over its raw JSON in order (first claim wins).
+ *   - A bank feed: the direction ([RuleAction.SetDirection]; unclaimed, the amount's sign), a decline
+ *     ([RuleAction.Exclude], its reason recorded), the counterparty account (the first
+ *     [com.moneymanager.domain.model.rules.AccountSide.COUNTERPARTY] candidate that names one, a built-in
+ *     one such as "ATM" consolidating every match; none, the description), whether the counterparty is a
+ *     person, whether its user id is throwaway, attributes (a unique-identifier one also identifies the
+ *     item), a fee (amount in [amountFormat]; Monzo's `atm_fees_detailed` is [FeeRule.includedInAmount])
+ *     and a foreign amount (see [ForeignAmount]).
+ *   - An exchange deposit or withdrawal: [RuleAction.Skip] drops it; the direction (unclaimed, the
+ *     endpoint's own: a deposit in, a withdrawal out); [RuleAction.LedgerTradeLeg] makes it a leg of
+ *     [ledgerTrades] instead of a transfer; the counterparty account, used when no wallet address names
+ *     one (unclaimed, the strategy-wide "<account> Funding"); the dedupe id ([RuleAction.ExternalId];
+ *     unclaimed, [idField]); and a fee, booked as its own transfer linked by a `fee` relationship, even
+ *     on a ledger trade leg. Rules can rewrite a value first ([RuleAction.SetValue]), e.g. to clear an
+ *     address that names an internal transfer rather than a wallet.
  */
 @Serializable
 data class ApiTransactionMappings(
@@ -394,11 +389,8 @@ data class ApiTransactionMappings(
     val currencyField: String = "currency",
     val descriptionField: String = "description",
     val amountFormat: ApiAmountFormat = ApiAmountFormat.MINOR_UNITS_INTEGER,
-    val direction: Direction? = null,
     val idField: String = "id",
     val counterpartyIdField: String? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val fee: FeeRule? = null,
     /**
      * Dot-path to a blockchain wallet address on a deposit/withdrawal item (e.g. "address" for a
      * withdrawal destination, "source_address" for a deposit sender). When set and non-blank, the
@@ -415,50 +407,14 @@ data class ApiTransactionMappings(
      */
     val txidField: String? = null,
     /**
-     * Dot-path to a field whose value can alias the counterparty to a named, already-owned account
-     * (e.g. "address"): a Crypto.com Exchange internal deposit has `address` = "INTERNAL_DEPOSIT",
-     * meaning the funds came from the Crypto.com App account. See [counterpartyAccountAliases].
-     */
-    val counterpartyAliasField: String? = null,
-    /**
-     * Maps a [counterpartyAliasField] value to the name of an owned account that is the real
-     * counterparty (e.g. {"INTERNAL_DEPOSIT": "Crypto.com"}). When matched, the transfer is booked
-     * directly against that account instead of a wallet/funding account, so the same movement recorded
-     * by another strategy (the CSV "Crypto.com" App export) reconciles to it regardless of import order.
-     */
-    @Serializable(with = SortedStringToStringMapSerializer::class)
-    val counterpartyAccountAliases: Map<String, String> = emptyMap(),
-    /**
      * Dot-path to a field on this item whose value is looked up against the id index built from any
      * [ApiDataEndpoint.enrichesTransfers] endpoint (e.g. Kraken Ledgers `refid`, matched against
      * DepositStatus/WithdrawStatus `refid`). A hit fills in [counterpartyAddressField]/[txidField]/
      * [counterpartyNetworkField] from the enrichment item. Null disables enrichment for this mapping.
      */
     val joinKeyField: String? = null,
-    /**
-     * Conditions that, when all hold (and there is at least one), make the item produce no transfer and
-     * no enrichment. Used when a single endpoint's response mixes record kinds that must be dropped —
-     * e.g. Kraken's Ledgers `type=all` includes `"trade"` entries that duplicate the trades already
-     * sourced from `TradesHistory`.
-     */
-    @Serializable(with = SortedConditionListSerializer::class)
-    val excludeWhen: List<Condition> = emptyList(),
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val ledgerTrades: ApiLedgerTrades? = null,
-    /**
-     * Conditions that must all hold (logical AND) against the item's raw JSON for it to be imported at
-     * all — the include-form counterpart of [excludeWhen] (e.g. Binance's
-     * `status == 1` on deposits, `status == 6` on withdrawals). Empty imposes no filter.
-     */
-    @Serializable(with = SortedConditionListSerializer::class)
-    val itemFilters: List<Condition> = emptyList(),
-    /**
-     * Dot-paths joined (in list order, hyphen-separated) into the transfer's de-duplication id instead of
-     * [idField], for an endpoint whose rows carry no id at all (Binance Simple Earn `rewardsRecord`, whose
-     * rows are only asset + project + type + time + amount). Order is semantic (produces a readable, stable
-     * composite key) - keeps default insertion-order serialization. Empty (the default) uses [idField] alone.
-     */
-    val compositeIdFields: List<String> = emptyList(),
     // First claim wins - order is semantic, keeps default insertion-order serialization.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val rules: List<StrategyRule> = emptyList(),
@@ -975,11 +931,6 @@ enum class TransferDirection {
  *
  * @property transactionMappings Field mappings for [ApiEndpointKind.BANK_TRANSACTIONS]/DEPOSITS/WITHDRAWALS.
  * @property tradeMappings Field mappings for [ApiEndpointKind.TRADES]/ORDERS.
- * @property counterpartyAccountName For DEPOSITS/WITHDRAWALS, the fixed account the money comes from /
- *                                   goes to when the row carries neither a counterparty alias nor a wallet
- *                                   address (e.g. "Binance Earn" for a Simple Earn subscription, "Binance
- *                                   Bank" for a fiat on-ramp). Null falls back to the strategy-wide
- *                                   "<synthetic account> Funding".
  * @property enrichesTransfers When true, this endpoint produces no transfers/trades of its own; its
  *                             items are indexed by [transactionMappings]' `idField` and used only to
  *                             enrich transfers built from other endpoints whose mapping sets a matching
@@ -992,7 +943,6 @@ data class ApiDataEndpoint(
     val kind: ApiEndpointKind,
     val transactionMappings: ApiTransactionMappings? = null,
     val tradeMappings: ApiTradeMappings? = null,
-    val counterpartyAccountName: String? = null,
     val enrichesTransfers: Boolean = false,
 )
 
@@ -1021,16 +971,17 @@ enum class InstrumentSplitMode {
  * @property splitMode How [instrumentField] is split into base/quote assets.
  * @property instrumentSeparator Separator for [InstrumentSplitMode.SEPARATOR] (default "_").
  * @property baseAssetField/quoteAssetField Dot-paths for [InstrumentSplitMode.EXPLICIT_FIELDS].
- * @property fixedBaseAsset/fixedQuoteAsset Constant asset codes used when the matching field is null.
  * @property quoteAssets Known quote assets for [InstrumentSplitMode.QUOTE_SUFFIX] (longest match wins).
- * @property sideField Dot-path to the buy/sell side; [buyValues] enumerates the values meaning BUY.
  * @property baseQuantityField Dot-path to the base-asset quantity traded.
  * @property priceField Dot-path to the price (quote per base); quote amount = quantity × price.
  * @property quoteQuantityField Dot-path to an explicit quote amount (used instead of price when present).
- * @property fee The trade's fee and its asset (see [FeeRule]); the asset defaults to the quote asset.
  * @property timestampField/timestampFormat Dot-path + encoding of the fill timestamp.
  * @property idField Dot-path to the stable trade id (used for de-duplication).
  * @property orderIdField Optional dot-path to the owning order id (joins ORDERS metadata onto the trade).
+ * @property rules What a trade or order item decides, in order (first claim wins): [RuleAction.Skip] drops
+ *   it; [RuleAction.TradeSide] is its side (unclaimed, the item is dropped); [RuleAction.ExternalId] its
+ *   dedupe id (unclaimed, [idField]); [RuleAction.Fee] its fee, whose asset defaults to the quote asset;
+ *   and [RuleAction.SetValue] supplies a value the item never carries (Binance dust always credits BNB).
  */
 @Serializable
 data class ApiTradeMappings(
@@ -1039,46 +990,16 @@ data class ApiTradeMappings(
     val instrumentSeparator: String = "_",
     val baseAssetField: String? = null,
     val quoteAssetField: String? = null,
-    /**
-     * A constant base asset code for [InstrumentSplitMode.EXPLICIT_FIELDS], used when [baseAssetField] is
-     * null because the item never names the asset it acquired (Binance dust conversions always credit BNB).
-     * Mirrors [fixedSideBuy]: what the endpoint *is* carries the information, not the row.
-     */
-    val fixedBaseAsset: String? = null,
-    /** A constant quote asset code, the [fixedBaseAsset] counterpart for [quoteAssetField]. */
-    val fixedQuoteAsset: String? = null,
     @Serializable(with = SortedStringListSerializer::class)
     val quoteAssets: List<String> = emptyList(),
-    /** Dot-path to the buy/sell side; null when [fixedSideBuy] fixes the direction instead. */
-    val sideField: String? = null,
-    @Serializable(with = SortedStringSetSerializer::class)
-    val buyValues: Set<String> = setOf("BUY", "buy"),
-    /**
-     * Fixes every trade from this endpoint to BUY (true) or SELL (false), for an endpoint whose side is
-     * implied by which endpoint it is rather than carried on each item (e.g. Binance Convert always
-     * acquires `toAsset` with `fromAsset`; Binance fiat buy/sell are two separate endpoints). Overrides
-     * [sideField] when set.
-     */
-    val fixedSideBuy: Boolean? = null,
     val baseQuantityField: String,
     val priceField: String? = null,
     val quoteQuantityField: String? = null,
-    /** The trade's fee; its currency defaults to the quote asset. */
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val fee: FeeRule? = null,
     val timestampField: String,
     val timestampFormat: TimestampFormat = TimestampFormat.EPOCH_MS,
     /** Pattern string for [TimestampFormat.PATTERN]; ignored for every other [timestampFormat]. */
     val timestampPattern: String? = null,
     val idField: String,
-    /**
-     * Dot-paths joined (in list order, hyphen-separated) into the trade's de-duplication id instead of
-     * [idField], for an endpoint whose own id is scoped to another field rather than globally unique
-     * (Binance `myTrades`' `id` is scoped per `symbol`, so two different pairs can share the same
-     * numeric id). Order is semantic (produces a readable, stable composite key) - keeps default
-     * insertion-order serialization. Empty (the default) uses [idField] alone.
-     */
-    val compositeIdFields: List<String> = emptyList(),
     val orderIdField: String? = null,
     val descriptionField: String? = null,
     /** Order-only fields surfaced as trade attributes when ORDERS metadata is joined in. */
@@ -1090,12 +1011,9 @@ data class ApiTradeMappings(
     val updateTimestampField: String? = null,
     val clientOidField: String? = null,
     val timeInForceField: String? = null,
-    /**
-     * Conditions that must all hold (logical AND) against the item's raw JSON for it to be imported at
-     * all. Empty imposes no filter.
-     */
-    @Serializable(with = SortedConditionListSerializer::class)
-    val itemFilters: List<Condition> = emptyList(),
+    // First claim wins - order is semantic, keeps default insertion-order serialization.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val rules: List<StrategyRule> = emptyList(),
 )
 
 /**

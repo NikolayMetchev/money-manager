@@ -48,7 +48,6 @@ import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
-import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ForeignAmount
@@ -636,20 +635,19 @@ object BuiltInApiStrategies {
         val tradeMappings =
             ApiTradeMappings(
                 instrumentField = "instrument_name",
-                sideField = "side",
-                buyValues = setOf("BUY", "buy"),
                 baseQuantityField = "traded_quantity",
                 priceField = "traded_price",
-                fee = FeeRule(amount = ValueExpr(listOf("fees")), currency = ValueExpr(listOf("fee_instrument_name"))),
                 timestampField = "create_time",
                 timestampFormat = TimestampFormat.EPOCH_MS,
                 idField = "trade_id",
                 orderIdField = "order_id",
+                rules =
+                    tradeSideFrom("side", "BUY,buy") +
+                        fee(FeeRule(amount = ValueExpr(listOf("fees")), currency = ValueExpr(listOf("fee_instrument_name")))),
             )
         val orderMappings =
             ApiTradeMappings(
                 instrumentField = "instrument_name",
-                sideField = "side",
                 baseQuantityField = "quantity",
                 timestampField = "create_time",
                 timestampFormat = TimestampFormat.EPOCH_MS,
@@ -663,6 +661,7 @@ object BuiltInApiStrategies {
                 updateTimestampField = "update_time",
                 clientOidField = "client_oid",
                 timeInForceField = "time_in_force",
+                rules = tradeSideFrom("side", "BUY,buy"),
             )
 
         fun transferMappings(addressField: String) =
@@ -676,10 +675,17 @@ object BuiltInApiStrategies {
                 counterpartyAddressField = addressField,
                 counterpartyNetworkField = "network_id",
                 txidField = "txid",
-                // An internal transfer (funds moved from/to the Crypto.com App) is booked directly against
-                // the "Crypto.com" App account so the same movement in the CSV export reconciles to it.
-                counterpartyAliasField = "address",
-                counterpartyAccountAliases = mapOf("INTERNAL_DEPOSIT" to "Crypto.com", "INTERNAL_WITHDRAWAL" to "Crypto.com"),
+                // An internal transfer (funds moved from/to the Crypto.com App) names no wallet: its address
+                // is cleared and it is booked directly against the "Crypto.com" App account, so the same
+                // movement in the CSV export reconciles to it.
+                rules =
+                    listOf(
+                        rule(
+                            RuleAction.SetValue(addressField, RuleValue.constant("")),
+                            RuleAction.Account(AccountSide.COUNTERPARTY, fixedNaming("currency", "Crypto.com")),
+                            conditions = listOf(Condition("address", ConditionOp.IN, "INTERNAL_DEPOSIT,INTERNAL_WITHDRAWAL")),
+                        ),
+                    ),
             )
         return ApiImportStrategy(
             id = ApiImportStrategyId(cryptoComExchangeStrategyId),
@@ -863,8 +869,6 @@ object BuiltInApiStrategies {
                         "EUR",
                         "GBP",
                     ),
-                sideField = "type",
-                buyValues = setOf("buy"),
                 baseQuantityField = "vol",
                 quoteQuantityField = "cost",
                 // No fee: TradesHistory's own fee is a quote-currency report that can disagree with
@@ -876,6 +880,7 @@ object BuiltInApiStrategies {
                 timestampFormat = TimestampFormat.EPOCH_S_FLOAT,
                 idField = "trade_id",
                 orderIdField = "ordertxid",
+                rules = tradeSideFrom("type", "buy"),
             )
 
         fun ledgerMappings(joinKey: String) =
@@ -887,16 +892,20 @@ object BuiltInApiStrategies {
                 // itemKeyField below under this field name.
                 idField = "ledger_id",
                 amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                fee = FeeRule(amount = ValueExpr(listOf("fee"))),
                 joinKeyField = joinKey,
+                // Only meaningful on the `type=trade` rows (see the ledger trade leg rule below) — refid
+                // equals the matching TradesHistory trade's own id.
+                ledgerTrades = ApiLedgerTrades(key = ValueExpr(listOf("refid"))),
                 // A failed/cancelled deposit or withdrawal appears as two ledger rows sharing one refid
                 // with opposite-signed amounts (the debit and its reversal), netting to zero. Kraken's
                 // "amount" is signed (negative = out), so trust that sign instead of the endpoint's fixed
                 // direction, or the reversal double-books as a second real movement in the same direction.
-                direction = Direction.AmountSign(),
-                // Only meaningful on the excluded `type=trade` rows (see excludeWhen
-                // below) — refid equals the matching TradesHistory trade's own id.
-                ledgerTrades = ApiLedgerTrades(key = ValueExpr(listOf("refid"))),
+                rules =
+                    directionFromSign("amount") +
+                        fee(FeeRule(amount = ValueExpr(listOf("fee")))) +
+                        // `type=all` also returns the trades TradesHistory already supplies: those rows are
+                        // ledger trade legs, not transfers.
+                        rule(RuleAction.LedgerTradeLeg, conditions = listOf(Condition("type", ConditionOp.IN, value = "trade"))),
             )
 
         // DepositStatus/WithdrawStatus supply no money movement of their own — they only enrich the
@@ -952,8 +961,8 @@ object BuiltInApiStrategies {
                             // sale/nft_rebate (Earn subscribe/unsubscribe, internal moves, fee rebates, etc.) was
                             // invisible to the importer — the account balance would silently drift from the true
                             // Kraken balance by exactly the missed amount. `type=all` also returns `trade`-type
-                            // entries that duplicate what TradesHistory already supplies, so those are dropped via
-                            // excludeWhen. Direction comes from the signed `amount` field
+                            // entries that duplicate what TradesHistory already supplies, so those become ledger
+                            // trade legs. Direction comes from the signed `amount` field
                             // (an amount-sign direction), not the ledger `type`, so this single endpoint covers
                             // every type without per-type direction mapping — including the historical "reward"
                             // vs "staking" naming inconsistency between Kraken account vintages.
@@ -966,10 +975,7 @@ object BuiltInApiStrategies {
                                     queryParams = listOf(ApiQueryParam(name = "type", value = "all")),
                                 ),
                                 ApiEndpointKind.DEPOSITS,
-                                transactionMappings =
-                                    ledgerMappings(
-                                        "refid",
-                                    ).copy(excludeWhen = listOf(Condition("type", ConditionOp.IN, value = "trade"))),
+                                transactionMappings = ledgerMappings("refid"),
                             ),
                             // Known limitation: Kraken pages these funding-status endpoints with an opaque cursor
                             // token, so only the first page is fetched here — enrichment (on-chain address/txid)
@@ -1205,7 +1211,9 @@ object BuiltInApiStrategies {
                 timestampFormat = TimestampFormat.EPOCH_MS,
                 amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                 idField = "tranId",
-                itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "CONFIRMED")),
+                rules =
+                    onlyWhen(Condition("status", ConditionOp.EQUALS, value = "CONFIRMED")) +
+                        counterparty("asset", binanceFundingWalletAccount),
             )
 
         // Simple Earn history costs 150 request-weight a call against Binance's ~6000/min budget, so it is
@@ -1367,9 +1375,10 @@ object BuiltInApiStrategies {
                                         txidField = "txId",
                                         // status: 0=pending, 1=success, 2=rejected, 6=credited but cannot
                                         // withdraw, 7=wrong deposit, 8=waiting user confirm.
-                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "1")),
+                                        rules =
+                                            onlyWhen(Condition("status", ConditionOp.EQUALS, value = "1")) +
+                                                counterparty("coin", "Binance Funding"),
                                     ),
-                                counterpartyAccountName = "Binance Funding",
                             ),
                             ApiDataEndpoint(
                                 withdrawalsEndpoint,
@@ -1384,12 +1393,13 @@ object BuiltInApiStrategies {
                                         counterpartyAddressField = "address",
                                         counterpartyNetworkField = "network",
                                         txidField = "txId",
-                                        // "amount" is net of the fee - transactionFee is booked separately.
-                                        fee = FeeRule(amount = ValueExpr(listOf("transactionFee"))),
                                         // status 6 = completed (see the capital/withdraw/history docs).
-                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "6")),
+                                        rules =
+                                            onlyWhen(Condition("status", ConditionOp.EQUALS, value = "6")) +
+                                                counterparty("coin", "Binance Funding") +
+                                                // "amount" is net of the fee - transactionFee is booked separately.
+                                                fee(FeeRule(amount = ValueExpr(listOf("transactionFee")))),
                                     ),
-                                counterpartyAccountName = "Binance Funding",
                             ),
                             ApiDataEndpoint(
                                 signedFiat("sapi/v1/fiat/orders", transactionType = "0"),
@@ -1401,9 +1411,10 @@ object BuiltInApiStrategies {
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                                         idField = "orderNo",
-                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "Successful")),
+                                        rules =
+                                            onlyWhen(Condition("status", ConditionOp.EQUALS, value = "Successful")) +
+                                                counterparty("fiatCurrency", "Binance Bank"),
                                     ),
-                                counterpartyAccountName = "Binance Bank",
                             ),
                             ApiDataEndpoint(
                                 signedFiat("sapi/v1/fiat/orders", transactionType = "1"),
@@ -1420,10 +1431,11 @@ object BuiltInApiStrategies {
                                         // export - which records the gross - can never be reconciled against
                                         // it. The deposit endpoint above needs no equivalent: Binance
                                         // returns totalFee "0" on every fiat deposit.
-                                        fee = FeeRule(amount = ValueExpr(listOf("totalFee"))),
-                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "Successful")),
+                                        rules =
+                                            onlyWhen(Condition("status", ConditionOp.EQUALS, value = "Successful")) +
+                                                counterparty("fiatCurrency", "Binance Bank") +
+                                                fee(FeeRule(amount = ValueExpr(listOf("totalFee")))),
                                     ),
-                                counterpartyAccountName = "Binance Bank",
                             ),
                             ApiDataEndpoint(
                                 fiatBuyEndpoint,
@@ -1433,16 +1445,22 @@ object BuiltInApiStrategies {
                                         splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
                                         baseAssetField = "cryptoCurrency",
                                         quoteAssetField = "fiatCurrency",
-                                        fixedSideBuy = true,
                                         // Buying crypto with fiat: obtainAmount = crypto received (base),
                                         // sourceAmount = fiat spent (quote).
                                         baseQuantityField = "obtainAmount",
                                         quoteQuantityField = "sourceAmount",
-                                        fee = FeeRule(amount = ValueExpr(listOf("totalFee")), currency = ValueExpr(listOf("fiatCurrency"))),
                                         timestampField = "createTime",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         idField = "orderNo",
-                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "Completed")),
+                                        rules =
+                                            onlyWhen(Condition("status", ConditionOp.EQUALS, value = "Completed")) +
+                                                tradeSide(buy = true) +
+                                                fee(
+                                                    FeeRule(
+                                                        amount = ValueExpr(listOf("totalFee")),
+                                                        currency = ValueExpr(listOf("fiatCurrency")),
+                                                    ),
+                                                ),
                                     ),
                             ),
                             ApiDataEndpoint(
@@ -1453,16 +1471,22 @@ object BuiltInApiStrategies {
                                         splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
                                         baseAssetField = "cryptoCurrency",
                                         quoteAssetField = "fiatCurrency",
-                                        fixedSideBuy = false,
                                         // Selling crypto for fiat: sourceAmount = crypto given (base),
                                         // obtainAmount = fiat received (quote).
                                         baseQuantityField = "sourceAmount",
                                         quoteQuantityField = "obtainAmount",
-                                        fee = FeeRule(amount = ValueExpr(listOf("totalFee")), currency = ValueExpr(listOf("fiatCurrency"))),
                                         timestampField = "createTime",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         idField = "orderNo",
-                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "Completed")),
+                                        rules =
+                                            onlyWhen(Condition("status", ConditionOp.EQUALS, value = "Completed")) +
+                                                tradeSide(buy = false) +
+                                                fee(
+                                                    FeeRule(
+                                                        amount = ValueExpr(listOf("totalFee")),
+                                                        currency = ValueExpr(listOf("fiatCurrency")),
+                                                    ),
+                                                ),
                                     ),
                             ),
                             ApiDataEndpoint(
@@ -1473,16 +1497,14 @@ object BuiltInApiStrategies {
                                         splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
                                         baseAssetField = "toAsset",
                                         quoteAssetField = "fromAsset",
-                                        fixedSideBuy = true,
                                         baseQuantityField = "toAmount",
                                         quoteQuantityField = "fromAmount",
                                         timestampField = "createTime",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         idField = "orderId",
-                                        itemFilters =
-                                            listOf(
-                                                Condition("orderStatus", ConditionOp.EQUALS, value = "SUCCESS"),
-                                            ),
+                                        rules =
+                                            onlyWhen(Condition("orderStatus", ConditionOp.EQUALS, value = "SUCCESS")) +
+                                                tradeSide(buy = true),
                                     ),
                             ),
                             // Simple Earn moves principal between the Spot wallet and the Earn wallet.
@@ -1502,9 +1524,10 @@ object BuiltInApiStrategies {
                                         // A subscription can be funded partly from the Funding wallet
                                         // (amtFromSpot/amtFromFunding), but both wallets are the one
                                         // Binance account here, so the whole amount moves as one leg.
-                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "SUCCESS")),
+                                        rules =
+                                            onlyWhen(Condition("status", ConditionOp.EQUALS, value = "SUCCESS")) +
+                                                counterparty("asset", binanceEarnAccount),
                                     ),
-                                counterpartyAccountName = binanceEarnAccount,
                             ),
                             ApiDataEndpoint(
                                 earnRedemptionsEndpoint,
@@ -1516,21 +1539,20 @@ object BuiltInApiStrategies {
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                                         idField = "redeemId",
-                                        itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "PAID")),
+                                        rules =
+                                            onlyWhen(Condition("status", ConditionOp.EQUALS, value = "PAID")) +
+                                                counterparty("asset", binanceEarnAccount),
                                     ),
-                                counterpartyAccountName = binanceEarnAccount,
                             ),
                             ApiDataEndpoint(
                                 spotToFundingEndpoint,
                                 ApiEndpointKind.WITHDRAWALS,
                                 transactionMappings = universalTransferMappings,
-                                counterpartyAccountName = binanceFundingWalletAccount,
                             ),
                             ApiDataEndpoint(
                                 fundingToSpotEndpoint,
                                 ApiEndpointKind.DEPOSITS,
                                 transactionMappings = universalTransferMappings,
-                                counterpartyAccountName = binanceFundingWalletAccount,
                             ),
                             ApiDataEndpoint(
                                 dividendEndpoint,
@@ -1543,8 +1565,8 @@ object BuiltInApiStrategies {
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                                         descriptionField = "enInfo",
                                         idField = "tranId",
+                                        rules = listOf(counterparty("asset", "Binance Distribution")),
                                     ),
-                                counterpartyAccountName = "Binance Distribution",
                             ),
                             // A dust conversion's detail rows are what actually moved: each swaps one small
                             // balance for BNB. "transferedAmount" is already net of "serviceChargeAmount", so
@@ -1556,14 +1578,19 @@ object BuiltInApiStrategies {
                                 tradeMappings =
                                     ApiTradeMappings(
                                         splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
-                                        fixedBaseAsset = "BNB",
+                                        baseAssetField = "toAsset",
                                         quoteAssetField = "fromAsset",
-                                        fixedSideBuy = true,
                                         baseQuantityField = "transferedAmount",
                                         quoteQuantityField = "amount",
                                         timestampField = "operateTime",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         idField = "transId",
+                                        rules =
+                                            listOf(
+                                                // The rows never name the asset they acquired: dust always converts to BNB.
+                                                rule(RuleAction.SetValue("toAsset", RuleValue.constant("BNB"))),
+                                                tradeSide(buy = true),
+                                            ),
                                     ),
                             ),
                             ApiDataEndpoint(
@@ -1574,23 +1601,24 @@ object BuiltInApiStrategies {
                                         instrumentField = "symbol",
                                         splitMode = InstrumentSplitMode.QUOTE_SUFFIX,
                                         quoteAssets = quoteAssets,
-                                        sideField = "isBuyer",
-                                        buyValues = setOf("true"),
                                         baseQuantityField = "qty",
                                         quoteQuantityField = "quoteQty",
-                                        fee =
-                                            FeeRule(
-                                                amount = ValueExpr(listOf("commission")),
-                                                currency = ValueExpr(listOf("commissionAsset")),
-                                            ),
                                         timestampField = "time",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         idField = "id",
-                                        // Binance's numeric trade "id" is scoped per symbol, not global —
-                                        // two different pairs can report the same id, so the composite key
-                                        // (symbol + id) is what's actually unique.
-                                        compositeIdFields = listOf("symbol", "id"),
                                         orderIdField = "orderId",
+                                        rules =
+                                            tradeSideFrom("isBuyer", "true") +
+                                                fee(
+                                                    FeeRule(
+                                                        amount = ValueExpr(listOf("commission")),
+                                                        currency = ValueExpr(listOf("commissionAsset")),
+                                                    ),
+                                                ) +
+                                                // Binance's numeric trade "id" is scoped per symbol, not global —
+                                                // two different pairs can report the same id, so the composite key
+                                                // (symbol + id) is what's actually unique.
+                                                compositeId("symbol", "id"),
                                     ),
                             ),
                         ) +
@@ -1612,9 +1640,10 @@ object BuiltInApiStrategies {
                                             // are otherwise indistinguishable: a BONUS and a REALTIME row
                                             // for the same project, second and amount would collide and
                                             // one of the two would be dropped as a duplicate.
-                                            compositeIdFields = listOf("asset", "projectId", "type", "time", "rewards"),
+                                            rules =
+                                                compositeId("asset", "projectId", "type", "time", "rewards") +
+                                                    counterparty("asset", "Binance Earn Rewards"),
                                         ),
-                                    counterpartyAccountName = "Binance Earn Rewards",
                                 )
                             },
                     // Binance's overall REST budget is ~6000 request-weight/min; 350ms between requests
@@ -1684,28 +1713,36 @@ object BuiltInApiStrategies {
                 counterpartyAddressField = "to.address",
                 counterpartyNetworkField = "network.network_name",
                 txidField = "network.hash",
-                // Every row is one wallet's own signed movement (negative = out).
-                direction = Direction.AmountSign(),
-                itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "completed")),
-                // Buys/sells/converts and Advanced Trade fills: one row per wallet touched, grouped into a
-                // trade by the id of the buy/sell/convert (or the Advanced Trade order) they belong to
-                // rather than booked as transfers. The rows carry the exact settled amounts, so no
-                // quantity is ever derived from a price.
-                excludeWhen = listOf(Condition("type", ConditionOp.IN, value = "advanced_trade_fill,buy,retail_simple_dust,sell,trade")),
                 ledgerTrades =
                     ApiLedgerTrades(
                         key = ValueExpr(listOf("trade.id", "buy.id", "sell.id", "advanced_trade_fill.order_id")),
                         unpairedCounterAmountPath = "native_amount",
                         unpairedFundingAccountName = "Coinbase Payment Methods",
                     ),
-                // An Advanced Trade fill's commission is settled outside its legs, and both legs repeat it:
-                // book it once, on the leg in the pair's quote asset.
-                fee =
-                    FeeRule(
-                        amount = ValueExpr(listOf("advanced_trade_fill.commission")),
-                        // Charged once, on the leg in the pair's quote asset: what follows the symbol's last "-".
-                        chargedOnAsset = ValueExpr(listOf("advanced_trade_fill.product_id"), Extraction("^.*-(.*)$", "$1")),
-                    ),
+                rules =
+                    onlyWhen(Condition("status", ConditionOp.EQUALS, value = "completed")) +
+                        // Every row is one wallet's own signed movement (negative = out).
+                        directionFromSign("amount.amount") +
+                        // Buys/sells/converts and Advanced Trade fills: one row per wallet touched, grouped into
+                        // a trade by the id of the buy/sell/convert (or the Advanced Trade order) they belong to
+                        // rather than booked as transfers. The rows carry the exact settled amounts, so no
+                        // quantity is ever derived from a price.
+                        rule(
+                            RuleAction.LedgerTradeLeg,
+                            conditions =
+                                listOf(
+                                    Condition("type", ConditionOp.IN, value = "advanced_trade_fill,buy,retail_simple_dust,sell,trade"),
+                                ),
+                        ) +
+                        // An Advanced Trade fill's commission is settled outside its legs, and both legs repeat it:
+                        // book it once, on the leg in the pair's quote asset.
+                        fee(
+                            FeeRule(
+                                amount = ValueExpr(listOf("advanced_trade_fill.commission")),
+                                // Charged once, on the leg in the pair's quote asset: what follows the symbol's last "-".
+                                chargedOnAsset = ValueExpr(listOf("advanced_trade_fill.product_id"), Extraction("^.*-(.*)$", "$1")),
+                            ),
+                        ),
             )
 
         return ApiImportStrategy(
@@ -1847,7 +1884,7 @@ object BuiltInApiStrategies {
             successCodeOkValue = "0",
         )
 
-        fun status(value: String) = listOf(Condition("status", ConditionOp.EQUALS, value = value))
+        fun status(value: String) = Condition("status", ConditionOp.EQUALS, value = value)
 
         // Longest-match-wins quote-asset suffixes for splitting a spot symbol ("BTCUSDT").
         val quoteAssets =
@@ -1870,17 +1907,15 @@ object BuiltInApiStrategies {
                     ApiTransactionMappings(
                         // change = cashFlow (realized PnL) + funding - fee: what the wallet actually moved.
                         amountField = "change",
-                        direction = Direction.AmountSign(),
                         descriptionField = "type",
                         timestampField = "transactionTime",
                         timestampFormat = TimestampFormat.EPOCH_MS,
                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                        itemFilters =
-                            listOf(
-                                Condition("type", ConditionOp.IN, value = "TRADE,SETTLEMENT,DELIVERY,LIQUIDATION,ADL"),
-                            ),
+                        rules =
+                            onlyWhen(Condition("type", ConditionOp.IN, value = "TRADE,SETTLEMENT,DELIVERY,LIQUIDATION,ADL")) +
+                                directionFromSign("change") +
+                                counterparty("currency", "Bybit Derivatives"),
                     ),
-                counterpartyAccountName = "Bybit Derivatives",
             )
 
         return ApiImportStrategy(
@@ -1922,16 +1957,21 @@ object BuiltInApiStrategies {
                                         instrumentField = "symbol",
                                         splitMode = InstrumentSplitMode.QUOTE_SUFFIX,
                                         quoteAssets = quoteAssets,
-                                        sideField = "side",
-                                        buyValues = setOf("Buy"),
                                         baseQuantityField = "execQty",
                                         quoteQuantityField = "execValue",
-                                        fee = FeeRule(amount = ValueExpr(listOf("execFee")), currency = ValueExpr(listOf("feeCurrency"))),
                                         timestampField = "execTime",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         idField = "execId",
                                         orderIdField = "orderId",
-                                        itemFilters = listOf(Condition("execType", ConditionOp.EQUALS, value = "Trade")),
+                                        rules =
+                                            onlyWhen(Condition("execType", ConditionOp.EQUALS, value = "Trade")) +
+                                                tradeSideFrom("side", "Buy") +
+                                                fee(
+                                                    FeeRule(
+                                                        amount = ValueExpr(listOf("execFee")),
+                                                        currency = ValueExpr(listOf("feeCurrency")),
+                                                    ),
+                                                ),
                                     ),
                             ),
                             ApiDataEndpoint(
@@ -1947,9 +1987,8 @@ object BuiltInApiStrategies {
                                         counterpartyNetworkField = "chain",
                                         txidField = "txID",
                                         // status 3 = success.
-                                        itemFilters = status("3"),
+                                        rules = onlyWhen(status("3")) + counterparty("coin", "Bybit Funding"),
                                     ),
-                                counterpartyAccountName = "Bybit Funding",
                             ),
                             ApiDataEndpoint(
                                 signed("v5/asset/withdraw/query-record", "result.rows", assetWindow),
@@ -1965,10 +2004,11 @@ object BuiltInApiStrategies {
                                         counterpartyAddressField = "toAddress",
                                         counterpartyNetworkField = "chain",
                                         txidField = "txID",
-                                        fee = FeeRule(amount = ValueExpr(listOf("withdrawFee"))),
-                                        itemFilters = status("success"),
+                                        rules =
+                                            onlyWhen(status("success")) +
+                                                counterparty("coin", "Bybit Funding") +
+                                                fee(FeeRule(amount = ValueExpr(listOf("withdrawFee")))),
                                     ),
-                                counterpartyAccountName = "Bybit Funding",
                             ),
                             // Transfers from another Bybit user (by email/phone/UID) never appear on-chain.
                             ApiDataEndpoint(
@@ -1983,9 +2023,8 @@ object BuiltInApiStrategies {
                                         counterpartyAddressField = "address",
                                         txidField = "txID",
                                         // status 2 = success.
-                                        itemFilters = status("2"),
+                                        rules = onlyWhen(status("2")) + counterparty("coin", "Bybit Funding"),
                                     ),
-                                counterpartyAccountName = "Bybit Funding",
                             ),
                             // Convert history has no time filter at all: one walk over 1-based "index" pages.
                             ApiDataEndpoint(
@@ -2004,16 +2043,14 @@ object BuiltInApiStrategies {
                                         splitMode = InstrumentSplitMode.EXPLICIT_FIELDS,
                                         baseAssetField = "toCoin",
                                         quoteAssetField = "fromCoin",
-                                        fixedSideBuy = true,
                                         baseQuantityField = "toAmount",
                                         quoteQuantityField = "fromAmount",
                                         timestampField = "createdAt",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         idField = "exchangeTxId",
-                                        itemFilters =
-                                            listOf(
-                                                Condition("exchangeStatus", ConditionOp.EQUALS, value = "success"),
-                                            ),
+                                        rules =
+                                            onlyWhen(Condition("exchangeStatus", ConditionOp.EQUALS, value = "success")) +
+                                                tradeSide(buy = true),
                                     ),
                             ),
                             // Stakes and redemptions share one list (there is no filter to split it), so the
@@ -2035,10 +2072,15 @@ object BuiltInApiStrategies {
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
                                         descriptionField = "orderType",
                                         idField = "orderId",
-                                        direction = Direction.Field(path = "orderType", incomingValues = setOf("Redeem")),
-                                        itemFilters = status("Success"),
+                                        rules =
+                                            onlyWhen(status("Success")) +
+                                                incomingWhen(Condition("orderType", ConditionOp.IN, "Redeem")) +
+                                                rule(
+                                                    RuleAction.SetDirection(incoming = false),
+                                                    conditions = listOf(Condition("orderType", ConditionOp.EXISTS)),
+                                                ) +
+                                                counterparty("coin", earnAccount),
                                     ),
-                                counterpartyAccountName = earnAccount,
                             ),
                             ApiDataEndpoint(
                                 signed(
@@ -2054,9 +2096,8 @@ object BuiltInApiStrategies {
                                         timestampField = "createdAt",
                                         timestampFormat = TimestampFormat.EPOCH_MS,
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                                        itemFilters = status("Success"),
+                                        rules = onlyWhen(status("Success")) + counterparty("coin", "Bybit Earn Rewards"),
                                     ),
-                                counterpartyAccountName = "Bybit Earn Rewards",
                             ),
                             derivativesLedger("linear"),
                             derivativesLedger("inverse"),
