@@ -62,5 +62,15 @@ common:rbe --host_platform=//bazel/platforms:rbe_linux_x64
 common:rbe --extra_execution_platforms=//bazel/platforms:rbe_linux_x64
 common:rbe --jobs=100
 
+# `rbe-mac`: CI's macOS job (#1089). Everything runs on the Mac but Kotlin/Native klib compiles: listing the bare
+# host first keeps every other target on the Mac's own tools (Xcode, the Android SDK, its C++ toolchain), and
+# klibs, which require `compiles_klibs`, resolve the Linux toolchain and run on BuildBuddy's executors.
+common:rbe-mac --config=cache
+common:rbe-mac --remote_executor=grpcs://remote.buildbuddy.io
+common:rbe-mac --extra_execution_platforms=@platforms//host,//bazel/platforms:rbe_linux_x64
+common:rbe-mac --spawn_strategy=worker,sandboxed,local
+common:rbe-mac --strategy=KotlinNativeCompile=remote
+common:rbe-mac --jobs=100
+
 # Personal overrides (disk cache, jobs, …), not checked in. user.bazelrc.example turns BuildBuddy on locally.
 try-import %workspace%/user.bazelrc

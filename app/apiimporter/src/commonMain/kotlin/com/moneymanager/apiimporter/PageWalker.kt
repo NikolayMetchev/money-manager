@@ -99,7 +99,7 @@ internal suspend fun walkPages(
 
 private enum class UnitOutcome { Complete, OutOfRange, Failed }
 
-private fun ApiPaging.isNewestFirst(): Boolean = this is ApiPaging.BeforeCursor || this is ApiPaging.Token && positionField != null
+private fun ApiPaging.isNewestFirst(): Boolean = this is ApiPaging.BeforeCursor || (this is ApiPaging.Token && positionField != null)
 
 private fun ApiPaging.Token.positionPath(): String? = positionField
 

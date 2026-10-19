@@ -45,7 +45,7 @@ def _fragment_args(args, chain):
     args.add_all(srcs, expand_directories = True)
     return srcs
 
-def _compile_klib(ctx, kgp_target, out, chain, fragment_suffix, deps, friends, module_name, short_name, plugins):
+def _compile_klib(ctx, kgp_target, out, chain, fragment_suffix, deps, friends, module_name, short_name, plugins, mnemonic):
     target = KONAN_TARGETS[kgp_target]
     transitive = depset(transitive = [d[KlibInfo].transitive_klibs for d in deps + friends])
     args = ctx.actions.args()
@@ -68,7 +68,7 @@ def _compile_klib(ctx, kgp_target, out, chain, fragment_suffix, deps, friends, m
         arguments = [args],
         inputs = depset(srcs + plugin_jars, transitive = [transitive]),
         outputs = [out],
-        mnemonic = "KotlinNativeCompile",
+        mnemonic = mnemonic,
         progress_message = "Compiling Kotlin/Native %{label} for " + kgp_target,
     )
     return KlibInfo(
@@ -107,6 +107,8 @@ def _klib_impl(ctx):
         out = out,
         chain = chain,
         fragment_suffix = "Main",
+        # `rbe-mac` sends this mnemonic, and only this one, to remote executors.
+        mnemonic = "KotlinNativeCompile",
         deps = ctx.attr.deps,
         friends = [],
         module_name = _unique_name(ctx.label, ""),
@@ -145,6 +147,7 @@ def _test_impl(ctx):
         out = test_klib,
         chain = _chain(ctx, ctx.attr.target),
         fragment_suffix = "Test",
+        mnemonic = "KotlinNativeTestCompile",
         deps = ctx.attr.deps,
         friends = [ctx.attr.associate],
         module_name = _unique_name(ctx.attr.associate.label, "_test"),

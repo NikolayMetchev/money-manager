@@ -45,7 +45,7 @@ use_repo(
 # Kotlin/Native for the exec host, at rules_kotlin's Kotlin version, with every konan dependency pinned in
 # bazel/kmp/native/pins.bzl (#998). After a Kotlin bump: bazel run @kotlin_native_repin//:repin
 kotlin_native = use_extension("//bazel/kmp/native:extensions.bzl", "kotlin_native")
-use_repo(kotlin_native, "kotlin_native", "kotlin_native_repin")
+use_repo(kotlin_native, "kotlin_native_linux_x64", "kotlin_native_macos_arm64", "kotlin_native_mingw_x64", "kotlin_native_repin")
 
 # The default desktop Google OAuth client, obfuscated from CI's secrets or secrets/google-oauth.properties (#1011).
 # The SQLite amalgamation utils/sqlite3 builds, pinned by sqlite-amalgamation-* in the catalog (#1012).
@@ -56,6 +56,8 @@ google_oauth = use_extension("//bazel/kmp/constants:google_oauth.bzl", "google_o
 use_repo(google_oauth, "google_oauth")
 
 register_toolchains("//bazel/kmp/native:all")
+
+register_execution_platforms("//bazel/platforms:host_klibs")
 
 # The WiX toolset jpackage builds the Windows installer with (#1020): the one the Compose Gradle plugin downloads
 # (`wix311`, its downloadWix task).

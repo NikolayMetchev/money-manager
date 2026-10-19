@@ -276,8 +276,9 @@ jobs:
           disable_search: true
           fail_ci_if_error: false
 
-  # macOS: every compile a Mac builds (macosArm64 only builds there: it needs Xcode), its `mm`, and its native
-  # tests. The JVM tests ran on Linux.
+  # macOS: the macosArm64 compiles, its `mm`, and its native tests. Everything else ran on Linux. `rbe-mac`
+  # sends its Kotlin/Native klib compiles, macosArm64 included, to BuildBuddy's Linux executors (#1089);
+  # everything else (cinterop, C, links, tests) runs on the runner.
   native-macos:
     name: Native Tests (macosArm64)
     runs-on: macos-latest
@@ -300,11 +301,14 @@ jobs:
         uses: ./.github/actions/bazel-setup
         with:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          config: cache
+          config: rbe-mac
           cache-name: macos
 
+      # Only the macosArm64 targets, plus `mm` (its macosArm64 binary is `manual`): Build and Test already builds the
+      # rest on Linux, and a Mac would redo it on its own JDK, missing the cache (the Android release's R8 alone took
+      # ~10 minutes).
       - name: Build
-        run: bazel build //... 2>&1 | tee build.log
+        run: bazel build $(bazel query 'attr(name, "_macosArm64", //...) except attr(tags, manual, //...)') //app/main/cli:mm 2>&1 | tee build.log
 
       - name: Test
         run: bazel test $(bazel query 'attr(name, "_macosArm64$", tests(//...))') 2>&1 | tee test.log

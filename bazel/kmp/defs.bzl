@@ -336,6 +336,7 @@ def kmp_library(
             family_srcs = _family(target, linux_srcs, apple_srcs, mingw_srcs),
             deps = _on(target, deps + native_deps + _family(target, linux_deps, apple_deps, mingw_deps) + exports),
             plugins = plugin_labels(plugins, "native"),
+            exec_compatible_with = ["//bazel/platforms:compiles_klibs"],
             target_compatible_with = BUILDS_ON.get(target, []),
             visibility = visibility,
         )

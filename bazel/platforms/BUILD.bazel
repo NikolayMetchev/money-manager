@@ -5,6 +5,7 @@
 platform(
     name = "rbe_linux_x64",
     constraint_values = [
+        ":compiles_klibs",
         "@platforms//cpu:x86_64",
         "@platforms//os:linux",
     ],
@@ -12,6 +13,24 @@ platform(
         "OSFamily": "Linux",
         "container-image": "docker://ghcr.io/nikolaymetchev/money-manager/rbe-ubuntu24-04@sha256:97fd7540143bd834e906f045be92fe1c95c50d0a393a5fd8a514be6ab3e28eea",
     },
+    visibility = ["//visibility:public"],
+)
+
+# Which execution platforms compile Kotlin/Native klibs (`kt_native_klib` requires it): every one but the bare
+# host, which `rbe-mac` lists first so all else stays on the Mac while klibs compile on `rbe_linux_x64` (#1089).
+constraint_setting(name = "klib_compiler")
+
+constraint_value(
+    name = "compiles_klibs",
+    constraint_setting = ":klib_compiler",
+    visibility = ["//visibility:public"],
+)
+
+# The host, registered in MODULE.bazel so a build without `rbe-mac` compiles klibs where it runs everything else.
+platform(
+    name = "host_klibs",
+    constraint_values = [":compiles_klibs"],
+    parents = ["@platforms//host"],
     visibility = ["//visibility:public"],
 )
 
@@ -33,6 +52,17 @@ platform(
     constraint_values = [
         "@platforms//cpu:x86_64",
         "@platforms//os:windows",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# macOS arm64, as a target: a Linux host compiles macosArm64 klibs for it (#1089), as CI's macOS job does on
+# BuildBuddy's executors.
+platform(
+    name = "macos_arm64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:macos",
     ],
     visibility = ["//visibility:public"],
 )

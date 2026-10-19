@@ -1033,12 +1033,9 @@ class ImportDeduper(
             approximateCandidates
                 .filter { (id, existing) ->
                     val sameAccounts =
-                        existing.sourceAccountId == from &&
-                            existing.targetAccountId == to ||
-                            placeholder == from &&
-                            existing.targetAccountId == to ||
-                            placeholder == to &&
-                            existing.sourceAccountId == from
+                        (existing.sourceAccountId == from && existing.targetAccountId == to) ||
+                            (placeholder == from && existing.targetAccountId == to) ||
+                            (placeholder == to && existing.sourceAccountId == from)
                     existing.amount == transfer.amount &&
                         sameAccounts &&
                         id !in existingExcludedLegs &&
