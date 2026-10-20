@@ -16,7 +16,8 @@ import java.util.stream.Stream;
  * Starts a konan tool for {@code run_konan}, in front of konan's own {@code MainKt}.
  *
  * <p>Bazel passes execroot-relative paths, and konan resolves most of them fine, but it matches
- * {@code -Xinclude} against the libraries it resolved by absolute path, so a relative one is never found.
+ * {@code -Xinclude} and {@code -Xadd-cache} against the libraries it resolved by absolute path, so a relative one
+ * is never found.
  * Actions have no shell to make it absolute, so this does.
  *
  * <p>It also replaces {@code {temp}} in any argument with a directory of its own, deleted afterwards, the way
@@ -35,6 +36,8 @@ import java.util.stream.Stream;
  */
 public final class KonanLauncher {
   private static final String INCLUDE = "-Xinclude=";
+
+  private static final String ADD_CACHE = "-Xadd-cache=";
 
   private KonanLauncher() {}
 
@@ -62,8 +65,10 @@ public final class KonanLauncher {
     String[] args = expandParamsFiles(commandLine);
     Path temp = null;
     for (int i = 0; i < args.length; i++) {
-      if (args[i].startsWith(INCLUDE)) {
-        args[i] = INCLUDE + Path.of(args[i].substring(INCLUDE.length())).toAbsolutePath();
+      for (String option : new String[] {INCLUDE, ADD_CACHE}) {
+        if (args[i].startsWith(option)) {
+          args[i] = option + Path.of(args[i].substring(option.length())).toAbsolutePath();
+        }
       }
       if (args[i].contains(TEMP)) {
         if (temp == null) {

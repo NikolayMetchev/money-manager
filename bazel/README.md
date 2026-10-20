@@ -186,6 +186,15 @@ by platform, which is how a Linux x64 host cross-links for `//bazel/platforms:li
 (manual, for linuxArm64 and mingwX64: `CROSS_PLATFORMS`) transitions that target's test binary to its platform, so CI
 links them in its one `bazel build` and only runs them on an arm64 and a Windows runner.
 
+Test binaries link against **compiler caches**, as KGP's debug binaries do: without one, konan compiles every library a
+binary links (stdlib and every Maven library included) to machine code in each link, minutes per test binary. An
+aspect on the test binary's deps (`_cache_aspect`, `native.bzl`) builds one static cache per klib (`KotlinNativeCache`),
+and the toolchain carries stdlib's and the platform klibs' (`kotlin_native_platform_cache`; `CACHED_PLATFORM_LIBS` in
+`properties.bzl` lists the platform klibs our code uses). The link finds them through `-Xcache-directory`. konan only
+caches a target on its own host (`cacheableTargets`: linuxX64 on Linux, macosArm64 on macOS), and the aspect resolves
+its own exec platform, so under `rbe-mac` klibs compile on BuildBuddy and their caches build on the Mac. Cross-linked
+and Windows test binaries link uncached, as does anything depending on clikt-mordant (`_UNCACHEABLE_KLIBS`).
+
 `kmp_native_executable` links the release binary per target (`-opt`, the module's klib `-Xinclude`d, no compiler
 caches: Clikt's two klibs both define a private `Context.selfAndAncestors()`) as `:<name>_<target>`, all `manual`;
 `:<name>` is the build platform's own, so `bazel build //...` links only the host's `mm`. `release_assets` adds the

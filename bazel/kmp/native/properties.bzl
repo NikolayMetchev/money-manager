@@ -22,6 +22,40 @@ KLIB_ONLY_TARGETS = {
     "linux_x64": {"macos_arm64": "macos_arm64"},
 }
 
+# The platform klibs our libraries depend on, per target konan caches (`cacheableTargets` in konan.properties):
+# every library a cache is built from needs its dependencies cached first, platform klibs included, so these get
+# caches of their own (the repository adds what they depend on). konan names one that's missing ("X is going to
+# be cached, but its dependency isn't"): add it here. The other ~170 Apple frameworks are left out, as nothing
+# uses them and each is an action.
+CACHED_PLATFORM_LIBS = {
+    "linux_x64": ["builtin", "iconv", "linux", "posix", "zlib"],
+    "macos_arm64": [
+        "AppKit",
+        "CFCGTypes",
+        "CommonCrypto",
+        "CoreFoundation",
+        "CoreFoundationBase",
+        "CoreServices",
+        "CoreVideo",
+        "DiskArbitration",
+        "Foundation",
+        "IOKit",
+        "Security",
+        "darwin",
+        "libkern",
+        "osx",
+        "posix",
+        "zlib",
+    ],
+}
+
+# The exec constraints of each host, for the actions that must run on it (a target's caches).
+HOST_CONSTRAINTS = {
+    "linux_x64": ["@platforms//os:linux", "@platforms//cpu:x86_64"],
+    "macos_arm64": ["@platforms//os:macos", "@platforms//cpu:aarch64"],
+    "mingw_x64": ["@platforms//os:windows", "@platforms//cpu:x86_64"],
+}
+
 DEPENDENCIES_URL = "https://download.jetbrains.com/kotlin/native"
 
 def parse_properties(text):
