@@ -30,6 +30,7 @@ KLIB_ONLY_TARGETS = {
 CACHED_PLATFORM_LIBS = {
     "linux_x64": ["builtin", "iconv", "linux", "posix", "zlib"],
     "macos_arm64": [
+        "AppKit",
         "CFCGTypes",
         "CommonCrypto",
         "CoreFoundation",
@@ -44,6 +45,7 @@ CACHED_PLATFORM_LIBS = {
         "libkern",
         "osx",
         "posix",
+        "zlib",
     ],
 }
 
