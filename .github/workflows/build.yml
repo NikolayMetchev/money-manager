@@ -79,6 +79,11 @@ jobs:
       # only: the keep rules and ServiceLoader providers don't depend on ProGuard's optimizer, which takes most of
       # its time (release builds optimize). The installer bundles the native mm, as release.yml's does.
       BAZEL_FLAGS: --define=proguard_optimize=false --define=bundle_native_cli=true
+    # `shell: bash` runs with pipefail; the default shell doesn't, so `bazel … | tee` would take tee's exit code and
+    # pass with failing tests.
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout code
