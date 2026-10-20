@@ -14,12 +14,11 @@ import kotlin.time.Instant
 
 /**
  * End-to-end test of the generic signed-exchange import against the built-in Binance config. Binance
- * exercises engine capabilities Kraken/Crypto.com don't: [Condition][com.moneymanager.domain.model.rules.Condition]
- * item filters (status-gated deposits/withdrawals), a fixed trade side per endpoint (Convert, fiat
- * buy/sell), a custom [pattern timestamp][com.moneymanager.domain.model.apistrategy.TimestampFormat.PATTERN]
+ * exercises engine capabilities Kraken/Crypto.com don't: skip rules (status-gated deposits/withdrawals),
+ * an unconditional trade side rule per endpoint (Convert, fiat buy/sell), a custom [pattern timestamp][com.moneymanager.domain.model.apistrategy.TimestampFormat.PATTERN]
  * (withdrawal `applyTime`), two data endpoints sharing one path disambiguated only by a static query
- * param (`fiat/orders` deposit vs withdrawal), and a symbol-scoped trade id disambiguated by
- * `compositeIdFields` across a fan-out endpoint's several symbols.
+ * param (`fiat/orders` deposit vs withdrawal), and a symbol-scoped trade id disambiguated by a
+ * composite external id rule across a fan-out endpoint's several symbols.
  *
  * The fan-out download loop itself (candidate symbol resolution, per-symbol requests) is exercised by
  * `BinanceFanOutDownloadE2ETest` in `app:ui:core`; this test stages responses directly and exercises the
@@ -84,7 +83,7 @@ class BinanceExchangeApiE2ETest : DbTest() {
         """.trimIndent()
 
     // Two different symbols share the raw numeric "id" (28457) - a real Binance shape (myTrades ids are
-    // scoped per symbol) that compositeIdFields (symbol + id) must keep from colliding.
+    // scoped per symbol) that the composite external id rule (symbol + id) must keep from colliding.
     private val myTradesBtcUsdtJson =
         """
         [{"symbol":"BTCUSDT","id":28457,"orderId":1000,"price":"40000.00","qty":"0.10000000",
@@ -323,7 +322,7 @@ class BinanceExchangeApiE2ETest : DbTest() {
             assertEquals("USDT", convert.from.asset.code)
 
             // Fan-out spot trades: BTCUSDT and ETHUSDT both carry the raw id "28457", but
-            // compositeIdFields (symbol + id) kept them from colliding into one trade.
+            // the composite external id rule (symbol + id) kept them from colliding into one trade.
             assertTrue(trades.any { it.to.asset.code == "BTC" && it.from.asset.code == "USDT" }, "BTCUSDT fan-out trade imported")
             assertTrue(trades.any { it.to.asset.code == "USDT" && it.from.asset.code == "ETH" }, "ETHUSDT fan-out trade imported")
 

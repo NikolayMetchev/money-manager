@@ -27,7 +27,12 @@ import com.moneymanager.domain.model.apistrategy.ApiValueSet
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.apistrategy.TransferDirection
-import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
+import com.moneymanager.domain.model.rules.FeeRule
+import com.moneymanager.domain.model.rules.Record
+import com.moneymanager.domain.model.rules.RuleEngine
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
@@ -653,20 +658,18 @@ private data class ParsedExchangeTransfer(
     val network: String?,
     /** On-chain transaction id, used as a cross-source unique identifier. */
     val txid: String?,
-    /** Name of an owned account the counterparty aliases to (e.g. "Crypto.com" for an internal deposit). */
-    val aliasAccount: String?,
     /**
-     * The endpoint's fixed counterparty account name ([ApiDataEndpoint.counterpartyAccountName], e.g.
-     * "Binance Earn" for a Simple Earn subscription) — used when the row carries neither an alias nor a
-     * wallet address, in place of the strategy-wide funding account.
+     * The counterparty account the rules name (e.g. "Binance Earn" for a Simple Earn subscription, "Crypto.com"
+     * for an internal transfer) — used when no wallet address names one, in place of the strategy-wide
+     * funding account.
      */
     val counterpartyAccountName: String?,
     /** Value looked up against an [ApiDataEndpoint.enrichesTransfers] index (e.g. Kraken Ledgers `refid`). */
     val joinKey: String?,
     /**
      * When true, this movement is booked straight to the fee account (exchange -> Fees), never to
-     * the counterparty/funding side. Produced by [ApiTransactionMappings.fee] on a ledger row
-     * whose main [ApiTransactionMappings.amountField] was skipped as an excluded duplicate (Kraken's
+     * the counterparty/funding side. Produced by a fee rule on a ledger row, even one whose main
+     * [ApiTransactionMappings.amountField] became a ledger trade leg instead (Kraken's
      * `type=trade` ledger rows carry a same-asset settlement fee TradesHistory never reports, alongside
      * an `amount` that duplicates the trade TradesHistory already supplied).
      */
@@ -703,7 +706,7 @@ private data class ParsedEnrichment(
 )
 
 /**
- * One leg of a trade-type ledger row excluded from [ParsedExchangeData.transfers] as a duplicate of a
+ * One leg of a trade-type ledger row kept out of [ParsedExchangeData.transfers] as a duplicate of a
  * `TradesHistory` trade (see [ApiTransactionMappings.ledgerTrades]) — kept so the trade's
  * booked amount can be reconciled against what the ledger actually settled.
  */
@@ -742,6 +745,7 @@ private class ParsedExchangeData {
 /** Parses one response item into [into] according to its endpoint kind. */
 private fun parseExchangeItem(
     obj: JsonObject,
+    rules: RuleEngine,
     dataEndpoint: ApiDataEndpoint,
     requestId: ApiRequestId,
     jsonPath: String,
@@ -755,11 +759,11 @@ private fun parseExchangeItem(
     }
     when (dataEndpoint.kind) {
         ApiEndpointKind.TRADES -> {
-            dataEndpoint.tradeMappings?.let { parseTrade(obj, it, requestId, jsonPath, windowStart) }?.let(into.trades::add)
+            dataEndpoint.tradeMappings?.let { parseTrade(obj, rules, it, requestId, jsonPath, windowStart) }?.let(into.trades::add)
         }
 
         ApiEndpointKind.ORDERS -> {
-            dataEndpoint.tradeMappings?.let { parseOrder(obj, it, requestId, jsonPath) }?.let(into.orders::add)
+            dataEndpoint.tradeMappings?.let { parseOrder(obj, rules, it, requestId, jsonPath) }?.let(into.orders::add)
         }
 
         ApiEndpointKind.DEPOSITS -> {
@@ -767,12 +771,12 @@ private fun parseExchangeItem(
                 ?.let {
                     parseExchangeTransfer(
                         obj,
+                        rules,
                         it,
                         TransferDirection.IN,
                         requestId,
                         jsonPath,
                         into,
-                        dataEndpoint.counterpartyAccountName,
                         windowStart,
                         windowEnd,
                     )
@@ -784,12 +788,12 @@ private fun parseExchangeItem(
                 ?.let {
                     parseExchangeTransfer(
                         obj,
+                        rules,
                         it,
                         TransferDirection.OUT,
                         requestId,
                         jsonPath,
                         into,
-                        dataEndpoint.counterpartyAccountName,
                         windowStart,
                         windowEnd,
                     )
@@ -840,6 +844,7 @@ suspend fun importApiSessionExchange(
     val responses = apiSessionRepository.getResponsesBySession(sessionId)
 
     val parsed = ParsedExchangeData()
+    val rules = RuleEngine()
     responses.forEachIndexed forEachResponse@{ responseIndex, response ->
         if (responseIndex % PARSE_PROGRESS_EVERY_RESPONSES == 0) {
             bar.emit(
@@ -879,7 +884,7 @@ suspend fun importApiSessionExchange(
                     } else {
                         arrayItemJsonPath(dataEndpoint.endpoint.responseArrayKey, index).value
                     }
-                parseExchangeItem(it, dataEndpoint, response.requestId, jsonPath, parsed, windowStart, windowEnd)
+                parseExchangeItem(it, rules, dataEndpoint, response.requestId, jsonPath, parsed, windowStart, windowEnd)
             }
         }
     }
@@ -1050,20 +1055,20 @@ suspend fun importApiSessionExchange(
         }
     }
 
-    // Counterparty accounts. An aliased counterparty (e.g. an internal deposit whose `address` is
-    // "INTERNAL_DEPOSIT") is booked against a named owned account (the Crypto.com App account) so the
-    // same movement recorded by the CSV export reconciles to it. Otherwise each distinct blockchain
-    // address on a CRYPTO-denominated transfer becomes its own wallet account (keyed by the address); a
+    // Counterparty accounts. Each distinct blockchain address on a CRYPTO-denominated transfer becomes
+    // its own wallet account (keyed by the address); a
     // missing address, or any address on a FIAT transfer, falls back to the generic funding account. The
     // fiat exclusion matters because a provider's "address"-shaped field can carry something else entirely
     // for fiat movements — e.g. Kraken's WithdrawStatus `info` is a blockchain address for a crypto
     // withdrawal but the user's own bank-transfer label (e.g. "Monzo") for a fiat one, and minting a wallet
-    // account from that label collides by name with the user's real bank account. Failing all of those, an
-    // endpoint that declares an [ApiDataEndpoint.counterpartyAccountName] books against that named account
-    // (Binance Earn/Bank), and only an endpoint declaring nothing lands in the generic funding account.
+    // account from that label collides by name with the user's real bank account. Failing that, a
+    // counterparty the rules name books against that named account (Binance Earn/Bank; the Crypto.com App
+    // account for an internal transfer, whose rules clear the address, so the same movement recorded by the
+    // CSV export reconciles to it), and only a row naming nothing lands in the generic funding account.
     val accountKeys = mutableMapOf<String, LocalAccountKey>()
     val counterpartyIntents = mutableListOf<ImportAccountIntent>()
-    (transfers.mapNotNull { it.aliasAccount } + transfers.mapNotNull { it.counterpartyAccountName })
+    transfers
+        .mapNotNull { it.counterpartyAccountName }
         .distinct()
         .forEach { name ->
             val key = LocalAccountKey("alias-$name")
@@ -1078,7 +1083,7 @@ suspend fun importApiSessionExchange(
                 )
         }
     transfers
-        .filter { it.aliasAccount == null && asset(it.currencyCode) is CryptoAsset }
+        .filter { asset(it.currencyCode) is CryptoAsset }
         .mapNotNull { it.counterpartyAddress?.takeIf(String::isNotBlank) }
         .distinct()
         .forEach { address ->
@@ -1126,11 +1131,10 @@ suspend fun importApiSessionExchange(
                 // so a fiat transfer can never resolve a wallet account a same-valued crypto address
                 // happened to mint.
                 val counterpartyKey =
-                    tx.aliasAccount?.let { accountKeys[it] }
-                        ?: tx.counterpartyAddress
-                            ?.takeIf { txAsset is CryptoAsset && it.isNotBlank() }
-                            ?.let { accountKeys[it] }
-                        // The endpoint's own counterparty (e.g. Binance's Earn wallet or its fiat
+                    tx.counterpartyAddress
+                        ?.takeIf { txAsset is CryptoAsset && it.isNotBlank() }
+                        ?.let { accountKeys[it] }
+                        // The counterparty the rules name (e.g. Binance's Earn wallet or its fiat
                         // on/off-ramp) — a named account, so the same movement seen from the other side
                         // reconciles to it instead of everything piling into one funding account.
                         ?: tx.counterpartyAccountName?.let { accountKeys[it] }
@@ -1307,26 +1311,30 @@ private fun tradeDescription(trade: ParsedTrade): String {
 
 private fun parseOrder(
     obj: JsonObject,
+    rules: RuleEngine,
     tm: ApiTradeMappings,
     requestId: ApiRequestId,
     jsonPath: String,
 ): ParsedOrder? {
-    val orderRef = (tm.orderIdField?.let { obj.str(it) } ?: obj.str(tm.idField)) ?: return null
-    val side = tm.sideField?.let { obj.str(it) } ?: return null
+    val outcome = rules.evaluate(tm.rules, JsonRecord(obj))
+    if (outcome.skipped) return null
+    val item = outcome.record
+    val orderRef = (tm.orderIdField?.let { item.text(it) } ?: item.text(tm.idField)) ?: return null
+    val side = (outcome.tradeBuy ?: return null).let { if (it) "BUY" else "SELL" }
     val createdAt =
-        obj.str(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat, tm.timestampPattern) } ?: return null
+        item.text(tm.timestampField)?.let { parseApiTimestamp(it, tm.timestampFormat, tm.timestampPattern) } ?: return null
     return ParsedOrder(
         orderRef = orderRef,
-        clientOid = tm.clientOidField?.let { obj.str(it) },
+        clientOid = tm.clientOidField?.let { item.text(it) },
         side = side,
-        orderType = tm.orderTypeField?.let { obj.str(it) },
-        timeInForce = tm.timeInForceField?.let { obj.str(it) },
-        status = tm.orderStatusField?.let { obj.str(it) },
-        limitPrice = tm.limitPriceField?.let { obj.str(it) },
-        quantity = obj.str(tm.baseQuantityField),
-        avgPrice = tm.avgPriceField?.let { obj.str(it) },
+        orderType = tm.orderTypeField?.let { item.text(it) },
+        timeInForce = tm.timeInForceField?.let { item.text(it) },
+        status = tm.orderStatusField?.let { item.text(it) },
+        limitPrice = tm.limitPriceField?.let { item.text(it) },
+        quantity = item.text(tm.baseQuantityField),
+        avgPrice = tm.avgPriceField?.let { item.text(it) },
         createdAt = createdAt,
-        updatedAt = tm.updateTimestampField?.let { obj.str(it) }?.let { parseApiTimestamp(it, tm.timestampFormat, tm.timestampPattern) },
+        updatedAt = tm.updateTimestampField?.let { item.text(it) }?.let { parseApiTimestamp(it, tm.timestampFormat, tm.timestampPattern) },
         requestId = requestId,
         jsonPath = jsonPath,
     )
@@ -1384,38 +1392,34 @@ internal fun approximateUntil(
 
 private fun parseTrade(
     obj: JsonObject,
+    rules: RuleEngine,
     tm: ApiTradeMappings,
     requestId: ApiRequestId,
     jsonPath: String,
     windowStart: Instant?,
 ): ParsedTrade? {
-    if (!obj.matchesAll(tm.itemFilters)) return null
+    val outcome = rules.evaluate(tm.rules, JsonRecord(obj))
+    if (outcome.skipped) return null
+    val item = outcome.record
     val (baseCode, quoteCode) =
         if (tm.splitMode == InstrumentSplitMode.EXPLICIT_FIELDS) {
-            // A constant asset stands in where the row never names it (Binance dust always credits BNB).
-            val base = tm.baseAssetField?.let { obj.str(it) } ?: tm.fixedBaseAsset
-            val quote = tm.quoteAssetField?.let { obj.str(it) } ?: tm.fixedQuoteAsset
+            val base = tm.baseAssetField?.let { item.text(it) }
+            val quote = tm.quoteAssetField?.let { item.text(it) }
             if (base != null && quote != null) base to quote else return null
         } else {
-            val instrument = tm.instrumentField?.let { obj.str(it) } ?: return null
+            val instrument = tm.instrumentField?.let { item.text(it) } ?: return null
             splitInstrument(instrument, tm) ?: return null
         }
-    val isBuy = tm.fixedSideBuy ?: (tm.sideField?.let { obj.str(it) }?.let { it in tm.buyValues } ?: return null)
-    val baseQty = obj.str(tm.baseQuantityField)?.let { runCatching { BigDecimal(it) }.getOrNull() } ?: return null
+    val isBuy = outcome.tradeBuy ?: return null
+    val baseQty = item.text(tm.baseQuantityField)?.let { runCatching { BigDecimal(it) }.getOrNull() } ?: return null
     val quoteAmount =
-        tm.quoteQuantityField?.let { obj.str(it)?.let { v -> runCatching { BigDecimal(v) }.getOrNull() } }
-            ?: tm.priceField?.let { obj.str(it)?.let { p -> runCatching { baseQty * BigDecimal(p) }.getOrNull() } }
+        tm.quoteQuantityField?.let { item.text(it)?.let { v -> runCatching { BigDecimal(v) }.getOrNull() } }
+            ?: tm.priceField?.let { item.text(it)?.let { p -> runCatching { baseQty * BigDecimal(p) }.getOrNull() } }
             ?: return null
     val timestamp =
-        itemTimestamp(obj.str(tm.timestampField), tm.timestampFormat, tm.timestampPattern, windowStart) ?: return null
-    val id =
-        tm.compositeIdFields
-            .takeIf { it.isNotEmpty() }
-            ?.map { field -> obj.str(field) ?: return null }
-            ?.joinToString("-")
-            ?: obj.str(tm.idField)
-            ?: return null
-    val fee = tm.fee?.takeIf { obj.matchesAll(it.conditions) }
+        itemTimestamp(item.text(tm.timestampField), tm.timestampFormat, tm.timestampPattern, windowStart) ?: return null
+    val id = outcome.externalId ?: item.text(tm.idField) ?: return null
+    val fee = outcome.fees.firstOrNull { rules.evaluator.all(it.conditions, item) }
     return ParsedTrade(
         id = id,
         timestamp = timestamp,
@@ -1425,11 +1429,14 @@ private fun parseTrade(
         baseQuantity = baseQty.abs(),
         quoteAmount = quoteAmount.abs(),
         feeAmount =
-            fee?.let { obj.resolve(it.amount) }?.takeIf { it.isNotBlank() }?.let { v -> runCatching { BigDecimal(v).abs() }.getOrNull() },
+            fee
+                ?.let { rules.resolve(it.amount, item) }
+                ?.takeIf { it.isNotBlank() }
+                ?.let { v -> runCatching { BigDecimal(v).abs() }.getOrNull() },
         // Most exchanges charge the trade fee in the quote asset without a separate field for it
         // (Kraken); an explicit fee currency (Crypto.com) overrides this default.
-        feeCode = fee?.currency?.let { obj.resolve(it) }?.takeIf { it.isNotBlank() } ?: quoteCode,
-        orderId = tm.orderIdField?.let { obj.str(it) },
+        feeCode = fee?.currency?.let { rules.resolve(it, item) }?.takeIf { it.isNotBlank() } ?: quoteCode,
+        orderId = tm.orderIdField?.let { item.text(it) },
         requestId = requestId,
         jsonPath = jsonPath,
     )
@@ -1468,38 +1475,38 @@ private fun splitInstrument(
 
 private fun parseExchangeTransfer(
     obj: JsonObject,
+    rules: RuleEngine,
     tm: ApiTransactionMappings,
     direction: TransferDirection,
     requestId: ApiRequestId,
     jsonPath: String,
     into: ParsedExchangeData,
-    counterpartyAccountName: String? = null,
     windowStart: Instant? = null,
     windowEnd: Instant? = null,
 ): List<ParsedExchangeTransfer> {
-    if (!obj.matchesAll(tm.itemFilters)) return emptyList()
-    val currency = obj.str(tm.currencyField) ?: return emptyList()
-    val rawTimestamp = obj.str(tm.timestampField)
+    val outcome = rules.evaluate(tm.rules, JsonRecord(obj))
+    if (outcome.skipped) return emptyList()
+    val item = outcome.record
+    val currency = item.text(tm.currencyField) ?: return emptyList()
+    val rawTimestamp = item.text(tm.timestampField)
     val timestamp =
         itemTimestamp(rawTimestamp, tm.timestampFormat, tm.timestampPattern, windowStart) ?: return emptyList()
     val approximateUntil = approximateUntil(rawTimestamp, tm.timestampFormat, tm.timestampPattern, windowStart, windowEnd)
-    val id =
-        tm.compositeIdFields
-            .takeIf { it.isNotEmpty() }
-            ?.map { field -> obj.str(field) ?: return emptyList() }
-            ?.joinToString("-")
-            ?: obj.str(tm.idField)
-            ?: return emptyList()
-    val excluded = tm.excludeWhen.isNotEmpty() && obj.matchesAll(tm.excludeWhen)
-    val rawAmount = obj.str(tm.amountField)?.let { runCatching { BigDecimal(it) }.getOrNull() }
-    val fee = tm.fee?.takeIf { obj.carriesFee(it, currency) }
-    val rawFeeAmount = fee?.let { obj.resolve(it.amount) }?.takeIf { it.isNotBlank() }?.let { runCatching { BigDecimal(it) }.getOrNull() }
-    val feeCurrency = fee?.currency?.let { obj.resolve(it) }?.takeIf { it.isNotBlank() } ?: currency
+    val id = outcome.externalId ?: item.text(tm.idField) ?: return emptyList()
+    val rawAmount = item.text(tm.amountField)?.let { runCatching { BigDecimal(it) }.getOrNull() }
+    val fee = outcome.fees.firstOrNull { rules.carries(it, item, currency) }
+    val rawFeeAmount =
+        fee
+            ?.let {
+                rules.resolve(it.amount, item)
+            }?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { BigDecimal(it) }.getOrNull() }
+    val feeCurrency = fee?.currency?.let { rules.resolve(it, item) }?.takeIf { it.isNotBlank() } ?: currency
 
     val result = mutableListOf<ParsedExchangeTransfer>()
-    if (excluded) {
+    if (outcome.ledgerTradeLeg) {
         val ledgerTrades = tm.ledgerTrades
-        val refid = ledgerTrades?.let { obj.resolve(it.key) }?.takeIf { it.isNotBlank() }
+        val refid = ledgerTrades?.let { rules.resolve(it.key, item) }?.takeIf { it.isNotBlank() }
         if (ledgerTrades != null && refid != null && rawAmount != null) {
             val counterField = ledgerTrades.unpairedCounterAmountPath
             into.ledgerTradeLegs +=
@@ -1510,37 +1517,17 @@ private fun parseExchangeTransfer(
                     timestamp = timestamp,
                     requestId = requestId,
                     jsonPath = jsonPath,
-                    counterAssetCode = counterField?.let { obj.str("$it.currency") },
-                    counterAmount = counterField?.let { obj.str("$it.amount") }?.let { runCatching { BigDecimal(it) }.getOrNull() },
+                    counterAssetCode = counterField?.let { item.text("$it.currency") },
+                    counterAmount = counterField?.let { item.text("$it.amount") }?.let { runCatching { BigDecimal(it) }.getOrNull() },
                     fundingAccountName = ledgerTrades.unpairedFundingAccountName,
                 )
         }
     } else if (rawAmount != null) {
-        // Some exchanges (Kraken) book a failed/cancelled deposit or withdrawal as a second ledger
-        // entry sharing the same id with the opposite sign of the original debit/credit, netting to
-        // zero; deriving direction from the sign instead of trusting the endpoint's fixed direction
-        // preserves that net-zero.
-        // An endpoint listing both directions with unsigned amounts (Bybit Earn's Stake/Redeem orders)
-        // names the direction in a field instead, read like a bank feed's FIELD sign source.
-        val resolvedDirection =
-            when (val configured = tm.direction) {
-                null -> {
-                    direction
-                }
-
-                is Direction.AmountSign -> {
-                    if ((rawAmount < BigDecimal.ZERO) == configured.positiveIsIncoming) TransferDirection.OUT else TransferDirection.IN
-                }
-
-                is Direction.Field -> {
-                    obj.str(configured.path)?.let { if (it in configured.incomingValues) TransferDirection.IN else TransferDirection.OUT }
-                        ?: direction
-                }
-
-                Direction.Outgoing -> {
-                    TransferDirection.OUT
-                }
-            }
+        // Unclaimed, the endpoint's own direction. Some exchanges (Kraken) book a failed/cancelled deposit
+        // or withdrawal as a second ledger entry sharing the same id with the opposite sign of the original,
+        // netting to zero, so their rules take the direction from the amount's sign instead; an endpoint
+        // listing both directions with unsigned amounts (Bybit Earn's Stake/Redeem orders) names it in a field.
+        val resolvedDirection = outcome.incoming?.let { if (it) TransferDirection.IN else TransferDirection.OUT } ?: direction
         // A gross amount already includes its fee: carve a same-asset fee out so the two sum back to it.
         val amount =
             if (fee?.includedInAmount == true && rawFeeAmount != null && feeCurrency.equals(currency, ignoreCase = true)) {
@@ -1549,7 +1536,7 @@ private fun parseExchangeTransfer(
                 rawAmount.abs()
             }
         val description =
-            obj.str(tm.descriptionField)?.takeIf { it.isNotBlank() }
+            item.text(tm.descriptionField)?.takeIf { it.isNotBlank() }
                 ?: if (resolvedDirection == TransferDirection.IN) "Deposit $currency" else "Withdraw $currency"
         result +=
             ParsedExchangeTransfer(
@@ -1561,19 +1548,18 @@ private fun parseExchangeTransfer(
                 description = description,
                 requestId = requestId,
                 jsonPath = jsonPath,
-                counterpartyAddress = tm.counterpartyAddressField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
-                network = tm.counterpartyNetworkField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
-                txid = tm.txidField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
-                aliasAccount = tm.counterpartyAliasField?.let { obj.str(it) }?.let { tm.counterpartyAccountAliases[it] },
-                counterpartyAccountName = counterpartyAccountName,
-                joinKey = tm.joinKeyField?.let { obj.str(it) },
+                counterpartyAddress = tm.counterpartyAddressField?.let { item.text(it) }?.takeIf { it.isNotBlank() },
+                network = tm.counterpartyNetworkField?.let { item.text(it) }?.takeIf { it.isNotBlank() },
+                txid = tm.txidField?.let { item.text(it) }?.takeIf { it.isNotBlank() },
+                counterpartyAccountName = rules.counterpartyName(outcome.accountsFor(AccountSide.COUNTERPARTY), item),
+                joinKey = tm.joinKeyField?.let { item.text(it) },
                 approximateUntil = approximateUntil,
             )
     }
 
     // Kraken's ledger charges a same-asset settlement fee on some rows (visible only here, never in
     // TradesHistory's own quote-currency fee) — extracted unconditionally, even when the row's main
-    // amount was excluded as a trade-type duplicate, since the fee itself is not a duplicate of anything.
+    // amount became a ledger trade leg as a trade-type duplicate, since the fee itself is not a duplicate of anything.
     // A failed/reversed deposit or withdrawal's reversal row carries the *negated* fee (a refund of the
     // original charge) — abs()-ing it would book the refund as a second charge instead of crediting it
     // back, so the sign decides direction: negative -> refund (Fees -> exchange), positive -> charge
@@ -1589,14 +1575,13 @@ private fun parseExchangeTransfer(
                 amount = rawFeeAmount.abs(),
                 direction = if (isRefund) TransferDirection.IN else TransferDirection.OUT,
                 description =
-                    fee.description?.let { obj.resolve(it) }?.takeIf { it.isNotBlank() }
+                    fee.description?.let { rules.resolve(it, item) }?.takeIf { it.isNotBlank() }
                         ?: if (isRefund) "$feeCurrency fee refund" else "$feeCurrency fee",
                 requestId = requestId,
                 jsonPath = jsonPath,
                 counterpartyAddress = null,
                 network = null,
                 txid = null,
-                aliasAccount = null,
                 counterpartyAccountName = null,
                 joinKey = null,
                 isFeeOnly = true,
@@ -1697,7 +1682,6 @@ private fun reconcileTradesAgainstLedger(
                     counterpartyAddress = null,
                     network = null,
                     txid = null,
-                    aliasAccount = null,
                     counterpartyAccountName = leg.fundingAccountName,
                     joinKey = null,
                 )
@@ -1793,3 +1777,23 @@ private fun moneyExact(
 private fun JsonObject.str(path: String): String? = (resolveJsonPathElement(path) as? JsonPrimitive)?.contentOrNullCompat()
 
 private fun JsonPrimitive.contentOrNullCompat(): String? = if (this is JsonNull) null else content
+
+private fun RuleEngine.resolve(
+    expr: ValueExpr,
+    item: Record,
+): String = evaluator.resolve(expr) { item.text(it) }
+
+/** Whether [item] carries [fee]: its conditions hold and, when it is charged on one asset, [item] is in [itemAsset]. */
+private fun RuleEngine.carries(
+    fee: FeeRule,
+    item: Record,
+    itemAsset: String,
+): Boolean =
+    evaluator.all(fee.conditions, item) &&
+        fee.chargedOnAsset?.let { resolve(it, item).equals(itemAsset, ignoreCase = true) } != false
+
+/** The first of [namings] that names an account for [item], or null. */
+private fun RuleEngine.counterpartyName(
+    namings: List<AccountNaming>,
+    item: Record,
+): String? = namings.firstNotNullOfOrNull { naming -> evaluator.name(naming) { item.text(it) }?.name?.takeIf { it.isNotBlank() } }

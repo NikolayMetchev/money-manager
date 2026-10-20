@@ -32,25 +32,23 @@ import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
+import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.ValueExpr
-import com.moneymanager.domain.model.rules.isComplete
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.components.AccountPicker
-import com.moneymanager.ui.components.rules.DirectionEditor
-import com.moneymanager.ui.components.rules.FeeRuleEditor
+import com.moneymanager.ui.components.rules.ConditionPathField
+import com.moneymanager.ui.components.rules.RuleContext
+import com.moneymanager.ui.components.rules.StrategyRulesEditor
 import com.moneymanager.ui.components.rules.isComplete
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** Kinds whose records are interpreted by [ApiTradeMappings]; the rest use [ApiTransactionMappings]. */
 private val TRADE_KINDS = setOf(ApiEndpointKind.TRADES, ApiEndpointKind.ORDERS)
-
-/** Kinds that carry a fixed movement direction + external counterparty account. */
-internal val DIRECTIONAL_KINDS = setOf(ApiEndpointKind.DEPOSITS, ApiEndpointKind.WITHDRAWALS)
 
 /** Editor for a single-account source: an exchange imports into one fixed account holding all assets. */
 @Composable
@@ -163,15 +161,6 @@ private fun DataEndpointEditor(
             enabled = enabled,
         )
     }
-
-    if (dataEndpoint.kind in DIRECTIONAL_KINDS && !dataEndpoint.enrichesTransfers) {
-        TextFieldRow(
-            label = "Counterparty account name (optional)",
-            value = dataEndpoint.counterpartyAccountName.orEmpty(),
-            onValueChange = { onChange(dataEndpoint.copy(counterpartyAccountName = it.ifBlank { null })) },
-            enabled = enabled,
-        )
-    }
 }
 
 /**
@@ -232,20 +221,6 @@ internal fun TransactionMappingsFields(
             optionLabel = { it.name },
             enabled = enabled,
         )
-        // A deposit endpoint's own direction is in, a withdrawal endpoint's out.
-        DirectionEditor(
-            direction = mappings.direction,
-            onDirectionChanged = { onChange(mappings.copy(direction = it)) },
-            pathField = { label, value, onValueChange, isError -> TextFieldRow(label, value, onValueChange, enabled, isError = isError) },
-            enabled = enabled,
-            allowDefault = true,
-        )
-        FeeRuleEditor(
-            fee = mappings.fee,
-            onFeeChanged = { onChange(mappings.copy(fee = it)) },
-            pathField = { label, value, onValueChange, isError -> TextFieldRow(label, value, onValueChange, enabled, isError = isError) },
-            enabled = enabled,
-        )
         TextFieldRow(
             "Txid field (optional)",
             mappings.txidField.orEmpty(),
@@ -270,23 +245,9 @@ internal fun TransactionMappingsFields(
             { onChange(mappings.copy(joinKeyField = it.ifBlank { null })) },
             enabled,
         )
-        TextFieldRow(
-            "Counterparty alias field (optional, e.g. address)",
-            mappings.counterpartyAliasField.orEmpty(),
-            { onChange(mappings.copy(counterpartyAliasField = it.ifBlank { null })) },
-            enabled,
-        )
-        StringMapEditor(
-            label = "Counterparty account aliases (alias value -> owned account name)",
-            entries = mappings.counterpartyAccountAliases,
-            onChange = { onChange(mappings.copy(counterpartyAccountAliases = it)) },
-            keyLabel = "Alias value",
-            valueLabel = "Account name",
-            enabled = enabled,
-        )
         val ledgerTrades = mappings.ledgerTrades
         StringListEditor(
-            label = "Trade group fields, on excluded trade-type rows (first non-blank wins)",
+            label = "Trade group fields, on ledger trade leg rows (first non-blank wins)",
             items = ledgerTrades?.key?.paths.orEmpty(),
             onChange = { paths ->
                 onChange(
@@ -314,6 +275,16 @@ internal fun TransactionMappingsFields(
                 enabled,
             )
         }
+        StrategyRulesEditor(
+            rules = mappings.rules,
+            onRulesChanged = { onChange(mappings.copy(rules = it)) },
+            context = RuleContext.API_TRANSACTION,
+            pathField = textPathField(enabled),
+            enabled = enabled,
+            title =
+                "Rules (top to bottom; the first rule to claim a value wins). They skip items, set the direction " +
+                    "(else the endpoint's own), name the counterparty, set the id, mark ledger trade legs and add fees.",
+        )
     }
 }
 
@@ -361,18 +332,6 @@ internal fun TradeMappingsEditor(
                     { onChange(mappings.copy(quoteAssetField = it.ifBlank { null })) },
                     enabled,
                 )
-                TextFieldRow(
-                    "Fixed base asset (used when the row never names it, e.g. BNB)",
-                    mappings.fixedBaseAsset.orEmpty(),
-                    { onChange(mappings.copy(fixedBaseAsset = it.ifBlank { null })) },
-                    enabled,
-                )
-                TextFieldRow(
-                    "Fixed quote asset (used when the row never names it)",
-                    mappings.fixedQuoteAsset.orEmpty(),
-                    { onChange(mappings.copy(fixedQuoteAsset = it.ifBlank { null })) },
-                    enabled,
-                )
             }
 
             InstrumentSplitMode.QUOTE_SUFFIX -> {
@@ -384,29 +343,6 @@ internal fun TradeMappingsEditor(
                 )
             }
         }
-        EnumDropdown(
-            label = "Side",
-            options = FixedSide.entries,
-            selected = FixedSide.from(mappings.fixedSideBuy),
-            onSelect = { onChange(mappings.copy(fixedSideBuy = it.toBoolean())) },
-            optionLabel = { it.label },
-            enabled = enabled,
-        )
-        if (mappings.fixedSideBuy == null) {
-            TextFieldRow(
-                "Side field",
-                mappings.sideField.orEmpty(),
-                { onChange(mappings.copy(sideField = it.ifBlank { null })) },
-                enabled,
-                isError = mappings.sideField.isNullOrBlank(),
-            )
-        }
-        StringSetEditor(
-            label = "Buy values (mean BUY side)",
-            values = mappings.buyValues,
-            onChange = { onChange(mappings.copy(buyValues = it)) },
-            enabled = enabled,
-        )
         TextFieldRow("Base quantity field", mappings.baseQuantityField, {
             onChange(mappings.copy(baseQuantityField = it))
         }, enabled, isError = mappings.baseQuantityField.isBlank())
@@ -419,13 +355,6 @@ internal fun TradeMappingsEditor(
         TextFieldRow("Quote quantity field (optional)", mappings.quoteQuantityField.orEmpty(), {
             onChange(mappings.copy(quoteQuantityField = it.ifBlank { null }))
         }, enabled)
-        FeeRuleEditor(
-            fee = mappings.fee,
-            onFeeChanged = { onChange(mappings.copy(fee = it)) },
-            pathField = { label, value, onValueChange, isError -> TextFieldRow(label, value, onValueChange, enabled, isError = isError) },
-            enabled = enabled,
-            movementOptions = false,
-        )
         TextFieldRow(
             "Timestamp field",
             mappings.timestampField,
@@ -481,8 +410,22 @@ internal fun TradeMappingsEditor(
         TextFieldRow("Time-in-force field (optional)", mappings.timeInForceField.orEmpty(), {
             onChange(mappings.copy(timeInForceField = it.ifBlank { null }))
         }, enabled)
+        StrategyRulesEditor(
+            rules = mappings.rules,
+            onRulesChanged = { onChange(mappings.copy(rules = it)) },
+            context = RuleContext.API_TRADE,
+            pathField = textPathField(enabled),
+            enabled = enabled,
+            title =
+                "Rules (top to bottom; the first rule to claim a value wins). They set the trade side (an item " +
+                    "no rule gives a side is dropped), skip items, set the id and add the fee.",
+        )
     }
 }
+
+/** A plain text field for a JSON path: data endpoints have no session sample to pick from. */
+private fun textPathField(enabled: Boolean) =
+    ConditionPathField { label, value, onValueChange, isError -> TextFieldRow(label, value, onValueChange, enabled, isError = isError) }
 
 /**
  * Editor for the optional [ApiInternalTransferReconcile]: collapses matching half-transfers recorded by
@@ -584,35 +527,8 @@ internal fun InternalTransferReconcileEditor(
     }
 }
 
-/** UI-only tri-state for [ApiTradeMappings.fixedSideBuy] - a per-item side field, or a fixed direction. */
-private enum class FixedSide(
-    val label: String,
-) {
-    PER_ITEM_FIELD("Per-item side field"),
-    FIXED_BUY("Fixed: always BUY"),
-    FIXED_SELL("Fixed: always SELL"),
-    ;
-
-    fun toBoolean(): Boolean? =
-        when (this) {
-            PER_ITEM_FIELD -> null
-            FIXED_BUY -> true
-            FIXED_SELL -> false
-        }
-
-    companion object {
-        fun from(fixedSideBuy: Boolean?): FixedSide =
-            when (fixedSideBuy) {
-                null -> PER_ITEM_FIELD
-                true -> FIXED_BUY
-                false -> FIXED_SELL
-            }
-    }
-}
-
 private fun defaultTradeMappings(): ApiTradeMappings =
     ApiTradeMappings(
-        sideField = "",
         baseQuantityField = "",
         timestampField = "",
         idField = "",
@@ -620,8 +536,7 @@ private fun defaultTradeMappings(): ApiTradeMappings =
 
 private fun ApiTradeMappings.isValidForSave(): Boolean =
     (splitMode == InstrumentSplitMode.EXPLICIT_FIELDS || !instrumentField.isNullOrBlank()) &&
-        itemFilters.all { it.isComplete() } &&
-        (!sideField.isNullOrBlank() || fixedSideBuy != null) &&
+        rules.isComplete() &&
         baseQuantityField.isNotBlank() &&
         timestampField.isNotBlank() &&
         idField.isNotBlank() &&
@@ -633,8 +548,7 @@ private fun ApiTradeMappings.isValidForSave(): Boolean =
             }
 
             InstrumentSplitMode.EXPLICIT_FIELDS -> {
-                (!baseAssetField.isNullOrBlank() || !fixedBaseAsset.isNullOrBlank()) &&
-                    (!quoteAssetField.isNullOrBlank() || !fixedQuoteAsset.isNullOrBlank())
+                !baseAssetField.isNullOrBlank() && !quoteAssetField.isNullOrBlank()
             }
 
             InstrumentSplitMode.QUOTE_SUFFIX -> {
@@ -647,16 +561,10 @@ private fun ApiTransactionMappings.isValidForSave(): Boolean =
         timestampField.isNotBlank() &&
         currencyField.isNotBlank() &&
         descriptionField.isNotBlank() &&
-        // A row with no id of its own (Binance Simple Earn rewards) is identified by a composite key instead.
-        (idField.isNotBlank() || compositeIdFields.isNotEmpty()) &&
-        direction.isComplete() &&
-        conditionsComplete()
-
-/**
- * Whether every exclusion and filter condition names its path and operand. An incomplete one
- * is not inert: a path-less "is blank" exclusion holds for every item and would exclude them all.
- */
-internal fun ApiTransactionMappings.conditionsComplete(): Boolean = (excludeWhen + itemFilters).all { it.isComplete() }
+        // A row with no id of its own (Binance Simple Earn rewards) is identified by an external id rule instead.
+        (idField.isNotBlank() || rules.any { rule -> rule.actions.any { it is RuleAction.ExternalId } }) &&
+        // An incomplete rule is not inert: a path-less "is blank" skip holds for every item and would drop them all.
+        rules.isComplete()
 
 /** Whether an [ApiEndpointConfig] is complete enough to save, independent of what kind of record it produces. */
 private fun ApiEndpointConfig.isValidForSave(): Boolean {
