@@ -12,6 +12,8 @@ import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.rules.ForeignAmount
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
@@ -1875,11 +1877,19 @@ class MonzoImportE2ETest : DbTest() {
                             config =
                                 baseStrategy.config.mapBankTransactionMappings {
                                     copy(
-                                        foreignAmount =
-                                            ForeignAmount(
-                                                amount = ValueExpr(listOf("local_amount")),
-                                                currency = ValueExpr(listOf("local_currency")),
-                                            ),
+                                        rules =
+                                            rules +
+                                                StrategyRule(
+                                                    actions =
+                                                        listOf(
+                                                            RuleAction.Foreign(
+                                                                ForeignAmount(
+                                                                    amount = ValueExpr(listOf("local_amount")),
+                                                                    currency = ValueExpr(listOf("local_currency")),
+                                                                ),
+                                                            ),
+                                                        ),
+                                                ),
                                     )
                                 },
                         )

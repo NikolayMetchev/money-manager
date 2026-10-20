@@ -66,13 +66,6 @@ internal fun <T> List<T>.replacingAt(
     value: T,
 ): List<T> = mapIndexed { i, existing -> if (i == index) value else existing }
 
-/** Holds the editable state for a single custom field mapping row. */
-data class CustomFieldState(
-    val name: String,
-    val path: String,
-    val isUniqueId: Boolean = false,
-)
-
 @Composable
 internal fun SectionHeader(text: String) {
     Text(
@@ -583,94 +576,6 @@ internal fun StringIntMapEditor(
         Icon(Icons.Default.Add, contentDescription = null)
         Spacer(Modifier.width(4.dp))
         Text("Add entry")
-    }
-}
-
-/** Expandable list of user-defined custom field mappings with add and remove controls. */
-@Composable
-internal fun CustomFieldsSection(
-    fields: List<CustomFieldState>,
-    onFieldsChange: (List<CustomFieldState>) -> Unit,
-    paths: List<JsonPathEntry>,
-    onRequestPick: PathPicker,
-    enabled: Boolean = true,
-) {
-    Text(
-        text = "Custom Fields",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 4.dp),
-    )
-    fields.forEachIndexed { index, field ->
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                OutlinedTextField(
-                    value = field.name,
-                    onValueChange = { updated ->
-                        onFieldsChange(fields.toMutableList().also { it[index] = field.copy(name = updated) })
-                    },
-                    label = { Text("Field name") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    enabled = enabled,
-                )
-                OutlinedTextField(
-                    value = field.path,
-                    onValueChange = { updated ->
-                        onFieldsChange(fields.toMutableList().also { it[index] = field.copy(path = updated) })
-                    },
-                    label = { Text("JSON path") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    enabled = enabled,
-                )
-                if (paths.isNotEmpty()) {
-                    IconButton(onClick = {
-                        onRequestPick(paths) { selected ->
-                            onFieldsChange(fields.toMutableList().also { it[index] = field.copy(path = selected) })
-                        }
-                    }, enabled = enabled) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.List,
-                            contentDescription = "Pick from session JSON",
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-                IconButton(onClick = {
-                    onFieldsChange(fields.toMutableList().also { it.removeAt(index) })
-                }, enabled = enabled) {
-                    Icon(Icons.Default.Close, contentDescription = "Remove field", tint = MaterialTheme.colorScheme.error)
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp)) {
-                Checkbox(
-                    checked = field.isUniqueId,
-                    onCheckedChange = { checked ->
-                        onFieldsChange(fields.toMutableList().also { it[index] = field.copy(isUniqueId = checked) })
-                    },
-                    enabled = enabled,
-                )
-                Text(
-                    text = "Use as unique identifier for duplicate detection",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-    TextButton(
-        onClick = { onFieldsChange(fields + CustomFieldState("", "")) },
-        modifier = Modifier.padding(top = 2.dp),
-        enabled = enabled,
-    ) {
-        Icon(Icons.Default.Add, contentDescription = null)
-        Spacer(Modifier.width(4.dp))
-        Text("Add Custom Field")
     }
 }
 

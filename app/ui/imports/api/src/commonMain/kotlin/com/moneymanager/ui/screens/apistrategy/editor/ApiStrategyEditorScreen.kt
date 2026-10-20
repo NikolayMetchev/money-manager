@@ -240,10 +240,6 @@ fun ApiStrategyEditorScreen(
                     PeopleTab(state, txJsonPaths, onRequestPick, enabled)
                 }
 
-                EditorTab.RULES -> {
-                    RulesTab(state, txJsonPaths, onRequestPick, enabled)
-                }
-
                 EditorTab.ADVANCED -> {
                     AdvancedTab(state, enabled, accountRepository, categoryRepository, personRepository)
                 }

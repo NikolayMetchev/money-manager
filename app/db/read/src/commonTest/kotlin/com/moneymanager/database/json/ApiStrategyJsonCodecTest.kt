@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiPaging
-import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
@@ -28,7 +27,15 @@ import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.AssetCodeRules
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleValue
+import com.moneymanager.domain.model.rules.StrategyRule
+import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -73,13 +80,23 @@ class ApiStrategyJsonCodecTest {
     }
 
     @Test
-    fun `people mappings ephemeral counterparty id prefixes round-trip`() {
+    fun `account rules round-trip`() {
+        val rules =
+            listOf(
+                StrategyRule(
+                    conditions = listOf(Condition("owners[1].user_id", ConditionOp.EXISTS)),
+                    actions = listOf(RuleAction.Account(AccountSide.OWN, AccountNaming(ValueExpr.of("id"), name = "Monzo Joint"))),
+                ),
+                StrategyRule(actions = listOf(RuleAction.ExternalId(RuleValue.Template("monzo:{id}")))),
+            )
         val original =
-            config(ApiPaginationConfig(paging = ApiPaging.BeforeCursor(), sendLimitParam = true))
-                .copy(peopleMappings = ApiPeopleMappings(ephemeralCounterpartyIdPrefixes = setOf("anonuser_")))
+            config(ApiPaginationConfig(paging = ApiPaging.BeforeCursor(), sendLimitParam = true)).let { config ->
+                val accounts = config.accounts as ApiAccountsSource.Downloaded
+                config.copy(accounts = accounts.copy(mappings = accounts.mappings.copy(rules = rules)))
+            }
         val decoded = ApiStrategyJsonCodec.decode(ApiStrategyJsonCodec.encode(original))
         assertEquals(original, decoded)
-        assertEquals(setOf("anonuser_"), decoded.peopleMappings.ephemeralCounterpartyIdPrefixes)
+        assertEquals(rules, (decoded.accounts as ApiAccountsSource.Downloaded).mappings.rules)
     }
 
     @Test

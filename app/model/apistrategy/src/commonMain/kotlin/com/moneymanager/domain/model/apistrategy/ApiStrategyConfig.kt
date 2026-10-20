@@ -3,10 +3,11 @@ package com.moneymanager.domain.model.apistrategy
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.Direction
-import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ForeignAmount
+import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.SortedConditionListSerializer
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.model.serialization.SortedListSerializer
 import com.moneymanager.domain.model.serialization.SortedStringListSerializer
@@ -290,12 +291,14 @@ data class ApiEndpointConfig(
  * @property accountNumberField Account/owner field holding a bank account number.
  * @property currencyField Optional account-level currency field (e.g. Wise "currency"); exposed to
  *                         templating as account.currency.
- * @property idExtraction Rewrites the [idField] value into the account's stored external id. External ids
- *                        are matched across every provider, so an id that is only unique within the
- *                        provider (PayPal's per-currency balances carry nothing but `currency`) needs a
- *                        provider prefix (`paypal:$0`). Requests still use the raw id.
- * @property descriptionExtraction Rewrites the [descriptionField] value into the account name
- *                                 (`PayPal $0`). Kept when its pattern doesn't match.
+ * @property rules What each account item decides, run over its raw JSON: its name (the first
+ *                 [com.moneymanager.domain.model.rules.AccountSide.OWN] account candidate that names one,
+ *                 else [descriptionField]), its stored external id ([RuleAction.ExternalId], else [idField]'s
+ *                 value) and its attributes. External ids are matched across every provider, so an id that
+ *                 is only unique within the provider (PayPal's per-currency balances carry nothing but
+ *                 `currency`) needs a provider prefix (`paypal:{currency}`); requests still use the raw id.
+ *                 When two accounts' rule-given names collide, the short tail of each id is appended.
+ *                 First claim wins, so order is semantic.
  */
 @Serializable
 data class ApiAccountMappings(
@@ -308,27 +311,8 @@ data class ApiAccountMappings(
     val sortCodeField: String = "sort_code",
     val accountNumberField: String = "account_number",
     val currencyField: String? = null,
-    @Serializable(with = SortedStringToStringMapSerializer::class)
-    val customFields: Map<String, String> = emptyMap(),
-    @Serializable(with = SortedStringSetSerializer::class)
-    val uniqueIdentifierFields: Set<String> = emptySet(),
-    /**
-     * A fixed display name for every account this strategy creates, overriding [descriptionField]
-     * (some providers' account "description" is an internal identifier never meant for display, e.g.
-     * Monzo's is the account holder's own user id). A joint account (more than one resolved owner)
-     * gets " Joint" appended so it's distinguishable from the holder's individual account.
-     */
-    val staticAccountName: String? = null,
-    /**
-     * Rules appending a distinguishing suffix to [staticAccountName] for accounts of a recognisable
-     * sub-kind (e.g. Monzo's `type == "uk_rewards"` -> "Monzo Rewards"), evaluated in order with the
-     * first match winning. Only used when [staticAccountName] is set.
-     */
-    val accountNameRules: List<ApiAccountNameRule> = emptyList(),
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val idExtraction: Extraction? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val descriptionExtraction: Extraction? = null,
+    val rules: List<StrategyRule> = emptyList(),
 )
 
 /** How a transaction amount value is encoded in the API response. */
@@ -380,27 +364,25 @@ data class ApiLedgerTrades(
  * @property currencyField Dot-path to the ISO-4217 currency code (e.g. "currency", "amount.currency")
  * @property descriptionField Dot-path to the transaction description
  * @property amountFormat How [amountField] is encoded; see [ApiAmountFormat]
- * @property direction Which way the money moves. Null takes the endpoint's own: a bank feed's signed
- *                  amount ([Direction.AmountSign]), a deposit endpoint's in, a withdrawal endpoint's
- *                  out. [Direction.Field] reads it from a field (Starling's `direction` = `IN`; Bybit
- *                  Earn orders listing both directions), skipping a bank item whose field is missing.
- *                  [Direction.AmountSign] on a deposit/withdrawal endpoint follows the raw amount's
+ * @property direction Which way a deposit or withdrawal moves (a bank feed claims its direction through
+ *                  [rules]). Null takes the endpoint's own: a deposit endpoint's in, a withdrawal
+ *                  endpoint's out. [Direction.Field] reads it from a field (Bybit Earn orders listing
+ *                  both directions). [Direction.AmountSign] follows the raw amount's
  *                  sign instead: Kraken books a failed deposit or withdrawal as a second ledger entry of
  *                  the opposite sign, so the movement nets to zero rather than double-booking.
  * @property idField Dot-path to the transaction's stable id, used for de-duplication
- * @property merchantNameField Optional dot-path to a merchant name; preferred counterparty name
- * @property counterpartyNameField Optional dot-path to a counterparty name; fallback for merchant
- * @property declinedWhen Conditions that each mark a transaction as declined — imported but excluded
- *                        from balances. The first that holds wins, and the value at its path becomes the
- *                        decline reason: Monzo's `decline_reason` NOT_BLANK, Starling's `status` IN
- *                        `DECLINED`. Order is semantic (it picks the reason).
- * @property foreignAmount What the counterparty was paid when the account settled in another currency
- *                       (a card abroad), parsed with [amountFormat]: the movement is booked in that
- *                       currency and the account's conversion as a trade (see [ForeignAmount]).
- * @property fee A fee charged on the transaction, imported as its own transfer linked to it via a `fee`
- *            relationship (see [FeeRule]); its amount is encoded using [amountFormat]. Monzo's
- *            `atm_fees_detailed` is a fee [FeeRule.includedInAmount]: `amount = withdrawal + fee`.
+ * @property fee A fee charged on a deposit or withdrawal, imported as its own transfer linked to it via a
+ *            `fee` relationship (see [FeeRule]); its amount is encoded using [amountFormat]. A bank feed
+ *            books its fees through [rules] instead.
  * @property ledgerTrades How a ledger's trade-type rows group into trades (see [ApiLedgerTrades]).
+ * @property rules What a bank feed's items decide, run over each item's raw JSON in order (first claim
+ *            wins): the direction ([RuleAction.SetDirection]; unclaimed, the amount's sign), a decline
+ *            ([RuleAction.Exclude], its reason recorded), the counterparty account (the first
+ *            [com.moneymanager.domain.model.rules.AccountSide.COUNTERPARTY] candidate that names one, a
+ *            built-in one such as "ATM" consolidating every match; none, the description), whether the
+ *            counterparty is a person, whether its user id is throwaway, attributes (a unique-identifier
+ *            one also identifies the item), a fee (amount in [amountFormat]; Monzo's `atm_fees_detailed`
+ *            is [FeeRule.includedInAmount]) and a foreign amount (see [ForeignAmount]).
  */
 @Serializable
 data class ApiTransactionMappings(
@@ -414,18 +396,9 @@ data class ApiTransactionMappings(
     val amountFormat: ApiAmountFormat = ApiAmountFormat.MINOR_UNITS_INTEGER,
     val direction: Direction? = null,
     val idField: String = "id",
-    val merchantNameField: String? = null,
-    val counterpartyNameField: String? = null,
     val counterpartyIdField: String? = null,
-    val declinedWhen: List<Condition> = emptyList(),
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val foreignAmount: ForeignAmount? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val fee: FeeRule? = null,
-    @Serializable(with = SortedStringToStringMapSerializer::class)
-    val customFields: Map<String, String> = emptyMap(),
-    @Serializable(with = SortedStringSetSerializer::class)
-    val uniqueIdentifierFields: Set<String> = emptySet(),
     /**
      * Dot-path to a blockchain wallet address on a deposit/withdrawal item (e.g. "address" for a
      * withdrawal destination, "source_address" for a deposit sender). When set and non-blank, the
@@ -486,6 +459,9 @@ data class ApiTransactionMappings(
      * composite key) - keeps default insertion-order serialization. Empty (the default) uses [idField] alone.
      */
     val compositeIdFields: List<String> = emptyList(),
+    // First claim wins - order is semantic, keeps default insertion-order serialization.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val rules: List<StrategyRule> = emptyList(),
 )
 
 @Serializable
@@ -493,14 +469,8 @@ data class ApiPeopleMappings(
     // Blank resolves to the transaction item itself, for providers whose counterparty fields are flat
     // (e.g. Starling) rather than nested under an object (e.g. Monzo's "counterparty").
     val counterpartyObjectField: String = "counterparty",
-    val beneficiaryAccountTypeField: String = "beneficiary_account_type",
-    val personalBeneficiaryAccountTypeValue: String = "Personal",
-    // Additional values of [beneficiaryAccountTypeField] that mark a counterparty as a person, for
-    // providers that classify person-like counterparties under several types (e.g. Starling's
-    // PAYEE/SENDER). A counterparty is personal when its type matches [personalBeneficiaryAccountTypeValue]
-    // or any of these.
-    @Serializable(with = SortedStringSetSerializer::class)
-    val personalBeneficiaryAccountTypeValues: Set<String> = emptySet(),
+    // Name of a person counterparty (one the bank feed's rules call a person), relative to
+    // [counterpartyObjectField].
     val counterpartyNameField: String = "name",
     val counterpartyUserIdField: String = "user_id",
     val counterpartySortCodeField: String = "sort_code",
@@ -512,58 +482,12 @@ data class ApiPeopleMappings(
     // present). Checked before falling back to a person's [counterpartyUserIdField], since that fallback
     // is not stable across a self-transfer (Monzo reports the account holder's own user id there).
     val counterpartyAccountIdField: String = "account_id",
-    // Prefixes marking a resolved counterparty id as ephemeral — a throwaway id that changes per
-    // transaction and so must NOT identify the counterparty account, or the same real counterparty
-    // fragments into one account per transaction (e.g. Monzo issues a fresh "anonuser_…" user id for
-    // every bank transfer to the same person). When the id begins with one of these it is discarded
-    // and the counterparty is matched by name instead. Empty = treat every id as stable.
-    @Serializable(with = SortedStringSetSerializer::class)
-    val ephemeralCounterpartyIdPrefixes: Set<String> = emptySet(),
     // When true, a counterparty's bank sub-entity (sort code + account number) identifies the
     // counterparty account in preference to [ApiTransactionMappings.counterpartyIdField]. Set for
     // providers (e.g. Starling) whose per-counterparty id can still split a single real bank account
     // across entries — the same account may appear under several counterparty ids (as a payee and a
     // sender). The id remains the fallback when no bank details are present, then the name.
     val preferBankIdentity: Boolean = false,
-)
-
-/** Sign gate for a [BuiltInCounterpartyRule]; restricts the rule to incoming or outgoing transactions. */
-@Serializable
-enum class RuleSign { ANY, NEGATIVE, POSITIVE }
-
-/**
- * A declarative rule that classifies a transaction as a well-known built-in counterparty (e.g.
- * "ATM"), so such transactions consolidate into a single account regardless of merchant details.
- * All [predicates] must match (logical AND) and the [onlyWhenSign] gate must hold.
- *
- * @property name Built-in type name; stored as the account's built-in-type attribute and used as
- *                the default counterparty account name.
- * @property onlyWhenSign Restricts the rule to incoming/outgoing transactions; ANY disables the gate.
- * @property predicates Conditions that must all hold for the rule to match.
- */
-@Serializable
-data class BuiltInCounterpartyRule(
-    val name: String,
-    val onlyWhenSign: RuleSign = RuleSign.ANY,
-    @Serializable(with = SortedConditionListSerializer::class)
-    val predicates: List<Condition> = emptyList(),
-)
-
-/**
- * A declarative rule appending [suffix] to a downloaded own account's [ApiAccountMappings.staticAccountName]
- * when all [predicates] match its raw account JSON (e.g. Monzo's `type == "uk_rewards"` -> "Rewards", so
- * that account is named "Monzo Rewards" instead of colliding with the main "Monzo" account). Evaluated
- * in list order; the first matching rule wins, so list order is meaningful (unlike [predicates] within
- * a single rule, which are all required). Only used when [ApiAccountMappings.staticAccountName] is set.
- *
- * @property suffix Appended (space-separated) to the static name when this rule matches.
- * @property predicates Conditions that must all hold (logical AND) for this rule to match.
- */
-@Serializable
-data class ApiAccountNameRule(
-    val suffix: String,
-    @Serializable(with = SortedConditionListSerializer::class)
-    val predicates: List<Condition> = emptyList(),
 )
 
 /**
@@ -1275,8 +1199,6 @@ data class ApiTokenExchange(
  * @property dataEndpoints The endpoints whose items are imported. A bank strategy has one
  *                        [ApiEndpointKind.BANK_TRANSACTIONS] feed (fetched once per account); an exchange
  *                        several (trades, orders, deposits, withdrawals).
- * @property builtInCounterpartyRules Declarative rules routing matching transactions to a single
- *                                    consolidated built-in counterparty account (e.g. ATM).
  */
 @Serializable
 data class ApiStrategyConfig(
@@ -1285,9 +1207,6 @@ data class ApiStrategyConfig(
     @Serializable(with = SortedDataEndpointListSerializer::class)
     val dataEndpoints: List<ApiDataEndpoint> = emptyList(),
     val peopleMappings: ApiPeopleMappings = ApiPeopleMappings(),
-    // First-match-wins (see resolveBuiltInCounterpartyType) - order is semantic, keeps default
-    // insertion-order serialization.
-    val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
     val signing: ApiSigningConfig? = null,
     val peopleDownload: ApiPersonImportConfig? = null,
     /**

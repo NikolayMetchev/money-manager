@@ -19,12 +19,10 @@ import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.BodyFormat
-import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
 import com.moneymanager.domain.model.apistrategy.FieldPlacement
 import com.moneymanager.domain.model.apistrategy.HttpMethodType
 import com.moneymanager.domain.model.apistrategy.NonceFormat
 import com.moneymanager.domain.model.apistrategy.NonceSpec
-import com.moneymanager.domain.model.apistrategy.RuleSign
 import com.moneymanager.domain.model.apistrategy.SecretEncoding
 import com.moneymanager.domain.model.apistrategy.SigFieldLocation
 import com.moneymanager.domain.model.apistrategy.SigPart
@@ -34,7 +32,8 @@ import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
-import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.StrategyRule
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -95,6 +94,17 @@ class ApiStrategyEditorStateTest {
                                         joinKeyField = "refid",
                                         counterpartyAliasField = "address",
                                         counterpartyAccountAliases = mapOf("INTERNAL_DEPOSIT" to "Crypto.com"),
+                                        rules =
+                                            listOf(
+                                                StrategyRule(
+                                                    conditions =
+                                                        listOf(
+                                                            Condition("metadata.mcc", ConditionOp.EQUALS, value = "6011"),
+                                                            Condition("amount", ConditionOp.NEGATIVE),
+                                                        ),
+                                                    actions = listOf(RuleAction.Skip),
+                                                ),
+                                            ),
                                     ),
                                 counterpartyAccountName = "Crypto.com Exchange Funding",
                             ),
@@ -107,20 +117,7 @@ class ApiStrategyEditorStateTest {
                         ),
                     peopleMappings =
                         ApiPeopleMappings(
-                            personalBeneficiaryAccountTypeValues = setOf("PAYEE", "SENDER"),
                             preferBankIdentity = true,
-                        ),
-                    builtInCounterpartyRules =
-                        listOf(
-                            BuiltInCounterpartyRule(
-                                name = "ATM",
-                                onlyWhenSign = RuleSign.NEGATIVE,
-                                predicates =
-                                    listOf(
-                                        Condition("metadata.mcc", ConditionOp.EQUALS, value = "6011"),
-                                        Condition("scheme", ConditionOp.EXISTS),
-                                    ),
-                            ),
                         ),
                     signing = ApiSigningConfig(triggerStatus = 401, statementCountries = setOf("GB", "US")),
                     peopleDownload =
@@ -201,40 +198,18 @@ class ApiStrategyEditorStateTest {
     }
 
     @Test
-    fun `a field direction needs its field and incoming values`() {
+    fun `an incomplete bank feed rule blocks saving`() {
         val state = ApiStrategyEditorState(strategy = null)
         state.name = "My API"
         state.updateConfig { copy(baseUrl = "https://api.example.com") }
-        state.updateConfig { mapBankTransactionMappings { copy(direction = Direction.Field(path = "", incomingValues = setOf("IN"))) } }
+        // A path-less "is blank" condition would hold for every item and skip them all.
+        val skipAll = StrategyRule(conditions = listOf(Condition("", ConditionOp.BLANK)), actions = listOf(RuleAction.Skip))
+        state.updateConfig { mapBankTransactionMappings { copy(rules = listOf(skipAll)) } }
         assertTrue(state.transactionMappingsHasError)
         state.updateConfig {
-            mapBankTransactionMappings {
-                copy(
-                    direction = Direction.Field(path = "direction", incomingValues = setOf("IN")),
-                )
-            }
+            mapBankTransactionMappings { copy(rules = listOf(skipAll.copy(conditions = listOf(Condition("type", ConditionOp.BLANK))))) }
         }
         assertFalse(state.transactionMappingsHasError)
-    }
-
-    @Test
-    fun `an incomplete exclusion or filter blocks saving`() {
-        val state = ApiStrategyEditorState(strategy = null)
-        state.name = "My API"
-        state.updateConfig { copy(baseUrl = "https://api.example.com") }
-        // A path-less "is blank" exclusion would hold for every item and exclude them all.
-        state.updateConfig { mapBankTransactionMappings { copy(excludeWhen = listOf(Condition("", ConditionOp.BLANK))) } }
-        assertTrue(state.transactionMappingsHasError)
-        state.updateConfig { mapBankTransactionMappings { copy(excludeWhen = emptyList()) } }
-        assertFalse(state.transactionMappingsHasError)
-        state.updateConfig {
-            mapBankTransactionMappings {
-                copy(
-                    itemFilters = listOf(Condition("status", ConditionOp.EQUALS, value = "")),
-                )
-            }
-        }
-        assertTrue(state.transactionMappingsHasError)
     }
 
     @Test

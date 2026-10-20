@@ -38,6 +38,8 @@ class RuleEvaluatorTest {
         assertFalse(holds(ConditionOp.MATCHES, path = "Missing cell", value = "^$"))
         assertTrue(holds(ConditionOp.EXISTS, path = "Missing cell"))
         assertFalse(holds(ConditionOp.EXISTS, path = "No such column"))
+        assertFalse(holds(ConditionOp.MISSING, path = "Missing cell"))
+        assertTrue(holds(ConditionOp.MISSING, path = "No such column"))
     }
 
     @Test

@@ -37,9 +37,10 @@ internal fun accounts(
     conditions: List<Condition> = emptyList(),
 ): StrategyRule = StrategyRule.accounts(side, namings.toList(), conditions)
 
-/** A naming that reads [column] (see [AccountNaming]). */
+/** A naming that reads [column] (see [AccountNaming]), or the first non-blank of it and [fallbacks]. */
 internal fun naming(
     column: String,
+    vararg fallbacks: String,
     pattern: String? = null,
     name: String = AccountNaming.VALUE_PLACEHOLDER,
     trim: Boolean = false,
@@ -51,7 +52,7 @@ internal fun naming(
     unidentified: Boolean = false,
 ): AccountNaming =
     AccountNaming(
-        value = ValueExpr.of(column, extraction = extraction),
+        value = ValueExpr.of(column, *fallbacks, extraction = extraction),
         trim = trim,
         pattern = pattern,
         name = name,
@@ -68,6 +69,15 @@ internal fun fixedNaming(
     name: String,
     unidentified: Boolean = false,
 ): AccountNaming = naming(column, pattern = "^", name = name, unidentified = unidentified)
+
+/**
+ * The built-in counterparty [name] (e.g. "ATM"): every record naming it consolidates into one account. It
+ * reads [column], which every record has, only so that the naming applies.
+ */
+internal fun builtInNaming(
+    column: String,
+    name: String,
+): AccountNaming = AccountNaming(value = ValueExpr.of(column), name = name, builtIn = true)
 
 /**
  * Tags the row with [column]'s value as a [typeName] attribute. With an [extraction] the attribute is the
@@ -118,3 +128,27 @@ internal fun fee(
     fee: FeeRule,
     conditions: List<Condition> = emptyList(),
 ): StrategyRule = rule(RuleAction.Fee(fee), conditions = conditions)
+
+/**
+ * The direction [field] gives: in when it is one of [incomingValues] (comma-separated), out for any other
+ * value. An item missing [field] although it moved money ([amountField] isn't zero) is skipped: its
+ * direction is unknown, and guessing a debit would be wrong half the time.
+ */
+internal fun directionFromField(
+    field: String,
+    incomingValues: String,
+    amountField: String,
+): List<StrategyRule> =
+    listOf(
+        incomingWhen(Condition(field, ConditionOp.IN, incomingValues)),
+        rule(RuleAction.SetDirection(incoming = false), conditions = listOf(Condition(field, ConditionOp.EXISTS))),
+    ) +
+        listOf(ConditionOp.POSITIVE, ConditionOp.NEGATIVE).map { sign ->
+            rule(RuleAction.Skip, conditions = listOf(Condition(field, ConditionOp.MISSING), Condition(amountField, sign)))
+        }
+
+/** The record is declined (imported, but excluded from balances) when [condition] holds, [reasonField]'s value its reason. */
+internal fun declinedWhen(
+    condition: Condition,
+    reasonField: String = condition.path,
+): StrategyRule = rule(RuleAction.Exclude(RuleValue.read(reasonField)), conditions = listOf(condition))

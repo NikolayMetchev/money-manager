@@ -175,6 +175,7 @@ private fun ConditionOpDropdown(
 fun ConditionOp.label(): String =
     when (this) {
         ConditionOp.EXISTS -> "exists"
+        ConditionOp.MISSING -> "is missing"
         ConditionOp.BLANK -> "is blank"
         ConditionOp.NOT_BLANK -> "is not blank"
         ConditionOp.EQUALS -> "equals value"

@@ -108,7 +108,6 @@ private val sectionLabels =
         "accounts.ancestorEndpoints" to "Ancestor endpoint",
         "accounts" to "Account",
         "peopleMappings" to "",
-        "builtInCounterpartyRules" to "Counterparty rule",
         "dataEndpoints" to "Data endpoint",
         "peopleDownload" to "People download",
         "requestSigning" to "Request signing",

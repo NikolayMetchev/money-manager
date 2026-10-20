@@ -26,8 +26,8 @@ class ApiStrategyAuditLabelTest {
         assertEquals("Accounts endpoint pagination paging param", labelForPath("accounts.endpoint.pagination.paging.param"))
         assertEquals("Ancestor endpoint #2 path", labelForPath("accounts.ancestorEndpoints[1].path"))
         assertEquals(
-            "Data endpoint #1 transaction mappings merchant name field",
-            labelForPath("dataEndpoints[0].transactionMappings.merchantNameField"),
+            "Data endpoint #1 transaction mappings counterparty ID field",
+            labelForPath("dataEndpoints[0].transactionMappings.counterpartyIdField"),
         )
         assertEquals("Request signing algorithm", labelForPath("requestSigning.algorithm"))
     }
@@ -36,10 +36,7 @@ class ApiStrategyAuditLabelTest {
     fun `the people section contributes no prefix so its labels stay as they read`() {
         assertEquals("Counterparty object field", labelForPath("peopleMappings.counterpartyObjectField"))
         assertEquals("Counterparty name field", labelForPath("peopleMappings.counterpartyNameField"))
-        assertEquals(
-            "Personal beneficiary account type value",
-            labelForPath("peopleMappings.personalBeneficiaryAccountTypeValue"),
-        )
+        assertEquals("Counterparty sort code field", labelForPath("peopleMappings.counterpartySortCodeField"))
     }
 
     @Test
@@ -55,7 +52,6 @@ class ApiStrategyAuditLabelTest {
 
     @Test
     fun `user-named map keys are left exactly as typed`() {
-        assertEquals("Account custom fields Monzo category", labelForPath("accounts.mappings.customFields.Monzo category"))
         assertEquals("Asset codes aliases XXBT", labelForPath("assetCodes.aliases.XXBT"))
         assertEquals("Minor unit decimal places GBP", labelForPath("minorUnitDecimalPlaces.GBP"))
     }

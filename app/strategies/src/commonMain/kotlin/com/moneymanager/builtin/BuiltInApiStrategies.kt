@@ -3,7 +3,6 @@ package com.moneymanager.builtin
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiAccountBridge
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
-import com.moneymanager.domain.model.apistrategy.ApiAccountNameRule
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
@@ -28,7 +27,6 @@ import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.ApiValueSet
 import com.moneymanager.domain.model.apistrategy.BodyFormat
-import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
 import com.moneymanager.domain.model.apistrategy.FieldPlacement
 import com.moneymanager.domain.model.apistrategy.HttpMethodType
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
@@ -39,7 +37,6 @@ import com.moneymanager.domain.model.apistrategy.NonceFormat
 import com.moneymanager.domain.model.apistrategy.NonceSpec
 import com.moneymanager.domain.model.apistrategy.ParamStringFormat
 import com.moneymanager.domain.model.apistrategy.RequestIdSpec
-import com.moneymanager.domain.model.apistrategy.RuleSign
 import com.moneymanager.domain.model.apistrategy.SecretEncoding
 import com.moneymanager.domain.model.apistrategy.SigFieldLocation
 import com.moneymanager.domain.model.apistrategy.SigPart
@@ -47,6 +44,7 @@ import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
+import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
@@ -54,6 +52,9 @@ import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ForeignAmount
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleValue
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -103,17 +104,23 @@ object BuiltInApiStrategies {
                                 ApiAccountMappings(
                                     ownerNameField = "preferred_name",
                                     // Monzo's account "description" is the account holder's own user id, not a
-                                    // display name — Monzo's API has no field meant for this, so use a fixed name
-                                    // ("Monzo Joint" for a joint account, detected by having more than one owner).
-                                    staticAccountName = "Monzo",
-                                    // Monzo's cashback/rewards opt-in is a pseudo-account with no bank details and (for
-                                    // most users) no activity — it would otherwise collide with the main "Monzo" name.
-                                    accountNameRules =
+                                    // display name — Monzo's API has no field meant for this, so use a fixed name.
+                                    rules =
                                         listOf(
-                                            ApiAccountNameRule(
-                                                suffix = "Rewards",
-                                                predicates = listOf(Condition("type", ConditionOp.EQUALS, value = "uk_rewards")),
+                                            // Monzo's cashback/rewards opt-in is a pseudo-account with no bank details and
+                                            // (for most users) no activity — it would otherwise collide with "Monzo".
+                                            accounts(
+                                                AccountSide.OWN,
+                                                fixedNaming("id", "Monzo Rewards"),
+                                                conditions = listOf(Condition("type", ConditionOp.EQUALS, value = "uk_rewards")),
                                             ),
+                                            // A joint account has more than one owner.
+                                            accounts(
+                                                AccountSide.OWN,
+                                                fixedNaming("id", "Monzo Joint"),
+                                                conditions = listOf(Condition("owners[1].user_id", ConditionOp.EXISTS)),
+                                            ),
+                                            accounts(AccountSide.OWN, fixedNaming("id", "Monzo")),
                                         ),
                                 ),
                         ),
@@ -133,30 +140,62 @@ object BuiltInApiStrategies {
                                 kind = ApiEndpointKind.BANK_TRANSACTIONS,
                                 transactionMappings =
                                     ApiTransactionMappings(
-                                        merchantNameField = "merchant.name",
-                                        counterpartyNameField = "counterparty.name",
                                         counterpartyIdField = "counterparty.id",
-                                        declinedWhen = listOf(Condition("decline_reason", ConditionOp.NOT_BLANK)),
-                                        // A card payment abroad: Monzo settles in GBP and reports what the merchant
-                                        // was paid alongside, so the spend is booked in that currency.
-                                        foreignAmount =
-                                            ForeignAmount(
-                                                amount = ValueExpr(listOf("local_amount")),
-                                                currency = ValueExpr(listOf("local_currency")),
-                                            ),
-                                        // Foreign ATM withdrawals above the fee-free allowance carry a charge in
-                                        // `atm_fees_detailed.fee_amount` (integer minor units; null/0 otherwise). Import it
-                                        // as its own linked fee transfer. Monzo's `amount` is gross (= withdrawal_amount +
-                                        // fee_amount), so the fee is carved out of the main transfer rather than added on top.
-                                        fee = FeeRule(amount = ValueExpr(listOf("atm_fees_detailed.fee_amount")), includedInAmount = true),
+                                        rules =
+                                            monzoAtmRules +
+                                                listOf(
+                                                    accounts(AccountSide.COUNTERPARTY, naming("merchant.name", "counterparty.name")),
+                                                    declinedWhen(Condition("decline_reason", ConditionOp.NOT_BLANK)),
+                                                    rule(
+                                                        RuleAction.CounterpartyIsPerson,
+                                                        conditions =
+                                                            listOf(
+                                                                Condition(
+                                                                    "counterparty.beneficiary_account_type",
+                                                                    ConditionOp.EQUALS_IGNORE_CASE,
+                                                                    value = "Personal",
+                                                                ),
+                                                            ),
+                                                    ),
+                                                    // Monzo issues a throwaway `anonuser_…` user id for every bank transfer, so
+                                                    // the same person would otherwise become one counterparty account per
+                                                    // transaction; such no-bank counterparties are matched by name instead.
+                                                    rule(
+                                                        RuleAction.IgnoreCounterpartyId,
+                                                        conditions =
+                                                            listOf(
+                                                                Condition(
+                                                                    "counterparty.user_id",
+                                                                    ConditionOp.STARTS_WITH,
+                                                                    value = "anonuser_",
+                                                                ),
+                                                            ),
+                                                    ),
+                                                    // A card payment abroad: Monzo settles in GBP and reports what the merchant
+                                                    // was paid alongside, so the spend is booked in that currency.
+                                                    rule(
+                                                        RuleAction.Foreign(
+                                                            ForeignAmount(
+                                                                amount = ValueExpr(listOf("local_amount")),
+                                                                currency = ValueExpr(listOf("local_currency")),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                    // Foreign ATM withdrawals above the fee-free allowance carry a charge in
+                                                    // `atm_fees_detailed.fee_amount` (integer minor units; null/0 otherwise).
+                                                    // Import it as its own linked fee transfer. Monzo's `amount` is gross
+                                                    // (= withdrawal_amount + fee_amount), so the fee is carved out of the main
+                                                    // transfer rather than added on top.
+                                                    fee(
+                                                        FeeRule(
+                                                            amount = ValueExpr(listOf("atm_fees_detailed.fee_amount")),
+                                                            includedInAmount = true,
+                                                        ),
+                                                    ),
+                                                ),
                                     ),
                             ),
                         ),
-                    // Monzo issues a throwaway `anonuser_…` user id for every bank transfer, so the same person
-                    // would otherwise become one counterparty account per transaction. Mark the prefix ephemeral
-                    // so such no-bank counterparties are matched by name instead.
-                    peopleMappings = ApiPeopleMappings(ephemeralCounterpartyIdPrefixes = setOf("anonuser_")),
-                    builtInCounterpartyRules = monzoAtmRules,
                     personExternalIdAttribute = "monzo-external-id",
                     tokenPageUrl = "https://developers.monzo.com/",
                     connectInstructions =
@@ -197,8 +236,11 @@ object BuiltInApiStrategies {
                                     descriptionField = "currency",
                                     ownersArrayField = null,
                                     currencyField = "currency",
-                                    idExtraction = Extraction(pattern = "^(.+)$", outputTemplate = "paypal:$1"),
-                                    descriptionExtraction = Extraction(pattern = "^(.+)$", outputTemplate = "PayPal $1"),
+                                    rules =
+                                        listOf(
+                                            rule(RuleAction.ExternalId(RuleValue.Template("paypal:{currency}"))),
+                                            accounts(AccountSide.OWN, naming("currency", name = "PayPal {value}")),
+                                        ),
                                 ),
                         ),
                     dataEndpoints =
@@ -248,34 +290,37 @@ object BuiltInApiStrategies {
                                         timestampField = "transaction_info.transaction_initiation_date",
                                         descriptionField = "transaction_info.transaction_subject",
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                                        direction = Direction.AmountSign(),
-                                        counterpartyNameField = "payer_info.payer_name.alternate_full_name",
-                                        declinedWhen =
+                                        rules =
                                             listOf(
-                                                Condition("transaction_info.transaction_status", ConditionOp.EQUALS, value = "D"),
-                                            ),
-                                        // The amount is gross; PayPal's fee (negative) comes off on top of it.
-                                        fee =
-                                            FeeRule(
-                                                amount = ValueExpr.of("transaction_info.fee_amount.value"),
-                                                currency = ValueExpr.of("transaction_info.fee_amount.currency_code"),
-                                            ),
-                                        customFields =
-                                            mapOf(
-                                                "paypal-event-code" to "transaction_info.transaction_event_code",
-                                                "paypal-payer-email" to "payer_info.email_address",
+                                                // Event codes T02xx are currency conversions: one item per currency, both
+                                                // routed through one account so the pair nets out.
+                                                accounts(
+                                                    AccountSide.COUNTERPARTY,
+                                                    builtInNaming("transaction_info.transaction_id", "PayPal Currency Conversion"),
+                                                    conditions =
+                                                        listOf(
+                                                            Condition(
+                                                                "transaction_info.transaction_event_code",
+                                                                ConditionOp.STARTS_WITH,
+                                                                value = "T02",
+                                                            ),
+                                                        ),
+                                                ),
+                                                accounts(AccountSide.COUNTERPARTY, naming("payer_info.payer_name.alternate_full_name")),
+                                                declinedWhen(
+                                                    Condition("transaction_info.transaction_status", ConditionOp.EQUALS, value = "D"),
+                                                ),
+                                                // The amount is gross; PayPal's fee (negative) comes off on top of it.
+                                                fee(
+                                                    FeeRule(
+                                                        amount = ValueExpr.of("transaction_info.fee_amount.value"),
+                                                        currency = ValueExpr.of("transaction_info.fee_amount.currency_code"),
+                                                    ),
+                                                ),
+                                                attribute("transaction_info.transaction_event_code", "paypal-event-code"),
+                                                attribute("payer_info.email_address", "paypal-payer-email"),
                                             ),
                                     ),
-                            ),
-                        ),
-                    // Event codes T02xx are currency conversions: one item per currency, both routed through
-                    // one account so the pair nets out.
-                    builtInCounterpartyRules =
-                        listOf(
-                            BuiltInCounterpartyRule(
-                                name = "PayPal Currency Conversion",
-                                predicates =
-                                    listOf(Condition("transaction_info.transaction_event_code", ConditionOp.STARTS_WITH, value = "T02")),
                             ),
                         ),
                     tokenPageUrl = "https://developer.paypal.com/dashboard/applications/live",
@@ -296,34 +341,23 @@ object BuiltInApiStrategies {
      * Monzo ATM-detection expressed declaratively (moved out of the import engine). Each rule routes
      * matching outgoing transactions to a single consolidated "ATM" counterparty account.
      */
-    private val monzoAtmRules: List<BuiltInCounterpartyRule> =
+    private val monzoAtmRules: List<StrategyRule> =
         listOf(
-            BuiltInCounterpartyRule(
-                name = "ATM",
-                onlyWhenSign = RuleSign.NEGATIVE,
-                predicates = listOf(Condition("atm_fees_detailed", ConditionOp.EXISTS)),
+            listOf(Condition("atm_fees_detailed", ConditionOp.EXISTS)),
+            listOf(Condition("labels", ConditionOp.ANY_ELEMENT_STARTS_WITH, value = "withdrawal.atm")),
+            listOf(Condition("metadata.mcc", ConditionOp.EQUALS, value = "6011")),
+            listOf(
+                Condition("category", ConditionOp.EQUALS_IGNORE_CASE, value = "cash"),
+                Condition("merchant", ConditionOp.EMPTY_OBJECT),
+                Condition("counterparty", ConditionOp.EMPTY_OBJECT),
             ),
-            BuiltInCounterpartyRule(
-                name = "ATM",
-                onlyWhenSign = RuleSign.NEGATIVE,
-                predicates = listOf(Condition("labels", ConditionOp.ANY_ELEMENT_STARTS_WITH, value = "withdrawal.atm")),
-            ),
-            BuiltInCounterpartyRule(
-                name = "ATM",
-                onlyWhenSign = RuleSign.NEGATIVE,
-                predicates = listOf(Condition("metadata.mcc", ConditionOp.EQUALS, value = "6011")),
-            ),
-            BuiltInCounterpartyRule(
-                name = "ATM",
-                onlyWhenSign = RuleSign.NEGATIVE,
-                predicates =
-                    listOf(
-                        Condition("category", ConditionOp.EQUALS_IGNORE_CASE, value = "cash"),
-                        Condition("merchant", ConditionOp.EMPTY_OBJECT),
-                        Condition("counterparty", ConditionOp.EMPTY_OBJECT),
-                    ),
-            ),
-        )
+        ).map { conditions ->
+            accounts(
+                AccountSide.COUNTERPARTY,
+                builtInNaming("id", "ATM"),
+                conditions = listOf(Condition("amount", ConditionOp.NEGATIVE)) + conditions,
+            )
+        }
 
     /**
      * The built-in Wise API import strategy. Wise has a three-level hierarchy
@@ -388,10 +422,10 @@ object BuiltInApiStrategies {
                                         timestampField = "date",
                                         descriptionField = "details.description",
                                         amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
-                                        direction = Direction.Field(path = "type", incomingValues = setOf("CREDIT")),
                                         idField = "referenceNumber",
-                                        merchantNameField = "details.merchant.name",
-                                        counterpartyNameField = "details.senderName",
+                                        rules =
+                                            directionFromField("type", incomingValues = "CREDIT", amountField = "amount.value") +
+                                                accounts(AccountSide.COUNTERPARTY, naming("details.merchant.name", "details.senderName")),
                                     ),
                             ),
                         ),
@@ -494,34 +528,46 @@ object BuiltInApiStrategies {
                                         timestampField = "transactionTime",
                                         descriptionField = "reference",
                                         amountFormat = ApiAmountFormat.MINOR_UNITS_INTEGER,
-                                        direction = Direction.Field(path = "direction", incomingValues = setOf("IN")),
                                         idField = "feedItemUid",
-                                        counterpartyNameField = "counterPartyName",
                                         // counterPartyUid is the fallback counterparty-account id; bank details
                                         // (sub-entity sort code + account number) take precedence where present, see
                                         // peopleMappings.preferBankIdentity. A single real account can otherwise be
                                         // split across uids (e.g. the same account as both a payee and a sender).
                                         counterpartyIdField = "counterPartyUid",
-                                        // Declined feed items never moved money; import them but exclude from balances
-                                        // (same treatment as Monzo's `decline_reason`), keyed off Starling's status.
-                                        declinedWhen = listOf(Condition("status", ConditionOp.IN, value = "DECLINED")),
-                                        // Persist the feed item's stable id as a transaction attribute so each imported
-                                        // transfer is uniquely identifiable and re-imports dedupe on it.
-                                        customFields = mapOf("starling-transaction-id" to "feedItemUid"),
-                                        uniqueIdentifierFields = setOf("starling-transaction-id"),
+                                        rules =
+                                            directionFromField("direction", incomingValues = "IN", amountField = "amount.minorUnits") +
+                                                listOf(
+                                                    accounts(AccountSide.COUNTERPARTY, naming("counterPartyName")),
+                                                    // Declined feed items never moved money; import them but exclude from
+                                                    // balances (same treatment as Monzo's `decline_reason`), keyed off
+                                                    // Starling's status.
+                                                    declinedWhen(Condition("status", ConditionOp.IN, value = "DECLINED")),
+                                                    // PAYEE/SENDER counterparties are people; MERCHANT/STARLING are not.
+                                                    rule(
+                                                        RuleAction.CounterpartyIsPerson,
+                                                        conditions =
+                                                            listOf(
+                                                                Condition(
+                                                                    "counterPartyType",
+                                                                    ConditionOp.MATCHES,
+                                                                    value = "^(Personal|PAYEE|SENDER)$",
+                                                                ),
+                                                            ),
+                                                    ),
+                                                    // Persist the feed item's stable id as a transaction attribute so each
+                                                    // imported transfer is uniquely identifiable and re-imports dedupe on it.
+                                                    attribute("feedItemUid", "starling-transaction-id", unique = true),
+                                                ),
                                     ),
                             ),
                         ),
                     // Per-account endpoint that returns the account's own sort code + account number, so the
                     // source account can be matched/merged with counterparties other providers create for it.
                     // Starling's counterparty fields are flat on the feed item (no nested object), so the
-                    // counterparty object path is blank (the item itself). PAYEE/SENDER counterparties are
-                    // people; MERCHANT/STARLING are not. counterPartyUid identifies the person.
+                    // counterparty object path is blank (the item itself). counterPartyUid identifies the person.
                     peopleMappings =
                         ApiPeopleMappings(
                             counterpartyObjectField = "",
-                            beneficiaryAccountTypeField = "counterPartyType",
-                            personalBeneficiaryAccountTypeValues = setOf("PAYEE", "SENDER"),
                             counterpartyNameField = "counterPartyName",
                             counterpartyUserIdField = "counterPartyUid",
                             // Starling exposes the counterparty's bank details flat on the feed item;
