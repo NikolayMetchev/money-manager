@@ -253,8 +253,8 @@ object BuiltInCsvStrategies {
     private const val BINANCE_ACCOUNT = "Binance"
 
     /**
-     * Binance counterparty accounts the API strategy also creates (`ApiDataEndpoint`'s
-     * `counterpartyAccountName`). Naming them identically is what makes the CSV's and the API's
+     * Binance counterparty accounts the API strategy also creates (its endpoints' counterparty
+     * `Account` rules). Naming them identically is what makes the CSV's and the API's
      * versions of the same deposit/withdrawal/earn movement reconcilable.
      */
     private const val BINANCE_FEES_ACCOUNT = "Binance Fees"

@@ -29,6 +29,7 @@ kmp_test(
         "//app/strategycatalog",
         "//bazel/kmp/deps:kotlin_test",
         "//utils/currency",
+        "@maven_kmp//:kotlinx_serialization_json",
     ],
     jvm_srcs = glob(["src/test/kotlin/**/*.kt"]),
 )
