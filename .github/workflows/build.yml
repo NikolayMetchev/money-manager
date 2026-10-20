@@ -304,11 +304,14 @@ jobs:
           config: rbe-mac
           cache-name: macos
 
-      # Only the macosArm64 targets, plus `mm` (its macosArm64 binary is `manual`): Build and Test already builds the
-      # rest on Linux, and a Mac would redo it on its own JDK, missing the cache (the Android release's R8 alone took
-      # ~10 minutes).
+      # Only the macosArm64 targets: Build and Test already builds the rest on Linux, and a Mac would redo it on its
+      # own JDK, missing the cache (the Android release's R8 alone took ~10 minutes). Main also links `mm` (its
+      # macosArm64 binary is `manual`); a PR leaves it out. Its optimised, uncached link is ~17 of a PR's ~25 minutes
+      # on the 3-core runner, and the cli and tui test binaries already link the same closure for macosArm64.
       - name: Build
-        run: bazel build $(bazel query 'attr(name, "_macosArm64", //...) except attr(tags, manual, //...)') //app/main/cli:mm 2>&1 | tee build.log
+        env:
+          MM: ${{ github.event_name == 'pull_request' && ' ' || '//app/main/cli:mm' }}
+        run: bazel build $(bazel query 'attr(name, "_macosArm64", //...) except attr(tags, manual, //...)') $MM 2>&1 | tee build.log
 
       - name: Test
         run: bazel test $(bazel query 'attr(name, "_macosArm64$", tests(//...))') 2>&1 | tee test.log
