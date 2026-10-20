@@ -236,6 +236,10 @@ fun ApiStrategyEditorScreen(
                     TransactionMappingsTab(state, txJsonPaths, txSampleItem != null, onRequestPick, enabled)
                 }
 
+                EditorTab.RULES -> {
+                    RulesTab(state, accountJsonPaths, txJsonPaths, onRequestPick, enabled)
+                }
+
                 EditorTab.PEOPLE -> {
                     PeopleTab(state, txJsonPaths, onRequestPick, enabled)
                 }

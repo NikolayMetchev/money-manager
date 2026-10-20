@@ -7,8 +7,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
-import com.moneymanager.ui.components.rules.RuleContext
-import com.moneymanager.ui.components.rules.StrategyRulesEditor
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /** Edits [ApiAccountMappings] in place inside the strategy config. */
@@ -98,16 +96,6 @@ internal fun AccountMappingsTab(
             accountJsonPaths,
             onRequestPick,
             enabled,
-        )
-        StrategyRulesEditor(
-            rules = mappings.rules,
-            onRulesChanged = { v -> state.updateAccountMappings { copy(rules = v) } },
-            context = RuleContext.API_ACCOUNT,
-            pathField = jsonPathField(accountJsonPaths, onRequestPick, enabled),
-            enabled = enabled,
-            title =
-                "Rules (top to bottom; the first rule to claim a value wins). They name the account (else the " +
-                    "description field), set its stored id (else the id field) and add attributes.",
         )
     }
 }

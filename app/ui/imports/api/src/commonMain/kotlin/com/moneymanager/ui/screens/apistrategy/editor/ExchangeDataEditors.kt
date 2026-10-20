@@ -40,15 +40,8 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.components.AccountPicker
-import com.moneymanager.ui.components.rules.ConditionPathField
-import com.moneymanager.ui.components.rules.RuleContext
-import com.moneymanager.ui.components.rules.StrategyRulesEditor
-import com.moneymanager.ui.components.rules.isComplete
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-
-/** Kinds whose records are interpreted by [ApiTradeMappings]; the rest use [ApiTransactionMappings]. */
-private val TRADE_KINDS = setOf(ApiEndpointKind.TRADES, ApiEndpointKind.ORDERS)
 
 /** Editor for a single-account source: an exchange imports into one fixed account holding all assets. */
 @Composable
@@ -275,16 +268,6 @@ internal fun TransactionMappingsFields(
                 enabled,
             )
         }
-        StrategyRulesEditor(
-            rules = mappings.rules,
-            onRulesChanged = { onChange(mappings.copy(rules = it)) },
-            context = RuleContext.API_TRANSACTION,
-            pathField = textPathField(enabled),
-            enabled = enabled,
-            title =
-                "Rules (top to bottom; the first rule to claim a value wins). They skip items, set the direction " +
-                    "(else the endpoint's own), name the counterparty, set the id, mark ledger trade legs and add fees.",
-        )
     }
 }
 
@@ -410,22 +393,8 @@ internal fun TradeMappingsEditor(
         TextFieldRow("Time-in-force field (optional)", mappings.timeInForceField.orEmpty(), {
             onChange(mappings.copy(timeInForceField = it.ifBlank { null }))
         }, enabled)
-        StrategyRulesEditor(
-            rules = mappings.rules,
-            onRulesChanged = { onChange(mappings.copy(rules = it)) },
-            context = RuleContext.API_TRADE,
-            pathField = textPathField(enabled),
-            enabled = enabled,
-            title =
-                "Rules (top to bottom; the first rule to claim a value wins). They set the trade side (an item " +
-                    "no rule gives a side is dropped), skip items, set the id and add the fee.",
-        )
     }
 }
-
-/** A plain text field for a JSON path: data endpoints have no session sample to pick from. */
-private fun textPathField(enabled: Boolean) =
-    ConditionPathField { label, value, onValueChange, isError -> TextFieldRow(label, value, onValueChange, enabled, isError = isError) }
 
 /**
  * Editor for the optional [ApiInternalTransferReconcile]: collapses matching half-transfers recorded by
@@ -527,7 +496,7 @@ internal fun InternalTransferReconcileEditor(
     }
 }
 
-private fun defaultTradeMappings(): ApiTradeMappings =
+internal fun defaultTradeMappings(): ApiTradeMappings =
     ApiTradeMappings(
         baseQuantityField = "",
         timestampField = "",
@@ -536,7 +505,6 @@ private fun defaultTradeMappings(): ApiTradeMappings =
 
 private fun ApiTradeMappings.isValidForSave(): Boolean =
     (splitMode == InstrumentSplitMode.EXPLICIT_FIELDS || !instrumentField.isNullOrBlank()) &&
-        rules.isComplete() &&
         baseQuantityField.isNotBlank() &&
         timestampField.isNotBlank() &&
         idField.isNotBlank() &&
@@ -562,9 +530,7 @@ private fun ApiTransactionMappings.isValidForSave(): Boolean =
         currencyField.isNotBlank() &&
         descriptionField.isNotBlank() &&
         // A row with no id of its own (Binance Simple Earn rewards) is identified by an external id rule instead.
-        (idField.isNotBlank() || rules.any { rule -> rule.actions.any { it is RuleAction.ExternalId } }) &&
-        // An incomplete rule is not inert: a path-less "is blank" skip holds for every item and would drop them all.
-        rules.isComplete()
+        (idField.isNotBlank() || rules.any { rule -> rule.actions.any { it is RuleAction.ExternalId } })
 
 /** Whether an [ApiEndpointConfig] is complete enough to save, independent of what kind of record it produces. */
 private fun ApiEndpointConfig.isValidForSave(): Boolean {

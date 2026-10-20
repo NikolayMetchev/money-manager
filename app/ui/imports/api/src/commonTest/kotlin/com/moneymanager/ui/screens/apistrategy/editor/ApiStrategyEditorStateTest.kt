@@ -202,11 +202,12 @@ class ApiStrategyEditorStateTest {
         // A path-less "is blank" condition would hold for every item and skip them all.
         val skipAll = StrategyRule(conditions = listOf(Condition("", ConditionOp.BLANK)), actions = listOf(RuleAction.Skip))
         state.updateConfig { mapBankTransactionMappings { copy(rules = listOf(skipAll)) } }
-        assertTrue(state.transactionMappingsHasError)
+        assertTrue(state.rulesHasError)
+        assertFalse(state.isValid)
         state.updateConfig {
             mapBankTransactionMappings { copy(rules = listOf(skipAll.copy(conditions = listOf(Condition("type", ConditionOp.BLANK))))) }
         }
-        assertFalse(state.transactionMappingsHasError)
+        assertFalse(state.rulesHasError)
     }
 
     @Test
