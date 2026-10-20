@@ -21,7 +21,7 @@ nothing) and features that only built-ins could configure. Don't recreate that d
 
 **How to apply:**
 - Before adding a config field, rule type, pipeline or screen, look for the existing concept that
-  already covers it — `Condition`, `ValueExpr`, `Direction`, `AccountRule`, `LegGroupRule`, `FeeRule`,
+  already covers it — `StrategyRule`/`RuleAction`, `Condition`, `ValueExpr`, `LegGroupRule`, `FeeRule`,
   `ApiPaging`/`ApiDateWindowing`, `ApiAccountsSource`, the `ImportBatch` intents, the leg matcher —
   and extend or parameterize that.
 - A new data source should be **configuration, not code**. If a source can't be expressed, find the
@@ -131,10 +131,10 @@ workflow because label events start it: any other label's run skips, without can
 | `utils/httpclient/` | The one place the Ktor engine is chosen: `platformHttpClient()` runs on Ktor's `ktor-client-engine-defaults` (OkHttp on JVM/Android, Curl on Linux, Darwin on macOS, WinHttp on Windows; native TLS comes from the OS or the statically linked libcurl), found by engine discovery. Build every production `HttpClient` with it, never with a named engine. ProGuard keeps `OkHttpEngineContainer` for the ServiceLoader lookup |
 | `utils/compose/{filePicker,scrollbar}/` | Platform file/folder pickers and scrollbar widgets |
 | `app/model/core/` | The flat `domain.model` package: entities, ids, `Money`, audit entries. Depends on nothing but `utils/bigdecimal` and `utils/files` |
-| `app/model/rules/` | The strategy vocabulary that CSV and API share: `Condition`, `ValueExpr`, `Direction`, `AssetCodeRules`, `FeeRule`, `RuleEvaluator` — see **Import Strategies** |
+| `app/model/rules/` | The strategy vocabulary that CSV and API share: `StrategyRule`/`RuleAction` and their `RuleEngine`, `Condition`, `ValueExpr`, `AssetCodeRules`, `FeeRule`, `ForeignAmount`, `RuleEvaluator` — see **Import Strategies** |
 | `app/model/{apistrategy,accountmapping,csv,qif,csvstrategy,importdirectory,passthrough,reconciliation,timeline}/` | One module per `domain.model` sub-package. All depend on `model/core`; `qif`→`csv`, `csvstrategy`→`qif`+`accountmapping` |
 | `app/model/repository/read/`, `app/model/repository/write/` | `*ReadRepository` / `*WriteRepository` interfaces. `write` depends on `read` (each write interface extends its read) |
-| `app/db/schema/`, `app/db/read/`, `app/db/repository/`, `app/db/write/`, `app/db/core/` | SQLDelight schema; generated read SQL + Mappie mappers + JSON codecs (and the strategy config migrations); read repository impls; write SQL + impls; `DatabaseManager` and services |
+| `app/db/schema/`, `app/db/read/`, `app/db/repository/`, `app/db/write/`, `app/db/core/` | SQLDelight schema; generated read SQL + Mappie mappers + JSON codecs; read repository impls; write SQL + impls; `DatabaseManager` and services |
 | `app/db/seed/`, `app/db/schemaspy/` | Static seed SQL; SchemaSpy docs generator for the Pages site |
 | `app/cryptodata/` | Bundled crypto asset catalog plus its refresher/installer (built by `tools/crypto-dataset`) |
 | `app/tasks/` | The one progress type `Progress` (every import, download, DB open and cloud sync reports it), its `PhasedProgress`/`WeightedProgress` folding helpers, and `TaskManager`: background tasks as a `StateFlow`, deduped by key, with child tasks and cancellation. Pure coroutines, so the UI, CLI and TUI share it; the Compose `TaskPanel` (`app/ui/foundation`) only collects it |
@@ -160,7 +160,7 @@ workflow because label events start it: any other label's run skips, without can
 | `app/db/di/`, `app/remotestorage/di/`, `app/strategycatalog/di/`, `utils/localsettings/di/`, `utils/credentialvault/di/` | Each feature's Metro modules, next to the code they provide |
 | `app/importfilesource/di/` | Platform factories for import file sources (not Metro — the entry points call these directly) |
 | `app/ui/core/` | Compose UI shell: app, navigation, setup wizard (JVM/Android only) |
-| `app/ui/{foundation,components}/` | Platform UI helpers; shared widgets and editors (pickers, `ConditionsEditor`, `DirectionEditor`, …) |
+| `app/ui/{foundation,components}/` | Platform UI helpers; shared widgets and editors (pickers, `ConditionsEditor`, `StrategyRulesEditor`, …) |
 | `app/ui/{accounts,audit,categories,currencies,people,settings,transactions}/`, `app/ui/imports/{api,csv,qif,importDirectory,reconciliation,timeline}/` | One module per feature screen |
 | `tools/{strategy-catalog,crypto-dataset}/` | Build-time tools: catalog site renderer; crypto dataset builder |
 | `test/{app/db,app/ui,app/remotestorage,utils/credentialvault}/` | Test fixtures only (see **Testing**); `app/remotestorage` is the in-memory cloud store (`InMemoryStorageProvider`, `SingleProviderFactory`) |
@@ -320,24 +320,59 @@ Google refresh tokens.
 ## Import Strategies (CSV and API)
 
 CSV and API strategies are built from the same small vocabularies. Extend these rather than adding
-parallel ones (see **Design Principle**):
+parallel ones (see **Design Principle**).
+
+**Every per-record decision is a rule.** A strategy carries one ordered list of `StrategyRule`s, "if
+`conditions` then `actions`" (`app/model/rules`), and the one `RuleEngine` runs it over each record: a CSV/QIF
+row (`CsvStrategyConfig.rules`), an API transaction or ledger item (`ApiTransactionMappings.rules`), an API trade
+or order (`ApiTradeMappings.rules`) or an API account item (`ApiAccountMappings.rules`). The bank-feed and
+exchange pipelines read the same `RuleOutcome`, so an action means the same thing everywhere.
+
+- Rules run in list order, and every rule whose conditions all hold applies its actions in order.
+- An action either **rewrites the record** (`SwapValues`, `SetValue`), and later rules see the new value, or
+  **claims an outcome slot**. A single-valued slot keeps the **first claim** (direction, exclusion, external id,
+  trade side, conduit, …). A list slot collects every claim in order (account candidates, attributes, fees,
+  legs).
+- `Skip` drops the record and stops evaluation.
+- Rule lists are first-match ordered: never sort them on export.
+
+| Action | Does | Replaced |
+|---|---|---|
+| `SwapValues`, `SetValue` | rewrite the record | row preprocessing / column swaps, fixed base/quote assets |
+| `Flip` | swaps the resolved source and target | `flipSourceAndTarget` |
+| `SetDirection` | money in or out of the record's own account | `Direction` (amount sign / field / always outgoing), API `direction` |
+| `Skip` | the record isn't imported | item filters (negated conditions), status filters |
+| `Exclude` | imported, excluded from balances, with a reason | `declinedWhen`, `excluded` attribute mappings, Koinly's deleted rows |
+| `Account(side, AccountNaming)` | an account candidate for SOURCE/TARGET/COUNTERPARTY/OWN; the first that names something wins | `AccountRulesMapping`/`AccountRule`, built-in counterparties, alias maps, `counterpartyAccountName`, merchant/counterparty name fields, API account-name rules |
+| `ExternalId` | the record's stable id (a `{path}` template joins several fields) | `idExtraction`, `compositeIdFields` |
+| `CounterpartyIsPerson`, `IgnoreCounterpartyId` | how the counterparty is identified | personal-beneficiary values, ephemeral id prefixes |
+| `Attribute` | tags the record (`uniqueIdentifier` identifies it across imports) | `AttributeColumnMapping`, `customFields`/`uniqueIdentifierFields` |
+| `Fee`, `Foreign` | a `FeeRule` / `ForeignAmount` the record reports | per-pipeline fee fields and their conditions, foreign-amount placement |
+| `ThroughConduit` | the row `funder → payee` becomes `funder → conduit → payee` (Curve's own export) | `StrategyConduit` |
+| `TradeSide` | a trade or order buys or sells its base asset | `sideField`/`buyValues`/`fixedSideBuy` |
+| `Leg(group, role)` | the row is a debit/credit/by-sign leg of the named `LegGroupRule` | `legWhen`, `LegSide` |
+| `LedgerTradeLeg` | a ledger row feeds `ApiLedgerTrades` instead of booking a transfer | Kraken/Coinbase `excludeWhen` |
+
+`ConditionOp` has `POSITIVE`/`NEGATIVE` for amount signs, plus `EXISTS`/`MISSING` for paths. Built-ins write
+rules through small shorthands (`RuleShorthand.kt` in `app/strategies`: `onlyWhen`, `directionFromSign`,
+`compositeId`, `tradeSideFrom`, …), which build plain rule data that the editor can change like any other.
+
+What isn't a per-record decision stays structural config:
 
 | Concept | Type | Replaced |
 |---|---|---|
-| "Does this row/item match?" | `Condition` (`app/model/rules`), evaluated by one `RuleEvaluator` over CSV rows and JSON items | row conditions, predicates, content-match rules, exclude/decline fields, item filters |
-| "Compute a value" | `ValueExpr`: ordered fallback columns/paths, extraction, templates | per-field fallback/extraction/template settings |
+| "Does this row/item match?" | `Condition`, evaluated by one `RuleEvaluator` over CSV rows and JSON items (rule conditions, strategy selection, content-match rules) | row conditions, predicates, item filters |
+| "Compute a value" | `ValueExpr`: ordered fallback columns/paths, extraction | per-field fallback/extraction settings |
 | Asset tickers | `AssetCodeRules`: aliases + suffix handling | separate CSV and API alias/suffix settings |
-| Direction | `Direction` (amount sign / field / always outgoing) | `flipAccountsOnPositive`, `negateValues`, `signSource`/`signField`/`creditValues`, … |
-| Account resolution | `AccountRulesMapping`, an ordered, **first-match-wins** `AccountRule` list | lookup/template/regex/attribute/conditional account mappings |
-| Multi-row grouping | `LegGroupRule` with `Trade` or `ThroughAccount` assembly (no accounts + `fundingWhen` = link two rows as one pass-through, e.g. PayPal's card deposit → payment) | `ConversionConfig`, `TradeGroupConfig` |
-| "Every row runs through a conduit" | `StrategyConduit` (`CsvStrategyConfig.conduit`): a row `funder → payee` becomes the chain `funder → conduit → payee` (Curve's own export) | single `Curve → merchant` rows that left the conduit unbalanced |
-| Fees | `FeeRule` (CSV, API transfers and API trades) | three separate sets of fee fields |
+| Multi-row grouping | `LegGroupRule` (name, key, window) with `Trade` or `ThroughAccount` assembly; rows join it through `Leg` actions (no accounts + `fundingWhen` = link two rows as one pass-through, e.g. PayPal's card deposit → payment) | `ConversionConfig`, `TradeGroupConfig` |
 | API fetching | One pipeline: `ApiAccountsSource` (`Downloaded`/`Single`) × `ApiDateWindowing` × `ApiPaging` (single/offset/before-cursor/forward-id/token), walked by one `PageWalker` | separate bank vs exchange paths and three hand-written pagination loops |
-| API ledger trades | `ApiLedgerTrades` | `reconcileTradeAmounts*`, `unpairedTradeLeg*` |
+| API ledger trades | `ApiLedgerTrades` (which rows join one is `LedgerTradeLeg`) | `reconcileTradeAmounts*`, `unpairedTradeLeg*` |
 | Transfer reconciliation | `ImportDeduper.reconcile()` over an ordered `ReconcileRule` table. Each rule only says how to find the existing record; one ranking decides which record stays counted (precise > approximate, named > placeholder, itemised > gross, ties keep the existing one) | nine cross-source classifiers |
 
-Shared editors (`ConditionsEditor`, `DirectionEditor`, the account-rules, fee and leg-group editors) serve
-both the CSV and API strategy screens.
+**One editor:** `StrategyRulesEditor` (`app/ui/components`) edits every rule list: an ordered list of rule cards,
+each with `ConditionsEditor` as "If" and its actions as "Then". Its `RuleContext` (`CSV_ROW`, `API_TRANSACTION`,
+`API_TRADE`, `API_ACCOUNT`) limits the add-menu to the actions that context reads. The CSV/QIF editor has a Rules
+tab; each API data endpoint, the bank feed and the accounts mapping have a Rules section.
 
 **Pass-through chains and conduit statements:** when a conduit's own export (PayPal) records money arriving
 from or leaving to an unidentified card (a placeholder leg) and that matches a pass-through chain's leg into
@@ -345,7 +380,7 @@ the conduit, the chain's legs *beyond* the conduit are excluded (`Classified.sup
 `ConduitStatementMatch`), because the conduit's statement names the real payee and currency. Both import
 orders reach the same result. A post-pass (`reconcileSplitConduitMovements`) also pairs one placeholder with
 2–4 chain movements to the same merchant that sum to it (Uber authorises £21.58, tops up £0.27; PayPal records
-£21.85). Curve's export has no deposit rows, so each row is its own chain (`StrategyConduit`), funded by a
+£21.85). Curve's export has no deposit rows, so each row is its own chain (a `ThroughConduit` rule), funded by a
 per-card placeholder (`Curve card 7721`) that reconciles against the card's movement into Curve: by its
 `fundingAttributeMatch` card, or by the unidentified-counterparty rule. Whenever a conduit's record of a payment
 reconciles its movement into the conduit, the conduit's onward legs stay counted and supersede the card chain's
@@ -382,13 +417,13 @@ source** (built-in: Koinly). Its data never touches real accounts:
 - `reconcile()` (`app/reconciliation`) matches legs per link group on (asset, signed amount): exact
   second, then nearest within 24h, then summed per (group, asset, second) so a fee booked separately on
   one side still matches the other side's gross leg.
-- Rows the source marks deleted are imported **excluded** (attribute mapping → `excluded`), like
+- Rows the source marks deleted are imported **excluded** (an `Exclude` rule), like
   declined card payments. Trades can be excluded too (`trade_attribute`, honoured by
   `BalanceLegsSelect`, toggled by hand in `TradeExclusionDialog`), and a transfer's fee/pass-through
   legs inherit its exclusion. Imports declare the attribute types their source **owns**
-  (`ownedAttributeTypeIds`: a CSV strategy's mapped columns); a re-import removes an owned type the row no
-  longer reports — so a row un-deleted at the source comes back — and never touches other attributes.
-- `CsvStrategyConfig.assetAliases` maps a source's tickers onto Money Manager's (Koinly `KNCL` → `KNC`).
+  (`ownedAttributeValues`: the types a CSV strategy's `Attribute` and `Exclude` rules write); a re-import removes an
+  owned value the row no longer reports — so a row un-deleted at the source comes back — and never touches other attributes.
+- `CsvStrategyConfig.assetCodes` (`AssetCodeRules`) maps a source's tickers onto Money Manager's (Koinly `KNCL` → `KNC`).
 - Shadow accounts are hidden by default in the Accounts screen and in `AccountPicker` (tickbox to show).
 - Keep it source-agnostic: no Koinly-specific code outside the built-in strategy's config.
 

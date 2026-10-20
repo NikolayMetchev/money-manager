@@ -4,6 +4,10 @@ import com.moneymanager.database.json.StrategyArtifactCodec
 import com.moneymanager.domain.strategy.StrategyFileNaming
 import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.strategycatalog.CatalogManifestCodec
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -62,6 +66,25 @@ class StrategyCatalogToolTest {
     }
 
     @Test
+    fun `every csv and api artifact publishes its rules`() {
+        // A built-in decides everything through its rule list, so an artifact without rules would install
+        // a strategy that imports differently from the built-in.
+        val strategies = builtInArtifacts().filterKeys { it.kind in RULE_KINDS }
+        assertTrue(strategies.isNotEmpty())
+        for ((key, json) in strategies) {
+            assertTrue(Json.parseToJsonElement(json).ruleCount() > 0, "${key.name} publishes no rules")
+        }
+    }
+
+    // A rule is the one object with an "actions" list, wherever the config nests it.
+    private fun JsonElement.ruleCount(): Int =
+        when (this) {
+            is JsonObject -> (if (get("actions") is JsonArray) 1 else 0) + values.sumOf { it.ruleCount() }
+            is JsonArray -> sumOf { it.ruleCount() }
+            else -> 0
+        }
+
+    @Test
     fun `regenerating replaces stale artifacts`() {
         val webpageDir = createTempDir()
         try {
@@ -72,6 +95,10 @@ class StrategyCatalogToolTest {
         } finally {
             webpageDir.deleteRecursively()
         }
+    }
+
+    private companion object {
+        val RULE_KINDS = setOf(StrategyKind.CSV, StrategyKind.QIF, StrategyKind.XLSX, StrategyKind.API)
     }
 
     private fun createTempDir(): File =
