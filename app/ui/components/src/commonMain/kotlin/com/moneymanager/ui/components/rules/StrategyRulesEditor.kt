@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.components.rules
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +13,8 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Card
@@ -37,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
@@ -168,6 +172,10 @@ private fun RuleAction.isComplete(): Boolean =
  * The one if/then rule editor every strategy editor uses: an ordered list of rules, each a set of
  * conditions ("If") and the actions applied when they all hold ("Then"). Order matters — rules run top to
  * bottom and the first claim of a single-valued outcome wins — so rules can be moved up and down.
+ *
+ * A rule card shows its one-line [summary] until it's opened for editing, so a long list (Binance's
+ * endpoints carry dozens of rules) reads at a glance. A rule that still needs inputs, or has no actions
+ * yet, stays open.
  */
 @Composable
 fun StrategyRulesEditor(
@@ -179,17 +187,43 @@ fun StrategyRulesEditor(
     ops: List<ConditionOp> = if (context == RuleContext.CSV_ROW) FLAT_CONDITION_OPS else ConditionOp.entries,
     title: String = "Rules (top to bottom; the first rule to claim a value wins)",
 ) {
+    // Indices of the rules opened by hand; they move with their rules.
+    var opened by remember { mutableStateOf(emptySet<Int>()) }
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(title, style = MaterialTheme.typography.titleSmall)
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            if (rules.isNotEmpty()) {
+                if (opened.size < rules.size) {
+                    TextButton(onClick = { opened = rules.indices.toSet() }) { Text("Expand all") }
+                }
+                if (opened.isNotEmpty()) {
+                    TextButton(onClick = { opened = emptySet() }) { Text("Collapse all") }
+                }
+            }
+        }
         rules.forEachIndexed { index, rule ->
             RuleCard(
                 index = index,
                 count = rules.size,
                 rule = rule,
+                isOpen = index in opened || rule.needsEditing(),
+                onOpenChanged = { open -> opened = if (open) opened + index else opened - index },
                 onRuleChanged = { updated -> onRulesChanged(rules.mapIndexed { i, r -> if (i == index) updated else r }) },
-                onMove = { delta -> onRulesChanged(rules.moved(index, index + delta)) },
-                onDuplicate = { onRulesChanged(rules.take(index + 1) + rule + rules.drop(index + 1)) },
-                onRemove = { onRulesChanged(rules.filterIndexed { i, _ -> i != index }) },
+                onMove = { delta ->
+                    val to = index + delta
+                    if (to in rules.indices) {
+                        opened = opened.swapped(index, to)
+                        onRulesChanged(rules.moved(index, to))
+                    }
+                },
+                onDuplicate = {
+                    opened = opened.map { if (it > index) it + 1 else it }.toSet() + (index + 1)
+                    onRulesChanged(rules.take(index + 1) + rule + rules.drop(index + 1))
+                },
+                onRemove = {
+                    opened = opened.filter { it != index }.map { if (it > index) it - 1 else it }.toSet()
+                    onRulesChanged(rules.filterIndexed { i, _ -> i != index })
+                },
                 context = context,
                 pathField = pathField,
                 enabled = enabled,
@@ -202,6 +236,23 @@ fun StrategyRulesEditor(
         }
     }
 }
+
+/** A rule that does nothing yet, or lacks an input, is being written: collapsing it would hide that. */
+private fun StrategyRule.needsEditing(): Boolean = actions.isEmpty() || !listOf(this).isComplete()
+
+private fun Set<Int>.swapped(
+    a: Int,
+    b: Int,
+): Set<Int> =
+    map {
+        if (it == a) {
+            b
+        } else if (it == b) {
+            a
+        } else {
+            it
+        }
+    }.toSet()
 
 private fun <T> List<T>.moved(
     from: Int,
@@ -218,6 +269,8 @@ private fun RuleCard(
     index: Int,
     count: Int,
     rule: StrategyRule,
+    isOpen: Boolean,
+    onOpenChanged: (Boolean) -> Unit,
     onRuleChanged: (StrategyRule) -> Unit,
     onMove: (Int) -> Unit,
     onDuplicate: () -> Unit,
@@ -233,7 +286,18 @@ private fun RuleCard(
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Rule ${index + 1}", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                Text(
+                    rule.name?.let { "Rule ${index + 1}: $it" } ?: "Rule ${index + 1}",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = { onOpenChanged(!isOpen) }, enabled = !rule.needsEditing()) {
+                    if (isOpen) {
+                        Icon(Icons.Filled.Done, contentDescription = "Collapse rule")
+                    } else {
+                        Icon(Icons.Filled.Edit, contentDescription = "Expand rule")
+                    }
+                }
                 IconButton(onClick = { onMove(-1) }, enabled = enabled && index > 0) {
                     Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move rule up")
                 }
@@ -244,6 +308,16 @@ private fun RuleCard(
                 IconButton(onClick = onRemove, enabled = enabled) {
                     Icon(Icons.Filled.Close, contentDescription = "Remove rule")
                 }
+            }
+            if (!isOpen) {
+                Text(
+                    rule.summary(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth().clickable { onOpenChanged(true) },
+                )
+                return@Column
             }
             OutlinedTextField(
                 value = rule.name.orEmpty(),

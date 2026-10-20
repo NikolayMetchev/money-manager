@@ -370,7 +370,8 @@ What isn't a per-record decision stays structural config:
 | Transfer reconciliation | `ImportDeduper.reconcile()` over an ordered `ReconcileRule` table. Each rule only says how to find the existing record; one ranking decides which record stays counted (precise > approximate, named > placeholder, itemised > gross, ties keep the existing one) | nine cross-source classifiers |
 
 **One editor:** `StrategyRulesEditor` (`app/ui/components`) edits every rule list: an ordered list of rule cards,
-each with `ConditionsEditor` as "If" and its actions as "Then". Its `RuleContext` (`CSV_ROW`, `API_TRANSACTION`,
+each with `ConditionsEditor` as "If" and its actions as "Then". A complete rule shows collapsed as its one-line `summary()` (`RuleSummary.kt`) until opened; one
+that lacks an input or has no actions stays open. Its `RuleContext` (`CSV_ROW`, `API_TRANSACTION`,
 `API_TRADE`, `API_ACCOUNT`) limits the add-menu to the actions that context reads. Both strategy editors keep every
 rule list on one Rules tab, and their other tabs hold only field mappings: the CSV/QIF editor's has its one list, the
 API editor's a section per list (`ApiStrategyConfig.ruleLists()`: downloaded accounts, the bank feed, then each data
