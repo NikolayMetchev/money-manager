@@ -4,7 +4,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -51,10 +51,9 @@ object CsvStrategyExportMapper {
                 )
             }
 
-            is AccountRulesMapping -> {
-                AccountRulesExport(
+            is AccountFromRulesMapping -> {
+                AccountFromRulesExport(
                     fieldType = fieldType,
-                    rules = rules,
                     defaultCategoryName = categoryNameById(defaultCategoryId) ?: Category.UNCATEGORIZED_NAME,
                 )
             }
@@ -85,9 +84,6 @@ object CsvStrategyExportMapper {
                     amountColumnName = amountColumnName,
                     creditColumnName = creditColumnName,
                     debitColumnName = debitColumnName,
-                    direction = direction,
-                    fee = fee,
-                    foreignAmount = foreignAmount,
                 )
             }
 

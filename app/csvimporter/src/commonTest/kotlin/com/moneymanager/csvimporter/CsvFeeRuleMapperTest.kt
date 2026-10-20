@@ -11,8 +11,7 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.domain.model.csvstrategy.AccountRule
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -21,10 +20,14 @@ import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -52,25 +55,27 @@ class CsvFeeRuleMapperTest {
             name = "Fees",
             config =
                 CsvStrategyConfig(
+                    rules =
+                        listOf(
+                            StrategyRule.accounts(
+                                AccountSide.SOURCE,
+                                listOf(AccountNaming(value = ValueExpr(listOf("Payee")), pattern = "^", name = "Wallet")),
+                            ),
+                            StrategyRule.accounts(AccountSide.TARGET, listOf(AccountNaming(value = ValueExpr(listOf("Payee"))))),
+                            StrategyRule(actions = listOf(RuleAction.Fee(fee))),
+                        ),
                     identificationColumns = columnNames.toSet(),
                     fieldMappings =
                         mapOf(
                             TransferField.SOURCE_ACCOUNT to
-                                AccountRulesMapping(
-                                    fieldType = TransferField.SOURCE_ACCOUNT,
-                                    rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")), pattern = "^", name = "Wallet")),
-                                ),
+                                AccountFromRulesMapping(TransferField.SOURCE_ACCOUNT),
                             TransferField.TARGET_ACCOUNT to
-                                AccountRulesMapping(
-                                    fieldType = TransferField.TARGET_ACCOUNT,
-                                    rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
-                                ),
+                                AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                             TransferField.AMOUNT to
                                 AmountParsingMapping(
                                     fieldType = TransferField.AMOUNT,
                                     mode = AmountMode.SINGLE_COLUMN,
                                     amountColumnName = "Amount",
-                                    fee = fee,
                                 ),
                             TransferField.CURRENCY to
                                 CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Asset"))),

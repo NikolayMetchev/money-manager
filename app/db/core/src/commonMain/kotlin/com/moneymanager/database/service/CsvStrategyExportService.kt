@@ -9,7 +9,7 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -21,7 +21,7 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.model.csvstrategy.export.AccountRulesExport
+import com.moneymanager.domain.model.csvstrategy.export.AccountFromRulesExport
 import com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExportMapper
@@ -169,7 +169,7 @@ class CsvStrategyExportService(
                 }
             }
 
-            is AccountRulesExport -> {
+            is AccountFromRulesExport -> {
                 addCategoryReferenceIfMissing(mappingExport.defaultCategoryName, fieldType, referenceData, unresolvedReferences)
             }
 
@@ -423,10 +423,9 @@ class CsvStrategyExportService(
                 )
             }
 
-            is AccountRulesExport -> {
-                AccountRulesMapping(
+            is AccountFromRulesExport -> {
+                AccountFromRulesMapping(
                     fieldType = fieldType,
-                    rules = rules,
                     defaultCategoryId =
                         categoriesByName[defaultCategoryName]?.id
                             ?: Category.UNCATEGORIZED_ID,
@@ -459,9 +458,6 @@ class CsvStrategyExportService(
                     amountColumnName = amountColumnName,
                     creditColumnName = creditColumnName,
                     debitColumnName = debitColumnName,
-                    direction = direction,
-                    fee = fee,
-                    foreignAmount = foreignAmount,
                 )
             }
 

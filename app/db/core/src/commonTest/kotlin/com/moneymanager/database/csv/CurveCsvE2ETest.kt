@@ -16,6 +16,7 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.setAccountAttributeValue
 import com.moneymanager.importengineapi.updateCsvStrategy
@@ -650,7 +651,17 @@ class CurveCsvE2ETest : DbTest() {
                     .getAllStrategies()
                     .first()
                     .first { it.name == "Curve CSV" }
-            repositories.importEngine.updateCsvStrategy(builtIn.copy(config = builtIn.config.copy(conduit = null)))
+            repositories.importEngine.updateCsvStrategy(
+                builtIn.copy(
+                    config =
+                        builtIn.config.copy(
+                            rules =
+                                builtIn.config.rules.filterNot { rule ->
+                                    rule.actions.any { it is RuleAction.ThroughConduit }
+                                },
+                        ),
+                ),
+            )
             val curve =
                 stage(
                     "Transaction History 2023-11-19.csv",

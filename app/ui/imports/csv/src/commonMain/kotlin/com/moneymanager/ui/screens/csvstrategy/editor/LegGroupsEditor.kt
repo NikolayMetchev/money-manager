@@ -30,9 +30,6 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
-import com.moneymanager.domain.model.csvstrategy.LegSide
-import com.moneymanager.domain.model.rules.Condition
-import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.model.rules.isComplete
@@ -40,8 +37,8 @@ import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
 /**
  * Editor for the strategy's [LegGroupRule]s: how the source splits one movement — a trade, a conversion —
- * across several rows, and how those rows are put back together. A row is a leg of the first rule that
- * claims it.
+ * across several rows, and how those rows are put back together. Which rows are legs, and whether each is
+ * a debit or a credit, is a "Leg of a group" action on the Rules tab naming the group.
  */
 @Composable
 internal fun LegGroupsEditor(
@@ -49,7 +46,6 @@ internal fun LegGroupsEditor(
     onRulesChanged: (List<LegGroupRule>) -> Unit,
     columns: List<CsvColumn>,
     firstRow: CsvRow?,
-    existingAttributeTypeNames: List<String>,
     enabled: Boolean,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -70,7 +66,6 @@ internal fun LegGroupsEditor(
                         onRuleChanged = { updated -> onRulesChanged(rules.mapIndexed { i, r -> if (i == index) updated else r }) },
                         columns = columns,
                         firstRow = firstRow,
-                        existingAttributeTypeNames = existingAttributeTypeNames,
                         enabled = enabled,
                     )
                 }
@@ -89,47 +84,18 @@ private fun LegGroupRuleEditor(
     onRuleChanged: (LegGroupRule) -> Unit,
     columns: List<CsvColumn>,
     firstRow: CsvRow?,
-    existingAttributeTypeNames: List<String>,
     enabled: Boolean,
 ) {
-    RowConditionsEditor(
-        conditions = rule.legWhen,
-        onConditionsChanged = { onRuleChanged(rule.copy(legWhen = it)) },
-        columns = columns,
+    OutlinedTextField(
+        value = rule.name,
+        onValueChange = { onRuleChanged(rule.copy(name = it)) },
+        label = { Text("Group name") },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
         enabled = enabled,
-        title = "A row is a leg when all of these hold (cells are trimmed)",
+        isError = rule.name.isBlank(),
+        supportingText = { Text("The name a rule's \"Leg of a group\" action uses") },
     )
-    Spacer(modifier = Modifier.height(8.dp))
-    Text("Side", style = MaterialTheme.typography.labelMedium)
-    Choice("By the sign of a column (negative is a debit)", rule.side is LegSide.Sign, enabled) {
-        if (rule.side !is LegSide.Sign) onRuleChanged(rule.copy(side = LegSide.Sign(columns.firstOrNull()?.originalName.orEmpty())))
-    }
-    Choice("A debit when conditions hold, otherwise a credit", rule.side is LegSide.DebitWhen, enabled) {
-        if (rule.side !is LegSide.DebitWhen) onRuleChanged(rule.copy(side = LegSide.DebitWhen(emptyList())))
-    }
-    when (val side = rule.side) {
-        is LegSide.Sign -> {
-            ColumnDropdown(
-                columns = columns,
-                selectedColumn = side.path.takeIf { it.isNotBlank() },
-                onColumnSelected = { onRuleChanged(rule.copy(side = LegSide.Sign(it))) },
-                label = "Sign column",
-                sampleValue = getSampleValue(columns, firstRow, side.path),
-                enabled = enabled,
-                isError = side.path.isBlank(),
-            )
-        }
-
-        is LegSide.DebitWhen -> {
-            RowConditionsEditor(
-                conditions = side.conditions,
-                onConditionsChanged = { onRuleChanged(rule.copy(side = LegSide.DebitWhen(it))) },
-                columns = columns,
-                enabled = enabled,
-                title = "A leg is a debit when all of these hold",
-            )
-        }
-    }
     Spacer(modifier = Modifier.height(8.dp))
     KeyPartsEditor(rule.key, { onRuleChanged(rule.copy(key = it)) }, columns, firstRow, enabled)
     LongField(
@@ -150,7 +116,7 @@ private fun LegGroupRuleEditor(
     }
     Choice("Through an account, each debit linked to its credit", rule.assembly is LegAssembly.ThroughAccount, enabled) {
         if (rule.assembly !is LegAssembly.ThroughAccount) {
-            onRuleChanged(rule.copy(assembly = LegAssembly.ThroughAccount(emptyList(), relationshipTypeName = "conversion")))
+            onRuleChanged(rule.copy(assembly = LegAssembly.ThroughAccount(relationshipTypeName = "conversion")))
         }
     }
     when (val assembly = rule.assembly) {
@@ -167,19 +133,10 @@ private fun LegGroupRuleEditor(
 
         is LegAssembly.ThroughAccount -> {
             Text(
-                "Intermediate account rules. With none, each leg keeps the counterparty its own row names " +
-                    "and the legs are only linked.",
+                "The intermediate account is the rules' \"Intermediate\" account action on each leg. With none, " +
+                    "each leg keeps the counterparty its own row names and the legs are only linked.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            AccountRulesEditor(
-                rules = assembly.accounts,
-                onRulesChanged = { onRuleChanged(rule.copy(assembly = assembly.copy(accounts = it))) },
-                columns = columns,
-                rows = listOfNotNull(firstRow),
-                firstRow = firstRow,
-                existingAttributeTypeNames = existingAttributeTypeNames,
-                enabled = enabled,
             )
             OutlinedTextField(
                 value = assembly.relationshipTypeName,
@@ -271,31 +228,14 @@ private fun Choice(
 
 /** Whether every part of [this] rule is filled in. */
 internal fun LegGroupRule.isComplete(): Boolean =
-    legWhen.isNotEmpty() &&
-        legWhen.all { it.isComplete() } &&
+    name.isNotBlank() &&
         key.all { it.primaryPath.isNotBlank() } &&
-        when (val side = side) {
-            is LegSide.Sign -> side.path.isNotBlank()
-            is LegSide.DebitWhen -> side.conditions.all { it.isComplete() }
-        } &&
         when (val assembly = assembly) {
-            is LegAssembly.Trade -> {
-                true
-            }
-
-            is LegAssembly.ThroughAccount -> {
-                assembly.accounts.all { it.isComplete() } &&
-                    assembly.fundingWhen.all { it.isComplete() } &&
-                    assembly.relationshipTypeName.isNotBlank()
-            }
+            is LegAssembly.Trade -> true
+            is LegAssembly.ThroughAccount -> assembly.fundingWhen.all { it.isComplete() } && assembly.relationshipTypeName.isNotBlank()
         }
 
-private fun defaultLegGroupRule(): LegGroupRule =
-    LegGroupRule(
-        legWhen = listOf(Condition("", ConditionOp.MATCHES, value = "")),
-        side = LegSide.DebitWhen(emptyList()),
-        assembly = LegAssembly.Trade(),
-    )
+private fun defaultLegGroupRule(): LegGroupRule = LegGroupRule(name = "", assembly = LegAssembly.Trade())
 
 /**
  * A numeric `OutlinedTextField` bound to a [Long]. Keeps its own text buffer so intermediate

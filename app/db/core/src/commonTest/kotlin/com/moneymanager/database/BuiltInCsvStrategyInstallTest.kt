@@ -1,12 +1,17 @@
 package com.moneymanager.database
 
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
-import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
-import com.moneymanager.domain.model.csvstrategy.LegSide
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.domain.model.rules.LegRole
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleValue
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInCsvStrategies
 import kotlinx.coroutines.flow.first
@@ -57,24 +62,16 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
                 )
             assertTrue(strategy.matchesColumns(wiseHeader))
 
-            // The new mapping types and row rules survive the JSON round trip through the database
-            val source = strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT]
-            assertIs<AccountRulesMapping>(source)
-            assertEquals("Wise: {value}", source.rules.single().name)
-            assertEquals(
-                "Source currency",
-                source.rules
-                    .single()
-                    .value.primaryPath,
-            )
+            // The mapping types and rules survive the JSON round trip through the database
+            val rules = strategy.config.rules
+            assertIs<AccountFromRulesMapping>(strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT])
+            val source = rules.namings(AccountSide.SOURCE).single()
+            assertEquals("Wise: {value}", source.name)
+            assertEquals("Source currency", source.value.primaryPath)
 
-            val target = strategy.config.fieldMappings[TransferField.TARGET_ACCOUNT]
-            assertIs<AccountRulesMapping>(target)
+            assertIs<AccountFromRulesMapping>(strategy.config.fieldMappings[TransferField.TARGET_ACCOUNT])
             assertTrue(
-                target.rules
-                    .first()
-                    .conditions
-                    .isNotEmpty(),
+                rules.first { it.namings(AccountSide.TARGET).isNotEmpty() }.conditions.isNotEmpty(),
                 "the guarded template rule comes first",
             )
 
@@ -83,17 +80,20 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
             assertEquals("yyyy-MM-dd HH:mm:ss", timestamp.dateTimeFormat)
 
             // OUT rows add the source fee to the debit (the amount column is net of fees)
-            val amount = strategy.config.fieldMappings[TransferField.AMOUNT]
-            assertIs<AmountParsingMapping>(amount)
-            assertEquals("Source fee amount", amount.fee?.amount?.primaryPath)
+            assertEquals(
+                "Source fee amount",
+                rules
+                    .actions<RuleAction.Fee>()
+                    .single()
+                    .fee.amount.primaryPath,
+            )
 
-            val swapRule = strategy.config.rowPreprocessingRules.single()
-            assertTrue(swapRule.flipSourceAndTarget)
-            assertEquals(3, swapRule.columnSwaps.size)
+            val swapRule = rules.single { RuleAction.Flip in it.actions }
+            assertEquals(3, swapRule.actions.filterIsInstance<RuleAction.SwapValues>().size)
 
             // The Wise transaction ID drives duplicate detection on re-import
-            val idMapping = strategy.config.attributeMappings.single { it.columnName == "ID" }
-            assertTrue(idMapping.isUniqueIdentifier)
+            assertTrue(rules.idAttribute("wise-id").uniqueIdentifier)
+            assertEquals(RuleValue.read("ID"), rules.idAttribute("wise-id").value)
 
             // Assets fees require a manually entered interest transfer (companion rule
             // survives the JSON round trip through the database)
@@ -144,13 +144,12 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
             assertNull(strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT])
 
             // Positive amounts flow INTO the account, so credits flip source/target
-            val amount = strategy.config.fieldMappings[TransferField.AMOUNT]
-            assertIs<AmountParsingMapping>(amount)
-            assertEquals(Direction.AmountSign(), amount.direction)
+            assertTrue(strategy.config.rules.isIncomingWhenPositive("Amount"))
 
             // The Monzo transaction ID drives duplicate detection on re-import
-            val idMapping = strategy.config.attributeMappings.single { it.columnName == "Transaction ID" }
-            assertTrue(idMapping.isUniqueIdentifier)
+            val idAttribute = strategy.config.rules.idAttribute("Monzo Transaction ID")
+            assertTrue(idAttribute.uniqueIdentifier)
+            assertEquals(RuleValue.read("Transaction ID"), idAttribute.value)
         }
 
     @Test
@@ -181,34 +180,53 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
 
             // Trade-group assembly survives the round trip - without it the export's trade rows would
             // import as suspense transfers instead of trades.
+            val rules = strategy.config.rules
             val (conversion, tradeGroup) = strategy.config.legGroups
             assertIs<LegAssembly.Trade>(tradeGroup.assembly)
-            assertEquals("Operation", tradeGroup.legWhen.single().path)
-            assertEquals(LegSide.Sign("Change"), tradeGroup.side, "the ambiguous leg name is resolved by sign")
+            val tradeLegRule = rules.single { rule -> rule.legs().any { it.group == tradeGroup.name } }
+            assertEquals("Operation", tradeLegRule.conditions.single().path)
+            assertEquals(LegRole.BySign("Change"), tradeLegRule.legs().single().role, "the ambiguous leg name is resolved by sign")
             assertEquals(0L, tradeGroup.windowSeconds)
 
             // So does the dust conversion rule, including the sign-based side classification.
-            val through = assertIs<LegAssembly.ThroughAccount>(conversion.assembly)
-            assertEquals("Binance Conversions", through.accounts.single().name)
-            assertEquals(LegSide.Sign("Change"), conversion.side, "both dust legs share one Operation")
+            assertIs<LegAssembly.ThroughAccount>(conversion.assembly)
+            val dustLegRule = rules.single { rule -> rule.legs().any { it.group == conversion.name } }
+            assertEquals("Binance Conversions", dustLegRule.namings(AccountSide.INTERMEDIATE).single().name)
+            assertEquals(LegRole.BySign("Change"), dustLegRule.legs().single().role, "both dust legs share one Operation")
 
             // The Operation column routes every row's counterparty, and the funding rules survive as
             // unidentified placeholders — which is what lets a deposit reconcile against the API's
             // record of it, since the API names the on-chain address the export cannot.
-            val target = strategy.config.fieldMappings[TransferField.TARGET_ACCOUNT]
-            assertIs<AccountRulesMapping>(target)
-            assertTrue(target.rules.all { it.value.primaryPath == "Operation" })
+            assertIs<AccountFromRulesMapping>(strategy.config.fieldMappings[TransferField.TARGET_ACCOUNT])
+            val targets = rules.namings(AccountSide.TARGET)
+            assertTrue(targets.all { it.value.primaryPath == "Operation" })
             assertTrue(
-                target.rules.first { it.name == "Binance Funding" }.counterpartyIsUnidentified,
+                targets.first { it.name == "Binance Funding" }.unidentified,
                 "a deposit/withdrawal counterparty is a placeholder, not an identity",
             )
 
-            val amount = strategy.config.fieldMappings[TransferField.AMOUNT]
-            assertIs<AmountParsingMapping>(amount)
-            assertEquals(Direction.AmountSign(), amount.direction, "a positive Change arrives into the Binance account")
+            assertTrue(rules.isIncomingWhenPositive("Change"), "a positive Change arrives into the Binance account")
 
             val timestamp = strategy.config.fieldMappings[TransferField.TIMESTAMP]
             assertIs<DateTimeParsingMapping>(timestamp)
             assertEquals("yyyy-MM-dd HH:mm:ss", timestamp.dateTimeFormat)
         }
 }
+
+private fun StrategyRule.namings(side: AccountSide): List<AccountNaming> =
+    actions.filterIsInstance<RuleAction.Account>().filter { it.side == side }.map { it.naming }
+
+private fun List<StrategyRule>.namings(side: AccountSide): List<AccountNaming> = flatMap { it.namings(side) }
+
+private fun StrategyRule.legs(): List<RuleAction.Leg> = actions.filterIsInstance<RuleAction.Leg>()
+
+private inline fun <reified A : RuleAction> List<StrategyRule>.actions(): List<A> = flatMap { it.actions.filterIsInstance<A>() }
+
+private fun List<StrategyRule>.idAttribute(typeName: String): RuleAction.Attribute =
+    actions<RuleAction.Attribute>().single { it.typeName == typeName }
+
+/** Whether a rule says a positive [amountColumn] is money coming in. */
+private fun List<StrategyRule>.isIncomingWhenPositive(amountColumn: String): Boolean =
+    any { rule ->
+        rule.conditions == listOf(Condition(amountColumn, ConditionOp.POSITIVE)) && RuleAction.SetDirection(incoming = true) in rule.actions
+    }

@@ -1,8 +1,7 @@
 package com.moneymanager.ui.screens.csvstrategy.editor
 
 import com.moneymanager.domain.model.CsvImportStrategyId
-import com.moneymanager.domain.model.csv.CsvColumn
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
@@ -15,11 +14,9 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.ReconciliationConfig
-import com.moneymanager.domain.model.csvstrategy.StrategyConduit
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.AssetCodeRules
-import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
 
@@ -40,27 +37,15 @@ internal enum class TimezoneMode {
 }
 
 /**
- * How the source account is resolved: one fixed account, or account rules read off each row.
+ * How the source account is resolved: one fixed account, or the strategy's rules read off each row.
  */
 internal enum class SourceAccountMode {
     FIXED_ACCOUNT,
     RULES,
 }
 
-internal fun attributeCandidateColumns(
-    csvColumns: List<CsvColumn>,
-    primaryFieldColumnNames: Set<String?>,
-): List<CsvColumn> {
-    val usedPrimaryFieldColumns = primaryFieldColumnNames.filterNotNull().toSet()
-    return csvColumns.filter { it.originalName !in usedPrimaryFieldColumns }
-}
-
 /** Null unless this column still exists in the uploaded CSV. */
 internal fun String?.takeIfPresentIn(columns: Set<String>): String? = this?.takeIf { it in columns }
-
-/** Drops conditions referencing columns absent from the uploaded CSV. */
-internal fun List<Condition>?.keepPresentIn(columns: Set<String>): List<Condition> =
-    this.orEmpty().filter { it.path in columns && (it.otherPath == null || it.otherPath in columns) }
 
 /**
  * Builds a [CsvImportStrategy] from the editor's live state. Shared by the save handler and tests so
@@ -88,24 +73,10 @@ internal fun buildStrategyFromEditorState(
                 }
 
                 SourceAccountMode.RULES -> {
-                    put(
-                        TransferField.SOURCE_ACCOUNT,
-                        AccountRulesMapping(
-                            fieldType = TransferField.SOURCE_ACCOUNT,
-                            rules = state.sourceRules,
-                            defaultCategoryId = state.sourceDefaultCategoryId,
-                        ),
-                    )
+                    put(TransferField.SOURCE_ACCOUNT, AccountFromRulesMapping(TransferField.SOURCE_ACCOUNT, state.sourceDefaultCategoryId))
                 }
             }
-            put(
-                TransferField.TARGET_ACCOUNT,
-                AccountRulesMapping(
-                    fieldType = TransferField.TARGET_ACCOUNT,
-                    rules = state.targetRules,
-                    defaultCategoryId = state.targetDefaultCategoryId,
-                ),
-            )
+            put(TransferField.TARGET_ACCOUNT, AccountFromRulesMapping(TransferField.TARGET_ACCOUNT, state.targetDefaultCategoryId))
             // The two modes are mutually exclusive: a combined format ignores any separate time
             // column, so null it out to keep the saved mapping consistent with the chosen mode.
             val timeColumnName = state.timeColumnName.takeUnless { state.dateTimeInOneColumn }
@@ -143,9 +114,6 @@ internal fun buildStrategyFromEditorState(
                     amountColumnName = if (singleColumn) state.amountColumnName else null,
                     creditColumnName = if (singleColumn) null else state.creditColumnName,
                     debitColumnName = if (singleColumn) null else state.debitColumnName,
-                    direction = state.direction,
-                    fee = state.fee,
-                    foreignAmount = state.foreignAmount,
                 ),
             )
             put(
@@ -198,8 +166,7 @@ internal fun buildStrategyFromEditorState(
             CsvStrategyConfig(
                 identificationColumns = state.identificationColumns,
                 fieldMappings = fieldMappings,
-                attributeMappings = state.attributeMappings,
-                rowPreprocessingRules = state.rowPreprocessingRules,
+                rules = state.rules,
                 companionTransactionRules = state.companionTransactionRules,
                 contentMatchRules = state.contentMatchRules,
                 fileNamePattern = state.fileNamePattern.takeIf { it.isNotBlank() },
@@ -210,10 +177,6 @@ internal fun buildStrategyFromEditorState(
                         ?.takeIf { it.isNotBlank() }
                         ?.let { AttributeAccountMatch(column = it, attributeTypeName = state.fundingMatchAttributeTypeName) },
                 legGroups = state.legGroups,
-                conduit =
-                    state.conduitAccountName.trim().takeIf { it.isNotEmpty() }?.let {
-                        StrategyConduit(accountName = it, conditions = state.conduitConditions)
-                    },
                 reconciliation =
                     state.reconciliationSourceName.trim().takeIf { it.isNotEmpty() }?.let { source ->
                         ReconciliationConfig(source, state.reconciliationLinkablePrefix.takeIf { it.isNotEmpty() })

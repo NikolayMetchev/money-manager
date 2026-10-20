@@ -210,6 +210,10 @@ private fun RecordBadge(record: QifImportRecord) {
                 Triple("Error", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
             }
 
+            record.importStatus == ImportStatus.SKIPPED -> {
+                Triple("Skipped", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
             else -> {
                 return
             }

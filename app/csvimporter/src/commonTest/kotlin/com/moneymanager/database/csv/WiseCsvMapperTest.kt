@@ -326,7 +326,7 @@ class WiseCsvMapperTest {
                 transferId = TransferId(99),
                 transfer = firstResult.transfer,
                 attributes = firstResult.attributes,
-                uniqueIdentifierValues = mapOf("ID" to "TRANSFER-1"),
+                uniqueIdentifierValues = mapOf("wise-id" to "TRANSFER-1"),
             )
         val secondResult = mapper(existingTransfers = listOf(existing)).mapRow(wiseRow(targetName = "TransferWise"))
 
@@ -345,7 +345,7 @@ class WiseCsvMapperTest {
                 transferId = TransferId(99),
                 transfer = firstResult.transfer,
                 attributes = firstResult.attributes,
-                uniqueIdentifierValues = mapOf("ID" to "TRANSFER-1"),
+                uniqueIdentifierValues = mapOf("wise-id" to "TRANSFER-1"),
             )
         val changedRow = wiseRow(targetName = "TransferWise", reference = "corrected description")
         val secondResult = mapper(existingTransfers = listOf(existing)).mapRow(changedRow)

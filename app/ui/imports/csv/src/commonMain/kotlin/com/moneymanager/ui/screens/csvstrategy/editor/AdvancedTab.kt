@@ -23,7 +23,7 @@ import com.moneymanager.ui.screens.accountmapping.AccountMappingsSection
 import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
 /**
- * Advanced tab: attributes, row preprocessing rules, companion transaction rules, and (in edit mode)
+ * Advanced tab: reconciliation, companion transaction rules, content matching, leg groups, and (in edit mode)
  * the account mappings scoped to this strategy. Global mappings are managed on the Account Mappings
  * screen instead.
  */
@@ -42,49 +42,6 @@ internal fun AdvancedTab(
     onAddAccountMapping: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text("Attributes (Optional)", style = MaterialTheme.typography.titleSmall)
-        Text(
-            "Select columns to store as attributes (metadata)",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-
-        val attributeColumns =
-            attributeCandidateColumns(
-                csvColumns = csvColumns,
-                primaryFieldColumnNames =
-                    setOf(
-                        state.dateColumnName,
-                        state.timeColumnName,
-                        state.descriptionColumnName,
-                        state.amountColumnName,
-                        state.creditColumnName,
-                        state.debitColumnName,
-                        state.currencyColumnName,
-                        state.timezoneColumnName,
-                    ) + state.targetRules.map { it.value.primaryPath },
-            )
-
-        if (attributeColumns.isEmpty()) {
-            Text(
-                "No columns available for attributes",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            AttributeMappingsEditor(
-                columns = attributeColumns,
-                conditionColumns = csvColumns,
-                mappings = state.attributeMappings,
-                onMappingsChanged = { state.attributeMappings = it },
-                existingAttributeTypes = existingAttributeTypes,
-                enabled = enabled,
-                firstRow = firstRow,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
         Text("Funding Reconciliation (Optional)", style = MaterialTheme.typography.titleSmall)
         Text(
             "Match a column against an account attribute to reconcile each row's hidden funding account " +
@@ -123,34 +80,6 @@ internal fun AdvancedTab(
                         },
                     )
                 },
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("Conduit (Optional)", style = MaterialTheme.typography.titleSmall)
-        Text(
-            "An account every row passes through (e.g. Curve): a row source → target is imported as " +
-                "source → conduit → target, so the conduit nets to zero.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        OutlinedTextField(
-            value = state.conduitAccountName,
-            onValueChange = { state.conduitAccountName = it },
-            label = { Text("Conduit account") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            enabled = enabled,
-        )
-        if (state.conduitAccountName.isNotBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            RowConditionsEditor(
-                conditions = state.conduitConditions,
-                onConditionsChanged = { state.conduitConditions = it },
-                columns = csvColumns,
-                enabled = enabled,
-                title = "Only rows where (all must match; none = every row)",
             )
         }
 
@@ -233,21 +162,6 @@ internal fun AdvancedTab(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Row Preprocessing Rules (Optional)", style = MaterialTheme.typography.titleSmall)
-        Text(
-            "Swap column values and/or flip source/target accounts when conditions match",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        RowPreprocessingRulesEditor(
-            rules = state.rowPreprocessingRules,
-            onRulesChanged = { state.rowPreprocessingRules = it },
-            columns = csvColumns,
-            enabled = enabled,
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
         Text("Companion Transaction Rules (Optional)", style = MaterialTheme.typography.titleSmall)
         Text(
             "Flag imported transfers that imply a manually entered companion transaction",
@@ -293,7 +207,6 @@ internal fun AdvancedTab(
             onRulesChanged = { state.legGroups = it },
             columns = csvColumns,
             firstRow = firstRow,
-            existingAttributeTypeNames = existingAttributeTypes.map { it.name },
             enabled = enabled,
         )
 

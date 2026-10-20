@@ -3,11 +3,6 @@ package com.moneymanager.domain.model.csvstrategy
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.rules.Condition
-import com.moneymanager.domain.model.rules.Direction
-import com.moneymanager.domain.model.rules.FeeRule
-import com.moneymanager.domain.model.rules.ForeignAmount
-import com.moneymanager.domain.model.rules.SortedConditionListSerializer
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
 import kotlinx.serialization.EncodeDefault
@@ -24,7 +19,8 @@ sealed interface FieldMapping {
 
 /**
  * Always uses a specific account, regardless of CSV data.
- * Typically used for the source account (the account the CSV statement belongs to).
+ * Typically used for the source account (the account the CSV statement belongs to). Accounts read from
+ * the row are named by the strategy's rules instead (`RuleAction.Account`).
  */
 @Serializable
 data class HardCodedAccountMapping(
@@ -33,94 +29,17 @@ data class HardCodedAccountMapping(
 ) : FieldMapping
 
 /**
- * Names the account on one side of a row (the source or the target): the first of [rules] that applies
- * names it, and the account is then found by that name (its current name, then a former one) or
- * created under [defaultCategoryId]. Before naming, the value the rule read is checked against the
- * user's persisted account mappings, which redirect it to the account they chose (renamed accounts,
- * merchants mapped onto one account).
- *
- * One rule list covers what used to be five mapping kinds: a plain lookup (one rule naming the account
- * after the value), a prefixed template, regex rules with a fallback, an account-attribute match, and
- * a conditional choice between two of those (rules with [AccountRule.conditions]).
+ * The account on this side is read from the row: the strategy's rules name it (`RuleAction.Account`
+ * for the [fieldType]'s side), and the first candidate that applies wins. The account is then found by
+ * that name (its current name, then a former one) or created under [defaultCategoryId]. Before naming,
+ * the value the candidate read is checked against the user's persisted account mappings, which redirect
+ * it to the account they chose (renamed accounts, merchants mapped onto one account).
  */
 @Serializable
-data class AccountRulesMapping(
+data class AccountFromRulesMapping(
     override val fieldType: TransferField,
-    // First applicable rule wins - order is semantic, keeps default insertion-order serialization.
-    val rules: List<AccountRule>,
     val defaultCategoryId: Long = Category.UNCATEGORIZED_ID,
-) : FieldMapping {
-    companion object {
-        /**
-         * [whenTrue]'s rules guarded by [conditions], then [whenFalse]'s: the first mapping's account when
-         * every condition holds, otherwise the second's. New accounts take [whenFalse]'s category.
-         */
-        fun conditional(
-            fieldType: TransferField,
-            conditions: List<Condition>,
-            whenTrue: AccountRulesMapping,
-            whenFalse: AccountRulesMapping,
-        ): AccountRulesMapping =
-            AccountRulesMapping(
-                fieldType = fieldType,
-                rules = whenTrue.rules.map { it.copy(conditions = conditions + it.conditions) } + whenFalse.rules,
-                defaultCategoryId = whenFalse.defaultCategoryId,
-            )
-    }
-}
-
-/**
- * One way of naming an account from a row. A rule applies when all of its [conditions] hold and, when
- * it has a [pattern], the pattern matches the value it reads — or, with an [attributeTypeName], exactly
- * one account's attribute regexes match the value (that account is then the answer, whatever [name]
- * says).
- *
- * @property value The row value the rule reads: the first of its columns holding a non-blank value. Its
- *   extraction (if any) cleans the value before it is substituted into [name]; persisted account
- *   mappings and [pattern] see it uncleaned.
- * @property trim Whether the value is trimmed first (and again after extraction).
- * @property pattern A regex (case-insensitive) the value must match for the rule to apply; its capture
- *   groups can be substituted into [name] and [personName].
- * @property name The account name. `{value}` is replaced by the (cleaned) value; `$0`/`$1`…`$9`/`${name}`
- *   by [pattern]'s captures (a pattern-less rule substitutes only `{value}`). A name built from captures has
- *   its whitespace runs collapsed. A blank result means no account unless [fallbackName] is set.
- * @property fallbackName The name to use when [name] renders blank (a capture that came out empty).
- * @property attributeTypeName Match the value against the regex tokens this account-attribute type
- *   holds on every account (see [AttributeAccountMatch]); the rule applies when exactly one matches.
- * @property counterpartyIsPerson The account belongs to a person: the import also creates the Person
- *   (named [personName], else the account name) and an ownership link.
- * @property counterpartyIsUnidentified The rule names the counterparty but not its identity: the export
- *   says money arrived or left, not whose account it was (e.g. crypto.com's card statement records a
- *   top-up only as "GBP Deposit"), so the import engine reconciles the row against a real record of
- *   the same movement — see `ImportTransfer.unidentifiedCounterpartyAccountId`.
- */
-@Serializable
-data class AccountRule(
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    @Serializable(with = SortedConditionListSerializer::class)
-    val conditions: List<Condition> = emptyList(),
-    val value: ValueExpr,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val trim: Boolean = false,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val pattern: String? = null,
-    val name: String = VALUE_PLACEHOLDER,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val fallbackName: String? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val attributeTypeName: String? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val counterpartyIsPerson: Boolean = false,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val personName: String? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val counterpartyIsUnidentified: Boolean = false,
-) {
-    companion object {
-        /** In [name], the (cleaned) value the rule read. */
-        const val VALUE_PLACEHOLDER: String = "{value}"
-    }
-}
+) : FieldMapping
 
 /**
  * Parses a date/time from one or two CSV columns.
@@ -160,19 +79,9 @@ data class DirectColumnMapping(
  * Parses a numeric amount from CSV columns.
  * Supports two modes: single column with +/- values, or separate credit/debit columns (credit - debit).
  *
- * [direction] says whether the money moves out of the source (statement) account into the target, or
- * the other way: [Direction.AmountSign] for statements whose signed amount says (positive = money in,
- * which swaps the source and target), [Direction.Outgoing] for unsigned amounts that always leave the
- * source, [Direction.Field] for a column naming the direction.
- *
- * When [fee] is set and the row reports one, the fee is imported as its own transfer out of the source
- * account, linked to the main transaction (via a `fee` relationship) — exports like Wise's, where the
- * amount column is net of fees but the fee also left the account (an ATM withdrawal: 200.00 withdrawn
- * plus a 7.29 fee movement).
- *
- * When [foreignAmount] is set and the row reports a different currency there, the parsed amount is what
- * the statement account settled, and the movement itself is booked in the foreign currency (see
- * [ForeignAmount]).
+ * The magnitude is all it gives: the strategy's rules say which way the money moves
+ * (`RuleAction.SetDirection`), what fee the row reports (`RuleAction.Fee`) and what it paid in another
+ * currency (`RuleAction.Foreign`).
  */
 @Serializable
 data class AmountParsingMapping(
@@ -181,11 +90,6 @@ data class AmountParsingMapping(
     val amountColumnName: String? = null,
     val creditColumnName: String? = null,
     val debitColumnName: String? = null,
-    val direction: Direction = Direction.Outgoing,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val fee: FeeRule? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val foreignAmount: ForeignAmount? = null,
 ) : FieldMapping {
     init {
         when (mode) {

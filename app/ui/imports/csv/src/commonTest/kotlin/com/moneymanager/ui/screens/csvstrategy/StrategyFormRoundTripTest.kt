@@ -4,13 +4,10 @@ import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
-import com.moneymanager.domain.model.csvstrategy.AccountRule
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
-import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
-import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
@@ -20,15 +17,18 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
-import com.moneymanager.domain.model.csvstrategy.LegSide
-import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
-import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
+import com.moneymanager.domain.model.rules.LegRole
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleValue
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorState
 import com.moneymanager.ui.screens.csvstrategy.editor.buildStrategyFromEditorState
@@ -63,7 +63,39 @@ class StrategyFormRoundTripTest {
             "ID",
         ).mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }
 
-    /** A strategy exercising all six advanced mapping types. */
+    private val advancedRules =
+        listOf(
+            StrategyRule(
+                conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "IN")),
+                actions =
+                    listOf(
+                        RuleAction.SwapValues("Source name", "Target name"),
+                        RuleAction.SwapValues("Source currency", "Target currency"),
+                        RuleAction.Flip,
+                    ),
+            ),
+            StrategyRule.accounts(
+                AccountSide.SOURCE,
+                listOf(AccountNaming(value = ValueExpr(listOf("Source currency")), trim = true, name = "Wise: {value}")),
+            ),
+            StrategyRule.accounts(
+                AccountSide.TARGET,
+                listOf(AccountNaming(value = ValueExpr(listOf("Target currency")), trim = true, name = "Wise: {value}")),
+                conditions =
+                    listOf(
+                        Condition("Source name", ConditionOp.EQUALS_PATH, otherPath = "Target name"),
+                        Condition("Source name", ConditionOp.NOT_BLANK),
+                    ),
+            ),
+            StrategyRule.accounts(AccountSide.TARGET, listOf(AccountNaming(value = ValueExpr(listOf("Target name", "Source name"))))),
+            StrategyRule(
+                conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
+                actions = listOf(RuleAction.Fee(FeeRule(amount = ValueExpr(listOf("Source fee amount"))))),
+            ),
+            StrategyRule(actions = listOf(RuleAction.Attribute("wise-id", RuleValue.read("ID"), uniqueIdentifier = true))),
+        )
+
+    /** A strategy exercising every advanced mapping type and a rule of each common kind. */
     private fun advancedStrategy(): CsvImportStrategy =
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
@@ -74,39 +106,9 @@ class StrategyFormRoundTripTest {
                     fieldMappings =
                         mapOf(
                             TransferField.SOURCE_ACCOUNT to
-                                AccountRulesMapping(
-                                    fieldType = TransferField.SOURCE_ACCOUNT,
-                                    rules =
-                                        listOf(
-                                            AccountRule(value = ValueExpr(listOf("Source currency")), trim = true, name = "Wise: {value}"),
-                                        ),
-                                ),
+                                AccountFromRulesMapping(TransferField.SOURCE_ACCOUNT),
                             TransferField.TARGET_ACCOUNT to
-                                AccountRulesMapping.conditional(
-                                    fieldType = TransferField.TARGET_ACCOUNT,
-                                    conditions =
-                                        listOf(
-                                            Condition("Source name", ConditionOp.EQUALS_PATH, otherPath = "Target name"),
-                                            Condition("Source name", ConditionOp.NOT_BLANK),
-                                        ),
-                                    whenTrue =
-                                        AccountRulesMapping(
-                                            fieldType = TransferField.TARGET_ACCOUNT,
-                                            rules =
-                                                listOf(
-                                                    AccountRule(
-                                                        value = ValueExpr(listOf("Target currency")),
-                                                        trim = true,
-                                                        name = "Wise: {value}",
-                                                    ),
-                                                ),
-                                        ),
-                                    whenFalse =
-                                        AccountRulesMapping(
-                                            fieldType = TransferField.TARGET_ACCOUNT,
-                                            rules = listOf(AccountRule(value = ValueExpr(listOf("Target name", "Source name")))),
-                                        ),
-                                ),
+                                AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                             TransferField.TIMESTAMP to
                                 DateTimeParsingMapping(
                                     fieldType = TransferField.TIMESTAMP,
@@ -121,31 +123,13 @@ class StrategyFormRoundTripTest {
                                     fieldType = TransferField.AMOUNT,
                                     mode = AmountMode.SINGLE_COLUMN,
                                     amountColumnName = "Source amount (after fees)",
-                                    fee =
-                                        FeeRule(
-                                            amount = ValueExpr(listOf("Source fee amount")),
-                                            conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
-                                        ),
                                 ),
                             TransferField.CURRENCY to
                                 CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Source currency"))),
                             TransferField.TIMEZONE to
                                 HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London"),
                         ),
-                    attributeMappings =
-                        listOf(AttributeColumnMapping(columnName = "ID", attributeTypeName = "wise-id", isUniqueIdentifier = true)),
-                    rowPreprocessingRules =
-                        listOf(
-                            RowPreprocessingRule(
-                                conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "IN")),
-                                columnSwaps =
-                                    listOf(
-                                        ColumnPairSwap("Source name", "Target name"),
-                                        ColumnPairSwap("Source currency", "Target currency"),
-                                    ),
-                                flipSourceAndTarget = true,
-                            ),
-                        ),
+                    rules = advancedRules,
                     companionTransactionRules =
                         listOf(
                             CompanionTransactionRule(
@@ -171,20 +155,8 @@ class StrategyFormRoundTripTest {
 
         assertEquals(original.config.fieldMappings, rebuilt.config.fieldMappings)
         assertEquals(original.config.identificationColumns, rebuilt.config.identificationColumns)
-        assertEquals(original.config.attributeMappings, rebuilt.config.attributeMappings)
-        assertEquals(original.config.rowPreprocessingRules, rebuilt.config.rowPreprocessingRules)
+        assertEquals(original.config.rules, rebuilt.config.rules, "rules keep their order and content")
         assertEquals(original.config.companionTransactionRules, rebuilt.config.companionTransactionRules)
-
-        // Spot-check the conditional rule survived: guarded template first, plain lookup after.
-        val target = rebuilt.config.fieldMappings[TransferField.TARGET_ACCOUNT]
-        assertIs<AccountRulesMapping>(target)
-        assertEquals(
-            2,
-            target.rules
-                .first()
-                .conditions.size,
-        )
-        assertEquals(emptyList(), target.rules.last().conditions)
     }
 
     @Test
@@ -199,30 +171,9 @@ class StrategyFormRoundTripTest {
                         fieldMappings =
                             mapOf(
                                 TransferField.SOURCE_ACCOUNT to
-                                    AccountRulesMapping(
-                                        fieldType = TransferField.SOURCE_ACCOUNT,
-                                        rules =
-                                            listOf(
-                                                AccountRule(
-                                                    value = ValueExpr(listOf("Source currency")),
-                                                    trim = true,
-                                                    name = "Wise: {value}",
-                                                ),
-                                            ),
-                                    ),
+                                    AccountFromRulesMapping(TransferField.SOURCE_ACCOUNT),
                                 TransferField.TARGET_ACCOUNT to
-                                    AccountRulesMapping(
-                                        fieldType = TransferField.TARGET_ACCOUNT,
-                                        rules =
-                                            listOf(
-                                                AccountRule(
-                                                    value = ValueExpr(listOf("Target name")),
-                                                    trim = true,
-                                                    attributeTypeName = "card-last4",
-                                                ),
-                                                AccountRule(value = ValueExpr(listOf("Target name")), trim = true),
-                                            ),
-                                    ),
+                                    AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                                 TransferField.TIMESTAMP to
                                     DateTimeParsingMapping(
                                         fieldType = TransferField.TIMESTAMP,
@@ -243,6 +194,26 @@ class StrategyFormRoundTripTest {
                                     HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London"),
                             ),
                         fundingAttributeMatch = AttributeAccountMatch(column = "Reference", attributeTypeName = "card-last4"),
+                        rules =
+                            listOf(
+                                StrategyRule.accounts(
+                                    AccountSide.SOURCE,
+                                    listOf(
+                                        AccountNaming(value = ValueExpr(listOf("Source currency")), trim = true, name = "Wise: {value}"),
+                                    ),
+                                ),
+                                StrategyRule.accounts(
+                                    AccountSide.TARGET,
+                                    listOf(
+                                        AccountNaming(
+                                            value = ValueExpr(listOf("Target name")),
+                                            trim = true,
+                                            attributeTypeName = "card-last4",
+                                        ),
+                                        AccountNaming(value = ValueExpr(listOf("Target name")), trim = true),
+                                    ),
+                                ),
+                            ),
                     ),
                 createdAt = timestamp,
                 updatedAt = timestamp,
@@ -254,15 +225,7 @@ class StrategyFormRoundTripTest {
 
         assertEquals(original.config.fieldMappings, rebuilt.config.fieldMappings)
         assertEquals(original.config.fundingAttributeMatch, rebuilt.config.fundingAttributeMatch)
-        val target = rebuilt.config.fieldMappings[TransferField.TARGET_ACCOUNT]
-        assertIs<AccountRulesMapping>(target)
-        assertEquals("card-last4", target.rules.first().attributeTypeName)
-        assertEquals(
-            "Target name",
-            target.rules
-                .first()
-                .value.primaryPath,
-        )
+        assertEquals(original.config.rules, rebuilt.config.rules)
     }
 
     @Test
@@ -280,39 +243,43 @@ class StrategyFormRoundTripTest {
                         legGroups =
                             listOf(
                                 LegGroupRule(
-                                    legWhen = listOf(Condition("Direction", ConditionOp.MATCHES, "(?i)_(debited|credited)$")),
-                                    side = LegSide.DebitWhen(listOf(Condition("Direction", ConditionOp.MATCHES, "(?i)_debited$"))),
+                                    name = "conversion",
                                     key =
                                         listOf(
                                             ValueExpr(listOf("Direction"), Extraction("(?i)^(.*)_(?:debited|credited)$", "$1")),
                                             ValueExpr(listOf("Reference")),
                                         ),
                                     windowSeconds = 60,
-                                    assembly =
-                                        LegAssembly.ThroughAccount(
-                                            accounts =
-                                                listOf(
-                                                    AccountRule(
-                                                        conditions =
-                                                            listOf(
-                                                                Condition("Source currency", ConditionOp.MATCHES, "(?i)^DUST$"),
-                                                            ),
-                                                        value = ValueExpr(listOf("Direction")),
-                                                        name = "Dust",
-                                                    ),
-                                                    AccountRule(value = ValueExpr(listOf("Direction")), name = "Crypto.com Conversions"),
-                                                ),
-                                            relationshipTypeName = "conversion",
-                                        ),
+                                    assembly = LegAssembly.ThroughAccount(relationshipTypeName = "conversion"),
                                     reconcileWindowSeconds = 5,
                                 ),
-                                LegGroupRule(
-                                    legWhen = listOf(Condition("Direction", ConditionOp.EQUALS, "TRADE")),
-                                    side = LegSide.Sign("Source amount (after fees)"),
-                                    windowSeconds = 1,
-                                    assembly = LegAssembly.Trade("Swap {from} for {to}"),
-                                ),
+                                LegGroupRule(name = "trade", windowSeconds = 1, assembly = LegAssembly.Trade("Swap {from} for {to}")),
                             ),
+                        rules =
+                            advancedStrategy().config.rules +
+                                listOf(
+                                    StrategyRule(
+                                        conditions = listOf(Condition("Direction", ConditionOp.MATCHES, "(?i)_debited$")),
+                                        actions = listOf(RuleAction.Leg("conversion", LegRole.Debit)),
+                                    ),
+                                    StrategyRule(
+                                        conditions = listOf(Condition("Direction", ConditionOp.MATCHES, "(?i)_(debited|credited)$")),
+                                        actions = listOf(RuleAction.Leg("conversion", LegRole.Credit)),
+                                    ),
+                                    StrategyRule.accounts(
+                                        AccountSide.INTERMEDIATE,
+                                        listOf(AccountNaming(value = ValueExpr(listOf("Direction")), name = "Dust")),
+                                        conditions = listOf(Condition("Source currency", ConditionOp.MATCHES, "(?i)^DUST$")),
+                                    ),
+                                    StrategyRule.accounts(
+                                        AccountSide.INTERMEDIATE,
+                                        listOf(AccountNaming(value = ValueExpr(listOf("Direction")), name = "Crypto.com Conversions")),
+                                    ),
+                                    StrategyRule(
+                                        conditions = listOf(Condition("Direction", ConditionOp.EQUALS, "TRADE")),
+                                        actions = listOf(RuleAction.Leg("trade", LegRole.BySign("Source amount (after fees)"))),
+                                    ),
+                                ),
                     ),
             )
         val availableColumns = columns.map { it.originalName }.toSet()
@@ -320,6 +287,7 @@ class StrategyFormRoundTripTest {
         val state = CsvStrategyEditorState(original, availableColumns)
         val rebuilt = buildStrategyFromEditorState(state, original.id, original.createdAt, original.updatedAt)
 
+        assertEquals(original.config.rules, rebuilt.config.rules)
         assertEquals(original.config.contentMatchRules, rebuilt.config.contentMatchRules)
         assertEquals(original.config.crossSourceReconcileWindowSeconds, rebuilt.config.crossSourceReconcileWindowSeconds)
         assertEquals(original.config.legGroups, rebuilt.config.legGroups)
@@ -354,24 +322,9 @@ class StrategyFormRoundTripTest {
                             advancedStrategy().config.fieldMappings +
                                 mapOf(
                                     TransferField.SOURCE_ACCOUNT to
-                                        AccountRulesMapping(
-                                            fieldType = TransferField.SOURCE_ACCOUNT,
-                                            rules =
-                                                listOf(
-                                                    AccountRule(
-                                                        value = ValueExpr(listOf("Source currency")),
-                                                        trim = true,
-                                                        name = "Wise: {value}",
-                                                    ),
-                                                ),
-                                            defaultCategoryId = 41L,
-                                        ),
+                                        AccountFromRulesMapping(TransferField.SOURCE_ACCOUNT, defaultCategoryId = 41L),
                                     TransferField.TARGET_ACCOUNT to
-                                        AccountRulesMapping(
-                                            fieldType = TransferField.TARGET_ACCOUNT,
-                                            rules = listOf(AccountRule(value = ValueExpr(listOf("Target name", "Source name")))),
-                                            defaultCategoryId = 42L,
-                                        ),
+                                        AccountFromRulesMapping(TransferField.TARGET_ACCOUNT, defaultCategoryId = 42L),
                                     TransferField.TIMESTAMP to
                                         DateTimeParsingMapping(
                                             fieldType = TransferField.TIMESTAMP,
@@ -393,7 +346,6 @@ class StrategyFormRoundTripTest {
                                             fieldType = TransferField.AMOUNT,
                                             mode = AmountMode.SINGLE_COLUMN,
                                             amountColumnName = "Source amount (after fees)",
-                                            direction = Direction.AmountSign(positiveIsIncoming = false),
                                         ),
                                     // A fallback currency column has no widget of its own.
                                     TransferField.CURRENCY to
@@ -423,39 +375,12 @@ class StrategyFormRoundTripTest {
         assertEquals("$1", description.value.extraction?.outputTemplate)
     }
 
-    /** The same, for the target modes that each carry their own `defaultCategoryId`. */
+    /** The same, for the category new target accounts land in. */
     @Test
-    fun `default category survives on every target account mode`() {
+    fun `default category survives on the target account`() {
         val availableColumns = columns.map { it.originalName }.toSet()
-        val targets =
-            listOf(
-                AccountRulesMapping(
-                    fieldType = TransferField.TARGET_ACCOUNT,
-                    rules = listOf(AccountRule(value = ValueExpr(listOf("Target name")))),
-                    defaultCategoryId = 7L,
-                ),
-                AccountRulesMapping(
-                    fieldType = TransferField.TARGET_ACCOUNT,
-                    rules =
-                        listOf(
-                            AccountRule(value = ValueExpr(listOf("Target name")), pattern = "^AMZN", name = "Amazon"),
-                            AccountRule(value = ValueExpr(listOf("Target name"))),
-                        ),
-                    defaultCategoryId = 8L,
-                ),
-                AccountRulesMapping(
-                    fieldType = TransferField.TARGET_ACCOUNT,
-                    rules = listOf(AccountRule(value = ValueExpr(listOf("Target name")), attributeTypeName = "card-last4")),
-                    defaultCategoryId = 9L,
-                ),
-                AccountRulesMapping(
-                    fieldType = TransferField.TARGET_ACCOUNT,
-                    rules = listOf(AccountRule(value = ValueExpr(listOf("Target currency")), trim = true, name = "Wise: {value}")),
-                    defaultCategoryId = 10L,
-                ),
-            )
-
-        for (target in targets) {
+        for (categoryId in listOf(7L, 8L)) {
+            val target = AccountFromRulesMapping(TransferField.TARGET_ACCOUNT, defaultCategoryId = categoryId)
             val base = advancedStrategy()
             val original =
                 base.copy(
@@ -528,28 +453,14 @@ class StrategyFormRoundTripTest {
         assertEquals("Source fee amount", amount.debitColumnName)
     }
 
+    /** Rules are carried verbatim: a rule naming a column this file lacks simply doesn't fire on it. */
     @Test
-    fun `conditions referencing dropped columns are removed on extract`() {
+    fun `rules naming a column the file lacks are kept on extract`() {
         val original = advancedStrategy()
-        // A CSV missing "Target name" invalidates the EQUALS_COLUMN condition and a column swap.
-        val availableColumns =
-            original.config.identificationColumns +
-                setOf(
-                    "Reference",
-                    "Source amount (after fees)",
-                    "Source fee amount",
-                    "Source name",
-                    "Source currency",
-                    "Target currency",
-                    "ID",
-                )
+        val availableColumns = original.config.identificationColumns + setOf("Reference", "Source amount (after fees)")
 
         val state = CsvStrategyEditorState(original, availableColumns)
 
-        // The guarded rule compared against the missing "Target name", so it can't be evaluated and is
-        // dropped; the plain lookup loses its missing primary column but keeps its "Source name" fallback.
-        assertEquals(listOf(AccountRule(value = ValueExpr(listOf("Source name")))), state.targetRules)
-        // The preprocessing rule referenced "Target name" in a swap, so the whole rule is dropped.
-        assertEquals(emptyList(), state.rowPreprocessingRules)
+        assertEquals(original.config.rules, state.rules)
     }
 }

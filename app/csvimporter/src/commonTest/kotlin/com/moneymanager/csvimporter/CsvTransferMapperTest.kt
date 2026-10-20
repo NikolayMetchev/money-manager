@@ -13,8 +13,7 @@ import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.domain.model.csvstrategy.AccountRule
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -25,15 +24,17 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
-import com.moneymanager.domain.model.csvstrategy.StrategyConduit
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.passthrough.PassThroughRule
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
-import com.moneymanager.domain.model.rules.Direction
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.PassThroughDetector
 import kotlinx.datetime.LocalDateTime
@@ -85,6 +86,14 @@ class CsvTransferMapperTest {
             name = "Test Strategy",
             config =
                 CsvStrategyConfig(
+                    rules =
+                        listOfNotNull(
+                            StrategyRule(
+                                conditions = listOf(Condition("Amount", if (negateValues) ConditionOp.NEGATIVE else ConditionOp.POSITIVE)),
+                                actions = listOf(RuleAction.SetDirection(incoming = true)),
+                            ).takeIf { flipAccountsOnPositive },
+                            StrategyRule.accounts(AccountSide.TARGET, listOf(AccountNaming(value = ValueExpr(listOf("Payee"))))),
+                        ),
                     identificationColumns = setOf("Date", "Description", "Amount"),
                     fieldMappings =
                         mapOf(
@@ -94,10 +103,7 @@ class CsvTransferMapperTest {
                                     accountId = testSourceAccountId,
                                 ),
                             TransferField.TARGET_ACCOUNT to
-                                AccountRulesMapping(
-                                    fieldType = TransferField.TARGET_ACCOUNT,
-                                    rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
-                                ),
+                                AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                             TransferField.TIMESTAMP to
                                 DateTimeParsingMapping(
                                     fieldType = TransferField.TIMESTAMP,
@@ -111,14 +117,6 @@ class CsvTransferMapperTest {
                                     fieldType = TransferField.AMOUNT,
                                     mode = AmountMode.SINGLE_COLUMN,
                                     amountColumnName = "Amount",
-                                    direction =
-                                        if (flipAccountsOnPositive) {
-                                            Direction.AmountSign(
-                                                positiveIsIncoming = !negateValues,
-                                            )
-                                        } else {
-                                            Direction.Outgoing
-                                        },
                                 ),
                             TransferField.CURRENCY to
                                 HardCodedCurrencyMapping(
@@ -211,13 +209,17 @@ class CsvTransferMapperTest {
         assertEquals(setOf("Curve", "Sainsburys"), newNames)
     }
 
+    /** Every row the [conditions] admit runs through the Curve conduit. */
+    private fun throughCurve(conditions: List<Condition> = emptyList()): StrategyRule =
+        StrategyRule(conditions = conditions, actions = listOf(RuleAction.ThroughConduit("Curve")))
+
     private fun conduitMapper(
-        conduit: StrategyConduit,
+        conduit: StrategyRule,
         passThroughs: List<PassThroughAccount> = emptyList(),
     ): CsvTransferMapper {
         val strategy = createStrategy()
         return CsvTransferMapper(
-            strategy = strategy.copy(config = strategy.config.copy(conduit = conduit)),
+            strategy = strategy.copy(config = strategy.config.copy(rules = strategy.config.rules + conduit)),
             columns = columns,
             existingAccounts = emptyMap(),
             existingCurrencies = mapOf(testCurrencyId to testCurrency),
@@ -228,7 +230,7 @@ class CsvTransferMapperTest {
 
     @Test
     fun `mapRow routes every row of a strategy with a conduit through it to the row's counterparty`() {
-        val result = conduitMapper(StrategyConduit("Curve")).mapRow(CsvRow(1, listOf("15/12/2024", "Tesco", "-10.00", "Tesco")))
+        val result = conduitMapper(throughCurve()).mapRow(CsvRow(1, listOf("15/12/2024", "Tesco", "-10.00", "Tesco")))
 
         assertIs<MappingResult.Success>(result)
         assertEquals(testSourceAccountId, result.transfer.sourceAccountId, "the row's own account funds the chain")
@@ -254,7 +256,7 @@ class CsvTransferMapperTest {
                     ),
             )
         val result =
-            conduitMapper(StrategyConduit("Curve"), listOf(payPal))
+            conduitMapper(throughCurve(), listOf(payPal))
                 .mapRow(CsvRow(1, listOf("15/12/2024", "Paypal *Thepihut", "-10.00", "Paypal *Thepihut")))
 
         assertIs<MappingResult.Success>(result)
@@ -266,7 +268,7 @@ class CsvTransferMapperTest {
 
     @Test
     fun `mapRow leaves a row out of the strategy conduit when its conditions do not hold`() {
-        val conduit = StrategyConduit("Curve", listOf(Condition("Payee", ConditionOp.NOT_EQUALS, "Curve Cash")))
+        val conduit = throughCurve(listOf(Condition("Payee", ConditionOp.NOT_EQUALS, "Curve Cash")))
         val result = conduitMapper(conduit).mapRow(CsvRow(1, listOf("15/12/2024", "Points", "-10.00", "Curve Cash")))
 
         assertIs<MappingResult.Success>(result)
@@ -543,6 +545,33 @@ class CsvTransferMapperTest {
     }
 
     @Test
+    fun `prepareImport reports the rows a rule skipped apart from the errors`() {
+        val strategy = createStrategy()
+        val skipPending =
+            StrategyRule(conditions = listOf(Condition("Description", ConditionOp.EQUALS, "Pending")), actions = listOf(RuleAction.Skip))
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy.copy(config = strategy.config.copy(rules = listOf(skipPending) + strategy.config.rules)),
+                columns = columns,
+                existingAccounts = mapOf("Payee Account" to testTargetAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        val preparation =
+            mapper.prepareImport(
+                listOf(
+                    CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Pending", "-50.00", "Payee Account")),
+                    CsvRow(rowIndex = 2, values = listOf("16/12/2024", "Settled", "-75.00", "Payee Account")),
+                ),
+            )
+
+        assertEquals(listOf(1L), preparation.skippedRowIndexes)
+        assertEquals(listOf(2L), preparation.validTransfers.map { it.rowIndex })
+        assertTrue(preparation.errorRows.isEmpty())
+    }
+
+    @Test
     fun `prepareImport collects new accounts to create`() {
         val strategy = createStrategy()
         val mapper =
@@ -626,6 +655,10 @@ class CsvTransferMapperTest {
                 name = "Test Strategy With Currency Column",
                 config =
                     CsvStrategyConfig(
+                        rules =
+                            listOf(
+                                StrategyRule.accounts(AccountSide.TARGET, listOf(AccountNaming(value = ValueExpr(listOf("Payee"))))),
+                            ),
                         identificationColumns = setOf("Date", "Description", "Amount", "Currency"),
                         fieldMappings =
                             mapOf(
@@ -635,10 +668,7 @@ class CsvTransferMapperTest {
                                         accountId = testSourceAccountId,
                                     ),
                                 TransferField.TARGET_ACCOUNT to
-                                    AccountRulesMapping(
-                                        fieldType = TransferField.TARGET_ACCOUNT,
-                                        rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
-                                    ),
+                                    AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                                 TransferField.TIMESTAMP to
                                     DateTimeParsingMapping(
                                         fieldType = TransferField.TIMESTAMP,
@@ -698,6 +728,10 @@ class CsvTransferMapperTest {
                 name = "Test Strategy With Currency Column",
                 config =
                     CsvStrategyConfig(
+                        rules =
+                            listOf(
+                                StrategyRule.accounts(AccountSide.TARGET, listOf(AccountNaming(value = ValueExpr(listOf("Payee"))))),
+                            ),
                         identificationColumns = setOf("Date", "Description", "Amount", "Currency"),
                         fieldMappings =
                             mapOf(
@@ -707,10 +741,7 @@ class CsvTransferMapperTest {
                                         accountId = testSourceAccountId,
                                     ),
                                 TransferField.TARGET_ACCOUNT to
-                                    AccountRulesMapping(
-                                        fieldType = TransferField.TARGET_ACCOUNT,
-                                        rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
-                                    ),
+                                    AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                                 TransferField.TIMESTAMP to
                                     DateTimeParsingMapping(
                                         fieldType = TransferField.TIMESTAMP,
@@ -760,6 +791,10 @@ class CsvTransferMapperTest {
                 name = "Test Strategy With Timezone",
                 config =
                     CsvStrategyConfig(
+                        rules =
+                            listOf(
+                                StrategyRule.accounts(AccountSide.TARGET, listOf(AccountNaming(value = ValueExpr(listOf("Payee"))))),
+                            ),
                         identificationColumns = setOf("Date", "Description", "Amount"),
                         fieldMappings =
                             mapOf(
@@ -769,10 +804,7 @@ class CsvTransferMapperTest {
                                         accountId = testSourceAccountId,
                                     ),
                                 TransferField.TARGET_ACCOUNT to
-                                    AccountRulesMapping(
-                                        fieldType = TransferField.TARGET_ACCOUNT,
-                                        rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
-                                    ),
+                                    AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                                 TransferField.TIMESTAMP to
                                     DateTimeParsingMapping(
                                         fieldType = TransferField.TIMESTAMP,
@@ -841,6 +873,10 @@ class CsvTransferMapperTest {
                 name = "Test Strategy With Timezone Column",
                 config =
                     CsvStrategyConfig(
+                        rules =
+                            listOf(
+                                StrategyRule.accounts(AccountSide.TARGET, listOf(AccountNaming(value = ValueExpr(listOf("Payee"))))),
+                            ),
                         identificationColumns = setOf("Date", "Description", "Amount", "Timezone"),
                         fieldMappings =
                             mapOf(
@@ -850,10 +886,7 @@ class CsvTransferMapperTest {
                                         accountId = testSourceAccountId,
                                     ),
                                 TransferField.TARGET_ACCOUNT to
-                                    AccountRulesMapping(
-                                        fieldType = TransferField.TARGET_ACCOUNT,
-                                        rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
-                                    ),
+                                    AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                                 TransferField.TIMESTAMP to
                                     DateTimeParsingMapping(
                                         fieldType = TransferField.TIMESTAMP,
@@ -918,6 +951,10 @@ class CsvTransferMapperTest {
                 name = "Test Strategy With $timezoneId",
                 config =
                     CsvStrategyConfig(
+                        rules =
+                            listOf(
+                                StrategyRule.accounts(AccountSide.TARGET, listOf(AccountNaming(value = ValueExpr(listOf("Payee"))))),
+                            ),
                         identificationColumns = setOf("Date", "Description", "Amount"),
                         fieldMappings =
                             mapOf(
@@ -927,10 +964,7 @@ class CsvTransferMapperTest {
                                         accountId = testSourceAccountId,
                                     ),
                                 TransferField.TARGET_ACCOUNT to
-                                    AccountRulesMapping(
-                                        fieldType = TransferField.TARGET_ACCOUNT,
-                                        rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
-                                    ),
+                                    AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                                 TransferField.TIMESTAMP to
                                     DateTimeParsingMapping(
                                         fieldType = TransferField.TIMESTAMP,
@@ -1029,6 +1063,20 @@ class CsvTransferMapperTest {
             name = "Strategy With Fallback",
             config =
                 CsvStrategyConfig(
+                    rules =
+                        listOf(
+                            StrategyRule.accounts(
+                                AccountSide.TARGET,
+                                listOf(
+                                    AccountNaming(
+                                        value =
+                                            ValueExpr(
+                                                listOf(primaryColumn) + fallbackColumns,
+                                            ),
+                                    ),
+                                ),
+                            ),
+                        ),
                     identificationColumns = setOf("Date", "Description", "Amount", "Name", "Type"),
                     fieldMappings =
                         mapOf(
@@ -1038,18 +1086,7 @@ class CsvTransferMapperTest {
                                     accountId = testSourceAccountId,
                                 ),
                             TransferField.TARGET_ACCOUNT to
-                                AccountRulesMapping(
-                                    fieldType = TransferField.TARGET_ACCOUNT,
-                                    rules =
-                                        listOf(
-                                            AccountRule(
-                                                value =
-                                                    ValueExpr(
-                                                        listOf(primaryColumn) + fallbackColumns,
-                                                    ),
-                                            ),
-                                        ),
-                                ),
+                                AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                             TransferField.TIMESTAMP to
                                 DateTimeParsingMapping(
                                     fieldType = TransferField.TIMESTAMP,
@@ -1230,9 +1267,9 @@ class CsvTransferMapperTest {
         )
 
     private fun createStrategyWithRegex(
-        rules: List<AccountRule> =
+        rules: List<AccountNaming> =
             listOf(
-                AccountRule(value = ValueExpr(listOf("Name")), pattern = ".*paxos.*", name = "Paxos"),
+                AccountNaming(value = ValueExpr(listOf("Name")), pattern = ".*paxos.*", name = "Paxos"),
             ),
         fallbackColumns: List<String> = listOf("Type"),
     ): CsvImportStrategy {
@@ -1242,6 +1279,13 @@ class CsvTransferMapperTest {
             name = "Strategy With Regex",
             config =
                 CsvStrategyConfig(
+                    rules =
+                        listOf(
+                            StrategyRule.accounts(
+                                AccountSide.TARGET,
+                                rules + AccountNaming(value = ValueExpr(listOf("Name") + fallbackColumns)),
+                            ),
+                        ),
                     identificationColumns = setOf("Date", "Description", "Amount", "Name", "Type"),
                     fieldMappings =
                         mapOf(
@@ -1251,11 +1295,7 @@ class CsvTransferMapperTest {
                                     accountId = testSourceAccountId,
                                 ),
                             TransferField.TARGET_ACCOUNT to
-                                AccountRulesMapping(
-                                    fieldType = TransferField.TARGET_ACCOUNT,
-                                    rules =
-                                        rules + AccountRule(value = ValueExpr(listOf("Name") + fallbackColumns)),
-                                ),
+                                AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                             TransferField.TIMESTAMP to
                                 DateTimeParsingMapping(
                                     fieldType = TransferField.TIMESTAMP,
@@ -1408,8 +1448,8 @@ class CsvTransferMapperTest {
             createStrategyWithRegex(
                 rules =
                     listOf(
-                        AccountRule(value = ValueExpr(listOf("Name")), pattern = ".*paxos.*", name = "Paxos"),
-                        AccountRule(value = ValueExpr(listOf("Name")), pattern = ".*crypto.*", name = "Crypto.com"),
+                        AccountNaming(value = ValueExpr(listOf("Name")), pattern = ".*paxos.*", name = "Paxos"),
+                        AccountNaming(value = ValueExpr(listOf("Name")), pattern = ".*crypto.*", name = "Crypto.com"),
                     ),
             )
         val cryptoAccount =
@@ -1625,23 +1665,20 @@ class CsvTransferMapperTest {
         return base.copy(
             config =
                 base.config.copy(
-                    fieldMappings =
-                        base.config.fieldMappings +
-                            (
-                                TransferField.TARGET_ACCOUNT to
-                                    AccountRulesMapping(
-                                        fieldType = TransferField.TARGET_ACCOUNT,
-                                        rules =
-                                            listOf(
-                                                AccountRule(
-                                                    value = ValueExpr(listOf("Payee")),
-                                                    trim = true,
-                                                    attributeTypeName = "card-last4",
-                                                ),
-                                                AccountRule(value = ValueExpr(listOf("Payee")), trim = true),
-                                            ),
-                                    )
+                    rules =
+                        listOf(
+                            StrategyRule.accounts(
+                                AccountSide.TARGET,
+                                listOf(
+                                    AccountNaming(
+                                        value = ValueExpr(listOf("Payee")),
+                                        trim = true,
+                                        attributeTypeName = "card-last4",
+                                    ),
+                                    AccountNaming(value = ValueExpr(listOf("Payee")), trim = true),
+                                ),
                             ),
+                        ),
                 ),
         )
     }

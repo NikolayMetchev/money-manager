@@ -3,7 +3,7 @@ package com.moneymanager.domain.model.csvstrategy
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.SortedConditionListSerializer
-import com.moneymanager.domain.model.serialization.SortedListSerializer
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.KSerializer
@@ -26,8 +26,10 @@ import kotlinx.serialization.encoding.Encoder
  * @property identificationColumns Set of column names used to auto-identify this strategy
  *                                 when importing a CSV file. Matching is exact and order-independent.
  * @property fieldMappings Map of TransferField to the mapping defining how each field is populated
- * @property rowPreprocessingRules Rules that may swap column values / flip accounts per row
- *                                 before field mappings run (see [RowPreprocessingRule])
+ * @property rules The strategy's if/then rules, run in order over each row before the field mappings
+ *                 parse it (see [StrategyRule]): they rewrite cells, name the accounts, set the direction,
+ *                 tag attributes, exclude rows, book fees and foreign amounts, route rows through a
+ *                 conduit and mark the legs of [legGroups].
  * @property companionTransactionRules Rules flagging imported transfers that require a manually
  *                                     entered companion transaction (see [CompanionTransactionRule])
  * @property contentMatchRules Conditions that auto-detect this strategy from row content when the column
@@ -59,8 +61,6 @@ import kotlinx.serialization.encoding.Encoder
  *                      mints a duplicate asset nor fails to match.
  * @property reconciliation When set, this strategy imports a reconciliation source into shadow
  *                          accounts only (see [ReconciliationConfig]). Null for ordinary strategies.
- * @property conduit When set, rows run through this conduit account as a pass-through chain
- *                   (see [StrategyConduit]). Null when rows move directly between their accounts.
  */
 @Serializable
 data class CsvStrategyConfig<out M>(
@@ -68,11 +68,10 @@ data class CsvStrategyConfig<out M>(
     val identificationColumns: Set<String>,
     @Serializable(with = SortedFieldMappingsSerializer::class)
     val fieldMappings: Map<TransferField, M>,
-    @Serializable(with = SortedAttributeMappingListSerializer::class)
-    val attributeMappings: List<AttributeColumnMapping> = emptyList(),
-    // Rules apply sequentially and each can affect what the next rule's conditions see (not
-    // first-match) - order is semantic, keeps default insertion-order serialization.
-    val rowPreprocessingRules: List<RowPreprocessingRule> = emptyList(),
+    // Rules apply in order, a rewrite is seen by the rules after it and single-valued outcomes keep the
+    // first claim - order is semantic, keeps insertion-order serialization. NEVER-encoded when empty.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val rules: List<StrategyRule> = emptyList(),
     @Serializable(with = SortedCompanionTransactionRuleListSerializer::class)
     val companionTransactionRules: List<CompanionTransactionRule> = emptyList(),
     @Serializable(with = SortedConditionListSerializer::class)
@@ -85,8 +84,8 @@ data class CsvStrategyConfig<out M>(
     // "all strategies changed" on catalog/Drive sync. See StrategyArtifactCodec.canonicalHash.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val fundingAttributeMatch: AttributeAccountMatch? = null,
-    // A row is a leg of the first rule that claims it - order is semantic, keeps insertion-order
-    // serialization. NEVER-encoded when empty.
+    // Groups are looked up by name; kept in insertion order like the rules that name them. NEVER-encoded
+    // when empty.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val legGroups: List<LegGroupRule> = emptyList(),
     // Same NEVER-encode rationale: only reconciliation-source strategies rehash.
@@ -95,17 +94,13 @@ data class CsvStrategyConfig<out M>(
     // NEVER-encoded when empty, same rationale.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val assetCodes: AssetCodeRules = AssetCodeRules(),
-    // NEVER-encoded when null, same rationale.
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val conduit: StrategyConduit? = null,
 ) {
     /** This config with each field mapping replaced by [transform]'s result, everything else unchanged. */
     fun <N> mapFieldMappings(transform: (M) -> N): CsvStrategyConfig<N> =
         CsvStrategyConfig(
             identificationColumns = identificationColumns,
             fieldMappings = fieldMappings.mapValues { (_, mapping) -> transform(mapping) },
-            attributeMappings = attributeMappings,
-            rowPreprocessingRules = rowPreprocessingRules,
+            rules = rules,
             companionTransactionRules = companionTransactionRules,
             contentMatchRules = contentMatchRules,
             fileNamePattern = fileNamePattern,
@@ -114,7 +109,6 @@ data class CsvStrategyConfig<out M>(
             legGroups = legGroups,
             reconciliation = reconciliation,
             assetCodes = assetCodes,
-            conduit = conduit,
         )
 }
 
@@ -136,6 +130,3 @@ class SortedFieldMappingsSerializer<M>(
     private fun sortedByField(value: Map<TransferField, M>): Map<TransferField, M> =
         value.entries.sortedBy { it.key.name }.associate { it.key to it.value }
 }
-
-/** Serializes attribute-column mappings sorted by [AttributeColumnMapping]'s natural order. */
-object SortedAttributeMappingListSerializer : SortedListSerializer<AttributeColumnMapping>(AttributeColumnMapping.serializer())

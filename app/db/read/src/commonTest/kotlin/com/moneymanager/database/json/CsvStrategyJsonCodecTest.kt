@@ -2,11 +2,9 @@ package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.csvstrategy.AccountRule
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
+import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
-import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
@@ -15,13 +13,18 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
-import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
-import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.FeeRule
+import com.moneymanager.domain.model.rules.ForeignAmount
+import com.moneymanager.domain.model.rules.LegRole
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleValue
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -49,37 +52,96 @@ class CsvStrategyJsonCodecTest {
     }
 
     @Test
-    fun `encode and decode AccountLookupMapping`() {
-        val mapping =
-            AccountRulesMapping(fieldType = TransferField.TARGET_ACCOUNT, rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))))
+    fun `encode and decode AccountFromRulesMapping`() {
+        val mapping = AccountFromRulesMapping(TransferField.TARGET_ACCOUNT, defaultCategoryId = 7)
         val mappings = mapOf(TransferField.TARGET_ACCOUNT to mapping)
 
         val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
         val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
 
-        val decodedMapping = decoded[TransferField.TARGET_ACCOUNT]
-        assertEquals(mapping, decodedMapping)
+        assertEquals(mapping, decoded[TransferField.TARGET_ACCOUNT])
     }
 
     @Test
-    fun `encode and decode RegexAccountMapping`() {
-        val mapping =
-            AccountRulesMapping(
-                fieldType = TransferField.TARGET_ACCOUNT,
-                rules =
+    fun `encode and decode account rules in their order`() {
+        val rules =
+            listOf(
+                StrategyRule.accounts(
+                    AccountSide.SOURCE,
+                    listOf(AccountNaming(value = ValueExpr(listOf("Source currency")), trim = true, name = "Wise: {value}")),
+                ),
+                StrategyRule.accounts(
+                    AccountSide.TARGET,
+                    listOf(AccountNaming(value = ValueExpr(listOf("Target currency")), trim = true, name = "Wise: {value}")),
+                    conditions =
+                        listOf(
+                            Condition("Source name", ConditionOp.EQUALS_PATH, otherPath = "Target name"),
+                            Condition("Source name", ConditionOp.NOT_BLANK),
+                        ),
+                ),
+                StrategyRule.accounts(
+                    AccountSide.TARGET,
                     listOf(
-                        AccountRule(value = ValueExpr(listOf("Name")), pattern = ".*paxos.*", name = "Paxos"),
-                        AccountRule(value = ValueExpr(listOf("Name")), pattern = ".*crypto\\.com.*", name = "Crypto.com"),
-                        AccountRule(value = ValueExpr(listOf("Name", "Type"))),
+                        AccountNaming(value = ValueExpr(listOf("Name")), pattern = ".*paxos.*", name = "Paxos"),
+                        AccountNaming(value = ValueExpr(listOf("Name")), pattern = ".*crypto\\.com.*", name = "Crypto.com"),
+                        AccountNaming(value = ValueExpr(listOf("Name", "Type"))),
                     ),
+                ),
             )
-        val mappings = mapOf(TransferField.TARGET_ACCOUNT to mapping)
 
-        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
-        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), emptyMap(), rules = rules))
 
-        val decodedMapping = decoded[TransferField.TARGET_ACCOUNT]
-        assertEquals(mapping, decodedMapping)
+        assertEquals(rules, CsvStrategyJsonCodec.decode(json).rules)
+    }
+
+    @Test
+    fun `encode and decode every rule action`() {
+        val rules =
+            listOf(
+                StrategyRule(
+                    name = "rewrites",
+                    conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "IN")),
+                    actions =
+                        listOf(
+                            RuleAction.SwapValues("Source name", "Target name"),
+                            RuleAction.SetValue("Kind", RuleValue.constant("swap")),
+                            RuleAction.Flip,
+                        ),
+                ),
+                StrategyRule(
+                    conditions = listOf(Condition("Amount", ConditionOp.POSITIVE)),
+                    actions = listOf(RuleAction.SetDirection(incoming = true)),
+                ),
+                StrategyRule(
+                    actions =
+                        listOf(
+                            RuleAction.Exclude(RuleValue.read("Status")),
+                            RuleAction.ExternalId(RuleValue.Template("{ID}-{Kind}")),
+                            RuleAction.CounterpartyIsPerson,
+                            RuleAction.IgnoreCounterpartyId,
+                            RuleAction.Attribute("wise-id", RuleValue.read("ID"), uniqueIdentifier = true),
+                            RuleAction.Fee(
+                                FeeRule(
+                                    amount = ValueExpr(listOf("Source fee amount")),
+                                    conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
+                                ),
+                            ),
+                            RuleAction.Foreign(
+                                ForeignAmount(amount = ValueExpr(listOf("Local amount")), currency = ValueExpr(listOf("Local currency"))),
+                            ),
+                            RuleAction.ThroughConduit("Curve"),
+                            RuleAction.TradeSide(buy = true),
+                            RuleAction.Leg("trade", LegRole.BySign("Change")),
+                            RuleAction.Leg("conversion", LegRole.Debit),
+                            RuleAction.LedgerTradeLeg,
+                            RuleAction.Skip,
+                        ),
+                ),
+            )
+
+        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), emptyMap(), rules = rules))
+
+        assertEquals(rules, CsvStrategyJsonCodec.decode(json).rules)
     }
 
     @Test
@@ -127,7 +189,6 @@ class CsvStrategyJsonCodecTest {
                 fieldType = TransferField.AMOUNT,
                 mode = AmountMode.SINGLE_COLUMN,
                 amountColumnName = "Amount",
-                direction = Direction.AmountSign(positiveIsIncoming = false),
             )
         val mappings = mapOf(TransferField.AMOUNT to mapping)
 
@@ -138,7 +199,6 @@ class CsvStrategyJsonCodecTest {
         assertIs<AmountParsingMapping>(decodedMapping)
         assertEquals(AmountMode.SINGLE_COLUMN, decodedMapping.mode)
         assertEquals("Amount", decodedMapping.amountColumnName)
-        assertEquals(Direction.AmountSign(positiveIsIncoming = false), decodedMapping.direction)
     }
 
     @Test
@@ -204,11 +264,7 @@ class CsvStrategyJsonCodecTest {
                         fieldType = TransferField.SOURCE_ACCOUNT,
                         accountId = AccountId(1),
                     ),
-                TransferField.TARGET_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        rules = listOf(AccountRule(value = ValueExpr(listOf("Payee")))),
-                    ),
+                TransferField.TARGET_ACCOUNT to AccountFromRulesMapping(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
@@ -231,7 +287,7 @@ class CsvStrategyJsonCodecTest {
 
         assertEquals(6, decoded.size)
         assertIs<HardCodedAccountMapping>(decoded[TransferField.SOURCE_ACCOUNT])
-        assertIs<AccountRulesMapping>(decoded[TransferField.TARGET_ACCOUNT])
+        assertIs<AccountFromRulesMapping>(decoded[TransferField.TARGET_ACCOUNT])
         assertIs<DateTimeParsingMapping>(decoded[TransferField.TIMESTAMP])
         assertIs<DirectColumnMapping>(decoded[TransferField.DESCRIPTION])
         assertIs<AmountParsingMapping>(decoded[TransferField.AMOUNT])
@@ -311,59 +367,6 @@ class CsvStrategyJsonCodecTest {
     }
 
     @Test
-    fun `encode and decode TemplateAccountMapping`() {
-        val mapping =
-            AccountRulesMapping(
-                fieldType = TransferField.SOURCE_ACCOUNT,
-                rules = listOf(AccountRule(value = ValueExpr(listOf("Source currency")), trim = true, name = "Wise: {value}")),
-            )
-        val mappings = mapOf(TransferField.SOURCE_ACCOUNT to mapping)
-
-        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
-        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
-
-        val decodedMapping = decoded[TransferField.SOURCE_ACCOUNT]
-        assertEquals(mapping, decodedMapping)
-    }
-
-    @Test
-    fun `encode and decode ConditionalAccountMapping with nested mappings`() {
-        val mapping =
-            AccountRulesMapping.conditional(
-                fieldType = TransferField.TARGET_ACCOUNT,
-                conditions =
-                    listOf(
-                        Condition("Source name", ConditionOp.EQUALS_PATH, otherPath = "Target name"),
-                        Condition("Source name", ConditionOp.NOT_BLANK),
-                    ),
-                whenTrue =
-                    AccountRulesMapping(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        rules = listOf(AccountRule(value = ValueExpr(listOf("Target currency")), trim = true, name = "Wise: {value}")),
-                    ),
-                whenFalse =
-                    AccountRulesMapping(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        rules = listOf(AccountRule(value = ValueExpr(listOf("Target name", "Source name")))),
-                    ),
-            )
-        val mappings = mapOf(TransferField.TARGET_ACCOUNT to mapping)
-
-        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
-        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
-
-        val decodedMapping = decoded[TransferField.TARGET_ACCOUNT]
-        assertEquals(mapping, decodedMapping)
-        assertEquals(
-            2,
-            assertIs<AccountRulesMapping>(decodedMapping)
-                .rules
-                .first()
-                .conditions.size,
-        )
-    }
-
-    @Test
     fun `encode and decode DateTimeParsingMapping with combined date-time format`() {
         val mapping =
             DateTimeParsingMapping(
@@ -380,46 +383,6 @@ class CsvStrategyJsonCodecTest {
         val decodedMapping = decoded[TransferField.TIMESTAMP]
         assertIs<DateTimeParsingMapping>(decodedMapping)
         assertEquals("yyyy-MM-dd HH:mm:ss", decodedMapping.dateTimeFormat)
-    }
-
-    @Test
-    fun `encode and decode AmountParsingMapping with conditional fee column`() {
-        val mapping =
-            AmountParsingMapping(
-                fieldType = TransferField.AMOUNT,
-                mode = AmountMode.SINGLE_COLUMN,
-                amountColumnName = "Source amount (after fees)",
-                fee =
-                    FeeRule(
-                        amount = ValueExpr(listOf("Source fee amount")),
-                        conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
-                    ),
-            )
-        val mappings = mapOf(TransferField.AMOUNT to mapping)
-
-        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), mappings))
-        val decoded = CsvStrategyJsonCodec.decode(json).fieldMappings
-
-        val decodedMapping = decoded[TransferField.AMOUNT]
-        assertIs<AmountParsingMapping>(decodedMapping)
-        assertEquals(mapping.fee, decodedMapping.fee)
-    }
-
-    @Test
-    fun `encode and decode row preprocessing rules`() {
-        val rules =
-            listOf(
-                RowPreprocessingRule(
-                    conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "IN")),
-                    columnSwaps = listOf(ColumnPairSwap("Source name", "Target name")),
-                    flipSourceAndTarget = true,
-                ),
-            )
-
-        val json = CsvStrategyJsonCodec.encode(CsvStrategyConfig(emptySet(), emptyMap(), rowPreprocessingRules = rules))
-        val decoded = CsvStrategyJsonCodec.decode(json).rowPreprocessingRules
-
-        assertEquals(rules, decoded)
     }
 
     @Test

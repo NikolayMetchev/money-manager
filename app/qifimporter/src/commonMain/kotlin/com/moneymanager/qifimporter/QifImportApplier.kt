@@ -313,14 +313,23 @@ suspend fun runImport(
         buildMapper(strategy, latestAccounts, currencies, latestMappings, selectedSourceAccountId, historicalAccountNames)
     val finalPrep = mapper.prepareImport(rows)
 
-    // Surface mapping errors on their records.
+    // Surface mapping errors on their records, and settle the records a rule skipped.
+    val skipped = finalPrep.skippedRowIndexes
     importEngine.applyQifImportMutations(
         finalPrep.errorRows.flatMap { errorRow ->
             listOf(
                 QifImportMutation.UpdateRecordStatuses(qifImport.id, ImportStatus.ERROR.name, mapOf(errorRow.rowIndex to null)),
                 QifImportMutation.SaveError(qifImport.id, errorRow.rowIndex, errorRow.errorMessage),
             )
-        },
+        } +
+            if (skipped.isEmpty()) {
+                emptyList()
+            } else {
+                listOf(
+                    QifImportMutation.UpdateRecordStatuses(qifImport.id, ImportStatus.SKIPPED.name, skipped.associateWith { null }),
+                    QifImportMutation.ClearErrors(qifImport.id, skipped),
+                )
+            },
     )
 
     if (finalPrep.validTransfers.isEmpty()) {

@@ -21,7 +21,16 @@ data class StrategyRule(
     val conditions: List<Condition> = emptyList(),
     // Actions apply in order, and a record rewrite is seen by the actions after it - order is semantic.
     val actions: List<RuleAction>,
-)
+) {
+    companion object {
+        /** A rule offering [namings], in order, as [side]'s account candidates when every one of [conditions] holds. */
+        fun accounts(
+            side: AccountSide,
+            namings: List<AccountNaming>,
+            conditions: List<Condition> = emptyList(),
+        ): StrategyRule = StrategyRule(conditions = conditions, actions = namings.map { RuleAction.Account(side, it) })
+    }
+}
 
 /**
  * A value an action computes: read from the record ([Read]) or written out ([Template], whose `{path}`
@@ -90,7 +99,6 @@ enum class AccountSide {
  * @property person The account belongs to a person, named [personName] (else the account name).
  * @property unidentified The record names the counterparty but not its identity (a "GBP Deposit"), so
  *   the import engine reconciles it against a real record of the same movement.
- * @property categoryId The category a newly created account gets; null keeps the default.
  */
 @Serializable
 data class AccountNaming(
@@ -110,8 +118,6 @@ data class AccountNaming(
     val personName: String? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val unidentified: Boolean = false,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val categoryId: Long? = null,
 ) {
     companion object {
         /** In [name], the (cleaned) value the naming read. */

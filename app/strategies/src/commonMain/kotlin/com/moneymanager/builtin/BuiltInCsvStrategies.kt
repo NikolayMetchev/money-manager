@@ -3,13 +3,9 @@ package com.moneymanager.builtin
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.WellKnownIds
-import com.moneymanager.domain.model.csvstrategy.AccountRule
-import com.moneymanager.domain.model.csvstrategy.AccountRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
-import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
-import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
@@ -21,20 +17,21 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
-import com.moneymanager.domain.model.csvstrategy.LegSide
 import com.moneymanager.domain.model.csvstrategy.ReconciliationConfig
-import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
-import com.moneymanager.domain.model.csvstrategy.StrategyConduit
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifColumns
+import com.moneymanager.domain.model.rules.AccountNaming
+import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
-import com.moneymanager.domain.model.rules.Direction
 import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ForeignAmount
+import com.moneymanager.domain.model.rules.LegRole
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -101,7 +98,7 @@ object BuiltInCsvStrategies {
      * Cash wallet or, as in crypto.com's pre-mid-2022 TGBP era, a crypto wallet. Booking it against Cash
      * would debit an account that never paid; the row lands here instead and reconciles away against the
      * funding side's own record of the movement when one is imported (see
-     * `AccountRule.counterpartyIsUnidentified`).
+     * `AccountNaming.unidentified`).
      */
     private const val CRYPTO_COM_CARD_TOP_UP_ACCOUNT = "Crypto.com Card Top Up"
 
@@ -126,6 +123,9 @@ object BuiltInCsvStrategies {
      */
     private const val CRYPTO_COM_CONVERSION_PAIRING_WINDOW_SECONDS = 5L
 
+    /** The Crypto.com Crypto strategy's leg group pairing dust conversions and wallet swaps. */
+    private const val CRYPTO_COM_CONVERSION_GROUP = "conversion"
+
     /** Account name prefix shared with the Wise API import strategy ("Wise: " + currency code). */
     private const val WISE_ACCOUNT_PREFIX = "Wise: "
 
@@ -142,16 +142,10 @@ object BuiltInCsvStrategies {
      * export can't identify further. The engine reconciles it against that card's own statement where the
      * card's import booked the same charge into Curve.
      */
-    private fun curveFundingCardRules(lastFourColumn: String): List<AccountRule> =
-        listOf(
-            AccountRule(
-                value = ValueExpr(listOf(lastFourColumn)),
-                trim = true,
-                pattern = "^(\\S+)$",
-                name = "$CURVE_FUNDING_CARD_PREFIX $1",
-                counterpartyIsUnidentified = true,
-            ),
-            AccountRule(value = ValueExpr(listOf(lastFourColumn)), name = CURVE_FUNDING_CARD_PREFIX, counterpartyIsUnidentified = true),
+    private fun curveFundingCards(lastFourColumn: String): Array<AccountNaming> =
+        arrayOf(
+            naming(lastFourColumn, trim = true, pattern = "^(\\S+)$", name = "$CURVE_FUNDING_CARD_PREFIX $1", unidentified = true),
+            naming(lastFourColumn, name = CURVE_FUNDING_CARD_PREFIX, unidentified = true),
         )
 
     /** Prefix of the per-card placeholder accounts funding Curve rows ("Curve card 7721"). */
@@ -187,7 +181,7 @@ object BuiltInCsvStrategies {
     /**
      * Placeholder counterparty for PayPal's "General Credit Card Deposit"/"Withdrawal" rows: the export
      * says a card funded the payment (or took the refund back) but never which card. Where a card import
-     * already booked the same money into PayPal it reconciles away; see `AccountRule.counterpartyIsUnidentified`.
+     * already booked the same money into PayPal it reconciles away; see `AccountNaming.unidentified`.
      */
     private const val PAYPAL_CARD_FUNDING_ACCOUNT = "PayPal Card Funding"
 
@@ -244,6 +238,12 @@ object BuiltInCsvStrategies {
      * of PayPal's reconciling match within the engine's date tolerance instead.
      */
     private const val PAYPAL_RECONCILE_WINDOW_SECONDS = 172_800L
+
+    /** PayPal's leg group pairing a conversion's debit and credit rows into one trade. */
+    private const val PAYPAL_CONVERSION_GROUP = "conversion"
+
+    /** PayPal's leg group linking a card deposit to the payment it funded (or a refund to its withdrawal). */
+    private const val PAYPAL_CARD_FUNDING_GROUP = "card funding"
 
     /**
      * The single Binance Spot account, holding one balance per asset. Matches the Binance API
@@ -398,49 +398,8 @@ object BuiltInCsvStrategies {
     fun buildCryptoComCardStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
             mapOf(
-                // Fixed-name source so the card and fiat strategies resolve the same account pair,
-                // which direction-sensitive reconciliation requires. The catch-all pattern always
-                // matches; users with an existing differently-named card account remap once.
-                TransferField.SOURCE_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.SOURCE_ACCOUNT,
-                        rules =
-                            listOf(
-                                AccountRule(
-                                    value = ValueExpr(listOf("Transaction Description")),
-                                    pattern = "^",
-                                    name = CRYPTO_COM_CARD_ACCOUNT,
-                                ),
-                                AccountRule(value = ValueExpr(listOf("Transaction Description"))),
-                            ),
-                    ),
-                TransferField.TARGET_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        rules =
-                            listOf(
-                                // Top-ups ("GBP Deposit", "EUR Deposit", …). The statement does not say
-                                // which wallet funded them, so they land on the top-up placeholder and
-                                // reconcile against the funding side's own record when it is imported.
-                                AccountRule(
-                                    value = ValueExpr(listOf("Transaction Description")),
-                                    pattern = "^[A-Z]{3,5} Deposit$",
-                                    name = CRYPTO_COM_CARD_TOP_UP_ACCOUNT,
-                                    counterpartyIsUnidentified = true,
-                                ),
-                                // Pre-mid-2022 exports describe the same top-up as "GBP -> GBP" (same
-                                // currency on both sides). Cross-currency arrows (e.g. "TGBP -> GBP") are
-                                // conversion-funded and deliberately NOT matched — the crypto export
-                                // records that movement separately.
-                                AccountRule(
-                                    value = ValueExpr(listOf("Transaction Description")),
-                                    pattern = "^([A-Z]{3,5}) -> \\1$",
-                                    name = CRYPTO_COM_CARD_TOP_UP_ACCOUNT,
-                                    counterpartyIsUnidentified = true,
-                                ),
-                                AccountRule(value = ValueExpr(listOf("Transaction Description"))),
-                            ),
-                    ),
+                accountFromRules(TransferField.SOURCE_ACCOUNT),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
@@ -450,16 +409,11 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Transaction Description"))),
-                // Negative = money out of the card; positive (top-ups, refunds) flows in, so flip. Native is
-                // what the card settled; Currency/Amount is what the merchant was paid, booked as the movement
-                // (with the card's conversion as a trade) when the two currencies differ.
                 TransferField.AMOUNT to
                     AmountParsingMapping(
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Native Amount",
-                        direction = Direction.AmountSign(),
-                        foreignAmount = ForeignAmount(amount = ValueExpr(listOf("Amount")), currency = ValueExpr(listOf("Currency"))),
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Native Currency"))),
@@ -469,12 +423,43 @@ object BuiltInCsvStrategies {
                         timezoneId = "UTC",
                     ),
             )
-        val attributeMappings =
+        val rules =
             listOf(
-                AttributeColumnMapping("Currency", "cryptocom-txn-currency"),
-                AttributeColumnMapping("Amount", "cryptocom-txn-amount"),
-                AttributeColumnMapping("Native Amount (in USD)", "cryptocom-usd-amount"),
-                AttributeColumnMapping("Transaction Hash", "cryptocom-hash"),
+                attribute("Currency", "cryptocom-txn-currency"),
+                attribute("Amount", "cryptocom-txn-amount"),
+                attribute("Native Amount (in USD)", "cryptocom-usd-amount"),
+                attribute("Transaction Hash", "cryptocom-hash"),
+                // Negative = money out of the card; positive (top-ups, refunds) flows in. Native is what the
+                // card settled; Currency/Amount is what the merchant was paid, booked as the movement (with the
+                // card's conversion as a trade) when the two currencies differ.
+                incomingWhenPositive("Native Amount"),
+                rule(RuleAction.Foreign(ForeignAmount(amount = ValueExpr.of("Amount"), currency = ValueExpr.of("Currency")))),
+                // Fixed-name source so the card and fiat strategies resolve the same account pair, which
+                // direction-sensitive reconciliation requires. Users with an existing differently-named card
+                // account remap once.
+                accounts(AccountSide.SOURCE, fixedNaming("Transaction Description", CRYPTO_COM_CARD_ACCOUNT)),
+                accounts(
+                    AccountSide.TARGET,
+                    // Top-ups ("GBP Deposit", "EUR Deposit", …). The statement does not say which wallet funded
+                    // them, so they land on the top-up placeholder and reconcile against the funding side's own
+                    // record when it is imported.
+                    naming(
+                        "Transaction Description",
+                        pattern = "^[A-Z]{3,5} Deposit$",
+                        name = CRYPTO_COM_CARD_TOP_UP_ACCOUNT,
+                        unidentified = true,
+                    ),
+                    // Pre-mid-2022 exports describe the same top-up as "GBP -> GBP" (same currency on both
+                    // sides). Cross-currency arrows (e.g. "TGBP -> GBP") are conversion-funded and deliberately
+                    // NOT matched — the crypto export records that movement separately.
+                    naming(
+                        "Transaction Description",
+                        pattern = "^([A-Z]{3,5}) -> \\1$",
+                        name = CRYPTO_COM_CARD_TOP_UP_ACCOUNT,
+                        unidentified = true,
+                    ),
+                    naming("Transaction Description"),
+                ),
             )
         return CsvImportStrategy(
             id = CsvImportStrategyId(cryptoComCardStrategyId),
@@ -483,7 +468,7 @@ object BuiltInCsvStrategies {
                 CsvStrategyConfig(
                     identificationColumns = cryptoComIdentificationColumns,
                     fieldMappings = fieldMappings,
-                    attributeMappings = attributeMappings,
+                    rules = rules,
                     contentMatchRules = listOf(Condition("Transaction Kind", ConditionOp.MATCHES, "^$")),
                     fileNamePattern = "^card_transactions_record_",
                     crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
@@ -509,79 +494,8 @@ object BuiltInCsvStrategies {
     fun buildCryptoComCardXlsxStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
             mapOf(
-                // Fixed-name source so this strategy resolves the same Card account as the CSV
-                // strategy above (both are exports of the same physical card).
-                TransferField.SOURCE_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.SOURCE_ACCOUNT,
-                        rules =
-                            listOf(
-                                AccountRule(
-                                    value = ValueExpr(listOf("Service Abbreviation")),
-                                    pattern = "^",
-                                    name = CRYPTO_COM_CARD_ACCOUNT,
-                                ),
-                                AccountRule(value = ValueExpr(listOf("Service Abbreviation"))),
-                            ),
-                    ),
-                TransferField.TARGET_ACCOUNT to
-                    // Rows with no card acceptor name at all ("Batch Credit Funds Transfer", "Balance
-                    // transfer", …) are account-level credits, not merchant purchases — a raw AccountLookup
-                    // would fail to resolve an empty name and error the row, so route them to Cash first.
-                    AccountRulesMapping.conditional(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        conditions = listOf(Condition("Card Acceptor Name", ConditionOp.BLANK)),
-                        whenTrue =
-                            AccountRulesMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                rules =
-                                    listOf(
-                                        AccountRule(
-                                            value = ValueExpr(listOf("Service Abbreviation")),
-                                            pattern = "^",
-                                            name = CRYPTO_COM_CARD_TOP_UP_ACCOUNT,
-                                            counterpartyIsUnidentified = true,
-                                        ),
-                                        AccountRule(value = ValueExpr(listOf("Service Abbreviation"))),
-                                    ),
-                            ),
-                        whenFalse =
-                            AccountRulesMapping.conditional(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                conditions =
-                                    listOf(
-                                        Condition("Service Abbreviation", ConditionOp.EQUALS, value = "LdExtDbCr"),
-                                    ),
-                                whenTrue =
-                                    AccountRulesMapping(
-                                        fieldType = TransferField.TARGET_ACCOUNT,
-                                        rules =
-                                            listOf(
-                                                AccountRule(
-                                                    value = ValueExpr(listOf("Service Abbreviation")),
-                                                    pattern = "^",
-                                                    name = CRYPTO_COM_CARD_TOP_UP_ACCOUNT,
-                                                    counterpartyIsUnidentified = true,
-                                                ),
-                                                AccountRule(value = ValueExpr(listOf("Service Abbreviation"))),
-                                            ),
-                                    ),
-                                whenFalse =
-                                    AccountRulesMapping(
-                                        fieldType = TransferField.TARGET_ACCOUNT,
-                                        rules =
-                                            listOf(
-                                                AccountRule(
-                                                    value = ValueExpr(listOf("Card Acceptor Name")),
-                                                    pattern = CARD_ACCEPTOR_NAME_TRIM_PATTERN,
-                                                    name = "$1",
-                                                    fallbackName = "Unknown Merchant",
-                                                ),
-                                                AccountRule(value = ValueExpr(listOf("Card Acceptor Name"))),
-                                            ),
-                                    ),
-                            ),
-                    ),
+                accountFromRules(TransferField.SOURCE_ACCOUNT),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
@@ -603,16 +517,11 @@ object BuiltInCsvStrategies {
                                 extraction = Extraction(pattern = CARD_ACCEPTOR_NAME_TRIM_PATTERN, outputTemplate = "$1"),
                             ),
                     ),
-                // Already signed: negative = spend, positive (loads/refunds) flows in, so flip. The requested
-                // currency's column header has a trailing space in the source workbook.
                 TransferField.AMOUNT to
                     AmountParsingMapping(
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Amount Processed",
-                        direction = Direction.AmountSign(),
-                        foreignAmount =
-                            ForeignAmount(amount = ValueExpr(listOf("Amount Requested")), currency = ValueExpr(listOf("Currency "))),
                     ),
                 // The settled currency, which no column names: a fixed value read off a column every row has.
                 TransferField.CURRENCY to
@@ -625,6 +534,35 @@ object BuiltInCsvStrategies {
                         fieldType = TransferField.TIMEZONE,
                         timezoneId = "UTC",
                     ),
+            )
+        val topUp =
+            arrayOf(
+                fixedNaming("Service Abbreviation", CRYPTO_COM_CARD_TOP_UP_ACCOUNT, unidentified = true),
+                naming("Service Abbreviation"),
+            )
+        val rules =
+            listOf(
+                // Already signed: negative = spend, positive (loads/refunds) flows in. The requested currency's
+                // column header has a trailing space in the source workbook.
+                incomingWhenPositive("Amount Processed"),
+                rule(RuleAction.Foreign(ForeignAmount(amount = ValueExpr.of("Amount Requested"), currency = ValueExpr.of("Currency ")))),
+                // Fixed-name source so this strategy resolves the same Card account as the CSV strategy above
+                // (both are exports of the same physical card).
+                accounts(AccountSide.SOURCE, fixedNaming("Service Abbreviation", CRYPTO_COM_CARD_ACCOUNT), naming("Service Abbreviation")),
+                // Rows with no card acceptor name at all ("Batch Credit Funds Transfer", "Balance transfer", …)
+                // are account-level credits, not merchant purchases, as are external loads: the top-up
+                // placeholder, not a merchant.
+                accounts(AccountSide.TARGET, *topUp, conditions = listOf(Condition("Card Acceptor Name", ConditionOp.BLANK))),
+                accounts(
+                    AccountSide.TARGET,
+                    *topUp,
+                    conditions = listOf(Condition("Service Abbreviation", ConditionOp.EQUALS, value = "LdExtDbCr")),
+                ),
+                accounts(
+                    AccountSide.TARGET,
+                    naming("Card Acceptor Name", pattern = CARD_ACCEPTOR_NAME_TRIM_PATTERN, name = "$1", fallbackName = "Unknown Merchant"),
+                    naming("Card Acceptor Name"),
+                ),
             )
         return CsvImportStrategy(
             id = CsvImportStrategyId(cryptoComCardXlsxStrategyId),
@@ -645,6 +583,7 @@ object BuiltInCsvStrategies {
                             "Amount Requested",
                         ),
                     fieldMappings = fieldMappings,
+                    rules = rules,
                     fileNamePattern = "Card Transaction History",
                     // Same physical card as the CSV export above, so the two overlap wherever their date ranges do.
                     crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
@@ -676,68 +615,8 @@ object BuiltInCsvStrategies {
     fun buildCryptoComFiatStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
             mapOf(
-                TransferField.SOURCE_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.SOURCE_ACCOUNT,
-                        rules =
-                            listOf(
-                                AccountRule(
-                                    value = ValueExpr(listOf("Transaction Description")),
-                                    pattern = "^",
-                                    name = CRYPTO_COM_CASH_ACCOUNT,
-                                ),
-                                AccountRule(value = ValueExpr(listOf("Transaction Description"))),
-                            ),
-                    ),
-                TransferField.TARGET_ACCOUNT to
-                    AccountRulesMapping.conditional(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        conditions =
-                            listOf(
-                                Condition("Currency", ConditionOp.NOT_EQUALS_PATH, otherPath = "To Currency"),
-                            ),
-                        whenTrue =
-                            AccountRulesMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                rules =
-                                    listOf(
-                                        AccountRule(
-                                            value = ValueExpr(listOf("Transaction Description")),
-                                            pattern = "^",
-                                            name = CRYPTO_COM_CRYPTO_ACCOUNT,
-                                        ),
-                                        AccountRule(value = ValueExpr(listOf("Transaction Description"))),
-                                    ),
-                            ),
-                        whenFalse =
-                            AccountRulesMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                rules =
-                                    listOf(
-                                        // Card top-ups route to the Card account (the card export's
-                                        // "GBP Deposit" side of the same movement).
-                                        AccountRule(
-                                            value = ValueExpr(listOf("Transaction Description")),
-                                            pattern = "^Top Up Card$",
-                                            name = CRYPTO_COM_CARD_ACCOUNT,
-                                        ),
-                                        // Bank deposits/withdrawals ("GBP Deposit (via FPS)"): the export
-                                        // names the movement, never the bank behind it. Keep the
-                                        // description as the placeholder account's name (so nothing is
-                                        // renamed) but mark it unidentified, so a bank export that DOES
-                                        // name both ends — resolving this wallet by sort code + account
-                                        // number — reconciles instead of double-counting the deposit.
-                                        AccountRule(
-                                            value = ValueExpr(listOf("Transaction Description")),
-                                            pattern = "^[A-Z]{3,5} (?:Deposit|Withdrawal) \\(via [A-Za-z ]+\\)$",
-                                            name = "$0",
-                                            fallbackName = "Bank Transfer",
-                                            counterpartyIsUnidentified = true,
-                                        ),
-                                        AccountRule(value = ValueExpr(listOf("Transaction Description"))),
-                                    ),
-                            ),
-                    ),
+                accountFromRules(TransferField.SOURCE_ACCOUNT),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
@@ -754,7 +633,6 @@ object BuiltInCsvStrategies {
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Amount",
-                        direction = Direction.AmountSign(),
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Currency"))),
@@ -775,34 +653,54 @@ object BuiltInCsvStrategies {
                         timezoneId = "UTC",
                     ),
             )
-        val rowRules =
+        val rules =
             listOf(
-                // crypto_viban ("TGBP -> GBP", a crypto sale) is a cross-asset conversion → a trade.
-                // Its Currency/To Currency already name the sold/received assets, and the positive-amount
-                // flip puts the crypto (source) leg on the debit side, so the trade comes out correctly
-                // directed WITHOUT the old column swap (which was a single-asset-transfer artifact).
-                // Top-ups and purchases are positive but money LEAVES Cash: flipping source/target
-                // here cancels the positive-amount flip (the two flips are XORed), keeping Cash as
-                // the source.
-                RowPreprocessingRule(
-                    conditions =
-                        listOf(Condition("Transaction Kind", ConditionOp.EQUALS, value = "viban_card_top_up")),
-                    flipSourceAndTarget = true,
+                attribute("Transaction Kind", "cryptocom-kind"),
+                attribute("Currency", "cryptocom-txn-currency"),
+                attribute("Amount", "cryptocom-txn-amount"),
+                attribute("To Currency", "cryptocom-to-currency"),
+                attribute("To Amount", "cryptocom-to-amount"),
+                attribute("Native Amount (in USD)", "cryptocom-usd-amount"),
+                attribute("Transaction Hash", "cryptocom-hash"),
+                incomingWhenPositive("Amount"),
+                // crypto_viban ("TGBP -> GBP", a crypto sale) is a cross-asset conversion → a trade. Its
+                // Currency/To Currency already name the sold/received assets, and the positive-amount flip puts
+                // the crypto (source) leg on the debit side, so the trade comes out correctly directed WITHOUT
+                // a column swap (which was a single-asset-transfer artifact).
+                // Top-ups and purchases are positive but money LEAVES Cash: flipping source/target here
+                // cancels the positive-amount flip, keeping Cash as the source.
+                rule(RuleAction.Flip, conditions = listOf(Condition("Transaction Kind", ConditionOp.EQUALS, value = "viban_card_top_up"))),
+                rule(RuleAction.Flip, conditions = listOf(Condition("Transaction Kind", ConditionOp.EQUALS, value = "viban_purchase"))),
+                accounts(
+                    AccountSide.SOURCE,
+                    fixedNaming("Transaction Description", CRYPTO_COM_CASH_ACCOUNT),
+                    naming("Transaction Description"),
                 ),
-                RowPreprocessingRule(
-                    conditions = listOf(Condition("Transaction Kind", ConditionOp.EQUALS, value = "viban_purchase")),
-                    flipSourceAndTarget = true,
+                accounts(
+                    AccountSide.TARGET,
+                    fixedNaming("Transaction Description", CRYPTO_COM_CRYPTO_ACCOUNT),
+                    naming("Transaction Description"),
+                    conditions = listOf(Condition("Currency", ConditionOp.NOT_EQUALS_PATH, otherPath = "To Currency")),
                 ),
-            )
-        val attributeMappings =
-            listOf(
-                AttributeColumnMapping("Transaction Kind", "cryptocom-kind"),
-                AttributeColumnMapping("Currency", "cryptocom-txn-currency"),
-                AttributeColumnMapping("Amount", "cryptocom-txn-amount"),
-                AttributeColumnMapping("To Currency", "cryptocom-to-currency"),
-                AttributeColumnMapping("To Amount", "cryptocom-to-amount"),
-                AttributeColumnMapping("Native Amount (in USD)", "cryptocom-usd-amount"),
-                AttributeColumnMapping("Transaction Hash", "cryptocom-hash"),
+                accounts(
+                    AccountSide.TARGET,
+                    // Card top-ups route to the Card account (the card export's "GBP Deposit" side of the same
+                    // movement).
+                    naming("Transaction Description", pattern = "^Top Up Card$", name = CRYPTO_COM_CARD_ACCOUNT),
+                    // Bank deposits/withdrawals ("GBP Deposit (via FPS)"): the export names the movement, never
+                    // the bank behind it. Keep the description as the placeholder account's name (so nothing is
+                    // renamed) but mark it unidentified, so a bank export that DOES name both ends — resolving
+                    // this wallet by sort code + account number — reconciles instead of double-counting the
+                    // deposit.
+                    naming(
+                        "Transaction Description",
+                        pattern = "^[A-Z]{3,5} (?:Deposit|Withdrawal) \\(via [A-Za-z ]+\\)$",
+                        name = "$0",
+                        fallbackName = "Bank Transfer",
+                        unidentified = true,
+                    ),
+                    naming("Transaction Description"),
+                ),
             )
         return CsvImportStrategy(
             id = CsvImportStrategyId(cryptoComFiatStrategyId),
@@ -811,8 +709,7 @@ object BuiltInCsvStrategies {
                 CsvStrategyConfig(
                     identificationColumns = cryptoComIdentificationColumns,
                     fieldMappings = fieldMappings,
-                    attributeMappings = attributeMappings,
-                    rowPreprocessingRules = rowRules,
+                    rules = rules,
                     contentMatchRules = listOf(Condition("Transaction Kind", ConditionOp.MATCHES, "^(viban_|crypto_viban)")),
                     fileNamePattern = "^fiat_transactions_record_",
                     crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
@@ -832,7 +729,7 @@ object BuiltInCsvStrategies {
      * (see CsvImportApplier.ensureCryptoAssets; any non-fiat currency-lookup value becomes a crypto asset).
      *
      * The Crypto.com account is the SOURCE and the counterparty (from the description, e.g. "Card
-     * Cashback") the TARGET; an amount-sign [AmountParsingMapping.direction] then makes a positive amount
+     * Cashback") the TARGET; an amount-sign direction rule then makes a positive amount
      * (rewards) flow INTO the account and a negative amount (a spend/swap out) flow OUT of it —
      * mirroring the card strategy's sign convention.
      *
@@ -855,72 +752,8 @@ object BuiltInCsvStrategies {
     fun buildCryptoComCryptoStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
             mapOf(
-                // All crypto lands in the single "Crypto.com" account (one balance per asset), not a
-                // separate wallet per ticker — except viban_purchase, whose debited leg is the fiat
-                // balance held in the Cash account. The "^" fallback rule routes every other row to
-                // the Crypto.com account.
-                TransferField.SOURCE_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.SOURCE_ACCOUNT,
-                        rules =
-                            listOf(
-                                AccountRule(
-                                    value = ValueExpr(listOf("Transaction Kind")),
-                                    pattern = "^viban_purchase$",
-                                    name = CRYPTO_COM_CASH_ACCOUNT,
-                                ),
-                                AccountRule(value = ValueExpr(listOf("Transaction Kind")), pattern = "^", name = CRYPTO_COM_CRYPTO_ACCOUNT),
-                                AccountRule(value = ValueExpr(listOf("Transaction Kind"))),
-                            ),
-                    ),
-                // Cross-asset rows (a trade's credited leg) route to the account holding the credited
-                // asset: fiat from a sell goes to the Cash account, crypto stays in Crypto.com. The
-                // IS_NOT_BLANK condition matters: most rows have a BLANK To Currency and must keep the
-                // single-asset routing below.
-                // Single-asset rows keep the description-derived counterparty (reward source / merchant),
-                // except App<->Exchange transfers which route to the shared "Crypto.com Exchange" account
-                // (see the constant's KDoc). Both descriptions contain "App wallet"; the flip-on-positive
-                // turns the pre-flip target into the source for the "Exchange -> App wallet" direction.
-                TransferField.TARGET_ACCOUNT to
-                    AccountRulesMapping.conditional(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        conditions =
-                            listOf(
-                                Condition("To Currency", ConditionOp.NOT_BLANK),
-                                Condition("Currency", ConditionOp.NOT_EQUALS_PATH, otherPath = "To Currency"),
-                            ),
-                        whenTrue =
-                            AccountRulesMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                rules =
-                                    listOf(
-                                        AccountRule(
-                                            value = ValueExpr(listOf("Transaction Kind")),
-                                            pattern = "^crypto_viban_exchange$",
-                                            name = CRYPTO_COM_CASH_ACCOUNT,
-                                        ),
-                                        AccountRule(
-                                            value = ValueExpr(listOf("Transaction Kind")),
-                                            pattern = "^",
-                                            name = CRYPTO_COM_CRYPTO_ACCOUNT,
-                                        ),
-                                        AccountRule(value = ValueExpr(listOf("Transaction Kind"))),
-                                    ),
-                            ),
-                        whenFalse =
-                            AccountRulesMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                rules =
-                                    listOf(
-                                        AccountRule(
-                                            value = ValueExpr(listOf("Transaction Description")),
-                                            pattern = "App wallet",
-                                            name = CRYPTO_COM_EXCHANGE_ACCOUNT,
-                                        ),
-                                        AccountRule(value = ValueExpr(listOf("Transaction Description"))),
-                                    ),
-                            ),
-                    ),
+                accountFromRules(TransferField.SOURCE_ACCOUNT),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
@@ -930,13 +763,11 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Transaction Description"))),
-                // Positive = crypto received into the wallet (flip so the wallet is the target).
                 TransferField.AMOUNT to
                     AmountParsingMapping(
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Amount",
-                        direction = Direction.AmountSign(),
                     ),
                 // The row's real asset (crypto ticker or, for the odd fiat row, a currency code).
                 TransferField.CURRENCY to
@@ -958,13 +789,71 @@ object BuiltInCsvStrategies {
                 TransferField.TO_CURRENCY to
                     CurrencyLookupMapping(fieldType = TransferField.TO_CURRENCY, value = ValueExpr(listOf("To Currency"))),
             )
-        val attributeMappings =
+        val conversionsAccount =
+            RuleAction.Account(
+                AccountSide.INTERMEDIATE,
+                naming("Transaction Kind", name = CRYPTO_COM_CONVERSIONS_ACCOUNT),
+            )
+        val rules =
             listOf(
-                AttributeColumnMapping("Transaction Kind", "cryptocom-kind"),
-                AttributeColumnMapping("Native Currency", "cryptocom-native-currency"),
-                AttributeColumnMapping("Native Amount", "cryptocom-native-amount"),
-                AttributeColumnMapping("Native Amount (in USD)", "cryptocom-usd-amount"),
-                AttributeColumnMapping("Transaction Hash", "cryptocom-hash"),
+                attribute("Transaction Kind", "cryptocom-kind"),
+                attribute("Native Currency", "cryptocom-native-currency"),
+                attribute("Native Amount", "cryptocom-native-amount"),
+                attribute("Native Amount (in USD)", "cryptocom-usd-amount"),
+                attribute("Transaction Hash", "cryptocom-hash"),
+                // Positive = crypto received into the wallet.
+                incomingWhenPositive("Amount"),
+                // All crypto lands in the single "Crypto.com" account (one balance per asset), not a separate
+                // wallet per ticker — except viban_purchase, whose debited leg is the fiat balance held in the
+                // Cash account. The "^" naming routes every other row to the Crypto.com account.
+                accounts(
+                    AccountSide.SOURCE,
+                    naming("Transaction Kind", pattern = "^viban_purchase$", name = CRYPTO_COM_CASH_ACCOUNT),
+                    fixedNaming("Transaction Kind", CRYPTO_COM_CRYPTO_ACCOUNT),
+                    naming("Transaction Kind"),
+                ),
+                // Cross-asset rows (a trade's credited leg) route to the account holding the credited asset:
+                // fiat from a sell goes to the Cash account, crypto stays in Crypto.com. The NOT_BLANK
+                // condition matters: most rows have a BLANK To Currency and must keep the single-asset routing
+                // below.
+                accounts(
+                    AccountSide.TARGET,
+                    naming("Transaction Kind", pattern = "^crypto_viban_exchange$", name = CRYPTO_COM_CASH_ACCOUNT),
+                    fixedNaming("Transaction Kind", CRYPTO_COM_CRYPTO_ACCOUNT),
+                    naming("Transaction Kind"),
+                    conditions =
+                        listOf(
+                            Condition("To Currency", ConditionOp.NOT_BLANK),
+                            Condition("Currency", ConditionOp.NOT_EQUALS_PATH, otherPath = "To Currency"),
+                        ),
+                ),
+                // Single-asset rows keep the description-derived counterparty (reward source / merchant),
+                // except App<->Exchange transfers which route to the shared "Crypto.com Exchange" account (see
+                // the constant's KDoc). Both descriptions contain "App wallet"; the incoming direction turns
+                // the target into the source for the "Exchange -> App wallet" direction.
+                accounts(
+                    AccountSide.TARGET,
+                    naming("Transaction Description", pattern = "App wallet", name = CRYPTO_COM_EXCHANGE_ACCOUNT),
+                    naming("Transaction Description"),
+                ),
+                // Dust conversions ("Convert Dust") and wallet swaps ("Balance Conversion") arrive as separate
+                // *_debited/*_credited rows (only Currency/Amount populated, no To Currency). Route both legs
+                // through the Conversions account and link each debit to its credit. The patterns match ONLY
+                // these two families — one-sided *_credited kinds (supercharger/rewards/admin income) are
+                // deliberately excluded. Debit rows are negative and credit rows positive, so the incoming
+                // direction already places the Crypto.com wallet on the correct side.
+                rule(
+                    RuleAction.Leg(CRYPTO_COM_CONVERSION_GROUP, LegRole.Debit),
+                    conversionsAccount,
+                    conditions =
+                        listOf(Condition("Transaction Kind", ConditionOp.MATCHES, "^(dust_conversion|crypto_wallet_swap)_debited$")),
+                ),
+                rule(
+                    RuleAction.Leg(CRYPTO_COM_CONVERSION_GROUP, LegRole.Credit),
+                    conversionsAccount,
+                    conditions =
+                        listOf(Condition("Transaction Kind", ConditionOp.MATCHES, "^(dust_conversion|crypto_wallet_swap)_credited$")),
+                ),
             )
         return CsvImportStrategy(
             id = CsvImportStrategyId(cryptoComCryptoStrategyId),
@@ -973,38 +862,13 @@ object BuiltInCsvStrategies {
                 CsvStrategyConfig(
                     identificationColumns = cryptoComIdentificationColumns,
                     fieldMappings = fieldMappings,
-                    attributeMappings = attributeMappings,
+                    rules = rules,
                     fileNamePattern = "^crypto_transactions_record_",
                     crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
-                    // Dust conversions ("Convert Dust") and wallet swaps ("Balance Conversion") arrive as
-                    // separate *_debited/*_credited rows (only Currency/Amount populated, no To Currency). Route
-                    // both legs through the Conversions account and link each debit to its credit. The signal
-                    // patterns match ONLY these two families — one-sided *_credited kinds (supercharger/rewards/
-                    // admin income) are deliberately excluded. Debit rows are negative and credit rows positive,
-                    // so the AMOUNT flip-on-positive already places the Crypto.com wallet on the correct side.
                     legGroups =
                         listOf(
                             LegGroupRule(
-                                legWhen =
-                                    listOf(
-                                        Condition(
-                                            "Transaction Kind",
-                                            ConditionOp.MATCHES,
-                                            "(?:^(dust_conversion|crypto_wallet_swap)_debited$)|" +
-                                                "(?:^(dust_conversion|crypto_wallet_swap)_credited$)",
-                                        ),
-                                        Condition("Transaction Kind", ConditionOp.NOT_BLANK),
-                                    ),
-                                side =
-                                    LegSide.DebitWhen(
-                                        listOf(
-                                            Condition(
-                                                "Transaction Kind",
-                                                ConditionOp.MATCHES,
-                                                "^(dust_conversion|crypto_wallet_swap)_debited$",
-                                            ),
-                                        ),
-                                    ),
+                                name = CRYPTO_COM_CONVERSION_GROUP,
                                 // Group 1 (dust_conversion | crypto_wallet_swap) keeps the two families from pairing
                                 // across each other; the time window then separates individual events within a family.
                                 key =
@@ -1012,17 +876,7 @@ object BuiltInCsvStrategies {
                                         ValueExpr(listOf("Transaction Kind"), Extraction("^(dust_conversion|crypto_wallet_swap)_", "$1")),
                                     ),
                                 windowSeconds = CRYPTO_COM_CONVERSION_PAIRING_WINDOW_SECONDS,
-                                assembly =
-                                    LegAssembly.ThroughAccount(
-                                        accounts =
-                                            listOf(
-                                                AccountRule(
-                                                    value = ValueExpr(listOf("Transaction Kind")),
-                                                    name = CRYPTO_COM_CONVERSIONS_ACCOUNT,
-                                                ),
-                                            ),
-                                        relationshipTypeName = "conversion",
-                                    ),
+                                assembly = LegAssembly.ThroughAccount(relationshipTypeName = "conversion"),
                             ),
                         ),
                 ),
@@ -1053,18 +907,8 @@ object BuiltInCsvStrategies {
     fun buildCurveCsvStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
             mapOf(
-                TransferField.SOURCE_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.SOURCE_ACCOUNT,
-                        rules = curveFundingCardRules("Funding Card Last 4 Digits"),
-                    ),
-                // Merchant account, looked up/created from the clean Merchant Name; persisted account
-                // mappings apply, so a user can normalise Curve's names onto their own merchant accounts.
-                TransferField.TARGET_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        rules = listOf(AccountRule(value = ValueExpr(listOf("Merchant Name")))),
-                    ),
+                accountFromRules(TransferField.SOURCE_ACCOUNT),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
@@ -1087,10 +931,15 @@ object BuiltInCsvStrategies {
                         timezoneId = "UTC",
                     ),
             )
-        val attributeMappings =
+        val rules =
             listOf(
-                AttributeColumnMapping("Funding Card Last 4 Digits", "curve-funding-card"),
-                AttributeColumnMapping("Merchant MCC Code", "curve-mcc"),
+                attribute("Funding Card Last 4 Digits", "curve-funding-card"),
+                attribute("Merchant MCC Code", "curve-mcc"),
+                accounts(AccountSide.SOURCE, *curveFundingCards("Funding Card Last 4 Digits")),
+                // Merchant account, looked up/created from the clean Merchant Name; persisted account mappings
+                // apply, so a user can normalise Curve's names onto their own merchant accounts.
+                accounts(AccountSide.TARGET, naming("Merchant Name")),
+                rule(RuleAction.ThroughConduit(CURVE_CONDUIT_ACCOUNT)),
             )
         return CsvImportStrategy(
             id = CsvImportStrategyId(curveCsvStrategyId),
@@ -1108,7 +957,7 @@ object BuiltInCsvStrategies {
                             "Txn Amount",
                         ),
                     fieldMappings = fieldMappings,
-                    attributeMappings = attributeMappings,
+                    rules = rules,
                     // Only a tiebreaker among column-matched candidates; Curve's column set is disjoint from
                     // Wise's transaction-history.csv, so the two never compete.
                     fileNamePattern = "^Transaction History",
@@ -1121,7 +970,6 @@ object BuiltInCsvStrategies {
                             column = "Funding Card Last 4 Digits",
                             attributeTypeName = WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME,
                         ),
-                    conduit = StrategyConduit(CURVE_CONDUIT_ACCOUNT),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -1146,39 +994,8 @@ object BuiltInCsvStrategies {
         val earned = listOf(Condition("Card Name", ConditionOp.EQUALS, "Curve Cash"), Condition("Type", ConditionOp.BLANK))
         val fieldMappings =
             mapOf(
-                TransferField.SOURCE_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.SOURCE_ACCOUNT,
-                        rules =
-                            listOf(
-                                AccountRule(
-                                    conditions = earned,
-                                    value = ValueExpr(listOf("Merchant")),
-                                    pattern = "^",
-                                    name = CURVE_CASHBACK_ACCOUNT,
-                                ),
-                                AccountRule(
-                                    conditions = listOf(Condition("Card Name", ConditionOp.EQUALS, "Curve Cash")),
-                                    value = ValueExpr(listOf("Merchant")),
-                                    pattern = "^",
-                                    name = CURVE_CASH_ACCOUNT,
-                                ),
-                            ) + curveFundingCardRules("Card Last 4 Digits"),
-                    ),
-                TransferField.TARGET_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        rules =
-                            listOf(
-                                AccountRule(
-                                    conditions = earned,
-                                    value = ValueExpr(listOf("Merchant")),
-                                    pattern = "^",
-                                    name = CURVE_CASH_ACCOUNT,
-                                ),
-                                AccountRule(value = ValueExpr(listOf("Merchant"))),
-                            ),
-                    ),
+                accountFromRules(TransferField.SOURCE_ACCOUNT),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
@@ -1199,15 +1016,25 @@ object BuiltInCsvStrategies {
                     CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Txn Currency (Funding Card)"))),
                 TransferField.TIMEZONE to HardCodedTimezoneMapping(fieldType = TransferField.TIMEZONE, timezoneId = "UTC"),
             )
-        val attributeMappings =
+        val curveCash = Condition("Card Name", ConditionOp.EQUALS, "Curve Cash")
+        val rules =
             listOf(
-                AttributeColumnMapping("Card Last 4 Digits", "curve-funding-card"),
-                AttributeColumnMapping("Card Name", "curve-card-name"),
-                AttributeColumnMapping("Category", "curve-category"),
-                AttributeColumnMapping("Fees", "curve-fee"),
-                AttributeColumnMapping("Txn Amount (Foreign Spend)", "curve-foreign-amount"),
-                AttributeColumnMapping("Txn Currency (Foreign Spend)", "curve-foreign-currency"),
-                AttributeColumnMapping("Notes", "curve-notes"),
+                attribute("Card Last 4 Digits", "curve-funding-card"),
+                attribute("Card Name", "curve-card-name"),
+                attribute("Category", "curve-category"),
+                attribute("Fees", "curve-fee"),
+                attribute("Txn Amount (Foreign Spend)", "curve-foreign-amount"),
+                attribute("Txn Currency (Foreign Spend)", "curve-foreign-currency"),
+                attribute("Notes", "curve-notes"),
+                accounts(AccountSide.SOURCE, fixedNaming("Merchant", CURVE_CASHBACK_ACCOUNT), conditions = earned),
+                accounts(AccountSide.SOURCE, fixedNaming("Merchant", CURVE_CASH_ACCOUNT), conditions = listOf(curveCash)),
+                accounts(AccountSide.SOURCE, *curveFundingCards("Card Last 4 Digits")),
+                accounts(AccountSide.TARGET, fixedNaming("Merchant", CURVE_CASH_ACCOUNT), conditions = earned),
+                accounts(AccountSide.TARGET, naming("Merchant")),
+                rule(
+                    RuleAction.ThroughConduit(CURVE_CONDUIT_ACCOUNT),
+                    conditions = listOf(Condition("Card Name", ConditionOp.NOT_EQUALS, "Curve Cash")),
+                ),
             )
         return CsvImportStrategy(
             id = CsvImportStrategyId(curveTransactionsCsvStrategyId),
@@ -1232,7 +1059,7 @@ object BuiltInCsvStrategies {
                             "Fees",
                         ),
                     fieldMappings = fieldMappings,
-                    attributeMappings = attributeMappings,
+                    rules = rules,
                     fileNamePattern = "^Transactions",
                     crossSourceReconcileWindowSeconds = CURVE_RECONCILE_WINDOW_SECONDS,
                     fundingAttributeMatch =
@@ -1241,11 +1068,6 @@ object BuiltInCsvStrategies {
                             attributeTypeName = WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME,
                         ),
                     assetCodes = AssetCodeRules(aliases = mapOf("CPT" to CURVE_CASH_ASSET)),
-                    conduit =
-                        StrategyConduit(
-                            accountName = CURVE_CONDUIT_ACCOUNT,
-                            conditions = listOf(Condition("Card Name", ConditionOp.NOT_EQUALS, "Curve Cash")),
-                        ),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -1282,14 +1104,10 @@ object BuiltInCsvStrategies {
                         ),
                     extraAttributes =
                         listOf(
-                            AttributeColumnMapping("Transaction ID", "paypal-transaction-id"),
-                            AttributeColumnMapping("Item Title", "paypal-item-title"),
+                            attribute("Transaction ID", "paypal-transaction-id"),
+                            attribute("Item Title", "paypal-item-title"),
                             // Informational: Amount is already net of it (it is what moved the balance).
-                            AttributeColumnMapping(
-                                columnName = "Fees",
-                                attributeTypeName = "paypal-fee",
-                                extraction = Extraction(pattern = "^.*[1-9].*$"),
-                            ),
+                            attribute("Fees", "paypal-fee", extraction = Extraction(pattern = "^.*[1-9].*$")),
                         ),
                     exclusions = emptyList(),
                 ),
@@ -1315,11 +1133,10 @@ object BuiltInCsvStrategies {
                     extraAttributes = emptyList(),
                     exclusions =
                         listOf(
-                            AttributeColumnMapping(
-                                columnName = "Type",
-                                attributeTypeName = "excluded",
-                                extraction = Extraction(pattern = "^General Withdrawal$"),
-                                emitWhenMatched = "status echo of a withdrawal",
+                            excludeWhen(
+                                "Type",
+                                "^General Withdrawal$",
+                                "status echo of a withdrawal",
                                 conditions = listOf(Condition("Status", ConditionOp.EQUALS, "Completed")),
                             ),
                         ),
@@ -1354,56 +1171,13 @@ object BuiltInCsvStrategies {
      */
     private fun payPalStrategyConfig(
         identificationColumns: Set<String>,
-        extraAttributes: List<AttributeColumnMapping>,
-        exclusions: List<AttributeColumnMapping>,
+        extraAttributes: List<StrategyRule>,
+        exclusions: List<StrategyRule>,
     ): CsvStrategyConfig<FieldMapping> {
         val fieldMappings =
             mapOf(
-                TransferField.SOURCE_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.SOURCE_ACCOUNT,
-                        rules =
-                            listOf(
-                                AccountRule(value = ValueExpr(listOf("Type")), pattern = "^", name = PAYPAL_ACCOUNT),
-                                AccountRule(value = ValueExpr(listOf("Type"))),
-                            ),
-                    ),
-                TransferField.TARGET_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        rules =
-                            listOf(
-                                AccountRule(
-                                    value = ValueExpr(listOf("Type")),
-                                    pattern = "^General Credit Card (Deposit|Withdrawal)$",
-                                    name = PAYPAL_CARD_FUNDING_ACCOUNT,
-                                    counterpartyIsUnidentified = true,
-                                ),
-                                AccountRule(
-                                    value = ValueExpr(listOf("Type")),
-                                    pattern =
-                                        "^(General Withdrawal|User Initiated Withdrawal|Bank deposit to PayPal account|" +
-                                            "Reversal of ACH Deposit)$",
-                                    name = PAYPAL_BANK_TRANSFERS_ACCOUNT,
-                                    counterpartyIsUnidentified = true,
-                                ),
-                                // Conversion legs only reach here when their pair did not resolve into a trade.
-                                AccountRule(
-                                    value = ValueExpr(listOf("Type")),
-                                    pattern = "^General Currency Conversion$",
-                                    name = PAYPAL_CONVERSIONS_ACCOUNT,
-                                ),
-                                // "PayPal" itself, or one of its entities ("PayPal (Europe) S.a.r.l. et Cie, SCA") —
-                                // not a merchant whose name merely starts with it ("PAYPAL ETSY IRELAND").
-                                AccountRule(
-                                    value = ValueExpr(listOf("Name")),
-                                    pattern = "^PayPal(?: \\(.*)?$",
-                                    name = PAYPAL_ADJUSTMENTS_ACCOUNT,
-                                ),
-                                // The merchant or person; a row without a Name is named after its Type.
-                                AccountRule(value = ValueExpr(listOf("Name", "Type")), trim = true),
-                            ),
-                    ),
+                accountFromRules(TransferField.SOURCE_ACCOUNT),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
@@ -1419,53 +1193,74 @@ object BuiltInCsvStrategies {
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Amount",
-                        direction = Direction.AmountSign(),
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Currency"))),
                 TransferField.TIMEZONE to
                     TimezoneLookupMapping(fieldType = TransferField.TIMEZONE, columnName = "Time zone", aliases = payPalTimezones),
             )
-        val attributeMappings =
+        val rules =
             listOf(
-                AttributeColumnMapping("Type", "paypal-type"),
-                AttributeColumnMapping("Status", "paypal-status"),
-                AttributeColumnMapping(
-                    columnName = "Type",
-                    attributeTypeName = "excluded",
-                    extraction =
-                        Extraction(
-                            pattern =
-                                "^(General Authorisation|Void of Authorisation|Account Hold for Open Authorisation|" +
-                                    "Reversal of General Account Hold|Order|Invoice Received|Request Received)$",
+                attribute("Type", "paypal-type"),
+                attribute("Status", "paypal-status"),
+                excludeWhen(
+                    "Type",
+                    "^(General Authorisation|Void of Authorisation|Account Hold for Open Authorisation|" +
+                        "Reversal of General Account Hold|Order|Invoice Received|Request Received)$",
+                    "not a movement",
+                ),
+                excludeWhen("Status", "^Refused$", "refused"),
+            ) + extraAttributes + exclusions +
+                listOf(
+                    incomingWhenPositive("Amount"),
+                    accounts(AccountSide.SOURCE, fixedNaming("Type", PAYPAL_ACCOUNT), naming("Type")),
+                    accounts(
+                        AccountSide.TARGET,
+                        naming(
+                            "Type",
+                            pattern = "^General Credit Card (Deposit|Withdrawal)$",
+                            name = PAYPAL_CARD_FUNDING_ACCOUNT,
+                            unidentified = true,
                         ),
-                    emitWhenMatched = "not a movement",
-                ),
-                AttributeColumnMapping(
-                    columnName = "Status",
-                    attributeTypeName = "excluded",
-                    extraction = Extraction(pattern = "^Refused$"),
-                    emitWhenMatched = "refused",
-                ),
-            ) + extraAttributes + exclusions
+                        naming(
+                            "Type",
+                            pattern =
+                                "^(General Withdrawal|User Initiated Withdrawal|Bank deposit to PayPal account|" +
+                                    "Reversal of ACH Deposit)$",
+                            name = PAYPAL_BANK_TRANSFERS_ACCOUNT,
+                            unidentified = true,
+                        ),
+                        // Conversion legs only reach here when their pair did not resolve into a trade.
+                        naming("Type", pattern = "^General Currency Conversion$", name = PAYPAL_CONVERSIONS_ACCOUNT),
+                        // "PayPal" itself, or one of its entities ("PayPal (Europe) S.a.r.l. et Cie, SCA") — not a
+                        // merchant whose name merely starts with it ("PAYPAL ETSY IRELAND").
+                        naming("Name", pattern = "^PayPal(?: \\(.*)?$", name = PAYPAL_ADJUSTMENTS_ACCOUNT),
+                        // The merchant or person; a row without a Name is named after its Type.
+                        AccountNaming(value = ValueExpr.of("Name", "Type"), trim = true),
+                    ),
+                    rule(
+                        RuleAction.Leg(PAYPAL_CONVERSION_GROUP, LegRole.BySign("Amount")),
+                        conditions = listOf(Condition("Type", ConditionOp.EQUALS, "General Currency Conversion")),
+                    ),
+                    rule(
+                        RuleAction.Leg(PAYPAL_CARD_FUNDING_GROUP, LegRole.BySign("Amount")),
+                        conditions =
+                            listOf(Condition("Type", ConditionOp.MATCHES, "^($PAYPAL_CARD_FUNDING_TYPES|$PAYPAL_CARD_FUNDED_TYPES)$")),
+                    ),
+                )
         return CsvStrategyConfig(
             identificationColumns = identificationColumns,
             fieldMappings = fieldMappings,
-            attributeMappings = attributeMappings,
+            rules = rules,
             crossSourceReconcileWindowSeconds = PAYPAL_RECONCILE_WINDOW_SECONDS,
             legGroups =
                 listOf(
                     LegGroupRule(
-                        legWhen = listOf(Condition("Type", ConditionOp.EQUALS, "General Currency Conversion")),
-                        side = LegSide.Sign("Amount"),
+                        name = PAYPAL_CONVERSION_GROUP,
                         assembly = LegAssembly.Trade(description = "Convert {from} to {to}"),
                     ),
                     LegGroupRule(
-                        legWhen =
-                            listOf(
-                                Condition("Type", ConditionOp.MATCHES, "^($PAYPAL_CARD_FUNDING_TYPES|$PAYPAL_CARD_FUNDED_TYPES)$"),
-                            ),
-                        side = LegSide.Sign("Amount"),
+                        name = PAYPAL_CARD_FUNDING_GROUP,
                         // Same currency and the same amount, whichever way it moved.
                         key = listOf(ValueExpr(listOf("Currency")), ValueExpr(listOf("Amount"), Extraction("^-?(.*)$", "$1"))),
                         assembly =
@@ -1494,51 +1289,10 @@ object BuiltInCsvStrategies {
      * for manual entry of the mirroring interest transfer.
      */
     fun buildWiseCsvStrategy(now: Instant): CsvImportStrategy {
-        val sourceAccount =
-            AccountRulesMapping(
-                fieldType = TransferField.SOURCE_ACCOUNT,
-                rules =
-                    listOf(
-                        AccountRule(
-                            value = ValueExpr(listOf("Source currency")),
-                            trim = true,
-                            name =
-                                WISE_ACCOUNT_PREFIX + AccountRule.VALUE_PLACEHOLDER,
-                        ),
-                    ),
-            )
-        val targetAccount =
-            AccountRulesMapping.conditional(
-                fieldType = TransferField.TARGET_ACCOUNT,
-                conditions =
-                    listOf(
-                        Condition("Source name", ConditionOp.EQUALS_PATH, otherPath = "Target name"),
-                        Condition("Source name", ConditionOp.NOT_BLANK),
-                        Condition("Source currency", ConditionOp.NOT_EQUALS_PATH, otherPath = "Target currency"),
-                    ),
-                whenTrue =
-                    AccountRulesMapping(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        rules =
-                            listOf(
-                                AccountRule(
-                                    value = ValueExpr(listOf("Target currency")),
-                                    trim = true,
-                                    name =
-                                        WISE_ACCOUNT_PREFIX + AccountRule.VALUE_PLACEHOLDER,
-                                ),
-                            ),
-                    ),
-                whenFalse =
-                    AccountRulesMapping(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        rules = listOf(AccountRule(value = ValueExpr(listOf("Target name", "Source name")))),
-                    ),
-            )
         val fieldMappings =
             mapOf(
-                TransferField.SOURCE_ACCOUNT to sourceAccount,
-                TransferField.TARGET_ACCOUNT to targetAccount,
+                accountFromRules(TransferField.SOURCE_ACCOUNT),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
@@ -1556,11 +1310,6 @@ object BuiltInCsvStrategies {
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Source amount (after fees)",
-                        fee =
-                            FeeRule(
-                                amount = ValueExpr(listOf("Source fee amount")),
-                                conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
-                            ),
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Source currency"))),
@@ -1570,28 +1319,50 @@ object BuiltInCsvStrategies {
                         timezoneId = "UTC",
                     ),
             )
-        val rowRules =
+        val rules =
             listOf(
-                RowPreprocessingRule(
+                attribute("ID", "wise-id", unique = true),
+                attribute("Status", "wise-status"),
+                attribute("Direction", "wise-direction"),
+                attribute("Exchange rate", "wise-exchange-rate"),
+                attribute("Category", "wise-category"),
+                attribute("Note", "note"),
+                attribute("Created by", "wise-created-by"),
+                // An IN row's Wise balance is its Target: swap the sides so every mapping reads the Source
+                // columns, then flip the resolved accounts back.
+                rule(
+                    RuleAction.SwapValues("Source name", "Target name"),
+                    RuleAction.SwapValues("Source amount (after fees)", "Target amount (after fees)"),
+                    RuleAction.SwapValues("Source currency", "Target currency"),
+                    RuleAction.Flip,
                     conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "IN")),
-                    columnSwaps =
-                        listOf(
-                            ColumnPairSwap("Source name", "Target name"),
-                            ColumnPairSwap("Source amount (after fees)", "Target amount (after fees)"),
-                            ColumnPairSwap("Source currency", "Target currency"),
-                        ),
-                    flipSourceAndTarget = true,
                 ),
-            )
-        val attributeMappings =
-            listOf(
-                AttributeColumnMapping("ID", "wise-id", isUniqueIdentifier = true),
-                AttributeColumnMapping("Status", "wise-status"),
-                AttributeColumnMapping("Direction", "wise-direction"),
-                AttributeColumnMapping("Exchange rate", "wise-exchange-rate"),
-                AttributeColumnMapping("Category", "wise-category"),
-                AttributeColumnMapping("Note", "note"),
-                AttributeColumnMapping("Created by", "wise-created-by"),
+                accounts(
+                    AccountSide.SOURCE,
+                    naming(
+                        "Source currency",
+                        trim = true,
+                        name =
+                            WISE_ACCOUNT_PREFIX + AccountNaming.VALUE_PLACEHOLDER,
+                    ),
+                ),
+                // A balance-to-balance conversion (same name on both sides, different currencies) goes to the
+                // other Wise balance rather than a counterparty.
+                accounts(
+                    AccountSide.TARGET,
+                    naming("Target currency", trim = true, name = WISE_ACCOUNT_PREFIX + AccountNaming.VALUE_PLACEHOLDER),
+                    conditions =
+                        listOf(
+                            Condition("Source name", ConditionOp.EQUALS_PATH, otherPath = "Target name"),
+                            Condition("Source name", ConditionOp.NOT_BLANK),
+                            Condition("Source currency", ConditionOp.NOT_EQUALS_PATH, otherPath = "Target currency"),
+                        ),
+                ),
+                accounts(AccountSide.TARGET, AccountNaming(value = ValueExpr.of("Target name", "Source name"))),
+                fee(
+                    FeeRule(amount = ValueExpr(listOf("Source fee amount"))),
+                    conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
+                ),
             )
         val companionRules =
             listOf(
@@ -1634,8 +1405,7 @@ object BuiltInCsvStrategies {
                 CsvStrategyConfig(
                     identificationColumns = identificationColumns,
                     fieldMappings = fieldMappings,
-                    attributeMappings = attributeMappings,
-                    rowPreprocessingRules = rowRules,
+                    rules = rules,
                     companionTransactionRules = companionRules,
                 ),
             createdAt = now,
@@ -1655,21 +1425,7 @@ object BuiltInCsvStrategies {
     ): CsvImportStrategy {
         val fieldMappings =
             mapOf(
-                // Prefer an explicit [transfer-account]; otherwise treat the payee (then category) as
-                // the other side of the transaction.
-                TransferField.TARGET_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        rules =
-                            listOf(
-                                AccountRule(
-                                    value =
-                                        ValueExpr(
-                                            listOf(QifColumns.COL_TRANSFER_ACCOUNT, QifColumns.COL_PAYEE, QifColumns.COL_CATEGORY),
-                                        ),
-                                ),
-                            ),
-                    ),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
@@ -1681,14 +1437,11 @@ object BuiltInCsvStrategies {
                         fieldType = TransferField.DESCRIPTION,
                         value = ValueExpr(listOf(QifColumns.COL_PAYEE, QifColumns.COL_MEMO)),
                     ),
-                // QIF amounts are signed: negative = money out of the account, positive = money in,
-                // so positive amounts flip source/target.
                 TransferField.AMOUNT to
                     AmountParsingMapping(
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = QifColumns.COL_AMOUNT,
-                        direction = Direction.AmountSign(),
                     ),
                 TransferField.CURRENCY to
                     HardCodedCurrencyMapping(
@@ -1702,6 +1455,17 @@ object BuiltInCsvStrategies {
                         timezoneId = "UTC",
                     ),
             )
+        val rules =
+            listOf(
+                // QIF amounts are signed: negative = money out of the account, positive = money in.
+                incomingWhenPositive(QifColumns.COL_AMOUNT),
+                // Prefer an explicit [transfer-account]; otherwise treat the payee (then category) as the other
+                // side of the transaction.
+                accounts(
+                    AccountSide.TARGET,
+                    AccountNaming(value = ValueExpr.of(QifColumns.COL_TRANSFER_ACCOUNT, QifColumns.COL_PAYEE, QifColumns.COL_CATEGORY)),
+                ),
+            )
         return CsvImportStrategy(
             id = CsvImportStrategyId(qifStrategyId),
             name = "QIF",
@@ -1709,6 +1473,7 @@ object BuiltInCsvStrategies {
                 CsvStrategyConfig(
                     identificationColumns = QifColumns.headers.toSet(),
                     fieldMappings = fieldMappings,
+                    rules = rules,
                 ),
             createdAt = now,
             updatedAt = now,
@@ -1735,147 +1500,136 @@ object BuiltInCsvStrategies {
         // First-match-wins rules over the Payee field; ${cp} extracts the clean counterparty name.
         // Tuned against a full Santander statement history (~7k records, ~99.9% parsed). The middle
         // rules use ".*?\bTO/\bFROM" to skip "VIA FASTER PAYMENT" / "REF.<x>" preludes that vary per row.
-        val counterpartyRules =
-            listOf(
+        val counterparties =
+            arrayOf(
                 // Cashback summary lines ("1 Direct Debit Payment for Water at 1,00% Cashback, 0.36").
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^\\d+ Direct Debit Payments?\\b",
                     name = "Santander Cashback",
                 ),
-                AccountRule(value = ValueExpr(listOf(QifColumns.COL_PAYEE)), pattern = "^MY OFFERS\\b", name = "Santander Cashback"),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(QifColumns.COL_PAYEE, pattern = "^MY OFFERS\\b", name = "Santander Cashback"),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^DIRECT DEBIT INDEMNITY\\b",
                     name = "Santander Direct Debit Indemnity",
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^DIRECT DEBIT REVERSAL\\b",
                     name = "Santander Direct Debit Reversal",
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^DIRECT DEBIT PAYMENT TO\\s+(.+?)(?:\\s+REF\\b|\\s+MANDATE\\b|,)",
                     name = "$1",
                     fallbackName = "Santander Direct Debit",
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^CARD PAYMENT TO\\s+(.+?)(?:,|\\s+ON\\b)",
                     name = "$1",
                     fallbackName = "Santander Card Payment",
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^FASTER PAYMENTS RECEIPT\\b.*?\\bFROM\\s+([^,]+?)\\s*,",
                     name = "$1",
                     fallbackName = "Santander Faster Payment",
-                    counterpartyIsPerson = true,
+                    person = true,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^PAYM\\b.*?\\bFROM\\s+([^,]+?)\\s*(?:,|\\s+REFERENCE\\b)",
                     name = "$1",
                     fallbackName = "Santander Paym",
-                    counterpartyIsPerson = true,
+                    person = true,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^PAYM\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|,)",
                     name = "$1",
                     fallbackName = "Santander Paym",
-                    counterpartyIsPerson = true,
+                    person = true,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^BILL PAYMENT\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|\\s+MANDATE\\b|,)",
                     name = "$1",
                     fallbackName = "Santander Bill Payment",
-                    counterpartyIsPerson = true,
+                    person = true,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^BILL PAYMENT\\b.*?\\bFROM\\s+([^,]+?)\\s*(?:,|\\s+REFERENCE\\b)",
                     name = "$1",
                     fallbackName = "Santander Bill Payment",
-                    counterpartyIsPerson = true,
+                    person = true,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^PENDED\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|,)",
                     name = "$1",
                     fallbackName = "Santander Pended Payment",
-                    counterpartyIsPerson = true,
+                    person = true,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^STANDING ORDER\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|\\s+MANDATE\\b|,)",
                     name = "$1",
                     fallbackName = "Santander Standing Order",
-                    counterpartyIsPerson = true,
+                    person = true,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^Third party payment\\b.*?\\bto\\s+(.+?)(?:\\s+Reference\\b|,)",
                     name = "$1",
                     fallbackName = "Santander Third Party Payment",
-                    counterpartyIsPerson = true,
+                    person = true,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^TRANSFER\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|,)",
                     name = "$1",
                     fallbackName = "Santander Transfer",
-                    counterpartyIsPerson = true,
+                    person = true,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^TRANSFER\\b.*?\\bFROM\\s+([^,.]+?)\\s*(?:,|\\.|\\s+REFERENCE\\b)",
                     name = "$1",
                     fallbackName = "Santander Transfer",
-                    counterpartyIsPerson = true,
+                    person = true,
                 ),
                 // Cash / cheque movements consolidate to a single account each.
-                AccountRule(value = ValueExpr(listOf(QifColumns.COL_PAYEE)), pattern = "^CASH\\b", name = "Cash"),
-                AccountRule(value = ValueExpr(listOf(QifColumns.COL_PAYEE)), pattern = "^WITHDRAWAL\\b", name = "Cash"),
-                AccountRule(value = ValueExpr(listOf(QifColumns.COL_PAYEE)), pattern = "^CHEQUE\\b", name = "Cheque"),
+                naming(QifColumns.COL_PAYEE, pattern = "^CASH\\b", name = "Cash"),
+                naming(QifColumns.COL_PAYEE, pattern = "^WITHDRAWAL\\b", name = "Cash"),
+                naming(QifColumns.COL_PAYEE, pattern = "^CHEQUE\\b", name = "Cheque"),
                 // Bank giro credit refs are often "<digits><NAME>"; strip leading digits to consolidate.
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^BANK GIRO CREDIT REF\\s+\\d*([^,]+?)\\s*,",
                     name = "$1",
                     fallbackName = "Santander Bank Giro Credit",
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^CREDIT FROM\\s+(.+?)(?:\\s+ON\\b|,)",
                     name = "$1",
                     fallbackName = "Santander Credit",
                 ),
-                AccountRule(value = ValueExpr(listOf(QifColumns.COL_PAYEE)), pattern = "^INTEREST\\b", name = "Santander Interest"),
-                AccountRule(value = ValueExpr(listOf(QifColumns.COL_PAYEE)), pattern = "^LOAN\\b", name = "Santander Loan"),
+                naming(QifColumns.COL_PAYEE, pattern = "^INTEREST\\b", name = "Santander Interest"),
+                naming(QifColumns.COL_PAYEE, pattern = "^LOAN\\b", name = "Santander Loan"),
                 // Fixed-name rules (no template) for the various account-fee narratives.
-                AccountRule(
-                    value = ValueExpr(listOf(QifColumns.COL_PAYEE)),
+                naming(
+                    QifColumns.COL_PAYEE,
                     pattern = "^(MONTHLY ACCOUNT FEE|MAINTAINING THE ACCOUNT|UNARRANGED|NON-STERLING|PENDED|PENDING)\\b",
                     name = "Santander Fees",
                 ),
             )
         val fieldMappings =
             mapOf(
-                TransferField.TARGET_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        rules =
-                            counterpartyRules +
-                                AccountRule(
-                                    value =
-                                        ValueExpr(
-                                            listOf(QifColumns.COL_PAYEE, QifColumns.COL_TRANSFER_ACCOUNT, QifColumns.COL_CATEGORY),
-                                        ),
-                                ),
-                    ),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
@@ -1896,7 +1650,6 @@ object BuiltInCsvStrategies {
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = QifColumns.COL_AMOUNT,
-                        direction = Direction.AmountSign(),
                     ),
                 TransferField.CURRENCY to
                     HardCodedCurrencyMapping(
@@ -1932,34 +1685,35 @@ object BuiltInCsvStrategies {
                 "^LOAN\\b" to "LOAN",
                 "^(MONTHLY ACCOUNT FEE|MAINTAINING THE ACCOUNT)" to "ACCOUNT_FEE",
             ).map { (pattern, label) ->
-                AttributeColumnMapping(
-                    columnName = QifColumns.COL_PAYEE,
-                    attributeTypeName = "santander-transaction-type",
-                    extraction = Extraction(pattern = pattern),
-                    emitWhenMatched = label,
-                )
+                attribute(QifColumns.COL_PAYEE, "santander-transaction-type", extraction = Extraction(pattern = pattern), label = label)
             }
-        val attributeMappings =
+        val rules =
             typeMappings +
                 listOf(
-                    AttributeColumnMapping(
-                        columnName = QifColumns.COL_PAYEE,
-                        attributeTypeName = "santander-reference",
+                    attribute(
+                        QifColumns.COL_PAYEE,
+                        "santander-reference",
                         extraction =
                             Extraction(
                                 pattern = "(?:REFERENCE|REF)\\b\\.?\\s*(.+?)\\s*(?:,|\\s+MANDATE\\b)",
                                 outputTemplate = "$1",
                             ),
                     ),
-                    AttributeColumnMapping(
-                        columnName = QifColumns.COL_PAYEE,
-                        attributeTypeName = "santander-mandate",
+                    attribute(
+                        QifColumns.COL_PAYEE,
+                        "santander-mandate",
                         extraction = Extraction(pattern = "MANDATE NO\\s*(\\d+)", outputTemplate = "$1"),
                     ),
-                    AttributeColumnMapping(
-                        columnName = QifColumns.COL_PAYEE,
-                        attributeTypeName = "santander-posted-date",
+                    attribute(
+                        QifColumns.COL_PAYEE,
+                        "santander-posted-date",
                         extraction = Extraction(pattern = "\\bON\\s+(\\d{2}-\\d{2}-\\d{4})", outputTemplate = "$1"),
+                    ),
+                    incomingWhenPositive(QifColumns.COL_AMOUNT),
+                    accounts(
+                        AccountSide.TARGET,
+                        *counterparties,
+                        AccountNaming(value = ValueExpr.of(QifColumns.COL_PAYEE, QifColumns.COL_TRANSFER_ACCOUNT, QifColumns.COL_CATEGORY)),
                     ),
                 )
         return CsvImportStrategy(
@@ -1969,7 +1723,7 @@ object BuiltInCsvStrategies {
                 CsvStrategyConfig(
                     identificationColumns = QifColumns.headers.toSet(),
                     fieldMappings = fieldMappings,
-                    attributeMappings = attributeMappings,
+                    rules = rules,
                     contentMatchRules =
                         listOf(
                             Condition(
@@ -2001,35 +1755,7 @@ object BuiltInCsvStrategies {
     fun buildMonzoCsvStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
             mapOf(
-                // A Monzo-to-Monzo transfer's "Name" is another Monzo user, not a merchant — route it to
-                // an account clearly identified as their Monzo account ("Monzo <name>") and mark the
-                // counterparty a person, so the import also creates/links a Person as its owner.
-                TransferField.TARGET_ACCOUNT to
-                    AccountRulesMapping.conditional(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        conditions = listOf(Condition("Type", ConditionOp.EQUALS, value = "Monzo-to-Monzo")),
-                        whenTrue =
-                            AccountRulesMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                rules =
-                                    listOf(
-                                        AccountRule(
-                                            value = ValueExpr(listOf("Name")),
-                                            pattern = ".+",
-                                            name = "Monzo $0",
-                                            fallbackName = "",
-                                            counterpartyIsPerson = true,
-                                            personName = "$0",
-                                        ),
-                                        AccountRule(value = ValueExpr(listOf("Name"))),
-                                    ),
-                            ),
-                        whenFalse =
-                            AccountRulesMapping(
-                                fieldType = TransferField.TARGET_ACCOUNT,
-                                rules = listOf(AccountRule(value = ValueExpr(listOf("Name", "Type")))),
-                            ),
-                    ),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
@@ -2045,10 +1771,6 @@ object BuiltInCsvStrategies {
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Amount",
-                        direction = Direction.AmountSign(),
-                        // A card payment abroad: Amount is the GBP Monzo settled, Local amount what the merchant was paid.
-                        foreignAmount =
-                            ForeignAmount(amount = ValueExpr(listOf("Local amount")), currency = ValueExpr(listOf("Local currency"))),
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Currency"))),
@@ -2064,15 +1786,32 @@ object BuiltInCsvStrategies {
                         timezoneId = "UTC",
                     ),
             )
-        val attributeMappings =
+        val rules =
             listOf(
-                AttributeColumnMapping("Transaction ID", "Monzo Transaction ID", isUniqueIdentifier = true),
-                AttributeColumnMapping("Emoji", "Emoji"),
-                AttributeColumnMapping("Category", "Monzo Category"),
-                AttributeColumnMapping("Notes and #tags", "Notes and #tags"),
-                AttributeColumnMapping("Address", "Address"),
-                AttributeColumnMapping("Receipt", "Receipt"),
-                AttributeColumnMapping("Type", "Type"),
+                attribute("Transaction ID", "Monzo Transaction ID", unique = true),
+                attribute("Emoji", "Emoji"),
+                attribute("Category", "Monzo Category"),
+                attribute("Notes and #tags", "Notes and #tags"),
+                attribute("Address", "Address"),
+                attribute("Receipt", "Receipt"),
+                attribute("Type", "Type"),
+                incomingWhenPositive("Amount"),
+                // A card payment abroad: Amount is the GBP Monzo settled, Local amount what the merchant was paid.
+                rule(
+                    RuleAction.Foreign(
+                        ForeignAmount(amount = ValueExpr(listOf("Local amount")), currency = ValueExpr(listOf("Local currency"))),
+                    ),
+                ),
+                // A Monzo-to-Monzo transfer's "Name" is another Monzo user, not a merchant — route it to an
+                // account clearly identified as their Monzo account ("Monzo <name>") and mark the counterparty a
+                // person, so the import also creates/links a Person as its owner.
+                accounts(
+                    AccountSide.TARGET,
+                    naming("Name", pattern = ".+", name = "Monzo $0", fallbackName = "", person = true, personName = "$0"),
+                    naming("Name"),
+                    conditions = listOf(Condition("Type", ConditionOp.EQUALS, value = "Monzo-to-Monzo")),
+                ),
+                accounts(AccountSide.TARGET, AccountNaming(value = ValueExpr.of("Name", "Type"))),
             )
         val identificationColumns =
             setOf(
@@ -2102,7 +1841,7 @@ object BuiltInCsvStrategies {
                 CsvStrategyConfig(
                     identificationColumns = identificationColumns,
                     fieldMappings = fieldMappings,
-                    attributeMappings = attributeMappings,
+                    rules = rules,
                     crossSourceReconcileWindowSeconds = MONZO_RECONCILE_WINDOW_SECONDS,
                 ),
             createdAt = now,
@@ -2145,115 +1884,100 @@ object BuiltInCsvStrategies {
      * while the debited amount is gross). They go through a [LegAssembly.ThroughAccount] rule instead,
      * which keeps every
      * balance exact without inventing a pairing. Both legs share one `Operation`, so a
-     * [LegSide.Sign] side classifies them by the sign of `Change`.
+     * [LegRole.BySign] role classifies them by the sign of `Change`.
      */
     @Suppress("LongMethod")
     fun buildBinanceCsvStrategy(now: Instant): CsvImportStrategy {
         // Every pattern is anchored: account-rule patterns use containsMatchIn, so a bare "Deposit" would
         // also claim "Fiat Deposit" and a bare "Buy" would claim "Transaction Buy".
-        val targetAccountRules =
-            listOf(
+        val targetAccounts =
+            arrayOf(
                 // The export says money arrived or left, never whose account it was: a deposit row names
                 // no bank and no wallet. The API does know — it books a crypto deposit against the
                 // on-chain address it came from ("ETH:0x9b4f…") and only falls back to Binance Funding
                 // when there is none. So the counterparty here is a *placeholder*: marking it
                 // unidentified lets the engine reconcile the row against the API's record of the same
                 // movement whatever counterparty that record names, instead of double-counting it.
-                AccountRule(
-                    value = ValueExpr(listOf("Operation")),
+                naming(
+                    "Operation",
                     pattern = "^(Fiat Deposit|Fiat Withdrawal)$",
                     name = BINANCE_BANK_ACCOUNT,
-                    counterpartyIsUnidentified = true,
+                    unidentified = true,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf("Operation")),
+                naming(
+                    "Operation",
                     pattern = "^(Deposit|Withdraw)$",
                     name = BINANCE_FUNDING_ACCOUNT,
-                    counterpartyIsUnidentified = true,
+                    unidentified = true,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf("Operation")),
+                naming(
+                    "Operation",
                     pattern = "^Simple Earn (Flexible|Locked) (Subscription|Redemption)$",
                     name = BINANCE_EARN_ACCOUNT,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf("Operation")),
+                naming(
+                    "Operation",
                     pattern = "^Simple Earn (Flexible (Interest|Airdrop)|Locked Rewards)$",
                     name = BINANCE_EARN_REWARDS_ACCOUNT,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf("Operation")),
+                naming(
+                    "Operation",
                     pattern = "^Staking (Purchase|Redemption)$",
                     name = BINANCE_STAKING_ACCOUNT,
                 ),
-                AccountRule(value = ValueExpr(listOf("Operation")), pattern = "^Staking Rewards$", name = BINANCE_STAKING_REWARDS_ACCOUNT),
-                AccountRule(value = ValueExpr(listOf("Operation")), pattern = "^BNB Vault Rewards$", name = BINANCE_VAULT_REWARDS_ACCOUNT),
-                AccountRule(
-                    value = ValueExpr(listOf("Operation")),
+                naming("Operation", pattern = "^Staking Rewards$", name = BINANCE_STAKING_REWARDS_ACCOUNT),
+                naming("Operation", pattern = "^BNB Vault Rewards$", name = BINANCE_VAULT_REWARDS_ACCOUNT),
+                naming(
+                    "Operation",
                     pattern = "^Launchpool Subscription/Redemption$",
                     name = BINANCE_LAUNCHPOOL_ACCOUNT,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf("Operation")),
+                naming(
+                    "Operation",
                     pattern = "^Launchpool (Interest|Earnings Withdrawal)$",
                     name = BINANCE_LAUNCHPOOL_REWARDS_ACCOUNT,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf("Operation")),
+                naming(
+                    "Operation",
                     pattern = "^Launchpad (Subscribe|Token Distribution)$",
                     name = BINANCE_LAUNCHPAD_ACCOUNT,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf("Operation")),
+                naming(
+                    "Operation",
                     pattern = "^(Distribution|Rewards Distribution)$",
                     name = BINANCE_DISTRIBUTION_ACCOUNT,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf("Operation")),
+                naming(
+                    "Operation",
                     pattern = "^Commission (History|Rebate)$",
                     name = BINANCE_COMMISSION_ACCOUNT,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf("Operation")),
+                naming(
+                    "Operation",
                     pattern = "^(Liquid Swap Add|Liquidity Farming Remove)$",
                     name = BINANCE_LIQUID_SWAP_ACCOUNT,
                 ),
-                AccountRule(
-                    value = ValueExpr(listOf("Operation")),
+                naming(
+                    "Operation",
                     pattern = "^Dual Savings (Purchase|Settlement)$",
                     name = BINANCE_DUAL_SAVINGS_ACCOUNT,
                 ),
-                AccountRule(value = ValueExpr(listOf("Operation")), pattern = "^(Fee|Transaction Fee)$", name = BINANCE_FEES_ACCOUNT),
+                naming("Operation", pattern = "^(Fee|Transaction Fee)$", name = BINANCE_FEES_ACCOUNT),
                 // Dust legs are re-routed to the conversion account by the dust leg rule; this rule is
                 // the home for a leg that somehow escapes detection (a zero Change).
-                AccountRule(
-                    value = ValueExpr(listOf("Operation")),
+                naming(
+                    "Operation",
                     pattern = "^Small Assets Exchange BNB( \\(Spot\\))?$",
                     name = BINANCE_CONVERSIONS_ACCOUNT,
                 ),
                 // Trade legs only reach here when their group did not resolve; and the trailing
                 // catch-all keeps a future unknown Operation from minting an account named after it.
-                AccountRule(value = ValueExpr(listOf("Operation")), pattern = "^", name = BINANCE_TRADING_ACCOUNT),
+                fixedNaming("Operation", BINANCE_TRADING_ACCOUNT),
             )
         val fieldMappings =
             mapOf(
-                // Account is "Spot" on every row; keying the rule off it rather than hard-coding an id
-                // keeps the mapping portable and leaves room for a future wallet column value.
-                TransferField.SOURCE_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.SOURCE_ACCOUNT,
-                        rules =
-                            listOf(
-                                AccountRule(value = ValueExpr(listOf("Account")), pattern = "^", name = BINANCE_ACCOUNT),
-                                AccountRule(value = ValueExpr(listOf("Account"))),
-                            ),
-                    ),
-                TransferField.TARGET_ACCOUNT to
-                    AccountRulesMapping(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        rules =
-                            targetAccountRules + AccountRule(value = ValueExpr(listOf("Operation"))),
-                    ),
+                accountFromRules(TransferField.SOURCE_ACCOUNT),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
@@ -2263,24 +1987,52 @@ object BuiltInCsvStrategies {
                     ),
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Operation"))),
-                // Change carries the direction: negative leaves the Binance account, positive arrives.
                 TransferField.AMOUNT to
                     AmountParsingMapping(
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "Change",
-                        direction = Direction.AmountSign(),
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Coin"))),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(fieldType = TransferField.TIMEZONE, timezoneId = "UTC"),
             )
-        val attributeMappings =
+        val rules =
             listOf(
-                AttributeColumnMapping("User_ID", "binance-user-id"),
-                AttributeColumnMapping("Operation", "binance-operation"),
-                AttributeColumnMapping("Remark", "binance-remark"),
+                attribute("User_ID", "binance-user-id"),
+                attribute("Operation", "binance-operation"),
+                attribute("Remark", "binance-remark"),
+                // Change carries the direction: negative leaves the Binance account, positive arrives.
+                incomingWhenPositive("Change"),
+                // Account is "Spot" on every row; keying the naming off it rather than hard-coding an id keeps
+                // the mapping portable and leaves room for a future wallet column value.
+                accounts(AccountSide.SOURCE, fixedNaming("Account", BINANCE_ACCOUNT), naming("Account")),
+                accounts(AccountSide.TARGET, *targetAccounts, naming("Operation")),
+                // Dust sweeps: both legs share one Operation, so Change's sign decides the side.
+                rule(
+                    RuleAction.Leg(BINANCE_DUST_GROUP, LegRole.BySign("Change")),
+                    RuleAction.Account(AccountSide.INTERMEDIATE, naming("Operation", name = BINANCE_CONVERSIONS_ACCOUNT)),
+                    conditions =
+                        listOf(
+                            Condition("Operation", ConditionOp.MATCHES, "^Small Assets Exchange BNB( \\(Spot\\))?$"),
+                            Condition("Operation", ConditionOp.NOT_BLANK),
+                        ),
+                ),
+                // "Transaction Related" is the older name for *either* leg of a fill, so the sign of Change - not
+                // the operation name - has to decide which side each row is.
+                rule(
+                    RuleAction.Leg(BINANCE_TRADE_GROUP, LegRole.BySign("Change")),
+                    conditions =
+                        listOf(
+                            Condition(
+                                "Operation",
+                                ConditionOp.MATCHES,
+                                "(?:^(Sell|Transaction (Spend|Sold))$)|" +
+                                    "(?:^(Buy|Transaction (Buy|Revenue)|Binance Convert|Transaction Related)$)",
+                            ),
+                        ),
+                ),
             )
         return CsvImportStrategy(
             id = CsvImportStrategyId(binanceCsvStrategyId),
@@ -2290,45 +2042,21 @@ object BuiltInCsvStrategies {
                     identificationColumns =
                         setOf("User_ID", "UTC_Time", "Account", "Operation", "Coin", "Change", "Remark"),
                     fieldMappings = fieldMappings,
-                    attributeMappings = attributeMappings,
+                    rules = rules,
                     // Binance names its exports with bare UUIDs, so there is no filename signal to use - and a
                     // filename match would win outright over content scoring and let a legacy file through.
                     contentMatchRules = listOf(Condition("User_ID", ConditionOp.MATCHES, "^\\s*\\d+\\s*$")),
                     crossSourceReconcileWindowSeconds = BINANCE_RECONCILE_WINDOW_SECONDS,
                     legGroups =
                         listOf(
-                            // Dust sweeps: both legs share one Operation, so Change's sign decides the side.
                             LegGroupRule(
-                                legWhen =
-                                    listOf(
-                                        Condition("Operation", ConditionOp.MATCHES, "^Small Assets Exchange BNB( \\(Spot\\))?$"),
-                                        Condition("Operation", ConditionOp.NOT_BLANK),
-                                    ),
-                                side = LegSide.Sign("Change"),
+                                name = BINANCE_DUST_GROUP,
                                 windowSeconds = BINANCE_CONVERSION_PAIRING_WINDOW_SECONDS,
-                                assembly =
-                                    LegAssembly.ThroughAccount(
-                                        accounts =
-                                            listOf(
-                                                AccountRule(value = ValueExpr(listOf("Operation")), name = BINANCE_CONVERSIONS_ACCOUNT),
-                                            ),
-                                        relationshipTypeName = "conversion",
-                                    ),
+                                assembly = LegAssembly.ThroughAccount(relationshipTypeName = "conversion"),
                                 reconcileWindowSeconds = BINANCE_TRADE_RECONCILE_WINDOW_SECONDS,
                             ),
                             LegGroupRule(
-                                legWhen =
-                                    listOf(
-                                        Condition(
-                                            "Operation",
-                                            ConditionOp.MATCHES,
-                                            "(?:^(Sell|Transaction (Spend|Sold))$)|" +
-                                                "(?:^(Buy|Transaction (Buy|Revenue)|Binance Convert|Transaction Related)$)",
-                                        ),
-                                    ),
-                                // "Transaction Related" is the older name for *either* leg of a fill, so the sign of
-                                // Change - not the operation name - has to decide which side each row is.
-                                side = LegSide.Sign("Change"),
+                                name = BINANCE_TRADE_GROUP,
                                 // The window and description keep their defaults: every leg of one fill carries the
                                 // identical second so no jitter needs tolerating, and the default "Buy {to}/{from}"
                                 // already matches the API importer's wording.
@@ -2349,6 +2077,12 @@ object BuiltInCsvStrategies {
      * that is what lets either source reconcile against the other.
      */
     private const val BYBIT_ACCOUNT = "Bybit"
+
+    /** Binance's leg group of a dust sweep's debits and BNB credits. */
+    private const val BINANCE_DUST_GROUP = "dust"
+
+    /** Binance's leg group folding a fill's rows into one trade. */
+    private const val BINANCE_TRADE_GROUP = "trade"
 
     /** Counterparty accounts the Bybit API strategy also creates; see [BINANCE_FEES_ACCOUNT] for why. */
     private const val BYBIT_FEES_ACCOUNT = "Bybit Fees"
@@ -2383,6 +2117,9 @@ object BuiltInCsvStrategies {
     /** Every Bybit ledger names a row's kind in this column. */
     private const val BYBIT_TYPE_COLUMN = "Type"
 
+    /** The Spot ledger's leg group folding a fill's rows into one trade. */
+    private const val BYBIT_TRADE_GROUP = "trade"
+
     /** Every Bybit ledger stamps rows `yyyy-MM-dd HH:mm:ss` in UTC. */
     private fun bybitTimestamp(columnName: String) =
         DateTimeParsingMapping(
@@ -2392,47 +2129,14 @@ object BuiltInCsvStrategies {
             dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
         )
 
-    /**
-     * The field mappings every Bybit ledger shares: the Bybit account on one side, [targetRules] over
-     * the `Type` column on the other, and a signed [amountColumn] whose positive rows arrive into Bybit.
-     */
+    /** The field mappings every Bybit ledger shares, with a signed [amountColumn]. */
     private fun bybitFieldMappings(
-        targetRules: List<AccountRule>,
         timeColumn: String,
         amountColumn: String,
         coinColumn: String,
     ) = mapOf(
-        TransferField.SOURCE_ACCOUNT to
-            AccountRulesMapping(
-                fieldType = TransferField.SOURCE_ACCOUNT,
-                rules =
-                    listOf(
-                        AccountRule(value = ValueExpr(listOf("Uid")), pattern = "^", name = BYBIT_ACCOUNT),
-                        AccountRule(value = ValueExpr(listOf("Uid"))),
-                    ),
-            ),
-        // A regex mapping resolves nothing for a blank cell (a Spot Convert leg's Type), so a blank Type is
-        // routed to the trade suspense explicitly; its group normally assembles into a trade anyway.
-        TransferField.TARGET_ACCOUNT to
-            AccountRulesMapping.conditional(
-                fieldType = TransferField.TARGET_ACCOUNT,
-                conditions = listOf(Condition(BYBIT_TYPE_COLUMN, ConditionOp.BLANK)),
-                whenTrue =
-                    AccountRulesMapping(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        rules =
-                            listOf(
-                                AccountRule(value = ValueExpr(listOf("Uid")), pattern = "^", name = BYBIT_TRADING_ACCOUNT),
-                                AccountRule(value = ValueExpr(listOf("Uid"))),
-                            ),
-                    ),
-                whenFalse =
-                    AccountRulesMapping(
-                        fieldType = TransferField.TARGET_ACCOUNT,
-                        rules =
-                            targetRules + AccountRule(value = ValueExpr(listOf(BYBIT_TYPE_COLUMN))),
-                    ),
-            ),
+        accountFromRules(TransferField.SOURCE_ACCOUNT),
+        accountFromRules(TransferField.TARGET_ACCOUNT),
         TransferField.TIMESTAMP to bybitTimestamp(timeColumn),
         TransferField.DESCRIPTION to
             DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf(BYBIT_TYPE_COLUMN, coinColumn))),
@@ -2441,35 +2145,43 @@ object BuiltInCsvStrategies {
                 fieldType = TransferField.AMOUNT,
                 mode = AmountMode.SINGLE_COLUMN,
                 amountColumnName = amountColumn,
-                direction = Direction.AmountSign(),
             ),
         TransferField.CURRENCY to CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf(coinColumn))),
         TransferField.TIMEZONE to HardCodedTimezoneMapping(fieldType = TransferField.TIMEZONE, timezoneId = "UTC"),
     )
 
     /** A deposit/withdrawal: the export never says where the money came from or went. */
-    private fun bybitFundingRule(pattern: String) =
-        AccountRule(
-            value = ValueExpr(listOf(BYBIT_TYPE_COLUMN)),
-            pattern = pattern,
-            name = BYBIT_FUNDING_ACCOUNT,
-            counterpartyIsUnidentified = true,
-        )
+    private fun bybitFunding(pattern: String) =
+        naming(BYBIT_TYPE_COLUMN, pattern = pattern, name = BYBIT_FUNDING_ACCOUNT, unidentified = true)
 
-    /** Attribute mappings every Bybit ledger shares, plus the exclusion of wallet-to-wallet moves. */
-    private fun bybitAttributeMappings(
+    /**
+     * The rules every Bybit ledger shares: its attributes (plus [extraAttributes]) and the exclusion of
+     * wallet-to-wallet moves, positive [amountColumn] rows arriving into Bybit, the Bybit account on one side
+     * and [targets] over the `Type` column on the other.
+     */
+    private fun bybitRules(
+        amountColumn: String,
         internalTransferPattern: String,
-        extra: List<AttributeColumnMapping> = emptyList(),
+        targets: Array<AccountNaming>,
+        extraAttributes: List<StrategyRule> = emptyList(),
     ) = listOf(
-        AttributeColumnMapping("Uid", "bybit-uid"),
-        AttributeColumnMapping(BYBIT_TYPE_COLUMN, "bybit-type"),
-        AttributeColumnMapping(
-            columnName = BYBIT_TYPE_COLUMN,
-            attributeTypeName = "excluded",
-            extraction = Extraction(pattern = internalTransferPattern),
-            emitWhenMatched = BYBIT_INTERNAL_TRANSFER_EXCLUSION,
-        ),
-    ) + extra
+        attribute("Uid", "bybit-uid"),
+        attribute(BYBIT_TYPE_COLUMN, "bybit-type"),
+        excludeWhen(BYBIT_TYPE_COLUMN, internalTransferPattern, BYBIT_INTERNAL_TRANSFER_EXCLUSION),
+    ) + extraAttributes +
+        listOf(
+            incomingWhenPositive(amountColumn),
+            accounts(AccountSide.SOURCE, fixedNaming("Uid", BYBIT_ACCOUNT), naming("Uid")),
+            // A pattern resolves nothing for a blank cell (a Spot Convert leg's Type), so a blank Type is routed
+            // to the trade suspense explicitly; its group normally assembles into a trade anyway.
+            accounts(
+                AccountSide.TARGET,
+                fixedNaming("Uid", BYBIT_TRADING_ACCOUNT),
+                naming("Uid"),
+                conditions = listOf(Condition(BYBIT_TYPE_COLUMN, ConditionOp.BLANK)),
+            ),
+            accounts(AccountSide.TARGET, *targets, naming(BYBIT_TYPE_COLUMN)),
+        )
 
     /**
      * Bybit's newer exports carry a `Uid` column (and open with a `UID: …` preamble line the CSV parser
@@ -2494,34 +2206,35 @@ object BuiltInCsvStrategies {
      */
     fun buildBybitSpotCsvStrategy(now: Instant): CsvImportStrategy {
         val internalTransfer = "^internalAccountTransfer"
-        val targetRules =
-            listOf(
-                bybitFundingRule("^user(Deposit|Withdraw)"),
-                AccountRule(value = ValueExpr(listOf(BYBIT_TYPE_COLUMN)), pattern = "^tradingFee$", name = BYBIT_FEES_ACCOUNT),
-                AccountRule(
-                    value = ValueExpr(listOf(BYBIT_TYPE_COLUMN)),
-                    pattern = internalTransfer,
-                    name = BYBIT_INTERNAL_TRANSFERS_ACCOUNT,
-                ),
+        val targets =
+            arrayOf(
+                bybitFunding("^user(Deposit|Withdraw)"),
+                naming(BYBIT_TYPE_COLUMN, pattern = "^tradingFee$", name = BYBIT_FEES_ACCOUNT),
+                naming(BYBIT_TYPE_COLUMN, pattern = internalTransfer, name = BYBIT_INTERNAL_TRANSFERS_ACCOUNT),
                 // Trade legs only reach here when their group did not resolve.
-                AccountRule(value = ValueExpr(listOf(BYBIT_TYPE_COLUMN)), pattern = "^", name = BYBIT_TRADING_ACCOUNT),
+                fixedNaming(BYBIT_TYPE_COLUMN, BYBIT_TRADING_ACCOUNT),
             )
+        val rules =
+            bybitRules("Amount", internalTransfer, targets) +
+                // An empty Type is a Convert leg; the pattern has to admit it explicitly.
+                rule(
+                    RuleAction.Leg(BYBIT_TRADE_GROUP, LegRole.BySign("Amount")),
+                    conditions = listOf(Condition("Type", ConditionOp.MATCHES, "^(trade)?$")),
+                )
         return CsvImportStrategy(
             id = CsvImportStrategyId(bybitSpotCsvStrategyId),
             name = "Bybit Spot CSV",
             config =
                 CsvStrategyConfig(
                     identificationColumns = setOf("Uid", "Type", "Coin", "Amount", "Wallet Balance", "Time(UTC)"),
-                    fieldMappings = bybitFieldMappings(targetRules, "Time(UTC)", "Amount", "Coin"),
-                    attributeMappings = bybitAttributeMappings(internalTransfer),
+                    fieldMappings = bybitFieldMappings("Time(UTC)", "Amount", "Coin"),
+                    rules = rules,
                     contentMatchRules = listOf(bybitUidRule),
                     crossSourceReconcileWindowSeconds = BYBIT_RECONCILE_WINDOW_SECONDS,
                     legGroups =
                         listOf(
                             LegGroupRule(
-                                // An empty Type is a Convert leg; the pattern has to admit it explicitly.
-                                legWhen = listOf(Condition("Type", ConditionOp.MATCHES, "^(trade)?$")),
-                                side = LegSide.Sign("Amount"),
+                                name = BYBIT_TRADE_GROUP,
                                 windowSeconds = 1,
                                 assembly = LegAssembly.Trade(),
                                 reconcileWindowSeconds = BYBIT_TRADE_RECONCILE_WINDOW_SECONDS,
@@ -2542,15 +2255,11 @@ object BuiltInCsvStrategies {
      */
     fun buildBybitFundingCsvStrategy(now: Instant): CsvImportStrategy {
         val internalTransfer = "^Transfer (in|out)$"
-        val targetRules =
-            listOf(
-                bybitFundingRule("^(Deposit|Withdraw)$"),
-                AccountRule(
-                    value = ValueExpr(listOf(BYBIT_TYPE_COLUMN)),
-                    pattern = internalTransfer,
-                    name = BYBIT_INTERNAL_TRANSFERS_ACCOUNT,
-                ),
-                AccountRule(value = ValueExpr(listOf(BYBIT_TYPE_COLUMN)), pattern = "^", name = BYBIT_TRADING_ACCOUNT),
+        val targets =
+            arrayOf(
+                bybitFunding("^(Deposit|Withdraw)$"),
+                naming(BYBIT_TYPE_COLUMN, pattern = internalTransfer, name = BYBIT_INTERNAL_TRANSFERS_ACCOUNT),
+                fixedNaming(BYBIT_TYPE_COLUMN, BYBIT_TRADING_ACCOUNT),
             )
         return CsvImportStrategy(
             id = CsvImportStrategyId(bybitFundingCsvStrategyId),
@@ -2559,12 +2268,8 @@ object BuiltInCsvStrategies {
                 CsvStrategyConfig(
                     identificationColumns =
                         setOf("Uid", "Date & Time(UTC)", "Coin", "QTY", "Type", "Account Balance", "Description"),
-                    fieldMappings = bybitFieldMappings(targetRules, "Date & Time(UTC)", "QTY", "Coin"),
-                    attributeMappings =
-                        bybitAttributeMappings(
-                            internalTransfer,
-                            listOf(AttributeColumnMapping("Description", "bybit-description")),
-                        ),
+                    fieldMappings = bybitFieldMappings("Date & Time(UTC)", "QTY", "Coin"),
+                    rules = bybitRules("QTY", internalTransfer, targets, listOf(attribute("Description", "bybit-description"))),
                     contentMatchRules = listOf(bybitUidRule),
                     crossSourceReconcileWindowSeconds = BYBIT_RECONCILE_WINDOW_SECONDS,
                 ),
@@ -2581,14 +2286,10 @@ object BuiltInCsvStrategies {
      */
     fun buildBybitUnifiedCsvStrategy(now: Instant): CsvImportStrategy {
         val internalTransfer = "^TRANSFER_(IN|OUT)$"
-        val targetRules =
-            listOf(
-                AccountRule(
-                    value = ValueExpr(listOf(BYBIT_TYPE_COLUMN)),
-                    pattern = internalTransfer,
-                    name = BYBIT_INTERNAL_TRANSFERS_ACCOUNT,
-                ),
-                AccountRule(value = ValueExpr(listOf(BYBIT_TYPE_COLUMN)), pattern = "^", name = BYBIT_DERIVATIVES_ACCOUNT),
+        val targets =
+            arrayOf(
+                naming(BYBIT_TYPE_COLUMN, pattern = internalTransfer, name = BYBIT_INTERNAL_TRANSFERS_ACCOUNT),
+                fixedNaming(BYBIT_TYPE_COLUMN, BYBIT_DERIVATIVES_ACCOUNT),
             )
         return CsvImportStrategy(
             id = CsvImportStrategyId(bybitUnifiedCsvStrategyId),
@@ -2613,12 +2314,8 @@ object BuiltInCsvStrategies {
                             "Action",
                             "Time(UTC)",
                         ),
-                    fieldMappings = bybitFieldMappings(targetRules, "Time(UTC)", "Change", "Currency"),
-                    attributeMappings =
-                        bybitAttributeMappings(
-                            internalTransfer,
-                            listOf(AttributeColumnMapping("Contract", "bybit-contract")),
-                        ),
+                    fieldMappings = bybitFieldMappings("Time(UTC)", "Change", "Currency"),
+                    rules = bybitRules("Change", internalTransfer, targets, listOf(attribute("Contract", "bybit-contract"))),
                     contentMatchRules = listOf(bybitUidRule),
                     crossSourceReconcileWindowSeconds = BYBIT_RECONCILE_WINDOW_SECONDS,
                 ),
@@ -2634,59 +2331,25 @@ object BuiltInCsvStrategies {
     private val KOINLY_NAME_EXTRACTION = Extraction(pattern = "^([^;]*)", outputTemplate = "$1")
 
     /**
-     * The counterparty of a Koinly deposit/withdrawal, which names only the user's own wallet: the row's
-     * Tag ("reward", "lending_interest", …) when it has one, otherwise a generic external account.
+     * The account candidates for one [side] of a Koinly row: its wallet when the row names one, otherwise the
+     * counterparty of a deposit/withdrawal, which names only the user's own wallet — the row's Tag
+     * ("reward", "lending_interest", …) when it has one, otherwise a generic external account.
      */
-    private fun koinlyCounterparty(fieldType: TransferField) =
-        AccountRulesMapping.conditional(
-            fieldType = fieldType,
-            conditions = listOf(Condition("Tag", ConditionOp.BLANK)),
-            whenTrue =
-                AccountRulesMapping(
-                    fieldType = fieldType,
-                    rules =
-                        listOf(
-                            AccountRule(value = ValueExpr(listOf("Type")), pattern = "^", name = "Koinly: External"),
-                            AccountRule(value = ValueExpr(listOf("Type"))),
-                        ),
-                ),
-            whenFalse =
-                AccountRulesMapping(
-                    fieldType = fieldType,
-                    rules =
-                        listOf(
-                            AccountRule(
-                                value = ValueExpr(listOf("Tag")),
-                                pattern = "^(.+)$",
-                                name = "Koinly: $1",
-                                fallbackName = "Koinly: Other",
-                            ),
-                            AccountRule(value = ValueExpr(listOf("Tag"))),
-                        ),
-                ),
-        )
-
-    /** A side of a Koinly row: its wallet when the row names one, otherwise the counterparty. */
     private fun koinlySide(
-        fieldType: TransferField,
+        side: AccountSide,
         walletColumn: String,
-    ) = AccountRulesMapping.conditional(
-        fieldType = fieldType,
-        conditions = listOf(Condition(walletColumn, ConditionOp.NOT_BLANK)),
-        whenTrue =
-            AccountRulesMapping(
-                fieldType = fieldType,
-                rules =
-                    listOf(
-                        AccountRule(
-                            value = ValueExpr(listOf(walletColumn), extraction = KOINLY_NAME_EXTRACTION),
-                            trim = true,
-                            name =
-                                KOINLY_WALLET_PREFIX + AccountRule.VALUE_PLACEHOLDER,
-                        ),
-                    ),
+    ) = listOf(
+        accounts(
+            side,
+            AccountNaming(
+                value = ValueExpr.of(walletColumn, extraction = KOINLY_NAME_EXTRACTION),
+                trim = true,
+                name = KOINLY_WALLET_PREFIX + AccountNaming.VALUE_PLACEHOLDER,
             ),
-        whenFalse = koinlyCounterparty(fieldType),
+            conditions = listOf(Condition(walletColumn, ConditionOp.NOT_BLANK)),
+        ),
+        accounts(side, fixedNaming("Type", "Koinly: External"), naming("Type"), conditions = listOf(Condition("Tag", ConditionOp.BLANK))),
+        accounts(side, naming("Tag", pattern = "^(.+)$", name = "Koinly: $1", fallbackName = "Koinly: Other"), naming("Tag")),
     )
 
     /**
@@ -2704,8 +2367,8 @@ object BuiltInCsvStrategies {
     fun buildKoinlyCsvStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
             mapOf(
-                TransferField.SOURCE_ACCOUNT to koinlySide(TransferField.SOURCE_ACCOUNT, "From Wallet (read-only)"),
-                TransferField.TARGET_ACCOUNT to koinlySide(TransferField.TARGET_ACCOUNT, "To Wallet (read-only)"),
+                accountFromRules(TransferField.SOURCE_ACCOUNT),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
@@ -2720,11 +2383,6 @@ object BuiltInCsvStrategies {
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
                         amountColumnName = "From Amount",
-                        fee =
-                            FeeRule(
-                                amount = ValueExpr(listOf("Fee Amount")),
-                                currency = ValueExpr(listOf("Fee Currency"), KOINLY_NAME_EXTRACTION),
-                            ),
                     ),
                 TransferField.CURRENCY to
                     CurrencyLookupMapping(
@@ -2752,31 +2410,29 @@ object BuiltInCsvStrategies {
                 CsvStrategyConfig(
                     identificationColumns = KOINLY_COLUMNS,
                     fieldMappings = fieldMappings,
-                    attributeMappings =
+                    rules =
                         listOf(
-                            AttributeColumnMapping("ID (read-only)", "koinly-id", isUniqueIdentifier = true),
-                            AttributeColumnMapping("Type", "koinly-type"),
-                            AttributeColumnMapping("Tag", "koinly-tag"),
-                            AttributeColumnMapping("TxHash", "koinly-tx-hash"),
+                            attribute("ID (read-only)", "koinly-id", unique = true),
+                            attribute("Type", "koinly-type"),
+                            attribute("Tag", "koinly-tag"),
+                            attribute("TxHash", "koinly-tx-hash"),
                             // A row deleted in Koinly is kept but excluded, like a declined card payment.
-                            AttributeColumnMapping(
-                                columnName = "Deleted",
-                                attributeTypeName = "excluded",
-                                extraction = Extraction(pattern = "^true$"),
-                                emitWhenMatched = "deleted in Koinly",
-                            ),
-                        ),
-                    rowPreprocessingRules =
-                        listOf(
-                            RowPreprocessingRule(
+                            excludeWhen("Deleted", "^true$", "deleted in Koinly"),
+                            // From always holds the primary leg: a deposit's amount and asset move there, so the To
+                            // columns only ever carry a trade's credited leg.
+                            rule(
+                                RuleAction.SwapValues("From Amount", "To Amount"),
+                                RuleAction.SwapValues("From Currency", "To Currency"),
                                 conditions = listOf(Condition("Type", ConditionOp.EQUALS, value = "deposit")),
-                                columnSwaps =
-                                    listOf(
-                                        ColumnPairSwap("From Amount", "To Amount"),
-                                        ColumnPairSwap("From Currency", "To Currency"),
-                                    ),
                             ),
-                        ),
+                        ) + koinlySide(AccountSide.SOURCE, "From Wallet (read-only)") +
+                            koinlySide(AccountSide.TARGET, "To Wallet (read-only)") +
+                            fee(
+                                FeeRule(
+                                    amount = ValueExpr(listOf("Fee Amount")),
+                                    currency = ValueExpr(listOf("Fee Currency"), KOINLY_NAME_EXTRACTION),
+                                ),
+                            ),
                     reconciliation = ReconciliationConfig(sourceName = "Koinly", linkableAccountPrefix = KOINLY_WALLET_PREFIX),
                     // Koinly keeps the pre-migration ticker for legacy Kyber Network (KNCL); exchanges and
                     // Money Manager call it KNC.
