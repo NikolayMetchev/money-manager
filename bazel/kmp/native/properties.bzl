@@ -35,6 +35,7 @@ CACHED_PLATFORM_LIBS = {
         "CoreFoundation",
         "CoreFoundationBase",
         "CoreServices",
+        "CoreVideo",
         "DiskArbitration",
         "Foundation",
         "IOKit",
