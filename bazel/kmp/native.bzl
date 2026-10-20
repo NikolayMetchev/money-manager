@@ -6,7 +6,15 @@ Tests compile to their own klib (with the main klib as a friend, so they see `in
 into a program with `-generate-test-runner`.
 """
 
-load("//bazel/kmp/native:toolchain.bzl", "KONAN_TARGETS", "TOOLCHAIN_TYPE", "run_konan")
+load(
+    "//bazel/kmp/native:toolchain.bzl",
+    "KONAN_TARGETS",
+    "KonanCacheInfo",
+    "TOOLCHAIN_TYPE",
+    "kotlin_native_toolchain_info",
+    "run_konan",
+    "static_cache_args",
+)
 load("//bazel/kmp/plugins:plugins.bzl", "NativePluginInfo", "native_plugin_args")
 
 KlibInfo = provider(
@@ -138,6 +146,54 @@ kt_native_klib = rule(
     toolchains = [TOOLCHAIN_TYPE],
 )
 
+# Maven klibs (file name prefixes) that no link can read from a cache: clikt and clikt-mordant both define a
+# private Context.selfAndAncestors(), a duplicate symbol once both are cached. What depends on one stays
+# uncached too, and the link compiles them as it would without caches.
+_UNCACHEABLE_KLIBS = ["clikt-mordant-"]
+
+def _cache_impl(target, ctx):
+    info = target[KlibInfo]
+    deps = [d for d in getattr(ctx.rule.attr, "deps", [])]
+    dep_caches = [d[KonanCacheInfo] for d in deps]
+    dirs = depset(transitive = [c.dirs for c in dep_caches])
+    platform = kotlin_native_toolchain_info(ctx).platform_caches.get(info.target)
+    if platform == None or not all([c.cacheable for c in dep_caches]):
+        return [KonanCacheInfo(cacheable = False, dirs = dirs)]
+
+    # An import's first klib is the library and the rest its cinterops, which the library depends on.
+    klibs = getattr(ctx.rule.files, "klibs", [])
+    klibs = klibs[1:] + klibs[:1] if klibs else ([info.klib] if info.klib else [])
+    libraries = depset(transitive = [d[KlibInfo].transitive_klibs for d in deps])
+    cached = []
+    for i, klib in enumerate(klibs):
+        if [p for p in _UNCACHEABLE_KLIBS if klib.basename.startswith(p)]:
+            return [KonanCacheInfo(cacheable = False, dirs = depset(cached, transitive = [dirs]))]
+        out = ctx.actions.declare_directory("%s_cache/%d" % (ctx.label.name, i))
+        caches = depset(cached, transitive = [platform, dirs])
+        others = depset(klibs[:i], transitive = [libraries])
+        run_konan(
+            ctx,
+            tool = "konanc",
+            target = info.target,
+            arguments = [static_cache_args(ctx, info.target, klib.path, others, caches, out)],
+            inputs = depset([klib], transitive = [others, caches]),
+            outputs = [out],
+            mnemonic = "KotlinNativeCache",
+            progress_message = "Caching Kotlin/Native %s for %s" % (klib.basename, info.target),
+        )
+        cached.append(out)
+    return [KonanCacheInfo(cacheable = True, dirs = depset(cached, transitive = [dirs]))]
+
+# A library's static cache (see KonanCacheInfo), built where the toolchain caches its target, which may not be
+# where the library compiled: under `rbe-mac` klibs compile on Linux and their caches on the Mac.
+_cache_aspect = aspect(
+    implementation = _cache_impl,
+    attr_aspects = ["deps"],
+    required_providers = [KlibInfo],
+    provides = [KonanCacheInfo],
+    toolchains = [TOOLCHAIN_TYPE],
+)
+
 def _test_impl(ctx):
     test_klib = ctx.actions.declare_file(ctx.label.name + "_test.klib")
     associate = ctx.attr.associate[KlibInfo]
@@ -168,6 +224,14 @@ def _test_impl(ctx):
     libraries = depset(transitive = [d[KlibInfo].transitive_klibs for d in ctx.attr.deps] + [associate.transitive_klibs])
     args.add_all(libraries, before_each = "-library")
 
+    # konan finds each library's cache by its unique name in these, and compiles the uncached ones itself.
+    kn = kotlin_native_toolchain_info(ctx)
+    caches = depset(transitive = [kn.platform_caches[target]] + [
+        d[KonanCacheInfo].dirs
+        for d in ctx.attr.deps + [ctx.attr.associate]
+    ]) if target in kn.platform_caches else depset()
+    args.add_all(caches, format_each = "-Xcache-directory=%s", expand_directories = False)
+
     # A library missing from the link would otherwise only fail when the test reaches it (partial linkage
     # turns unlinked symbols into runtime errors); our rules, not KGP, decide what's linked, so fail here.
     args.add("-Xpartial-linkage-loglevel=ERROR")
@@ -176,7 +240,7 @@ def _test_impl(ctx):
         tool = "konanc",
         target = target,
         arguments = [args],
-        inputs = info.transitive_klibs,
+        inputs = depset(transitive = [info.transitive_klibs, caches]),
         outputs = [exe],
         mnemonic = "KotlinNativeLink",
         progress_message = "Linking Kotlin/Native tests %{label} for " + ctx.attr.target,
@@ -187,8 +251,8 @@ kt_native_test_binary = rule(
     implementation = _test_impl,
     doc = "A module's tests for one Kotlin/Native target, linked with konan's test runner.",
     attrs = _SRC_ATTRS | {
-        "associate": attr.label(mandatory = True, providers = [KlibInfo]),
-        "deps": attr.label_list(providers = [KlibInfo]),
+        "associate": attr.label(mandatory = True, providers = [KlibInfo], aspects = [_cache_aspect]),
+        "deps": attr.label_list(providers = [KlibInfo], aspects = [_cache_aspect]),
         "module": attr.string(mandatory = True),
     },
     executable = True,
