@@ -189,6 +189,8 @@ fun ConditionOp.label(): String =
         ConditionOp.ANY_ELEMENT_STARTS_WITH -> "has an element starting with"
         ConditionOp.EMPTY_OBJECT -> "is an empty object"
         ConditionOp.NON_EMPTY_OBJECT -> "is a non-empty object"
+        ConditionOp.POSITIVE -> "is a positive number"
+        ConditionOp.NEGATIVE -> "is a negative number"
     }
 
 private fun ConditionOp.operandLabel(): String =

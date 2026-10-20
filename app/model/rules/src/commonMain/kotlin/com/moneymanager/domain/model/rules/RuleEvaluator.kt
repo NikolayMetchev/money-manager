@@ -1,5 +1,7 @@
 package com.moneymanager.domain.model.rules
 
+import com.moneymanager.bigdecimal.BigDecimal
+
 /**
  * One row or item a strategy's rules are evaluated against. A CSV row exposes its columns by name; an
  * API item exposes its JSON by dot-path. Structural lookups ([arrayTexts], [objectSize]) are only
@@ -119,6 +121,14 @@ class RuleEvaluator {
             ConditionOp.NON_EMPTY_OBJECT -> {
                 (record.objectSize(condition.path) ?: 0) > 0
             }
+
+            ConditionOp.POSITIVE -> {
+                raw?.let(::parseDecimalOrNull)?.let { it > BigDecimal.ZERO } == true
+            }
+
+            ConditionOp.NEGATIVE -> {
+                raw?.let(::parseDecimalOrNull)?.let { it < BigDecimal.ZERO } == true
+            }
         }
     }
 
@@ -158,6 +168,22 @@ class RuleEvaluator {
         return substituteTemplate(extraction.outputTemplate, match)
     }
 }
+
+/**
+ * [value] as a number, the way statements write amounts: trimmed, with thousand separators, spaces and
+ * the common currency symbols dropped. Null when what's left isn't a number.
+ */
+fun parseDecimalOrNull(value: String): BigDecimal? {
+    val cleaned = AMOUNT_NOISE.replace(value.trim(), "")
+    if (cleaned.isEmpty()) return null
+    return try {
+        BigDecimal(cleaned)
+    } catch (_: NumberFormatException) {
+        null
+    }
+}
+
+private val AMOUNT_NOISE = Regex("[, $€£]")
 
 /**
  * Substitutes capture-group references in [template] from [match]. Supports `$0` (whole match),

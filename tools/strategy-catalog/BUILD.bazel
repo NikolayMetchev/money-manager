@@ -25,16 +25,12 @@ kmp_test(
     associate = ":strategy-catalog",
     jvm_deps = [
         "//app/db/read",
-        "//app/model/core",
         "//app/model/csvstrategy",
-        "//app/model/rules",
-        "//app/strategies",
         "//app/strategycatalog",
         "//bazel/kmp/deps:kotlin_test",
         "//utils/currency",
     ],
     jvm_srcs = glob(["src/test/kotlin/**/*.kt"]),
-    resources = glob(["src/test/resources/**"]),
 )
 
 _MAIN_CLASS = "com.moneymanager.tools.strategycatalog.StrategyCatalogToolKt"

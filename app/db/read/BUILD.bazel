@@ -84,6 +84,5 @@ kmp_test(
         "//app/model/csvstrategy",
         "//app/model/rules",
         "//bazel/kmp/deps:kotlin_test",
-        "@maven_kmp//:kotlinx_serialization_json",
     ],
 )

@@ -20,6 +20,7 @@ import com.moneymanager.domain.model.rules.isComplete
  * the one asset it is charged on — and is off for a trade, whose fee is a field of the trade. [pathField]
  * picks each path the way the owning editor picks every path (a CSV column, a JSON dot-path); a path
  * edited here replaces only the value's first path, keeping any fallbacks and extraction it already had.
+ * [showConditions] is off inside a rule, whose own conditions gate the fee.
  */
 @Composable
 fun FeeRuleEditor(
@@ -28,6 +29,7 @@ fun FeeRuleEditor(
     pathField: ConditionPathField,
     enabled: Boolean,
     movementOptions: Boolean = true,
+    showConditions: Boolean = true,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         pathField.Field("Fee amount (optional)", fee?.amount?.primaryPath.orEmpty(), { path ->
@@ -63,6 +65,7 @@ fun FeeRuleEditor(
                 Text("The amount already includes the fee", modifier = Modifier.padding(start = 4.dp))
             }
         }
+        if (!showConditions) return@Column
         ConditionsEditor(
             title = "Only charge the fee when all of these hold",
             conditions = fee.conditions,

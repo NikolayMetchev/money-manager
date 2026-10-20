@@ -10,7 +10,6 @@ import com.moneymanager.database.json.PassThroughExportCodec
 import com.moneymanager.database.json.StrategyArtifactCodec
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExportMapper
 import com.moneymanager.domain.model.csvstrategy.isQifStrategy
 import com.moneymanager.domain.model.csvstrategy.isXlsxStrategy
@@ -54,15 +53,11 @@ fun main(args: Array<String>) {
 private fun workspaceFile(path: String): File =
     File(path).takeIf { it.isAbsolute } ?: File(System.getenv("BUILD_WORKSPACE_DIRECTORY") ?: ".", path)
 
-/**
- * Every built-in definition rendered to its portable artifact, keyed for StrategyFileNaming. [csvAsOf]
- * lets a test render each CSV built-in as it stood at an earlier point (see `LegacyStrategyUpgradeTest`).
- */
-internal fun builtInArtifacts(csvAsOf: (CsvImportStrategy) -> CsvImportStrategy = { it }): Map<StrategyKey, String> {
+/** Every built-in definition rendered to its portable artifact, keyed for StrategyFileNaming. */
+internal fun builtInArtifacts(): Map<StrategyKey, String> {
     val artifacts = linkedMapOf<StrategyKey, String>()
 
-    for (builtIn in BuiltInCsvStrategies.builtInCsvStrategies(Instant.fromEpochMilliseconds(0), GBP_CURRENCY_ID)) {
-        val strategy = csvAsOf(builtIn)
+    for (strategy in BuiltInCsvStrategies.builtInCsvStrategies(Instant.fromEpochMilliseconds(0), GBP_CURRENCY_ID)) {
         val export =
             CsvStrategyExportMapper.toExport(
                 strategy = strategy,
