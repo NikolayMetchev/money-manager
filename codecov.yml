@@ -1,19 +1,15 @@
 # Codecov configuration
 # https://docs.codecov.com/docs/codecovyml-reference
 
-# Wait for both unit and instrumented uploads before sending notifications
-# Disable default path fixes to let Codecov search the entire repo for files
-# This is needed for multi-module Kotlin projects where files can be in various
-# subdirectories (app/*, utils/*, test/*, etc.)
+# Build and Test uploads one coverage report per commit (`unit`: the Kotlin JVM and Android tests under
+# `bazel coverage`). The instrumented job uploads test results only, which don't count as a build, so waiting
+# for a second upload would hold back the PR comment and status forever.
 codecov:
   notify:
-    after_n_builds: 2
+    after_n_builds: 1
 
-# Define flags for unit and instrumented tests
 flags:
   unit:
-    after_n_builds: 1
-  instrumented:
     after_n_builds: 1
 
 comment:
