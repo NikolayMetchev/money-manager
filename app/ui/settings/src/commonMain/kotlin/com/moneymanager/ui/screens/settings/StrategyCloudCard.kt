@@ -102,8 +102,9 @@ fun StrategyCloudCard(
         prefix: String,
         cause: Throwable,
     ) {
-        logger.e(cause) { "Strategy cloud sync failed: $prefix ${cause.message}" }
-        message = "$prefix ${cause.message}"
+        val reason = cause.message ?: cause::class.simpleName
+        logger.e(cause) { "Strategy cloud sync failed: $prefix $reason" }
+        message = "$prefix $reason"
         needsReconnect = cause is RemoteAuthException
     }
 
@@ -129,7 +130,12 @@ fun StrategyCloudCard(
                     )
                 selectedToPull.clear()
                 conflictChoices.clear()
-                message = "Synced: ${summary.uploaded} uploaded, ${summary.pulled} imported."
+                message =
+                    buildString {
+                        append("Synced: ${summary.uploaded} uploaded, ${summary.pulled} imported")
+                        if (summary.failed > 0) append(", ${summary.failed} couldn't be read")
+                        append(".")
+                    }
             }.onFailure { fail("Sync failed:", it) }
             syncProgress = null
             busyLocal = false
@@ -174,7 +180,7 @@ fun StrategyCloudCard(
                 }
             }
         } else {
-            StatusSummary(state.toUpload, state.updatesAvailable, state.newOnRemote, state.conflicts)
+            StatusSummary(state.toUpload, state.updatesAvailable, state.newOnRemote, state.conflicts, state.unreadable)
 
             StrategyItemList(
                 items = state.items,
@@ -219,18 +225,23 @@ fun StrategyCloudCard(
                         scope.launch {
                             runCatching {
                                 // Any references the selected pulls can't resolve locally need the user first.
+                                // A file that can't be read is flagged on its row and left out; the rest go ahead.
                                 val unresolved = mutableMapOf<StrategyKey, List<CsvUnresolvedReference>>()
+                                val readable = mutableSetOf<StrategyKey>()
                                 pull.forEachIndexed { index, key ->
                                     syncProgress = Progress("Checking ${key.displayLabel()}…", index.toFloat() / pull.size)
-                                    val references = controller.previewPull(library, key).unresolvedReferences
-                                    if (references.isNotEmpty()) unresolved[key] = references
+                                    val preview = controller.previewPull(library, key) ?: return@forEachIndexed
+                                    readable += key
+                                    if (preview.unresolvedReferences.isNotEmpty()) unresolved[key] = preview.unresolvedReferences
                                 }
+                                selectedToPull.removeAll { it !in readable }
+                                (pull - readable).forEach(conflictChoices::remove)
                                 syncProgress = null
                                 busyLocal = false
                                 if (unresolved.isEmpty()) {
-                                    performSync(pull, force, emptyMap())
+                                    performSync(readable, force, emptyMap())
                                 } else {
-                                    pendingSync = PendingSync(pull, force, unresolved)
+                                    pendingSync = PendingSync(readable, force, unresolved)
                                 }
                             }.onFailure {
                                 fail("Sync failed:", it)
@@ -315,10 +326,11 @@ private fun StatusSummary(
     updatesAvailable: Int,
     newOnRemote: Int,
     conflicts: Int,
+    unreadable: Int,
 ) {
     val line =
         when {
-            toUpload == 0 && updatesAvailable == 0 && newOnRemote == 0 && conflicts == 0 -> {
+            toUpload == 0 && updatesAvailable == 0 && newOnRemote == 0 && conflicts == 0 && unreadable == 0 -> {
                 "✓ Everything is synced"
             }
 
@@ -328,6 +340,7 @@ private fun StatusSummary(
                     if (updatesAvailable > 0) add("$updatesAvailable to update")
                     if (newOnRemote > 0) add("$newOnRemote new on Drive")
                     if (conflicts > 0) add("$conflicts in conflict")
+                    if (unreadable > 0) add("$unreadable can't be read")
                 }.joinToString(" · ")
             }
         }
@@ -365,11 +378,12 @@ private fun StrategyItemList(
                     // Keep names aligned with the checkboxed rows.
                     Spacer(Modifier.width(48.dp))
                 }
-                Text(
-                    text = item.key.displayLabel(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f),
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = item.key.displayLabel(), style = MaterialTheme.typography.bodyMedium)
+                    item.error?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                }
                 if (item.status == StrategyItemStatus.CONFLICT) {
                     // A conflict needs an explicit direction: upload the local version or take Drive's.
                     val choice = conflictChoices[item.key]
@@ -401,7 +415,7 @@ private fun StrategyItemList(
 private fun statusColor(status: StrategyItemStatus) =
     when (status) {
         StrategyItemStatus.IN_SYNC -> MaterialTheme.colorScheme.onSurfaceVariant
-        StrategyItemStatus.CONFLICT -> MaterialTheme.colorScheme.error
+        StrategyItemStatus.CONFLICT, StrategyItemStatus.UNREADABLE -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.primary
     }
 
@@ -413,6 +427,7 @@ private fun statusLabel(status: StrategyItemStatus): String =
         StrategyItemStatus.REMOTE_AHEAD -> "Update available"
         StrategyItemStatus.AVAILABLE -> "New on Drive"
         StrategyItemStatus.CONFLICT -> "Conflict"
+        StrategyItemStatus.UNREADABLE -> "Can't read"
     }
 
 /**

@@ -50,6 +50,32 @@ class StrategyConfigMigrationsTest {
         val config = JsonObject(mapOf(StrategyConfigMigrations.VERSION_KEY to JsonPrimitive(future)))
         assertFailsWith<IllegalArgumentException> { StrategyConfigMigrations.upgradeApi(config) }
     }
+
+    @Test
+    fun `an unstamped config that isn't the legacy shape says which field it lacks`() {
+        val config =
+            JsonObject(
+                mapOf(
+                    "fieldMappings" to
+                        JsonObject(
+                            mapOf(
+                                "CURRENCY" to
+                                    JsonObject(
+                                        mapOf(
+                                            "type" to
+                                                JsonPrimitive(
+                                                    "com.moneymanager.domain.model.csvstrategy.export.CurrencyLookupExport",
+                                                ),
+                                            "fieldType" to JsonPrimitive("CURRENCY"),
+                                        ),
+                                    ),
+                            ),
+                        ),
+                ),
+            )
+        val failure = assertFailsWith<IllegalArgumentException> { StrategyConfigMigrations.upgradeCsv(config) }
+        assertTrue("columnName" in failure.message.orEmpty(), failure.message)
+    }
 }
 
 class SharedRulesMigrationTest {

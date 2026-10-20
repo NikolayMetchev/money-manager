@@ -51,9 +51,9 @@ private val PREDICATE_OPS =
 private fun JsonObject.isRulePredicate(): Boolean = "op" in this && "path" in this && keys.all { it in setOf("path", "op", "value") }
 
 private fun predicateToCondition(obj: JsonObject): JsonObject {
-    val op = obj.string("op")!!
+    val op = obj.requireString("op")
     return conditionJson(
-        path = obj.string("path")!!,
+        path = obj.requireString("path"),
         op = requireNotNull(PREDICATE_OPS[op]) { "Unknown predicate op $op" },
         value = obj.string("value"),
     )

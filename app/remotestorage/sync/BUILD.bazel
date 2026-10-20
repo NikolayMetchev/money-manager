@@ -35,7 +35,10 @@ kmp_library(
         "//utils/localsettings",
         "@maven_kmp//:kotlinx_coroutines_core",
     ],
-    deps = ["//utils/archive"],
+    deps = [
+        "//utils/archive",
+        "@maven_kmp//:kermit",
+    ],
 )
 
 kmp_test(

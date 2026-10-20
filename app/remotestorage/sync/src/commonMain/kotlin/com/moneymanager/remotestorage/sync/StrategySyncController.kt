@@ -1,5 +1,6 @@
 package com.moneymanager.remotestorage.sync
 
+import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.strategy.CsvResolution
 import com.moneymanager.domain.strategy.CsvUnresolvedReference
@@ -14,6 +15,7 @@ import com.moneymanager.remotestorage.RemoteStorageProviderFactory
 import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.reconnect
 import com.moneymanager.tasks.Progress
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -21,6 +23,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+
+private val logger = Logger.withTag("StrategySyncController")
 
 /** How a single artifact stands relative to the remote library. */
 enum class StrategyItemStatus {
@@ -41,12 +45,19 @@ enum class StrategyItemStatus {
 
     /** Remote-only; can be imported (selective). */
     AVAILABLE,
+
+    /**
+     * The remote file can't be read (malformed, or written by a newer app); see [StrategyItem.error].
+     * It is neither pulled nor overwritten until the file changes.
+     */
+    UNREADABLE,
 }
 
-/** One artifact row in the strategy-library view. */
+/** One artifact row in the strategy-library view; [error] says why an [StrategyItemStatus.UNREADABLE] one failed. */
 data class StrategyItem(
     val key: StrategyKey,
     val status: StrategyItemStatus,
+    val error: String? = null,
 )
 
 /** Reactive snapshot of the whole library relative to the remote (drives the settings card). */
@@ -58,12 +69,14 @@ data class StrategyLibraryState(
     val updatesAvailable: Int get() = items.count { it.status == StrategyItemStatus.REMOTE_AHEAD }
     val newOnRemote: Int get() = items.count { it.status == StrategyItemStatus.AVAILABLE }
     val conflicts: Int get() = items.count { it.status == StrategyItemStatus.CONFLICT }
+    val unreadable: Int get() = items.count { it.status == StrategyItemStatus.UNREADABLE }
 }
 
-/** Result of a [StrategySyncController.syncNow] run. */
+/** Result of a [StrategySyncController.syncNow] run; [failed] counts the selected pulls that couldn't be read or applied. */
 data class StrategySyncSummary(
     val uploaded: Int,
     val pulled: Int,
+    val failed: Int = 0,
 )
 
 /**
@@ -81,6 +94,15 @@ class StrategySyncController(
 ) {
     private val _state = MutableStateFlow(StrategyLibraryState())
     val state: StateFlow<StrategyLibraryState> = _state.asStateFlow()
+
+    // Remote files that failed to read or apply, by the revision that failed, so the row keeps its error
+    // across refreshes until the file changes. In memory only: a restart simply tries again.
+    private val readFailures = mutableMapOf<StrategyKey, ReadFailure>()
+
+    private data class ReadFailure(
+        val revisionId: String?,
+        val message: String,
+    )
 
     fun isConnected(): Boolean = store.isConnected()
 
@@ -110,6 +132,7 @@ class StrategySyncController(
     /** Disconnects the library from remote storage (keeps local strategies and baselines). */
     fun disconnect() {
         store.clearConnection()
+        readFailures.clear()
         _state.value = StrategyLibraryState()
     }
 
@@ -151,7 +174,8 @@ class StrategySyncController(
         val contents = prefetchComparisons(provider, local.keys, remote)
         val items =
             (local.keys + remote.keys).map { key ->
-                StrategyItem(key, classify(contents, library, key, local[key]?.contentHash, remote[key]))
+                val status = classify(contents, library, key, local[key]?.contentHash, remote[key])
+                StrategyItem(key, status, error = readFailures[key]?.message?.takeIf { status == StrategyItemStatus.UNREADABLE })
             }
         _state.value = StrategyLibraryState(items = items.sortedBy { it.key.name.lowercase() })
     }
@@ -195,6 +219,7 @@ class StrategySyncController(
             }
 
             var pulled = 0
+            var failed = 0
             if (selectedToPull.isNotEmpty()) {
                 remote = remoteByKey(provider) // refresh ids/revisions after uploads
                 val pulls = prefetch(provider, selectedToPull.mapNotNull { remote[it] })
@@ -202,28 +227,96 @@ class StrategySyncController(
                     step("Importing ${key.name}…")
                     val remoteFile = remote[key] ?: continue
                     val json = pulls.get(remoteFile)
-                    library.applyIncoming(key, json, resolutions[key] ?: emptyMap())
-                    store.putBaseline(key, StrategySyncedBaseline(remoteFile.id, remoteFile.revisionId, library.canonicalHash(key, json)))
-                    pulled++
+                    // One bad file mustn't stop the rest: record it against its row and carry on.
+                    val applied =
+                        reading(key, remoteFile) {
+                            library.applyIncoming(key, json, resolutions[key] ?: emptyMap())
+                            library.canonicalHash(key, json)
+                        }
+                    if (applied == null) {
+                        failed++
+                    } else {
+                        store.putBaseline(key, StrategySyncedBaseline(remoteFile.id, remoteFile.revisionId, applied))
+                        pulled++
+                    }
                 }
             }
 
             step("Refreshing the library view…")
             refresh(library, appVersion)
             onProgress(Progress("Done", 1f))
-            StrategySyncSummary(uploaded, pulled)
+            StrategySyncSummary(uploaded, pulled, failed)
         }
 
-    /** Downloads the remote artifact [key] and reports its unresolved references (for a pull preview). */
+    /**
+     * Downloads the remote artifact [key] and reports its unresolved references (for a pull preview), or
+     * null when the file can't be read: its row is then marked [StrategyItemStatus.UNREADABLE] with the
+     * reason, and the caller should leave it out of the pull.
+     */
     suspend fun previewPull(
         library: StrategyLibrary,
         key: StrategyKey,
-    ): StrategyParseResult {
+    ): StrategyParseResult? {
         val provider = resolveSignedIn()
         val remoteFile = remoteByKey(provider)[key] ?: return StrategyParseResult(key, emptyList())
         val json = provider.download(remoteFile.id).decodeToString()
-        return library.parseIncoming(key, json)
+        val result = reading(key, remoteFile) { library.parseIncoming(key, json) }
+        if (result == null) {
+            val failure = readFailures.getValue(key)
+            _state.value =
+                _state.value.copy(
+                    items =
+                        _state.value.items.map {
+                            if (it.key == key) it.copy(status = StrategyItemStatus.UNREADABLE, error = failure.message) else it
+                        },
+                )
+        }
+        return result
     }
+
+    /**
+     * Runs [block], which reads or applies the remote file [remoteFile] for [key], and returns its result,
+     * or null after recording why it failed. Only the parse/apply step is guarded: a download or sign-in
+     * failure is the connection's problem, not this file's, so it still fails the whole operation.
+     */
+    @Suppress("TooGenericExceptionCaught") // Whatever a malformed file makes the decoders throw.
+    private inline fun <T> reading(
+        key: StrategyKey,
+        remoteFile: RemoteFile,
+        block: () -> T,
+    ): T? =
+        try {
+            block().also { readFailures.remove(key) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            val message = failure.message ?: failure::class.simpleName ?: "Unknown error"
+            logger.w(failure) { "Can't read the remote strategy ${key.kind} \"${key.name}\": $message" }
+            readFailures[key] = ReadFailure(remoteFile.revisionId, message)
+            null
+        }
+
+    /** The canonical hash of [remoteFile], or null when it can't be read (see [reading]). */
+    private suspend fun remoteHash(
+        contents: RemoteContents,
+        library: StrategyLibrary,
+        key: StrategyKey,
+        remoteFile: RemoteFile,
+    ): String? {
+        val json = contents.get(remoteFile)
+        return reading(key, remoteFile) { library.canonicalHash(key, json) }
+    }
+
+    /**
+     * Whether [remoteFile] is the revision that already failed to read, so it isn't retried until it changes. A
+     * backend without revisions can't say whether it changed, so its files are read again every time.
+     */
+    private fun knownUnreadable(
+        key: StrategyKey,
+        remoteFile: RemoteFile,
+    ): Boolean =
+        remoteFile.revisionId != null &&
+            readFailures[key]?.let { it.revisionId == remoteFile.revisionId } == true
 
     private suspend fun classify(
         contents: RemoteContents,
@@ -234,16 +327,18 @@ class StrategySyncController(
     ): StrategyItemStatus {
         // A key comes from the local set, the remote set, or both, so at least one side is present.
         if (remoteFile == null) return StrategyItemStatus.NEW_LOCAL
+        if (knownUnreadable(key, remoteFile)) return StrategyItemStatus.UNREADABLE
         if (localHash == null) return StrategyItemStatus.AVAILABLE
 
         val baseline = store.baseline(key)
         if (baseline == null) {
             // Never synced but present both sides: compare content to tell equal from conflicting.
-            val remoteHash = library.canonicalHash(key, contents.get(remoteFile))
+            val remoteHash = remoteHash(contents, library, key, remoteFile) ?: return StrategyItemStatus.UNREADABLE
             return if (remoteHash == localHash) StrategyItemStatus.IN_SYNC else StrategyItemStatus.CONFLICT
         }
         val localChanged = localHash != baseline.syncedHash
-        val remoteChanged = remoteEffectivelyChanged(contents, library, key, remoteFile, baseline)
+        val remoteChanged =
+            remoteEffectivelyChanged(contents, library, key, remoteFile, baseline) ?: return StrategyItemStatus.UNREADABLE
         return when {
             !localChanged && !remoteChanged -> StrategyItemStatus.IN_SYNC
             localChanged && !remoteChanged -> StrategyItemStatus.LOCAL_AHEAD
@@ -270,11 +365,13 @@ class StrategySyncController(
             upload(provider, entry, remoteFileId = null)
             return true
         }
+        // A file this app can't read may be a newer app's work, so never overwrite it automatically.
+        if (knownUnreadable(entry.key, remoteFile)) return false
         val baseline = store.baseline(entry.key)
         if (baseline == null) {
             // Present both sides but never synced (e.g. identical built-ins on first connect): compare
             // content. Equal → adopt the baseline; different → a conflict, upload only if forced.
-            val remoteHash = library.canonicalHash(entry.key, contents.get(remoteFile))
+            val remoteHash = remoteHash(contents, library, entry.key, remoteFile) ?: return false
             return when {
                 remoteHash == entry.contentHash -> {
                     store.putBaseline(entry.key, StrategySyncedBaseline(remoteFile.id, remoteFile.revisionId, entry.contentHash))
@@ -292,7 +389,7 @@ class StrategySyncController(
             }
         }
         val localChanged = entry.contentHash != baseline.syncedHash
-        val remoteChanged = remoteEffectivelyChanged(contents, library, entry.key, remoteFile, baseline)
+        val remoteChanged = remoteEffectivelyChanged(contents, library, entry.key, remoteFile, baseline) ?: return false
         // Auto-upload local-ahead; a conflict (both changed) only uploads when the user forced it.
         if (localChanged && (!remoteChanged || entry.key in forceUpload)) {
             upload(provider, entry, remoteFile.id)
@@ -323,7 +420,8 @@ class StrategySyncController(
      * a backend may report a different revision without a content change (e.g. Drive's headRevisionId
      * drifting after an upload). When the revision differs, verify by content: if the remote's canonical
      * hash still equals the synced hash, adopt the new revision as the baseline and report "unchanged",
-     * so a local-only edit stays LOCAL_AHEAD instead of degrading into a false CONFLICT.
+     * so a local-only edit stays LOCAL_AHEAD instead of degrading into a false CONFLICT. Null when the
+     * changed remote can't be read.
      */
     private suspend fun remoteEffectivelyChanged(
         contents: RemoteContents,
@@ -331,9 +429,9 @@ class StrategySyncController(
         key: StrategyKey,
         remoteFile: RemoteFile,
         baseline: StrategySyncedBaseline,
-    ): Boolean {
+    ): Boolean? {
         if (!remoteAdvanced(remoteFile, baseline)) return false
-        val remoteHash = library.canonicalHash(key, contents.get(remoteFile))
+        val remoteHash = remoteHash(contents, library, key, remoteFile) ?: return null
         if (remoteHash != baseline.syncedHash) return true
         store.putBaseline(key, baseline.copy(remoteFileId = remoteFile.id, syncedRevision = remoteFile.revisionId))
         return false

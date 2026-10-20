@@ -24,6 +24,7 @@ import kotlin.test.assertTrue
 /**
  * A [StrategyLibrary] over an in-memory artifact set. The artifact JSON doubles as its own canonical
  * hash (so tests set content by string), and pulls are recorded and reflected back into [entries].
+ * JSON starting with [UNREADABLE] fails to decode, like a file written by a newer app.
  */
 private class FakeStrategyLibrary(
     initial: List<LocalStrategyEntry> = emptyList(),
@@ -48,21 +49,31 @@ private class FakeStrategyLibrary(
     override fun canonicalHash(
         key: StrategyKey,
         json: String,
-    ): String = json
+    ): String = decode(json)
 
     override suspend fun parseIncoming(
         key: StrategyKey,
         json: String,
-    ): StrategyParseResult = StrategyParseResult(key, emptyList())
+    ): StrategyParseResult {
+        decode(json)
+        return StrategyParseResult(key, emptyList())
+    }
 
     override suspend fun applyIncoming(
         key: StrategyKey,
         json: String,
         resolutions: Map<CsvUnresolvedReference, CsvResolution>,
     ) {
+        decode(json)
         applied += key to json
         // Simulate the pulled artifact now existing locally with the remote content.
         set(key, json)
+    }
+
+    private fun decode(json: String): String = json.also { require(!it.startsWith(UNREADABLE)) { "Unknown strategy format" } }
+
+    companion object {
+        const val UNREADABLE = "unreadable"
     }
 }
 
@@ -297,5 +308,78 @@ class StrategySyncControllerTest {
 
             controller.refresh(library, version)
             assertEquals(StrategyItemStatus.IN_SYNC, statusOf(controller, "Built-in"))
+        }
+
+    @Test
+    fun `an unreadable remote file is flagged on its row and the rest of the pull carries on`() =
+        runTest {
+            val provider = InMemoryStorageProvider()
+            val bad = StrategyKey(StrategyKind.CSV, "Newer")
+            val good = StrategyKey(StrategyKind.CSV, "Monzo")
+            provider.upload(null, StrategyFileNaming.fileName(bad), "${FakeStrategyLibrary.UNREADABLE}-v9".encodeToByteArray())
+            provider.upload(null, StrategyFileNaming.fileName(good), "monzo-v1".encodeToByteArray())
+            val library = FakeStrategyLibrary()
+            val controller = controllerWith(provider)
+            controller.connectTo(provider)
+            controller.refresh(library, version)
+
+            assertEquals(null, controller.previewPull(library, bad))
+            val flagged =
+                controller.state.value.items
+                    .single { it.key == bad }
+            assertEquals(StrategyItemStatus.UNREADABLE, flagged.status)
+            assertEquals("Unknown strategy format", flagged.error)
+
+            val summary = controller.syncNow(library, version, selectedToPull = setOf(bad, good))
+            assertEquals(1, summary.pulled)
+            assertEquals(1, summary.failed)
+            assertEquals(listOf(good), library.applied.map { it.first })
+            // The error survives the refresh at the end of the sync, while the file is unchanged.
+            assertEquals(StrategyItemStatus.UNREADABLE, statusOf(controller, "Newer"))
+            assertEquals(StrategyItemStatus.IN_SYNC, statusOf(controller, "Monzo"))
+            assertEquals(1, controller.state.value.unreadable)
+        }
+
+    @Test
+    fun `an unreadable remote copy of a local strategy is neither compared nor overwritten`() =
+        runTest {
+            val provider = InMemoryStorageProvider()
+            val key = StrategyKey(StrategyKind.CSV, "Wise")
+            provider.upload(null, StrategyFileNaming.fileName(key), "${FakeStrategyLibrary.UNREADABLE}-v9".encodeToByteArray())
+            val library = FakeStrategyLibrary(listOf(entry("Wise", "wise-v1")))
+            val controller = controllerWith(provider)
+            controller.connectTo(provider)
+
+            val summary = controller.syncNow(library, version, forceUpload = setOf(key))
+
+            assertEquals(0, summary.uploaded)
+            assertEquals(StrategyItemStatus.UNREADABLE, statusOf(controller, "Wise"))
+            val remote = provider.list().single { it.name == StrategyFileNaming.fileName(key) }
+            assertEquals("${FakeStrategyLibrary.UNREADABLE}-v9", provider.download(remote.id).decodeToString())
+        }
+
+    @Test
+    fun `a fixed remote file is readable again`() =
+        runTest {
+            val provider = InMemoryStorageProvider()
+            val key = StrategyKey(StrategyKind.CSV, "Newer")
+            provider.upload(null, StrategyFileNaming.fileName(key), "${FakeStrategyLibrary.UNREADABLE}-v9".encodeToByteArray())
+            val library = FakeStrategyLibrary()
+            val controller = controllerWith(provider)
+            controller.connectTo(provider)
+            controller.refresh(library, version)
+            controller.previewPull(library, key)
+
+            val fileId = provider.list().single().id
+            provider.externalPush(fileId, "newer-v1".encodeToByteArray())
+            controller.refresh(library, version)
+
+            assertEquals(StrategyItemStatus.AVAILABLE, statusOf(controller, "Newer"))
+            assertEquals(
+                null,
+                controller.state.value.items
+                    .single()
+                    .error,
+            )
         }
 }
