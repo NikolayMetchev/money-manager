@@ -47,7 +47,8 @@ case "$(uname -s)" in
 esac
 
 echo "Installed into $root:"
-find "$root" -maxdepth 2 | sort | head -40
+# sed, not head: head exits after 40 lines, and under pipefail the SIGPIPE it leaves sort fails the script.
+find "$root" -maxdepth 2 | sort | sed -n 1,40p
 
 # --app-content puts cli/ in lib/ on Linux, Contents/ on macOS and the app's root on Windows.
 mm=$(find "$root" -path '*/cli/mm' -o -path '*/cli/mm.exe' | head -1)
