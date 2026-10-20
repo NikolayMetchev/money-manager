@@ -27,6 +27,7 @@ internal enum class EditorTab(
     ENDPOINTS("Endpoints"),
     ACCOUNT_MAPPINGS("Accounts"),
     TRANSACTION_MAPPINGS("Transactions"),
+    RULES("Rules"),
     PEOPLE("People"),
     ADVANCED("Advanced"),
 }
@@ -128,8 +129,7 @@ internal class ApiStrategyEditorState(
         get() =
             config.editedAccountMappings.let { mappings ->
                 mappings.idField.isBlank() ||
-                    mappings.descriptionField.isBlank() ||
-                    !mappings.rules.isComplete()
+                    mappings.descriptionField.isBlank()
             }
 
     val transactionMappingsHasError: Boolean
@@ -140,9 +140,15 @@ internal class ApiStrategyEditorState(
                         mappings.timestampField.isBlank() ||
                         mappings.currencyField.isBlank() ||
                         mappings.descriptionField.isBlank() ||
-                        mappings.idField.isBlank() ||
-                        !mappings.rules.isComplete()
+                        mappings.idField.isBlank()
                 }
+
+    /**
+     * Whether a rule list on the Rules tab has a condition or action missing its inputs. An incomplete rule is
+     * not inert: a path-less "is blank" skip holds for every item and would drop them all.
+     */
+    val rulesHasError: Boolean
+        get() = !config.ruleLists().all { it.rules.isComplete() }
 
     val peopleHasError: Boolean
         get() =
@@ -154,6 +160,7 @@ internal class ApiStrategyEditorState(
             EditorTab.ENDPOINTS -> endpointsHasError
             EditorTab.ACCOUNT_MAPPINGS -> accountMappingsHasError
             EditorTab.TRANSACTION_MAPPINGS -> transactionMappingsHasError
+            EditorTab.RULES -> rulesHasError
             EditorTab.PEOPLE -> peopleHasError
             EditorTab.ADVANCED -> advancedHasError
         }
@@ -164,6 +171,7 @@ internal class ApiStrategyEditorState(
                 !endpointsHasError &&
                 !accountMappingsHasError &&
                 !transactionMappingsHasError &&
+                !rulesHasError &&
                 !peopleHasError &&
                 !advancedHasError
 

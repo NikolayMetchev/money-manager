@@ -8,8 +8,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
-import com.moneymanager.ui.components.rules.RuleContext
-import com.moneymanager.ui.components.rules.StrategyRulesEditor
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /** Edits the top-level [ApiTransactionMappings] in place inside the strategy config. */
@@ -53,15 +51,5 @@ internal fun TransactionMappingsTab(
         path("Counterparty ID field (optional)", m.counterpartyIdField.orEmpty()) { v ->
             state.updateTransactionMappings { copy(counterpartyIdField = v.ifBlank { null }) }
         }
-        StrategyRulesEditor(
-            rules = m.rules,
-            onRulesChanged = { v -> state.updateTransactionMappings { copy(rules = v) } },
-            context = RuleContext.API_TRANSACTION,
-            pathField = jsonPathField(txJsonPaths, onRequestPick, enabled),
-            enabled = enabled,
-            title =
-                "Rules (top to bottom; the first rule to claim a value wins). They name the counterparty, set " +
-                    "the direction (else the amount's sign), decline or skip items, and add fees and attributes.",
-        )
     }
 }

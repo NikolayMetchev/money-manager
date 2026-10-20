@@ -371,8 +371,10 @@ What isn't a per-record decision stays structural config:
 
 **One editor:** `StrategyRulesEditor` (`app/ui/components`) edits every rule list: an ordered list of rule cards,
 each with `ConditionsEditor` as "If" and its actions as "Then". Its `RuleContext` (`CSV_ROW`, `API_TRANSACTION`,
-`API_TRADE`, `API_ACCOUNT`) limits the add-menu to the actions that context reads. The CSV/QIF editor has a Rules
-tab; each API data endpoint, the bank feed and the accounts mapping have a Rules section.
+`API_TRADE`, `API_ACCOUNT`) limits the add-menu to the actions that context reads. Both strategy editors keep every
+rule list on one Rules tab, and their other tabs hold only field mappings: the CSV/QIF editor's has its one list, the
+API editor's a section per list (`ApiStrategyConfig.ruleLists()`: downloaded accounts, the bank feed, then each data
+endpoint, numbered as the Endpoints tab numbers them).
 
 **Pass-through chains and conduit statements:** when a conduit's own export (PayPal) records money arriving
 from or leaving to an unidentified card (a placeholder leg) and that matches a pass-through chain's leg into
