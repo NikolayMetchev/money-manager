@@ -461,7 +461,7 @@ maven.install(
         "org.jetbrains.dokka:dokka-cli:2.2.0",
         "org.jetbrains.dokka:templating-plugin:2.2.0",
         # Transitive versions held at the newest (see version_conflict_policy).
-        "org.jetbrains.kotlin:kotlin-stdlib-common:2.0.21",
+        "org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21",
     ],
     lock_file = "//bazel/maven:dokka_install.json",
     repositories = ["https://repo1.maven.org/maven2"],
