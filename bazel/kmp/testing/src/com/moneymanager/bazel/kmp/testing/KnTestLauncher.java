@@ -14,8 +14,9 @@ import java.util.Map;
  * does.
  *
  * <p>The executable (linked with {@code -generate-test-runner}) is the first argument. It runs with
- * {@code --ktest_logger=TEAMCITY}, whose service messages become JUnit XML in {@code $XML_OUTPUT_FILE}; its
- * output is passed through unchanged. {@code --test_filter} ({@code TESTBRIDGE_TEST_ONLY}) is a substring of
+ * {@code --ktest_logger=TEAMCITY}, whose service messages become JUnit XML in {@code $XML_OUTPUT_FILE}. The
+ * messages themselves stay out of the log: it gets what the tests print, each failure and a summary, as the JVM
+ * runner writes them. {@code --test_filter} ({@code TESTBRIDGE_TEST_ONLY}) is a substring of
  * {@code Class#method}, as on the JVM. Written in Java rather than shell so it runs the same on every OS.
  */
 public final class KnTestLauncher {
@@ -36,14 +37,19 @@ public final class KnTestLauncher {
     JUnitXml report = new JUnitXml();
     String suite = "";
     int failed = 0;
+    int ignored = 0;
     try (BufferedReader reader =
         new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
       String line;
       while ((line = reader.readLine()) != null) {
-        System.out.println(line);
         int start = line.indexOf(PREFIX);
         if (start < 0) {
+          System.out.println(line);
           continue;
+        }
+        if (start > 0) {
+          // Output the test printed without a newline before the message.
+          System.out.println(line.substring(0, start));
         }
         Map<String, String> attrs = new HashMap<>();
         String type = parse(line, start + PREFIX.length(), attrs);
@@ -54,12 +60,17 @@ public final class KnTestLauncher {
           case "testStarted" -> report.caseFor(suite, name);
           case "testFinished" -> report.caseFor(suite, name).seconds =
               Long.parseLong(attrs.getOrDefault("duration", "0")) / 1000.0;
-          case "testIgnored" -> report.caseFor(suite, name).skipped = true;
+          case "testIgnored" -> {
+            report.caseFor(suite, name).skipped = true;
+            ignored++;
+          }
           case "testFailed" -> {
             JUnitXml.Case c = report.caseFor(suite, name);
             c.failureMessage = attrs.getOrDefault("message", "");
             c.failureDetails = attrs.getOrDefault("details", c.failureMessage);
             failed++;
+            System.err.println("FAILED " + suite + "." + name);
+            System.err.println(c.failureDetails);
           }
           default -> {}
         }
@@ -71,7 +82,7 @@ public final class KnTestLauncher {
     if (xmlOutput != null) {
       report.write(Path.of(xmlOutput));
     }
-    System.err.printf("%d tests, %d failed%n", report.count(), failed);
+    System.err.printf("%d tests, %d failed, %d ignored%n", report.count(), failed, ignored);
     System.exit(exit != 0 ? exit : report.count() > 0 && failed == 0 ? 0 : 1);
   }
 
