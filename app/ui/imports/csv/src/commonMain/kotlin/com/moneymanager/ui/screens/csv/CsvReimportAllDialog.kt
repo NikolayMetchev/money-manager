@@ -50,7 +50,11 @@ fun CsvReimportAllDialog(
     // Resolves each file's strategy the same way the re-import will, so the dialog can say how many files
     // will be skipped (no matching strategy).
     var plan by remember { mutableStateOf<CsvReimportAllPlan?>(null) }
-    LaunchedEffect(imported) { plan = importDirectoryService.planCsvReimportAll(imported) }
+    // A run changes the file list it was planned from; re-planning then would only replace the plan it ran.
+    LaunchedEffect(imported) {
+        if (isRunning || result != null) return@LaunchedEffect
+        plan = importDirectoryService.planCsvReimportAll(imported)
+    }
     val skippedNoStrategyCount = plan?.skippedNoStrategy ?: 0
 
     BulkImportDialogScaffold(

@@ -12,6 +12,13 @@ flags:
   unit:
     after_n_builds: 1
 
+# A line that ran counts as covered even when some of its bytecode branches didn't. Every composable's opening line
+# carries the Compose compiler's skip checks (`Composer.changed`, `shouldExecute`), and which of them a test takes
+# depends on how often the UI happened to recompose, so a dependency bump could fail codecov/project on noise.
+parsers:
+  jacoco:
+    partials_as_hits: true
+
 comment:
   layout: "header, diff, flags, components"
   require_changes: false
