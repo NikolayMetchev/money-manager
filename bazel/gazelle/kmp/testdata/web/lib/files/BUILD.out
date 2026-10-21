@@ -1,0 +1,22 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_web_tests false
+
+kmp_library(
+    name = "files",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = ["linuxX64"],
+    visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":files",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = ["linuxX64"],
+    deps = ["//bazel/kmp/deps:kotlin_test"],
+)

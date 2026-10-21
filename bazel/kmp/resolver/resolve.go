@@ -40,8 +40,8 @@ var platforms = map[string]Platform{
 	metadataWeb:      {Name: metadataWeb, Common: true, SeesWeb: true},
 }
 
-// IsKlib is a platform whose libraries are klibs Gradle resolves by `kotlin-api` usage alone (no runtime variant
-// to follow, no POM-only fallback): native and the browser.
+// IsKlib is a platform whose libraries are klibs Gradle resolves by `kotlin-api` usage (no POM-only fallback):
+// native and the browser. Only the browser's also follow a `kotlin-runtime` variant.
 func (p Platform) IsKlib() bool { return p.Konan != "" || p.Web != "" }
 
 const jvmVersion = 25
@@ -58,7 +58,7 @@ type Resolved struct {
 	Version string   `json:"version"`
 	Files   []File   `json:"files"`
 	Deps    []string `json:"deps,omitempty"`         // api: on dependents' compile classpath too
-	Runtime []string `json:"runtime_deps,omitempty"` // runtime only (JVM)
+	Runtime []string `json:"runtime_deps,omitempty"` // runtime only (JVM, web)
 	// CompileOnly are api dependencies its runtime variant leaves out (log4j-core's OSGi annotations): on
 	// dependents' compile classpath only, as Gradle's runtime classpath follows the runtime variant (JVM).
 	CompileOnly []string `json:"compile_only_deps,omitempty"`
@@ -220,7 +220,7 @@ var errNoVariant = errors.New("no variant for this platform")
 
 // node is what one library version contributes on a platform, before versions are settled.
 type node struct {
-	files      []File
+	files       []File
 	api         []Coordinate
 	runtime     []Coordinate
 	compileOnly []Coordinate
@@ -289,8 +289,12 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 		return r.loadMetadata(p, c, dir, module)
 	}
 	compileUsage, runtimeUsage := "java-api", "java-runtime"
-	if p.IsKlib() {
+	if p.Konan != "" {
 		compileUsage, runtimeUsage = "kotlin-api", ""
+	} else if p.Web != "" {
+		// A browser program links its runtime closure, which can name more than the api one: ktor's wasmJs
+		// runtime variant alone brings kotlinx-browser, where Kotlin 2.4's wasm DOM declarations live.
+		compileUsage, runtimeUsage = "kotlin-api", "kotlin-runtime"
 	}
 	api := pick(p, compileUsage, module.Variants)
 	if api == nil && runtimeUsage != "" {
@@ -340,7 +344,8 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 			}
 		}
 		// The variants are one when they're the same (a POM-only library, or the api variant Gradle falls back to).
-		if runtime != api {
+		// A klib has no compile-only dependencies: a web program links what it compiled against.
+		if runtime != api && !p.IsKlib() {
 			var api []Coordinate
 			for _, d := range n.api {
 				if runtimeSet[d.Module()] {
@@ -613,6 +618,11 @@ func (r *Resolver) Resolve(p Platform, roots []Coordinate) (map[string]Resolved,
 			res.Deps = append(res.Deps, d.Module())
 		}
 		for _, d := range n.runtime {
+			if p.Web != "" && !hasKlib(r, p, d.Module(), version) {
+				// A browser runtime can name a plain archive, not a klib (Compose's skiko-js-wasm-runtime: the
+				// program's own JavaScript and wasm, which the app ships itself).
+				continue
+			}
 			res.Runtime = append(res.Runtime, d.Module())
 		}
 		for _, d := range n.compileOnly {
@@ -642,6 +652,13 @@ func (r *Resolver) Resolve(p Platform, roots []Coordinate) (map[string]Resolved,
 	}
 	breakCycles(out, roots, skipped)
 	return out, skipped, nil
+}
+
+// hasKlib is whether module, at its settled version, has a variant for the platform p.
+func hasKlib(r *Resolver, p Platform, module string, version map[string]string) bool {
+	ga := strings.SplitN(module, ":", 2)
+	_, err := r.node(p, Coordinate{ga[0], ga[1], version[module]})
+	return !errors.Is(err, errNoVariant)
 }
 
 // breakCycles drops each dependency that closes a cycle (AGP's gradle-api has a runtime dependency on gradle,

@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_plugins serialization
 # gazelle:kmp_export //app/model/core
 
@@ -17,5 +17,9 @@ kmp_library(
     ],
     plugins = ["serialization"],
     visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = ["//app/model/core"],
 )

@@ -17,6 +17,7 @@ fun deviceInfoOrNull(
     when (Platform.entries.firstOrNull { it.name.equals(platformName, ignoreCase = true) }) {
         Platform.JVM -> DeviceInfo.Jvm(osName = osName ?: UNKNOWN, machineName = machineName ?: UNKNOWN)
         Platform.NATIVE -> DeviceInfo.Native(osName = osName ?: UNKNOWN, machineName = machineName ?: UNKNOWN)
+        Platform.WEB -> DeviceInfo.Web(osName = osName ?: UNKNOWN, machineName = machineName ?: UNKNOWN)
         Platform.ANDROID -> DeviceInfo.Android(deviceMake = deviceMake ?: UNKNOWN, deviceModel = deviceModel ?: UNKNOWN)
         null -> null
     }

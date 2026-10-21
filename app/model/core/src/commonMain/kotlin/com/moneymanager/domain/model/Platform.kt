@@ -15,4 +15,7 @@ enum class Platform(
 
     /** Kotlin/Native command-line client (Windows, macOS, Linux) */
     NATIVE(3),
+
+    /** The browser app (wasmJs or js) */
+    WEB(4),
 }

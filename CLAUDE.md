@@ -632,7 +632,9 @@ set of writes.
   catches a JVM-only API in commonMain that each platform's compile accepts (`RegexOption.DOT_MATCHES_ALL`).
 - **Browser** (`wasmJs`, `js`; #84, in progress): a module joins with `web` in its `kmp_targets` (both targets), and its
   tests then run in Node as `:test_wasmJs` and `:test_js`. Code the browser shares with native goes in `nonJvmMain`,
-  code both browser targets share in `webMain`. So far: `utils/{bigdecimal,currency,humanreadable}`, `utils/parsers/{csv,qif}`, `app/di/scope`.
+  code both browser targets share in `webMain`. So far: `utils/{bigdecimal,currency,humanreadable,files,httpclient}`, `utils/parsers/{csv,qif}`, `app/di/scope`,
+  `app/model/*`, `app/importengineapi`, `app/tasks`, `app/cryptodata`. The browser app is a `DeviceInfo.Web` host (OS and
+  browser from the user agent; platform row `WEB`, 4).
 - **No classpath resources** (native has none): data a module ships is compiled into `commonMain` by
   `kotlin_constants` (`//bazel/kmp/constants`), wired with `# gazelle:kmp_generated_srcs`: the app version
   (`app/di/core`, from the root `VERSION`), the crypto catalog (`app/cryptodata/data/coins.tsv`) and the

@@ -4,6 +4,7 @@
     "org.jetbrains.kotlinx:kotlinx-coroutines-test": "kotlinx_coroutines_test",
     "org.jetbrains.kotlinx:kotlinx-io-core": "kotlinx_io_core",
     "io.ktor:ktor-client-js": "ktor_client_js",
+    "org.jetbrains.kotlinx:kotlinx-browser": "kotlinx_browser",
     "org.jetbrains.skiko:skiko-wasm-runtime": "skiko_wasm_runtime",
     "org.jetbrains.skiko:skiko-js-runtime": "skiko_js_runtime"
   },
@@ -12,12 +13,14 @@
     "org.jetbrains.kotlinx:kotlinx-coroutines-test": ["kotlinx.coroutines.test"],
     "org.jetbrains.kotlinx:kotlinx-io-core": ["kotlinx.io"],
     "io.ktor:ktor-client-js": ["io.ktor.client.engine.js"],
+    "org.jetbrains.kotlinx:kotlinx-browser": ["kotlinx.browser", "org.w3c.dom"],
     "org.jetbrains.skiko:skiko-wasm-runtime": ["org.jetbrains.skiko"],
     "org.jetbrains.skiko:skiko-js-runtime": ["org.jetbrains.skiko"]
   },
   "artifacts": {
     "org.jetbrains.kotlinx:kotlinx-io-core": {"jvm": {}, "linuxX64": {}, "wasmJs": {}, "js": {}},
     "io.ktor:ktor-client-js": {"wasmJs": {}, "js": {}},
+    "org.jetbrains.kotlinx:kotlinx-browser": {"wasmJs": {}, "js": {}},
     "org.jetbrains.skiko:skiko-wasm-runtime": {"wasmJs": {}},
     "org.jetbrains.skiko:skiko-js-runtime": {"js": {}}
   }

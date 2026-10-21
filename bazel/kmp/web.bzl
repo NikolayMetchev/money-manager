@@ -129,7 +129,14 @@ def link_web(ctx, out, base_name, include, libraries, production, mnemonic):
         args.add_all(["-target", "es2015"])
     args.add_all(["-ir-output-dir", out.path, "-ir-output-name", base_name])
     args.add("-Xir-module-name=" + base_name)
-    args.add_all(["-Werror", "-Xpartial-linkage-loglevel=ERROR"])
+    if ctx.attr.target == "js":
+        # Libraries built with an older Kotlin can call DOM declarations a newer kotlin-dom-api-compat changed
+        # (ktor 3.6.0, built with 2.3, calls `EventTarget.addEventListener(String, (Event) -> Unit)`, which 2.4's
+        # doesn't have). KGP links those as warnings, the call throwing only if it runs, so the js link does too.
+        # wasmJs takes its DOM from kotlinx-browser and stays strict.
+        args.add("-Xpartial-linkage-loglevel=WARNING")
+    else:
+        args.add_all(["-Werror", "-Xpartial-linkage-loglevel=ERROR"])
     if production:
         args.add("-Xir-dce")
     args.add("-Xinclude=" + include.path)

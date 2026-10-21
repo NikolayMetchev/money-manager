@@ -132,6 +132,7 @@ JSR305 = "3.0.2"  # renovate: com.google.code.findbugs:jsr305
 JUNIT = "4.13.2"  # renovate: junit:junit
 KERMIT = "2.2.0"  # renovate: co.touchlab:kermit
 KOTLIN = "2.4.21"  # renovate: org.jetbrains.kotlin:kotlin-stdlib
+KOTLINX_BROWSER = "0.5.0"  # renovate: org.jetbrains.kotlinx:kotlinx-browser
 KOTLINX_COROUTINES = "1.11.0"  # renovate: org.jetbrains.kotlinx:kotlinx-coroutines-android
 KOTLINX_DATETIME = "0.8.0"  # renovate: org.jetbrains.kotlinx:kotlinx-datetime
 KOTLINX_IO = "0.9.1"  # renovate: org.jetbrains.kotlinx:kotlinx-io-core
@@ -221,6 +222,7 @@ maven_kmp.install(
         "kermit-core": "co.touchlab:kermit-core:" + KERMIT,
         "kotlin-compose-compiler-plugin-embeddable": "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable:" + KOTLIN,
         "kotlin-serialization-compiler-plugin-embeddable": "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable:" + KOTLIN,
+        "kotlinx-browser": "org.jetbrains.kotlinx:kotlinx-browser:" + KOTLINX_BROWSER,
         "kotlinx-coroutines-android": "org.jetbrains.kotlinx:kotlinx-coroutines-android:" + KOTLINX_COROUTINES,
         "kotlinx-coroutines-core": "org.jetbrains.kotlinx:kotlinx-coroutines-core:" + KOTLINX_COROUTINES,
         "kotlinx-coroutines-swing": "org.jetbrains.kotlinx:kotlinx-coroutines-swing:" + KOTLINX_COROUTINES,

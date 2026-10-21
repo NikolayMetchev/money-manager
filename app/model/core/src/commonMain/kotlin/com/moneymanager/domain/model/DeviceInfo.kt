@@ -8,8 +8,8 @@ sealed interface DeviceInfo {
     val platform: Platform
 
     /**
-     * A desktop host, identified by its OS and machine name. The desktop app and the native CLI both run
-     * on one, so they share how a device row is stored and only differ in [platform].
+     * A host, identified by its OS and machine name. The desktop app, the native CLI and the browser app all
+     * run on one, so they share how a device row is stored and only differ in [platform].
      *
      * @property osName Operating system name (e.g., "Windows 11", "macOS 14.0", "Linux")
      * @property machineName Hostname of the machine
@@ -33,6 +33,17 @@ sealed interface DeviceInfo {
         override val machineName: String,
     ) : Host {
         override val platform: Platform = Platform.NATIVE
+    }
+
+    /**
+     * Device info for the browser app. A page can't read the host name, so [machineName] is the browser
+     * ("Chrome"), which keeps two browsers on one OS separate devices, as the desktop app and the CLI are.
+     */
+    data class Web(
+        override val osName: String,
+        override val machineName: String,
+    ) : Host {
+        override val platform: Platform = Platform.WEB
     }
 
     /**
