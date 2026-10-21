@@ -23,7 +23,6 @@ internal enum class RulePathSource {
  */
 internal class ApiRuleList(
     val title: String,
-    val description: String,
     val context: RuleContext,
     val paths: RulePathSource,
     val rules: List<StrategyRule>,
@@ -42,9 +41,6 @@ internal fun ApiStrategyConfig.ruleLists(): List<ApiRuleList> {
         (accounts as? ApiAccountsSource.Downloaded)?.let {
             ApiRuleList(
                 title = "Accounts",
-                description =
-                    "They name the account (else the description field), set its stored id (else the id field) and " +
-                        "add attributes.",
                 context = RuleContext.API_ACCOUNT,
                 paths = RulePathSource.ACCOUNT_SAMPLE,
                 rules = editedAccountMappings.rules,
@@ -55,9 +51,6 @@ internal fun ApiStrategyConfig.ruleLists(): List<ApiRuleList> {
         bankTransactions?.let { feed ->
             ApiRuleList(
                 title = "Transactions (${feed.endpoint.path})",
-                description =
-                    "They name the counterparty, set the direction (else the amount's sign), decline or skip items, " +
-                        "and add fees and attributes.",
                 context = RuleContext.API_TRANSACTION,
                 paths = RulePathSource.TRANSACTION_SAMPLE,
                 rules = editedTransactionMappings.rules,
@@ -83,7 +76,6 @@ private fun ApiDataEndpoint.ruleList(
     return if (kind in TRADE_KINDS) {
         ApiRuleList(
             title = title,
-            description = "They set the trade side (an item no rule gives a side is dropped), skip items, set the id and add the fee.",
             context = RuleContext.API_TRADE,
             paths = RulePathSource.NONE,
             rules = tradeMappings?.rules.orEmpty(),
@@ -94,9 +86,6 @@ private fun ApiDataEndpoint.ruleList(
     } else {
         ApiRuleList(
             title = title,
-            description =
-                "They skip items, set the direction (else the endpoint's own), name the counterparty, set the id, mark " +
-                    "ledger trade legs and add fees.",
             context = RuleContext.API_TRANSACTION,
             paths = RulePathSource.NONE,
             rules = transactionMappings?.rules.orEmpty(),

@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.ui.components.rules.ConditionPathField
 import com.moneymanager.ui.components.rules.StrategyRulesEditor
-import com.moneymanager.ui.components.rules.isComplete
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /**
@@ -34,11 +33,6 @@ internal fun RulesTab(
         ruleLists.forEachIndexed { index, list ->
             if (index > 0) HorizontalDivider()
             SectionHeader(list.title)
-            Text(
-                list.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (list.rules.isComplete()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-            )
             StrategyRulesEditor(
                 rules = list.rules,
                 onRulesChanged = { rules -> state.updateConfig { list.withRules(this, rules) } },
