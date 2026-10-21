@@ -33,3 +33,28 @@ java_binary(
     main_class = "com.moneymanager.bazel.kmp.testing.KnTestLauncher",
     runtime_deps = [":native_launcher_lib"],
 )
+
+# Coverage: `--config=coverage` (`--define=coverage=intellij`) runs the JVM and Android host tests under the IntelliJ
+# coverage engine (see defs.bzl's _jvm_test, and coverage.sh for the report).
+config_setting(
+    name = "coverage",
+    define_values = {"coverage": "intellij"},
+)
+
+# A JVM agent jar (-javaagent), so only its deploy jar is used: CoverageAgent starts Kover's agent.
+java_binary(
+    name = "coverage_agent",
+    srcs = ["src/com/moneymanager/bazel/kmp/testing/CoverageAgent.java"],
+    create_executable = False,
+    deploy_manifest_lines = [
+        "Premain-Class: com.moneymanager.bazel.kmp.testing.CoverageAgent",
+        "Can-Retransform-Classes: true",
+    ],
+)
+
+# The reporter, run by coverage.sh: the tests' binary reports and the production classes in, a JaCoCo XML report out.
+java_binary(
+    name = "kover_cli",
+    main_class = "kotlinx.kover.cli.MainKt",
+    runtime_deps = ["@kover//:org_jetbrains_kotlinx_kover_cli"],
+)

@@ -13,6 +13,11 @@
   ],
   "packageRules": [
     {
+      "description": "Kover's 1.0.715 on Maven Central is a 2023 IntelliJ-numbered upload, older than the 0.9.x line, not an upgrade",
+      "matchPackageNames": ["/^org\\.jetbrains\\.kotlinx:kover-/"],
+      "allowedVersions": "!/^1\\.0\\.715$/"
+    },
+    {
       "description": "kotlinx-datetime publishes '-0.6.x-compat' sibling releases; they are not upgrades",
       "matchPackageNames": ["org.jetbrains.kotlinx:kotlinx-datetime"],
       "allowedVersions": "!/-compat$/"

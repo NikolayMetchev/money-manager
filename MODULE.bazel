@@ -440,6 +440,17 @@ maven.install(
     version_conflict_policy = "pinned",
 )
 
+# Coverage: the IntelliJ engine's JVM agent and its reporter, Kover's packaging of them (both self-contained jars).
+maven.install(
+    name = "kover",
+    artifacts = [
+        "org.jetbrains.kotlinx:kover-cli:0.9.11",
+        "org.jetbrains.kotlinx:kover-jvm-agent:0.9.11",
+    ],
+    lock_file = "//bazel/maven:kover_install.json",
+    repositories = ["https://repo1.maven.org/maven2"],
+)
+
 # Dokka (#1027), the KDoc site: its CLI (a fat jar, with Dokka's core) and the plugins the Gradle plugin ran.
 maven.install(
     name = "dokka",
@@ -569,7 +580,7 @@ maven.amend_artifact(
     coordinates = "com.android.tools.build:gradle-api",
     exclusions = ["com.android.tools.build:gradle"],
 )
-use_repo(maven, "android_lint", "android_tools", "detekt_cli", "dokka", "ktlint_cli", "proguard", "schemaspy")
+use_repo(maven, "android_lint", "android_tools", "detekt_cli", "dokka", "kover", "ktlint_cli", "proguard", "schemaspy")
 
 use_repo(maven_kmp, "maven_kmp")
 

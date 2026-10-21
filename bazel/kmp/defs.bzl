@@ -588,6 +588,9 @@ def _device_test(name, associate, srcs, deps_of_plugins, plugins, deps, manifest
         package = application_id,
     )
 
+_COVERAGE_AGENT = str(Label("//bazel/kmp/testing:coverage_agent_deploy.jar"))
+_KOVER_AGENT = str(Label("@kover//:org_jetbrains_kotlinx_kover_jvm_agent"))
+
 def _jvm_test(name, lib, size, flaky, jvm_flags, data, runtime_deps):
     """A JUnit 4 test over `lib`'s classes, run by KmpJUnitRunner (the JVM tests and the Android host tests)."""
     java_test(
@@ -608,8 +611,17 @@ def _jvm_test(name, lib, size, flaky, jvm_flags, data, runtime_deps):
             # Gradle's test JVMs use /tmp, and terminal tests lay out paths under it within a fixed width
             # (app/tui's footer). The sandbox's /tmp is hermetic, so this stays per test.
             "//conditions:default": ["-Djava.io.tmpdir=/tmp"],
+        }) + select({
+            # The IntelliJ coverage engine (--config=coverage): see CoverageAgent and coverage.sh.
+            Label("//bazel/kmp/testing:coverage"): [
+                "-javaagent:$(rootpath %s)=$(rootpath %s)" % (_COVERAGE_AGENT, _KOVER_AGENT),
+            ],
+            "//conditions:default": [],
         }) + jvm_flags,
-        data = data,
+        data = data + select({
+            Label("//bazel/kmp/testing:coverage"): [_COVERAGE_AGENT, _KOVER_AGENT],
+            "//conditions:default": [],
+        }),
         runtime_deps = [
             ":" + lib,
             Label("//bazel/kmp/testing:runner"),

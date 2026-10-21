@@ -64,7 +64,7 @@ timeout; use at least 20 minutes.
 | `bazel run //:format` | Regenerate the BUILD files (Gazelle), then ktlint -F |
 | `bazel run //:gazelle` | Regenerate the BUILD files only |
 | `bazel/renovate/repin.sh` | Re-pin every lockfile (after changing `MODULE.bazel`) |
-| `bazel coverage $(bazel query 'attr(name, "^test_(jvm\|android)$", tests(//...))')` | Coverage, one LCOV report in `bazel-out/_coverage/_coverage_report.dat` |
+| `bazel test --config=coverage $(bazel query 'attr(name, "^test_(jvm\|android)$", tests(//...))')`, then `bazel/kmp/testing/coverage.sh coverage.xml` | Coverage (the IntelliJ engine), one JaCoCo-format XML report |
 
 Target naming: a module `//utils/files:files` builds as `:files_jvm`, `:files_android` and `:files_<target>`
 (`_linuxX64`, `_linuxArm64`, `_macosArm64`, `_mingwX64`); its tests are `:test_jvm`, `:test_android` (host),
@@ -95,8 +95,8 @@ Release Smoke Test" workflow (dispatch it on main or a PR branch). Cut a release
 
 **CI**: every workflow sets Bazel up through `.github/actions/bazel-setup`. `build.yml`'s Build and Test, on Linux
 (RBE), is `bazel build //...` (plus the cross-linked linuxArm64 and mingwX64 test binaries and the Linux desktop
-installer), `bazel test //...` (plus the desktop ProGuard check, minus the Kotlin JVM and Android tests) and
-`bazel coverage` over those Kotlin tests, then installs the deb and starts the app, `mm-jvm` and `mm`. Native Tests run
+installer) and `bazel test //...` (plus the desktop ProGuard check), all with `--config=coverage`, then merges the
+Kotlin JVM and Android tests' coverage (`coverage.sh`), installs the deb and starts the app, `mm-jvm` and `mm`. Native Tests run
 the cross-linked binaries on an arm64 and a Windows runner, and build and test macOS on its own runner (with the
 cache); Android Instrumented Tests (an API 36 emulator) and Desktop Installer (macOS and Windows, smoke-tested the same
 way) are their own jobs. Auto-format PR runs `//:format` on every PR and pushes the fixes, so a stale BUILD file is

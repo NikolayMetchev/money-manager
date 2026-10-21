@@ -283,10 +283,15 @@ release's `mm-<os>-<arch>` (`pkg_tar` keeping the exec bit; a copied `.exe` on W
 
 ## Coverage, tools and Pages
 
-- **Coverage**: `bazel coverage $(bazel query 'attr(name, "^test_(jvm|android)$", tests(//...))')`. rules_kotlin
-  instruments with JaCoCo; `.bazelrc`'s `coverage` lines leave out `test/` fixtures, tests and SQLDelight code and
-  merge it into one LCOV report, `bazel-out/_coverage/_coverage_report.dat`. A module's code is credited to every
-  test that runs it. The device tests aren't covered. The Go tests can't link under coverage, hence the query.
+- **Coverage**: `bazel test --config=coverage $(bazel query 'attr(name, "^test_(jvm|android)$", tests(//...))')`,
+  then `bazel/kmp/testing/coverage.sh coverage.xml` (pass the same Bazel flags, such as `--config=rbe`). The JVM and
+  Android host tests run under the IntelliJ coverage engine, Kover's JVM agent (`CoverageAgent` starts it), and each
+  leaves a binary report in its `test.outputs`. The agent doesn't rewrite jars, so only the test actions change.
+  `coverage.sh` merges the reports over the production modules' `_jvm`/`_android` jars (not `test/` fixtures, tests or
+  SQLDelight code) with `kover-cli` into one XML report in JaCoCo's format. It names files by package, and Codecov maps them onto
+  the repository's paths. A module's code is credited to every test
+  that runs it. Native and device tests aren't covered: nothing instruments them. Don't use `bazel coverage`, which
+  is JaCoCo.
 - **Tools**: `tools/*` and `app/db/schemaspy` are ordinary modules plus `java_binary`s.
   `bazel run //tools/strategy-catalog:generate_bundled_currencies` and `bazel run //tools/crypto-dataset:generate`
   write into the workspace (`BUILD_WORKSPACE_DIRECTORY`).
