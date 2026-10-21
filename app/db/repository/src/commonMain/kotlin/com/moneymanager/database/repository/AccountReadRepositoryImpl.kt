@@ -1,5 +1,7 @@
 package com.moneymanager.database.repository
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
@@ -46,7 +48,7 @@ class AccountReadRepositoryImpl(
         withContext(Dispatchers.Default) {
             selectQueries
                 .selectPreviousAccountNames { name, accountId -> name.lowercase() to AccountId(accountId) }
-                .executeAsList()
+                .awaitAsList()
                 .toMap()
         }
 
@@ -57,25 +59,20 @@ class AccountReadRepositoryImpl(
         withContext(Dispatchers.Default) {
             attributeSelectQueries
                 .selectAccountIdsByTypeAndValue(attributeTypeId, value)
-                .executeAsList()
+                .awaitAsList()
                 .mapTo(mutableSetOf(), ::AccountId)
         }
 
     override suspend fun countTransfersByAccount(accountId: AccountId): Long =
         withContext(Dispatchers.Default) {
-            transferSelectQueries.countTransfersByAccount(accountId.id).executeAsOne()
+            transferSelectQueries.countTransfersByAccount(accountId.id).awaitAsOne()
         }
 
     override suspend fun accountsWithTransfers(accountIds: Collection<AccountId>): Set<AccountId> =
         withContext(Dispatchers.Default) {
-            accountIds
-                .asSequence()
-                .map { it.id }
-                .distinct()
-                .chunked(MAX_IDS_PER_TWO_SIDED_QUERY)
-                .flatMap { chunk ->
-                    transferSelectQueries.selectAccountsWithTransfers(chunk).executeAsList()
-                }.mapTo(mutableSetOf(), ::AccountId)
+            queryInChunks(accountIds.map { it.id }, MAX_IDS_PER_TWO_SIDED_QUERY) { chunk ->
+                transferSelectQueries.selectAccountsWithTransfers(chunk).awaitAsList()
+            }.mapTo(mutableSetOf(), ::AccountId)
         }
 
     override suspend fun getTransfersBetweenAccounts(
@@ -88,7 +85,7 @@ class AccountReadRepositoryImpl(
                     accountA = accountA.id,
                     accountB = accountB.id,
                     TransferMapper::mapRaw,
-                ).executeAsList()
+                ).awaitAsList()
         }
 
     override fun getReversibleMerges(): Flow<List<AccountMerge>> =
@@ -135,7 +132,7 @@ class AccountReadRepositoryImpl(
                         survivingAccountName = survivingAccountName,
                         reversed = reversed != 0L,
                     )
-                }.executeAsList()
+                }.awaitAsList()
         }
 
     override suspend fun getMergeMovedTransfers(mergeId: MergeId): List<MergeMovedTransfer> =
@@ -146,6 +143,6 @@ class AccountReadRepositoryImpl(
                         transferId = TransferId(transferId),
                         movedTarget = movedTarget != 0L,
                     )
-                }.executeAsList()
+                }.awaitAsList()
         }
 }

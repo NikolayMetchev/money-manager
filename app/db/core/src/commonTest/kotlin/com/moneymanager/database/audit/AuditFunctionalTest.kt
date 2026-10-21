@@ -1,5 +1,5 @@
 package com.moneymanager.database.audit
-import app.cash.sqldelight.db.QueryResult
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
@@ -61,7 +61,7 @@ class AuditFunctionalTest : DbTest() {
      * Test-only query: selectAuditHistoryForAccount
      * Retrieves audit history for a specific account using raw SQL.
      */
-    private fun selectAuditHistoryForAccount(accountId: Long): List<AccountAuditRecord> {
+    private suspend fun selectAuditHistoryForAccount(accountId: Long): List<AccountAuditRecord> {
         val sql =
             """
             SELECT
@@ -77,33 +77,22 @@ class AuditFunctionalTest : DbTest() {
             """.trimIndent()
 
         return database
-            .executeQuery(
-                identifier = null,
-                sql = sql,
-                mapper = { cursor ->
-                    val results = mutableListOf<AccountAuditRecord>()
-                    while (cursor.next().value) {
-                        results.add(
-                            AccountAuditRecord(
-                                auditId = cursor.getLong(0)!!,
-                                auditTimestamp = cursor.getLong(1)!!,
-                                auditType = cursor.getString(2)!!,
-                                id = cursor.getLong(3)!!,
-                                name = cursor.getString(4)!!,
-                            ),
-                        )
-                    }
-                    QueryResult.Value(results)
-                },
-                parameters = 0,
-            ).value
+            .rawQuery(sql) { cursor ->
+                AccountAuditRecord(
+                    auditId = cursor.getLong(0)!!,
+                    auditTimestamp = cursor.getLong(1)!!,
+                    auditType = cursor.getString(2)!!,
+                    id = cursor.getLong(3)!!,
+                    name = cursor.getString(4)!!,
+                )
+            }.awaitAsList()
     }
 
     /**
      * Test-only query: selectAuditHistoryForCurrency
      * Retrieves audit history for a specific currency using raw SQL.
      */
-    private fun selectAuditHistoryForCurrency(currencyId: Long): List<CurrencyAuditRecord> {
+    private suspend fun selectAuditHistoryForCurrency(currencyId: Long): List<CurrencyAuditRecord> {
         val sql =
             """
             SELECT
@@ -120,34 +109,23 @@ class AuditFunctionalTest : DbTest() {
             """.trimIndent()
 
         return database
-            .executeQuery(
-                identifier = null,
-                sql = sql,
-                mapper = { cursor ->
-                    val results = mutableListOf<CurrencyAuditRecord>()
-                    while (cursor.next().value) {
-                        results.add(
-                            CurrencyAuditRecord(
-                                auditId = cursor.getLong(0)!!,
-                                auditTimestamp = cursor.getLong(1)!!,
-                                auditType = cursor.getString(2)!!,
-                                id = cursor.getLong(3)!!,
-                                code = cursor.getString(4)!!,
-                                name = cursor.getString(5)!!,
-                            ),
-                        )
-                    }
-                    QueryResult.Value(results)
-                },
-                parameters = 0,
-            ).value
+            .rawQuery(sql) { cursor ->
+                CurrencyAuditRecord(
+                    auditId = cursor.getLong(0)!!,
+                    auditTimestamp = cursor.getLong(1)!!,
+                    auditType = cursor.getString(2)!!,
+                    id = cursor.getLong(3)!!,
+                    code = cursor.getString(4)!!,
+                    name = cursor.getString(5)!!,
+                )
+            }.awaitAsList()
     }
 
     /**
      * Test-only query: selectAuditHistoryForCategory
      * Retrieves audit history for a specific category using raw SQL.
      */
-    private fun selectAuditHistoryForCategory(categoryId: Long): List<CategoryAuditRecord> {
+    private suspend fun selectAuditHistoryForCategory(categoryId: Long): List<CategoryAuditRecord> {
         val sql =
             """
             SELECT
@@ -163,26 +141,15 @@ class AuditFunctionalTest : DbTest() {
             """.trimIndent()
 
         return database
-            .executeQuery(
-                identifier = null,
-                sql = sql,
-                mapper = { cursor ->
-                    val results = mutableListOf<CategoryAuditRecord>()
-                    while (cursor.next().value) {
-                        results.add(
-                            CategoryAuditRecord(
-                                auditId = cursor.getLong(0)!!,
-                                auditTimestamp = cursor.getLong(1)!!,
-                                auditType = cursor.getString(2)!!,
-                                id = cursor.getLong(3)!!,
-                                name = cursor.getString(4)!!,
-                            ),
-                        )
-                    }
-                    QueryResult.Value(results)
-                },
-                parameters = 0,
-            ).value
+            .rawQuery(sql) { cursor ->
+                CategoryAuditRecord(
+                    auditId = cursor.getLong(0)!!,
+                    auditTimestamp = cursor.getLong(1)!!,
+                    auditType = cursor.getString(2)!!,
+                    id = cursor.getLong(3)!!,
+                    name = cursor.getString(4)!!,
+                )
+            }.awaitAsList()
     }
 
     @Test
@@ -436,7 +403,7 @@ class AuditFunctionalTest : DbTest() {
                     ),
                 )
 
-            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
+            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).awaitAsList()
 
             assertEquals(1, auditHistory.size)
             assertEquals("INSERT", auditHistory[0].audit_type)
@@ -482,7 +449,7 @@ class AuditFunctionalTest : DbTest() {
                 source = Source.Manual,
             )
 
-            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
+            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).awaitAsList()
 
             assertEquals(2, auditHistory.size)
             val updateAudit = auditHistory[0]
@@ -512,7 +479,7 @@ class AuditFunctionalTest : DbTest() {
 
             repositories.transactionRepository.deleteTransaction(transfer.id.id)
 
-            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
+            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).awaitAsList()
 
             assertEquals(2, auditHistory.size)
             assertEquals("DELETE", auditHistory[0].audit_type)
@@ -557,7 +524,7 @@ class AuditFunctionalTest : DbTest() {
                 source = Source.Manual,
             )
 
-            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
+            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).awaitAsList()
 
             assertEquals(2, auditHistory.size, "Should have 2 audit records (INSERT + UPDATE)")
 
@@ -630,7 +597,7 @@ class AuditFunctionalTest : DbTest() {
                 source = Source.Manual,
             )
 
-            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
+            val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).awaitAsList()
 
             assertEquals(3, auditHistory.size, "Should have 3 audit records (INSERT + 2 UPDATEs)")
 

@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
@@ -39,14 +40,9 @@ class TransferRelationshipReadRepositoryImpl(
 
     override suspend fun getByTransfers(transferIds: Collection<TransferId>): List<TransferRelationship> =
         withContext(Dispatchers.Default) {
-            transferIds
-                .asSequence()
-                .map { it.id }
-                .distinct()
-                .chunked(MAX_IDS_PER_TWO_SIDED_QUERY)
-                .flatMap { chunk ->
-                    selectQueries.selectByTransfers(chunk).executeAsList()
-                }
+            queryInChunks(transferIds.map { it.id }, MAX_IDS_PER_TWO_SIDED_QUERY) { chunk ->
+                selectQueries.selectByTransfers(chunk).awaitAsList()
+            }
                 // A relationship whose two sides fall into different chunks is returned by both.
                 .distinct()
                 .map { row ->

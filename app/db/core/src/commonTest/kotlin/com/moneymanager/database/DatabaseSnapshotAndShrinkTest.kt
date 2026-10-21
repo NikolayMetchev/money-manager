@@ -1,6 +1,6 @@
 package com.moneymanager.database
 
-import app.cash.sqldelight.db.QueryResult
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -26,16 +26,8 @@ import kotlin.time.Clock
  * storage: truncating materialized views and exporting/importing a consistent database file.
  */
 class DatabaseSnapshotAndShrinkTest : DbTest() {
-    private fun MoneyManagerDatabaseWrapper.countRows(table: String): Long =
-        executeQuery(
-            identifier = null,
-            sql = "SELECT COUNT(*) FROM $table",
-            mapper = { cursor ->
-                cursor.next()
-                QueryResult.Value(cursor.getLong(0)!!)
-            },
-            parameters = 0,
-        ).value
+    private suspend fun MoneyManagerDatabaseWrapper.countRows(table: String): Long =
+        rawQuery("SELECT COUNT(*) FROM $table") { it.getLong(0)!! }.awaitAsOne()
 
     private suspend fun seedTransfer() {
         val account1 =

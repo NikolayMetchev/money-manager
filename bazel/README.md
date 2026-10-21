@@ -84,7 +84,7 @@ PR, and `renovate-pins.yml` runs the script on it. 3 is by hand.
   modules) is a plain dep marked `# keep`, or named with `# gazelle:kmp_keep_dep`, which also exempts it from the
   unused-deps check.
 - **SQLDelight** (`kmp/sqldelight`): `sqldelight_library` runs the SQLDelight compiler (`SqlDelightEnvironment`, with
-  its defaults) over a module's `.sq` files, upstream databases' folders as dependencies, and
+  its defaults, but `generateAsync`, since the browser's worker driver can't block) over a module's `.sq` files, upstream databases' folders as dependencies, and
   `kmp_library(sqldelight = …)` compiles the result as `commonMain` (plus the runtime as an export). konanc gets the
   sources in the module's own compile; on the JVM they compile as `<name>_sqldelight_jvm`, exported, because
   rules_kotlin can't put srcjar sources in a fragment. The compiler API is internal:

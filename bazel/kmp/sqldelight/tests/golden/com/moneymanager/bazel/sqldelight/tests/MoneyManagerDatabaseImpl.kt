@@ -2,7 +2,7 @@
 
 package com.moneymanager.bazel.sqldelight.tests
 
-import app.cash.sqldelight.TransacterImpl
+import app.cash.sqldelight.SuspendingTransacterImpl
 import app.cash.sqldelight.db.AfterVersion
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlDriver
@@ -13,30 +13,29 @@ import kotlin.Long
 import kotlin.Unit
 import kotlin.reflect.KClass
 
-internal val KClass<MoneyManagerDatabase>.schema: SqlSchema<QueryResult.Value<Unit>>
+internal val KClass<MoneyManagerDatabase>.schema: SqlSchema<QueryResult.AsyncValue<Unit>>
   get() = MoneyManagerDatabaseImpl.Schema
 
 internal fun KClass<MoneyManagerDatabase>.newInstance(driver: SqlDriver): MoneyManagerDatabase = MoneyManagerDatabaseImpl(driver)
 
 private class MoneyManagerDatabaseImpl(
   driver: SqlDriver,
-) : TransacterImpl(driver),
+) : SuspendingTransacterImpl(driver),
     MoneyManagerDatabase {
   override val ledgerQueries: LedgerQueries = LedgerQueries(driver)
 
-  public object Schema : SqlSchema<QueryResult.Value<Unit>> {
+  public object Schema : SqlSchema<QueryResult.AsyncValue<Unit>> {
     override val version: Long
       get() = 1
 
-    override fun create(driver: SqlDriver): QueryResult.Value<Unit> {
+    override fun create(driver: SqlDriver): QueryResult.AsyncValue<Unit> = QueryResult.AsyncValue {
       driver.execute(null, """
           |CREATE TABLE ledger (
           |    id INTEGER NOT NULL PRIMARY KEY,
           |    name TEXT NOT NULL,
           |    balance INTEGER NOT NULL DEFAULT 0
           |)
-          """.trimMargin(), 0)
-      return QueryResult.Unit
+          """.trimMargin(), 0).await()
     }
 
     override fun migrate(
@@ -44,6 +43,7 @@ private class MoneyManagerDatabaseImpl(
       oldVersion: Long,
       newVersion: Long,
       vararg callbacks: AfterVersion,
-    ): QueryResult.Value<Unit> = QueryResult.Unit
+    ): QueryResult.AsyncValue<Unit> = QueryResult.AsyncValue {
+    }
   }
 }

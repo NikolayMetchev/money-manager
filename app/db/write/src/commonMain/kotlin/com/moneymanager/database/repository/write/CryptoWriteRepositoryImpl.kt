@@ -1,5 +1,7 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.CryptoAsset
@@ -30,13 +32,13 @@ class CryptoWriteRepositoryImpl(
     ): CryptoId =
         withContext(Dispatchers.Default) {
             writeQueries.transactionWithResult {
-                val existing = selectQueries.selectByCode(code).executeAsOneOrNull()
+                val existing = selectQueries.selectByCode(code).awaitAsOneOrNull()
                 existing?.let { CryptoId(it.id) }
                     ?: run {
                         val displayName = name ?: CryptoRegistry.nameFor(code)
                         // Allocate an id from the shared `asset` id space, then insert the crypto with it.
                         assetWriteQueries.insert()
-                        val newId = assetWriteQueries.lastInsertedId().executeAsOne()
+                        val newId = assetWriteQueries.lastInsertedId().awaitAsOne()
                         writeQueries.insert(newId, code, displayName, CryptoAsset.CRYPTO_SCALE_FACTOR)
                         database.recordSource(deviceId, EntityType.CRYPTO, newId, 1L, source)
                         CryptoId(newId)
@@ -56,7 +58,7 @@ class CryptoWriteRepositoryImpl(
                     scale_factor = crypto.scaleFactor,
                     id = crypto.id.id,
                 )
-                val revision = selectQueries.selectById(crypto.id.id).executeAsOne().revision_id
+                val revision = selectQueries.selectById(crypto.id.id).awaitAsOne().revision_id
                 database.recordSource(deviceId, EntityType.CRYPTO, crypto.id.id, revision, source)
             }
         }

@@ -1,5 +1,8 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOne
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.mapper.TransferMapper
 import com.moneymanager.database.sql.accountAttribute.SelectByAccount
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
@@ -47,7 +50,7 @@ class AccountWriteRepositoryImpl(
                         opening_date = account.openingDate.toEpochMilliseconds(),
                         category_id = account.categoryId,
                     )
-                    val newId = writeQueries.lastInsertRowId().executeAsOne()
+                    val newId = writeQueries.lastInsertRowId().awaitAsOne()
                     database.recordSource(deviceId, EntityType.ACCOUNT, newId, 1L, source)
                     newId
                 }
@@ -66,7 +69,7 @@ class AccountWriteRepositoryImpl(
                         opening_date = account.openingDate.toEpochMilliseconds(),
                         category_id = account.categoryId,
                     )
-                    val id = writeQueries.lastInsertRowId().executeAsOne()
+                    val id = writeQueries.lastInsertRowId().awaitAsOne()
                     database.recordSource(deviceId, EntityType.ACCOUNT, id, 1L, sourceFor(account))
                     AccountId(id)
                 }
@@ -84,7 +87,7 @@ class AccountWriteRepositoryImpl(
                     category_id = account.categoryId,
                     id = account.id.id,
                 )
-                val revision = selectQueries.selectRevisionById(account.id.id).executeAsOne()
+                val revision = selectQueries.selectRevisionById(account.id.id).awaitAsOne()
                 database.recordSource(deviceId, EntityType.ACCOUNT, account.id.id, revision, source)
                 revision
             }
@@ -118,9 +121,9 @@ class AccountWriteRepositoryImpl(
                             )
                         },
                         bumpRevisionOnly = { writeQueries.bumpRevisionOnly(effectiveAccountId.id) },
-                        selectRevision = { selectQueries.selectRevisionById(effectiveAccountId.id).executeAsOne() },
+                        selectRevision = { selectQueries.selectRevisionById(effectiveAccountId.id).awaitAsOne() },
                         selectCurrentSlot = { id ->
-                            attributeSelectQueries.selectById(id).executeAsOneOrNull()?.let {
+                            attributeSelectQueries.selectById(id).awaitAsOneOrNull()?.let {
                                 it.attribute_type_id to it.group_key
                             }
                         },
@@ -169,7 +172,7 @@ class AccountWriteRepositoryImpl(
                             accountA = deletedAccount.id,
                             accountB = survivingAccount.id,
                             TransferMapper::mapRaw,
-                        ).executeAsList()
+                        ).awaitAsList()
                 require(between.isEmpty()) {
                     "Cannot merge: ${between.size} transaction(s) exist between the accounts"
                 }
@@ -178,9 +181,9 @@ class AccountWriteRepositoryImpl(
                 // which the cascade delete leaves no trace of. Attributes and ownerships are NOT
                 // snapshotted: the cascade delete records each one as a DELETE in account_attribute_audit
                 // / person_account_ownership_audit, so unmerge reconstructs them from the audit trail.
-                val account = selectQueries.selectById(deletedAccount.id).executeAsOne()
-                val sourceTransferIds = transferSelectQueries.selectTransferIdsBySourceAccount(deletedAccount.id).executeAsList()
-                val targetTransferIds = transferSelectQueries.selectTransferIdsByTargetAccount(deletedAccount.id).executeAsList()
+                val account = selectQueries.selectById(deletedAccount.id).awaitAsOne()
+                val sourceTransferIds = transferSelectQueries.selectTransferIdsBySourceAccount(deletedAccount.id).awaitAsList()
+                val targetTransferIds = transferSelectQueries.selectTransferIdsByTargetAccount(deletedAccount.id).awaitAsList()
 
                 mergeWriteQueries.insertMerge(
                     merged_at = Clock.System.now().toEpochMilliseconds(),
@@ -194,7 +197,7 @@ class AccountWriteRepositoryImpl(
                     // unmerge recreates the account at the next revision after it.
                     deleted_account_revision_id = account.revision_id + 1,
                 )
-                val mergeId = mergeWriteQueries.lastInsertRowId().executeAsOne()
+                val mergeId = mergeWriteQueries.lastInsertRowId().awaitAsOne()
 
                 val sourceSet = sourceTransferIds.toSet()
                 val targetSet = targetTransferIds.toSet()
@@ -245,7 +248,7 @@ class AccountWriteRepositoryImpl(
     override suspend fun unmergeAccount(mergeId: MergeId): Unit =
         withContext(Dispatchers.Default) {
             database.transaction {
-                val merge = mergeSelectQueries.selectById(mergeId.id).executeAsOneOrNull() ?: return@transaction
+                val merge = mergeSelectQueries.selectById(mergeId.id).awaitAsOneOrNull() ?: return@transaction
                 if (merge.reversed != 0L) return@transaction
 
                 // Recreate the merged-away account with its original id so the transfers reassigned
@@ -260,7 +263,7 @@ class AccountWriteRepositoryImpl(
                 val takenNames =
                     selectQueries
                         .selectAll()
-                        .executeAsList()
+                        .awaitAsList()
                         .map { it.name }
                         .toSet()
                 val restoredName = uniqueRestoreName(merge.deleted_account_name, takenNames)
@@ -288,7 +291,7 @@ class AccountWriteRepositoryImpl(
                 // pairs collapsed into the ungrouped slot, violating the UNIQUE constraint.
                 database.beginCreationMode()
                 try {
-                    auditQueries.selectDeletedAttributesForAccount(merge.deleted_account_id).executeAsList().forEach {
+                    auditQueries.selectDeletedAttributesForAccount(merge.deleted_account_id).awaitAsList().forEach {
                         attributeWriteQueries.insert(
                             account_id = merge.deleted_account_id,
                             attribute_type_id = it.attribute_type_id,
@@ -299,7 +302,7 @@ class AccountWriteRepositoryImpl(
                     // Remove the attributes the merge grafted onto the SURVIVOR. Leaving them would have
                     // both accounts claiming the same bank identity, making the next import's lookup
                     // non-deterministic (whichever account id the index happens to see first wins).
-                    mergeSelectQueries.selectAttributeIdsForMerge(mergeId.id).executeAsList().forEach { attributeId ->
+                    mergeSelectQueries.selectAttributeIdsForMerge(mergeId.id).awaitAsList().forEach { attributeId ->
                         attributeWriteQueries.deleteById(attributeId)
                     }
                 } finally {
@@ -309,11 +312,11 @@ class AccountWriteRepositoryImpl(
                 // Restore ownerships from the audit trail: the merge's cascade delete recorded each
                 // ownership as a DELETE in person_account_ownership_audit, and the latest such batch for
                 // this account is exactly the set deleted by this merge.
-                auditQueries.selectDeletedOwnershipPersonIds(merge.deleted_account_id).executeAsList().forEach { personId ->
+                auditQueries.selectDeletedOwnershipPersonIds(merge.deleted_account_id).awaitAsList().forEach { personId ->
                     personWriteQueries.ownershipInsert(person_id = personId, account_id = merge.deleted_account_id)
                 }
 
-                mergeSelectQueries.selectTransfersForMerge(mergeId.id).executeAsList().forEach { row ->
+                mergeSelectQueries.selectTransfersForMerge(mergeId.id).awaitAsList().forEach { row ->
                     if (row.moved_source != 0L) {
                         transferWriteQueries.setTransferSourceAccount(sourceAccount = merge.deleted_account_id, id = row.transfer_id)
                     }
@@ -341,14 +344,14 @@ class AccountWriteRepositoryImpl(
      * two accounts that each carry a different `account-external-id` keeps both and the survivor stays
      * matchable by either provider.
      */
-    private fun carryAttributeGroups(
+    private suspend fun carryAttributeGroups(
         deletedAccount: AccountId,
         survivingAccount: AccountId,
         mergeId: Long,
     ) {
-        val loserAttrs = attributeSelectQueries.selectByAccount(deletedAccount.id).executeAsList()
+        val loserAttrs = attributeSelectQueries.selectByAccount(deletedAccount.id).awaitAsList()
         if (loserAttrs.isEmpty()) return
-        val survivor = SurvivorAttributes(attributeSelectQueries.selectByAccount(survivingAccount.id).executeAsList())
+        val survivor = SurvivorAttributes(attributeSelectQueries.selectByAccount(survivingAccount.id).awaitAsList())
 
         database.beginCreationMode()
         try {
@@ -369,14 +372,14 @@ class AccountWriteRepositoryImpl(
      * value goes into a group of its own rather than overwriting, so merging two provider-created accounts
      * keeps both external ids and the survivor stays matchable by either.
      */
-    private fun carryUngrouped(
+    private suspend fun carryUngrouped(
         group: List<SelectByAccount>,
         survivor: SurvivorAttributes,
         survivingAccount: AccountId,
         mergeId: Long,
     ) {
-        group.forEach { attr ->
-            if (survivor.holds(attr.attribute_type_id, attr.attribute_value)) return@forEach
+        for (attr in group) {
+            if (survivor.holds(attr.attribute_type_id, attr.attribute_value)) continue
             val target = if (survivor.occupiesUngrouped(attr.attribute_type_id)) "m$mergeId:${attr.id}" else ""
             insertCarriedAttribute(survivingAccount, attr.attribute_type_id, attr.attribute_value, target, mergeId)
         }
@@ -391,7 +394,7 @@ class AccountWriteRepositoryImpl(
      * A group with no derivable bank identity (an arbitrary user group) falls back to key-string matching,
      * which for UUIDs effectively never collides, so it is carried across verbatim.
      */
-    private fun carryGroup(
+    private suspend fun carryGroup(
         groupKey: String,
         group: List<SelectByAccount>,
         survivor: SurvivorAttributes,
@@ -456,7 +459,7 @@ class AccountWriteRepositoryImpl(
     }
 
     /** Inserts one carried attribute onto the survivor and records it against [mergeId] for unmerge. */
-    private fun insertCarriedAttribute(
+    private suspend fun insertCarriedAttribute(
         survivingAccount: AccountId,
         attributeTypeId: Long,
         value: String,
@@ -469,7 +472,7 @@ class AccountWriteRepositoryImpl(
             attribute_value = value,
             group_key = groupKey,
         )
-        val attributeId = attributeWriteQueries.selectLastInsertedId().executeAsOne()
+        val attributeId = attributeWriteQueries.selectLastInsertedId().awaitAsOne()
         mergeWriteQueries.insertMergeAttribute(merge_id = mergeId, attribute_id = attributeId)
     }
 
@@ -483,7 +486,7 @@ class AccountWriteRepositoryImpl(
     }
 
     /** Records [transferId]'s current revision in entity_source for a merge/unmerge [source]. */
-    private fun recordTransferMergeSource(
+    private suspend fun recordTransferMergeSource(
         transferId: Long,
         source: Source,
     ) {
@@ -491,7 +494,7 @@ class AccountWriteRepositoryImpl(
             deviceId = deviceId,
             entityType = EntityType.TRANSFER,
             entityId = transferId,
-            revisionId = transferSelectQueries.selectRevisionById(transferId).executeAsOne(),
+            revisionId = transferSelectQueries.selectRevisionById(transferId).awaitAsOne(),
             source = source,
         )
     }

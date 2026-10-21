@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.database.mapper.toSourceRecord
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.EntityType
@@ -31,13 +32,13 @@ internal class EntitySourceReader(
     private val queries = database.entitySourceSelectQueries
 
     /** Every recorded source for one entity, newest revision first. */
-    fun sourcesFor(
+    suspend fun sourcesFor(
         entityType: EntityType,
         entityId: Long,
     ): List<SourceRecord> =
         queries
             .selectEntitySources(entityType.id, entityId)
-            .executeAsList()
+            .awaitAsList()
             .mapNotNull { it.toSourceRecord(entityType) }
 
     /**
@@ -45,7 +46,7 @@ internal class EntitySourceReader(
      * audit rows. Audit screens pass a single id; only ownership-by-account passes several (one per
      * owner of the account), so a query per id is cheaper than a dynamic IN list.
      */
-    fun sourcesByRevision(
+    suspend fun sourcesByRevision(
         entityType: EntityType,
         entityIds: Collection<Long>,
     ): Map<EntityRevision, SourceRecord> =

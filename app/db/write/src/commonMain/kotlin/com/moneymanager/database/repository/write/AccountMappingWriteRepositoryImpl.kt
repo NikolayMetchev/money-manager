@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
@@ -34,7 +35,7 @@ class AccountMappingWriteRepositoryImpl(
                 created_at = now.toEpochMilliseconds(),
                 updated_at = now.toEpochMilliseconds(),
             )
-            writeQueries.lastInsertRowId().executeAsOne()
+            writeQueries.lastInsertRowId().awaitAsOne()
         }
 
     override suspend fun createMappings(mappings: List<AccountMapping>): Unit =

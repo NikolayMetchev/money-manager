@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.json.PassThroughRulesJsonCodec
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
@@ -27,7 +28,7 @@ class PassThroughAccountWriteRepositoryImpl(
                     relationship_type_id = account.relationshipTypeId,
                     rules_json = PassThroughRulesJsonCodec.encode(account.rules),
                 )
-                PassThroughAccountId(writeQueries.lastInsertRowId().executeAsOne())
+                PassThroughAccountId(writeQueries.lastInsertRowId().awaitAsOne())
             }
         }
 

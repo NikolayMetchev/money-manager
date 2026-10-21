@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import com.moneymanager.bigdecimal.BigInteger
@@ -62,14 +63,9 @@ class ReconciliationReadRepositoryImpl(
         if (accountIds.isEmpty()) return emptyList()
         return withContext(coroutineContext) {
             // Each id is bound four times (one per UNION branch), so chunk to stay under the variable limit.
-            accountIds
-                .asSequence()
-                .map { it.id }
-                .distinct()
-                .chunked(MAX_IDS_PER_QUERY / 4)
-                .flatMap { chunk ->
-                    queries.selectLegsForAccounts(chunk).executeAsList()
-                }.sortedWith(compareBy({ it.timestamp }, { it.id }))
+            queryInChunks(accountIds.map { it.id }, MAX_IDS_PER_QUERY / 4) { chunk ->
+                queries.selectLegsForAccounts(chunk).awaitAsList()
+            }.sortedWith(compareBy({ it.timestamp }, { it.id }))
                 .map { row ->
                     val asset =
                         AssetRowMapper.buildAsset(row.asset_id, row.asset_code, row.asset_name, row.asset_scale_factor, row.asset_kind)

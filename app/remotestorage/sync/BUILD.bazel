@@ -64,6 +64,6 @@ kmp_test(
         "//utils/credentialvault",
         "//utils/localsettings",
         "@maven_kmp//:kotlinx_coroutines_test",
-        "@maven_kmp//:sqldelight_runtime",
+        "@maven_kmp//:sqldelight_async_extensions",
     ],
 )

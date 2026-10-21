@@ -1,5 +1,7 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
@@ -22,15 +24,15 @@ class DeviceWriteRepositoryImpl(
         database.deviceWriteQueries.insertOrIgnorePlatform(platform.id, platform.name)
 
         database.deviceWriteQueries.insertOrIgnoreOs(deviceInfo.osName)
-        val osId = database.deviceSelectQueries.selectOsByName(deviceInfo.osName).executeAsOne()
+        val osId = database.deviceSelectQueries.selectOsByName(deviceInfo.osName).awaitAsOne()
 
         database.deviceWriteQueries.insertOrIgnoreMachine(deviceInfo.machineName)
-        val machineId = database.deviceSelectQueries.selectMachineByName(deviceInfo.machineName).executeAsOne()
+        val machineId = database.deviceSelectQueries.selectMachineByName(deviceInfo.machineName).awaitAsOne()
 
-        fun existing() =
+        suspend fun existing() =
             database.deviceSelectQueries
                 .selectByAttributesHost(platform_id = platform.id, os_id = osId, machine_id = machineId)
-                .executeAsOneOrNull()
+                .awaitAsOneOrNull()
 
         existing()?.let { return DeviceId(it) }
         database.deviceWriteQueries.insertHost(platform_id = platform.id, os_id = osId, machine_id = machineId)
@@ -41,11 +43,11 @@ class DeviceWriteRepositoryImpl(
     private suspend fun getOrCreateAndroidDevice(deviceInfo: DeviceInfo.Android): DeviceId {
         // Get or create DeviceMake
         database.deviceWriteQueries.insertOrIgnoreDeviceMake(deviceInfo.deviceMake)
-        val makeId = database.deviceSelectQueries.selectDeviceMakeByName(deviceInfo.deviceMake).executeAsOne()
+        val makeId = database.deviceSelectQueries.selectDeviceMakeByName(deviceInfo.deviceMake).awaitAsOne()
 
         // Get or create DeviceModel
         database.deviceWriteQueries.insertOrIgnoreDeviceModel(deviceInfo.deviceModel)
-        val modelId = database.deviceSelectQueries.selectDeviceModelByName(deviceInfo.deviceModel).executeAsOne()
+        val modelId = database.deviceSelectQueries.selectDeviceModelByName(deviceInfo.deviceModel).awaitAsOne()
 
         // Try to find existing device
         val existingDevice =
@@ -53,7 +55,7 @@ class DeviceWriteRepositoryImpl(
                 .selectByAttributesAndroid(
                     device_make_id = makeId,
                     device_model_id = modelId,
-                ).executeAsOneOrNull()
+                ).awaitAsOneOrNull()
 
         if (existingDevice != null) {
             return DeviceId(existingDevice)
@@ -70,7 +72,7 @@ class DeviceWriteRepositoryImpl(
                 .selectByAttributesAndroid(
                     device_make_id = makeId,
                     device_model_id = modelId,
-                ).executeAsOne(),
+                ).awaitAsOne(),
         )
     }
 }

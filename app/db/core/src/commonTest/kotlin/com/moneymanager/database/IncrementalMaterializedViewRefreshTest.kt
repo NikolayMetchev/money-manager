@@ -1,5 +1,6 @@
 package com.moneymanager.database
-import app.cash.sqldelight.db.QueryResult
+import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -41,32 +42,21 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
      * Test-only query: countPendingChanges
      * Counts pending changes using raw SQL.
      */
-    private fun countPendingChanges(): Long {
-        val sql = "SELECT COUNT(*) FROM pending_materialized_view_changes"
-        return database
-            .executeQuery(
-                identifier = null,
-                sql = sql,
-                mapper = { cursor ->
-                    cursor.next()
-                    QueryResult.Value(cursor.getLong(0)!!)
-                },
-                parameters = 0,
-            ).value
-    }
+    private suspend fun countPendingChanges(): Long =
+        database.rawQuery("SELECT COUNT(*) FROM pending_materialized_view_changes") { it.getLong(0)!! }.awaitAsOne()
 
     /**
      * Test-only query: selectBalancesFromView
      * Retrieves balances from AccountBalanceView using raw SQL.
      */
-    private fun selectBalancesFromView(): List<BalanceViewRecord> {
+    private suspend fun selectBalancesFromView(): List<BalanceViewRecord> {
         // The SQL account_balance_view was removed when amounts became arbitrary-precision TEXT.
         // Independently recompute non-excluded account balances from the raw legs in Kotlin
         // BigInteger — a cross-check that the materialized table matches a from-scratch aggregation.
         val sums = LinkedHashMap<Pair<Long, Long>, BigInteger>()
         database.balanceLegsSelectQueries
             .selectAllTransactionLegs()
-            .executeAsList()
+            .awaitAsList()
             .forEach { leg ->
                 if (leg.is_excluded != 0L) return@forEach
                 val value = if (leg.sign < 0) -BigInteger(leg.amount) else BigInteger(leg.amount)
@@ -87,7 +77,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
         val materializedBalances =
             database.transferSelectQueries
                 .selectAllBalances()
-                .executeAsList()
+                .awaitAsList()
                 .sortedWith(compareBy({ it.account_id }, { it.asset_id }))
 
         val viewBalances = selectBalancesFromView()
@@ -120,7 +110,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
     }
 
     // Helper to get count of pending changes
-    private fun getPendingChangesCount(): Long = countPendingChanges()
+    private suspend fun getPendingChangesCount(): Long = countPendingChanges()
 
     // Helper to create test data
     private suspend fun createTestAccounts(): Pair<AccountId, AccountId> {
@@ -493,7 +483,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // Verify materialized view has entries
-            val balancesBeforeDelete = database.transferSelectQueries.selectAllBalances().executeAsList()
+            val balancesBeforeDelete = database.transferSelectQueries.selectAllBalances().awaitAsList()
             assertTrue(
                 balancesBeforeDelete.isNotEmpty(),
                 "Should have balances before delete",
@@ -506,7 +496,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             verifyMaterializedViewsMatchViews()
 
             // Verify materialized view is now empty
-            val balancesAfterDelete = database.transferSelectQueries.selectAllBalances().executeAsList()
+            val balancesAfterDelete = database.transferSelectQueries.selectAllBalances().awaitAsList()
             assertEquals(
                 0,
                 balancesAfterDelete.size,
@@ -568,7 +558,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             verifyMaterializedViewsMatchViews()
 
             // Verify the new account appears in balances
-            val balances = database.transferSelectQueries.selectAllBalances().executeAsList()
+            val balances = database.transferSelectQueries.selectAllBalances().awaitAsList()
             assertTrue(
                 balances.any { it.account_id == account3Id.id },
                 "New account should appear in materialized view",
@@ -616,7 +606,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             verifyMaterializedViewsMatchViews()
 
             // Verify the new currency appears in balances
-            val balances = database.transferSelectQueries.selectAllBalances().executeAsList()
+            val balances = database.transferSelectQueries.selectAllBalances().awaitAsList()
             assertTrue(
                 balances.any { it.asset_id == eurId.id },
                 "New currency should appear in materialized view",
@@ -731,7 +721,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             val incrementalBalances =
                 database.transferSelectQueries
                     .selectAllBalances()
-                    .executeAsList()
+                    .awaitAsList()
                     .sortedBy { "${it.account_id}-${it.asset_id}" }
 
             // Do full refresh
@@ -739,7 +729,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             val fullBalances =
                 database.transferSelectQueries
                     .selectAllBalances()
-                    .executeAsList()
+                    .awaitAsList()
                     .sortedBy { "${it.account_id}-${it.asset_id}" }
 
             // Compare results

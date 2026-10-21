@@ -1,7 +1,8 @@
 package com.moneymanager.database.schema
 
-import app.cash.sqldelight.db.QueryResult
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.test.database.DbTest
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -27,75 +28,66 @@ class SnakeCaseNamingConventionTest : DbTest() {
     private val dynamicTablePrefix = "csv_import_"
 
     @Test
-    fun `all table and view names use snake_case naming`() {
-        val violations = mutableListOf<String>()
+    fun `all table and view names use snake_case naming`() =
+        runTest {
+            val violations = mutableListOf<String>()
 
-        // Get all tables and views
-        val tablesAndViews = getTablesAndViews()
+            // Get all tables and views
+            val tablesAndViews = getTablesAndViews()
 
-        assertTrue(tablesAndViews.isNotEmpty(), "Should have at least one table or view")
+            assertTrue(tablesAndViews.isNotEmpty(), "Should have at least one table or view")
 
-        tablesAndViews.forEach { name ->
-            if (!snakeCasePattern.matches(name)) {
-                violations.add(name)
+            tablesAndViews.forEach { name ->
+                if (!snakeCasePattern.matches(name)) {
+                    violations.add(name)
+                }
+            }
+
+            if (violations.isNotEmpty()) {
+                fail(
+                    "Found ${violations.size} table/view name(s) not using snake_case naming:\n" +
+                        violations.sorted().joinToString("\n") { "  - $it" },
+                )
             }
         }
-
-        if (violations.isNotEmpty()) {
-            fail(
-                "Found ${violations.size} table/view name(s) not using snake_case naming:\n" +
-                    violations.sorted().joinToString("\n") { "  - $it" },
-            )
-        }
-    }
 
     @Test
-    fun `all table and view columns use snake_case naming`() {
-        val violations = mutableListOf<String>()
+    fun `all table and view columns use snake_case naming`() =
+        runTest {
+            val violations = mutableListOf<String>()
 
-        // Get all tables and views
-        val tablesAndViews = getTablesAndViews()
+            // Get all tables and views
+            val tablesAndViews = getTablesAndViews()
 
-        assertTrue(tablesAndViews.isNotEmpty(), "Should have at least one table or view")
+            assertTrue(tablesAndViews.isNotEmpty(), "Should have at least one table or view")
 
-        tablesAndViews.forEach { name ->
-            val columns = database.getTableColumns(name)
-            columns.forEach { column ->
-                if (!snakeCasePattern.matches(column)) {
-                    violations.add("$name.$column")
+            tablesAndViews.forEach { name ->
+                val columns = database.getTableColumns(name)
+                columns.forEach { column ->
+                    if (!snakeCasePattern.matches(column)) {
+                        violations.add("$name.$column")
+                    }
                 }
+            }
+
+            if (violations.isNotEmpty()) {
+                fail(
+                    "Found ${violations.size} column(s) not using snake_case naming:\n" +
+                        violations.sorted().joinToString("\n") { "  - $it" },
+                )
             }
         }
 
-        if (violations.isNotEmpty()) {
-            fail(
-                "Found ${violations.size} column(s) not using snake_case naming:\n" +
-                    violations.sorted().joinToString("\n") { "  - $it" },
-            )
-        }
-    }
-
-    private fun getTablesAndViews(): List<String> {
-        val names = mutableListOf<String>()
-        database.executeQuery(
-            null,
-            """
-            SELECT name FROM sqlite_master
-            WHERE type IN ('table', 'view')
-            AND name NOT LIKE 'sqlite_%'
-            ORDER BY type, name
-            """.trimIndent(),
-            { cursor ->
-                while (cursor.next().value) {
-                    val name = cursor.getString(0) ?: continue
-                    if (name !in excludedNames && !name.startsWith(dynamicTablePrefix)) {
-                        names.add(name)
-                    }
-                }
-                QueryResult.Unit
-            },
-            0,
-        )
-        return names
-    }
+    private suspend fun getTablesAndViews(): List<String> =
+        database
+            .rawQuery(
+                """
+                SELECT name FROM sqlite_master
+                WHERE type IN ('table', 'view')
+                AND name NOT LIKE 'sqlite_%'
+                ORDER BY type, name
+                """.trimIndent(),
+            ) { it.getString(0)!! }
+            .awaitAsList()
+            .filter { name -> name !in excludedNames && !name.startsWith(dynamicTablePrefix) }
 }

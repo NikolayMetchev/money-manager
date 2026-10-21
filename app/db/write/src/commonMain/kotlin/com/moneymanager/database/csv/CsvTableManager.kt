@@ -1,6 +1,6 @@
 package com.moneymanager.database.csv
 
-import app.cash.sqldelight.db.QueryResult
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvRow
@@ -19,7 +19,7 @@ class CsvTableManager(
      * @param tableName The name of the table (should be csv_import_<uuid>)
      * @param columnCount The number of columns in the CSV
      */
-    fun createCsvTable(
+    suspend fun createCsvTable(
         tableName: String,
         columnCount: Int,
     ) {
@@ -42,7 +42,7 @@ class CsvTableManager(
      * @param rows The rows to insert
      * @param columnCount The number of columns
      */
-    fun insertRowsBatch(
+    suspend fun insertRowsBatch(
         tableName: String,
         rows: List<List<String>>,
         columnCount: Int,
@@ -87,7 +87,7 @@ class CsvTableManager(
      * @param offset Number of rows to skip
      * @return List of CSV rows
      */
-    fun queryRows(
+    suspend fun queryRows(
         tableName: String,
         csvImportId: String,
         columnCount: Int,
@@ -125,37 +125,17 @@ class CsvTableManager(
             LIMIT $limit OFFSET $offset
             """.trimIndent()
 
-        val result = mutableListOf<CsvRow>()
-        database.executeQuery(
-            null,
-            sql,
-            { cursor ->
-                while (cursor.next().value) {
-                    val rowIndex = cursor.getLong(0) ?: continue
-                    val transferIdLong = cursor.getLong(1)
-                    val transferId = transferIdLong?.let { TransferId(it) }
-                    val importStatusStr = cursor.getString(2)
-                    val importStatus = importStatusStr?.let { ImportStatus.valueOf(it) }
-                    val errorMessage = cursor.getString(3)
-                    val values =
-                        (0 until columnCount).map { i ->
-                            cursor.getString(i + 4).orEmpty()
-                        }
-                    result.add(
-                        CsvRow(
-                            rowIndex = rowIndex,
-                            values = values,
-                            transferId = transferId,
-                            importStatus = importStatus,
-                            errorMessage = errorMessage,
-                        ),
-                    )
-                }
-                QueryResult.Unit
-            },
-            0,
-        )
-        return result
+        return database
+            .rawQuery(sql) { cursor ->
+                val importStatusStr = cursor.getString(2)
+                CsvRow(
+                    rowIndex = cursor.getLong(0)!!,
+                    values = (0 until columnCount).map { i -> cursor.getString(i + 4).orEmpty() },
+                    transferId = cursor.getLong(1)?.let { TransferId(it) },
+                    importStatus = importStatusStr?.let { ImportStatus.valueOf(it) },
+                    errorMessage = cursor.getString(3),
+                )
+            }.awaitAsList()
     }
 
     /**
@@ -163,7 +143,7 @@ class CsvTableManager(
      *
      * @param tableName The name of the table to drop
      */
-    fun dropCsvTable(tableName: String) {
+    suspend fun dropCsvTable(tableName: String) {
         database.execute(
             null,
             "DROP TABLE IF EXISTS $tableName",
@@ -178,7 +158,7 @@ class CsvTableManager(
      * @param rowIndex The row index to update
      * @param transferId The transfer ID to set
      */
-    fun updateTransferId(
+    suspend fun updateTransferId(
         tableName: String,
         rowIndex: Long,
         transferId: TransferId,
@@ -196,7 +176,7 @@ class CsvTableManager(
      * @param tableName The name of the table
      * @param rowTransferMap Map of row index to transfer ID
      */
-    fun updateTransferIdsBatch(
+    suspend fun updateTransferIdsBatch(
         tableName: String,
         rowTransferMap: Map<Long, TransferId>,
     ) {
@@ -213,7 +193,7 @@ class CsvTableManager(
      * @param status The import status to set
      * @param transferId The transfer ID to set (optional)
      */
-    fun updateRowStatus(
+    suspend fun updateRowStatus(
         tableName: String,
         rowIndex: Long,
         status: String,
@@ -234,7 +214,7 @@ class CsvTableManager(
      * @param tableName The name of the table
      * @param rowIndexes The row indexes to reset
      */
-    fun resetRowStatuses(
+    suspend fun resetRowStatuses(
         tableName: String,
         rowIndexes: Collection<Long>,
     ) {
@@ -248,7 +228,7 @@ class CsvTableManager(
     }
 
     /** Returns every row of [tableName] to the never-imported state (see [resetRowStatuses]). */
-    fun resetAllRowStatuses(tableName: String) {
+    suspend fun resetAllRowStatuses(tableName: String) {
         database.execute(null, "UPDATE $tableName SET import_status = NULL, transaction_id = NULL", 0)
     }
 
@@ -257,25 +237,19 @@ class CsvTableManager(
      * one of [transactionIds]. The column is TEXT but may hold the id in either storage class, hence the
      * cast.
      */
-    fun findRowsWithTransactionIds(
+    suspend fun findRowsWithTransactionIds(
         tableName: String,
         transactionIds: Collection<Long>,
     ): List<Long> {
-        val rows = mutableListOf<Long>()
-        transactionIds.chunked(ID_CHUNK_SIZE).forEach { chunk ->
-            database.executeQuery(
-                null,
-                "SELECT row_index FROM $tableName " +
-                    "WHERE CAST(transaction_id AS INTEGER) IN (${chunk.joinToString(",")}) ORDER BY row_index",
-                { cursor ->
-                    while (cursor.next().value) {
-                        cursor.getLong(0)?.let(rows::add)
-                    }
-                    QueryResult.Unit
-                },
-                0,
-            )
-        }
+        val rows =
+            transactionIds.chunked(ID_CHUNK_SIZE).flatMap { chunk ->
+                database
+                    .rawQuery(
+                        "SELECT row_index FROM $tableName " +
+                            "WHERE CAST(transaction_id AS INTEGER) IN (${chunk.joinToString(",")}) ORDER BY row_index",
+                    ) { it.getLong(0)!! }
+                    .awaitAsList()
+            }
         return rows.distinct().sorted()
     }
 

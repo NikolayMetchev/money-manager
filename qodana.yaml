@@ -72,6 +72,14 @@ exclude:
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/CsvReimportE2ETest.kt
       - app/importfilesource/localfolder/src/androidMain/kotlin/com/moneymanager/importfilesource/localfolder/SafFolderImportFileSource.kt
       - app/apiimporter/src/commonMain/kotlin/com/moneymanager/apiimporter/ApiSessionImportService.kt
+      # [5] — `awaitAsOneOrNull() ?: return` (or `?: throw`): SQLDelight's generated queries reach the model as
+      # compiled classes, and the linter takes the async query's row as always null, so everything after the
+      # elvis looks unreachable. Each file's tests run that code.
+      - app/db/repository/src/commonMain/kotlin/com/moneymanager/database/repository/DeviceReadRepositoryImpl.kt
+      - app/db/repository/src/commonMain/kotlin/com/moneymanager/database/repository/TransactionReadRepositoryImpl.kt
+      - app/db/write/src/commonMain/kotlin/com/moneymanager/database/repository/write/AccountWriteRepositoryImpl.kt
+      - app/db/write/src/commonMain/kotlin/com/moneymanager/database/repository/write/CsvImportReadRepositoryImpl.kt
+      - app/db/write/src/commonMain/kotlin/com/moneymanager/database/repository/write/CsvImportWriteRepositoryImpl.kt
       # The version check after `json.decodeFromString` (in a try whose catch throws) runs — the vault's
       # "newer version is refused" test exercises it; the linter resolves the reified call to Nothing.
       - utils/credentialvault/src/commonMain/kotlin/com/moneymanager/credentialvault/CredentialVaultImpl.kt

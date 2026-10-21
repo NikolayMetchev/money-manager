@@ -1,5 +1,6 @@
 package com.moneymanager.database.audit
-import app.cash.sqldelight.db.QueryResult
+
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.builtin.BuiltInApiStrategies
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -327,19 +328,9 @@ class AuditSourceCoverageTest : DbTest() {
         }
     }
 
-    private fun discoverAuditTables(): Set<String> {
-        val tables = mutableSetOf<String>()
-        database.executeQuery(
-            null,
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%_audit'",
-            { cursor ->
-                while (cursor.next().value) {
-                    tables.add(cursor.getString(0)!!)
-                }
-                QueryResult.Unit
-            },
-            0,
-        )
-        return tables
-    }
+    private suspend fun discoverAuditTables(): Set<String> =
+        database
+            .rawQuery("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%_audit'") { it.getString(0)!! }
+            .awaitAsList()
+            .toSet()
 }

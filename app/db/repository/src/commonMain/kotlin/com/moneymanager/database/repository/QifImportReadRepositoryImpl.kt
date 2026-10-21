@@ -1,5 +1,7 @@
 package com.moneymanager.database.repository
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
@@ -50,25 +52,25 @@ class QifImportReadRepositoryImpl(
         withContext(coroutineContext) {
             selectQueries
                 .selectRecordsByImportId(id.id.toString(), limit.toLong(), offset.toLong())
-                .executeAsList()
+                .awaitAsList()
                 .map { it.toDomain() }
         }
 
     override suspend fun countRecords(id: QifImportId): Int =
         withContext(coroutineContext) {
-            selectQueries.countRecords(id.id.toString()).executeAsOne().toInt()
+            selectQueries.countRecords(id.id.toString()).awaitAsOne().toInt()
         }
 
     override suspend fun findImportsByChecksum(checksum: String): List<QifImport> =
         withContext(coroutineContext) {
-            selectQueries.selectImportsByChecksum(checksum, ::toQifImport).executeAsList()
+            selectQueries.selectImportsByChecksum(checksum, ::toQifImport).awaitAsList()
         }
 
     override suspend fun getAccountsCreatedByImport(id: QifImportId): Set<AccountId> =
         withContext(coroutineContext) {
             entitySourceSelectQueries
                 .selectAccountIdsCreatedByQifImport(id.id.toString())
-                .executeAsList()
+                .awaitAsList()
                 .map { AccountId(it) }
                 .toSet()
         }

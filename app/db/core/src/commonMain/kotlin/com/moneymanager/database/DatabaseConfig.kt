@@ -1,5 +1,6 @@
 package com.moneymanager.database
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.currency.IsoCurrencies
 import com.moneymanager.currency.IsoCurrency
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
@@ -57,7 +58,7 @@ object DatabaseConfig {
      * (with audit triggers) per test dominated DB-test setup time. Runs after Schema.create (which
      * already seeded the lookups, the system device, and GBP).
      */
-    fun seedCurrencies(
+    suspend fun seedCurrencies(
         database: MoneyManagerDatabaseWrapper,
         currencies: List<IsoCurrency> = allCurrencies,
     ) {
@@ -72,7 +73,7 @@ object DatabaseConfig {
                 val currencyId =
                     assetWriteQueries.transactionWithResult {
                         assetWriteQueries.insert()
-                        assetWriteQueries.lastInsertedId().executeAsOne()
+                        assetWriteQueries.lastInsertedId().awaitAsOne()
                     }
                 currencyWriteQueries.insert(currencyId, currency.code, currency.name, scaleFactor)
                 recordSource(

@@ -1,5 +1,6 @@
 package com.moneymanager.database
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.deleteTestDatabase
 import kotlinx.coroutines.test.runTest
@@ -32,7 +33,7 @@ class FailedDatabaseCreationTest {
                 val database = JvmDatabaseManager(currenciesToSeed = { emptyList() }).openDatabase(location)
                 try {
                     // The schema exists: a fresh database has no balances, rather than no table to read them from.
-                    assertEquals(emptyList(), database.transferSelectQueries.selectAllBalances().executeAsList())
+                    assertEquals(emptyList(), database.transferSelectQueries.selectAllBalances().awaitAsList())
                 } finally {
                     database.close()
                 }

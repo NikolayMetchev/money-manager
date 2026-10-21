@@ -2,6 +2,7 @@ package com.moneymanager.database
 
 import android.content.Context
 import androidx.sqlite.db.SupportSQLiteDatabase
+import app.cash.sqldelight.async.coroutines.synchronous
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import com.moneymanager.currency.IsoCurrency
 import com.moneymanager.database.sql.seed.MoneyManagerDatabase
@@ -41,11 +42,11 @@ class AndroidDatabaseManager(
             // Use custom callback that handles existing databases gracefully
             val driver =
                 AndroidSqliteDriver(
-                    schema = MoneyManagerDatabase.Schema,
+                    schema = MoneyManagerDatabase.Schema.synchronous(),
                     context = context,
                     name = location.path,
                     callback =
-                        object : AndroidSqliteDriver.Callback(MoneyManagerDatabase.Schema) {
+                        object : AndroidSqliteDriver.Callback(MoneyManagerDatabase.Schema.synchronous()) {
                             override fun onConfigure(db: SupportSQLiteDatabase) {
                                 super.onConfigure(db)
                                 // WAL must be enabled in onConfigure so it is active during

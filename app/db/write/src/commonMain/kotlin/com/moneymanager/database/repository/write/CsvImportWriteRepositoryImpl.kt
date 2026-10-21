@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.csv.CsvTableManager
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.CsvImportId
@@ -89,7 +90,7 @@ class CsvImportWriteRepositoryImpl(
         withContext(coroutineContext) {
             database.transaction {
                 val import =
-                    csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                    csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                         ?: return@transaction
                 val columnCount = headers.size
 
@@ -135,7 +136,7 @@ class CsvImportWriteRepositoryImpl(
         withContext(coroutineContext) {
             database.transaction {
                 val import =
-                    csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                    csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                         ?: return@transaction
                 val importId = id.id.toString()
 
@@ -178,7 +179,7 @@ class CsvImportWriteRepositoryImpl(
     override suspend fun deleteImport(id: CsvImportId): Unit =
         withContext(coroutineContext) {
             val import =
-                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                     ?: return@withContext
 
             database.transaction {
@@ -198,7 +199,7 @@ class CsvImportWriteRepositoryImpl(
     override suspend fun resetToUnimported(id: CsvImportId): Unit =
         withContext(coroutineContext) {
             val import =
-                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                     ?: return@withContext
 
             database.transaction {
@@ -223,7 +224,7 @@ class CsvImportWriteRepositoryImpl(
     ): Unit =
         withContext(coroutineContext) {
             val import =
-                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                     ?: return@withContext
 
             tableManager.updateTransferId(import.table_name, rowIndex, transferId)
@@ -237,7 +238,7 @@ class CsvImportWriteRepositoryImpl(
             if (rowTransferMap.isEmpty()) return@withContext
 
             val import =
-                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                     ?: return@withContext
 
             tableManager.updateTransferIdsBatch(import.table_name, rowTransferMap)
@@ -251,7 +252,7 @@ class CsvImportWriteRepositoryImpl(
     ): Unit =
         withContext(coroutineContext) {
             val import =
-                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                     ?: return@withContext
 
             tableManager.updateRowStatus(import.table_name, rowIndex, status, transferId)
@@ -266,7 +267,7 @@ class CsvImportWriteRepositoryImpl(
             if (rowTransferMap.isEmpty()) return@withContext
 
             val import =
-                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                     ?: return@withContext
 
             database.transaction {
@@ -284,7 +285,7 @@ class CsvImportWriteRepositoryImpl(
             if (rowIndexes.isEmpty()) return@withContext
 
             val import =
-                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                     ?: return@withContext
 
             tableManager.resetRowStatuses(import.table_name, rowIndexes)

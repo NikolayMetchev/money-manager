@@ -1,5 +1,8 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOne
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.mapper.TransferMapper
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
@@ -115,7 +118,7 @@ class TransactionWriteRepositoryImpl(
                         // Update attributes
                         updatedAttributes.forEach { (id, attr) ->
                             // Check if type changed (requires delete + insert)
-                            val current = transferAttributeSelectQueries.selectById(id).executeAsOneOrNull()
+                            val current = transferAttributeSelectQueries.selectById(id).awaitAsOneOrNull()
                             val slot = current?.let { it.attribute_type_id to it.group_key }
                             if (slot != null && slot != (attr.typeId.id to attr.groupKey)) {
                                 // Type or group changed: the row belongs in a different UNIQUE slot, so
@@ -148,7 +151,7 @@ class TransactionWriteRepositoryImpl(
                 }
 
                 // Record the source against the new revision.
-                val persisted = transferSelectQueries.selectById(effectiveTransactionId.id, TransferMapper::mapRaw).executeAsOne()
+                val persisted = transferSelectQueries.selectById(effectiveTransactionId.id, TransferMapper::mapRaw).awaitAsOne()
                 database.recordSource(
                     deviceId,
                     EntityType.TRANSFER,
@@ -202,7 +205,7 @@ class TransactionWriteRepositoryImpl(
                             transferAttributeSelectQueries
                                 .selectByTransaction(updatedTransfer.id.id) { rowId, _, typeId, value, _, _, _ ->
                                     Triple(rowId, typeId, value)
-                                }.executeAsList()
+                                }.awaitAsList()
                                 .filter { (_, typeId, value) ->
                                     typeId in removable && removable[typeId].let { values -> values == null || value in values }
                                 }.map { (rowId, typeId, _) -> rowId to typeId }
@@ -229,7 +232,7 @@ class TransactionWriteRepositoryImpl(
                             transferAttributeSelectQueries
                                 .selectByTransaction(updatedTransfer.id.id) { rowId, _, typeId, value, groupKey, _, _ ->
                                     (typeId to groupKey) to (rowId to value)
-                                }.executeAsList()
+                                }.awaitAsList()
                                 .toMap()
                         database.beginCreationMode()
                         try {
@@ -262,7 +265,7 @@ class TransactionWriteRepositoryImpl(
                         }
                     }
                     // Record the source against the new revision.
-                    val persisted = transferSelectQueries.selectById(updatedTransfer.id.id, TransferMapper::mapRaw).executeAsOne()
+                    val persisted = transferSelectQueries.selectById(updatedTransfer.id.id, TransferMapper::mapRaw).awaitAsOne()
                     database.recordSource(
                         deviceId,
                         EntityType.TRANSFER,
@@ -280,7 +283,7 @@ class TransactionWriteRepositoryImpl(
      * Inserts new transfers with their attributes and records their source. Must be called inside an
      * open transaction with creation mode active. Returns the generated ids in input order.
      */
-    private fun insertNewTransfers(
+    private suspend fun insertNewTransfers(
         transfers: List<Transfer>,
         newAttributes: Map<TransferId, List<NewAttribute>>,
         newRelationships: Map<TransferId, List<NewRelationship>>,
@@ -292,7 +295,7 @@ class TransactionWriteRepositoryImpl(
         val idMap = mutableMapOf<TransferId, TransferId>()
         transfers.forEachIndexed { index, transfer ->
             transactionIdWriteQueries.insert()
-            val generatedId = transactionIdWriteQueries.lastInsertedId().executeAsOne()
+            val generatedId = transactionIdWriteQueries.lastInsertedId().awaitAsOne()
             val realId = TransferId(generatedId)
             createdIds += realId
             idMap[transfer.id] = realId

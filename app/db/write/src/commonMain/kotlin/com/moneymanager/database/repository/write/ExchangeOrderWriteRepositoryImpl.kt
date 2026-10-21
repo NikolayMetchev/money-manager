@@ -1,5 +1,7 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.AccountId
@@ -41,7 +43,7 @@ class ExchangeOrderWriteRepositoryImpl(
     ): OrderUpsertResult =
         withContext(Dispatchers.Default) {
             writeQueries.transactionWithResult {
-                val existing = selectQueries.selectByAccountAndOrderRef(accountId.id, orderRef).executeAsOneOrNull()
+                val existing = selectQueries.selectByAccountAndOrderRef(accountId.id, orderRef).awaitAsOneOrNull()
                 when {
                     existing == null -> {
                         writeQueries.insert(
@@ -58,7 +60,7 @@ class ExchangeOrderWriteRepositoryImpl(
                             created_at = createdAt.toEpochMilliseconds(),
                             updated_at = updatedAt?.toEpochMilliseconds(),
                         )
-                        val id = writeQueries.lastInsertedId().executeAsOne()
+                        val id = writeQueries.lastInsertedId().awaitAsOne()
                         database.recordSource(deviceId, EntityType.EXCHANGE_ORDER, id, 1L, source)
                         OrderUpsertResult(ExchangeOrderId(id), OrderUpsertResult.Outcome.CREATED)
                     }

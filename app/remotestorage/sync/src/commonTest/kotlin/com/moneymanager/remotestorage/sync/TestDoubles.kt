@@ -1,26 +1,18 @@
 package com.moneymanager.remotestorage.sync
 
-import app.cash.sqldelight.db.QueryResult
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.localsettings.LocalSettings
 
 /** Counts rows in [table] (test helper). */
-fun MoneyManagerDatabaseWrapper.countRows(table: String): Long =
-    executeQuery(
-        identifier = null,
-        sql = "SELECT COUNT(*) FROM $table",
-        mapper = { cursor ->
-            cursor.next()
-            QueryResult.Value(cursor.getLong(0)!!)
-        },
-        parameters = 0,
-    ).value
+suspend fun MoneyManagerDatabaseWrapper.countRows(table: String): Long =
+    rawQuery("SELECT COUNT(*) FROM $table") { it.getLong(0)!! }.awaitAsOne()
 
 /**
  * Appends an audit row so [MoneyManagerDatabaseWrapper.dataChangeToken] advances, simulating a local
  * edit (the controller's "local dirty" signal) without going through the repositories.
  */
-fun MoneyManagerDatabaseWrapper.bumpDataChange() {
+suspend fun MoneyManagerDatabaseWrapper.bumpDataChange() {
     execute(
         identifier = null,
         sql =

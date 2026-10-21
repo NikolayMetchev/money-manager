@@ -1,5 +1,8 @@
 package com.moneymanager.database.repository
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOne
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
@@ -37,13 +40,13 @@ class TransactionReadRepositoryImpl(
     private val transferSelectQueries = database.transferSelectQueries
     private val transferAttributeSelectQueries = database.transferAttributeSelectQueries
 
-    private fun loadAttributesForTransfers(transfers: List<Transfer>): List<Transfer> {
+    private suspend fun loadAttributesForTransfers(transfers: List<Transfer>): List<Transfer> {
         if (transfers.isEmpty()) return transfers
         val ids = transfers.map { it.id.id }
         val attributesByTransferId =
             transferAttributeSelectQueries
                 .selectByTransactionIds(ids)
-                .executeAsList()
+                .awaitAsList()
                 .groupBy { TransferId(it.transaction_id) }
                 .mapValues { (_, rows) ->
                     rows.map { row ->
@@ -63,7 +66,7 @@ class TransactionReadRepositoryImpl(
         return transfers.map { it.copy(attributes = attributesByTransferId[it.id].orEmpty()) }
     }
 
-    private fun loadAttributesForTransfer(transfer: Transfer?): Transfer? {
+    private suspend fun loadAttributesForTransfer(transfer: Transfer?): Transfer? {
         if (transfer == null) return null
         return loadAttributesForTransfers(listOf(transfer)).first()
     }
@@ -77,16 +80,9 @@ class TransactionReadRepositoryImpl(
 
     override suspend fun getTransactionsByIds(ids: Collection<TransferId>): Map<TransferId, Transfer> =
         withContext(Dispatchers.Default) {
-            ids
-                .asSequence()
-                .map { it.id }
-                .distinct()
-                .chunked(MAX_IDS_PER_QUERY)
-                .flatMap { chunk ->
-                    loadAttributesForTransfers(
-                        transferSelectQueries.selectByIds(chunk, TransferMapper::mapRaw).executeAsList(),
-                    )
-                }.associateBy { it.id }
+            queryInChunks(ids.map { it.id }, MAX_IDS_PER_QUERY) { chunk ->
+                loadAttributesForTransfers(transferSelectQueries.selectByIds(chunk, TransferMapper::mapRaw).awaitAsList())
+            }.associateBy { it.id }
         }
 
     override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> =
@@ -134,7 +130,7 @@ class TransactionReadRepositoryImpl(
             loadAttributesForTransfers(
                 transferSelectQueries
                     .selectByAccountsWithAttributeType(accountIds.map { it.id }.distinct(), attributeTypeName, TransferMapper::mapRaw)
-                    .executeAsList(),
+                    .awaitAsList(),
             )
         }
 
@@ -153,7 +149,7 @@ class TransactionReadRepositoryImpl(
                     maxTimestamp = maxTimestamp.toEpochMilliseconds(),
                     reversalTypeId = reversalTypeId.id,
                     TransferMapper::mapRaw,
-                ).executeAsList()
+                ).awaitAsList()
         }
 
     override fun getTransfersMissingCompanion(
@@ -193,7 +189,7 @@ class TransactionReadRepositoryImpl(
                         pagingInfo?.lastId?.id,
                         (pageSize + 1).toLong(),
                         AccountRowMapper::mapRaw,
-                    ).executeAsList()
+                    ).awaitAsList()
 
             val hasMore = items.size > pageSize
             val pageItems = if (hasMore) items.take(pageSize) else items
@@ -237,7 +233,7 @@ class TransactionReadRepositoryImpl(
                         firstId.id,
                         (pageSize + 1).toLong(),
                         AccountRowMapper::mapRaw,
-                    ).executeAsList()
+                    ).awaitAsList()
                     // Reverse to get correct display order (newest first)
                     .reversed()
 
@@ -277,7 +273,7 @@ class TransactionReadRepositoryImpl(
             val transaction =
                 transferSelectQueries
                     .selectById(transactionId.id, TransferMapper::mapRaw)
-                    .executeAsOneOrNull()
+                    .awaitAsOneOrNull()
                     ?: throw IllegalArgumentException("Transaction not found: $transactionId")
 
             // Get the row position of the transaction (0-indexed, sorted by timestamp DESC)
@@ -288,13 +284,13 @@ class TransactionReadRepositoryImpl(
                         currencyId = currencyId?.id,
                         targetTimestamp = transaction.timestamp.toEpochMilliseconds(),
                         targetId = transactionId.id,
-                    ).executeAsOne()
+                    ).awaitAsOne()
 
             // Get total count to know if there are more items
             val totalCount =
                 transferSelectQueries
                     .countTransactionsByAccount(accountId.id, currencyId?.id)
-                    .executeAsOne()
+                    .awaitAsOne()
 
             // Calculate offset to center the transaction in the page
             // Try to put the transaction in the middle
@@ -314,7 +310,7 @@ class TransactionReadRepositoryImpl(
                         limit = pageSize.toLong(),
                         offset = offset,
                         mapper = AccountRowMapper::mapRaw,
-                    ).executeAsList()
+                    ).awaitAsList()
 
             // Calculate if there are more items after this page
             val hasMore = (offset + items.size) < totalCount
