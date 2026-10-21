@@ -133,8 +133,8 @@
       "androidx.lifecycle:lifecycle-runtime-compose-android": "2.11.0",
       "androidx.lifecycle:lifecycle-runtime-ktx": "2.11.0",
       "androidx.lifecycle:lifecycle-runtime-ktx-android": "2.11.0",
-      "androidx.navigationevent:navigationevent": "1.1.2",
-      "androidx.navigationevent:navigationevent-compose": "1.1.2",
+      "androidx.navigationevent:navigationevent": "1.2.0",
+      "androidx.navigationevent:navigationevent-compose": "1.2.0",
       "androidx.savedstate:savedstate": "1.5.0",
       "androidx.savedstate:savedstate-compose": "1.5.0",
       "androidx.test.services:storage": "1.6.0",
@@ -6241,12 +6241,12 @@
     },
     "androidx.navigationevent:navigationevent": {
       "android": {
-        "version": "1.1.2",
+        "version": "1.2.0",
         "files": [
           {
             "name": "navigationevent.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-android/1.1.2/navigationevent-android-1.1.2.aar",
-            "sha256": "40a357103ab703762bf434f424a8486be18652b4aa25110f0d635a4cef5dcd63"
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-android/1.2.0/navigationevent-android-1.2.0.aar",
+            "sha256": "14fade4ff0637f23fa540b4059e3e847d3882f2cd1015febcf97992bc3dbdc73"
           }
         ],
         "deps": [
@@ -6261,12 +6261,12 @@
         ]
       },
       "jvm": {
-        "version": "1.1.2",
+        "version": "1.2.0",
         "files": [
           {
-            "name": "navigationevent-desktop-1.1.2.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-desktop/1.1.2/navigationevent-desktop-1.1.2.jar",
-            "sha256": "4c92508d4bd3b9cafb2785e8211057d39ed8465b529660223864a19625cedb5b"
+            "name": "navigationevent-desktop-1.2.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-desktop/1.2.0/navigationevent-desktop-1.2.0.jar",
+            "sha256": "a0086c69fe2b8adefbc3e067ff27cb1e7b4817144ec6277a5fc2a9edc2e332d3"
           }
         ],
         "deps": [
@@ -6330,12 +6330,12 @@
         ]
       },
       "metadata": {
-        "version": "1.1.2",
+        "version": "1.2.0",
         "files": [
           {
-            "name": "navigationevent-metadata-1.1.2.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent/1.1.2/navigationevent-1.1.2.jar",
-            "sha256": "adbd571aa7ac75fadcc31fa1a21fcd3718a5c0f8b6eb79aa3f823ff61055027b"
+            "name": "navigationevent-metadata-1.2.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent/1.2.0/navigationevent-1.2.0.jar",
+            "sha256": "78ec036661adff7569720399f5bdb1bcdf01b8ce11fdfd91fb47e6ee5db50966"
           }
         ],
         "deps": [
@@ -6368,12 +6368,12 @@
     },
     "androidx.navigationevent:navigationevent-compose": {
       "android": {
-        "version": "1.1.2",
+        "version": "1.2.0",
         "files": [
           {
             "name": "navigationevent-compose.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-compose-android/1.1.2/navigationevent-compose-android-1.1.2.aar",
-            "sha256": "ac9773dc9076d3b035ccf5494316d78a5f9abc18a8fa73fb211f92957286e1aa"
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-compose-android/1.2.0/navigationevent-compose-android-1.2.0.aar",
+            "sha256": "e4a00dc4b80ca81aff7e6f4db3222237614b410fe478c10be8d8665445275767"
           }
         ],
         "deps": [
@@ -6382,16 +6382,17 @@
         ],
         "runtime_deps": [
           "androidx.compose.ui:ui",
+          "androidx.lifecycle:lifecycle-runtime",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
       "jvm": {
-        "version": "1.1.2",
+        "version": "1.2.0",
         "files": [
           {
-            "name": "navigationevent-compose-desktop-1.1.2.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-compose-desktop/1.1.2/navigationevent-compose-desktop-1.1.2.jar",
-            "sha256": "1d7d20d7826a2cc63ace9862cddd8a7085a11a3ea2cff258c28b3d58e57f143b"
+            "name": "navigationevent-compose-desktop-1.2.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-compose-desktop/1.2.0/navigationevent-compose-desktop-1.2.0.jar",
+            "sha256": "e2fa25e9ef1189049387bf1f9a53ff5e3616987a1ac7108596711609cac7fcc9"
           }
         ],
         "deps": [
