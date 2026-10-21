@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -189,6 +190,8 @@ fun StrategyRulesEditor(
 ) {
     // Indices of the rules opened by hand; they move with their rules.
     var opened by remember { mutableStateOf(emptySet<Int>()) }
+    // A rule being written stays open once it's complete, so its first action doesn't snap the card shut.
+    LaunchedEffect(rules) { opened = opened + rules.indices.filter { rules[it].needsEditing() } }
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))

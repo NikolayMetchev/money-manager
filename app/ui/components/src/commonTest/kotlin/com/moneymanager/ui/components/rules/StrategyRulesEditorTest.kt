@@ -13,8 +13,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -24,6 +26,7 @@ import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.FeeRule
+import com.moneymanager.domain.model.rules.ForeignAmount
 import com.moneymanager.domain.model.rules.LegRole
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
@@ -67,6 +70,9 @@ class StrategyRulesEditorTest {
             onNodeWithText("Skip the record").performClick()
             waitForIdle()
             assertEquals(listOf(StrategyRule(actions = listOf(RuleAction.Skip))), rules())
+            // Complete now, but still open for more actions.
+            onNodeWithContentDescription("Collapse rule").assertIsEnabled()
+            onNodeWithText("Add action").assertExists()
         }
 
     @Test
@@ -201,6 +207,125 @@ class StrategyRulesEditorTest {
             onAllNodesWithContentDescription("Collapse rule")[0].assertExists()
             onAllNodesWithContentDescription("Expand rule")[0].assertExists()
             onNodeWithText("If Type = ATM → counterparty “ATM”").assertExists()
+        }
+    }
+
+    private val everyAction =
+        listOf(
+            RuleAction.Account(AccountSide.TARGET, AccountNaming(ValueExpr.of("Name"))),
+            RuleAction.SetDirection(incoming = true),
+            RuleAction.Flip,
+            RuleAction.SwapValues("From", "To"),
+            RuleAction.SetValue("Asset", RuleValue.constant("GBP")),
+            RuleAction.Skip,
+            RuleAction.Exclude(RuleValue.read("Reason")),
+            RuleAction.Attribute("Note", RuleValue.read("Notes")),
+            RuleAction.ExternalId(RuleValue.read("Id")),
+            RuleAction.CounterpartyIsPerson,
+            RuleAction.IgnoreCounterpartyId,
+            RuleAction.Fee(FeeRule(amount = ValueExpr.of("Fee"))),
+            RuleAction.Foreign(ForeignAmount(ValueExpr.of("Local"), ValueExpr.of("Local currency"))),
+            RuleAction.ThroughConduit("Curve"),
+            RuleAction.TradeSide(buy = false),
+            RuleAction.Leg("swap", LegRole.BySign("Amount")),
+            RuleAction.LedgerTradeLeg,
+        )
+
+    @Test
+    fun everyActionKindHasAOneLineSummary() {
+        assertEquals(
+            listOf(
+                "target from Name",
+                "money in",
+                "flip source and target",
+                "swap From ↔ To",
+                "set Asset = “GBP”",
+                "skip",
+                "exclude (reason: Reason)",
+                "attribute Note = Notes",
+                "id = Id",
+                "counterparty is a person",
+                "ignore the counterparty id",
+                "fee Fee",
+                "foreign amount Local Local currency",
+                "through “Curve”",
+                "sell",
+                "by-sign (Amount) leg of swap",
+                "ledger trade leg",
+            ),
+            everyAction.map { it.summary() },
+        )
+        assertEquals(
+            listOf("money out", "exclude", "buy", "credit leg of ?", "source “?”", "own account “Monzo”", "intermediate “Fx”"),
+            listOf(
+                RuleAction.SetDirection(incoming = false),
+                RuleAction.Exclude(),
+                RuleAction.TradeSide(buy = true),
+                RuleAction.Leg("", LegRole.Credit),
+                RuleAction.Account(AccountSide.SOURCE, AccountNaming(ValueExpr.of("x"), name = "")),
+                RuleAction.Account(AccountSide.OWN, AccountNaming(ValueExpr.of("x"), name = "Monzo")),
+                RuleAction.Account(AccountSide.INTERMEDIATE, AccountNaming(ValueExpr.of("x"), name = "Fx")),
+            ).map { it.summary() },
+        )
+    }
+
+    @Test
+    fun everyConditionOpHasAOneLineSummary() {
+        val operandSummaries =
+            mapOf(
+                ConditionOp.EQUALS to "Type = A",
+                ConditionOp.NOT_EQUALS to "Type ≠ A",
+                ConditionOp.EQUALS_IGNORE_CASE to "Type ≈ A",
+                ConditionOp.IN to "Type in [A]",
+                ConditionOp.NOT_IN to "Type not in [A]",
+                ConditionOp.STARTS_WITH to "Type starts with A",
+                ConditionOp.MATCHES to "Type matches /A/",
+                ConditionOp.ANY_ELEMENT_STARTS_WITH to "Type has an element starting with A",
+                ConditionOp.EQUALS_PATH to "Type = Other",
+                ConditionOp.NOT_EQUALS_PATH to "Type ≠ Other",
+            )
+        ConditionOp.entries.forEach { op ->
+            assertEquals(
+                operandSummaries[op] ?: "Type ${op.label()}",
+                Condition("Type", op, value = "A", otherPath = "Other").summary(),
+            )
+        }
+        assertEquals("? = ?", Condition("", ConditionOp.EQUALS).summary())
+        assertEquals("Type ≠ ?", Condition("Type", ConditionOp.NOT_EQUALS_PATH).summary())
+    }
+
+    @Test
+    fun anExpandedRuleShowsAnEditorForEveryAction() =
+        runEditor(listOf(StrategyRule(name = "all", actions = everyAction))) { rules ->
+            onNodeWithText("Rule 1: all").assertExists()
+            onNodeWithText("Remove action").assertDoesNotExist()
+            onNodeWithText(everyAction.joinToString("; ", prefix = "Always → ") { it.summary() }, substring = true)
+                .performClick()
+            waitForIdle()
+            assertEquals(everyAction.size, onAllNodesWithContentDescription("Remove action").fetchSemanticsNodes().size)
+            assertEquals(everyAction, rules().single().actions)
+        }
+
+    @Test
+    fun duplicatingAndRemovingKeepEachOpenedRuleOpen() {
+        val flip = StrategyRule(name = "flip", actions = listOf(RuleAction.Flip))
+        val skip = StrategyRule(name = "skip", actions = listOf(RuleAction.Skip))
+        runEditor(listOf(atmRule, flip, skip)) { rules ->
+            onAllNodesWithContentDescription("Expand rule")[2].performClick()
+            waitForIdle()
+            onAllNodesWithText("Duplicate")[0].performClick()
+            waitForIdle()
+            assertEquals(listOf(atmRule, atmRule, flip, skip), rules())
+            // The duplicate opens; the skip rule, now fourth, stays open.
+            assertEquals(2, onAllNodesWithContentDescription("Collapse rule").fetchSemanticsNodes().size)
+            onAllNodesWithContentDescription("Remove rule")[0].performClick()
+            waitForIdle()
+            assertEquals(listOf(atmRule, flip, skip), rules())
+            assertEquals(2, onAllNodesWithContentDescription("Collapse rule").fetchSemanticsNodes().size)
+            onNodeWithText("Collapse all").performClick()
+            waitForIdle()
+            onNodeWithText("Collapse all").assertDoesNotExist()
+            assertEquals(3, onAllNodesWithContentDescription("Expand rule").fetchSemanticsNodes().size)
         }
     }
 }

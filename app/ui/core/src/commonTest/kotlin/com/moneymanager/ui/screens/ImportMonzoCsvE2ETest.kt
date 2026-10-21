@@ -207,6 +207,9 @@ class ImportMonzoCsvE2ETest {
             onNodeWithText("Rules", substring = false).performClick()
             waitForIdle()
             waitUntilAtLeastOneExists(hasText("target from Name", substring = true), timeoutMillis = 10000)
+            onNodeWithText("Expand all").performClick()
+            waitForIdle()
+            waitUntilAtLeastOneExists(hasText("Name", substring = false), timeoutMillis = 10000)
 
             // Step 6: Amount & Date tab - verify column auto-detection.
             // ColumnDetector should have selected: Date -> "Date", Time -> "Time", Amount -> "Amount",
