@@ -49,8 +49,8 @@ class QifStagingConversionTest {
                     clearedStatus = "X",
                     splits =
                         listOf(
-                            QifRecordSplit(category = "Food:Groceries", transferAccount = null, memo = "Veg", amount = "-10.00"),
-                            QifRecordSplit(category = null, transferAccount = "Savings", memo = null, amount = "-2.50"),
+                            QifRecordSplit(category = "Food:Groceries", memo = "Veg", amount = "-10.00"),
+                            QifRecordSplit(transferAccount = "Savings", amount = "-2.50"),
                         ),
                 ),
             ),

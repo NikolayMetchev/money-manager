@@ -29,15 +29,16 @@ import kotlinx.serialization.json.put
 class FakeDrive(
     private val pageSize: Int = Int.MAX_VALUE,
 ) {
-    data class Item(
+    // A plain class: an upload updates an item in place, and a ByteArray has no value equality anyway.
+    class Item(
         val id: String,
-        val name: String,
+        var name: String,
         val parent: String?,
         val mimeType: String = "application/octet-stream",
-        val bytes: ByteArray = ByteArray(0),
+        var bytes: ByteArray = ByteArray(0),
         val modifiedTime: String? = null,
         val md5Checksum: String? = null,
-        val revision: Int = 1,
+        var revision: Int = 1,
         val sharedWithMe: Boolean = false,
         val appProperties: Map<String, String> = emptyMap(),
     )
@@ -93,20 +94,20 @@ class FakeDrive(
         failures[path]?.let { return respond("""{"error":"$it"}""", it) }
         val fileId = path.substringAfter("/files", "").removePrefix("/").ifEmpty { null }
         val upload = path.startsWith("/upload/")
-        return when {
-            request.method == HttpMethod.Get -> {
+        return when (request.method) {
+            HttpMethod.Get -> {
                 if (fileId == null) list(request) else get(fileId, request)
             }
 
-            request.method == HttpMethod.Post && !upload -> {
+            HttpMethod.Post if !upload -> {
                 createFolder(request)
             }
 
-            request.method == HttpMethod.Post || request.method == HttpMethod.Patch -> {
+            HttpMethod.Post, HttpMethod.Patch -> {
                 upload(fileId, request)
             }
 
-            request.method == HttpMethod.Delete -> {
+            HttpMethod.Delete -> {
                 if (items.removeAll { it.id == fileId }) respond("", HttpStatusCode.NoContent) else respond("", HttpStatusCode.NotFound)
             }
 
@@ -199,9 +200,12 @@ class FakeDrive(
                     appProperties = metadata.appProperties(),
                 ).also { items += it }
             } else {
-                val index = items.indexOfFirst { it.id == fileId }
-                if (index < 0) return respond("", HttpStatusCode.NotFound)
-                items[index].copy(name = name, bytes = media, revision = items[index].revision + 1).also { items[index] = it }
+                val existing = items.firstOrNull { it.id == fileId } ?: return respond("", HttpStatusCode.NotFound)
+                existing.also {
+                    it.name = name
+                    it.bytes = media
+                    it.revision++
+                }
             }
         return json(item.toJson())
     }
