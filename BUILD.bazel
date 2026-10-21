@@ -7,9 +7,6 @@ load("@gazelle//:def.bzl", "gazelle", "gazelle_binary")
 # The app version, compiled into app/di/core (#1011).
 exports_files(["VERSION"])
 
-# The version catalog, read by the maven_kmp, android_sdk and sqlite module extensions (MODULE.bazel).
-exports_files(["libs.versions.toml"])
-
 # detekt's configuration, over its defaults (//bazel/kmp/lint, #1015).
 exports_files(["detekt.yml"])
 

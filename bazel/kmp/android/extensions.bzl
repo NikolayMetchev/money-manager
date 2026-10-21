@@ -2,17 +2,15 @@
 
 AGP compiles an Android library against the SDK's `platforms/android-<compileSdk>/android.jar`. This finds the SDK
 as AGP does (`ANDROID_HOME`, then `ANDROID_SDK_ROOT`, then `local.properties`' `sdk.dir`) and exposes that jar,
-neverlink, as `@android_sdk//:android_jar`. `compileSdk` is the catalog's `android-compileSdk`. Nothing is
+neverlink, as `@android_sdk//:android_jar`. `compileSdk` is `android_sdk.levels`' `compile_sdk`. Nothing is
 downloaded: installing the SDK means accepting its license, which stays the person's (or CI's `sdkmanager`) call.
 Without the SDK the repository still loads, and building anything that needs the jar says what's missing.
 
-`@android_sdk//:versions.bzl` holds the catalog's `android-minSdk`, `android-targetSdk`, `android-compileSdk` and
-AGP's version, `@android_sdk//:adb` is platform-tools' adb (device tests run through it), and
+`@android_sdk//:versions.bzl` holds the levels `android_sdk.levels` sets (min, target, compile) and AGP's version, `@android_sdk//:adb` is platform-tools' adb (device tests run through it), and
 `@aapt2//:aapt2` is the host's aapt2, the build AGP itself downloads (`pins.bzl`).
 """
 
 load("//bazel/kmp/android:pins.bzl", "AAPT2_BUILD", "AAPT2_SHA256")
-load("//bazel/kmp/deps:catalog.bzl", "catalog")
 
 _FOUND = """\
 load("@rules_java//java:java_import.bzl", "java_import")
@@ -207,17 +205,19 @@ _aapt2 = repository_rule(
 )
 
 def _android_sdk_impl(module_ctx):
-    versions = catalog(module_ctx.read(Label("//:libs.versions.toml")))[0]
     agps = [tag.version for mod in module_ctx.modules if mod.is_root for tag in mod.tags.agp]
     if len(agps) != 1:
         fail("android_sdk: the root module sets the AGP version with exactly one android_sdk.agp(version = …)")
+    levels = [tag for mod in module_ctx.modules if mod.is_root for tag in mod.tags.levels]
+    if len(levels) != 1:
+        fail("android_sdk: the root module sets the API levels with exactly one android_sdk.levels(…)")
     root = module_ctx.path(Label("//:MODULE.bazel")).dirname
     _platform(
         name = "android_sdk",
         agp = agps[0],
-        compile_sdk = versions["android-compileSdk"],
-        min_sdk = versions["android-minSdk"],
-        target_sdk = versions["android-targetSdk"],
+        compile_sdk = str(levels[0].compile_sdk),
+        min_sdk = str(levels[0].min_sdk),
+        target_sdk = str(levels[0].target_sdk),
         local_properties = str(root) + "/local.properties",
     )
     _aapt2(name = "aapt2", agp = agps[0])
@@ -225,6 +225,14 @@ def _android_sdk_impl(module_ctx):
 
 android_sdk = module_extension(
     implementation = _android_sdk_impl,
-    # The AGP release aapt2 and AGP_VERSION come from; @android_tools resolves the same version.
-    tag_classes = {"agp": tag_class(attrs = {"version": attr.string(mandatory = True)})},
+    tag_classes = {
+        # The AGP release aapt2 and AGP_VERSION come from; @android_tools resolves the same version.
+        "agp": tag_class(attrs = {"version": attr.string(mandatory = True)}),
+        # The API levels: modules compile against compile_sdk's android.jar, and apps declare min and target.
+        "levels": tag_class(attrs = {
+            "compile_sdk": attr.int(mandatory = True),
+            "min_sdk": attr.int(mandatory = True),
+            "target_sdk": attr.int(mandatory = True),
+        }),
+    },
 )
