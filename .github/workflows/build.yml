@@ -629,8 +629,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          # Codecov reports a few minutes after the upload; give it 30 minutes.
-          for _ in $(seq 1 60); do
+          # Codecov reports a few minutes after the upload; give it 3 minutes.
+          for _ in $(seq 1 18); do
             checks=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?per_page=100" --paginate \
               --jq '.check_runs[] | select(.app.slug == "codecov" and (.name == "codecov/patch" or .name == "codecov/project"))
                     | "\(.name) \(.status) \(.conclusion) \(.output.title)"')
@@ -642,7 +642,7 @@ jobs:
               echo "::error::Codecov failed: $(echo "$checks" | grep -v ' completed success ')"
               exit 1
             fi
-            sleep 30
+            sleep 10
           done
-          echo "::error::Codecov didn't report codecov/patch and codecov/project within 30 minutes"
+          echo "::error::Codecov didn't report codecov/patch and codecov/project within 3 minutes"
           exit 1
