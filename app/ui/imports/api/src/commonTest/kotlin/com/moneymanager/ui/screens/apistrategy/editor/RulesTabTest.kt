@@ -37,8 +37,8 @@ class RulesTabTest {
             assertEquals(lists.sumOf { it.rules.size }, onAllNodesWithContentDescription("Remove rule").fetchSemanticsNodes().size)
             assertEquals(lists.size, onAllNodesWithText("Add rule").fetchSemanticsNodes().size)
             // Every list opens its rules for editing, each field a JSON path picker.
-            while (onAllNodesWithText("Expand all").fetchSemanticsNodes().isNotEmpty()) {
-                onAllNodesWithText("Expand all")[0].performScrollTo().performClick()
+            while (onAllNodesWithContentDescription("Expand rule").fetchSemanticsNodes().isNotEmpty()) {
+                onAllNodesWithContentDescription("Expand rule")[0].performScrollTo().performClick()
                 waitForIdle()
             }
             assertEquals(lists.sumOf { it.rules.size }, onAllNodesWithContentDescription("Collapse rule").fetchSemanticsNodes().size)

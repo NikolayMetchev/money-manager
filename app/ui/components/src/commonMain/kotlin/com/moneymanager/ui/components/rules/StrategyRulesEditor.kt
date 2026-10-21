@@ -186,24 +186,12 @@ fun StrategyRulesEditor(
     pathField: ConditionPathField,
     enabled: Boolean,
     ops: List<ConditionOp> = if (context == RuleContext.CSV_ROW) FLAT_CONDITION_OPS else ConditionOp.entries,
-    title: String = "Rules",
 ) {
     // Indices of the rules opened by hand; they move with their rules.
     var opened by remember { mutableStateOf(emptySet<Int>()) }
     // A rule being written stays open once it's complete, so its first action doesn't snap the card shut.
     LaunchedEffect(rules) { opened = opened + rules.indices.filter { rules[it].needsEditing() } }
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            if (rules.isNotEmpty()) {
-                if (opened.size < rules.size) {
-                    TextButton(onClick = { opened = rules.indices.toSet() }) { Text("Expand all") }
-                }
-                if (opened.isNotEmpty()) {
-                    TextButton(onClick = { opened = emptySet() }) { Text("Collapse all") }
-                }
-            }
-        }
         rules.forEachIndexed { index, rule ->
             RuleCard(
                 index = index,

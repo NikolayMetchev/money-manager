@@ -192,10 +192,13 @@ class StrategyRulesEditorTest {
         }
 
     @Test
-    fun expandAllOpensEveryRuleAndAMovedRuleStaysOpen() {
+    fun aMovedRuleStaysOpen() {
         val skip = StrategyRule(name = "skip", actions = listOf(RuleAction.Skip))
         runEditor(listOf(atmRule, skip)) { rules ->
-            onNodeWithText("Expand all").performClick()
+            // The lower card first, so the upper one opening doesn't push it out of view.
+            onAllNodesWithContentDescription("Expand rule")[1].performClick()
+            waitForIdle()
+            onAllNodesWithContentDescription("Expand rule")[0].performClick()
             waitForIdle()
             assertEquals(2, onAllNodesWithContentDescription("Collapse rule").fetchSemanticsNodes().size)
             onAllNodesWithContentDescription("Collapse rule")[0].performClick()
@@ -323,10 +326,7 @@ class StrategyRulesEditorTest {
             waitForIdle()
             assertEquals(listOf(atmRule, flip, skip), rules())
             assertEquals(2, onAllNodesWithContentDescription("Collapse rule").fetchSemanticsNodes().size)
-            onNodeWithText("Collapse all").performClick()
-            waitForIdle()
-            onNodeWithText("Collapse all").assertDoesNotExist()
-            assertEquals(3, onAllNodesWithContentDescription("Expand rule").fetchSemanticsNodes().size)
+            assertEquals(1, onAllNodesWithContentDescription("Expand rule").fetchSemanticsNodes().size)
         }
     }
 }

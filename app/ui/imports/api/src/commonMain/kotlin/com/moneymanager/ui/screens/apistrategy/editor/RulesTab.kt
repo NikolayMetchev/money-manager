@@ -44,7 +44,6 @@ internal fun RulesTab(
                         RulePathSource.NONE -> textPathField(enabled)
                     },
                 enabled = enabled,
-                title = "Rules",
             )
         }
     }

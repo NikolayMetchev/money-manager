@@ -207,7 +207,7 @@ class ImportMonzoCsvE2ETest {
             onNodeWithText("Rules", substring = false).performClick()
             waitForIdle()
             waitUntilAtLeastOneExists(hasText("target from Name", substring = true), timeoutMillis = 10000)
-            onNodeWithText("Expand all").performClick()
+            onAllNodesWithText("target from Name", substring = true)[0].performClick()
             waitForIdle()
             waitUntilAtLeastOneExists(hasText("Name", substring = false), timeoutMillis = 10000)
 
