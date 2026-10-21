@@ -10,6 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.moneymanager.builtin.BuiltInApiStrategies
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.Test
@@ -34,6 +36,12 @@ class RulesTabTest {
             lists.forEach { onNodeWithText(it.title).assertExists() }
             assertEquals(lists.sumOf { it.rules.size }, onAllNodesWithContentDescription("Remove rule").fetchSemanticsNodes().size)
             assertEquals(lists.size, onAllNodesWithText("Add rule").fetchSemanticsNodes().size)
+            // Every list opens its rules for editing, each field a JSON path picker.
+            while (onAllNodesWithContentDescription("Expand rule").fetchSemanticsNodes().isNotEmpty()) {
+                onAllNodesWithContentDescription("Expand rule")[0].performScrollTo().performClick()
+                waitForIdle()
+            }
+            assertEquals(lists.sumOf { it.rules.size }, onAllNodesWithContentDescription("Collapse rule").fetchSemanticsNodes().size)
         }
 
     @Test

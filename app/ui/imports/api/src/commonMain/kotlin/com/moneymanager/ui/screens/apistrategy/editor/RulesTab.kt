@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.ui.components.rules.ConditionPathField
 import com.moneymanager.ui.components.rules.StrategyRulesEditor
-import com.moneymanager.ui.components.rules.isComplete
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 
 /**
@@ -28,23 +27,12 @@ internal fun RulesTab(
 ) {
     val ruleLists = state.config.ruleLists()
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            "Each list runs top to bottom over every record of its kind: each rule whose conditions all hold applies " +
-                "its actions, and the first rule to claim a value wins.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         if (ruleLists.isEmpty()) {
             Text("This strategy has no endpoints yet: add one on the Endpoints tab.", style = MaterialTheme.typography.bodyMedium)
         }
         ruleLists.forEachIndexed { index, list ->
             if (index > 0) HorizontalDivider()
             SectionHeader(list.title)
-            Text(
-                list.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (list.rules.isComplete()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-            )
             StrategyRulesEditor(
                 rules = list.rules,
                 onRulesChanged = { rules -> state.updateConfig { list.withRules(this, rules) } },
@@ -56,7 +44,6 @@ internal fun RulesTab(
                         RulePathSource.NONE -> textPathField(enabled)
                     },
                 enabled = enabled,
-                title = "Rules",
             )
         }
     }

@@ -44,7 +44,7 @@ class ApiRuleListsTest {
         val config = builtIn("Kraken").config
         val lists = config.ruleLists()
         assertEquals(config.dataEndpoints.size, lists.size)
-        lists.forEachIndexed { i, list -> assertTrue(list.title.startsWith("Data endpoint ${i + 1}: "), list.title) }
+        lists.forEachIndexed { i, list -> assertTrue(list.title.startsWith("${i + 1}. "), list.title) }
         assertTrue(RuleContext.API_TRADE in lists.map { it.context })
     }
 
