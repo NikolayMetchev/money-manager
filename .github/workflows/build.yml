@@ -75,10 +75,11 @@ jobs:
     env:
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-      # On every command, so they share one analysis cache; they only change ProGuard and the installer. Shrink
-      # only: the keep rules and ServiceLoader providers don't depend on ProGuard's optimizer, which takes most of
-      # its time (release builds optimize). The installer bundles the native mm, as release.yml's does.
-      BAZEL_FLAGS: --define=proguard_optimize=false --define=bundle_native_cli=true
+      # On every command, so they share one analysis cache; they only change ProGuard, the installer and the JVM
+      # tests. Shrink only: the keep rules and ServiceLoader providers don't depend on ProGuard's optimizer, which
+      # takes most of its time (release builds optimize). The installer bundles the native mm, as release.yml's does.
+      # The JVM and Android host tests run under the coverage agent, which Coverage reads.
+      BAZEL_FLAGS: --define=proguard_optimize=false --define=bundle_native_cli=true --config=coverage
     # `shell: bash` runs with pipefail; the default shell doesn't, so `bazel … | tee` would take tee's exit code and
     # pass with failing tests.
     defaults:
@@ -109,28 +110,20 @@ jobs:
           bazel build $BAZEL_FLAGS //... //app/main/jvm:installer //bazel/kmp/testing:native_launcher_deploy.jar
           $(bazel query 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') 2>&1 | tee build.log
 
-      # Every test but the Kotlin JVM and Android ones, which Coverage runs, plus the desktop ProGuard check:
-      # `//...` never runs ProGuard (its targets are manual), so a new dependency that needs keep/dontwarn rules
-      # would otherwise surface only when release.yml ran. It shrinks the desktop app and checks every
-      # ServiceLoader provider survived.
+      # Every test, plus the desktop ProGuard check: `//...` never runs ProGuard (its targets are manual), so a new
+      # dependency that needs keep/dontwarn rules would otherwise surface only when release.yml ran. It shrinks the
+      # desktop app and checks every ServiceLoader provider survived.
       - name: Test
-        run: >-
-          bazel test $BAZEL_FLAGS -- //... //app/main/jvm:release_service_providers_test
-          $(bazel query 'attr(name, "^test_(jvm|android)$", tests(//...))' | sed 's/^/-/') 2>&1 | tee test.log
+        run: bazel test $BAZEL_FLAGS -- //... //app/main/jvm:release_service_providers_test 2>&1 | tee test.log
 
-      # Kover's replacement (#1026): the Kotlin JVM and Android tests under `bazel coverage`, with .bazelrc's JaCoCo
-      # filter, merged into one LCOV report. It credits code to every test that runs it, so it reads higher than
-      # Kover's per-module reports did. A command of its own, as coverage instruments what it builds (the
-      # installer and ProGuard must see the real jars), and the Go tests can't link under it.
+      # The JVM and Android host tests' coverage reports, merged into one LCOV report (bazel/kmp/testing/coverage.sh).
+      # It credits code to every test that runs it, not only its own module's.
       - name: Coverage
         if: ${{ !cancelled() }}
-        run: >-
-          bazel coverage $BAZEL_FLAGS $(bazel query 'attr(name, "^test_(jvm|android)$", tests(//...))')
-          2>&1 | tee coverage.log
+        run: bazel/kmp/testing/coverage.sh coverage.lcov $BAZEL_FLAGS 2>&1 | tee coverage.log
 
       - name: Coverage summary
         run: |
-          cp bazel-out/_coverage/_coverage_report.dat coverage.lcov
           awk -F: '/^SF:/{f++} /^LF:/{lf+=$2} /^LH:/{lh+=$2}
             END{printf "### Coverage\n%d files, %d of %d lines (%.1f%%)\n", f, lh, lf, 100*lh/lf}' \
             coverage.lcov >> "$GITHUB_STEP_SUMMARY"
