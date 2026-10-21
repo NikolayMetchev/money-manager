@@ -109,7 +109,7 @@ COMPOSE_PLUGIN = "1.12.2"  # renovate: org.jetbrains.compose.animation:animation
 CRYPTOGRAPHY = "0.6.0"  # renovate: dev.whyoleg.cryptography:cryptography-bigint
 ERRORPRONE = "2.50.0"  # renovate: com.google.errorprone:error_prone_annotations
 JAVAWRITER = "2.5.1"  # renovate: com.squareup:javawriter
-JETBRAINS_ANNOTATIONS = "23.1.0"  # renovate: org.jetbrains:annotations
+JETBRAINS_ANNOTATIONS = "26.1.0"  # renovate: org.jetbrains:annotations
 JETBRAINS_NAVIGATION3 = "1.1.2"  # renovate: org.jetbrains.androidx.navigation3:navigation3-ui-desktop
 JSR305 = "3.0.2"  # renovate: com.google.code.findbugs:jsr305
 JUNIT = "4.13.2"  # renovate: junit:junit
@@ -432,7 +432,7 @@ maven.install(
         "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.4.21",
         "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.4.21",
         "org.jetbrains.kotlin:kotlin-stdlib:2.4.21",
-        "org.jetbrains:annotations:23.1.0",
+        "org.jetbrains:annotations:26.1.0",
         "org.slf4j:slf4j-api:2.0.20",
     ],
     lock_file = "//bazel/maven:ktlint_cli_install.json",
