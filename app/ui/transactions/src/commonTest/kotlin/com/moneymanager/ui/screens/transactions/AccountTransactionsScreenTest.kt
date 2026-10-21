@@ -22,6 +22,7 @@ import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.di.DatabaseComponent
+import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
@@ -849,7 +850,7 @@ class AccountTransactionsScreenTest {
                 testDbLocation = createTestDatabaseLocation()
                 val databaseManager = createTestDatabaseManager()
                 database = databaseManager.openDatabase(testDbLocation)
-                repositories = DatabaseComponent.create(database)
+                repositories = openDatabaseComponent(database)
 
                 val now = Clock.System.now()
 
@@ -1055,7 +1056,7 @@ class AccountTransactionsScreenTest {
                 testDbLocation = createTestDatabaseLocation()
                 val databaseManager = createTestDatabaseManager()
                 database = databaseManager.openDatabase(testDbLocation)
-                repositories = DatabaseComponent.create(database)
+                repositories = openDatabaseComponent(database)
 
                 val now = Clock.System.now()
 
@@ -1236,7 +1237,7 @@ class AccountTransactionsScreenTest {
                 testDbLocation = createTestDatabaseLocation()
                 val databaseManager = createTestDatabaseManager()
                 database = databaseManager.openDatabase(testDbLocation)
-                repositories = DatabaseComponent.create(database)
+                repositories = openDatabaseComponent(database)
 
                 val now = Clock.System.now()
 

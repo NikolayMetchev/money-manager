@@ -116,6 +116,8 @@ class DeviceRepositoryImplTest : DbTest() {
     @Test
     fun `a database created before the NATIVE platform gains its row on first CLI use`() =
         runTest {
+            // Opening the database records the host device, which on native is a NATIVE one.
+            database.execute(null, "DELETE FROM device WHERE platform_id = 3", 0)
             database.execute(null, "DELETE FROM platform WHERE id = 3", 0)
 
             val cli = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Native("Linux", "box"))

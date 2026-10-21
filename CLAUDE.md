@@ -253,9 +253,10 @@ inject the write repositories (`# gazelle:kmp_visibility` in its BUILD file): `a
 that depends on it fails analysis. Within `app/importer`, `kmp_forbid_reference` keeps `*WriteRepository` to
 `ImportEngineImpl.kt`.
 
-**The one exception:** `DeviceWriteRepository` is injected directly in `DeviceIdModule` (di/core).
-`DeviceId` is a synchronous singleton that every write-repo impl — and therefore the engine — depends
-on, so routing it through the suspend engine would be a DI cycle.
+**The one exception:** `openDatabaseComponent` (`app/db/di`) records this device with `DeviceWriteRepositoryImpl`
+before it builds the graph, and passes the `DeviceId` to `DatabaseComponent.Factory.create`. Every write-repo impl,
+and so the engine, needs the `DeviceId`, so it can't come from the engine. Build a `DatabaseComponent` through
+`openDatabaseComponent`, never `DatabaseComponent.create`.
 
 **How to apply:** to add a write (new field, entity, or config), extend `ImportBatch`/`ImportResult`
 and `ImportEngineImpl`, add a helper if useful, and call it — never inject a `*WriteRepository` outside

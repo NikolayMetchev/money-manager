@@ -1,6 +1,7 @@
 package com.moneymanager.cli
 
 import com.moneymanager.database.di.DatabaseComponent
+import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Asset
@@ -32,7 +33,7 @@ internal suspend fun TestCli.seedQueryFixture(installStrategies: Boolean = false
     val location = createTestDatabaseLocation()
     val database = databaseManager.openDatabase(location)
     try {
-        val db = DatabaseComponent.create(database)
+        val db = openDatabaseComponent(database)
         val alice = db.person("Alice", "Smith")
         val bob = db.person("Bob", null)
         db.person("Sam", "Lee")

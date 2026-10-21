@@ -10,7 +10,7 @@ import androidx.compose.ui.test.waitUntilDoesNotExist
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.di.DatabaseComponent
+import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
@@ -80,7 +80,7 @@ class CsvAccountSourceAuditE2ETest {
             // Pre-populate: import a CSV that creates a counterparty account, via the real apply path.
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
-                val dc = DatabaseComponent.create(db)
+                val dc = openDatabaseComponent(db)
                 // A manually-created source account the imported transfer flows out of.
                 val sourceAccountId =
                     dc.accountRepository.createAccount(

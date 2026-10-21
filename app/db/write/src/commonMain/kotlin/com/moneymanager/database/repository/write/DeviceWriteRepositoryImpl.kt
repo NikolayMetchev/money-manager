@@ -11,13 +11,13 @@ class DeviceWriteRepositoryImpl(
     reader: DeviceReadRepository,
 ) : DeviceWriteRepository,
     DeviceReadRepository by reader {
-    override fun getOrCreateDevice(deviceInfo: DeviceInfo): DeviceId =
+    override suspend fun getOrCreateDevice(deviceInfo: DeviceInfo): DeviceId =
         when (deviceInfo) {
             is DeviceInfo.Host -> getOrCreateHostDevice(deviceInfo)
             is DeviceInfo.Android -> getOrCreateAndroidDevice(deviceInfo)
         }
 
-    private fun getOrCreateHostDevice(deviceInfo: DeviceInfo.Host): DeviceId {
+    private suspend fun getOrCreateHostDevice(deviceInfo: DeviceInfo.Host): DeviceId {
         val platform = deviceInfo.platform
         database.deviceWriteQueries.insertOrIgnorePlatform(platform.id, platform.name)
 
@@ -38,7 +38,7 @@ class DeviceWriteRepositoryImpl(
         return DeviceId(checkNotNull(existing()) { "Device row for $deviceInfo not found after insert" })
     }
 
-    private fun getOrCreateAndroidDevice(deviceInfo: DeviceInfo.Android): DeviceId {
+    private suspend fun getOrCreateAndroidDevice(deviceInfo: DeviceInfo.Android): DeviceId {
         // Get or create DeviceMake
         database.deviceWriteQueries.insertOrIgnoreDeviceMake(deviceInfo.deviceMake)
         val makeId = database.deviceSelectQueries.selectDeviceMakeByName(deviceInfo.deviceMake).executeAsOne()

@@ -1,10 +1,13 @@
 package com.moneymanager.database.di
 
 import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.database.repository.DeviceReadRepositoryImpl
+import com.moneymanager.database.repository.write.DeviceWriteRepositoryImpl
 import com.moneymanager.database.service.AccountMappingExportService
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.scope.DatabaseScope
+import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
@@ -93,6 +96,17 @@ interface DatabaseComponent {
     interface Factory {
         fun create(
             @Provides database: MoneyManagerDatabaseWrapper,
+            @Provides deviceId: DeviceId,
         ): DatabaseComponent
     }
+}
+
+/**
+ * Builds the [DatabaseComponent] for an open [database], recording this device first: every write records
+ * which device made it, so the graph takes the [DeviceId] as an input rather than querying for it while it
+ * is built.
+ */
+suspend fun openDatabaseComponent(database: MoneyManagerDatabaseWrapper): DatabaseComponent {
+    val deviceId = DeviceWriteRepositoryImpl(database, DeviceReadRepositoryImpl(database)).getOrCreateDevice(getDeviceInfo())
+    return DatabaseComponent.create(database, deviceId)
 }

@@ -1,6 +1,7 @@
 package com.moneymanager.test.database
 
 import com.moneymanager.database.di.DatabaseComponent
+import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.database.sql.entitySource.EntitySourceWriteQueries
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.ApiCredentialId
@@ -34,7 +35,7 @@ open class DbTest {
         runTest {
             testDbLocation = createTestDatabaseLocation()
             database = createTestDatabaseManager(seedAllCurrencies).openDatabase(testDbLocation)
-            repositories = DatabaseComponent.create(database)
+            repositories = openDatabaseComponent(database)
             entitySourceQueries = database.entitySourceWriteQueries
             if (installBuiltInStrategies) {
                 repositories.installBuiltInCsvStrategies()

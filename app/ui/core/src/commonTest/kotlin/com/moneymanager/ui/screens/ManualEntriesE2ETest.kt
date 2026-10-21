@@ -9,6 +9,7 @@ import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.di.DatabaseComponent
+import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
@@ -64,7 +65,7 @@ class ManualEntriesE2ETest {
 
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
-                databaseComponent = DatabaseComponent.create(db)
+                databaseComponent = openDatabaseComponent(db)
                 databaseComponent.installBuiltInCsvStrategies()
 
                 val wiseEur =

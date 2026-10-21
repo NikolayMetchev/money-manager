@@ -8,7 +8,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.di.DatabaseComponent
+import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.test.database.createTestDatabaseLocation
@@ -104,7 +104,7 @@ class SetupWizardE2ETest {
         location: DbLocation,
     ): Boolean =
         runBlocking {
-            val component = DatabaseComponent.create(databaseManager.openDatabase(location))
+            val component = openDatabaseComponent(databaseManager.openDatabase(location))
             component.settingsRepository.isSetupWizardCompleted().first()
         }
 }
