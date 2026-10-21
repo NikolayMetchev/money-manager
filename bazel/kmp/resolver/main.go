@@ -219,11 +219,8 @@ func run(kotlin, out string, libraries, libraryPlatformSpecs, platformNames, for
 	for module, byPlatform := range lock.Artifacts {
 		set := map[string]bool{}
 		// A metadata jar declares what the module's platform files do; the stdlib's is no import's library.
-		if _, ok := byPlatform[metadataPlatform]; ok && len(byPlatform) == 1 {
-			continue
-		}
 		for name, res := range byPlatform {
-			if name == metadataPlatform {
+			if platforms[name].Common {
 				continue
 			}
 			for _, file := range res.Files {

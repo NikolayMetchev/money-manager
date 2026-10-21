@@ -376,14 +376,18 @@ maven_kmp.install(
         "sqldelight-sqlite-driver": ["jvm"],
     },
     lock_file = "//bazel/kmp/deps:maven_kmp.lock.json",
+    # wasmJs and js are the browser (#84); metadataWeb is the common metadata of the modules that compile for it.
     platforms = [
         "android",
+        "js",
         "jvm",
         "linuxArm64",
         "linuxX64",
         "macosArm64",
         "metadata",
+        "metadataWeb",
         "mingwX64",
+        "wasmJs",
     ],
     # Google's repository only for these groups, Maven Central for everything.
     repositories = [

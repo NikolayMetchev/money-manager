@@ -27,6 +27,10 @@ func TestPickVariant(t *testing.T) {
 		{Name: "jvmRuntimeElements-published", Attributes: attrs{"org.gradle.usage": "java-runtime", "org.gradle.category": "library", "org.jetbrains.kotlin.platform.type": "jvm"}},
 		{Name: "androidReleaseApiElements", Attributes: attrs{"org.gradle.usage": "java-api", "org.gradle.category": "library", "org.jetbrains.kotlin.platform.type": "androidJvm"}},
 		{Name: "linuxX64ApiElements-published", Attributes: attrs{"org.gradle.usage": "kotlin-api", "org.gradle.category": "library", "org.jetbrains.kotlin.platform.type": "native", "org.jetbrains.kotlin.native.target": "linux_x64"}},
+		{Name: "wasmWasiApiElements-published", Attributes: attrs{"org.gradle.usage": "kotlin-api", "org.gradle.category": "library", "org.jetbrains.kotlin.platform.type": "wasm", "org.jetbrains.kotlin.wasm.target": "wasi"}},
+		{Name: "wasmJsApiElements-published", Attributes: attrs{"org.gradle.usage": "kotlin-api", "org.gradle.category": "library", "org.jetbrains.kotlin.platform.type": "wasm", "org.jetbrains.kotlin.wasm.target": "js"}},
+		{Name: "jsLegacyApiElements", Attributes: attrs{"org.gradle.usage": "kotlin-api", "org.gradle.category": "library", "org.jetbrains.kotlin.platform.type": "js", "org.jetbrains.kotlin.js.compiler": "legacy"}},
+		{Name: "jsApiElements-published", Attributes: attrs{"org.gradle.usage": "kotlin-api", "org.gradle.category": "library", "org.jetbrains.kotlin.platform.type": "js", "org.jetbrains.kotlin.js.compiler": "ir"}},
 		{Name: "linuxX64SourcesElements", Attributes: attrs{"org.gradle.usage": "kotlin-runtime", "org.gradle.category": "documentation", "org.jetbrains.kotlin.platform.type": "native", "org.jetbrains.kotlin.native.target": "linux_x64"}},
 	}
 	cases := []struct {
@@ -36,6 +40,8 @@ func TestPickVariant(t *testing.T) {
 		{"jvm", "java-runtime", "jvmRuntimeElements-published"},
 		{"linuxX64", "kotlin-api", "linuxX64ApiElements-published"},
 		{"mingwX64", "kotlin-api", ""},
+		{"wasmJs", "kotlin-api", "wasmJsApiElements-published"},
+		{"js", "kotlin-api", "jsApiElements-published"},
 	}
 	for _, c := range cases {
 		got := pick(platforms[c.platform], c.usage, variants)

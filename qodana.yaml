@@ -204,6 +204,7 @@ exclude:
       - bazel/kmp/native/properties.bzl
       - bazel/kmp/native/toolchain.bzl
       - bazel/kmp/sqlite/extensions.bzl
+      - bazel/kmp/web.bzl
 
   # [2] — refreshViews/sourceAccountOverride/engineBatchSize are passed other values by callers in
   # the UI modules (and one Poi-typed test builder the linter can't resolve).
