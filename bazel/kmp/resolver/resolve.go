@@ -466,7 +466,7 @@ func (r *Resolver) loadPom(p Platform, c Coordinate, dir string) (*node, error) 
 }
 
 // Resolve resolves the roots and everything they need on one platform. As in Gradle, a module requested at
-// several versions gets the highest, unless it's forced (the catalog substitutions Gradle applies). Roots
+// several versions gets the highest, unless it's forced (the substitutions Gradle applies). Roots
 // with no variant for the platform (a JVM-only library on native) are left out.
 func (r *Resolver) Resolve(p Platform, roots []Coordinate) (map[string]Resolved, []string, error) {
 	version := map[string]string{}

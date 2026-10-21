@@ -28,7 +28,7 @@ read what the upstream plugin passes, then pass the same.
 
 Kotlin has one version, and four things must agree on it:
 
-1. `kotlin` in `libs.versions.toml` (the catalog `maven_kmp` reads), with the Compose compiler, Metro and
+1. `KOTLIN` in `MODULE.bazel` (the Kotlin libraries `maven_kmp` resolves), with the Compose compiler, Metro and
    Mappie releases built for it.
 2. `bazel_dep(name = "rules_kotlin")` in `MODULE.bazel`: rules_kotlin bundles the compiler Bazel runs, so its
    version is the Kotlin release.
@@ -95,8 +95,8 @@ PR, and `renovate-pins.yml` runs the script on it. 3 is by hand.
   `VERSION`, the crypto catalog, the default Google OAuth client). The OAuth client is XOR-obfuscated in the
   `@google_oauth` repository (from `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`, else `secrets/google-oauth.properties`), so
   the plaintext is never an action input.
-- **Bundled SQLite** (`utils/sqlite3`, `kmp/sqlite`): `@sqlite_amalgamation` downloads the amalgamation the
-  catalog's `sqlite-amalgamation-*` entries pin (SHA-256 checked), `kmp_static_library` compiles it per target with
+- **Bundled SQLite** (`utils/sqlite3`, `kmp/sqlite`): `@sqlite_amalgamation` downloads the amalgamation
+  `sqlite_amalgamation.version(…)` pins in `MODULE.bazel` (SHA-256 checked), `kmp_static_library` compiles it per target with
   konan's own clang and `llvm-ar`, and `kmp_cinterop` embeds the archive in a klib (`-staticLibrary`).
   `kmp_library(cinterops = …)`, set by `# gazelle:kmp_cinterops`, compiles a module with it, even one with no Kotlin
   of its own. `app/db/core` keeps the dep with `kmp_keep_dep`: nothing imports SQLite, it's linked.
@@ -114,7 +114,7 @@ PR, and `renovate-pins.yml` runs the script on it. 3 is by hand.
   those already bring every candidate, then to the one whose API brings the rest, and only then to the most specific.
   An import resolves to a library every compilation of its source set has, else per compilation (commonMain's
   Material 3 import is `compose_material3_desktop` on the JVM and `androidx_compose_material3` on Android),
-  preferring catalog libraries over the modules they bring. `android.*` is the SDK.
+  preferring `artifacts` libraries over the modules they bring. `android.*` is the SDK.
 - Directives, for what sources can't say, are per module and not inherited: `kmp_generate true`, `kmp_targets`,
   `kmp_export <label> [sourceSet]` (an API dep: always a dep, and exported), `kmp_keep_dep <label> [sourceSet]` (a dep
   no import explains: Metro contributors, runtime-only libraries), `kmp_plugins`, `kmp_sqldelight_package`,
@@ -153,8 +153,8 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
 `-linuxx64` klib plus any cinterop klibs, the `androidJvm` AAR.
 
 - Highest version wins, raised by `dependencyConstraints` and BOMs (`platform(…)`, module metadata or POM) without
-  bringing anything in. The modules `force_bundles` names (the catalog's `transitive-pins`) are pinned everywhere;
-  `forces` pins on the JVM and in metadata only, never in native klibs. `excludes` drops a module everywhere, also
+  bringing anything in. `forces` pins a module everywhere;
+  `classpath_forces` pins on the JVM and in metadata only, never in native klibs. `excludes` drops a module everywhere, also
   where a variant points (`available-at`) at it.
 - An api-variant dependency the runtime variant leaves out is compile-only (`compile_only_deps`, a neverlink twin),
   and a library with only a runtime variant (the Compose Gradle plugin jar) compiles against that one.
@@ -162,11 +162,12 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
   else a JVM one, never androidx's `*Stubs`; `library_platforms` limits a library to the platforms that use it (the
   `-desktop` jars to `jvm`, the androidx roots to `android`).
 - The Kotlin stdlib comes from the toolchain. Each
-  `maven_kmp.install(name = …)` is its own resolution and hub repository. Versions come from the catalog;
-  `MODULE.bazel` lists the catalog aliases, platforms and repositories.
-- Each install writes `bazel/kmp/deps/<name>.lock.json` (every file with its sha256); after changing an install or the
-  catalog, run `bazel run @<name>//:pin`, or `bazel/renovate/repin.sh` for all of them. `//bazel/kmp/deps:maven_kmp_lock_test`
-  fails while any lock is stale. Modules name a library by its catalog alias, `@maven_kmp//:kotlinx_io_core` (the
+  `maven_kmp.install(name = …)` is its own resolution and hub repository. `artifacts` maps each library's alias to its
+  `group:artifact:version`, written in `MODULE.bazel` with the platforms and repositories. A version several
+  coordinates share is a constant there (`KTOR = "…"  # renovate: io.ktor:ktor-client-auth`), so they move together,
+  as a Gradle `version.ref` did; Renovate's regex manager bumps the constant.
+- Each install writes `bazel/kmp/deps/<name>.lock.json` (every file with its sha256); after changing an install, run `bazel run @<name>//:pin`, or `bazel/renovate/repin.sh` for all of them. `//bazel/kmp/deps:maven_kmp_lock_test`
+  fails while any lock is stale. Modules name a library by its alias, `@maven_kmp//:kotlinx_io_core` (the
   `_jvm`/`_<target>` suffix is added per platform); `//bazel/kmp/deps` only holds `kotlin_test` and the compiler
   plugins. `dependency_snapshot.py` turns the lockfiles into GitHub's dependency graph.
 - `aliases` adds a hub target under a name some tool expects instead of ours: Android Studio builds
@@ -244,7 +245,7 @@ release's `mm-<os>-<arch>` (`pkg_tar` keeping the exec bit; a copied `.exe` on W
 ## Android (`kmp/android`)
 
 - **SDK**: the `android_sdk` extension finds the SDK as AGP does (`ANDROID_HOME`, `ANDROID_SDK_ROOT`,
-  `local.properties`) and takes the catalog's `android-compileSdk` platform, never downloading it (CI runs
+  `local.properties`) and takes the `compile_sdk` platform `android_sdk.levels(…)` sets, never downloading it (CI runs
   `sdkmanager`). `@android_sdk//:lint_sdk` is that platform laid out as an SDK for lint. AGP's own tools come from the
   `@android_tools` install; aapt2 is downloaded as AGP does, for the release `android_sdk.agp(version = …)` names (`pins.bzl`, from AGP's `aapt2_version.properties`).
 - **Libraries**: `# gazelle:kmp_targets android …` gives a module `:<name>_android`: `commonMain ← jvmAndroidMain ←

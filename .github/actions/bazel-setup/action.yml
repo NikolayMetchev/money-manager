@@ -22,7 +22,7 @@ runs:
   using: 'composite'
   steps:
     # The JDK, Kotlin/Native and every Maven library are Bazel repositories (hermetic, sha256-pinned), so
-    # nothing else needs installing. The JVM version lives in .bazelrc and libs.versions.toml.
+    # nothing else needs installing. The JVM version lives in .bazelrc.
     - name: Set up Bazel
       uses: bazel-contrib/setup-bazel@0.19.1
       with:
@@ -45,13 +45,14 @@ runs:
           echo "common --build_metadata=REPO_URL=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
         } > user.bazelrc
 
-    # Android modules compile against the SDK's android.jar for the catalog's compileSdk (//bazel/kmp/android),
+    # Android modules compile against the SDK's android.jar for MODULE.bazel's compile_sdk (//bazel/kmp/android),
     # which the runners' preinstalled SDK may not have yet. Bazel only looks; it never downloads it.
     - name: Install the Android SDK platform
       if: inputs.android-sdk == 'true'
       shell: bash
       run: |
-        level=$(sed -n 's/^android-compileSdk = "\(.*\)"/\1/p' libs.versions.toml)
+        level=$(sed -n 's/^ *compile_sdk = \([0-9]*\),$/\1/p' MODULE.bazel)
+        [ -n "$level" ] || { echo "no compile_sdk in MODULE.bazel's android_sdk.levels" >&2; exit 1; }
         sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
         [ -f "$sdkmanager" ] || sdkmanager="$sdkmanager.bat"
         (yes || true) | "$sdkmanager" --install "platforms;android-$level.0" > /dev/null

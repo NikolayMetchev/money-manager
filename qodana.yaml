@@ -197,7 +197,6 @@ exclude:
       - bazel/kmp/android/extensions.bzl
       - bazel/kmp/checks/checks.bzl
       - bazel/kmp/constants/google_oauth.bzl
-      - bazel/kmp/deps/catalog.bzl
       - bazel/kmp/deps/extensions.bzl
       - bazel/kmp/metadata.bzl
       - bazel/kmp/native.bzl

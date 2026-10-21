@@ -3,7 +3,7 @@
   "extends": [
     "config:recommended"
   ],
-  "description": "Automerge every update, majors included, once the required CI checks pass (GitHub native auto-merge). The app's libraries are bumped in libs.versions.toml (the catalog maven_kmp reads), the build tools' maven.install artifacts and the Bazel modules in MODULE.bazel; renovate-pins.yml then re-pins the lockfiles on the PR's branch (bazel/renovate/repin.sh)",
+  "description": "Automerge every update, majors included, once the required CI checks pass (GitHub native auto-merge). Every version is in MODULE.bazel: the Bazel modules and the build tools' maven.install artifacts (the bazel-module manager), and the app's library versions, the constants maven_kmp.install's coordinates share (a regex manager); renovate-pins.yml then re-pins the lockfiles on the PR's branch (bazel/renovate/repin.sh)",
   "automerge": true,
   "automergeType": "pr",
   "platformAutomerge": true,
@@ -18,7 +18,7 @@
       "allowedVersions": "!/-compat$/"
     },
     {
-      "description": "Kotlin and what's built for one Kotlin release move together: Kotlin's plugins (the Compose compiler among them), rules_kotlin (it bundles the compiler Bazel runs, which must equal the catalog's kotlin), and the Metro and Mappie compiler plugins. Split groups open PRs that each fail alone",
+      "description": "Kotlin and what's built for one Kotlin release move together: Kotlin's plugins (the Compose compiler among them), rules_kotlin (it bundles the compiler Bazel runs, which must equal MODULE.bazel's KOTLIN), and the Metro and Mappie compiler plugins. Split groups open PRs that each fail alone",
       "matchPackageNames": ["/^org\\.jetbrains\\.kotlin[.:]/", "rules_kotlin", "/^dev\\.zacsweers\\.metro[.:]/", "/^tech\\.mappie[.:]/"],
       "groupName": "kotlin monorepo"
     },
@@ -28,12 +28,25 @@
       "groupName": "android gradle plugin"
     },
     {
-      "description": "@proguard applies the Compose Gradle plugin's default ProGuard rules for the Compose libraries the catalog pins, so the plugin moves with them",
+      "description": "@proguard applies the Compose Gradle plugin's default ProGuard rules for the Compose libraries maven_kmp resolves, so the plugin moves with them",
       "matchPackageNames": ["/^org\\.jetbrains\\.compose[.:]/"],
       "groupName": "compose multiplatform"
+    },
+    {
+      "description": "The app's library versions are looked up where maven_kmp.install's repositories resolve them: Maven Central or Google's repository (androidx)",
+      "matchManagers": ["custom.regex"],
+      "matchDatasources": ["maven"],
+      "registryUrls": ["https://repo1.maven.org/maven2", "https://dl.google.com/dl/android/maven2"]
     }
   ],
   "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The app's library versions: MODULE.bazel constants maven_kmp.install's artifacts and forces share, each with a `# renovate: <group:artifact>` comment naming the artifact its version is looked up for",
+      "managerFilePatterns": ["/^MODULE\\.bazel$/"],
+      "matchStrings": ["[A-Z0-9_]+ = \"(?<currentValue>[^\"]+)\"  # renovate: (?<depName>\\S+)"],
+      "datasourceTemplate": "maven"
+    },
     {
       "customType": "regex",
       "description": "The Go SDK rules_go downloads for the Gazelle extension (MODULE.bazel's go_sdk.download)",

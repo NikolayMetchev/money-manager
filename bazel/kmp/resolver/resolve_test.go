@@ -1,8 +1,6 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -58,36 +56,14 @@ func TestPickVariantRejectsNewerJvm(t *testing.T) {
 	}
 }
 
-func TestReadCatalog(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "libs.versions.toml")
-	toml := `# comment
-[versions]
-kotlinx-io = "0.9.1" # trailing
-odd = "a#b"
-
-[libraries]
-kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinx-io" }
-odd = { group = "g", name = "odd", version.ref = "odd" }
-fixed = { module = "g:fixed", version = "1.0" }
-
-[plugins]
-kotlin = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlinx-io" }
-`
-	if err := os.WriteFile(path, []byte(toml), 0o644); err != nil {
-		t.Fatal(err)
+func TestParseCoordinate(t *testing.T) {
+	c, err := ParseCoordinate("org.jetbrains.kotlinx:kotlinx-io-core:0.9.1")
+	if err != nil || c.Module() != "org.jetbrains.kotlinx:kotlinx-io-core" || c.Version != "0.9.1" {
+		t.Errorf("got %+v, %v", c, err)
 	}
-	cat, err := ReadCatalog(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := map[string]string{
-		"kotlinx-io-core": "org.jetbrains.kotlinx:kotlinx-io-core:0.9.1",
-		"odd":             "g:odd:a#b",
-		"fixed":           "g:fixed:1.0",
-	}
-	for alias, coordinate := range want {
-		if got := cat.Libraries[alias].String(); got != coordinate {
-			t.Errorf("%s = %s, want %s", alias, got, coordinate)
+	for _, bad := range []string{"g:a", "g::1", "g:a:1:x", ":a:1"} {
+		if _, err := ParseCoordinate(bad); err == nil {
+			t.Errorf("%q parsed", bad)
 		}
 	}
 }
