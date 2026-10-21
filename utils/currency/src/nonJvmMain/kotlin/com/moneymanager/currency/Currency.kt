@@ -3,7 +3,7 @@ package com.moneymanager.currency
 import com.moneymanager.bigdecimal.BigDecimal
 
 /**
- * Native has no locale data, so a currency formats as a plain decimal followed by its code
+ * Native and the browser have no locale data, so a currency formats as a plain decimal followed by its code
  * ("-1234.50 GBP"), padded to the ISO minor-unit width from the bundled [IsoCurrencies] table. A code the
  * bundle doesn't know (installed from a newer catalog list, or user-created) formats unpadded rather than
  * failing, since its minor unit is unknown.

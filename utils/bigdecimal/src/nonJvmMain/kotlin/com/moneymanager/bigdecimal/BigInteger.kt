@@ -3,7 +3,7 @@ package com.moneymanager.bigdecimal
 import com.ionspin.kotlin.bignum.integer.BigInteger as IonBigInteger
 
 /**
- * Native implementation of BigInteger over ionspin's BigInteger, matching java.math.BigInteger's
+ * Native and browser implementation of BigInteger over ionspin's BigInteger, matching java.math.BigInteger's
  * semantics: [toLong] keeps the low 64 bits.
  */
 actual class BigInteger internal constructor(

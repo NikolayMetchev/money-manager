@@ -49,8 +49,8 @@ var resolvedAttrs = map[string]bool{
 	"js_deps":             true,
 }
 
-// The `*_srcs` globs aren't mergeable: each is fixed for its source set, Gazelle can't merge every glob
-// expression, and a source set's attribute is only ever added.
+// The `*_srcs` globs aren't mergeable: each is fixed for its source set and Gazelle can't merge every glob
+// expression, so Fix drops them and the generated rule brings back the ones whose dirs still exist.
 func mergeable(extra ...string) map[string]bool {
 	out := map[string]bool{"android": true, "native_targets": true, "web_targets": true, "plugins": true}
 	for _, k := range extra {
@@ -85,8 +85,8 @@ func (*kmpLang) Loads() []rule.LoadInfo {
 	}
 }
 
-// Fix drops each generated rule's `resources` before the merge, so the generated glob always replaces it (or
-// it goes, with its dirs): Gazelle only merges string lists and selects, not globs.
+// Fix drops each generated rule's globs (`resources`, the source sets') before the merge, so the generated glob
+// always replaces it (or it goes, with its dir): Gazelle only merges string lists and selects, not globs.
 func (*kmpLang) Fix(c *config.Config, f *rule.File) {
 	if f == nil || !getConfig(c).generate {
 		return
@@ -96,6 +96,11 @@ func (*kmpLang) Fix(c *config.Config, f *rule.File) {
 			r.DelAttr("resources")
 			r.DelAttr("device_resources")
 			r.DelAttr("device_srcs")
+			for _, sets := range [][]sourceSet{mainSets, testSets} {
+				for _, set := range sets {
+					r.DelAttr(set.srcsAttr)
+				}
+			}
 		}
 	}
 }

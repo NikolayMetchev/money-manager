@@ -4,7 +4,7 @@ import com.moneymanager.bigdecimal.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class NativeCurrencyTest {
+class NonJvmCurrencyTest {
     @Test
     fun `formats a plain decimal at the minor-unit width followed by the code`() {
         assertEquals("1234.50 GBP", Currency("GBP").format(BigDecimal("1234.5")))
