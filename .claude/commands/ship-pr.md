@@ -30,7 +30,13 @@ poll loop and a completion notification rather than blocking; CI takes 10–25 m
   - `qodana` reporting masses of "unused" or "unresolved" findings means the IDE didn't open the
     project through Bazel (`.qodana/open-as-bazel.sh`), not that the code changed — check its log
     before fixing anything.
-  - `codecov` is NOT a required check; don't block on it.
+  - `CI Passed` is the one required check: it fails when Build and Test or a Native Tests job fails or is
+    cancelled, or when `codecov/patch` or `codecov/project` fails. Fix the job it names, not `CI Passed` itself.
+  - Codecov uses its defaults: the patch must reach `main`'s project coverage, and project coverage must
+    not drop at all. A codecov failure is never a flake: when one fails,
+    read the per-file numbers (`https://api.codecov.io/api/v2/github/NikolayMetchev/repos/money-manager/compare/impacted_files?pullid=<num>`)
+    and add tests. A drop in files the PR didn't touch usually means it hid UI that other modules'
+    tests used to render. Don't lower the target or add a threshold.
   - `//app/ui/core:test_jvm` ComposeTimeoutException under load is flaky — re-run before investigating.
 - Repeat until every required check is green.
 
