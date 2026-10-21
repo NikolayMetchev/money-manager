@@ -297,7 +297,8 @@ class StrategyRulesEditorTest {
     @Test
     fun anExpandedRuleShowsAnEditorForEveryAction() =
         runEditor(listOf(StrategyRule(name = "all", actions = everyAction))) { rules ->
-            onNodeWithText("Rule 1: all").assertExists()
+            onNodeWithText("1.").assertExists()
+            onNodeWithText("all: Always → ", substring = true).assertExists()
             onNodeWithText("Remove action").assertDoesNotExist()
             onNodeWithText(everyAction.joinToString("; ", prefix = "Always → ") { it.summary() }, substring = true)
                 .performClick()

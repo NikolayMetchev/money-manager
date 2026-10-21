@@ -287,11 +287,25 @@ private fun RuleCard(
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    rule.name?.let { "Rule ${index + 1}: $it" } ?: "Rule ${index + 1}",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.weight(1f),
-                )
+                Text("${index + 1}.", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 8.dp))
+                if (isOpen) {
+                    OutlinedTextField(
+                        value = rule.name.orEmpty(),
+                        onValueChange = { onRuleChanged(rule.copy(name = it.ifBlank { null })) },
+                        label = { Text("Name (optional)") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        enabled = enabled,
+                    )
+                } else {
+                    Text(
+                        rule.name?.let { "$it: ${rule.summary()}" } ?: rule.summary(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).clickable { onOpenChanged(true) },
+                    )
+                }
                 IconButton(onClick = { onOpenChanged(!isOpen) }, enabled = !rule.needsEditing()) {
                     if (isOpen) {
                         Icon(Icons.Filled.Done, contentDescription = "Collapse rule")
@@ -310,24 +324,7 @@ private fun RuleCard(
                     Icon(Icons.Filled.Close, contentDescription = "Remove rule")
                 }
             }
-            if (!isOpen) {
-                Text(
-                    rule.summary(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth().clickable { onOpenChanged(true) },
-                )
-                return@Column
-            }
-            OutlinedTextField(
-                value = rule.name.orEmpty(),
-                onValueChange = { onRuleChanged(rule.copy(name = it.ifBlank { null })) },
-                label = { Text("Name (optional)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                enabled = enabled,
-            )
+            if (!isOpen) return@Column
             Spacer(modifier = Modifier.height(4.dp))
             ConditionsEditor(
                 title = "If all of these hold (none: every record)",
