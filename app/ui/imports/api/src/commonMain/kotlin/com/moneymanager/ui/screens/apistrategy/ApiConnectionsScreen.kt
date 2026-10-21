@@ -46,6 +46,7 @@ import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.setPlainText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
@@ -262,6 +263,8 @@ private fun ApiConnectionRow(
                                 }
                                 importEngine.ensureApiCredential(strategy.id, now)
                                 onSaved()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
                             } catch (expected: Exception) {
                                 onFailure(saveFailureMessage(expected))
                             }
