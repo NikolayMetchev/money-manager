@@ -102,19 +102,19 @@ jobs:
       - name: Install packaging tools
         run: sudo apt-get update && sudo apt-get install -y fakeroot xvfb
 
-      # Also the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`, manual so local builds skip
-      # them) and the launcher that turns their output into JUnit XML, for Native Tests to run on their own
-      # runners, and the Linux desktop installer.
-      - name: Build
+      # `bazel test` builds every target it's given, tests or not, so one invocation builds `//...` and runs its
+      # tests. The rest are manual, so `//...` skips them:
+      # - the desktop ProGuard check: `//...` never runs ProGuard, so a new dependency that needs keep/dontwarn rules
+      #   would otherwise surface only when release.yml ran. It shrinks the desktop app and checks every
+      #   ServiceLoader provider survived.
+      # - the Linux desktop installer.
+      # - the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`) and the launcher that turns their
+      #   output into JUnit XML, for Native Tests to run on their own runners.
+      - name: Build and Test
         run: >-
-          bazel build $BAZEL_FLAGS //... //app/main/jvm:installer //bazel/kmp/testing:native_launcher_deploy.jar
-          $(bazel query 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') 2>&1 | tee build.log
-
-      # Every test, plus the desktop ProGuard check: `//...` never runs ProGuard (its targets are manual), so a new
-      # dependency that needs keep/dontwarn rules would otherwise surface only when release.yml ran. It shrinks the
-      # desktop app and checks every ServiceLoader provider survived.
-      - name: Test
-        run: bazel test $BAZEL_FLAGS -- //... //app/main/jvm:release_service_providers_test 2>&1 | tee test.log
+          bazel test $BAZEL_FLAGS -- //... //app/main/jvm:release_service_providers_test
+          //app/main/jvm:installer //bazel/kmp/testing:native_launcher_deploy.jar
+          $(bazel query 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') 2>&1 | tee test.log
 
       # The JVM and Android host tests' coverage reports, merged into one XML report (bazel/kmp/testing/coverage.sh).
       # It credits code to every test that runs it, not only its own module's.
@@ -629,8 +629,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          # Codecov reports a few minutes after the upload; give it 30 minutes.
-          for _ in $(seq 1 60); do
+          # Codecov reports a few minutes after the upload; give it 3 minutes.
+          for _ in $(seq 1 18); do
             checks=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?per_page=100" --paginate \
               --jq '.check_runs[] | select(.app.slug == "codecov" and (.name == "codecov/patch" or .name == "codecov/project"))
                     | "\(.name) \(.status) \(.conclusion) \(.output.title)"')
@@ -642,7 +642,7 @@ jobs:
               echo "::error::Codecov failed: $(echo "$checks" | grep -v ' completed success ')"
               exit 1
             fi
-            sleep 30
+            sleep 10
           done
-          echo "::error::Codecov didn't report codecov/patch and codecov/project within 30 minutes"
+          echo "::error::Codecov didn't report codecov/patch and codecov/project within 3 minutes"
           exit 1
