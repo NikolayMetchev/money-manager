@@ -1,14 +1,18 @@
 package com.moneymanager.ui.credentials
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.waitUntilAtLeastOneExists
+import androidx.compose.ui.test.waitUntilDoesNotExist
 import com.moneymanager.credentialvault.CredentialBundle
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.StoredApiCredential
@@ -22,6 +26,7 @@ import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.screens.apistrategy.ApiConnectionsScreen
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
@@ -83,7 +88,20 @@ class ApiConnectionsVaultE2ETest : DbTest() {
     @Test
     fun saving_a_token_stores_it_in_the_vault_not_the_database() {
         runMoneyManagerComposeUiTest {
-            val vault = runBlocking { unlockedCredentialVault() }
+            val unlocked = runBlocking { unlockedCredentialVault() }
+            // Holds the save open, so the spinner is on screen for the test to see rather than only when a
+            // frame happens to land mid-save.
+            val releaseSave = CompletableDeferred<Unit>()
+            val vault =
+                object : CredentialVault by unlocked {
+                    override suspend fun update(
+                        reason: String,
+                        transform: (CredentialBundle) -> CredentialBundle,
+                    ) {
+                        releaseSave.await()
+                        unlocked.update(reason, transform)
+                    }
+                }
             showConnections(vault)
 
             // Binance sorts first, so its Connect button is the first one on screen. It is a signed API:
@@ -94,8 +112,14 @@ class ApiConnectionsVaultE2ETest : DbTest() {
             onNode(hasText("API secret").and(hasSetTextAction())).performTextInput("binance-secret")
             onNodeWithText("Save and continue").performClick()
 
+            val saving = hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)
+            waitUntilAtLeastOneExists(saving, timeoutMillis = 10_000)
+            releaseSave.complete(Unit)
+
             waitUntil(timeoutMillis = 10_000) { vault.bundleOrNull()?.apiCredential("Binance") != null }
             waitUntil(timeoutMillis = 10_000) { connectionRowFor("Binance") != null }
+            // The form closes once the save has finished, taking its spinner with it.
+            waitUntilDoesNotExist(saving, timeoutMillis = 10_000)
             waitForIdle()
             val saved = vault.bundleOrNull()?.apiCredential("Binance")
             assertEquals("binance-key-abcdef", saved?.token)
