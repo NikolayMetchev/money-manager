@@ -46,6 +46,7 @@ import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.formatAmount
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
@@ -124,7 +125,8 @@ fun ManualEntriesScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (visibleGroups.isEmpty()) {
+        // The saved entries drop out of the list before the save finishes, so "nothing pending" waits for it.
+        if (visibleGroups.isEmpty() && !isSaving) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
@@ -158,6 +160,8 @@ fun ManualEntriesScreen(
                                         maintenance.refreshMaterializedViews()
                                         entries.forEach { (matched, _) -> amounts.remove(matched.transferId) }
                                         onTransactionsImported()
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
                                     } catch (expected: Exception) {
                                         errorMessage = "Failed to create transactions: ${expected.message}"
                                     } finally {

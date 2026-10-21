@@ -190,6 +190,10 @@ class CsvAccountSourceAuditE2ETest {
             onNodeWithText(CSV_FILE_NAME).performClick()
             waitForIdle()
             waitUntilAtLeastOneExists(hasText("1 rows", substring = true), timeoutMillis = 10000)
+            // The header counts the rows before the table shows them; wait for the row itself and let its
+            // scroll-to-row effect run, rather than ending the test before it starts.
+            waitUntilAtLeastOneExists(hasText("15/12/2024"), timeoutMillis = 10000)
+            waitForIdle()
         }
     }
 
