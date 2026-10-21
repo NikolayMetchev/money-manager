@@ -121,8 +121,8 @@
     },
     "classpath_forces": {
       "androidx.activity:activity": "1.13.0",
-      "androidx.annotation:annotation": "1.9.1",
-      "androidx.annotation:annotation-jvm": "1.9.1",
+      "androidx.annotation:annotation": "1.11.0",
+      "androidx.annotation:annotation-jvm": "1.11.0",
       "androidx.collection:collection": "1.7.0",
       "androidx.concurrent:concurrent-futures": "1.3.0",
       "androidx.lifecycle:lifecycle-common": "2.11.0",
@@ -4249,22 +4249,22 @@
     },
     "androidx.annotation:annotation": {
       "android": {
-        "version": "1.9.1",
+        "version": "1.11.0",
         "files": [
           {
-            "name": "annotation-jvm-1.9.1.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-jvm/1.9.1/annotation-jvm-1.9.1.jar",
-            "sha256": "1e343917ebf27ba96fe4dc52b1cad7fd32b738fbc6355bb6cd5b3b305d7212d0"
+            "name": "annotation-jvm-1.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-jvm/1.11.0/annotation-jvm-1.11.0.jar",
+            "sha256": "a83b827cc17fd6b41c7bf5e7a2a2b40a0895b00b3e30fdfdb820b49dc7b667f3"
           }
         ]
       },
       "jvm": {
-        "version": "1.9.1",
+        "version": "1.11.0",
         "files": [
           {
-            "name": "annotation-jvm-1.9.1.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-jvm/1.9.1/annotation-jvm-1.9.1.jar",
-            "sha256": "1e343917ebf27ba96fe4dc52b1cad7fd32b738fbc6355bb6cd5b3b305d7212d0"
+            "name": "annotation-jvm-1.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-jvm/1.11.0/annotation-jvm-1.11.0.jar",
+            "sha256": "a83b827cc17fd6b41c7bf5e7a2a2b40a0895b00b3e30fdfdb820b49dc7b667f3"
           }
         ]
       },
@@ -4299,12 +4299,12 @@
         ]
       },
       "metadata": {
-        "version": "1.9.1",
+        "version": "1.11.0",
         "files": [
           {
-            "name": "annotation-metadata-1.9.1.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation/1.9.1/annotation-1.9.1.jar",
-            "sha256": "38322afa7345c37e29c65ec8852178ae1c26e23096a0634d07a4a3893931f58c"
+            "name": "annotation-metadata-1.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation/1.11.0/annotation-1.11.0.jar",
+            "sha256": "cef5f2f3dee9d6c7f07bf70976951761bbddbda4de3974de6636d7f065f2b90b"
           }
         ],
         "source_sets": [
