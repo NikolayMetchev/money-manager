@@ -139,7 +139,7 @@
       "androidx.savedstate:savedstate-compose": "1.5.0",
       "androidx.test.services:storage": "1.6.0",
       "androidx.test:runner": "1.7.0",
-      "androidx.tracing:tracing": "1.3.0",
+      "androidx.tracing:tracing": "2.0.5",
       "org.jetbrains.kotlinx:atomicfu": "0.33.0",
       "org.jetbrains.kotlinx:atomicfu-jvm": "0.33.0",
       "org.jetbrains.kotlinx:kotlinx-coroutines-android": "1.11.0",
@@ -6911,16 +6911,20 @@
     },
     "androidx.tracing:tracing": {
       "android": {
-        "version": "1.3.0",
+        "version": "2.0.5",
         "files": [
           {
             "name": "tracing.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/tracing/tracing-android/1.3.0/tracing-android-1.3.0.aar",
-            "sha256": "f59782bbe3470a6b0c531cef262dd1fc9d9a0233490bb5e6d553e1fe6a1816b2"
+            "url": "https://dl.google.com/dl/android/maven2/androidx/tracing/tracing-android/2.0.5/tracing-android-2.0.5.aar",
+            "sha256": "2466e420a2d7e4fa7bbf64205f48aabf3adab0d03c781c5bd260c4d92ff34e09"
           }
         ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
         "runtime_deps": [
-          "androidx.annotation:annotation"
+          "androidx.collection:collection"
         ]
       }
     },

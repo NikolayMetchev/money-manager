@@ -120,7 +120,6 @@ kmp_test(
         "//test/app/db",
         "//utils/bigdecimal",
         "@maven_kmp//:androidx_test_runner",
-        "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_coroutines_test",
         "@maven_kmp//:sqldelight_runtime",
     ],
