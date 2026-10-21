@@ -60,7 +60,9 @@ fun QifReimportAllDialog(
     var result by remember { mutableStateOf<BulkReimportResult?>(null) }
 
     var plan by remember { mutableStateOf<QifReimportAllPlan?>(null) }
+    // A run changes the file list it was planned from; re-planning then would only replace the plan it ran.
     LaunchedEffect(imported) {
+        if (isRunning || result != null) return@LaunchedEffect
         val planned = importDirectoryService.planQifReimportAll(imported)
         if (sourceAccountId == null) sourceAccountId = planned.defaultSourceAccountId
         if (selectedCurrencyId == null) selectedCurrencyId = planned.defaultCurrencyId

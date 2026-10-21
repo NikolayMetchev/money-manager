@@ -1,6 +1,7 @@
 package com.moneymanager.ui.screens
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -240,6 +241,11 @@ class MonzoImportAuditE2ETest {
             onNodeWithText("API Import").performClick()
             waitForIdle()
             waitUntilAtLeastOneExists(hasText("API Traffic"), timeoutMillis = 10000)
+            // The traffic loads after the title; wait for the highlighted JSON node, then let the screen centre it,
+            // so the test never leaves mid-scroll.
+            waitUntilAtLeastOneExists(hasTestTag("apiTrafficHighlight"), timeoutMillis = 10000)
+            waitForIdle()
+            onNode(hasTestTag("apiTrafficHighlight")).assertIsDisplayed()
 
             // Navigate back to Accounts via the nav bar
             onNodeWithText("Accounts", useUnmergedTree = true).performClick()

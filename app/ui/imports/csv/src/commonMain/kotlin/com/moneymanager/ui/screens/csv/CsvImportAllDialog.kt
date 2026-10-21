@@ -54,7 +54,11 @@ fun CsvImportAllDialog(
     // picker below, so two folders of identically-formatted files each land on their own account). Lets the
     // dialog say how many files will be skipped and whether a shared source account is needed.
     var plan by remember { mutableStateOf<CsvImportAllPlan?>(null) }
-    LaunchedEffect(unimported) { plan = importDirectoryService.planCsvImportAll(unimported) }
+    // A run changes the file list it was planned from; re-planning then would only swap in an empty plan.
+    LaunchedEffect(unimported) {
+        if (isImporting || summary != null) return@LaunchedEffect
+        plan = importDirectoryService.planCsvImportAll(unimported)
+    }
     val skippedNoStrategyCount = plan?.skippedNoStrategy ?: 0
     val needsSourceAccount = plan?.needsSourceAccount == true
 

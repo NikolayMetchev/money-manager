@@ -52,7 +52,9 @@ fun QifImportAllDialog(
     // Each file's import directory account takes priority over the shared picker below, so two folders of
     // identically-formatted files each land on their own account without user disambiguation.
     var plan by remember { mutableStateOf<QifImportAllPlan?>(null) }
+    // A run changes the file list it was planned from; re-planning then would only swap in an empty plan.
     LaunchedEffect(unimported) {
+        if (isImporting || summary != null) return@LaunchedEffect
         val planned = importDirectoryService.planQifImportAll(unimported)
         if (sourceAccountId == null) sourceAccountId = planned.defaultSourceAccountId
         plan = planned

@@ -57,6 +57,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1613,7 +1614,7 @@ private fun JsonTreeNode(
             .padding(start = (depth * 12).dp)
             .then(
                 if (isHighlightTarget && onHighlightPositioned != null) {
-                    Modifier.onGloballyPositioned { coords ->
+                    Modifier.testTag("apiTrafficHighlight").onGloballyPositioned { coords ->
                         onHighlightPositioned(coords.positionInRoot().y)
                     }
                 } else {
