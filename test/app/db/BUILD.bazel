@@ -1,5 +1,7 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
+# The database worker and sqlite-wasm, which MemorySqliteChannel imports by npm name (@JsModule).
+# gazelle:kmp_keep_dep //app/db/worker webMain
 # gazelle:kmp_export //app/db/core
 # gazelle:kmp_export //app/db/di
 # gazelle:kmp_export //app/model/core
@@ -8,7 +10,7 @@
 # gazelle:kmp_export //bazel/kmp/deps:kotlin_test
 # gazelle:kmp_export //app/db/write jvmMain
 
-load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 kmp_library(
     name = "db",
@@ -17,6 +19,7 @@ kmp_library(
     android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    keep_deps = ["//app/db/worker"],
     native_deps = [
         "//utils/files",
         "@maven_kmp//:kotlinx_io_core",
@@ -29,6 +32,12 @@ kmp_library(
         "mingwX64",
     ],
     visibility = ["//visibility:public"],
+    web_deps = ["//app/db/worker"],
+    web_srcs = glob(["src/webMain/kotlin/**/*.kt"]),
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = [
         "//app/db/core",
         "//app/db/di",
@@ -45,5 +54,23 @@ kmp_library(
         "//utils/currency",
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_coroutines_test",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":db",
+    web_deps = [
+        "//app/db/core",
+        "//app/db/write",
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:sqldelight_async_extensions",
+    ],
+    web_srcs = glob(["src/webTest/kotlin/**/*.kt"]),
+    web_targets = [
+        "wasmJs",
+        "js",
     ],
 )

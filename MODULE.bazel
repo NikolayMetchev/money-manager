@@ -156,6 +156,7 @@ TURBINE = "1.2.1"  # renovate: app.cash.turbine:turbine
 # names @js-joda/core 3.2.0, and the time-zone database (which the browser has to bring itself) needs a newer core.
 JS_JODA_CORE = "6.3.0"  # renovate-npm: @js-joda/core
 JS_JODA_TIMEZONE = "3.1.0"  # renovate-npm: @js-joda/timezone
+SQLITE_WASM = "3.54.1-build1"  # renovate-npm: @sqlite.org/sqlite-wasm
 
 maven_kmp = use_extension("//bazel/kmp/deps:extensions.bzl", "maven_kmp")
 maven_kmp.install(
@@ -404,7 +405,11 @@ maven_kmp.install(
     lock_file = "//bazel/kmp/deps:maven_kmp.lock.json",
     # alias → name@version: npm packages our own browser code imports (`@JsModule`), named like the libraries, with a
     # target per browser platform: @maven_kmp//:js_joda_timezone. The ones the libraries need come from their klibs.
-    npm = {"js-joda-timezone": "@js-joda/timezone@" + JS_JODA_TIMEZONE},
+    npm = {
+        "js-joda-timezone": "@js-joda/timezone@" + JS_JODA_TIMEZONE,
+        # SQLite compiled to WebAssembly, which the browser's database worker (app/db/worker) runs.
+        "sqlite-wasm": "@sqlite.org/sqlite-wasm@" + SQLITE_WASM,
+    },
     # name → version, whoever asks for it, as a Yarn `resolutions` entry.
     npm_forces = {"@js-joda/core": JS_JODA_CORE},
     # wasmJs and js are the browser (#84); metadataWeb is the common metadata of the modules that compile for it.

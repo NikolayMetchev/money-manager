@@ -1,10 +1,8 @@
 package com.moneymanager.database
 
-import app.cash.sqldelight.async.coroutines.await
 import app.cash.sqldelight.db.SqlDriver
 import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.currency.IsoCurrency
-import com.moneymanager.database.sql.seed.MoneyManagerDatabase
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.defaultFileDatabaseLocation
@@ -61,28 +59,17 @@ abstract class FileDatabaseManager(
             if (isNewDatabase) {
                 var created = false
                 try {
-                    // One transaction for the whole creation: on its own every statement and seeded currency commits
-                    // separately, about a thousand syncs to disk, which takes seconds where syncing is slow (Windows).
-                    database.transaction {
-                        onProgress(Progress.counted("Creating the database schema...", 4, OPEN_STEPS))
-                        // Lookups, the system device and GBP are seeded inside Schema.create (the :app:db:seed module).
-                        MoneyManagerDatabase.Schema.create(driver).await()
-                        // The rest of the bundled ISO 4217 list is seeded here for a freshly created database.
-                        onProgress(Progress.counted("Adding default currencies...", 5, OPEN_STEPS))
-                        DatabaseConfig.seedCurrencies(database, currenciesToSeed())
-                    }
+                    createSchema(database, currenciesToSeed, onProgress)
                     created = true
                 } finally {
-                    // A file left behind would be opened next time as an existing, empty database, so a failed
-                    // creation leaves nothing: close the driver first, so it releases the file.
+                    // Close the driver first, so it releases the file.
                     if (!created) {
                         database.close()
                         (listOf(file) + location.sidecars).forEach { SystemFileSystem.delete(it, mustExist = false) }
                     }
                 }
             } else {
-                onProgress(Progress.counted("Checking the database schema...", 4, OPEN_STEPS))
-                onProgress(Progress.counted("Preparing repositories...", 5, OPEN_STEPS))
+                reportExisting(onProgress)
             }
             onProgress(Progress.counted("Finishing database startup...", OPEN_STEPS, OPEN_STEPS))
             database
@@ -158,7 +145,6 @@ abstract class FileDatabaseManager(
         get() = listOf(Path("$path-wal"), Path("$path-shm"))
 
     private companion object {
-        const val OPEN_STEPS = 6
         const val SNAPSHOT_NAME_RADIX = 36
     }
 }

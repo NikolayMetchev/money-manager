@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_plugins mappie serialization
 # gazelle:kmp_sqldelight_package com.moneymanager.database.sql.read
 # gazelle:kmp_sqldelight_dep //app/db/schema:sqldelight
@@ -40,6 +40,10 @@ kmp_library(
     ],
     sqldelight = ":sqldelight",
     visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = [
         "//app/db/schema",
         "//app/model/accountmapping",
@@ -76,6 +80,10 @@ kmp_test(
     plugins = [
         "mappie",
         "serialization",
+    ],
+    web_targets = [
+        "wasmJs",
+        "js",
     ],
     deps = [
         "//app/model/accountmapping",

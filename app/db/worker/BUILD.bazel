@@ -1,0 +1,27 @@
+# The browser's SQLite worker (#84), an npm package of our own: app/db/core's WebSqliteDriver talks to it, and the
+# browser targets' tests run it in-process over memory (`@moneymanager/sqlite-worker/memory`).
+load("//bazel/kmp:web.bzl", "WEB_TARGETS", "kt_web_group", "npm_package")
+
+npm_package(
+    name = "package",
+    package_name = "@moneymanager/sqlite-worker",
+    srcs = [
+        "handler.mjs",
+        "memory.mjs",
+        "package.json",
+        "worker.mjs",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# A module names `//app/db/worker` for its browser targets, as it would a library with npm packages.
+[
+    kt_web_group(
+        name = "worker_" + target,
+        npm = [":package"],
+        target = target,
+        visibility = ["//visibility:public"],
+        deps = ["@maven_kmp//:sqlite_wasm_" + target],
+    )
+    for target in WEB_TARGETS
+]

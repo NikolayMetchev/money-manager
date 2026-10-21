@@ -90,6 +90,9 @@ def _compile_klib(ctx, out, chain, deps, friends, module_name, mnemonic):
     args.add_all(["-ir-output-dir", out.dirname, "-ir-output-name", out.basename[:-len(".klib")]])
     args.add("-Xir-module-name=" + module_name)
     args.add_all(["-Werror", "-Xexpect-actual-classes"])
+    if ctx.attr.target == "js":
+        # The link's ES modules, so the frontend checks `@JsModule` declarations as ES imports, not UMD ones.
+        args.add_all(["-target", "es2015"])
     plugin_jars = native_plugin_args(args, ctx.attr.plugins)
     srcs = fragment_args(args, chain)
     args.add_joined("-libraries", transitive, join_with = ctx.configuration.host_path_separator)
