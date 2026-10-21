@@ -10,14 +10,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Runs a Kotlin/Native test executable for {@code kmp_test} and reports its results the way the JVM runner
- * does.
+ * Runs a Kotlin/Native test executable, or a browser target's tests in Node, for {@code kmp_test} and reports
+ * their results the way the JVM runner does.
  *
  * <p>The executable (linked with {@code -generate-test-runner}) is the first argument. It runs with
  * {@code --ktest_logger=TEAMCITY}, whose service messages become JUnit XML in {@code $XML_OUTPUT_FILE}. The
  * messages themselves stay out of the log: it gets what the tests print, each failure and a summary, as the JVM
  * runner writes them. {@code --test_filter} ({@code TESTBRIDGE_TEST_ONLY}) is a substring of
  * {@code Class#method}, as on the JVM. Written in Java rather than shell so it runs the same on every OS.
+ *
+ * <p>With {@code --node <node> <runner.mjs> <test.mjs>} it runs a wasmJs or js test program instead: runner.mjs
+ * reports the same service messages and reads the filter from the environment itself.
  */
 public final class KnTestLauncher {
   private static final String PREFIX = "##teamcity[";
@@ -26,11 +29,17 @@ public final class KnTestLauncher {
 
   static void main(String[] args) throws Exception {
     List<String> command = new ArrayList<>();
-    command.add(Path.of(args[0]).toAbsolutePath().toString());
-    command.add("--ktest_logger=TEAMCITY");
-    String only = System.getenv("TESTBRIDGE_TEST_ONLY");
-    if (only != null && !only.isEmpty()) {
-      command.add("--ktest_regex_filter=.*" + regexLiteral(only.replace('#', '.')) + ".*");
+    if (args[0].equals("--node")) {
+      for (int i = 1; i < args.length; i++) {
+        command.add(Path.of(args[i]).toAbsolutePath().toString());
+      }
+    } else {
+      command.add(Path.of(args[0]).toAbsolutePath().toString());
+      command.add("--ktest_logger=TEAMCITY");
+      String only = System.getenv("TESTBRIDGE_TEST_ONLY");
+      if (only != null && !only.isEmpty()) {
+        command.add("--ktest_regex_filter=.*" + regexLiteral(only.replace('#', '.')) + ".*");
+      }
     }
     Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Re-pins everything a version bump leaves stale (#1029), so a Renovate PR needs no hand edits: the Kotlin/Native
-# toolchain when Kotlin moved, every Maven lockfile (`bazel run @<hub>//:pin`: maven_kmp's and the tools'
+# toolchain when Kotlin moved, Node.js's archive SHA-256s, every Maven lockfile (`bazel run @<hub>//:pin`: maven_kmp's and the tools'
 # rules_jvm_external ones), MODULE.bazel.lock, and the
 # BUILD files Gazelle writes (a library's packages can move). renovate-pins.yml runs it on Renovate's branches;
 # run it by hand after editing MODULE.bazel.
@@ -17,6 +17,8 @@ if [ "$module_kotlin" != "$pinned_native" ]; then
   echo "Kotlin/Native is pinned at $pinned_native, MODULE.bazel's Kotlin is $module_kotlin: repinning"
   bazel run @kotlin_native_repin//:repin
 fi
+
+python3 bazel/renovate/repin_node.py MODULE.bazel
 
 for hub in $(sed -n 's|.*lock_file = "//bazel/kmp/deps:\(.*\)\.lock\.json".*|\1|p' MODULE.bazel); do
   bazel run "@$hub//:pin"

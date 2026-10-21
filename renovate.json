@@ -62,6 +62,14 @@
     },
     {
       "customType": "regex",
+      "description": "The Node.js release the browser tests run on (MODULE.bazel's NODE); repin.sh rewrites its archives' SHA-256s",
+      "managerFilePatterns": ["/^MODULE\\.bazel$/"],
+      "matchStrings": ["\\nNODE = \"(?<currentValue>[^\"]+)\"\\n"],
+      "depNameTemplate": "node",
+      "datasourceTemplate": "node-version"
+    },
+    {
+      "customType": "regex",
       "description": "The AGP release aapt2 is downloaded from (MODULE.bazel's android_sdk.agp)",
       "managerFilePatterns": ["/^MODULE\\.bazel$/"],
       "matchStrings": ["android_sdk\\.agp\\(version = \"(?<currentValue>[^\"]+)\"\\)"],
