@@ -294,11 +294,13 @@ private fun RuleCard(
                         modifier = Modifier.weight(1f).clickable { onOpenChanged(true) },
                     )
                 }
-                IconButton(onClick = { onOpenChanged(!isOpen) }, enabled = !rule.needsEditing()) {
+                TextButton(onClick = { onOpenChanged(!isOpen) }, enabled = !rule.needsEditing()) {
                     if (isOpen) {
-                        Icon(Icons.Filled.Done, contentDescription = "Collapse rule")
+                        Icon(Icons.Filled.Done, contentDescription = "Collapse rule", modifier = Modifier.padding(end = 4.dp))
+                        Text("Collapse")
                     } else {
-                        Icon(Icons.Filled.Edit, contentDescription = "Expand rule")
+                        Icon(Icons.Filled.Edit, contentDescription = "Expand rule", modifier = Modifier.padding(end = 4.dp))
+                        Text("Edit")
                     }
                 }
                 IconButton(onClick = { onMove(-1) }, enabled = enabled && index > 0) {
