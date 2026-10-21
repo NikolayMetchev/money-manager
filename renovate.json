@@ -3,7 +3,7 @@
   "extends": [
     "config:recommended"
   ],
-  "description": "Automerge every update, majors included, once the required CI checks pass (GitHub native auto-merge). Libraries are bumped in libs.versions.toml (the catalog MODULE.bazel reads) and Bazel modules in MODULE.bazel; renovate-pins.yml then re-pins the lockfiles on the PR's branch (bazel/renovate/repin.sh)",
+  "description": "Automerge every update, majors included, once the required CI checks pass (GitHub native auto-merge). The app's libraries are bumped in libs.versions.toml (the catalog maven_kmp reads), the build tools' maven.install artifacts and the Bazel modules in MODULE.bazel; renovate-pins.yml then re-pins the lockfiles on the PR's branch (bazel/renovate/repin.sh)",
   "automerge": true,
   "automergeType": "pr",
   "platformAutomerge": true,
@@ -23,9 +23,14 @@
       "groupName": "kotlin monorepo"
     },
     {
-      "description": "AGP and the lint it runs release together (lint's version is AGP's + 23); Bazel's Android lint pins lint-gradle beside AGP",
+      "description": "AGP and the lint it runs release together (lint's version is AGP's + 23): @android_tools' AGP and builder, android_sdk.agp (aapt2) and @android_lint's lint-gradle move as one",
       "matchPackageNames": ["com.android.tools.build:gradle", "com.android.tools.build:builder", "com.android.tools.lint:lint-gradle", "/^com\\.android\\.(application|kotlin\\.multiplatform\\.library)$/"],
       "groupName": "android gradle plugin"
+    },
+    {
+      "description": "@proguard applies the Compose Gradle plugin's default ProGuard rules for the Compose libraries the catalog pins, so the plugin moves with them",
+      "matchPackageNames": ["/^org\\.jetbrains\\.compose[.:]/"],
+      "groupName": "compose multiplatform"
     }
   ],
   "customManagers": [
@@ -36,6 +41,15 @@
       "matchStrings": ["go_sdk\\.download\\(version = \"(?<currentValue>[^\"]+)\"\\)"],
       "depNameTemplate": "go",
       "datasourceTemplate": "golang-version"
+    },
+    {
+      "customType": "regex",
+      "description": "The AGP release aapt2 is downloaded from (MODULE.bazel's android_sdk.agp)",
+      "managerFilePatterns": ["/^MODULE\\.bazel$/"],
+      "matchStrings": ["android_sdk\\.agp\\(version = \"(?<currentValue>[^\"]+)\"\\)"],
+      "depNameTemplate": "com.android.tools.build:gradle",
+      "datasourceTemplate": "maven",
+      "registryUrlTemplate": "https://maven.google.com"
     }
   ]
 }

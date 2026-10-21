@@ -26,8 +26,8 @@ java_binary(
     name = "schemaspy_main",
     main_class = "org.schemaspy.Main",
     runtime_deps = [
-        "@schemaspy//:schemaspy_jvm",
-        "@schemaspy//:sqldelight_sqlite_driver_jvm",
+        "@schemaspy//:org_schemaspy_schemaspy",
+        "@schemaspy//:org_xerial_sqlite_jdbc",
     ],
 )
 

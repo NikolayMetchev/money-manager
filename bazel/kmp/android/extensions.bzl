@@ -208,16 +208,23 @@ _aapt2 = repository_rule(
 
 def _android_sdk_impl(module_ctx):
     versions = catalog(module_ctx.read(Label("//:libs.versions.toml")))[0]
+    agps = [tag.version for mod in module_ctx.modules if mod.is_root for tag in mod.tags.agp]
+    if len(agps) != 1:
+        fail("android_sdk: the root module sets the AGP version with exactly one android_sdk.agp(version = …)")
     root = module_ctx.path(Label("//:MODULE.bazel")).dirname
     _platform(
         name = "android_sdk",
-        agp = versions["android-gradle-plugin"],
+        agp = agps[0],
         compile_sdk = versions["android-compileSdk"],
         min_sdk = versions["android-minSdk"],
         target_sdk = versions["android-targetSdk"],
         local_properties = str(root) + "/local.properties",
     )
-    _aapt2(name = "aapt2", agp = versions["android-gradle-plugin"])
+    _aapt2(name = "aapt2", agp = agps[0])
     return module_ctx.extension_metadata(reproducible = False)
 
-android_sdk = module_extension(implementation = _android_sdk_impl)
+android_sdk = module_extension(
+    implementation = _android_sdk_impl,
+    # The AGP release aapt2 and AGP_VERSION come from; @android_tools resolves the same version.
+    tag_classes = {"agp": tag_class(attrs = {"version": attr.string(mandatory = True)})},
+)

@@ -140,12 +140,11 @@ PR, and `renovate-pins.yml` runs the script on it. 3 is by hand.
   none of a declared dep's own jars (not what it re-exports). Exports and `keep_deps` are exempt: Metro graphs,
   SQLDelight and other generated code use them where jdeps can't see.
 - **Lint** (`kmp/lint`): every `kmp_library`/`kmp_test` gets `:<name>_ktlint` and `:<name>_detekt`, tests that run
-  the tool's own `main` over the hand-written sources (generated ones are left out). ktlint is the catalog's
-  `ktlint-engine` with `ktlint_official` and the tree's `.editorconfig` files: the sandbox isn't under the repo, so
+  the tool's own `main` over the hand-written sources (generated ones are left out). ktlint is `@ktlint_cli`'s engine with `ktlint_official` and the tree's `.editorconfig` files: the sandbox isn't under the repo, so
   each test carries its package's own and `//:editorconfigs` (those no module owns, such as `app/presenter`'s) at
   their real paths. detekt reads `detekt.yml` over its defaults, without type resolution. `bazel run //:format` is
   Gazelle, then ktlint -F over the same sources. The tools resolve on their own classpaths
-  (`maven_kmp.install(name = "ktlint_cli"/"detekt_cli", resolve_stdlib = True)`).
+  (see **Maven tools**).
 
 ## Maven (`maven_kmp`)
 
@@ -154,7 +153,7 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
 `-linuxx64` klib plus any cinterop klibs, the `androidJvm` AAR.
 
 - Highest version wins, raised by `dependencyConstraints` and BOMs (`platform(…)`, module metadata or POM) without
-  bringing anything in. The modules `force_bundles` names (the catalog's `build-tool-pins`) are pinned everywhere;
+  bringing anything in. The modules `force_bundles` names (the catalog's `transitive-pins`) are pinned everywhere;
   `forces` pins on the JVM and in metadata only, never in native klibs. `excludes` drops a module everywhere, also
   where a variant points (`available-at`) at it.
 - An api-variant dependency the runtime variant leaves out is compile-only (`compile_only_deps`, a neverlink twin),
@@ -162,7 +161,7 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
 - The `android` platform takes a library's `androidJvm` variant (an AAR: `classes.jar` merged with its `libs/` jars),
   else a JVM one, never androidx's `*Stubs`; `library_platforms` limits a library to the platforms that use it (the
   `-desktop` jars to `jvm`, the androidx roots to `android`).
-- The Kotlin stdlib comes from the toolchain (unless `resolve_stdlib`, for a tool). Each
+- The Kotlin stdlib comes from the toolchain. Each
   `maven_kmp.install(name = …)` is its own resolution and hub repository. Versions come from the catalog;
   `MODULE.bazel` lists the catalog aliases, platforms and repositories.
 - Each install writes `bazel/kmp/deps/<name>.lock.json` (every file with its sha256); after changing an install or the
@@ -172,6 +171,21 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
   plugins. `dependency_snapshot.py` turns the lockfiles into GitHub's dependency graph.
 - `aliases` adds a hub target under a name some tool expects instead of ours: Android Studio builds
   `@maven_kmp//:androidx_compose_ui_ui_tooling` (rules_jvm_external's name) after every sync of a Compose project.
+
+## Maven tools (rules_jvm_external)
+
+The JVM tools the build runs are plain Maven artifacts, so they need no variant resolution: each is a
+rules_jvm_external `maven.install` in `MODULE.bazel` (`@detekt_cli`, `@ktlint_cli`, `@dokka`, `@schemaspy`,
+`@proguard`, `@android_tools`, `@android_lint`), its own resolution and hub, with the versions written right there and
+bumped by Renovate. Targets are rules_jvm_external's names (`@ktlint_cli//:com_pinterest_ktlint_ktlint_cli`).
+
+- Each pins into `bazel/maven/<name>_install.json`. After changing an install run `REPIN=1 bazel run @<name>//:pin`
+  (or `bazel/renovate/repin.sh`); a lockfile its install no longer matches fails the build.
+- Maven keeps the version a POM asks for, often years old, and doesn't read Gradle's module metadata, which moves a KMP
+  library's `-jvm` artifact and the Kotlin stdlib up. So an install also lists those transitive libraries, under
+  "Transitive versions held at the newest", and `version_conflict_policy = "pinned"` makes them win.
+- A new lockfile can't be bootstrapped with `lock_file` set (the extension reads it first): pin without it, move
+  `rules_jvm_external++maven+<name>_install.json` to `bazel/maven/<name>_install.json`, then add `lock_file`.
 
 ## Kotlin/Native
 
@@ -232,7 +246,7 @@ release's `mm-<os>-<arch>` (`pkg_tar` keeping the exec bit; a copied `.exe` on W
 - **SDK**: the `android_sdk` extension finds the SDK as AGP does (`ANDROID_HOME`, `ANDROID_SDK_ROOT`,
   `local.properties`) and takes the catalog's `android-compileSdk` platform, never downloading it (CI runs
   `sdkmanager`). `@android_sdk//:lint_sdk` is that platform laid out as an SDK for lint. AGP's own tools come from the
-  `android_tools` install; aapt2 is downloaded as AGP does (`pins.bzl`, from AGP's `aapt2_version.properties`).
+  `@android_tools` install; aapt2 is downloaded as AGP does, for the release `android_sdk.agp(version = …)` names (`pins.bzl`, from AGP's `aapt2_version.properties`).
 - **Libraries**: `# gazelle:kmp_targets android …` gives a module `:<name>_android`: `commonMain ← jvmAndroidMain ←
   androidMain` against `@android_sdk//:android_jar` (neverlink), on the JVM's toolchain. `jvmAndroidMain`'s deps are
   `jvm_android_deps`/`jvm_android_exports`, which both compiles see. An `androidMain` runtime-only dep is
@@ -260,8 +274,8 @@ release's `mm-<os>-<arch>` (`pkg_tar` keeping the exec bit; a copied `.exe` on W
   fails on API 37). rules_android's emulator rules aren't used: they can't take APKs built outside them. The release
   smoke test is `//app/main/android-smoketest:smoketest_test` (its own test APK, the release variant not
   debuggable), which installs `//app/main/android:release_debug_signed` first.
-- **Lint** (`lint.bzl`): `//app/main/android:lint` runs the lint AGP does (`android-lint-gradle` in the catalog,
-  always AGP + 23, its own `android_lint` install) over a lint model built from the APK's `AndroidAppInfo`:
+- **Lint** (`lint.bzl`): `//app/main/android:lint` runs the lint AGP does (`@android_lint`'s lint-gradle,
+  always AGP + 23) over a lint model built from the APK's `AndroidAppInfo`:
   namespace, SDK levels, merged manifest, classes and R.jar, and every AAR extracted (its `lint.jar`, `public.txt`,
   `annotations.zip`), with the module's `disable` list. Not in its model: build-tools' `core-lambda-stubs.jar` and
   D8's backported-methods list (both only quiet NewApi on desugared calls).

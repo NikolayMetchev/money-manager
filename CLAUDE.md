@@ -579,8 +579,14 @@ set of writes.
 
 ### Dependencies
 
-- A library's version lives in the catalog, `libs.versions.toml`, never in a BUILD file. A new library also
+- **Always use the latest release** of a library, tool, Bazel module or action, including recent ones. Don't hold
+  back to an older version because a release is new: Renovate keeps every version current (and automerges once CI
+  passes), so pick the newest when adding or bumping something, never a deliberately older one.
+- An app library's version lives in the catalog, `libs.versions.toml`, never in a BUILD file. A new library also
   needs its alias in `MODULE.bazel`'s `maven_kmp.install(libraries = …)`, then `bazel run @maven_kmp//:pin`
+- The build's JVM tools (detekt, ktlint, Dokka, SchemaSpy, ProGuard, AGP's tools, Android lint) are plain Maven
+  artifacts: rules_jvm_external `maven.install`s in `MODULE.bazel`, with their versions written there and locks in
+  `bazel/maven/`. After changing one, `REPIN=1 bazel run @<name>//:pin` (see `bazel/README.md`, "Maven tools")
 - Don't write `deps` by hand: import the type and run `bazel run //:gazelle`, which resolves each import to a module
   or a `@maven_kmp//:<alias>` library. What no import explains (a runtime-only library, a Metro contributor) is a
   `# gazelle:kmp_keep_dep` directive; an API dep other modules see is `# gazelle:kmp_export`

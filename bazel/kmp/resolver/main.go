@@ -40,9 +40,7 @@ type Lock struct {
 		// LibraryPlatforms limit a library to some platforms (alias → platforms), as Gradle only resolves a
 		// library for the source sets that declare it: the desktop Compose jars are no Android library.
 		LibraryPlatforms map[string][]string `json:"library_platforms,omitempty"`
-		Excludes        []string          `json:"excludes"`
-		// ResolveStdlib: the Kotlin stdlib is resolved like any library, for a tool run on its own classpath.
-		ResolveStdlib bool `json:"resolve_stdlib,omitempty"`
+		Excludes         []string            `json:"excludes"`
 	} `json:"inputs"`
 	// Names are the Bazel target names, without the platform suffix: a catalog library by its alias
 	// (kotlinx-coroutines-core → kotlinx_coroutines_core), anything else by its coordinate.
@@ -67,15 +65,14 @@ func main() {
 	flag.Var(&classpathForces, "classpath-force", "module=version-ref: pin a module on the JVM and in common metadata only (repeatable)")
 	flag.Var(&repos, "repository", "url[=group-regex,…]: a repository, in order, optionally limited to groups (repeatable)")
 	flag.Var(&excludes, "exclude", "group:artifact never to resolve, whoever depends on it (repeatable)")
-	stdlib := flag.Bool("resolve-stdlib", false, "resolve the Kotlin stdlib too, for a tool (JVM only); else it comes from the toolchain")
 	flag.Parse()
-	if err := run(*toml, *out, libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes, *stdlib); err != nil {
+	if err := run(*toml, *out, libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes); err != nil {
 		fmt.Fprintln(os.Stderr, "resolver:", err)
 		os.Exit(1)
 	}
 }
 
-func run(tomlPath, out string, libraries, libraryPlatformSpecs, platformNames, forceSpecs, classpathForceSpecs, repoSpecs, excludes []string, resolveStdlib bool) error {
+func run(tomlPath, out string, libraries, libraryPlatformSpecs, platformNames, forceSpecs, classpathForceSpecs, repoSpecs, excludes []string) error {
 	cat, err := ReadCatalog(tomlPath)
 	if err != nil {
 		return err
@@ -121,7 +118,6 @@ func run(tomlPath, out string, libraries, libraryPlatformSpecs, platformNames, f
 	lock.Inputs.Platforms = platformNames
 	// Never null: MODULE.bazel's empty list must read back as one.
 	lock.Inputs.Excludes = append([]string{}, excludes...)
-	lock.Inputs.ResolveStdlib = resolveStdlib
 	only := map[string]map[string]bool{}
 	for _, spec := range libraryPlatformSpecs {
 		alias, names, ok := strings.Cut(spec, "=")
@@ -154,7 +150,6 @@ func run(tomlPath, out string, libraries, libraryPlatformSpecs, platformNames, f
 	}
 
 	resolver := NewResolver(NewFetcher(repos), forced, excludes)
-	resolver.resolveStdlib = resolveStdlib
 	resolver.classpathForces = classpathForced
 	for _, name := range platformNames {
 		if p, ok := platforms[name]; ok && !p.Common {

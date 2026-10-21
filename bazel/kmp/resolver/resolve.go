@@ -71,7 +71,7 @@ func (r *Resolver) forced(p Platform, module string) (string, bool) {
 }
 
 func (r *Resolver) excluded(module string) bool {
-	return (!r.resolveStdlib && fromToolchain(module)) || r.excludes[module]
+	return fromToolchain(module) || r.excludes[module]
 }
 
 type attrs map[string]any
@@ -202,8 +202,6 @@ type Resolver struct {
 	// classpathForces apply on the JVM and to common metadata, not on native (Gradle's classpath substitutions).
 	classpathForces map[string]string
 	excludes        map[string]bool
-	// resolveStdlib resolves the toolchain's modules too: a tool's classpath has its own stdlib.
-	resolveStdlib bool
 	// consumers are the platforms common code is compiled for, whose variants decide what it sees.
 	consumers []Platform
 	mu        sync.Mutex
