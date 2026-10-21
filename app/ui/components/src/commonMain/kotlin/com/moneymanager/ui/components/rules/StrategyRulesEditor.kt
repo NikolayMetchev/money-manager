@@ -177,7 +177,7 @@ fun StrategyRulesEditor(
     pathField: ConditionPathField,
     enabled: Boolean,
     ops: List<ConditionOp> = if (context == RuleContext.CSV_ROW) FLAT_CONDITION_OPS else ConditionOp.entries,
-    title: String = "Rules (top to bottom; the first rule to claim a value wins)",
+    title: String = "Rules",
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(title, style = MaterialTheme.typography.titleSmall)
