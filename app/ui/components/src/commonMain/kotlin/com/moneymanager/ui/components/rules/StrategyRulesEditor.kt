@@ -245,12 +245,10 @@ private fun Set<Int>.swapped(
     b: Int,
 ): Set<Int> =
     map {
-        if (it == a) {
-            b
-        } else if (it == b) {
-            a
-        } else {
-            it
+        when (it) {
+            a -> b
+            b -> a
+            else -> it
         }
     }.toSet()
 
