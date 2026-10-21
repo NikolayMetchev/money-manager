@@ -10,11 +10,11 @@
     "org.jetbrains.kotlin:kotlin-stdlib-jdk7": -1754760516,
     "org.jetbrains.kotlin:kotlin-stdlib-jdk8": -800531621,
     "org.jetbrains:annotations": -874481574,
-    "org.slf4j:slf4j-api": -516945322,
+    "org.slf4j:slf4j-api": -1626237844,
     "repositories": -1949687017
   },
   "__RESOLVED_ARTIFACTS_HASH": {
-    "ch.qos.logback:logback-classic": 1460179188,
+    "ch.qos.logback:logback-classic": 404065412,
     "ch.qos.logback:logback-core": -290381862,
     "com.github.ajalt.clikt:clikt-core-jvm": -236822266,
     "com.github.ajalt.clikt:clikt-jvm": -743906023,
@@ -24,7 +24,7 @@
     "com.github.ajalt.mordant:mordant-jvm-ffm-jvm": -538720682,
     "com.github.ajalt.mordant:mordant-jvm-graal-ffi-jvm": 814764253,
     "com.github.ajalt.mordant:mordant-jvm-jna-jvm": -880766219,
-    "com.pinterest.ktlint:ktlint-cli": 746056354,
+    "com.pinterest.ktlint:ktlint-cli": -662191313,
     "com.pinterest.ktlint:ktlint-cli-reporter-baseline": 181616226,
     "com.pinterest.ktlint:ktlint-cli-reporter-checkstyle": 551932203,
     "com.pinterest.ktlint:ktlint-cli-reporter-core": -1414948032,
@@ -56,7 +56,7 @@
     "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm": -292051970,
     "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": -1364108886,
     "org.jetbrains:annotations": -1663747638,
-    "org.slf4j:slf4j-api": 1965957737
+    "org.slf4j:slf4j-api": -736053657
   },
   "artifacts": {
     "ch.qos.logback:logback-classic": {
@@ -313,9 +313,9 @@
     },
     "org.slf4j:slf4j-api": {
       "shasums": {
-        "jar": "e91ff6d720609e7a194ffe758c3ed5c84e798617ae07b0a0f6a4fe229741b4bb"
+        "jar": "7e1446499b359675d8aabe6af2de86b85e72ae8a2a932c0b40d0e5ba57097439"
       },
-      "version": "2.0.19"
+      "version": "2.0.20"
     }
   },
   "dependencies": {
