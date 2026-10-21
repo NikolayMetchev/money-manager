@@ -151,7 +151,7 @@
       "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm": "1.12.0",
       "org.jetbrains.kotlinx:kotlinx-serialization-json": "1.12.0",
       "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": "1.12.0",
-      "org.jetbrains:annotations": "23.1.0",
+      "org.jetbrains:annotations": "26.1.0",
       "org.slf4j:slf4j-api": "2.0.20"
     },
     "platforms": [
@@ -15877,22 +15877,22 @@
     },
     "org.jetbrains:annotations": {
       "android": {
-        "version": "23.1.0",
+        "version": "26.1.0",
         "files": [
           {
-            "name": "annotations-23.1.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/23.1.0/annotations-23.1.0.jar",
-            "sha256": "2a114c5684afc924fae316fdd3be15ca18015e39759d65712285266f7aea829d"
+            "name": "annotations-26.1.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/26.1.0/annotations-26.1.0.jar",
+            "sha256": "ebc7aec252ed0c7d2d04c039d7f00e69f7b86b1f493c741d67b3ef31b986b054"
           }
         ]
       },
       "jvm": {
-        "version": "23.1.0",
+        "version": "26.1.0",
         "files": [
           {
-            "name": "annotations-23.1.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/23.1.0/annotations-23.1.0.jar",
-            "sha256": "2a114c5684afc924fae316fdd3be15ca18015e39759d65712285266f7aea829d"
+            "name": "annotations-26.1.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/annotations/26.1.0/annotations-26.1.0.jar",
+            "sha256": "ebc7aec252ed0c7d2d04c039d7f00e69f7b86b1f493c741d67b3ef31b986b054"
           }
         ]
       }
