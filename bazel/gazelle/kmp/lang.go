@@ -43,12 +43,16 @@ var resolvedAttrs = map[string]bool{
 	"linux_deps":          true,
 	"apple_deps":          true,
 	"mingw_deps":          true,
+	"non_jvm_deps":        true,
+	"web_deps":            true,
+	"wasm_js_deps":        true,
+	"js_deps":             true,
 }
 
 // The `*_srcs` globs aren't mergeable: each is fixed for its source set, Gazelle can't merge every glob
 // expression, and a source set's attribute is only ever added.
 func mergeable(extra ...string) map[string]bool {
-	out := map[string]bool{"android": true, "native_targets": true, "plugins": true}
+	out := map[string]bool{"android": true, "native_targets": true, "web_targets": true, "plugins": true}
 	for _, k := range extra {
 		out[k] = true
 	}

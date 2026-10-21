@@ -1,0 +1,20 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_targets js wasmJs
+
+kmp_library(
+    name = "server",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":server",
+    jvm_deps = ["//bazel/kmp/deps:kotlin_test"],
+    jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
+)

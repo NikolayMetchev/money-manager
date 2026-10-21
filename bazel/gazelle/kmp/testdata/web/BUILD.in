@@ -1,0 +1,2 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets linuxX64 web

@@ -621,7 +621,7 @@ set of writes.
 
 ### Platform Support
 
-- **JVM** ✅ | **Android** ✅ | **iOS** ⚠️ planned | **Web** ⚠️ planned | **Native** ⚠️ in progress (CLI `mm`, #917)
+- **JVM** ✅ | **Android** ✅ | **iOS** ⚠️ planned | **Web** ⚠️ in progress (#84) | **Native** ⚠️ in progress (CLI `mm`, #917)
 - **Kotlin/Native** (`linuxX64`, `linuxArm64`, `macosArm64`, `mingwX64`): a module joins with
   `# gazelle:kmp_targets … linuxArm64 linuxX64 macosArm64 mingwX64` in its BUILD file. Only the CLI's dependency closure does, never `app/ui/*`. Once a module has
   a native target, JVM-only APIs in its `commonMain` (`java.*`, `System.*`, implicit `kotlin.jvm` imports) fail the
@@ -630,6 +630,9 @@ set of writes.
   full project path (`app-db-core`), since same-named modules (`core`, `read`, `write`) would otherwise clash.
   Every module also gets `:<name>_metadata`, commonMain compiled alone against its deps' common metadata, which
   catches a JVM-only API in commonMain that each platform's compile accepts (`RegexOption.DOT_MATCHES_ALL`).
+- **Browser** (`wasmJs`, `js`; #84, in progress): a module joins with `web` in its `kmp_targets` (both targets), and its
+  tests then run in Node as `:test_wasmJs` and `:test_js`. Code the browser shares with native goes in `nonJvmMain`,
+  code both browser targets share in `webMain`. So far: `utils/humanreadable`, `utils/parsers/{csv,qif}`, `app/di/scope`.
 - **No classpath resources** (native has none): data a module ships is compiled into `commonMain` by
   `kotlin_constants` (`//bazel/kmp/constants`), wired with `# gazelle:kmp_generated_srcs`: the app version
   (`app/di/core`, from the root `VERSION`), the crypto catalog (`app/cryptodata/data/coins.tsv`) and the
