@@ -15,3 +15,9 @@ flags:
 comment:
   layout: "header, diff, flags, components"
   require_changes: false
+
+# Code only a device or emulator runs (SharedPreferences, the Storage Access Framework): the coverage run is the JVM
+# and Android host tests, which never reach it, so it would only count against the patch and project targets.
+# Native source sets need no entry: no coverage run instruments them, so they never reach the report.
+ignore:
+  - "**/src/androidMain/**"
