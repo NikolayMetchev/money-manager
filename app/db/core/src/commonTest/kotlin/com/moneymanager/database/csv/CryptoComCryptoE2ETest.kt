@@ -14,7 +14,6 @@ import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -123,7 +122,7 @@ class CryptoComCryptoE2ETest : DbTest() {
 
     @Test
     fun cryptoExport_reimportAll_resolvesCryptoAndKeepsBalance() =
-        runTest {
+        runDbTest {
             val file =
                 stage(
                     "crypto_transactions_record_20231119_121744.csv",
@@ -151,7 +150,7 @@ class CryptoComCryptoE2ETest : DbTest() {
 
     @Test
     fun cryptoExport_importsCashbackAsRealCryptoBalance() =
-        runTest {
+        runDbTest {
             val crypto =
                 stage(
                     "crypto_transactions_record_20231119_121744.csv",
@@ -205,7 +204,7 @@ class CryptoComCryptoE2ETest : DbTest() {
 
     @Test
     fun cryptoExchange_importsAsSameAccountTrade() =
-        runTest {
+        runDbTest {
             // A crypto→crypto exchange inside the App wallet: one row, TGBP out and CRO in, both legs
             // in the single "Crypto.com" account. Previously this imported as a single-leg transfer
             // into a junk "TGBP -> CRO" account, losing the bought leg.
@@ -253,7 +252,7 @@ class CryptoComCryptoE2ETest : DbTest() {
 
     @Test
     fun vibanRows_dedupeAgainstFiatTrades_eitherImportOrder() =
-        runTest {
+        runDbTest {
             // The same viban purchase appears in BOTH exports (identical timestamp/description/amounts;
             // the fiat file's Amount is positive, the crypto file's negative). Both strategies must
             // produce the identical trade so createTrade's exact match books it once — whichever file
@@ -284,7 +283,7 @@ class CryptoComCryptoE2ETest : DbTest() {
 
     @Test
     fun vibanRows_dedupeAgainstFiatTrades_cryptoFileFirst() =
-        runTest {
+        runDbTest {
             val fiatRow =
                 row("2022-06-16 04:55:30", "TGBP -> GBP", "TGBP", "46.03", "46.03", "crypto_viban", "GBP", "46.03")
             val cryptoRow =
@@ -321,7 +320,7 @@ class CryptoComCryptoE2ETest : DbTest() {
 
     @Test
     fun reimport_convertsOldSingleLegTransferToTrade() =
-        runTest {
+        runDbTest {
             // Upgrade path: a crypto_exchange row imported under the OLD strategy definition (no
             // TO_CURRENCY/TO_AMOUNT mappings) produced a single-leg transfer into a junk
             // description-named account. Re-importing under the CURRENT definition must delete that
@@ -425,7 +424,7 @@ class CryptoComCryptoE2ETest : DbTest() {
 
     @Test
     fun dustConversion_manyDebitsOneCredit_linkedThroughConversionsAccount() =
-        runTest {
+        runDbTest {
             // A "Convert Dust" event: three tiny tokens converted into one aggregate CRO credit, all at
             // the same timestamp (crypto.com reports the credit as a separate *_credited row with only
             // Currency/Amount — no To Currency). Previously the credit leg errored and the debits imported
@@ -478,7 +477,7 @@ class CryptoComCryptoE2ETest : DbTest() {
 
     @Test
     fun walletSwap_oneToOne_linkedThroughConversionsAccount() =
-        runTest {
+        runDbTest {
             // A 1:1 "Balance Conversion" (crypto_wallet_swap): LUNA -> LUNC.
             val file =
                 stage(

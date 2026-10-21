@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_export @maven_kmp//:kotlinx_io_core
 
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
@@ -17,6 +17,12 @@ kmp_library(
         "mingwX64",
     ],
     visibility = ["//visibility:public"],
+    web_deps = ["@maven_kmp//:kotlinx_browser"],
+    web_srcs = glob(["src/webMain/kotlin/**/*.kt"]),
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = ["@maven_kmp//:kotlinx_io_core"],
     deps = [
         "//utils/files",
@@ -31,6 +37,10 @@ kmp_test(
     android = True,
     associate = ":localsettings",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    jvm_deps = [
+        "//utils/files",
+        "@maven_kmp//:kotlinx_io_core",
+    ],
     jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
     native_targets = [
         "linuxArm64",
@@ -38,9 +48,9 @@ kmp_test(
         "macosArm64",
         "mingwX64",
     ],
-    deps = [
-        "//bazel/kmp/deps:kotlin_test",
-        "//utils/files",
-        "@maven_kmp//:kotlinx_io_core",
+    web_targets = [
+        "wasmJs",
+        "js",
     ],
+    deps = ["//bazel/kmp/deps:kotlin_test"],
 )

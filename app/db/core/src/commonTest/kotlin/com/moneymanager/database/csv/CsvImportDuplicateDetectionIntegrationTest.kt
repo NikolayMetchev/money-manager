@@ -33,7 +33,6 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -155,7 +154,7 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
 
     @Test
     fun `full import flow should detect duplicates using existing transfers from repository`() =
-        runTest {
+        runDbTest {
             setupTestData()
 
             // Create an existing transfer with attributes
@@ -294,7 +293,7 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
 
     @Test
     fun `duplicate detection should work without unique identifiers by comparing all fields`() =
-        runTest {
+        runDbTest {
             setupTestData()
 
             // Create an existing transfer WITHOUT any attributes

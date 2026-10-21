@@ -19,3 +19,5 @@ actual fun deleteTestDatabase(location: DbLocation) {
         // Ignore cleanup errors
     }
 }
+
+actual val testDatabasesAreFiles: Boolean = true

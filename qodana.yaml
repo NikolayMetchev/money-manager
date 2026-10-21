@@ -363,6 +363,8 @@ exclude:
       - bazel/kmp/plugins/tests/src/commonMain/kotlin/com/moneymanager/bazel/plugins/Plugins.kt
       # [5] — the browser rules' fixture: greeting() is called by the web-only hello program, in no module.
       - bazel/kmp/web/tests/greeting/common/greeting/Greeting.kt
+      # [5] — FileSettingsText is used by jvmMain's DesktopLocalSettings and the CLI's CreateLocalSettings.native.
+      - utils/localsettings/src/commonMain/kotlin/com/moneymanager/localsettings/JsonLocalSettings.kt
       # [5] — actuals of common expects (BigDecimal/BigInteger, Currency, the file pickers, the vault path
       # resolver, the crypto catalog file, the remote cache location, the test database loader) and
       # MainActivity, which the Android manifest names.

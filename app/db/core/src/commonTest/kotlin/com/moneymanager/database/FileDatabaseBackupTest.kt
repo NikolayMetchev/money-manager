@@ -6,6 +6,7 @@ import com.moneymanager.files.writeText
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.testDatabasesAreFiles
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -22,6 +23,7 @@ class FileDatabaseBackupTest {
     @Test
     fun `backup moves the WAL and SHM sidecars with the database`() =
         runTest {
+            if (!testDatabasesAreFiles) return@runTest
             val location = createTestDatabaseLocation()
             val manager = createTestDatabaseManager()
             var backup: DbLocation? = null

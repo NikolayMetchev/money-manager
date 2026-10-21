@@ -25,7 +25,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -123,7 +122,7 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
 
     @Test
     fun `downloads every wallet ledger page then imports its movements and trades`() =
-        runTest {
+        runDbTest {
             val strategy = coinbaseStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val credentialId = apiConnection("Coinbase", now)
@@ -193,7 +192,7 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
      */
     @Test
     fun `a fiat deposit a bank export already recorded is not counted twice`() =
-        runTest {
+        runDbTest {
             val gbp = assertNotNull(repositories.currencyRepository.getCurrencyByCode("GBP").first())
             val coinbaseKey = LocalAccountKey("coinbase")
             val bankKey = LocalAccountKey("bank")
@@ -298,7 +297,7 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
 
     @Test
     fun `a repeat download stops walking a wallet ledger once it reaches the previous download`() =
-        runTest {
+        runDbTest {
             val strategy = coinbaseStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val credentialId = apiConnection("Coinbase", now)
@@ -318,7 +317,7 @@ class CoinbaseExchangeApiE2ETest : DbTest() {
 
     @Test
     fun `a wallet ledger that echoes back the cursor it was sent stops paging`() =
-        runTest {
+        runDbTest {
             val strategy = coinbaseStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val credentialId = apiConnection("Coinbase", now)

@@ -29,7 +29,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -743,7 +742,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `downloaded transactions are imported with correct API audit source on accounts and transfers`() =
-        runTest {
+        runDbTest {
             // GIVEN — device and session
             val deviceId =
                 repositories.deviceRepository.getOrCreateDevice(
@@ -921,7 +920,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `pagination continues past a page that contains only declined transactions`() =
-        runTest {
+        runDbTest {
             val deviceId =
                 repositories.deviceRepository.getOrCreateDevice(
                     DeviceInfo.Jvm("test-machine", "Test OS"),
@@ -1027,7 +1026,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `counterparty id creates one account attribute and prevents duplicate counterparty accounts`() =
-        runTest {
+        runDbTest {
             val deviceId =
                 repositories.deviceRepository.getOrCreateDevice(
                     DeviceInfo.Jvm("test-machine", "Test OS"),
@@ -1112,7 +1111,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `account owners with same external user id create one person with monzo-external-id attribute`() =
-        runTest {
+        runDbTest {
             val deviceId =
                 repositories.deviceRepository.getOrCreateDevice(
                     DeviceInfo.Jvm("test-machine", "Test OS"),
@@ -1210,7 +1209,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `counterparty bank details are used when configured counterparty id is absent`() =
-        runTest {
+        runDbTest {
             val deviceId =
                 repositories.deviceRepository.getOrCreateDevice(
                     DeviceInfo.Jvm("test-machine", "Test OS"),
@@ -1303,7 +1302,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `personal counterparties create one owner person keyed by external id`() =
-        runTest {
+        runDbTest {
             val deviceId =
                 repositories.deviceRepository.getOrCreateDevice(
                     DeviceInfo.Jvm("test-machine", "Test OS"),
@@ -1439,7 +1438,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `personal counterparty import matches existing person ignoring middle names`() =
-        runTest {
+        runDbTest {
             repositories.personRepository.createPerson(
                 Person(
                     id = PersonId(0L),
@@ -1524,7 +1523,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `atm withdrawals with counterparty ids consolidate into one account and are excluded from discovery`() =
-        runTest {
+        runDbTest {
             val deviceId =
                 repositories.deviceRepository.getOrCreateDevice(
                     DeviceInfo.Jvm("test-machine", "Test OS"),
@@ -1625,7 +1624,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `ordinary payments with a null atm_fees_detailed field are not routed to the ATM account`() =
-        runTest {
+        runDbTest {
             val deviceId =
                 repositories.deviceRepository.getOrCreateDevice(
                     DeviceInfo.Jvm("test-machine", "Test OS"),
@@ -1714,7 +1713,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `atm withdrawals reuse one built-in ATM counterparty account even after rename`() =
-        runTest {
+        runDbTest {
             val deviceId =
                 repositories.deviceRepository.getOrCreateDevice(
                     DeviceInfo.Jvm("test-machine", "Test OS"),
@@ -1830,7 +1829,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `a foreign currency spend is booked in the local currency with the conversion as a trade`() =
-        runTest {
+        runDbTest {
             val deviceId =
                 repositories.deviceRepository.getOrCreateDevice(
                     DeviceInfo.Jvm("test-machine", "Test OS"),
@@ -1955,7 +1954,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `atm withdrawal fee imports as its own transfer linked to the withdrawal`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val sessionId =
                 repositories.apiSessionRepository.createSession(
@@ -2067,7 +2066,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `ephemeral anonuser counterparties with the same name collapse into one account`() =
-        runTest {
+        runDbTest {
             val deviceId =
                 repositories.deviceRepository.getOrCreateDevice(
                     DeviceInfo.Jvm("test-machine", "Test OS"),
@@ -2155,7 +2154,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `ephemeral counterparties reconcile onto one account across separate imports`() =
-        runTest {
+        runDbTest {
             val deviceId =
                 repositories.deviceRepository.getOrCreateDevice(
                     DeviceInfo.Jvm("test-machine", "Test OS"),
@@ -2243,7 +2242,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `own accounts with no activity are never created and the personal account gets no id suffix`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val sessionId =
                 repositories.apiSessionRepository.createSession(
@@ -2327,7 +2326,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `a self-transfer to the joint account resolves onto the joint own account not a new counterparty`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val sessionId =
                 repositories.apiSessionRepository.createSession(
@@ -2443,7 +2442,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `a pre-existing bare account of the same name is adopted instead of duplicated`() =
-        runTest {
+        runDbTest {
             // Mirrors a CSV import (or a manually created account) getting to "Monzo Joint" first, with
             // no bank identity of its own — exactly what the import-directory auto-create-by-name feature
             // produces. The API import must fill in this account's identity/owner attributes rather than
@@ -2561,7 +2560,7 @@ class MonzoImportE2ETest : DbTest() {
 
     @Test
     fun `the rewards account is created and named Monzo Rewards when it does carry activity`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val sessionId =
                 repositories.apiSessionRepository.createSession(

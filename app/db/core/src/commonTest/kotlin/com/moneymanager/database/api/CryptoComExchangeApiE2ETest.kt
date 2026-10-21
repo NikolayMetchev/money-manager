@@ -13,7 +13,6 @@ import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -107,7 +106,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
 
     @Test
     fun `imports a cross-asset trade - a deposit and auto-creates crypto assets - idempotently`() =
-        runTest {
+        runDbTest {
             stageSessionAndImport()
 
             val exchange =
@@ -249,7 +248,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
 
     @Test
     fun `re-importing an order whose status changed updates it in place and bumps the revision`() =
-        runTest {
+        runDbTest {
             stageSessionAndImport()
             val exchange =
                 repositories.accountRepository
@@ -281,7 +280,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
 
     @Test
     fun `a value with more precision than the asset's scale fails the import instead of rounding`() =
-        runTest {
+        runDbTest {
             // Every currency shares crypto's 10^18 storage scale, so a realistic exchange-reported value
             // (e.g. Kraken's 5-decimal GBP trade legs) is always representable — only a value exceeding
             // even that (19+ decimals) still can't be represented exactly, so the import must throw
@@ -303,7 +302,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
 
     @Test
     fun `an internal deposit aliases to the App account and reconciles with the CSV leg regardless of order`() =
-        runTest {
+        runDbTest {
             // The CSV export's view of the same App -> Exchange transfer, already imported:
             // Crypto.com -> Crypto.com Exchange, 1500.25 CRO, 30s before the API's create_time.
             val croId = repositories.importEngine.createCrypto("CRO")
@@ -361,7 +360,7 @@ class CryptoComExchangeApiE2ETest : DbTest() {
 
     @Test
     fun `reconciles an App to Exchange transfer into one internal transfer`() =
-        runTest {
+        runDbTest {
             // Seed the App side: the CSV "Crypto.com" account records the same CRO moving out (to a
             // dangling external wallet) that the Exchange deposit below records moving in.
             val croId = repositories.importEngine.createCrypto("CRO")

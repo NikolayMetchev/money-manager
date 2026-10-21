@@ -14,7 +14,6 @@ import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -50,7 +49,7 @@ class DatabaseSnapshotAndShrinkTest : DbTest() {
 
     @Test
     fun truncateEmptiesMaterializedViewsAndFullRefreshRebuilds() =
-        runTest {
+        runDbTest {
             seedTransfer()
             repositories.maintenanceService.fullRefreshMaterializedViews()
             assertTrue(database.countRows("account_balance_materialized_view") > 0, "MV should be populated")
@@ -68,7 +67,7 @@ class DatabaseSnapshotAndShrinkTest : DbTest() {
 
     @Test
     fun dataChangeTokenTracksLogicalChangesButNotViewRebuilds() =
-        runTest {
+        runDbTest {
             val before = database.dataChangeToken()
             repositories.accountRepository.createAccount(
                 Account(id = AccountId(0), name = "Tracked", openingDate = Clock.System.now()),
@@ -84,7 +83,7 @@ class DatabaseSnapshotAndShrinkTest : DbTest() {
 
     @Test
     fun snapshotRestoreRoundTripPreservesData() =
-        runTest {
+        runDbTest {
             seedTransfer()
             val manager = createTestDatabaseManager()
 

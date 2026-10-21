@@ -29,10 +29,10 @@ import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.createCsvStrategy
 import com.moneymanager.importengineapi.createCurrency
 import com.moneymanager.importengineapi.deleteCsvStrategy
+import com.moneymanager.regex.compileRegex
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInPassThroughs
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -45,7 +45,7 @@ class StrategyLibraryServiceTest : DbTest() {
 
     @Test
     fun `csv strategy round-trips with its per-strategy account mapping - keyed by name - no duplicates`() =
-        runTest {
+        runDbTest {
             val library = repositories.strategyLibrary
             val engine = repositories.importEngine
             val csvRepo = repositories.csvImportStrategyRepository
@@ -67,7 +67,7 @@ class StrategyLibraryServiceTest : DbTest() {
                     updatedAt = now,
                 )
             engine.createCsvStrategy(strategy)
-            engine.createAccountMapping(Regex("PAXOS.*", RegexOption.IGNORE_CASE), accountId, strategy.id)
+            engine.createAccountMapping(compileRegex("PAXOS.*", RegexOption.IGNORE_CASE), accountId, strategy.id)
 
             val key = StrategyKey(StrategyKind.CSV, "WiseTest")
             val entry = library.listLocal(version).first { it.key == key }
@@ -93,7 +93,7 @@ class StrategyLibraryServiceTest : DbTest() {
 
     @Test
     fun `a QIF strategy is classified as QIF - a plain one as CSV`() =
-        runTest {
+        runDbTest {
             val engine = repositories.importEngine
             val now = Clock.System.now()
             engine.createCsvStrategy(
@@ -115,7 +115,7 @@ class StrategyLibraryServiceTest : DbTest() {
 
     @Test
     fun `api strategy round-trips and re-applies by name without duplicating`() =
-        runTest {
+        runDbTest {
             val library = repositories.strategyLibrary
             val engine = repositories.importEngine
             val now = Clock.System.now()
@@ -162,7 +162,7 @@ class StrategyLibraryServiceTest : DbTest() {
 
     @Test
     fun `pass-through definition round-trips and re-applies by name without duplicating`() =
-        runTest {
+        runDbTest {
             val library = repositories.strategyLibrary
             // The installed Curve definition is listed as its own artifact.
             repositories.installBuiltInPassThroughs()
@@ -185,7 +185,7 @@ class StrategyLibraryServiceTest : DbTest() {
 
     @Test
     fun `currency list lists seeded currencies - skips user-created ones - and installs only missing codes`() =
-        runTest {
+        runDbTest {
             val library = repositories.strategyLibrary
             val engine = repositories.importEngine
             val key = StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)
@@ -227,7 +227,7 @@ class StrategyLibraryServiceTest : DbTest() {
 
     @Test
     fun `a database seeded from the bundled table matches the published list for the same table`() =
-        runTest {
+        runDbTest {
             val key = StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)
             val seeded = IsoCurrencies.all.filter { it.code in setOf("EUR", "GBP", "USD") }
             val published =

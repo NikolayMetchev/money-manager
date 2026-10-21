@@ -7,7 +7,6 @@ import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Source
 import com.moneymanager.test.database.DbTest
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -16,7 +15,7 @@ import kotlin.time.Clock
 class DbEntitySourceTest : DbTest() {
     @Test
     fun `recordEntityProvenance persists api detail per revision of the same entity`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, Clock.System.now(), null)
             val requestId =

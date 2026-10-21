@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_plugins serialization
 # gazelle:kmp_export //utils/localsettings
 # gazelle:kmp_export @maven_kmp//:kotlinx_coroutines_core
@@ -19,6 +19,12 @@ kmp_library(
     ],
     plugins = ["serialization"],
     visibility = ["//visibility:public"],
+    web_deps = ["@maven_kmp//:kotlinx_browser"],
+    web_srcs = glob(["src/webMain/kotlin/**/*.kt"]),
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = [
         "//utils/localsettings",
         "@maven_kmp//:kotlinx_coroutines_core",
@@ -44,6 +50,10 @@ kmp_test(
         "mingwX64",
     ],
     plugins = ["serialization"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     deps = [
         "//bazel/kmp/deps:kotlin_test",
         "//test/utils/credentialvault",

@@ -5,7 +5,6 @@ import com.moneymanager.importengineapi.setSetupWizardCompleted
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -29,14 +28,14 @@ class SettingsRepositoryImplTest : DbTest() {
 
     @Test
     fun `fresh database returns null default currency`() =
-        runTest {
+        runDbTest {
             val result = repositories.settingsRepository.getDefaultCurrencyId().first()
             assertNull(result)
         }
 
     @Test
     fun `set and get default currency`() =
-        runTest {
+        runDbTest {
             val currencies = repositories.currencyRepository.getAllCurrencies().first()
             val eurCurrency = currencies.first { it.code == "EUR" }
 
@@ -49,7 +48,7 @@ class SettingsRepositoryImplTest : DbTest() {
 
     @Test
     fun `update default currency replaces previous value`() =
-        runTest {
+        runDbTest {
             val currencies = repositories.currencyRepository.getAllCurrencies().first()
             val eurCurrency = currencies.first { it.code == "EUR" }
             val usdCurrency = currencies.first { it.code == "USD" }
@@ -63,13 +62,13 @@ class SettingsRepositoryImplTest : DbTest() {
 
     @Test
     fun `fresh database returns null last qif account`() =
-        runTest {
+        runDbTest {
             assertNull(repositories.settingsRepository.getLastQifAccountId().first())
         }
 
     @Test
     fun `set and get last qif account`() =
-        runTest {
+        runDbTest {
             val accountId = createAccount()
 
             repositories.settingsRepository.setLastQifAccountId(accountId)
@@ -79,7 +78,7 @@ class SettingsRepositoryImplTest : DbTest() {
 
     @Test
     fun `settings columns are independent - writing one does not clear the other`() =
-        runTest {
+        runDbTest {
             val eur =
                 repositories.currencyRepository
                     .getAllCurrencies()
@@ -98,13 +97,13 @@ class SettingsRepositoryImplTest : DbTest() {
 
     @Test
     fun `fresh database has not completed the setup wizard`() =
-        runTest {
+        runDbTest {
             assertFalse(repositories.settingsRepository.isSetupWizardCompleted().first())
         }
 
     @Test
     fun `set and get setup wizard completed`() =
-        runTest {
+        runDbTest {
             repositories.settingsRepository.setSetupWizardCompleted(true)
             assertTrue(repositories.settingsRepository.isSetupWizardCompleted().first())
 
@@ -114,7 +113,7 @@ class SettingsRepositoryImplTest : DbTest() {
 
     @Test
     fun `import engine records setup wizard completion`() =
-        runTest {
+        runDbTest {
             repositories.importEngine.setSetupWizardCompleted(true)
 
             assertTrue(repositories.settingsRepository.isSetupWizardCompleted().first())
@@ -122,7 +121,7 @@ class SettingsRepositoryImplTest : DbTest() {
 
     @Test
     fun `completing the setup wizard does not clear the default currency`() =
-        runTest {
+        runDbTest {
             val eur =
                 repositories.currencyRepository
                     .getAllCurrencies()

@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -71,7 +70,7 @@ class RunningBalancePaginationCurrencyFilterTest : DbTest() {
 
     @Test
     fun `currency filtered pagination returns only matching rows even when they are older than a page`() =
-        runTest {
+        runDbTest {
             val gbp = currency("GBP")
             val usd = currency("USD")
             val card = createAccount("Card")

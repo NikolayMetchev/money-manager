@@ -30,6 +30,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.test.runTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -41,6 +43,11 @@ import kotlin.test.assertNull
 @OptIn(ExperimentalTestApi::class)
 class ApiConnectionsVaultE2ETest : DbTest() {
     override val installBuiltInStrategies: Boolean = true
+
+    // A Compose test, so not runDbTest: the database opens before it, which only JVM and Android (where this runs)
+    // wait for.
+    @BeforeTest
+    fun openDatabase() = runTest { openTestDatabase() }
 
     private val monzo = StoredApiCredential(strategyName = "Monzo", token = "monzo-token-123456", createdAtEpochMillis = 1)
 

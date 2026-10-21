@@ -10,7 +10,6 @@ import com.moneymanager.regex.compileRegex
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -59,7 +58,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
     @Test
     fun `global and strategy-scoped mappings coexist and round-trip their scope`() =
-        runTest {
+        runDbTest {
             val account = createTestAccount()
             val strategyId = createTestStrategy()
 
@@ -80,7 +79,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
     @Test
     fun `strategy-scoped mappings are cascade-deleted when the strategy is deleted`() =
-        runTest {
+        runDbTest {
             val account = createTestAccount()
             val strategyId = createTestStrategy()
             repositories.accountMappingRepository.createMapping(
@@ -103,7 +102,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
     @Test
     fun `createMapping should insert mapping and be retrievable`() =
-        runTest {
+        runDbTest {
             val account = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
@@ -119,7 +118,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
     @Test
     fun `getAllMappings should return all mappings ordered by id`() =
-        runTest {
+        runDbTest {
             val account1 = createTestAccount()
             val account2 = createTestAccount()
 
@@ -142,7 +141,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
     @Test
     fun `updateMapping should update mapping fields`() =
-        runTest {
+        runDbTest {
             val account1 = createTestAccount()
             val account2 = createTestAccount()
 
@@ -171,7 +170,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
     @Test
     fun `deleteMapping should remove mapping`() =
-        runTest {
+        runDbTest {
             val account = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
@@ -193,7 +192,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
     @Test
     fun `mappings should be deleted when account is deleted`() =
-        runTest {
+        runDbTest {
             val account = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
@@ -214,7 +213,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
     @Test
     fun `stored regex pattern preserves original pattern string`() =
-        runTest {
+        runDbTest {
             val account = createTestAccount()
 
             val complexPattern = "^Nikolay Metchev & Olga Zakharenko$"
@@ -230,7 +229,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
     @Test
     fun `retrieved regex is case insensitive`() =
-        runTest {
+        runDbTest {
             val account = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
@@ -250,14 +249,14 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
     @Test
     fun `getAllMappings returns empty list when there are no mappings`() =
-        runTest {
+        runDbTest {
             val mappings = repositories.accountMappingRepository.getAllMappings().first()
             assertTrue(mappings.isEmpty())
         }
 
     @Test
     fun `multiple mappings with different patterns are allowed`() =
-        runTest {
+        runDbTest {
             val account1 = createTestAccount()
             val account2 = createTestAccount()
 

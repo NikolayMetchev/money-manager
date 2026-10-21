@@ -4,7 +4,6 @@ import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.test.database.DbTest
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -31,7 +30,7 @@ class DeviceRepositoryImplTest : DbTest() {
 
     @Test
     fun `getOrCreateDevice should create device and return valid id`() =
-        runTest {
+        runDbTest {
             // First check if Platform table is seeded
             val platforms = selectAllPlatforms()
             assertTrue(platforms.isNotEmpty(), "Platform table should be seeded. Found: ${platforms.size} entries")
@@ -57,7 +56,7 @@ class DeviceRepositoryImplTest : DbTest() {
 
     @Test
     fun `Platform table should be seeded with JVM entry`() =
-        runTest {
+        runDbTest {
             // Check that Platform(id=1) exists
             val platforms = selectAllPlatforms()
             assertTrue(platforms.isNotEmpty(), "Platform table should be seeded")
@@ -77,7 +76,7 @@ class DeviceRepositoryImplTest : DbTest() {
 
     @Test
     fun `desktop and CLI hosts on one machine are separate devices`() =
-        runTest {
+        runDbTest {
             val desktop = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("Linux", "box"))
             val cli = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Native("Linux", "box"))
 
@@ -88,7 +87,7 @@ class DeviceRepositoryImplTest : DbTest() {
 
     @Test
     fun `a browser is a host device of its own`() =
-        runTest {
+        runDbTest {
             val desktop = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("Linux", "box"))
             val browser = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Web("Linux", "Chrome"))
 
@@ -99,7 +98,7 @@ class DeviceRepositoryImplTest : DbTest() {
 
     @Test
     fun `a database created before the NATIVE platform gains its row on first CLI use`() =
-        runTest {
+        runDbTest {
             // Opening the database records the host device, which on native is a NATIVE one.
             database.execute(null, "DELETE FROM device WHERE platform_id = 3", 0)
             database.execute(null, "DELETE FROM platform WHERE id = 3", 0)

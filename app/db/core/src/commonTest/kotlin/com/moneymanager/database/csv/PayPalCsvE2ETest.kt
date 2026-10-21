@@ -21,7 +21,6 @@ import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -286,7 +285,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun cardStatementFirst_thenPayPalExport_countsEachPaymentOnce() =
-        runTest {
+        runDbTest {
             importCard()
             importPayPal()
             assertEachPaymentCountedOnce()
@@ -296,7 +295,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun payPalExportFirst_thenCardStatement_countsEachPaymentOnce() =
-        runTest {
+        runDbTest {
             importPayPal()
             importCard()
             assertEachPaymentCountedOnce()
@@ -306,7 +305,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun payPalExportAlone_keepsTheUnidentifiedCardFundingVisible() =
-        runTest {
+        runDbTest {
             importPayPal()
             assertBalance("0", "PayPal")
             assertBalance("0", "PayPal", "USD")
@@ -335,7 +334,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun eachCardDeposit_isLinkedToThePaymentItFunded_asOneChainThroughPayPal() =
-        runTest {
+        runDbTest {
             val refund =
                 listOf(
                     payPalRow("01/09/2025", "10:00:00", "Pret-a-Portrait Ltd", "Payment Refund", "GBP", "5.00", "r1", "BST"),
@@ -358,7 +357,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun cardStatementFirst_thenPayPalExport_stillLinksEachDepositToItsPayment() =
-        runTest {
+        runDbTest {
             importCard()
             importPayPal()
             assertEachPaymentCountedOnce()
@@ -370,7 +369,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun payPalTimes_areReadInTheZoneTheirAbbreviationNames() =
-        runTest {
+        runDbTest {
             importPayPal()
             // "17/10/2025 09:57:32 BST" is 08:57:32 UTC; "02/11/2025 11:55:15 GMT" is UTC already.
             val payPal = account("PayPal")
@@ -413,7 +412,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun foreignCurrencyCardCharge_thenPayPalExport_countsThePaymentOnce() =
-        runTest {
+        runDbTest {
             importCard(foreignCardFile)
             importPayPal(foreignPayPalFile)
             assertForeignPaymentCountedOnce()
@@ -421,7 +420,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun payPalExport_thenForeignCurrencyCardCharge_countsThePaymentOnce() =
-        runTest {
+        runDbTest {
             importPayPal(foreignPayPalFile)
             importCard(foreignCardFile)
             assertForeignPaymentCountedOnce()
@@ -429,7 +428,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun payPalExportFirst_thenAChainThroughCurveAlone_reconcilesWithPayPalBehindCurve() =
-        runTest {
+        runDbTest {
             // Only the card -> Curve -> PayPal chain: PayPal is never the card row's own counterparty, so its
             // history has to be loaded for being an inner conduit.
             importPayPal(payPalFile.take(2))
@@ -444,7 +443,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun monzoCsvChargeImportedAfterThePayPalExport_reconciles() =
-        runTest {
+        runDbTest {
             importPayPal(payPalFile.subList(6, 8))
             val monzo =
                 repositories.importEngine.createAccount(
@@ -554,7 +553,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun splitCardCharges_thenPayPalExport_countEachPaymentOnce() =
-        runTest {
+        runDbTest {
             importCard(splitCardFile)
             importPayPal(splitPayPalFile)
             assertSplitPaymentsCountedOnce()
@@ -562,7 +561,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun payPalExport_thenSplitCardCharges_countEachPaymentOnce() =
-        runTest {
+        runDbTest {
             importPayPal(splitPayPalFile)
             importCard(splitCardFile)
             assertSplitPaymentsCountedOnce()
@@ -570,7 +569,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun reimportingTheCardFile_afterThePayPalExport_keepsPayPalsDeposits() =
-        runTest {
+        runDbTest {
             // PayPal first, so each card chain's leg into PayPal links forward (`reconciled`) to PayPal's own
             // deposit. Re-importing the card file must treat that deposit as PayPal's, not as a leg of the
             // card row to delete and rebuild.
@@ -593,7 +592,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun reimportingSplitCardCharges_afterThePayPalExport_countsEachPaymentOnce() =
-        runTest {
+        runDbTest {
             // Each PayPal deposit is reconciled against two card rows, so no single row's rewrite explains it
             // away: re-importing must still lift its exclusion once both rows' chains are deleted.
             importPayPal(splitPayPalFile)
@@ -658,7 +657,7 @@ class PayPalCsvE2ETest : DbTest() {
 
     @Test
     fun legacyExport_excludesNonMovementsAndTheWithdrawalEcho() =
-        runTest {
+        runDbTest {
             val headers = listOf("Date", "Time", "Time zone", "Name", "Type", "Status", "Currency", "Amount", "Receipt ID", "Balance")
 
             fun row(

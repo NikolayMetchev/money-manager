@@ -4,7 +4,6 @@ import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.importengineapi.ensureApiCredentials
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -24,7 +23,7 @@ class ApiCredentialConnectionTest : DbTest() {
 
     @Test
     fun `ensuring a connection twice returns the same row`() =
-        runTest {
+        runDbTest {
             val strategy = strategies().first()
 
             val first = repositories.apiSessionRepository.ensureCredential(strategy.id, now)
@@ -36,7 +35,7 @@ class ApiCredentialConnectionTest : DbTest() {
 
     @Test
     fun `different strategies each get their own connection`() =
-        runTest {
+        runDbTest {
             val (first, second) = strategies().take(2)
 
             val ids = repositories.importEngine.ensureApiCredentials(listOf(first.id, second.id), now)
@@ -49,7 +48,7 @@ class ApiCredentialConnectionTest : DbTest() {
 
     @Test
     fun `the credentials flow reflects a newly connected api`() =
-        runTest {
+        runDbTest {
             val strategy = strategies().first()
             assertEquals(emptyList(), repositories.apiSessionRepository.getCredentialsFlow().first())
 

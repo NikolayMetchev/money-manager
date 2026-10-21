@@ -25,7 +25,6 @@ import io.ktor.http.Url
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -170,7 +169,7 @@ class PayPalImportE2ETest : DbTest() {
 
     @Test
     fun `paypal exchanges its client credentials for a bearer token and imports per-currency accounts`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, Clock.System.now(), null)
             val strategy = payPal()
@@ -254,7 +253,7 @@ class PayPalImportE2ETest : DbTest() {
 
     @Test
     fun `a rejected token exchange stops the download before any data request`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, Clock.System.now(), null)
             val captured = Captured()
@@ -302,7 +301,7 @@ class PayPalImportE2ETest : DbTest() {
 
     @Test
     fun `an account id rewrite that merges two accounts fails the import instead of merging them`() =
-        runTest {
+        runDbTest {
             val paypal = payPal()
             val accounts = paypal.config.accounts as ApiAccountsSource.Downloaded
             val merging =
@@ -346,7 +345,7 @@ class PayPalImportE2ETest : DbTest() {
 
     @Test
     fun `an unrecognised token error body stays out of the failure message`() =
-        runTest {
+        runDbTest {
             val failure =
                 assertFailsWith<ApiDownloadNotPossibleException> {
                     downloadSession(

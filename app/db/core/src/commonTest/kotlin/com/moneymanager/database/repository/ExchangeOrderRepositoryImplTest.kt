@@ -10,7 +10,6 @@ import com.moneymanager.importengineapi.createTrade
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -48,7 +47,7 @@ class ExchangeOrderRepositoryImplTest : DbTest() {
     // allows spaces but not commas — keep punctuation out of the backticked names here.
     @Test
     fun `upsert creates then dedupes an identical order and revises a changed one`() =
-        runTest {
+        runDbTest {
             val accountId = account()
 
             val created = upsert(accountId)
@@ -78,7 +77,7 @@ class ExchangeOrderRepositoryImplTest : DbTest() {
 
     @Test
     fun `the same order ref on different accounts is two distinct orders`() =
-        runTest {
+        runDbTest {
             val a = account("Exchange A")
             val b = account("Exchange B")
             val first = upsert(a)
@@ -89,7 +88,7 @@ class ExchangeOrderRepositoryImplTest : DbTest() {
 
     @Test
     fun `linkTrade is idempotent and drives both fill queries`() =
-        runTest {
+        runDbTest {
             val accountId = account()
             val gbp =
                 repositories.currencyRepository
@@ -122,7 +121,7 @@ class ExchangeOrderRepositoryImplTest : DbTest() {
 
     @Test
     fun `deleting the account cascades to its orders and links`() =
-        runTest {
+        runDbTest {
             val accountId = account()
             val order = upsert(accountId)
             assertEquals(1L, repositories.exchangeOrderRepository.countOrdersByAccount(accountId).first())

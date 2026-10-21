@@ -20,7 +20,6 @@ import com.moneymanager.reconciliation.realAccounts
 import com.moneymanager.reconciliation.reconcile
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -212,7 +211,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
     @Test
     fun everyKoinlyRowLandsOnShadowAccounts() =
-        runTest {
+        runDbTest {
             val result =
                 applyAll(
                     listOf(stage("transactions.csv", listOf(binanceReward, coinbaseDeposit, coinbaseTrade, walletTransfer, withdrawal))),
@@ -252,7 +251,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
     @Test
     fun deletedRowsAreImportedButExcluded() =
-        runTest {
+        runDbTest {
             applyAll(listOf(stage("transactions.csv", listOf(coinbaseDeposit, coinbaseTrade.deleted(), walletTransfer.deleted()))))
 
             // Only the live deposit counts: the deleted trade, its fee and the deleted transfer (with its
@@ -271,7 +270,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
     @Test
     fun aLaterExportThatUndeletesRowsBringsThemBack() =
-        runTest {
+        runDbTest {
             applyAll(
                 listOf(stage("old.csv", listOf(coinbaseDeposit, coinbaseTrade.deleted(), withdrawal.deleted(), walletTransfer.deleted()))),
             )
@@ -292,7 +291,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
     @Test
     fun aTradeCanBeExcludedAndRestoredByHand() =
-        runTest {
+        runDbTest {
             applyAll(listOf(stage("transactions.csv", listOf(coinbaseDeposit, coinbaseTrade))))
             val coinbase = assertNotNull(accountByName("Koinly · Coinbase")).id
             val trade =
@@ -318,7 +317,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
     @Test
     fun aManualExclusionSurvivesReimportingTheLiveRow() =
-        runTest {
+        runDbTest {
             applyAll(listOf(stage("a.csv", listOf(coinbaseDeposit, coinbaseTrade))))
             val coinbase = assertNotNull(accountByName("Koinly · Coinbase")).id
             val trade =
@@ -337,7 +336,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
     @Test
     fun removingAWalletsLastLinkStopsAutoLinkingIt() =
-        runTest {
+        runDbTest {
             applyAll(listOf(stage("transactions.csv", listOf(binanceReward))))
             val shadow = assertNotNull(accountByName("Koinly · Binance")).id
             val binance =
@@ -372,7 +371,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
     @Test
     fun aRealAccountWithTheShadowNameIsNeverReused() =
-        runTest {
+        runDbTest {
             val real =
                 repositories.importEngine.createAccount(
                     Account(id = AccountId(0), name = "Koinly · Binance", openingDate = now),
@@ -387,7 +386,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
     @Test
     fun overlappingExportsDedupe() =
-        runTest {
+        runDbTest {
             applyAll(listOf(stage("a.csv", listOf(binanceReward, coinbaseDeposit, coinbaseTrade))))
             applyAll(listOf(stage("b.csv", listOf(coinbaseDeposit, coinbaseTrade, withdrawal))))
 
@@ -397,7 +396,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
     @Test
     fun realImportsAreNotDedupedAgainstShadowData() =
-        runTest {
+        runDbTest {
             applyAll(listOf(stage("transactions.csv", listOf(binanceReward))))
             // The very same reward, now from Binance's own export.
             val binanceHeaders = listOf("User_ID", "UTC_Time", "Account", "Operation", "Coin", "Change", "Remark")
@@ -417,7 +416,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
     @Test
     fun shadowBatchesRefuseRealAccounts() =
-        runTest {
+        runDbTest {
             applyAll(listOf(stage("transactions.csv", listOf(binanceReward))))
             val real =
                 repositories.importEngine.createAccount(
@@ -448,7 +447,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
     @Test
     fun linksAreValidatedAndDriveMatching() =
-        runTest {
+        runDbTest {
             applyAll(listOf(stage("transactions.csv", listOf(binanceReward, coinbaseDeposit))))
             val shadowBinance = assertNotNull(accountByName("Koinly · Binance")).id
             val shadowCoinbase = assertNotNull(accountByName("Koinly · Coinbase")).id

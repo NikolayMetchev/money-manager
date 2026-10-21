@@ -21,7 +21,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -137,7 +136,7 @@ class ImportDirectoryScannerTest : DbTest() {
 
     @Test
     fun `scan downloads every file concurrently`() =
-        runTest {
+        runDbTest {
             val engine = engine()
             val directory = newDirectory(engine)
             val names = listOf("jan.csv", "feb.csv", "mar.csv")
@@ -156,7 +155,7 @@ class ImportDirectoryScannerTest : DbTest() {
 
     @Test
     fun `scan stages a new csv then skips it when unchanged`() =
-        runTest {
+        runDbTest {
             val engine = engine()
             val directory = newDirectory(engine)
             val source = FakeFileSource(listOf(FileSpec("jan.csv", csvV1, 1_000)))
@@ -183,7 +182,7 @@ class ImportDirectoryScannerTest : DbTest() {
 
     @Test
     fun `deleting a staged import makes the next scan stage the file again`() =
-        runTest {
+        runDbTest {
             val engine = engine()
             val directory = newDirectory(engine)
             // A remote file whose hash never changes: only forgetting it can bring it back.
@@ -206,7 +205,7 @@ class ImportDirectoryScannerTest : DbTest() {
 
     @Test
     fun `scan skips unsupported files like pdf and stages only supported ones`() =
-        runTest {
+        runDbTest {
             val engine = engine()
             val directory = newDirectory(engine)
             val source =
@@ -233,7 +232,7 @@ class ImportDirectoryScannerTest : DbTest() {
 
     @Test
     fun `recordFileImported rejects a file that resolves to both csv and qif`() =
-        runTest {
+        runDbTest {
             val engine = engine()
             val directory = newDirectory(engine)
             assertFailsWith<IllegalArgumentException> {
@@ -252,7 +251,7 @@ class ImportDirectoryScannerTest : DbTest() {
 
     @Test
     fun `scan skips the download entirely when the remote content hash is unchanged`() =
-        runTest {
+        runDbTest {
             val engine = engine()
             val directory = newDirectory(engine)
             val source = FakeFileSource(listOf(FileSpec("jan.csv", csvV1, 1_000, remoteContentHash = "md5-aaa")))
@@ -269,7 +268,7 @@ class ImportDirectoryScannerTest : DbTest() {
 
     @Test
     fun `scan re-downloads and re-stages when the remote content hash changes`() =
-        runTest {
+        runDbTest {
             val engine = engine()
             val directory = newDirectory(engine)
             val file = FileSpec("jan.csv", csvV1, 1_000, remoteContentHash = "md5-aaa")
@@ -293,7 +292,7 @@ class ImportDirectoryScannerTest : DbTest() {
 
     @Test
     fun `scan re-stages a changed csv as a new staging row`() =
-        runTest {
+        runDbTest {
             val engine = engine()
             val directory = newDirectory(engine)
             val file = FileSpec("jan.csv", csvV1, 1_000)

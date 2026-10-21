@@ -21,7 +21,6 @@ import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -140,7 +139,7 @@ class CryptoComCsvE2ETest : DbTest() {
 
     @Test
     fun importAll_routesFilesByName_mapsKinds_andReconcilesTheSharedTopUp() =
-        runTest {
+        runDbTest {
             val card = stage("card_transactions_record_20231120_210200.csv", cardRows)
             val fiat = stage("fiat_transactions_record_20231120_085814.csv", fiatRows)
             val crypto = stage("crypto_transactions_record_20231119_121744.csv", cryptoRows)
@@ -292,7 +291,7 @@ class CryptoComCsvE2ETest : DbTest() {
 
     @Test
     fun sameConversionWordedDifferentlyByTwoExports_isBookedOnce() =
-        runTest {
+        runDbTest {
             // crypto.com's crypto export calls a purchase "GBP -> TGBP" while its newer cash export calls
             // the same conversion "Bought TGBP". A trade's instant, accounts, assets and amounts pin one
             // conversion, so the wording must not make it two.
@@ -320,7 +319,7 @@ class CryptoComCsvE2ETest : DbTest() {
 
     @Test
     fun bankLegImportedLater_isReconciledRetroactivelyOnReimport() =
-        runTest {
+        runDbTest {
             // The order the real world produces: the wallet's own export is imported first, so its deposit
             // record is the only one and counts. The bank feed arrives later, and re-importing the wallet
             // export must then reconcile the now-redundant placeholder record instead of leaving the
@@ -371,7 +370,7 @@ class CryptoComCsvE2ETest : DbTest() {
 
     @Test
     fun bankLegAlreadyImported_reconcilesTheWalletsOwnDepositRecord() =
-        runTest {
+        runDbTest {
             // The bank knows both ends of an FPS deposit (its feed resolves the wallet by sort code +
             // account number), while crypto.com's own export says only "GBP Deposit (via FPS)" and books a
             // placeholder counterparty. Nothing links the two records but the wallet account, the
@@ -436,7 +435,7 @@ class CryptoComCsvE2ETest : DbTest() {
 
     @Test
     fun reimportingBothFiles_producesOnlyDuplicates() =
-        runTest {
+        runDbTest {
             val card = stage("card_transactions_record_20231120_210200.csv", cardRows)
             val fiat = stage("fiat_transactions_record_20231120_085814.csv", fiatRows)
             applyAll(listOf(card, fiat))
@@ -462,7 +461,7 @@ class CryptoComCsvE2ETest : DbTest() {
 
     @Test
     fun importAll_marksHeaderOnlyFileAsImported() =
-        runTest {
+        runDbTest {
             // A header-only export (no transactions in that period) still matches its strategy by
             // filename. It has nothing to import, but must be marked imported so it leaves the
             // Unimported tab instead of reappearing on every "Import all".
@@ -495,7 +494,7 @@ class CryptoComCsvE2ETest : DbTest() {
 
     @Test
     fun fiatExport_cryptoBuy_importsAsTrade() =
-        runTest {
+        runDbTest {
             // A real crypto buy in the fiat export: £100 -> 0.005 BTC (viban_purchase, To Currency = BTC).
             val fiat =
                 stage(

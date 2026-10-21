@@ -14,7 +14,6 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
@@ -91,7 +90,7 @@ class TransferRelationshipReconciliationTest : DbTest() {
 
     @Test
     fun reconciledDuplicate_persistsRelationshipAndExclusion() =
-        runTest {
+        runDbTest {
             val currency = gbp()
             val sourceId = createAccount("Checking")
             val targetId = createAccount("Coffee Shop")
@@ -116,7 +115,7 @@ class TransferRelationshipReconciliationTest : DbTest() {
 
     @Test
     fun deletingTransfer_cascadeDeletesItsRelationships() =
-        runTest {
+        runDbTest {
             val currency = gbp()
             val sourceId = createAccount("Checking")
             val targetId = createAccount("Coffee Shop")
@@ -140,7 +139,7 @@ class TransferRelationshipReconciliationTest : DbTest() {
 
     @Test
     fun passThroughTransfer_runningBalanceRowsLinkFundingAndSpendLegs() =
-        runTest {
+        runDbTest {
             val currency = gbp()
             val cardId = createAccount("Crypto.com")
             val conduitId = createAccount("Curve")
@@ -198,7 +197,7 @@ class TransferRelationshipReconciliationTest : DbTest() {
 
     @Test
     fun passThroughChain_readsReconciled_whenTheFundingLegIsReconciled() =
-        runTest {
+        runDbTest {
             // A Curve funding-card reconcile links the conduit's export spend to the FUNDING leg
             // (card -> conduit). The sibling SPEND leg (conduit -> merchant, the "Via conduit" row) must
             // then also read as reconciled — the whole chain is reconciled, not just the funding leg.
@@ -283,7 +282,7 @@ class TransferRelationshipReconciliationTest : DbTest() {
 
     @Test
     fun feeTransfer_inBatchRelationshipResolvesToSiblingsRealId() =
-        runTest {
+        runDbTest {
             val currency = gbp()
             val checkingId = createAccount("Checking")
             val shopId = createAccount("Coffee Shop")
@@ -355,7 +354,7 @@ class TransferRelationshipReconciliationTest : DbTest() {
 
     @Test
     fun runningBalanceRows_flagBothSidesOfReconciledPairAsReconciled() =
-        runTest {
+        runDbTest {
             val currency = gbp()
             val checkingId = createAccount("Checking")
             val coffeeShopId = createAccount("Coffee Shop")

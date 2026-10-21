@@ -19,7 +19,6 @@ import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.importfilesource.ImportSubfolder
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -149,7 +148,7 @@ class CsvRedownloadE2ETest : DbTest() {
 
     @Test
     fun `a file staged by an older parser is re-parsed and then matches its strategy`() =
-        runTest {
+        runDbTest {
             fileContent = (listOf(preamble, header) + spotRows).joinToString("\n")
             val directory = directory()
             // What the parser produced before it skipped the preamble: the "UID: …" line as the header.
@@ -183,7 +182,7 @@ class CsvRedownloadE2ETest : DbTest() {
 
     @Test
     fun `an imported file keeps its rows' outcomes and provenance when a column and a row are added`() =
-        runTest {
+        runDbTest {
             fileContent = (listOf(preamble, header) + spotRows).joinToString("\n")
             val directory = directory()
             scan(directory)
@@ -222,7 +221,7 @@ class CsvRedownloadE2ETest : DbTest() {
 
     @Test
     fun `re-downloading a directory re-stages its files and only unimports when asked`() =
-        runTest {
+        runDbTest {
             fileContent = (listOf(preamble, header) + spotRows).joinToString("\n")
             val directory = directory()
             scan(directory)

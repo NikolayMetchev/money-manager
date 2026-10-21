@@ -15,3 +15,5 @@ actual fun deleteTestDatabase(location: DbLocation) {
     val context = InstrumentationRegistry.getInstrumentation().targetContext
     context.deleteDatabase(location.path)
 }
+
+actual val testDatabasesAreFiles: Boolean = true

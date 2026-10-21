@@ -5,7 +5,6 @@ import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -109,7 +108,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
 
     @Test
     fun `imports keyed-object trades and ledger transfers with asset-alias normalization and enrichment - idempotently`() =
-        runTest {
+        runDbTest {
             stageSessionAndImport()
 
             val exchange =
@@ -175,7 +174,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
 
     @Test
     fun `a fiat withdrawal's WithdrawStatus enrichment books against the funding account - not a bogus wallet account`() =
-        runTest {
+        runDbTest {
             // Real shape observed from Kraken's WithdrawStatus for a fiat withdrawal: "info" carries the
             // user's own bank-transfer label ("Monzo"), not a blockchain address — unlike the crypto case
             // (depositStatusJson above), where "info" IS a real on-chain address. Minting a wallet account
@@ -221,7 +220,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
     // silently dropped — the trade's assets never moved, permanently corrupting the BTC/ETH balance.
     @Test
     fun `imports crypto-quoted pairs instead of silently dropping them`() =
-        runTest {
+        runDbTest {
             val trades =
                 """
                 {"error":[],"result":{"trades":{
@@ -255,7 +254,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
     // crypto asset that siphoned BTC balance away from the real "BTC" asset.
     @Test
     fun `splits a multi-character stablecoin quote suffix correctly`() =
-        runTest {
+        runDbTest {
             val trades =
                 """
                 {"error":[],"result":{"trades":{
@@ -289,7 +288,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
     // reversed withdrawal attempt as an actual loss of funds.
     @Test
     fun `nets a reversed withdrawal to zero instead of double-booking it`() =
-        runTest {
+        runDbTest {
             val withdrawals =
                 """
                 {"error":[],"result":{"ledger":{
@@ -327,7 +326,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
     // entries, which duplicate TradesHistory and must be excluded rather than double-booked.
     @Test
     fun `imports non-standard ledger types from type=all and excludes duplicate trade entries`() =
-        runTest {
+        runDbTest {
             val deposits =
                 """
                 {"error":[],"result":{"ledger":{
@@ -366,7 +365,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
     // small but real balance short by exactly the missed fee — see ledgerMappings' fee.
     @Test
     fun `books a same-asset settlement fee from an excluded trade-type ledger row without duplicating its amount`() =
-        runTest {
+        runDbTest {
             val deposits =
                 """
                 {"error":[],"result":{"ledger":{
@@ -407,7 +406,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
     // matching ledger group staged at all, so no fee transfer should exist regardless.
     @Test
     fun `a trade's TradesHistory fee never books its own fee transfer`() =
-        runTest {
+        runDbTest {
             val trades =
                 """
                 {"error":[],"result":{"trades":{
@@ -446,7 +445,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
     // so the two are joined by that shared identifier.
     @Test
     fun `overrides a trade's leg amounts with its matching ledger group when they disagree`() =
-        runTest {
+        runDbTest {
             val trades =
                 """
                 {"error":[],"result":{"trades":{
@@ -492,7 +491,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
     // same {base, quote} asset pair, which is unambiguous in practice.
     @Test
     fun `overrides a synthetic-pair trade's leg amounts via the timestamp and asset-pair fallback`() =
-        runTest {
+        runDbTest {
             val trades =
                 """
                 {"error":[],"result":{"trades":{
@@ -533,7 +532,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
     // movement it reports may be silently dropped.
     @Test
     fun `books a ledger trade group with no matching TradesHistory trade at all as its own trade`() =
-        runTest {
+        runDbTest {
             val deposits =
                 """
                 {"error":[],"result":{"ledger":{
@@ -572,7 +571,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
     // autoallocation and leaving the exchange balance overstated by the full deposited amount.
     @Test
     fun `books both legs of an earn autoallocation pair instead of fuzzy-deduping one against the other`() =
-        runTest {
+        runDbTest {
             val deposits =
                 """
                 {"error":[],"result":{"ledger":{
@@ -613,7 +612,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
     // the persisted ms value, not the full-precision Instant.
     @Test
     fun `books each of several byte-identical fills as its own trade - but stays idempotent on re-import`() =
-        runTest {
+        runDbTest {
             val trades =
                 """
                 {"error":[],"result":{"trades":{
@@ -647,7 +646,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
     // overstated (and the exchange balance understated) by double the fee on every reversed withdrawal.
     @Test
     fun `nets a refunded ledger fee to zero instead of booking it as a second charge`() =
-        runTest {
+        runDbTest {
             val withdrawals =
                 """
                 {"error":[],"result":{"ledger":{

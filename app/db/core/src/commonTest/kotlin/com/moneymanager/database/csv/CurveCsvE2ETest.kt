@@ -23,7 +23,6 @@ import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -245,7 +244,7 @@ class CurveCsvE2ETest : DbTest() {
 
     @Test
     fun curveCsvRow_isAChainThroughCurve_supersedingTheCardsGuessedMerchant_andForeignRowStandsAlone() =
-        runTest {
+        runDbTest {
             // Underlying card statement: a Curve payment forwarded to the crypto.com card. The
             // pass-through detector expands it into Crypto.com Card -> Curve (funding) and
             // Curve -> Amazon (spend, described "Amazon").
@@ -305,7 +304,7 @@ class CurveCsvE2ETest : DbTest() {
 
     @Test
     fun curveCsvRow_reconcilesAgainstFundingLegByCardNumber_evenWhenMerchantDiffers() =
-        runTest {
+        runDbTest {
             // The card statement records the Curve charge as "Crv*Sainsburys London"; the pass-through
             // makes a funding leg (Crypto.com Card -> Curve) and a spend leg (Curve -> "Sainsburys London").
             val card =
@@ -355,7 +354,7 @@ class CurveCsvE2ETest : DbTest() {
 
     @Test
     fun curveCsvImportedFirst_thenTheCard_reachesTheSameResult() =
-        runTest {
+        runDbTest {
             registerCardAccount()
             val curve =
                 stage(
@@ -453,7 +452,7 @@ class CurveCsvE2ETest : DbTest() {
 
     @Test
     fun curveTransactionsExport_reconcilesByCard_tracksCurveCash_andSkipsOverlap() =
-        runTest {
+        runDbTest {
             val card =
                 stage(
                     "card_transactions_record_20260510_100000.csv",
@@ -516,7 +515,7 @@ class CurveCsvE2ETest : DbTest() {
 
     @Test
     fun assigningUnmatchedCard_addsItToTheAccountSet_andReconcilesTheCurveSpend() =
-        runTest {
+        runDbTest {
             val card =
                 stage(
                     "card_transactions_record_20231120_210200.csv",
@@ -610,7 +609,7 @@ class CurveCsvE2ETest : DbTest() {
 
     @Test
     fun reimport_afterCardRegistered_isANoOp() =
-        runTest {
+        runDbTest {
             // The card statement is imported, then the Curve file BEFORE any card is registered: the card's
             // movement into Curve reconciles the row anyway. Registering the card and re-importing changes
             // nothing, however often it runs.
@@ -643,7 +642,7 @@ class CurveCsvE2ETest : DbTest() {
 
     @Test
     fun reimport_rewritesARowImportedAsAPlainSpend_intoAChain() =
-        runTest {
+        runDbTest {
             // A database that imported Curve's export before it was a conduit holds plain rows that never
             // pass through Curve. Re-importing with the conduit strategy rewrites them into chains.
             val builtIn =
@@ -685,7 +684,7 @@ class CurveCsvE2ETest : DbTest() {
 
     @Test
     fun curveCsvRow_withIdenticalMerchant_countsTheSpendOnce() =
-        runTest {
+        runDbTest {
             // Same merchant text on both sides: the card's spend leg and the Curve row's merchant leg are
             // both Curve -> Amazon, £12.99. The spend still counts once and Curve nets to zero.
             val card =
@@ -711,7 +710,7 @@ class CurveCsvE2ETest : DbTest() {
 
     @Test
     fun reimportingTheCurveFile_producesOnlyDuplicates() =
-        runTest {
+        runDbTest {
             val curve =
                 stage(
                     "Transaction History 2023-11-19.csv",

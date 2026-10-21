@@ -126,7 +126,7 @@ workflow because label events start it: any other label's run skips, without can
 | `utils/archive/` | Compress + password-encrypt the DB archive (`ArchiveCodec`); shared by remote backends and the credential vault. zlib is `java.util.zip` on JVM/Android and the platform zlib on native; crypto is the JDK provider or openssl3. `ArchiveGoldenTest` checks each platform reads the others' archives |
 | `utils/sqlite3/` | The SQLite every native binary links statically: `CompileBundledSqliteTask` builds the pinned amalgamation (`sqlite_amalgamation.version` in `MODULE.bazel`, SHA-256 checked) with Kotlin/Native's own clang, and a cinterop klib embeds it. JVM and Android keep their own SQLite |
 | `utils/files/` | Plain-file access over kotlinx-io `SystemFileSystem`, one implementation for JVM, Android and native: home dir and `~` expansion, `~/.moneymanager`, whole-file reads/writes, atomic replace, last-modified time. Use it instead of `java.io.File`/`java.nio.file` |
-| `utils/localsettings/` (+ `di/`) | App-level settings kept outside any database (`lastDatabase`, remote bindings, vault path). Desktop JVM and native share one JSON file, `~/.moneymanager/settings.json` (`FileLocalSettings`), so the desktop app and the CLI see the same state; Android keeps SharedPreferences. The desktop app moves any old `java.util.prefs` values into the file on first use |
+| `utils/localsettings/` (+ `di/`) | App-level settings kept outside any database (`lastDatabase`, remote bindings, vault path). Desktop JVM and native share one JSON file, `~/.moneymanager/settings.json` (`JsonLocalSettings` over a `SettingsText`), so the desktop app and the CLI see the same state; the browser keeps the same JSON in a `localStorage` item, and Android keeps SharedPreferences. The desktop app moves any old `java.util.prefs` values into the file on first use |
 | `utils/credentialvault/` | The encrypted, password-protected credential file (API tokens, Google refresh tokens) that outlives the DB — see **Credentials** |
 | `utils/parsers/{csv,qif,xlsx}/` | File-format parsers |
 | `utils/rest/` | Shared Ktor `ApiClient`, request signing, SCA challenge signing (`ScaCrypto`: RSA keys + SHA256withRSA on cryptography-kotlin, so native too; suspending, as WebCrypto has no blocking calls) and API traffic recording |
@@ -328,7 +328,9 @@ Google refresh tokens.
   hang off; `ImportEngine.ensureApiCredentials` creates it idempotently, and the API screens create rows for
   any installed strategy with vault secrets, which is how a recreated database reconnects.
 - The vault is `AppScope` and re-bound (`bindToDatabase`) on every database switch, which locks it if the
-  file changes. Tests use `unlockedCredentialVault()` from `test/utils/credentialvault`.
+  file changes. In the browser the vault's bytes live in `localStorage` (`LocalStorageVaultStorage`), one vault for
+  every database, as its databases all share one store. Tests use `unlockedCredentialVault()` from
+  `test/utils/credentialvault`.
 - **Opt-in cloud backup**: `CredentialSyncController` (`app/remotestorage/sync`) uploads the vault file's
   already-encrypted bytes, as is, to Drive `Money Manager/Credentials/<vault file name>`. It runs on its
   own connection, like the strategy library. Sync is two-way against a per-vault-path baseline: the side
@@ -632,6 +634,8 @@ set of writes.
   under `app/`, `utils/`, or `tools/` instead (e.g. the built-in strategy definitions live in
   `app/strategies`, not `test/app/strategies`).
 - Tests in `commonTest` run on both JVM and Android
+- A `DbTest` opens its database in `runDbTest { }`, not a `@BeforeTest`: the browser's test runner doesn't wait for
+  a `@BeforeTest`'s result (only `@AfterTest` follows the test's own)
 - Use `runComposeUiTest` for UI tests
 - Android tests require manifest with `ComponentActivity` declaration
 - Share commonTest sources with a device test via `# gazelle:kmp_device_test_srcs`
@@ -660,7 +664,11 @@ set of writes.
   `utils/parsers/xlsx` (unsupported there, as on native), `app/importfilesource/core`, the importers
   (`app/{csvimporter,qifimporter,apiimporter,importer}`), `app/{reconciliation,strategies,query}`,
   `app/presenter/{core,accounts,transactions}`, the database (`app/db/{schema,seed,read,write,repository,core,di}`,
-  `app/di/params`, `test/app/db`; `app/db/core`'s own suite waits for the modules its tests link). The browser app is a `DeviceInfo.Web` host (OS and browser from the
+  `app/di/params`, `test/app/db`), `utils/{archive,localsettings,credentialvault}` (+ their `di`), `app/{importdirectory,apiimport,session}`
+  and `app/remotestorage/{core,sync}`. `ArchiveCodec` compresses with the browser's `CompressionStream` and encrypts with
+  WebCrypto, so the browser reads the other platforms' archives (`ArchiveGoldenTest`). Mappie (2.4.21) maps the internal
+  `var _hashCode` Kotlin/Wasm's `Any` declares when a mapper's source and target both come from other modules, which
+  the wasm link rejects: such a mapper is written out (`AccountMapper`). The browser app is a `DeviceInfo.Web` host (OS and browser from the
   user agent; platform row `WEB`, 4). What only the browser lacks goes behind a shared helper rather than per call
   site: `compileRegex` for patterns, `ioDispatcher` for I/O, and suspending crypto (`sha256Hex`, `ScaCrypto`), since
   WebCrypto never blocks. kotlinx-datetime's zone database is the npm `@js-joda/timezone`, imported by

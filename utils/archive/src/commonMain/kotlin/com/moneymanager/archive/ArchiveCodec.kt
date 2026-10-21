@@ -60,7 +60,8 @@ object ArchiveCodec {
             block()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (expected: Exception) {
+        } catch (expected: Throwable) {
+            // Throwable, not Exception: in the browser, WebCrypto's and the streams' failures are JavaScript errors.
             throw ArchiveDecryptionException("Wrong password or corrupted archive", expected)
         }
 

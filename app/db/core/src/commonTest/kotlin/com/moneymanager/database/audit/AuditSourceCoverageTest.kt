@@ -27,7 +27,6 @@ import com.moneymanager.test.database.createOwnership
 import com.moneymanager.test.database.createPerson
 import com.moneymanager.test.database.installBuiltInApiStrategies
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -86,7 +85,7 @@ class AuditSourceCoverageTest : DbTest() {
 
     @Test
     fun allEntityAuditEntriesHaveSource() =
-        runTest {
+        runDbTest {
             // Entities created below record their source automatically inside the repository (the
             // create methods require an EntityProvenance), so this test also proves that contract.
             val now = Clock.System.now()

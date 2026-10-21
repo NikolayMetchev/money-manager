@@ -26,7 +26,6 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -91,7 +90,7 @@ class QifApplyIntegrationTest : DbTest() {
 
     @Test
     fun qifRecordsMapThroughCsvEngine_splitsExpandToMultipleTransfers() =
-        runTest {
+        runDbTest {
             val (currency, source, target) = seed()
             val rows = QifCsvAdapter.toRows(sampleRecords())
             assertEquals(3, rows.size)
@@ -117,7 +116,7 @@ class QifApplyIntegrationTest : DbTest() {
 
     @Test
     fun reimportingSameRecords_isDetectedAsDuplicate() =
-        runTest {
+        runDbTest {
             val (currency, source, target) = seed()
             val rows = QifCsvAdapter.toRows(sampleRecords())
             val accountsByName = mapOf(source.name to source, target.name to target)
@@ -210,7 +209,7 @@ class QifApplyIntegrationTest : DbTest() {
 
     @Test
     fun nearDuplicate_driftedDescriptionDateAndAccount_isDetectedAsDuplicate() =
-        runTest {
+        runDbTest {
             val (currency, source, target) = seed()
             val existing = existingFrom(currency, source, target, record("03/16/2022", "-20.00", "$payeeBase 20.00GBP"))
             // Re-import: trailing GBP dropped, date shifted +2 days, and a different target account.
@@ -220,7 +219,7 @@ class QifApplyIntegrationTest : DbTest() {
 
     @Test
     fun differentAmount_isNotAFuzzyDuplicate() =
-        runTest {
+        runDbTest {
             val (currency, source, target) = seed()
             val existing = existingFrom(currency, source, target, record("03/16/2022", "-20.00", "$payeeBase 20.00GBP"))
             val result = statuses(currency, source, target, record("03/16/2022", "-25.00", "$payeeBase 20.00"), existing)
@@ -229,7 +228,7 @@ class QifApplyIntegrationTest : DbTest() {
 
     @Test
     fun dateBeyondTolerance_isNotAFuzzyDuplicate() =
-        runTest {
+        runDbTest {
             val (currency, source, target) = seed()
             val existing = existingFrom(currency, source, target, record("03/16/2022", "-20.00", "$payeeBase 20.00GBP"))
             // 9 days apart — outside the +/-3 day window.
@@ -239,7 +238,7 @@ class QifApplyIntegrationTest : DbTest() {
 
     @Test
     fun differentPayee_isNotAFuzzyDuplicate() =
-        runTest {
+        runDbTest {
             val (currency, source, target) = seed()
             val existing =
                 existingFrom(

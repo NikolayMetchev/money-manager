@@ -15,22 +15,42 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-private val logger = Logger.withTag("FileLocalSettings")
+private val logger = Logger.withTag("JsonLocalSettings")
 
 /** `~/.moneymanager/settings.json`: the one settings file the desktop app and the native CLI share. */
 fun defaultLocalSettingsPath(): Path = Path(appDataDirectory(), "settings.json")
 
-/**
- * [LocalSettings] stored as a flat JSON object in [path]. The desktop app and the native CLI both use it,
- * so either one sees the database, remote bindings and vault path the other last chose.
- *
- * Another process may write the file at any time, so every access re-reads it (it's a few hundred bytes; only
- * a change in its text is re-parsed), and every write replaces it atomically. Two processes writing within the
- * same instant can still lose one update; for settings that's acceptable. Like every [LocalSettings], access is
- * best-effort and never throws back to the caller.
- */
-class FileLocalSettings(
+/** Where [JsonLocalSettings] keeps its text: a file on desktop and native, a `localStorage` item in the browser. */
+interface SettingsText {
+    /** The text, or null when there is none yet. Throws [IOException] when it can't be read. */
+    fun read(): String?
+
+    /** Replaces the text in one step. Throws [IOException] when it can't. */
+    fun write(text: String)
+}
+
+/** [SettingsText] in the file at [path], replaced atomically. */
+class FileSettingsText(
     private val path: Path,
+) : SettingsText {
+    override fun read(): String? = if (SystemFileSystem.exists(path)) readText(path) else null
+
+    override fun write(text: String) = writeAtomically(path, text.encodeToByteArray())
+
+    override fun toString(): String = path.toString()
+}
+
+/**
+ * [LocalSettings] stored as a flat JSON object in [text]. The desktop app and the native CLI share one file
+ * ([defaultLocalSettingsPath]), so either one sees the database, remote bindings and vault path the other last chose.
+ *
+ * Another process (or browser tab) may write it at any time, so every access re-reads it (it's a few hundred bytes;
+ * only a change in its text is re-parsed), and every write replaces it whole. Two writers within the same instant can
+ * still lose one update; for settings that's acceptable. Like every [LocalSettings], access is best-effort and never
+ * throws back to the caller.
+ */
+class JsonLocalSettings(
+    private val text: SettingsText,
 ) : LocalSettings {
     private val lock = SynchronizedObject()
     private var cachedText: String? = null
@@ -63,44 +83,44 @@ class FileLocalSettings(
             try {
                 // Sorted so the file diffs cleanly between writes.
                 val json = JsonObject(after.entries.sortedBy { it.key }.associate { it.key to JsonPrimitive(it.value) })
-                val text = prettyJson.encodeToString(JsonObject.serializer(), json)
-                writeAtomically(path, text.encodeToByteArray())
-                cachedText = text
+                val encoded = prettyJson.encodeToString(JsonObject.serializer(), json)
+                text.write(encoded)
+                cachedText = encoded
                 cached = after
                 true
             } catch (e: IOException) {
-                logger.w(e) { "Could not write settings to $path" }
+                logger.w(e) { "Could not write settings to $text" }
                 false
             }
         }
 
     private fun current(): Map<String, String> {
-        val text = readOrNull()
-        if (text != cachedText) {
-            cached = text?.let(::parse) ?: emptyMap()
-            cachedText = text
+        val read = readOrNull()
+        if (read != cachedText) {
+            cached = read?.let(::parse) ?: emptyMap()
+            cachedText = read
         }
         return cached
     }
 
     private fun readOrNull(): String? =
         try {
-            if (SystemFileSystem.exists(path)) readText(path) else null
+            text.read()
         } catch (e: IOException) {
-            logger.w(e) { "Could not read settings file $path" }
+            logger.w(e) { "Could not read settings from $text" }
             null
         }
 
-    private fun parse(text: String): Map<String, String> =
+    private fun parse(json: String): Map<String, String> =
         try {
-            Json.parseToJsonElement(text).jsonObject.mapValues { (key, value) ->
+            Json.parseToJsonElement(json).jsonObject.mapValues { (key, value) ->
                 val primitive = value.jsonPrimitive
                 require(primitive.isString) { "Setting $key is not a string" }
                 primitive.content
             }
         } catch (e: IllegalArgumentException) {
             // Malformed JSON (SerializationException is one), or a value that isn't a string.
-            logger.w(e) { "Ignoring unreadable settings file $path" }
+            logger.w(e) { "Ignoring unreadable settings in $text" }
             emptyMap()
         }
 

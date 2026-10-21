@@ -14,7 +14,6 @@ import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
@@ -95,7 +94,7 @@ class CsvReimportHistoricalSourceAccountE2ETest : DbTest() {
 
     @Test
     fun reimportAll_resolvesSourceAccountFromHistory_withNoOverride() =
-        runTest {
+        runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val monzoAccount =
                 repositories.importEngine.createAccount(

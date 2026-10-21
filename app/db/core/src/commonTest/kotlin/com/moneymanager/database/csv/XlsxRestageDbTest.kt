@@ -2,7 +2,6 @@ package com.moneymanager.database.csv
 
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -20,7 +19,7 @@ class XlsxRestageDbTest : DbTest() {
 
     @Test
     fun restageReplacesSheetRowsColumnsAndBlobWorksheet() =
-        runTest {
+        runDbTest {
             val repo = repositories.csvImportRepository
 
             val sheet1Headers = listOf("Date", "Amount")

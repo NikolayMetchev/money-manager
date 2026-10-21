@@ -14,7 +14,6 @@ import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -135,7 +134,7 @@ class MonzoCsvOwnerE2ETest : DbTest() {
 
     @Test
     fun monzoToMonzoTransfer_createsMonzoPrefixedAccountOwnedByThatPerson() =
-        runTest {
+        runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
 
             val export =
@@ -162,7 +161,7 @@ class MonzoCsvOwnerE2ETest : DbTest() {
 
     @Test
     fun ordinaryFasterPayment_toSomeoneNamedLikeAPerson_isNotTreatedAsAnOwnedAccount() =
-        runTest {
+        runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
 
             // Same name, but an ordinary payment (not Monzo-to-Monzo) — must resolve the plain-name

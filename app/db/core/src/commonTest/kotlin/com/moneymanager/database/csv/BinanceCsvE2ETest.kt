@@ -20,7 +20,6 @@ import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.createTrade
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -166,7 +165,7 @@ class BinanceCsvE2ETest : DbTest() {
 
     @Test
     fun rewardOperations_landInTheirOwnAccountsAndCreateCryptoOnDemand() =
-        runTest {
+        runDbTest {
             val file =
                 stage(
                     "0452506e-8714-11ee-9934-06655da838d5-1.csv",
@@ -202,7 +201,7 @@ class BinanceCsvE2ETest : DbTest() {
 
     @Test
     fun depositAndWithdrawal_bookAgainstThePlaceholderTheApiAlsoFallsBackTo() =
-        runTest {
+        runDbTest {
             // The export never says whose account the money came from, so both fiat and crypto funding
             // land on "Binance Funding" — the same name the API uses when it has no address either.
             val file =
@@ -224,7 +223,7 @@ class BinanceCsvE2ETest : DbTest() {
 
     @Test
     fun theExplicitlyFiatOperationsUseTheBankPlaceholder() =
-        runTest {
+        runDbTest {
             val file =
                 stage(
                     "fiat.csv",
@@ -241,7 +240,7 @@ class BinanceCsvE2ETest : DbTest() {
 
     @Test
     fun aDepositTheApiAlreadyRecordedAgainstAWalletIsNotCountedTwice() =
-        runTest {
+        runDbTest {
             // The API books a crypto deposit against the on-chain address it came from. The CSV cannot
             // name that address, so its counterparty is a placeholder — and being marked unidentified is
             // what lets the engine reconcile the two instead of adding a second 0.5 BTC.
@@ -274,7 +273,7 @@ class BinanceCsvE2ETest : DbTest() {
 
     @Test
     fun aMultiFillOrder_becomesOneTradeAndOneFeeTransfer() =
-        runTest {
+        runDbTest {
             // The real 2022-11-14 20:32:54 shape, trimmed: several fills per leg all stamped with the
             // same second, plus a fee in a third asset.
             val file =
@@ -312,7 +311,7 @@ class BinanceCsvE2ETest : DbTest() {
 
     @Test
     fun aDustSweep_becomesLinkedConversionLegsRatherThanFabricatedTrades() =
-        runTest {
+        runDbTest {
             // A real sweep: three assets swept, three BNB credits, and nothing in the file saying which
             // credit came from which debit. Assembling trades here would have to invent the pairing.
             val file =
@@ -349,7 +348,7 @@ class BinanceCsvE2ETest : DbTest() {
 
     @Test
     fun aTradeTheApiImportAlreadyBookedIsNotBookedTwice() =
-        runTest {
+        runDbTest {
             // Stand in for the API import: the per-fill trades api/v3/myTrades returns for one order,
             // stamped to the millisecond, on the single Binance account.
             val binanceId = repositories.importEngine.createAccount(account("Binance"), Source.Manual)
@@ -408,7 +407,7 @@ class BinanceCsvE2ETest : DbTest() {
 
     @Test
     fun aTradeTheApiImportDoesNotHaveIsStillBooked() =
-        runTest {
+        runDbTest {
             // The 2022 Convert conversions Binance's API window limit hides: nothing to match, so they
             // must import in full. This is the case the reconcile must not over-suppress.
             val file =
@@ -436,7 +435,7 @@ class BinanceCsvE2ETest : DbTest() {
 
     @Test
     fun aDustSweepTheApiImportAlreadyBookedIsNotBookedTwice() =
-        runTest {
+        runDbTest {
             // Stand in for the API's asset/dribblet import: one trade per swept asset, its BNB leg
             // reported GROSS. The CSV credits are net of Binance's 2% service charge, so only the
             // debited legs can be compared — which is exactly what the group reconcile does.
@@ -488,7 +487,7 @@ class BinanceCsvE2ETest : DbTest() {
 
     @Test
     fun aDustSweepTheCsvImportAlreadyBookedIsNotBookedTwiceByTheApi() =
-        runTest {
+        runDbTest {
             // The mirror of the test above: the export lands first, so the sweep is already in the
             // database as conversion transfer legs when the dust endpoint reports it as trades.
             applyAll(listOf(stage("dust-first.csv", dustSweepRows)))
@@ -520,7 +519,7 @@ class BinanceCsvE2ETest : DbTest() {
 
     @Test
     fun aDustSweepTheCsvImportDoesNotHaveIsStillBookedByTheApi() =
-        runTest {
+        runDbTest {
             // A near-miss must not suppress: the debited amount differs, so this is a genuinely
             // different sweep the export never recorded and it has to book in full.
             applyAll(listOf(stage("dust-first-near-miss.csv", dustSweepRows)))
@@ -540,7 +539,7 @@ class BinanceCsvE2ETest : DbTest() {
 
     @Test
     fun aDustSweepTheApiImportDoesNotHaveIsStillImported() =
-        runTest {
+        runDbTest {
             // A near-miss must not suppress: one leg differs, so the group is genuinely a different
             // sweep and has to import in full.
             val binanceId = repositories.importEngine.createAccount(account("Binance"), Source.Manual)
@@ -574,7 +573,7 @@ class BinanceCsvE2ETest : DbTest() {
 
     @Test
     fun reimportingTheSameFileCreatesNothingNew() =
-        runTest {
+        runDbTest {
             val rows =
                 listOf(
                     row("2022-11-14 20:32:54", "Transaction Sold", "BTC", "-0.04382"),
@@ -608,7 +607,7 @@ class BinanceCsvE2ETest : DbTest() {
 
     @Test
     fun aLegacySixColumnExportIsSkippedRatherThanImported() =
-        runTest {
+        runDbTest {
             // Legacy exports use an older Operation vocabulary ("Savings purchase" for what the modern
             // file calls "Simple Earn Flexible Subscription"), so importing both would book each event
             // twice under two descriptions.

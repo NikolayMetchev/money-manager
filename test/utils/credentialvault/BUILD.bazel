@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_export //utils/credentialvault
 # gazelle:kmp_export //utils/localsettings
 
@@ -16,6 +16,10 @@ kmp_library(
         "mingwX64",
     ],
     visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = [
         "//utils/credentialvault",
         "//utils/localsettings",

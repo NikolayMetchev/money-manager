@@ -19,7 +19,6 @@ import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInApiStrategies
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -32,7 +31,7 @@ import kotlin.time.Instant
 class BuiltInApiStrategyInstallTest : DbTest() {
     @Test
     fun `installing the built-in API strategies creates all of them`() =
-        runTest {
+        runDbTest {
             repositories.installBuiltInApiStrategies()
             val names =
                 repositories.apiImportStrategyRepository
@@ -48,7 +47,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
 
     @Test
     fun `an exchange strategy has no bank counterparties to suggest`() =
-        runTest {
+        runDbTest {
             repositories.installBuiltInApiStrategies()
             val coinbase =
                 repositories.apiImportStrategyRepository
@@ -71,7 +70,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
 
     @Test
     fun `the Coinbase strategy installs with its JWT-signed exchange configuration`() =
-        runTest {
+        runDbTest {
             repositories.installBuiltInApiStrategies()
             val coinbase =
                 repositories.apiImportStrategyRepository
@@ -93,7 +92,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
 
     @Test
     fun `the Coinbase strategy survives an export file round trip`() =
-        runTest {
+        runDbTest {
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val original =
                 BuiltInApiStrategies.coinbase(now)
@@ -114,7 +113,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
 
     @Test
     fun `the Bybit strategy installs with its header-signed exchange configuration`() =
-        runTest {
+        runDbTest {
             repositories.installBuiltInApiStrategies()
             val bybit =
                 repositories.apiImportStrategyRepository
@@ -143,7 +142,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
 
     @Test
     fun `the Bybit strategy survives an export file round trip`() =
-        runTest {
+        runDbTest {
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val original = BuiltInApiStrategies.bybit(now)
             val json = ApiStrategyExportCodec.encode(ApiStrategyExportMapper.toExport(original, "test"))
@@ -154,7 +153,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
 
     @Test
     fun `strategies that leave the new signing and paging fields at their defaults do not encode them`() =
-        runTest {
+        runDbTest {
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             for (strategy in BuiltInApiStrategies.builtInApiStrategies(now).filter { it.name != "Bybit" }) {
                 val json = ApiStrategyExportCodec.encode(ApiStrategyExportMapper.toExport(strategy, "test"))
@@ -164,7 +163,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
 
     @Test
     fun `the Kraken strategy installs with its signed-exchange configuration`() =
-        runTest {
+        runDbTest {
             repositories.installBuiltInApiStrategies()
             val kraken =
                 repositories.apiImportStrategyRepository
@@ -193,7 +192,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
 
     @Test
     fun `the Crypto_com Exchange strategy installs with its signed-exchange configuration`() =
-        runTest {
+        runDbTest {
             repositories.installBuiltInApiStrategies()
             val exchange =
                 repositories.apiImportStrategyRepository
@@ -217,7 +216,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
 
     @Test
     fun `the Crypto_com Exchange strategy survives an export file round trip`() =
-        runTest {
+        runDbTest {
             // The distribution format used by the catalog and by the API-strategies "Import file" button:
             // toExport -> JSON encode/decode -> fromExport must reproduce the full signed-exchange config.
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
@@ -244,7 +243,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
 
     @Test
     fun `the Binance strategy installs with its signed-exchange configuration`() =
-        runTest {
+        runDbTest {
             repositories.installBuiltInApiStrategies()
             val binance =
                 repositories.apiImportStrategyRepository
@@ -277,7 +276,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
 
     @Test
     fun `the Binance strategy survives an export file round trip`() =
-        runTest {
+        runDbTest {
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val original = BuiltInApiStrategies.binance(now)
             val json = ApiStrategyExportCodec.encode(ApiStrategyExportMapper.toExport(original, "test"))
@@ -300,7 +299,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
 
     @Test
     fun `the Starling strategy installs with its expected configuration`() =
-        runTest {
+        runDbTest {
             repositories.installBuiltInApiStrategies()
             val starling =
                 repositories.apiImportStrategyRepository

@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_forbid_deps //app/db/core //app/di/core //app/ui/core
 # gazelle:kmp_export //app/csvimporter
 # gazelle:kmp_export //app/importengineapi
@@ -32,6 +32,10 @@ kmp_library(
         "mingwX64",
     ],
     visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = [
         "//app/csvimporter",
         "//app/importengineapi",
@@ -67,6 +71,10 @@ kmp_test(
         "linuxX64",
         "macosArm64",
         "mingwX64",
+    ],
+    web_targets = [
+        "wasmJs",
+        "js",
     ],
     deps = [
         "//app/csvimporter",

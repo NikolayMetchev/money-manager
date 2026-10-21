@@ -5,7 +5,6 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -235,7 +234,7 @@ class BinanceExchangeApiE2ETest : DbTest() {
 
     @Test
     fun `imports status-filtered transfers - both fiat_orders endpoints - fixed-side trades and fan-out spot trades - idempotently`() =
-        runTest {
+        runDbTest {
             stageSessionAndImport()
 
             val exchange =
@@ -358,7 +357,7 @@ class BinanceExchangeApiE2ETest : DbTest() {
 
     @Test
     fun `imports Simple Earn principal and rewards - dust conversions - distributions and wallet transfers`() =
-        runTest {
+        runDbTest {
             stageSessionAndImport()
 
             val exchange =

@@ -22,3 +22,5 @@ actual fun deleteTestDatabase(location: DbLocation) {
         file.parent?.let { SystemFileSystem.delete(it, mustExist = false) }
     }
 }
+
+actual val testDatabasesAreFiles: Boolean = true
