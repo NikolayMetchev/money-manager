@@ -51,6 +51,7 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.updateAccountMapping
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.regex.compileRegex
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.foundation.LocalImportEngine
 import kotlinx.coroutines.launch
@@ -249,7 +250,7 @@ internal fun AccountMappingEditorDialog(
                         val accountId = selectedAccountId ?: return@TextButton
                         scope.launch {
                             try {
-                                val pattern = Regex(patternText, RegexOption.IGNORE_CASE)
+                                val pattern = compileRegex(patternText, RegexOption.IGNORE_CASE)
                                 if (existingMapping != null) {
                                     importEngine.updateAccountMapping(
                                         existingMapping.copy(
@@ -305,7 +306,7 @@ private fun matchPreview(
     if (csvColumns == null || sampleRows.isEmpty() || patternText.isBlank()) return null
     val regex =
         try {
-            Regex(patternText, RegexOption.IGNORE_CASE)
+            compileRegex(patternText, RegexOption.IGNORE_CASE)
         } catch (_: IllegalArgumentException) {
             return "Invalid regex pattern"
         }

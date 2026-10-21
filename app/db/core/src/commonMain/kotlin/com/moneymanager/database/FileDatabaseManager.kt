@@ -1,6 +1,7 @@
 package com.moneymanager.database
 
 import app.cash.sqldelight.db.SqlDriver
+import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.currency.IsoCurrency
 import com.moneymanager.database.sql.seed.MoneyManagerDatabase
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
@@ -10,7 +11,6 @@ import com.moneymanager.files.absolutePath
 import com.moneymanager.files.readBytes
 import com.moneymanager.files.writeAtomically
 import com.moneymanager.tasks.Progress
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -26,12 +26,10 @@ import kotlin.random.Random
  * "empty" would try to create the schema again over a desktop-created file. There is no DB versioning yet
  * (#426), so nothing else reads `user_version` either.
  *
- * @param ioDispatcher where file and database work runs (`Dispatchers.IO`, which common code can't name).
  * @param currenciesToSeed deferred so the currency list is only built when a fresh database is seeded;
  *   tests inject a minimal list (see :test:app:db's createTestDatabaseManager).
  */
 abstract class FileDatabaseManager(
-    private val ioDispatcher: CoroutineDispatcher,
     private val currenciesToSeed: () -> List<IsoCurrency>,
 ) : DatabaseManager {
     /**

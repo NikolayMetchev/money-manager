@@ -33,6 +33,7 @@ import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importer.ImportEngineImpl
+import com.moneymanager.regex.compileRegex
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
@@ -163,7 +164,7 @@ class CsvReimportE2ETest {
 
             // The user notices the duplicate and adds a global mapping to the true account.
             fixture.importEngine.createAccountMapping(
-                valuePattern = Regex("^Amazon\\.com$", RegexOption.IGNORE_CASE),
+                valuePattern = compileRegex("^Amazon\\.com$", RegexOption.IGNORE_CASE),
                 accountId = fixture.trueAccountId,
             )
 
@@ -245,7 +246,7 @@ class CsvReimportE2ETest {
             )
 
             fixture.importEngine.createAccountMapping(
-                valuePattern = Regex("^Amazon\\.com$", RegexOption.IGNORE_CASE),
+                valuePattern = compileRegex("^Amazon\\.com$", RegexOption.IGNORE_CASE),
                 accountId = fixture.trueAccountId,
             )
 

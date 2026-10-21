@@ -1,5 +1,6 @@
 package com.moneymanager.remotestorage.googledrive
 
+import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageException
 import com.moneymanager.remotestorage.RemoteStorageProvider
@@ -21,8 +22,6 @@ import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.http.withCharset
 import io.ktor.utils.io.charsets.Charsets
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
@@ -64,7 +63,7 @@ class GoogleDriveProvider(
     }
 
     override suspend fun list(): List<RemoteFile> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val driveQuery = "'${folderId()}' in parents and trashed = false"
             val body =
                 httpClient
@@ -79,7 +78,7 @@ class GoogleDriveProvider(
         }
 
     override suspend fun stat(fileId: String): RemoteFile? =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val response =
                 httpClient.get("$FILES_ENDPOINT/$fileId") {
                     url { parameters.append("fields", FILE_FIELDS) }
@@ -89,7 +88,7 @@ class GoogleDriveProvider(
         }
 
     override suspend fun download(fileId: String): ByteArray =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val response =
                 httpClient.get("$FILES_ENDPOINT/$fileId") {
                     url { parameters.append("alt", "media") }
@@ -105,7 +104,7 @@ class GoogleDriveProvider(
         name: String,
         bytes: ByteArray,
     ): RemoteFile =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val boundary = "mmboundary_${name.hashCode().toUInt()}_${bytes.size}"
             // Updating in place re-sends only the name; appProperties/parents are set once at create.
             val metadata =
@@ -129,7 +128,7 @@ class GoogleDriveProvider(
         }
 
     override suspend fun delete(fileId: String) {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val response = httpClient.delete("$FILES_ENDPOINT/$fileId")
             if (!response.status.isSuccess() && response.status.value != HTTP_NOT_FOUND) {
                 throw RemoteStorageException("Failed to delete $fileId from Google Drive (${response.status.value})")

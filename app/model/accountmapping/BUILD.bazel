@@ -26,4 +26,5 @@ kmp_library(
         "//app/model/core",
         "@maven_kmp//:kotlinx_serialization_core",
     ],
+    deps = ["//utils/regex"],
 )

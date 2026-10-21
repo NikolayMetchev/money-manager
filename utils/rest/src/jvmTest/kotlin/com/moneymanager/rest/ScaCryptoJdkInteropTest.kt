@@ -1,5 +1,6 @@
 package com.moneymanager.rest
 
+import kotlinx.coroutines.test.runTest
 import java.security.KeyFactory
 import java.security.Signature
 import java.security.spec.X509EncodedKeySpec
@@ -11,43 +12,46 @@ import kotlin.test.assertTrue
 /** Keys and signatures from [generateScaKeyPair] and [signScaChallenge] as the JDK reads them. */
 class ScaCryptoJdkInteropTest {
     @Test
-    fun `a generated key signs a token verifiably with its public key`() {
-        val keyPair = generateScaKeyPair()
-        val token = "one-time-token-abc123"
+    fun `a generated key signs a token verifiably with its public key`() =
+        runTest {
+            val keyPair = generateScaKeyPair()
+            val token = "one-time-token-abc123"
 
-        val signatureBase64 = signScaChallenge(keyPair.privateKeyPem, token)
+            val signatureBase64 = signScaChallenge(keyPair.privateKeyPem, token)
 
-        val publicKeyDer = Base64.decode(pemBody(keyPair.publicKeyPem))
-        val publicKey = KeyFactory.getInstance("RSA").generatePublic(X509EncodedKeySpec(publicKeyDer))
-        val verifier =
-            Signature.getInstance("SHA256withRSA").apply {
-                initVerify(publicKey)
-                update(token.encodeToByteArray())
-            }
-        assertTrue(verifier.verify(Base64.decode(signatureBase64)), "signature must verify with the public key")
-    }
-
-    @Test
-    fun `the wrong token does not verify`() {
-        val keyPair = generateScaKeyPair()
-        val signatureBase64 = signScaChallenge(keyPair.privateKeyPem, "token-one")
-
-        val publicKey =
-            KeyFactory
-                .getInstance("RSA")
-                .generatePublic(X509EncodedKeySpec(Base64.decode(pemBody(keyPair.publicKeyPem))))
-        val verifier =
-            Signature.getInstance("SHA256withRSA").apply {
-                initVerify(publicKey)
-                update("token-two".encodeToByteArray())
-            }
-        assertTrue(!verifier.verify(Base64.decode(signatureBase64)), "a different token must not verify")
-    }
+            val publicKeyDer = Base64.decode(pemBody(keyPair.publicKeyPem))
+            val publicKey = KeyFactory.getInstance("RSA").generatePublic(X509EncodedKeySpec(publicKeyDer))
+            val verifier =
+                Signature.getInstance("SHA256withRSA").apply {
+                    initVerify(publicKey)
+                    update(token.encodeToByteArray())
+                }
+            assertTrue(verifier.verify(Base64.decode(signatureBase64)), "signature must verify with the public key")
+        }
 
     @Test
-    fun `each generated key pair is distinct`() {
-        assertNotEquals(generateScaKeyPair().publicKeyPem, generateScaKeyPair().publicKeyPem)
-    }
+    fun `the wrong token does not verify`() =
+        runTest {
+            val keyPair = generateScaKeyPair()
+            val signatureBase64 = signScaChallenge(keyPair.privateKeyPem, "token-one")
+
+            val publicKey =
+                KeyFactory
+                    .getInstance("RSA")
+                    .generatePublic(X509EncodedKeySpec(Base64.decode(pemBody(keyPair.publicKeyPem))))
+            val verifier =
+                Signature.getInstance("SHA256withRSA").apply {
+                    initVerify(publicKey)
+                    update("token-two".encodeToByteArray())
+                }
+            assertTrue(!verifier.verify(Base64.decode(signatureBase64)), "a different token must not verify")
+        }
+
+    @Test
+    fun `each generated key pair is distinct`() =
+        runTest {
+            assertNotEquals(generateScaKeyPair().publicKeyPem, generateScaKeyPair().publicKeyPem)
+        }
 
     private fun pemBody(pem: String): String =
         pem

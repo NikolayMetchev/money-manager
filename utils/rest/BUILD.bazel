@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_export //app/importengineapi
 # gazelle:kmp_export //app/model/apistrategy
 # gazelle:kmp_export //app/model/core
@@ -8,6 +8,7 @@
 # gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_jdk jvmMain
 # gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_openssl3_prebuilt nativeMain
 # gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_jdk androidMain
+# gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_webcrypto webMain
 
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
@@ -24,6 +25,7 @@ kmp_library(
         "@maven_kmp//:cryptography_bigint",
         "@maven_kmp//:cryptography_provider_jdk",
         "@maven_kmp//:cryptography_provider_openssl3_prebuilt",
+        "@maven_kmp//:cryptography_provider_webcrypto",
     ],
     native_deps = ["@maven_kmp//:cryptography_provider_openssl3_prebuilt"],
     native_targets = [
@@ -33,6 +35,11 @@ kmp_library(
         "mingwX64",
     ],
     visibility = ["//visibility:public"],
+    web_deps = ["@maven_kmp//:cryptography_provider_webcrypto"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = [
         "//app/importengineapi",
         "//app/model/apistrategy",
@@ -59,6 +66,10 @@ kmp_test(
         "linuxX64",
         "macosArm64",
         "mingwX64",
+    ],
+    web_targets = [
+        "wasmJs",
+        "js",
     ],
     deps = [
         "//app/model/apistrategy",

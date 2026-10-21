@@ -1,8 +1,7 @@
 package com.moneymanager.csvimporter
 
+import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.importfilesource.ImportFileSource
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -37,10 +36,10 @@ suspend fun discoverImportableFolders(
         if (depth > maxDepth || !visitedLock.withLock { visited.add(ref) }) return emptyList()
         val source = openFolder(ref)
         return coroutineScope {
-            val hasImportableFile = async(Dispatchers.IO) { source.list().any { isSupportedImportFile(it.name) } }
+            val hasImportableFile = async(ioDispatcher) { source.list().any { isSupportedImportFile(it.name) } }
             val subtrees =
                 source.listSubfolders().map { sub ->
-                    async(Dispatchers.IO) { visit(sub.ref, "$path / ${sub.name}", depth + 1) }
+                    async(ioDispatcher) { visit(sub.ref, "$path / ${sub.name}", depth + 1) }
                 }
             val self =
                 if (hasImportableFile.await()) {

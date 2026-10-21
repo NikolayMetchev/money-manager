@@ -94,7 +94,9 @@ kmp_library(
     deps = [
         "//app/db/seed",
         "//utils/bigdecimal",
+        "//utils/coroutines",
         "//utils/files",
+        "//utils/regex",
         "@maven_kmp//:kotlinx_datetime",
         "@maven_kmp//:kotlinx_serialization_json",
     ],
@@ -122,6 +124,7 @@ kmp_test(
         "@maven_kmp//:androidx_test_runner",
         "@maven_kmp//:kotlinx_coroutines_test",
         "@maven_kmp//:sqldelight_runtime",
+        "//utils/regex",
     ],
     device_srcs = glob([
         "src/commonTest/kotlin/com/moneymanager/database/repository/**/*.kt",
@@ -174,6 +177,7 @@ kmp_test(
         "//utils/credentialvault",
         "//utils/currency",
         "//utils/files",
+        "//utils/regex",
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_coroutines_test",
         "@maven_kmp//:kotlinx_datetime",

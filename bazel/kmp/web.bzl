@@ -18,10 +18,54 @@ WebKlibInfo = provider(
     doc = "A Kotlin/Wasm or Kotlin/JS library for one browser target.",
     fields = {
         "klib": "The .klib file, or None for a group with no library of its own.",
+        "npm": "depset of the npm packages (`npm_package`'s structs) these klibs need at runtime.",
         "target": "The KGP target name (`wasmJs`, `js`).",
         "transitive_klibs": "depset of this klib and every klib it needs, for -libraries.",
     },
 )
+
+NpmPackageInfo = provider(
+    doc = "An npm package and the packages it depends on.",
+    fields = {"packages": "depset of struct(name, package_json, files): this package and its dependencies."},
+)
+
+def _npm_package_impl(ctx):
+    root = "/".join([p for p in (ctx.label.workspace_root, ctx.label.package) if p])
+    package_json = [f for f in ctx.files.srcs if f.path == (root + "/" if root else "") + "package.json"]
+    if len(package_json) != 1:
+        fail("%s: no package.json at the package's root" % ctx.label)
+    package = struct(name = ctx.attr.package_name, package_json = package_json[0], files = tuple(ctx.files.srcs))
+    return [NpmPackageInfo(packages = depset([package], transitive = [d[NpmPackageInfo].packages for d in ctx.attr.deps]))]
+
+npm_package = rule(
+    implementation = _npm_package_impl,
+    doc = "An npm package from its registry tarball, which a browser klib names in its `package.json`.",
+    attrs = {
+        "deps": attr.label_list(providers = [NpmPackageInfo]),
+        "package_name": attr.string(mandatory = True, doc = "Its name on npm, as code imports it."),
+        "srcs": attr.label_list(allow_files = True, mandatory = True),
+    },
+    provides = [NpmPackageInfo],
+)
+
+def _npm(deps):
+    return depset(transitive = [d[WebKlibInfo].npm for d in deps])
+
+def node_modules(ctx, root, packages):
+    """Lays `packages` out as `<root>/node_modules/<name>/…`, symlinks to their files, as npm installs them, so Node
+    resolves a program's bare imports (`@js-joda/core`) from `root`."""
+    by_name = {}
+    out = []
+    for package in packages.to_list():
+        if package.name in by_name and by_name[package.name] != package.package_json:
+            fail("two versions of the npm package %s: %s and %s" % (package.name, by_name[package.name].short_path, package.package_json.short_path))
+        by_name[package.name] = package.package_json
+        prefix = package.package_json.short_path[:-len("package.json")]
+        for f in package.files:
+            link = ctx.actions.declare_file("%s/node_modules/%s/%s" % (root, package.name, f.short_path[len(prefix):]))
+            ctx.actions.symlink(output = link, target_file = f)
+            out.append(link)
+    return out
 
 # Each target's compiler, and the flags that pick its flavour.
 _COMPILER = {
@@ -63,6 +107,7 @@ def _compile_klib(ctx, out, chain, deps, friends, module_name, mnemonic):
     )
     return WebKlibInfo(
         klib = out,
+        npm = _npm(deps + friends + [_stdlib(ctx)]),
         target = ctx.attr.target,
         transitive_klibs = depset([out], transitive = [transitive]),
     )
@@ -199,7 +244,10 @@ def _test_impl(ctx):
         production = False,
         mnemonic = "KotlinWebTestLink",
     )
-    return [DefaultInfo(files = depset([out]))]
+
+    # runner.mjs resolves the program's npm imports from `<program>_node_modules`.
+    modules = node_modules(ctx, ctx.label.name + "_node_modules", info.npm)
+    return [DefaultInfo(files = depset([out]), runfiles = ctx.runfiles(files = modules))]
 
 kt_web_test_program = rule(
     implementation = _test_impl,
@@ -227,6 +275,7 @@ def _import_impl(ctx):
         DefaultInfo(files = depset(ctx.files.klibs)),
         WebKlibInfo(
             klib = ctx.files.klibs[0],
+            npm = depset(transitive = [_npm(ctx.attr.deps)] + [p[NpmPackageInfo].packages for p in ctx.attr.npm]),
             target = ctx.attr.target,
             transitive_klibs = depset(ctx.files.klibs, transitive = deps),
         ),
@@ -238,6 +287,7 @@ kt_web_import = rule(
     attrs = {
         "deps": attr.label_list(providers = [WebKlibInfo]),
         "klibs": attr.label_list(mandatory = True, allow_files = [".klib"]),
+        "npm": attr.label_list(providers = [NpmPackageInfo], doc = "The npm packages its `package.json` names."),
         "target": attr.string(mandatory = True, values = WEB_TARGETS),
     },
     provides = [WebKlibInfo],
@@ -246,15 +296,17 @@ kt_web_import = rule(
 def _group_impl(ctx):
     return [WebKlibInfo(
         klib = None,
+        npm = depset(transitive = [_npm(ctx.attr.deps)] + [p[NpmPackageInfo].packages for p in ctx.attr.npm]),
         target = ctx.attr.target,
         transitive_klibs = depset(transitive = [d[WebKlibInfo].transitive_klibs for d in ctx.attr.deps]),
     )]
 
 kt_web_group = rule(
     implementation = _group_impl,
-    doc = "Several klibs under one label, or none: a library that only redirects to others.",
+    doc = "Several klibs under one label, or none: a library that only redirects to others, or only npm packages.",
     attrs = {
         "deps": attr.label_list(providers = [WebKlibInfo]),
+        "npm": attr.label_list(providers = [NpmPackageInfo]),
         "target": attr.string(mandatory = True, values = WEB_TARGETS),
     },
     provides = [WebKlibInfo],

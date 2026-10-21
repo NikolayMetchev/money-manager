@@ -18,6 +18,7 @@ kmp_library(
     visibility = ["//visibility:public"],
     exports = ["//app/importfilesource/core"],
     deps = [
+        "//utils/coroutines",
         "//utils/files",
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_io_core",

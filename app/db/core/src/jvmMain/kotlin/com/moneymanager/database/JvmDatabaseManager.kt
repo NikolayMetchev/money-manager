@@ -2,14 +2,13 @@ package com.moneymanager.database
 
 import app.cash.sqldelight.db.SqlDriver
 import com.moneymanager.currency.IsoCurrency
-import kotlinx.coroutines.Dispatchers
 import kotlinx.io.files.Path
 import java.util.Properties
 
 /** The desktop [FileDatabaseManager]: SQLite over sqlite-jdbc, with cached prepared statements. */
 class JvmDatabaseManager(
     currenciesToSeed: () -> List<IsoCurrency> = { DatabaseConfig.allCurrencies },
-) : FileDatabaseManager(Dispatchers.IO, currenciesToSeed) {
+) : FileDatabaseManager(currenciesToSeed) {
     override fun openDriver(file: Path): SqlDriver {
         // foreign_keys must be set via Properties for file-based databases, since the driver opens a
         // connection per thread: https://github.com/sqldelight/sqldelight/issues/2421

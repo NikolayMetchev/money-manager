@@ -26,7 +26,7 @@ class ScaParams(
     val challengeHeader: String,
     val signatureHeader: String,
     val triggerStatus: Int,
-    val sign: (oneTimeToken: String) -> String,
+    val sign: suspend (oneTimeToken: String) -> String,
 )
 
 class ApiClient(

@@ -1,10 +1,9 @@
 package com.moneymanager.strategycatalog
 
+import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.files.expandTilde
 import com.moneymanager.files.isRegularFile
 import com.moneymanager.files.readText
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 import kotlinx.io.files.FileNotFoundException
 import kotlinx.io.files.Path
@@ -27,7 +26,7 @@ class LocalDirectoryStrategyCatalogSource(
     override suspend fun fetchArtifact(fileName: String): String = readFile(fileName)
 
     private suspend fun readFile(fileName: String): String =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val problem =
                 when (SystemFileSystem.metadataOrNull(directory)?.isDirectory) {
                     null -> "does not exist"

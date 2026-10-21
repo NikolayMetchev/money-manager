@@ -3,6 +3,7 @@ package com.moneymanager.rest
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.RSA
 import dev.whyoleg.cryptography.algorithms.SHA256
+import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,35 +12,38 @@ import kotlin.test.assertTrue
 
 class ScaCryptoTest {
     @Test
-    fun signsExactlyAsJdkSha256WithRsa() {
-        // Captured from the JDK's SHA256withRSA (the signer this replaced); PKCS#1 v1.5 is deterministic,
-        // so every platform must produce these exact bytes.
-        assertEquals(GOLDEN_SIGNATURE, signScaChallenge(GOLDEN_PRIVATE_KEY, GOLDEN_TOKEN))
-    }
+    fun signsExactlyAsJdkSha256WithRsa() =
+        runTest {
+            // Captured from the JDK's SHA256withRSA (the signer this replaced); PKCS#1 v1.5 is deterministic,
+            // so every platform must produce these exact bytes.
+            assertEquals(GOLDEN_SIGNATURE, signScaChallenge(GOLDEN_PRIVATE_KEY, GOLDEN_TOKEN))
+        }
 
     @Test
-    fun generatedKeysArePkcs8AndSpkiPem() {
-        val pair = generateScaKeyPair()
+    fun generatedKeysArePkcs8AndSpkiPem() =
+        runTest {
+            val pair = generateScaKeyPair()
 
-        assertTrue(pair.privateKeyPem.startsWith("-----BEGIN PRIVATE KEY-----"))
-        assertTrue(pair.publicKeyPem.startsWith("-----BEGIN PUBLIC KEY-----"))
-        assertFalse("PRIVATE KEY" in pair.toString())
-    }
+            assertTrue(pair.privateKeyPem.startsWith("-----BEGIN PRIVATE KEY-----"))
+            assertTrue(pair.publicKeyPem.startsWith("-----BEGIN PUBLIC KEY-----"))
+            assertFalse("PRIVATE KEY" in pair.toString())
+        }
 
     @Test
-    fun generatedKeySignaturesVerifyWithItsPublicKey() {
-        val pair = generateScaKeyPair()
-        val signature = signScaChallenge(pair.privateKeyPem, GOLDEN_TOKEN)
+    fun generatedKeySignaturesVerifyWithItsPublicKey() =
+        runTest {
+            val pair = generateScaKeyPair()
+            val signature = signScaChallenge(pair.privateKeyPem, GOLDEN_TOKEN)
 
-        val publicKey =
-            CryptographyProvider.Default
-                .get(RSA.PKCS1)
-                .publicKeyDecoder(SHA256)
-                .decodeFromByteArrayBlocking(RSA.PublicKey.Format.PEM.Generic, pair.publicKeyPem.encodeToByteArray())
-        assertTrue(
-            publicKey.signatureVerifier().tryVerifySignatureBlocking(GOLDEN_TOKEN.encodeToByteArray(), Base64.decode(signature)),
-        )
-    }
+            val publicKey =
+                CryptographyProvider.Default
+                    .get(RSA.PKCS1)
+                    .publicKeyDecoder(SHA256)
+                    .decodeFromByteArray(RSA.PublicKey.Format.PEM.Generic, pair.publicKeyPem.encodeToByteArray())
+            assertTrue(
+                publicKey.signatureVerifier().tryVerifySignature(GOLDEN_TOKEN.encodeToByteArray(), Base64.decode(signature)),
+            )
+        }
 }
 
 private const val GOLDEN_TOKEN = "one-time-token-1234"

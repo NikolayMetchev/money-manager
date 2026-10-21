@@ -48,6 +48,7 @@ kmp_library(
         "//utils/humanreadable",
         "//utils/parsers/csv",
         "//utils/parsers/xlsx",
+        "//utils/regex",
         "@maven_kmp//:androidx_compose_runtime",
         "@maven_kmp//:kermit",
         "@maven_kmp//:kotlinx_coroutines_core",

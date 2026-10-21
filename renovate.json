@@ -54,6 +54,13 @@
     },
     {
       "customType": "regex",
+      "description": "The npm packages the browser programs load: MODULE.bazel constants with a `# renovate-npm: <package>` comment",
+      "managerFilePatterns": ["/^MODULE\\.bazel$/"],
+      "matchStrings": ["[A-Z0-9_]+ = \"(?<currentValue>[^\"]+)\"  # renovate-npm: (?<depName>\\S+)"],
+      "datasourceTemplate": "npm"
+    },
+    {
+      "customType": "regex",
       "description": "The Go SDK rules_go downloads for the Gazelle extension (MODULE.bazel's go_sdk.download)",
       "managerFilePatterns": ["/^MODULE\\.bazel$/"],
       "matchStrings": ["go_sdk\\.download\\(version = \"(?<currentValue>[^\"]+)\"\\)"],

@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AssetId
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.regex.compileRegex
 
 /**
  * Which accounts (and which of their balances) an [AccountSnapshot.filter] keeps. Every filter left empty
@@ -76,7 +77,7 @@ sealed interface NameMatch {
     class Pattern(
         val pattern: String,
     ) : NameMatch {
-        private val regex = Regex(pattern, RegexOption.IGNORE_CASE)
+        private val regex = compileRegex(pattern, RegexOption.IGNORE_CASE)
 
         override val text: String get() = pattern
 

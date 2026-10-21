@@ -2,6 +2,7 @@ package com.moneymanager.domain.model.rules
 
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
 import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
+import com.moneymanager.regex.compileRegex
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -18,7 +19,7 @@ data class Extraction(
     val outputTemplate: String = "$0",
 ) {
     /** Whether [pattern] compiles; an editor must not save one that doesn't. */
-    val isValid: Boolean get() = runCatching { Regex(pattern) }.isSuccess
+    val isValid: Boolean get() = runCatching { compileRegex(pattern) }.isSuccess
 }
 
 /**

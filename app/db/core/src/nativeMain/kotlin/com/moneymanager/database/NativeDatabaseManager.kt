@@ -6,7 +6,6 @@ import co.touchlab.sqliter.DatabaseConfiguration
 import co.touchlab.sqliter.JournalMode
 import co.touchlab.sqliter.NO_VERSION_CHECK
 import com.moneymanager.currency.IsoCurrency
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.io.files.Path
 
@@ -21,7 +20,7 @@ import kotlinx.io.files.Path
  */
 class NativeDatabaseManager(
     currenciesToSeed: () -> List<IsoCurrency> = { DatabaseConfig.allCurrencies },
-) : FileDatabaseManager(Dispatchers.IO, currenciesToSeed) {
+) : FileDatabaseManager(currenciesToSeed) {
     override fun openDriver(file: Path): SqlDriver =
         NativeSqliteDriver(
             DatabaseConfiguration(

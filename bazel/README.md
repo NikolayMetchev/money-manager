@@ -166,6 +166,13 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
   (`kmp/web.bzl`, `WebKlibInfo`). Unlike native they also follow the `kotlin-runtime` variant, as a program links
   its runtime closure: ktor's wasmJs runtime variant alone brings kotlinx-browser. A runtime dependency with no klib
   (Compose's `skiko-js-wasm-runtime`, the program's own JavaScript and wasm) is left out.
+- A browser klib names the npm packages it needs in its `package.json` (kotlinx-datetime: `@js-joda/core`; ktor:
+  `ws`), which KGP installs with Yarn. The resolver records them per klib (`npm` on its entry) and pins each one, and
+  what it depends on (required peers too, as npm 7 does), from registry.npmjs.org by tarball URL and SRI `integrity`
+  into the lockfile's `npm`. `maven_kmp.install(npm = {alias: "name@version"})` adds packages our own code imports
+  (`@JsModule`), as hub targets per browser platform (`@maven_kmp//:js_joda_timezone`), and `npm_forces` pins a
+  package whoever asks for it, as Yarn's `resolutions` does. Only exact versions resolve: a range needs a force.
+  Each package is an `http_archive` with an `npm_package` target, carried along `WebKlibInfo.npm` to the programs.
 - Common metadata comes in two views. `metadata` holds the source sets that JVM, Android and native share;
   `metadataWeb` holds those the web platforms share too, so it's never wider (no `concurrentMain` in
   kotlinx-coroutines). Only modules that compile for the browser compile their `commonMain` against
@@ -251,7 +258,9 @@ only so its dependents can, and the browser app never calls it).
 `kmp_test`'s `web_targets` link the test klib (unoptimised) into `:<name>_<target>_bin/test.mjs`, and `:<name>_wasmJs`
 / `:<name>_js` run it in Node on every host. Node is rules_nodejs' toolchain only, pinned in `MODULE.bazel` with each
 platform's SHA-256 (no npm): Renovate bumps `NODE`, and `bazel/renovate/repin.sh` rewrites the SHA-256s from
-nodejs.org's `SHASUMS256.txt` (`repin_node.py`). `testing/web/runner.mjs` defines the `describe`/`it` globals kotlin-test's adapter
+nodejs.org's `SHASUMS256.txt` (`repin_node.py`). A test program's npm packages are laid out as npm installs them, in
+`:<name>_<target>_bin_node_modules/node_modules` (symlinks), and the runner resolves the program's bare imports from
+there (`module.registerHooks`). `testing/web/runner.mjs` defines the `describe`/`it` globals kotlin-test's adapter
 registers tests with, runs them (awaiting async ones) and prints TeamCity service messages, which `KnTestLauncher
 --node` turns into `test.xml` exactly as it does a native test binary's; `--test_filter` works the same way.
 

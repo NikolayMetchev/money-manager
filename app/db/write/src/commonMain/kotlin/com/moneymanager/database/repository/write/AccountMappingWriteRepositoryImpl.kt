@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.write.AccountMappingWriteRepository
+import com.moneymanager.regex.PortableRegex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
@@ -20,7 +21,7 @@ class AccountMappingWriteRepositoryImpl(
     private val writeQueries = database.accountMappingWriteQueries
 
     override suspend fun createMapping(
-        valuePattern: Regex,
+        valuePattern: PortableRegex,
         accountId: AccountId,
         strategyId: CsvImportStrategyId?,
     ): Long =

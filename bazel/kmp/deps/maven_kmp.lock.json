@@ -58,6 +58,7 @@
       "cryptography-core": "dev.whyoleg.cryptography:cryptography-core:0.6.0",
       "cryptography-provider-jdk": "dev.whyoleg.cryptography:cryptography-provider-jdk:0.6.0",
       "cryptography-provider-openssl3-prebuilt": "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt:0.6.0",
+      "cryptography-provider-webcrypto": "dev.whyoleg.cryptography:cryptography-provider-webcrypto:0.6.0",
       "cryptography-random": "dev.whyoleg.cryptography:cryptography-random:0.6.0",
       "jetbrains-navigation3-ui-desktop": "org.jetbrains.androidx.navigation3:navigation3-ui-desktop:1.2.0",
       "junit": "junit:junit:4.13.2",
@@ -352,7 +353,13 @@
     "excludes": [
       "org.jetbrains.compose.runtime:runtime-desktop",
       "org.jetbrains.kotlin:kotlin-gradle-plugin"
-    ]
+    ],
+    "npm": {
+      "js-joda-timezone": "@js-joda/timezone@3.1.0"
+    },
+    "npm_forces": {
+      "@js-joda/core": "6.3.0"
+    }
   },
   "names": {
     "androidx.activity:activity": "androidx_activity",
@@ -507,6 +514,7 @@
     "dev.whyoleg.cryptography:cryptography-provider-jdk": "cryptography_provider_jdk",
     "dev.whyoleg.cryptography:cryptography-provider-openssl3-api": "dev_whyoleg_cryptography_cryptography_provider_openssl3_api",
     "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt": "cryptography_provider_openssl3_prebuilt",
+    "dev.whyoleg.cryptography:cryptography-provider-webcrypto": "cryptography_provider_webcrypto",
     "dev.whyoleg.cryptography:cryptography-random": "cryptography_random",
     "dev.whyoleg.cryptography:cryptography-serialization-asn1": "dev_whyoleg_cryptography_cryptography_serialization_asn1",
     "dev.whyoleg.cryptography:cryptography-serialization-asn1-modules": "dev_whyoleg_cryptography_cryptography_serialization_asn1_modules",
@@ -2711,6 +2719,13 @@
       "dev.whyoleg.cryptography.providers.openssl3.prebuilt",
       "linking"
     ],
+    "dev.whyoleg.cryptography:cryptography-provider-webcrypto": [
+      "dev.whyoleg.cryptography.providers.webcrypto",
+      "dev.whyoleg.cryptography.providers.webcrypto.algorithms",
+      "dev.whyoleg.cryptography.providers.webcrypto.internal",
+      "dev.whyoleg.cryptography.providers.webcrypto.materials",
+      "dev.whyoleg.cryptography.providers.webcrypto.operations"
+    ],
     "dev.whyoleg.cryptography:cryptography-random": [
       "dev.whyoleg.cryptography.random"
     ],
@@ -4218,6 +4233,7 @@
     "android": [
       "app.cash.sqldelight:native-driver",
       "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt",
+      "dev.whyoleg.cryptography:cryptography-provider-webcrypto",
       "org.jetbrains.kotlinx:kotlinx-browser"
     ],
     "js": [
@@ -4236,10 +4252,12 @@
     "jvm": [
       "app.cash.sqldelight:native-driver",
       "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt",
+      "dev.whyoleg.cryptography:cryptography-provider-webcrypto",
       "org.jetbrains.kotlinx:kotlinx-browser"
     ],
     "linuxArm64": [
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
+      "dev.whyoleg.cryptography:cryptography-provider-webcrypto",
       "io.github.ehsannarmani:compose-charts",
       "junit:junit",
       "org.apache.poi:poi",
@@ -4248,6 +4266,7 @@
     ],
     "linuxX64": [
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
+      "dev.whyoleg.cryptography:cryptography-provider-webcrypto",
       "io.github.ehsannarmani:compose-charts",
       "junit:junit",
       "org.apache.poi:poi",
@@ -4256,6 +4275,7 @@
     ],
     "macosArm64": [
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
+      "dev.whyoleg.cryptography:cryptography-provider-webcrypto",
       "io.github.ehsannarmani:compose-charts",
       "junit:junit",
       "org.apache.poi:poi",
@@ -4266,6 +4286,7 @@
       "app.cash.sqldelight:native-driver",
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
       "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt",
+      "dev.whyoleg.cryptography:cryptography-provider-webcrypto",
       "io.github.ehsannarmani:compose-charts",
       "junit:junit",
       "org.apache.poi:poi",
@@ -4281,6 +4302,7 @@
       "com.jakewharton.mosaic:mosaic-tty-terminal",
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
       "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt",
+      "dev.whyoleg.cryptography:cryptography-provider-webcrypto",
       "io.github.ehsannarmani:compose-charts",
       "junit:junit",
       "org.apache.poi:poi",
@@ -4289,6 +4311,7 @@
     ],
     "mingwX64": [
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
+      "dev.whyoleg.cryptography:cryptography-provider-webcrypto",
       "io.github.ehsannarmani:compose-charts",
       "junit:junit",
       "org.apache.poi:poi",
@@ -12047,6 +12070,26 @@
           "org.jetbrains.kotlinx:kotlinx-serialization-json"
         ]
       },
+      "js": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-base-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-base-js/0.6.0/cryptography-provider-base-js-0.6.0.klib",
+            "sha256": "9e76ed5d84cf134301920aff1f81a2f2f325946d34cb803f2036795c80e067b3"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-core",
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1",
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1-modules",
+          "dev.whyoleg.cryptography:cryptography-serialization-pem",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-json"
+        ]
+      },
       "jvm": {
         "version": "0.6.0",
         "files": [
@@ -12131,6 +12174,25 @@
           "dev.whyoleg.cryptography:cryptography-serialization-asn1",
           "dev.whyoleg.cryptography:cryptography-serialization-asn1-modules",
           "dev.whyoleg.cryptography:cryptography-serialization-pem",
+          "org.jetbrains.kotlinx:kotlinx-serialization-json"
+        ]
+      },
+      "wasmJs": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-base-wasm-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-base-wasm-js/0.6.0/cryptography-provider-base-wasm-js-0.6.0.klib",
+            "sha256": "f28357fdec5f005263aaec43968468636b1c85cc41d67355840e237809d2c01f"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-core",
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1",
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1-modules",
+          "dev.whyoleg.cryptography:cryptography-serialization-pem"
+        ],
+        "runtime_deps": [
           "org.jetbrains.kotlinx:kotlinx-serialization-json"
         ]
       }
@@ -12321,6 +12383,41 @@
         ]
       }
     },
+    "dev.whyoleg.cryptography:cryptography-provider-webcrypto": {
+      "js": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-webcrypto-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-webcrypto-js/0.6.0/cryptography-provider-webcrypto-js-0.6.0.klib",
+            "sha256": "9f1b2f34ee7c7218eba76ac9639af69c9ea40e4c5309968351c74046280148fb"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-core",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ],
+        "runtime_deps": [
+          "dev.whyoleg.cryptography:cryptography-provider-base"
+        ]
+      },
+      "wasmJs": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-webcrypto-wasm-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-webcrypto-wasm-js/0.6.0/cryptography-provider-webcrypto-wasm-js-0.6.0.klib",
+            "sha256": "b03890e89a7216c18dc438435b7219b842ac865403c848f4f379ff5efbc4bd0e"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-core"
+        ],
+        "runtime_deps": [
+          "dev.whyoleg.cryptography:cryptography-provider-base"
+        ]
+      }
+    },
     "dev.whyoleg.cryptography:cryptography-random": {
       "android": {
         "version": "0.6.0",
@@ -12447,6 +12544,21 @@
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ]
       },
+      "js": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-asn1-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-asn1-js/0.6.0/cryptography-serialization-asn1-js-0.6.0.klib",
+            "sha256": "bea6dbb08e651cc8b04d4ea3706e7ea75f314b83a15be43546d1498fb423fed5"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-bigint",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
       "jvm": {
         "version": "0.6.0",
         "files": [
@@ -12516,6 +12628,20 @@
           "dev.whyoleg.cryptography:cryptography-bigint",
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ]
+      },
+      "wasmJs": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-asn1-wasm-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-asn1-wasm-js/0.6.0/cryptography-serialization-asn1-wasm-js-0.6.0.klib",
+            "sha256": "acf5bcb39b78f2db6afef3c5f70f93801ff6505629a7393edae55dd47e4d018d"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-bigint",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
       }
     },
     "dev.whyoleg.cryptography:cryptography-serialization-asn1-modules": {
@@ -12530,6 +12656,20 @@
         ],
         "deps": [
           "dev.whyoleg.cryptography:cryptography-serialization-asn1"
+        ]
+      },
+      "js": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-asn1-modules-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-asn1-modules-js/0.6.0/cryptography-serialization-asn1-modules-js-0.6.0.klib",
+            "sha256": "53db637f83d899baf3dfb39285d523224be10ccd5a639cbb42c940d6e1074e25"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ]
       },
       "jvm": {
@@ -12596,6 +12736,19 @@
         "deps": [
           "dev.whyoleg.cryptography:cryptography-serialization-asn1"
         ]
+      },
+      "wasmJs": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-asn1-modules-wasm-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-asn1-modules-wasm-js/0.6.0/cryptography-serialization-asn1-modules-wasm-js-0.6.0.klib",
+            "sha256": "75680a3a79d1ed013d9251ae12f16e6ed5033847334fa1e9fb1130aba88e62af"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1"
+        ]
       }
     },
     "dev.whyoleg.cryptography:cryptography-serialization-pem": {
@@ -12609,6 +12762,20 @@
           }
         ],
         "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-core"
+        ]
+      },
+      "js": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-pem-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-pem-js/0.6.0/cryptography-serialization-pem-js-0.6.0.klib",
+            "sha256": "eedbc648d8167d289a8eb2c6867016703271219d6726e836b564ec45c1882d63"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
           "org.jetbrains.kotlinx:kotlinx-io-core"
         ]
       },
@@ -12671,6 +12838,19 @@
             "name": "cryptography-serialization-pem-mingwX64Main-0.6.0.klib",
             "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-pem-mingwx64/0.6.0/cryptography-serialization-pem-mingwx64-0.6.0.klib",
             "sha256": "4473ec329d8d23a2db11e215360196585b175c1736a303f6670309cefd1f3cfb"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-pem-wasm-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-pem-wasm-js/0.6.0/cryptography-serialization-pem-wasm-js-0.6.0.klib",
+            "sha256": "58067e3f7578322c6eb10ccf5881aa62a2e2b7fb94fd76acf6c7df1dc2515cfc"
           }
         ],
         "deps": [
@@ -13100,7 +13280,10 @@
         ],
         "runtime_deps": [
           "org.jetbrains.kotlinx:kotlinx-browser"
-        ]
+        ],
+        "npm": {
+          "ws": "8.20.1"
+        }
       },
       "jvm": {
         "version": "3.6.0",
@@ -13263,7 +13446,10 @@
         ],
         "runtime_deps": [
           "org.jetbrains.kotlinx:kotlinx-browser"
-        ]
+        ],
+        "npm": {
+          "ws": "8.20.1"
+        }
       }
     },
     "io.ktor:ktor-client-curl": {
@@ -18946,7 +19132,10 @@
         "deps": [
           "org.jetbrains.kotlin:kotlin-dom-api-compat",
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
-        ]
+        ],
+        "npm": {
+          "@js-joda/core": "6.3.0"
+        }
       },
       "jvm": {
         "version": "0.8.0",
@@ -19053,7 +19242,10 @@
         ],
         "deps": [
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
-        ]
+        ],
+        "npm": {
+          "@js-joda/core": "6.3.0"
+        }
       }
     },
     "org.jetbrains.kotlinx:kotlinx-io-bytestring": {
@@ -20044,5 +20236,31 @@
         ]
       }
     }
+  },
+  "npm": {
+    "@js-joda/core@6.3.0": {
+      "name": "@js-joda/core",
+      "version": "6.3.0",
+      "url": "https://registry.npmjs.org/@js-joda/core/-/core-6.3.0.tgz",
+      "integrity": "sha512-mdmjc6lJkTCORsHlMxBT9XM1yLqgtsNZmv/Hwme2v/HIb15D2XcmklZKTnynqBgsSizA9SkFvzpuksfIXhDV/w=="
+    },
+    "@js-joda/timezone@3.1.0": {
+      "name": "@js-joda/timezone",
+      "version": "3.1.0",
+      "url": "https://registry.npmjs.org/@js-joda/timezone/-/timezone-3.1.0.tgz",
+      "integrity": "sha512-6bCJgw/LqUHoXrZ8xJ+CLdiqfiFJ4I+imjb69+6q6YHmSOxB2pZbsd0BctMMhi0qMmCohAyyZsh29fDKnHuEYA==",
+      "deps": {
+        "@js-joda/core": "6.3.0"
+      }
+    },
+    "ws@8.20.1": {
+      "name": "ws",
+      "version": "8.20.1",
+      "url": "https://registry.npmjs.org/ws/-/ws-8.20.1.tgz",
+      "integrity": "sha512-It4dO0K5v//JtTXuPkfEOaI3uUN87iYPnqo/ZzqCoG3g8uhA66QUMs/SrM0YK7/NAu+r4LMh/9dq2A7k+rHs+w=="
+    }
+  },
+  "npm_libraries": {
+    "js-joda-timezone": "@js-joda/timezone@3.1.0"
   }
 }

@@ -38,6 +38,10 @@ def _expected_inputs(install):
         inputs["classpath_forces"] = install.classpath_forces
     if install.library_platforms:
         inputs["library_platforms"] = install.library_platforms
+    if install.npm:
+        inputs["npm"] = install.npm
+    if install.npm_forces:
+        inputs["npm_forces"] = install.npm_forces
     return inputs
 
 def _file_repo(file):
@@ -145,6 +149,25 @@ aar_import(
 def _is_aar(file):
     return file["name"].endswith(".aar")
 
+def _npm_repo(key):
+    return "npm_" + "".join([c if c.isalnum() else "_" for c in key.elems()])
+
+# An npm package's tarball, for the browser programs' `node_modules`.
+_NPM_BUILD = """\
+load("@money_manager//bazel/kmp:web.bzl", "npm_package")
+
+npm_package(
+    name = "package",
+    package_name = {name},
+    srcs = glob(["**"], exclude = ["BUILD.bazel", "REPO.bazel", "WORKSPACE"]),
+    deps = {deps},
+    visibility = ["//visibility:public"],
+)
+"""
+
+def _npm_labels(deps):
+    return ['"@%s//:package"' % _npm_repo(n + "@" + v) for n, v in sorted(deps.items())]
+
 def _file_label(file):
     return '"@%s//%s"' % (_file_repo(file), ":jar" if _is_aar(file) else "file")
 
@@ -181,12 +204,14 @@ def _target(name, platform, resolved, names, artifacts):
         deps = deps + _labels(names, _through_redirects(artifacts, resolved.get("runtime_deps", []), platform), platform)
     if not files:
         return 'kt_%s_group(name = "%s", target = "%s", deps = [%s])\n' % (kind, full, platform, ", ".join(deps))
-    return 'kt_%s_import(name = "%s", target = "%s", klibs = [%s], deps = [%s])\n' % (
+    npm = ", npm = [%s]" % ", ".join(_npm_labels(resolved["npm"])) if resolved.get("npm") else ""
+    return 'kt_%s_import(name = "%s", target = "%s", klibs = [%s], deps = [%s]%s)\n' % (
         kind,
         full,
         platform,
         ", ".join(files),
         ", ".join(deps),
+        npm,
     )
 
 _PIN_SH = """\
@@ -219,7 +244,7 @@ _hub = repository_rule(
 def _lock_path(label):
     return (label.package + "/" + label.name) if label.package else label.name
 
-def _install(module_ctx, install, files, archives):
+def _install(module_ctx, install, files, archives, npm):
     """One install: its hub repository's BUILD content and why its lockfile is stale (or "")."""
     lock_path = _lock_path(install.lock_file)
     lock = json.decode(module_ctx.read(install.lock_file))
@@ -229,6 +254,7 @@ def _install(module_ctx, install, files, archives):
                  "Re-pin with `bazel run @%s//:pin`." % install.name)
 
     names = lock["names"]
+    npm.update(lock.get("npm", {}))
     targets = []
     metadata_sets = {}
     for module in sorted(lock["artifacts"]):
@@ -258,6 +284,12 @@ def _install(module_ctx, install, files, archives):
     pin_args += ["--classpath-force=%s=%s" % (m, v) for m, v in sorted(install.classpath_forces.items())]
     pin_args += ["--repository=" + r for r in install.repositories]
     pin_args += ["--exclude=" + e for e in install.excludes]
+    pin_args += ["--npm=%s=%s" % (a, p) for a, p in sorted(install.npm.items())]
+    pin_args += ["--npm-force=%s=%s" % (n, v) for n, v in sorted(install.npm_forces.items())]
+    for alias, key in sorted(lock.get("npm_libraries", {}).items()):
+        name = "".join([c if c.isalnum() else "_" for c in alias.elems()])
+        for platform in _WEB:
+            targets.append('kt_web_group(name = "%s_%s", target = "%s", npm = ["@%s//:package"])\n' % (name, platform, platform, _npm_repo(key)))
     for alias, actual in sorted(install.aliases.items()):
         targets.append('alias(name = "%s", actual = ":%s")\n' % (alias, actual))
     return _HEADER.format(pin_args = repr(pin_args)) + "\n" + "\n".join(targets), stale
@@ -269,8 +301,9 @@ def _maven_kmp_impl(module_ctx):
     # Files several installs share are one repository each.
     files = {}
     archives = {}
+    npm = {}
     for install in installs:
-        content, stale = _install(module_ctx, install, files, archives)
+        content, stale = _install(module_ctx, install, files, archives, npm)
         _hub(name = install.name, build_file_content = content, stale = stale)
     for repo, f in files.items():
         http_file(name = repo, urls = [f["url"]], sha256 = f["sha256"], downloaded_file_path = f["name"])
@@ -281,6 +314,14 @@ def _maven_kmp_impl(module_ctx):
             sha256 = f["sha256"],
             type = "zip",
             build_file_content = build,
+        )
+    for key, package in npm.items():
+        http_archive(
+            name = _npm_repo(key),
+            urls = [package["url"]],
+            integrity = package["integrity"],
+            strip_prefix = "package",
+            build_file_content = _NPM_BUILD.format(name = repr(package["name"]), deps = "[%s]" % ", ".join(_npm_labels(package.get("deps", {})))),
         )
     return module_ctx.extension_metadata(reproducible = True)
 
@@ -310,6 +351,10 @@ maven_kmp = module_extension(
                 the source sets declaring it: the desktop Compose jars are no Android library.""",
             ),
             "lock_file": attr.label(mandatory = True),
+            "npm": attr.string_dict(
+                doc = "alias → name@version: npm packages our browser code imports, a target per browser platform.",
+            ),
+            "npm_forces": attr.string_dict(doc = "npm name → version, whoever asks for it (Yarn's `resolutions`)."),
             "name": attr.string(
                 default = "maven_kmp",
                 doc = "The hub repository. Each install resolves on its own, as each Gradle configuration does " +

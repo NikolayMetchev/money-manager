@@ -2,6 +2,9 @@ package com.moneymanager.csvimporter
 
 import com.moneymanager.domain.model.AccountAttribute
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.regex.PortableRegex
+import com.moneymanager.regex.compileRegex
+import com.moneymanager.regex.escapeRegex
 
 /**
  * Resolves a CSV value to the account whose account-attribute pattern matches it. Built from the
@@ -20,7 +23,7 @@ import com.moneymanager.domain.model.AccountId
  * literally rather than failing the whole import.
  */
 class AttributeAccountMatcher private constructor(
-    private val patterns: List<Pair<Regex, AccountId>>,
+    private val patterns: List<Pair<PortableRegex, AccountId>>,
 ) {
     /** The single account whose pattern matches [value], or null when none or more than one does. */
     fun match(value: String): AccountId? = matchingAccounts(value).singleOrNull()
@@ -47,9 +50,9 @@ class AttributeAccountMatcher private constructor(
             )
 
         /** Compiles a token as a regex, falling back to a literal match when it isn't valid regex syntax. */
-        private fun compileToken(token: String): Regex =
-            runCatching { Regex(token, RegexOption.IGNORE_CASE) }
-                .getOrElse { Regex(Regex.escape(token), RegexOption.IGNORE_CASE) }
+        private fun compileToken(token: String): PortableRegex =
+            runCatching { compileRegex(token, RegexOption.IGNORE_CASE) }
+                .getOrElse { compileRegex(escapeRegex(token), RegexOption.IGNORE_CASE) }
 
         /** Builds a registry keyed by attribute-type name from a mixed list of account attributes. */
         fun registry(attributes: List<AccountAttribute>): Map<String, AttributeAccountMatcher> =

@@ -1,9 +1,8 @@
 package com.moneymanager.remotestorage.googledrive
 
+import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.remotestorage.RemoteAuthException
 import io.ktor.client.HttpClient
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 
 /**
@@ -51,7 +50,7 @@ internal suspend fun performLoopbackSignIn(
     oauth: GoogleOAuth,
     scopes: List<String>,
 ): GoogleTokens =
-    withContext(Dispatchers.IO) {
+    withContext(ioDispatcher) {
         LoopbackRedirectReceiver.bind().use { receiver ->
             val state = oauth.newState()
             browser.open(oauth.consentUrl(credentials.clientId, receiver.redirectUri, state, scopes))

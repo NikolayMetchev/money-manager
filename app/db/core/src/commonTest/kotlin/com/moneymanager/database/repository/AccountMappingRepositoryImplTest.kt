@@ -1,10 +1,12 @@
 package com.moneymanager.database.repository
+
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
+import com.moneymanager.regex.compileRegex
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
@@ -62,11 +64,11 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val strategyId = createTestStrategy()
 
             repositories.accountMappingRepository.createMapping(
-                valuePattern = Regex("global"),
+                valuePattern = compileRegex("global"),
                 accountId = account.id,
             )
             repositories.accountMappingRepository.createMapping(
-                valuePattern = Regex("scoped"),
+                valuePattern = compileRegex("scoped"),
                 accountId = account.id,
                 strategyId = strategyId,
             )
@@ -82,7 +84,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account = createTestAccount()
             val strategyId = createTestStrategy()
             repositories.accountMappingRepository.createMapping(
-                valuePattern = Regex("scoped"),
+                valuePattern = compileRegex("scoped"),
                 accountId = account.id,
                 strategyId = strategyId,
             )
@@ -105,7 +107,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
-                valuePattern = Regex("^Test Pattern$", RegexOption.IGNORE_CASE),
+                valuePattern = compileRegex("^Test Pattern$", RegexOption.IGNORE_CASE),
                 accountId = account.id,
             )
 
@@ -122,11 +124,11 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account2 = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
-                valuePattern = Regex("pattern1"),
+                valuePattern = compileRegex("pattern1"),
                 accountId = account1.id,
             )
             repositories.accountMappingRepository.createMapping(
-                valuePattern = Regex("pattern2"),
+                valuePattern = compileRegex("pattern2"),
                 accountId = account2.id,
             )
 
@@ -145,7 +147,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account2 = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
-                valuePattern = Regex("original"),
+                valuePattern = compileRegex("original"),
                 accountId = account1.id,
             )
 
@@ -155,7 +157,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
             val updated =
                 original.copy(
-                    valuePattern = Regex("updated"),
+                    valuePattern = compileRegex("updated"),
                     accountId = account2.id,
                 )
             repositories.accountMappingRepository.updateMapping(updated)
@@ -173,7 +175,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
-                valuePattern = Regex("test"),
+                valuePattern = compileRegex("test"),
                 accountId = account.id,
             )
 
@@ -195,7 +197,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
-                valuePattern = Regex("test"),
+                valuePattern = compileRegex("test"),
                 accountId = account.id,
             )
 
@@ -217,7 +219,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
 
             val complexPattern = "^Nikolay Metchev & Olga Zakharenko$"
             repositories.accountMappingRepository.createMapping(
-                valuePattern = Regex(complexPattern),
+                valuePattern = compileRegex(complexPattern),
                 accountId = account.id,
             )
 
@@ -232,7 +234,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
-                valuePattern = Regex("paxos"),
+                valuePattern = compileRegex("paxos"),
                 accountId = account.id,
             )
 
@@ -260,11 +262,11 @@ class AccountMappingRepositoryImplTest : DbTest() {
             val account2 = createTestAccount()
 
             repositories.accountMappingRepository.createMapping(
-                valuePattern = Regex("pattern1"),
+                valuePattern = compileRegex("pattern1"),
                 accountId = account1.id,
             )
             repositories.accountMappingRepository.createMapping(
-                valuePattern = Regex("pattern2"),
+                valuePattern = compileRegex("pattern2"),
                 accountId = account2.id,
             )
 

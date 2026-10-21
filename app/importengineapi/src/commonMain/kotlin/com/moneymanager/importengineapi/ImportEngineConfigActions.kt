@@ -23,6 +23,7 @@ import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.qif.QifImportRecord
+import com.moneymanager.regex.PortableRegex
 import kotlin.time.Instant
 
 /*
@@ -130,7 +131,7 @@ suspend fun ImportEngine.deleteApiStrategy(id: ApiImportStrategyId) {
 // region account mappings
 
 suspend fun ImportEngine.createAccountMapping(
-    valuePattern: Regex,
+    valuePattern: PortableRegex,
     accountId: AccountId,
     strategyId: CsvImportStrategyId? = null,
 ): Long =

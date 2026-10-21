@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.qifimporter.qifCompatible
 import com.moneymanager.qifimporter.selectForQifContent
+import com.moneymanager.regex.compileRegex
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -146,7 +147,7 @@ class SantanderQifMapperTest {
         val mapping =
             AccountMapping(
                 id = 1L,
-                valuePattern = Regex("ZAKHARENKO O"),
+                valuePattern = compileRegex("ZAKHARENKO O"),
                 accountId = mapped.id,
                 createdAt = now,
                 updatedAt = now,

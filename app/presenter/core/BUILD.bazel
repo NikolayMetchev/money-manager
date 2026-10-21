@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_plugins compose
 # gazelle:kmp_export @maven_kmp//:androidx_compose_runtime
 # gazelle:kmp_export @maven_kmp//:kotlinx_coroutines_core
@@ -20,6 +20,10 @@ kmp_library(
     ],
     plugins = ["compose"],
     visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = [
         "@maven_kmp//:androidx_compose_runtime",
         "@maven_kmp//:kotlinx_coroutines_core",

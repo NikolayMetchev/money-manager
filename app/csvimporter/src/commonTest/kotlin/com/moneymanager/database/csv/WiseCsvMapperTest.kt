@@ -16,6 +16,7 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.regex.compileRegex
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -381,7 +382,7 @@ class WiseCsvMapperTest {
         val mapping =
             AccountMapping(
                 id = 1,
-                valuePattern = Regex("^EUR$"),
+                valuePattern = compileRegex("^EUR$"),
                 accountId = renamedAccount.id,
                 createdAt = Clock.System.now(),
                 updatedAt = Clock.System.now(),

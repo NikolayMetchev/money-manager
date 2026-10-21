@@ -42,6 +42,7 @@ import com.moneymanager.importengineapi.deletePassThroughAccount
 import com.moneymanager.importengineapi.updatePassThroughAccount
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.regex.compileRegex
 import kotlinx.coroutines.launch
 
 /**
@@ -292,5 +293,5 @@ private fun regexError(pattern: String): String? =
     if (pattern.isBlank()) {
         null
     } else {
-        runCatching { Regex(pattern) }.exceptionOrNull()?.let { "Invalid regex" }
+        runCatching { compileRegex(pattern) }.exceptionOrNull()?.let { "Invalid regex" }
     }
