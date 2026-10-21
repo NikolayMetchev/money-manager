@@ -212,7 +212,7 @@ def _run(ctx, config, out, inputs, message):
 
 # The Kotlin analysis loads with the plugins, as on the Gradle plugin's one classpath: it reads the enum members'
 # documentation templates from dokka-base.
-_MODULE_PLUGINS = ["@dokka//:dokka_analysis_kotlin_symbols_jvm", "@dokka//:dokka_templating_plugin_jvm", "@dokka//:dokka_base_jvm"]
+_MODULE_PLUGINS = ["@dokka//:org_jetbrains_dokka_analysis_kotlin_symbols", "@dokka//:org_jetbrains_dokka_templating_plugin", "@dokka//:org_jetbrains_dokka_dokka_base"]
 
 _COMMON_ATTRS = {
     "_runner": attr.label(default = "//bazel/kmp/dokka:runner", executable = True, cfg = "exec"),
@@ -271,6 +271,6 @@ dokka_site = rule(
     attrs = _COMMON_ATTRS | {
         "module_name": attr.string(mandatory = True),
         "modules": attr.label_list(providers = [DokkaModuleInfo]),
-        "_site_plugins": attr.label_list(default = _MODULE_PLUGINS + ["@dokka//:dokka_all_modules_page_plugin_jvm"], providers = [JavaInfo]),
+        "_site_plugins": attr.label_list(default = _MODULE_PLUGINS + ["@dokka//:org_jetbrains_dokka_all_modules_page_plugin"], providers = [JavaInfo]),
     },
 )

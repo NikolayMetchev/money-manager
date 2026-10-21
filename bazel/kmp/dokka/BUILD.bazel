@@ -6,5 +6,5 @@ java_binary(
     srcs = ["src/com/moneymanager/bazel/kmp/dokka/DokkaRunner.java"],
     main_class = "com.moneymanager.bazel.kmp.dokka.DokkaRunner",
     visibility = ["//visibility:public"],
-    runtime_deps = ["@dokka//:dokka_cli_jvm"],
+    runtime_deps = ["@dokka//:org_jetbrains_dokka_dokka_cli"],
 )

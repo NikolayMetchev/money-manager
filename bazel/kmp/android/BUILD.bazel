@@ -14,7 +14,7 @@ java_binary(
     name = "mockable_jar",
     srcs = ["src/com/moneymanager/bazel/kmp/android/MockableJar.java"],
     main_class = "com.moneymanager.bazel.kmp.android.MockableJar",
-    deps = ["@android_tools//:android_builder_jvm"],
+    deps = ["@android_tools//:com_android_tools_build_builder"],
 )
 
 genrule(
@@ -41,13 +41,13 @@ java_binary(
     main_class = "com.moneymanager.bazel.kmp.android.AndroidApp",
     visibility = ["//visibility:public"],
     deps = [
-        "@android_tools//:android_builder_jvm",
-        "@android_tools//:android_gradle_plugin_jvm",
-        "@android_tools//:com_android_tools_build_apkzlib_jvm",
-        "@android_tools//:com_android_tools_build_manifest_merger_jvm",
-        "@android_tools//:com_android_tools_common_jvm",
-        "@android_tools//:com_android_tools_sdk_common_jvm",
-        "@android_tools//:com_google_guava_guava_jvm",
+        "@android_tools//:com_android_tools_build_apkzlib",
+        "@android_tools//:com_android_tools_build_builder",
+        "@android_tools//:com_android_tools_build_gradle",
+        "@android_tools//:com_android_tools_build_manifest_merger",
+        "@android_tools//:com_android_tools_common",
+        "@android_tools//:com_android_tools_sdk_common",
+        "@android_tools//:com_google_guava_guava",
     ],
 )
 
@@ -56,7 +56,7 @@ java_binary(
     name = "d8",
     main_class = "com.android.tools.r8.D8",
     visibility = ["//visibility:public"],
-    runtime_deps = ["@android_tools//:android_builder_jvm"],
+    runtime_deps = ["@android_tools//:com_android_tools_build_builder"],
 )
 
 config_setting(
@@ -89,5 +89,5 @@ java_library(
     testonly = True,
     srcs = ["src/com/moneymanager/bazel/kmp/android/LintRunner.java"],
     visibility = ["//visibility:public"],
-    runtime_deps = ["@android_lint//:android_lint_gradle_jvm"],
+    runtime_deps = ["@android_lint//:com_android_tools_lint_lint_gradle"],
 )

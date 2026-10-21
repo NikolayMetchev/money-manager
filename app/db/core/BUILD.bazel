@@ -153,6 +153,7 @@ kmp_test(
         "//app/importengineapi",
         "//app/importer",
         "//app/importfilesource/core",
+        "//app/model/accountmapping",
         "//app/model/apistrategy",
         "//app/model/core",
         "//app/model/csv",

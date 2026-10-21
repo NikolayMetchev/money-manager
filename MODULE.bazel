@@ -11,6 +11,7 @@ module(
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "rules_java", version = "9.9.0")
+bazel_dep(name = "rules_jvm_external", version = "7.2")
 bazel_dep(name = "rules_pkg", version = "1.3.0")
 bazel_dep(name = "rules_kotlin", version = "2.4.21")
 bazel_dep(name = "rules_shell", version = "0.8.0")
@@ -47,11 +48,17 @@ use_repo(
 kotlin_native = use_extension("//bazel/kmp/native:extensions.bzl", "kotlin_native")
 use_repo(kotlin_native, "kotlin_native_linux_x64", "kotlin_native_macos_arm64", "kotlin_native_mingw_x64", "kotlin_native_repin")
 
-# The default desktop Google OAuth client, obfuscated from CI's secrets or secrets/google-oauth.properties (#1011).
-# The SQLite amalgamation utils/sqlite3 builds, pinned by sqlite-amalgamation-* in the catalog (#1012).
+# The SQLite amalgamation utils/sqlite3 builds (#1012). The release number in sqlite.org's download naming
+# (3.54.0 = 3540000), its year directory and the zip's SHA-256 move together.
 sqlite_amalgamation = use_extension("//bazel/kmp/sqlite:extensions.bzl", "sqlite_amalgamation")
+sqlite_amalgamation.version(
+    release = "3540000",
+    sha256 = "68e913b0fe8ec6b4e5f391c594a28872884e80d6cd042a1e50c957be46b5aa4d",
+    year = "2026",
+)
 use_repo(sqlite_amalgamation, "sqlite_amalgamation")
 
+# The default desktop Google OAuth client, obfuscated from CI's secrets or secrets/google-oauth.properties (#1011).
 google_oauth = use_extension("//bazel/kmp/constants:google_oauth.bzl", "google_oauth")
 use_repo(google_oauth, "google_oauth")
 
@@ -70,15 +77,217 @@ http_archive(
     url = "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip",
 )
 
-# Maven libraries, resolved per platform (jar, klib) from Gradle Module Metadata into
-# bazel/kmp/deps/maven_kmp.lock.json (#1000). Versions come from the catalog. After changing this or the
-# catalog, re-pin: bazel run @maven_kmp//:pin
+# The app's Maven libraries: Kotlin Multiplatform ones, resolved per platform (jar, klib) from Gradle Module Metadata
+# into bazel/kmp/deps/maven_kmp.lock.json (#1000), which rules_jvm_external's POM resolution can't do. A version shared
+# by several coordinates moves them together; its `# renovate:` comment names the artifact Renovate looks up for it.
+# After changing any of this, re-pin: bazel run @maven_kmp//:pin
+ANDROIDX_ACTIVITY_COMPOSE = "1.13.0"  # renovate: androidx.activity:activity
+ANDROIDX_ANNOTATION = "1.9.1"  # renovate: androidx.annotation:annotation
+ANDROIDX_COLLECTION = "1.5.0"  # renovate: androidx.collection:collection
+ANDROIDX_COMPOSE = "1.12.1"  # renovate: androidx.compose.animation:animation
+ANDROIDX_COMPOSE_MATERIAL3 = "1.4.0"  # renovate: androidx.compose.material3:material3
+ANDROIDX_COMPOSE_MATERIAL_ICONS = "1.7.8"  # renovate: androidx.compose.material:material-icons-core
+ANDROIDX_CONCURRENT_FUTURES = "1.2.0"  # renovate: androidx.concurrent:concurrent-futures
+ANDROIDX_LIFECYCLE = "2.10.0"  # renovate: androidx.lifecycle:lifecycle-common
+ANDROIDX_NAVIGATION3 = "1.2.0"  # renovate: androidx.navigation3:navigation3-runtime
+ANDROIDX_NAVIGATIONEVENT = "1.1.2"  # renovate: androidx.navigationevent:navigationevent
+ANDROIDX_SAVEDSTATE = "1.5.0"  # renovate: androidx.savedstate:savedstate
+ANDROIDX_SQLITE = "2.7.1"  # renovate: androidx.sqlite:sqlite
+ANDROIDX_TEST_MONITOR = "1.8.0"  # renovate: androidx.test:monitor
+ANDROIDX_TEST_RUNNER = "1.7.0"  # renovate: androidx.test:runner
+ANDROIDX_TEST_SERVICES_STORAGE = "1.6.0"  # renovate: androidx.test.services:storage
+ANDROIDX_TEST_UIAUTOMATOR = "2.4.0"  # renovate: androidx.test.uiautomator:uiautomator
+ANDROIDX_TRACING = "1.2.0"  # renovate: androidx.tracing:tracing
+ATOMICFU = "0.33.0"  # renovate: org.jetbrains.kotlinx:atomicfu
+BIGNUM = "0.3.10"  # renovate: com.ionspin.kotlin:bignum
+CLIKT = "5.1.0"  # renovate: com.github.ajalt.clikt:clikt
+COMMONS_IO = "2.22.0"  # renovate: commons-io:commons-io
+COMPOSE_CHARTS = "1.0.0"  # renovate: io.github.ehsannarmani:compose-charts
+COMPOSE_MATERIAL3_DESKTOP = "1.9.0"  # renovate: org.jetbrains.compose.material3:material3-desktop
+COMPOSE_MATERIAL_ICONS_DESKTOP = "1.7.3"  # renovate: org.jetbrains.compose.material:material-icons-core-desktop
+COMPOSE_PLUGIN = "1.12.2"  # renovate: org.jetbrains.compose.animation:animation-core-desktop
+CRYPTOGRAPHY = "0.6.0"  # renovate: dev.whyoleg.cryptography:cryptography-bigint
+ERRORPRONE = "2.50.0"  # renovate: com.google.errorprone:error_prone_annotations
+JAVAWRITER = "2.5.1"  # renovate: com.squareup:javawriter
+JETBRAINS_ANNOTATIONS = "23.0.0"  # renovate: org.jetbrains:annotations
+JETBRAINS_NAVIGATION3 = "1.1.2"  # renovate: org.jetbrains.androidx.navigation3:navigation3-ui-desktop
+JSR305 = "3.0.2"  # renovate: com.google.code.findbugs:jsr305
+JUNIT = "4.13.2"  # renovate: junit:junit
+KERMIT = "2.2.0"  # renovate: co.touchlab:kermit
+KOTLIN = "2.4.21"  # renovate: org.jetbrains.kotlin:kotlin-stdlib
+KOTLINX_COROUTINES = "1.11.0"  # renovate: org.jetbrains.kotlinx:kotlinx-coroutines-android
+KOTLINX_DATETIME = "0.8.0"  # renovate: org.jetbrains.kotlinx:kotlinx-datetime
+KOTLINX_IO = "0.9.1"  # renovate: org.jetbrains.kotlinx:kotlinx-io-core
+KOTLINX_SERIALIZATION = "1.12.0"  # renovate: org.jetbrains.kotlinx:kotlinx-serialization-core
+KTOR = "3.6.0"  # renovate: io.ktor:ktor-client-auth
+LOG4J = "2.26.1"  # renovate: org.apache.logging.log4j:log4j-core
+MAPPIE = "2.4.21-2.4.5"  # renovate: tech.mappie:mappie-api
+METRO = "1.4.5"  # renovate: dev.zacsweers.metro:compiler
+MOKKERY = "3.5.1"  # renovate: dev.mokkery:mokkery-core
+MOLECULE = "2.2.0"  # renovate: app.cash.molecule:molecule-runtime
+MORDANT = "3.1.0"  # renovate: com.github.ajalt.mordant:mordant-core
+MOSAIC = "0.18.0"  # renovate: com.jakewharton.mosaic:mosaic-runtime
+PLAY_SERVICES_AUTH = "22.0.0"  # renovate: com.google.android.gms:play-services-auth
+POI = "5.5.1"  # renovate: org.apache.poi:poi
+POKO = "0.23.2"  # renovate: dev.drewhamilton.poko:poko-annotations
+SLF4J = "2.0.20"  # renovate: org.slf4j:slf4j-api
+SQLDELIGHT = "2.4.1"  # renovate: app.cash.sqldelight:android-driver
+TURBINE = "1.2.1"  # renovate: app.cash.turbine:turbine
+
 maven_kmp = use_extension("//bazel/kmp/deps:extensions.bzl", "maven_kmp")
 maven_kmp.install(
     # Android Studio renders Compose previews with the hub's `androidx_compose_ui_ui_tooling`, rules_jvm_external's
     # name for it, and builds it after every sync of a Compose project: a missing target fails that build.
     aliases = {"androidx_compose_ui_ui_tooling": "androidx_compose_ui_tooling_android"},
-    catalog = "//:libs.versions.toml",
+    # alias → group:artifact:version. Modules name a library by its alias: @maven_kmp//:kotlinx_io_core.
+    artifacts = {
+        "androidx-activity": "androidx.activity:activity:" + ANDROIDX_ACTIVITY_COMPOSE,
+        "androidx-activity-compose": "androidx.activity:activity-compose:" + ANDROIDX_ACTIVITY_COMPOSE,
+        "androidx-compose-animation": "androidx.compose.animation:animation:" + ANDROIDX_COMPOSE,
+        "androidx-compose-animation-core": "androidx.compose.animation:animation-core:" + ANDROIDX_COMPOSE,
+        "androidx-compose-foundation": "androidx.compose.foundation:foundation:" + ANDROIDX_COMPOSE,
+        "androidx-compose-foundation-layout": "androidx.compose.foundation:foundation-layout:" + ANDROIDX_COMPOSE,
+        "androidx-compose-material-icons-core": "androidx.compose.material:material-icons-core:" + ANDROIDX_COMPOSE_MATERIAL_ICONS,
+        "androidx-compose-material3": "androidx.compose.material3:material3:" + ANDROIDX_COMPOSE_MATERIAL3,
+        "androidx-compose-runtime": "androidx.compose.runtime:runtime:" + ANDROIDX_COMPOSE,
+        "androidx-compose-runtime-annotation": "androidx.compose.runtime:runtime-annotation:" + ANDROIDX_COMPOSE,
+        "androidx-compose-runtime-desktop": "androidx.compose.runtime:runtime-desktop:" + ANDROIDX_COMPOSE,
+        "androidx-compose-ui": "androidx.compose.ui:ui:" + ANDROIDX_COMPOSE,
+        "androidx-compose-ui-geometry": "androidx.compose.ui:ui-geometry:" + ANDROIDX_COMPOSE,
+        "androidx-compose-ui-graphics": "androidx.compose.ui:ui-graphics:" + ANDROIDX_COMPOSE,
+        "androidx-compose-ui-test": "androidx.compose.ui:ui-test:" + ANDROIDX_COMPOSE,
+        "androidx-compose-ui-text": "androidx.compose.ui:ui-text:" + ANDROIDX_COMPOSE,
+        "androidx-compose-ui-tooling": "androidx.compose.ui:ui-tooling:" + ANDROIDX_COMPOSE,
+        "androidx-compose-ui-unit": "androidx.compose.ui:ui-unit:" + ANDROIDX_COMPOSE,
+        "androidx-navigation3-runtime": "androidx.navigation3:navigation3-runtime:" + ANDROIDX_NAVIGATION3,
+        "androidx-navigation3-runtime-desktop": "androidx.navigation3:navigation3-runtime-desktop:" + ANDROIDX_NAVIGATION3,
+        "androidx-navigation3-ui": "androidx.navigation3:navigation3-ui:" + ANDROIDX_NAVIGATION3,
+        "androidx-savedstate": "androidx.savedstate:savedstate:" + ANDROIDX_SAVEDSTATE,
+        "androidx-savedstate-desktop": "androidx.savedstate:savedstate-desktop:" + ANDROIDX_SAVEDSTATE,
+        "androidx-sqlite": "androidx.sqlite:sqlite:" + ANDROIDX_SQLITE,
+        "androidx-test-monitor": "androidx.test:monitor:" + ANDROIDX_TEST_MONITOR,
+        "androidx-test-runner": "androidx.test:runner:" + ANDROIDX_TEST_RUNNER,
+        "androidx-test-uiautomator": "androidx.test.uiautomator:uiautomator:" + ANDROIDX_TEST_UIAUTOMATOR,
+        "atomicfu": "org.jetbrains.kotlinx:atomicfu:" + ATOMICFU,
+        "bignum": "com.ionspin.kotlin:bignum:" + BIGNUM,
+        "clikt": "com.github.ajalt.clikt:clikt:" + CLIKT,
+        "clikt-core": "com.github.ajalt.clikt:clikt-core:" + CLIKT,
+        "compose-animation-core-desktop": "org.jetbrains.compose.animation:animation-core-desktop:" + COMPOSE_PLUGIN,
+        "compose-animation-desktop": "org.jetbrains.compose.animation:animation-desktop:" + COMPOSE_PLUGIN,
+        "compose-charts": "io.github.ehsannarmani:compose-charts:" + COMPOSE_CHARTS,
+        "compose-charts-desktop": "io.github.ehsannarmani:compose-charts-desktop:" + COMPOSE_CHARTS,
+        "compose-desktop-linux-arm64": "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64:" + COMPOSE_PLUGIN,
+        "compose-desktop-linux-x64": "org.jetbrains.compose.desktop:desktop-jvm-linux-x64:" + COMPOSE_PLUGIN,
+        "compose-desktop-macos-arm64": "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64:" + COMPOSE_PLUGIN,
+        "compose-desktop-macos-x64": "org.jetbrains.compose.desktop:desktop-jvm-macos-x64:" + COMPOSE_PLUGIN,
+        "compose-desktop-windows-x64": "org.jetbrains.compose.desktop:desktop-jvm-windows-x64:" + COMPOSE_PLUGIN,
+        "compose-foundation-desktop": "org.jetbrains.compose.foundation:foundation-desktop:" + COMPOSE_PLUGIN,
+        "compose-foundation-layout-desktop": "org.jetbrains.compose.foundation:foundation-layout-desktop:" + COMPOSE_PLUGIN,
+        "compose-material-icons-core-desktop": "org.jetbrains.compose.material:material-icons-core-desktop:" + COMPOSE_MATERIAL_ICONS_DESKTOP,
+        "compose-material3-desktop": "org.jetbrains.compose.material3:material3-desktop:" + COMPOSE_MATERIAL3_DESKTOP,
+        "compose-runtime": "org.jetbrains.compose.runtime:runtime:" + COMPOSE_PLUGIN,
+        "compose-ui-desktop": "org.jetbrains.compose.ui:ui-desktop:" + COMPOSE_PLUGIN,
+        "compose-ui-geometry-desktop": "org.jetbrains.compose.ui:ui-geometry-desktop:" + COMPOSE_PLUGIN,
+        "compose-ui-graphics-desktop": "org.jetbrains.compose.ui:ui-graphics-desktop:" + COMPOSE_PLUGIN,
+        "compose-ui-test-desktop": "org.jetbrains.compose.ui:ui-test-desktop:" + COMPOSE_PLUGIN,
+        "compose-ui-text-desktop": "org.jetbrains.compose.ui:ui-text-desktop:" + COMPOSE_PLUGIN,
+        "compose-ui-unit-desktop": "org.jetbrains.compose.ui:ui-unit-desktop:" + COMPOSE_PLUGIN,
+        "compose-ui-util-desktop": "org.jetbrains.compose.ui:ui-util-desktop:" + COMPOSE_PLUGIN,
+        "cryptography-bigint": "dev.whyoleg.cryptography:cryptography-bigint:" + CRYPTOGRAPHY,
+        "cryptography-core": "dev.whyoleg.cryptography:cryptography-core:" + CRYPTOGRAPHY,
+        "cryptography-provider-jdk": "dev.whyoleg.cryptography:cryptography-provider-jdk:" + CRYPTOGRAPHY,
+        "cryptography-provider-openssl3-prebuilt": "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt:" + CRYPTOGRAPHY,
+        "cryptography-random": "dev.whyoleg.cryptography:cryptography-random:" + CRYPTOGRAPHY,
+        "jetbrains-navigation3-ui-desktop": "org.jetbrains.androidx.navigation3:navigation3-ui-desktop:" + JETBRAINS_NAVIGATION3,
+        "junit": "junit:junit:" + JUNIT,
+        "kermit": "co.touchlab:kermit:" + KERMIT,
+        "kermit-core": "co.touchlab:kermit-core:" + KERMIT,
+        "kotlin-compose-compiler-plugin-embeddable": "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable:" + KOTLIN,
+        "kotlin-serialization-compiler-plugin-embeddable": "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable:" + KOTLIN,
+        "kotlinx-coroutines-android": "org.jetbrains.kotlinx:kotlinx-coroutines-android:" + KOTLINX_COROUTINES,
+        "kotlinx-coroutines-core": "org.jetbrains.kotlinx:kotlinx-coroutines-core:" + KOTLINX_COROUTINES,
+        "kotlinx-coroutines-swing": "org.jetbrains.kotlinx:kotlinx-coroutines-swing:" + KOTLINX_COROUTINES,
+        "kotlinx-coroutines-test": "org.jetbrains.kotlinx:kotlinx-coroutines-test:" + KOTLINX_COROUTINES,
+        "kotlinx-datetime": "org.jetbrains.kotlinx:kotlinx-datetime:" + KOTLINX_DATETIME,
+        "kotlinx-io-core": "org.jetbrains.kotlinx:kotlinx-io-core:" + KOTLINX_IO,
+        "kotlinx-serialization-core": "org.jetbrains.kotlinx:kotlinx-serialization-core:" + KOTLINX_SERIALIZATION,
+        "kotlinx-serialization-json": "org.jetbrains.kotlinx:kotlinx-serialization-json:" + KOTLINX_SERIALIZATION,
+        "ktor-client-auth": "io.ktor:ktor-client-auth:" + KTOR,
+        "ktor-client-cio": "io.ktor:ktor-client-cio:" + KTOR,
+        "ktor-client-core": "io.ktor:ktor-client-core:" + KTOR,
+        "ktor-client-engine-defaults": "io.ktor:ktor-client-engine-defaults:" + KTOR,
+        "ktor-client-mock": "io.ktor:ktor-client-mock:" + KTOR,
+        "ktor-http": "io.ktor:ktor-http:" + KTOR,
+        "ktor-io": "io.ktor:ktor-io:" + KTOR,
+        "ktor-network": "io.ktor:ktor-network:" + KTOR,
+        "ktor-utils": "io.ktor:ktor-utils:" + KTOR,
+        "log4j-core": "org.apache.logging.log4j:log4j-core:" + LOG4J,
+        "log4j-slf4j2-impl": "org.apache.logging.log4j:log4j-slf4j2-impl:" + LOG4J,
+        "mappie-api": "tech.mappie:mappie-api:" + MAPPIE,
+        "mappie-compiler-plugin": "tech.mappie:mappie-compiler-plugin:" + MAPPIE,
+        "metro-compiler": "dev.zacsweers.metro:compiler:" + METRO,
+        "metro-runtime": "dev.zacsweers.metro:runtime:" + METRO,
+        "mokkery-core": "dev.mokkery:mokkery-core:" + MOKKERY,
+        "mokkery-plugin": "dev.mokkery:mokkery-plugin:" + MOKKERY,
+        "mokkery-runtime": "dev.mokkery:mokkery-runtime:" + MOKKERY,
+        "molecule-runtime": "app.cash.molecule:molecule-runtime:" + MOLECULE,
+        "mordant-core": "com.github.ajalt.mordant:mordant-core:" + MORDANT,
+        "mosaic-runtime": "com.jakewharton.mosaic:mosaic-runtime:" + MOSAIC,
+        "mosaic-terminal": "com.jakewharton.mosaic:mosaic-terminal:" + MOSAIC,
+        "mosaic-testing": "com.jakewharton.mosaic:mosaic-testing:" + MOSAIC,
+        "mosaic-tty": "com.jakewharton.mosaic:mosaic-tty:" + MOSAIC,
+        "mosaic-tty-terminal": "com.jakewharton.mosaic:mosaic-tty-terminal:" + MOSAIC,
+        "play-services-auth": "com.google.android.gms:play-services-auth:" + PLAY_SERVICES_AUTH,
+        "poi": "org.apache.poi:poi:" + POI,
+        "poi-ooxml": "org.apache.poi:poi-ooxml:" + POI,
+        "sqldelight-android-driver": "app.cash.sqldelight:android-driver:" + SQLDELIGHT,
+        "sqldelight-compiler-env": "app.cash.sqldelight:compiler-env:" + SQLDELIGHT,
+        "sqldelight-coroutines-extensions": "app.cash.sqldelight:coroutines-extensions:" + SQLDELIGHT,
+        "sqldelight-dialect-sqlite": "app.cash.sqldelight:sqlite-3-25-dialect:" + SQLDELIGHT,
+        "sqldelight-gradle-plugin": "app.cash.sqldelight:gradle-plugin:" + SQLDELIGHT,
+        "sqldelight-jdbc-driver": "app.cash.sqldelight:jdbc-driver:" + SQLDELIGHT,
+        "sqldelight-native-driver": "app.cash.sqldelight:native-driver:" + SQLDELIGHT,
+        "sqldelight-runtime": "app.cash.sqldelight:runtime:" + SQLDELIGHT,
+        "sqldelight-sqlite-driver": "app.cash.sqldelight:sqlite-driver:" + SQLDELIGHT,
+        "turbine": "app.cash.turbine:turbine:" + TURBINE,
+    },
+    # Gradle's classpath substitutions: these modules resolve to this version on the JVM and in common metadata,
+    # whoever asks for them.
+    classpath_forces = {
+        "androidx.activity:activity": ANDROIDX_ACTIVITY_COMPOSE,
+        "androidx.annotation:annotation": ANDROIDX_ANNOTATION,
+        "androidx.annotation:annotation-jvm": ANDROIDX_ANNOTATION,
+        "androidx.collection:collection": ANDROIDX_COLLECTION,
+        "androidx.concurrent:concurrent-futures": ANDROIDX_CONCURRENT_FUTURES,
+        "androidx.lifecycle:lifecycle-common": ANDROIDX_LIFECYCLE,
+        "androidx.lifecycle:lifecycle-common-jvm": ANDROIDX_LIFECYCLE,
+        "androidx.lifecycle:lifecycle-runtime": ANDROIDX_LIFECYCLE,
+        "androidx.lifecycle:lifecycle-runtime-android": ANDROIDX_LIFECYCLE,
+        "androidx.lifecycle:lifecycle-runtime-compose": ANDROIDX_LIFECYCLE,
+        "androidx.lifecycle:lifecycle-runtime-compose-android": ANDROIDX_LIFECYCLE,
+        "androidx.lifecycle:lifecycle-runtime-ktx": ANDROIDX_LIFECYCLE,
+        "androidx.lifecycle:lifecycle-runtime-ktx-android": ANDROIDX_LIFECYCLE,
+        "androidx.navigationevent:navigationevent": ANDROIDX_NAVIGATIONEVENT,
+        "androidx.navigationevent:navigationevent-compose": ANDROIDX_NAVIGATIONEVENT,
+        "androidx.savedstate:savedstate": ANDROIDX_SAVEDSTATE,
+        "androidx.savedstate:savedstate-compose": ANDROIDX_SAVEDSTATE,
+        "androidx.test.services:storage": ANDROIDX_TEST_SERVICES_STORAGE,
+        "androidx.test:runner": ANDROIDX_TEST_RUNNER,
+        "androidx.tracing:tracing": ANDROIDX_TRACING,
+        "org.jetbrains.kotlinx:atomicfu": ATOMICFU,
+        "org.jetbrains.kotlinx:atomicfu-jvm": ATOMICFU,
+        "org.jetbrains.kotlinx:kotlinx-coroutines-android": KOTLINX_COROUTINES,
+        "org.jetbrains.kotlinx:kotlinx-coroutines-bom": KOTLINX_COROUTINES,
+        "org.jetbrains.kotlinx:kotlinx-coroutines-core": KOTLINX_COROUTINES,
+        "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": KOTLINX_COROUTINES,
+        "org.jetbrains.kotlinx:kotlinx-serialization-bom": KOTLINX_SERIALIZATION,
+        "org.jetbrains.kotlinx:kotlinx-serialization-core": KOTLINX_SERIALIZATION,
+        "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm": KOTLINX_SERIALIZATION,
+        "org.jetbrains.kotlinx:kotlinx-serialization-json": KOTLINX_SERIALIZATION,
+        "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": KOTLINX_SERIALIZATION,
+        "org.jetbrains:annotations": JETBRAINS_ANNOTATIONS,
+        "org.slf4j:slf4j-api": SLF4J,
+    },
     # SQLDelight's Gradle plugin jar carries the compiler environment //bazel/kmp/sqldelight runs, but none
     # of its Gradle API.
     # JetBrains' runtime-desktop is a LICENSE-only redirect with the same jar name as androidx's runtime-desktop;
@@ -87,44 +296,20 @@ maven_kmp.install(
         "org.jetbrains.compose.runtime:runtime-desktop",
         "org.jetbrains.kotlin:kotlin-gradle-plugin",
     ],
-    # These modules always resolve to the catalog version, whoever asks for them (and so does every library
-    # of the build-tool-pins bundle).
-    force_bundles = ["build-tool-pins"],
+    # Transitive modules the app's graph would otherwise resolve older (compiler plugins' and Android's transitives),
+    # pinned on every platform, as Gradle's `configurations.all`. Compose's internal annotation and collection are
+    # deliberately not pinned (it desyncs the Compose runtime), nor are the Kotlin compiler, stdlib and reflect, or
+    # dagger: each plugin needs its own.
     forces = {
-        "androidx.activity:activity": "androidx-activity-compose",
-        "androidx.annotation:annotation": "androidx-annotation",
-        "androidx.annotation:annotation-jvm": "androidx-annotation",
-        "androidx.collection:collection": "androidx-collection",
-        "androidx.concurrent:concurrent-futures": "androidx-concurrent-futures",
-        "androidx.lifecycle:lifecycle-common": "androidx-lifecycle",
-        "androidx.lifecycle:lifecycle-common-jvm": "androidx-lifecycle",
-        "androidx.lifecycle:lifecycle-runtime": "androidx-lifecycle",
-        "androidx.lifecycle:lifecycle-runtime-android": "androidx-lifecycle",
-        "androidx.lifecycle:lifecycle-runtime-compose": "androidx-lifecycle",
-        "androidx.lifecycle:lifecycle-runtime-compose-android": "androidx-lifecycle",
-        "androidx.lifecycle:lifecycle-runtime-ktx": "androidx-lifecycle",
-        "androidx.lifecycle:lifecycle-runtime-ktx-android": "androidx-lifecycle",
-        "androidx.navigationevent:navigationevent": "androidx-navigationevent",
-        "androidx.navigationevent:navigationevent-compose": "androidx-navigationevent",
-        "androidx.savedstate:savedstate": "androidx-savedstate",
-        "androidx.savedstate:savedstate-compose": "androidx-savedstate",
-        "androidx.test.services:storage": "androidx-test-services-storage",
-        "androidx.test:runner": "androidx-test-runner",
-        "androidx.tracing:tracing": "androidx-tracing",
-        "org.jetbrains.kotlinx:atomicfu": "atomicfu",
-        "org.jetbrains.kotlinx:atomicfu-jvm": "atomicfu",
-        "org.jetbrains.kotlinx:kotlinx-coroutines-android": "kotlinx-coroutines",
-        "org.jetbrains.kotlinx:kotlinx-coroutines-bom": "kotlinx-coroutines",
-        "org.jetbrains.kotlinx:kotlinx-coroutines-core": "kotlinx-coroutines",
-        "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": "kotlinx-coroutines",
-        "org.jetbrains.kotlinx:kotlinx-serialization-bom": "kotlinx-serialization",
-        "org.jetbrains.kotlinx:kotlinx-serialization-core": "kotlinx-serialization",
-        "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm": "kotlinx-serialization",
-        "org.jetbrains.kotlinx:kotlinx-serialization-json": "kotlinx-serialization",
-        "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": "kotlinx-serialization",
-        "org.jetbrains:annotations": "jetbrains-annotations",
-        "org.slf4j:slf4j-api": "slf4j",
+        "com.google.code.findbugs:jsr305": JSR305,
+        "com.google.errorprone:error_prone_annotations": ERRORPRONE,
+        "com.squareup:javawriter": JAVAWRITER,
+        "commons-io:commons-io": COMMONS_IO,
+        "dev.drewhamilton.poko:poko-annotations": POKO,
     },
+    # The Kotlin release the toolchain's stdlib and kotlin-test are (rules_kotlin's): common code compiles against
+    # their metadata jars.
+    kotlin = KOTLIN,
     # Gradle only resolves a library for the source sets declaring it. The Android-only libraries (androidMain and
     # the Android tests) would otherwise raise versions on the JVM and native; the desktop-only ones, the compiler
     # plugins and the tools would pull the desktop Compose stack (skiko) into Android.
@@ -190,117 +375,6 @@ maven_kmp.install(
         "sqldelight-jdbc-driver": ["jvm"],
         "sqldelight-sqlite-driver": ["jvm"],
     },
-    libraries = [
-        "androidx-activity",
-        "androidx-activity-compose",
-        "androidx-compose-animation",
-        "androidx-compose-animation-core",
-        "androidx-compose-foundation",
-        "androidx-compose-foundation-layout",
-        "androidx-compose-material-icons-core",
-        "androidx-compose-material3",
-        "androidx-compose-runtime",
-        "androidx-compose-runtime-annotation",
-        "androidx-compose-runtime-desktop",
-        "androidx-compose-ui",
-        "androidx-compose-ui-geometry",
-        "androidx-compose-ui-graphics",
-        "androidx-compose-ui-test",
-        "androidx-compose-ui-text",
-        "androidx-compose-ui-tooling",
-        "androidx-compose-ui-unit",
-        "androidx-navigation3-runtime",
-        "androidx-navigation3-runtime-desktop",
-        "androidx-navigation3-ui",
-        "androidx-savedstate",
-        "androidx-savedstate-desktop",
-        "androidx-sqlite",
-        "androidx-test-monitor",
-        "androidx-test-runner",
-        "androidx-test-uiautomator",
-        "atomicfu",
-        "bignum",
-        "clikt",
-        "clikt-core",
-        "compose-animation-core-desktop",
-        "compose-animation-desktop",
-        "compose-charts",
-        "compose-charts-desktop",
-        "compose-desktop-linux-arm64",
-        "compose-desktop-linux-x64",
-        "compose-desktop-macos-arm64",
-        "compose-desktop-macos-x64",
-        "compose-desktop-windows-x64",
-        "compose-foundation-desktop",
-        "compose-foundation-layout-desktop",
-        "compose-material-icons-core-desktop",
-        "compose-material3-desktop",
-        "compose-runtime",
-        "compose-ui-desktop",
-        "compose-ui-geometry-desktop",
-        "compose-ui-graphics-desktop",
-        "compose-ui-test-desktop",
-        "compose-ui-text-desktop",
-        "compose-ui-unit-desktop",
-        "compose-ui-util-desktop",
-        "cryptography-bigint",
-        "cryptography-core",
-        "cryptography-provider-jdk",
-        "cryptography-provider-openssl3-prebuilt",
-        "cryptography-random",
-        "jetbrains-navigation3-ui-desktop",
-        "junit",
-        "kermit",
-        "kermit-core",
-        "kotlin-compose-compiler-plugin-embeddable",
-        "kotlin-serialization-compiler-plugin-embeddable",
-        "kotlinx-coroutines-android",
-        "kotlinx-coroutines-core",
-        "kotlinx-coroutines-swing",
-        "kotlinx-coroutines-test",
-        "kotlinx-datetime",
-        "kotlinx-io-core",
-        "kotlinx-serialization-core",
-        "kotlinx-serialization-json",
-        "ktor-client-auth",
-        "ktor-client-cio",
-        "ktor-client-core",
-        "ktor-client-engine-defaults",
-        "ktor-client-mock",
-        "ktor-http",
-        "ktor-io",
-        "ktor-network",
-        "ktor-utils",
-        "log4j-core",
-        "log4j-slf4j2-impl",
-        "mappie-api",
-        "mappie-compiler-plugin",
-        "metro-compiler",
-        "metro-runtime",
-        "mokkery-core",
-        "mokkery-plugin",
-        "mokkery-runtime",
-        "molecule-runtime",
-        "mordant-core",
-        "mosaic-runtime",
-        "mosaic-terminal",
-        "mosaic-testing",
-        "mosaic-tty",
-        "mosaic-tty-terminal",
-        "play-services-auth",
-        "poi",
-        "poi-ooxml",
-        "sqldelight-android-driver",
-        "sqldelight-compiler-env",
-        "sqldelight-coroutines-extensions",
-        "sqldelight-dialect-sqlite",
-        "sqldelight-gradle-plugin",
-        "sqldelight-jdbc-driver",
-        "sqldelight-native-driver",
-        "sqldelight-runtime",
-        "sqldelight-sqlite-driver",
-        "turbine",
-    ],
     lock_file = "//bazel/kmp/deps:maven_kmp.lock.json",
     platforms = [
         "android",
@@ -318,119 +392,206 @@ maven_kmp.install(
     ],
 )
 
-# The lint tools (#1015), each resolved on its own like the Gradle configuration (`ktlint`, `detekt`) it matches:
-# only the build-tool-pins bundle applies to those.
-maven_kmp.install(
+# The JVM tools the build runs, each resolved on its own (the KMP libraries above need maven_kmp's variant
+# resolution; these are plain Maven artifacts). Renovate bumps the versions here; `bazel/renovate/repin.sh` re-pins.
+# Maven resolution keeps the version a POM asks for, often years old (logback, protobuf, guava, asm), and doesn't read
+# Gradle's module metadata, which moves a KMP library's `-jvm` artifact and the Kotlin stdlib to the newest any
+# dependency asks for. So an install lists those transitive libraries too, at their newest, and
+# `version_conflict_policy = "pinned"` makes the listed versions win.
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+
+# The lint tools (#1015).
+maven.install(
     name = "detekt_cli",
-    catalog = "//:libs.versions.toml",
-    force_bundles = ["build-tool-pins"],
-    libraries = ["detekt-cli"],
-    lock_file = "//bazel/kmp/deps:detekt_cli.lock.json",
-    platforms = ["jvm"],
+    artifacts = [
+        "dev.detekt:detekt-cli:2.0.0-alpha.6",
+        # Transitive versions held at the newest (see version_conflict_policy).
+        "com.google.errorprone:error_prone_annotations:2.50.0",
+        "dev.drewhamilton.poko:poko-annotations-jvm:0.23.2",
+        "org.checkerframework:checker-qual:4.3.1",
+        "org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.4.21",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.4.21",
+        "org.jetbrains.kotlin:kotlin-stdlib:2.4.21",
+        "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.11.0",
+    ],
+    lock_file = "//bazel/maven:detekt_cli_install.json",
     repositories = ["https://repo1.maven.org/maven2"],
-    resolve_stdlib = True,
+    version_conflict_policy = "pinned",
 )
 
-maven_kmp.install(
+maven.install(
     name = "ktlint_cli",
-    catalog = "//:libs.versions.toml",
-    force_bundles = ["build-tool-pins"],
-    libraries = ["ktlint-cli"],
-    lock_file = "//bazel/kmp/deps:ktlint_cli.lock.json",
-    platforms = ["jvm"],
+    artifacts = [
+        "com.pinterest.ktlint:ktlint-cli:1.8.0",
+        # Transitive versions held at the newest (see version_conflict_policy).
+        "ch.qos.logback:logback-classic:1.6.5",
+        "ch.qos.logback:logback-core:1.6.5",
+        "dev.drewhamilton.poko:poko-annotations-jvm:0.23.2",
+        "org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.4.21",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.4.21",
+        "org.jetbrains.kotlin:kotlin-stdlib:2.4.21",
+        "org.jetbrains:annotations:23.0.0",
+        "org.slf4j:slf4j-api:2.0.20",
+    ],
+    lock_file = "//bazel/maven:ktlint_cli_install.json",
     repositories = ["https://repo1.maven.org/maven2"],
-    resolve_stdlib = True,
+    version_conflict_policy = "pinned",
 )
 
-# Dokka (#1027), the KDoc site: its CLI (a fat jar, with Dokka's core) and the plugins the Gradle plugin runs.
-maven_kmp.install(
+# Coverage: the IntelliJ engine's JVM agent and its reporter, Kover's packaging of them (both self-contained jars).
+maven.install(
+    name = "kover",
+    artifacts = [
+        "org.jetbrains.kotlinx:kover-cli:0.9.11",
+        "org.jetbrains.kotlinx:kover-jvm-agent:0.9.11",
+    ],
+    lock_file = "//bazel/maven:kover_install.json",
+    repositories = ["https://repo1.maven.org/maven2"],
+)
+
+# Dokka (#1027), the KDoc site: its CLI (a fat jar, with Dokka's core) and the plugins the Gradle plugin ran.
+maven.install(
     name = "dokka",
-    catalog = "//:libs.versions.toml",
-    force_bundles = ["build-tool-pins"],
-    libraries = [
-        "dokka-all-modules-page-plugin",
-        "dokka-analysis-kotlin-symbols",
-        "dokka-base",
-        "dokka-cli",
-        "dokka-templating-plugin",
+    artifacts = [
+        "org.jetbrains.dokka:all-modules-page-plugin:2.2.0",
+        "org.jetbrains.dokka:analysis-kotlin-symbols:2.2.0",
+        "org.jetbrains.dokka:dokka-base:2.2.0",
+        "org.jetbrains.dokka:dokka-cli:2.2.0",
+        "org.jetbrains.dokka:templating-plugin:2.2.0",
+        # Transitive versions held at the newest (see version_conflict_policy).
+        "org.jetbrains.kotlin:kotlin-stdlib-common:2.0.21",
     ],
-    lock_file = "//bazel/kmp/deps:dokka.lock.json",
-    platforms = ["jvm"],
+    lock_file = "//bazel/maven:dokka_install.json",
     repositories = ["https://repo1.maven.org/maven2"],
-    resolve_stdlib = True,
+    version_conflict_policy = "pinned",
 )
 
-# SchemaSpy (#1027), on its own classpath as in app/db/schemaspy's Gradle `schemaspy` configuration, with the
-# SQLite JDBC driver it reads the schema through.
-maven_kmp.install(
+# SchemaSpy (#1027), with the SQLite JDBC driver it reads the schema through.
+maven.install(
     name = "schemaspy",
-    catalog = "//:libs.versions.toml",
-    force_bundles = ["build-tool-pins"],
-    libraries = [
-        "schemaspy",
-        "sqldelight-sqlite-driver",
+    artifacts = [
+        "org.schemaspy:schemaspy:7.0.2",
+        "org.xerial:sqlite-jdbc:3.53.4.0",
+        # Transitive versions held at the newest (see version_conflict_policy).
+        "ch.qos.logback:logback-classic:1.6.5",
+        "ch.qos.logback:logback-core:1.6.5",
+        "commons-io:commons-io:2.22.0",
+        "org.ow2.asm:asm-analysis:9.11.1",
+        "org.ow2.asm:asm-commons:9.11.1",
+        "org.ow2.asm:asm-tree:9.11.1",
+        "org.ow2.asm:asm-util:9.11.1",
+        "org.ow2.asm:asm:9.11.1",
+        "org.slf4j:slf4j-api:2.0.20",
     ],
-    lock_file = "//bazel/kmp/deps:schemaspy.lock.json",
-    platforms = ["jvm"],
+    lock_file = "//bazel/maven:schemaspy_install.json",
     repositories = ["https://repo1.maven.org/maven2"],
-    resolve_stdlib = True,
+    version_conflict_policy = "pinned",
 )
 
 # The desktop app's ProGuard (#1019), with the Compose Gradle plugin for the default rules it applies.
-maven_kmp.install(
+maven.install(
     name = "proguard",
-    catalog = "//:libs.versions.toml",
-    # Optional in the plugin's POM, and Gradle-only.
-    excludes = ["org.jetbrains.compose.hot-reload:hot-reload-gradle-plugin"],
-    force_bundles = ["build-tool-pins"],
-    libraries = [
-        "compose-gradle-plugin",
-        "proguard-base",
+    artifacts = [
+        "com.guardsquare:proguard-base:7.10.0",
+        "org.jetbrains.compose:compose-gradle-plugin:1.12.2",
+        # Transitive versions held at the newest (see version_conflict_policy).
+        "com.google.code.gson:gson:2.14.0",
+        "com.google.errorprone:error_prone_annotations:2.50.0",
     ],
-    lock_file = "//bazel/kmp/deps:proguard.lock.json",
-    platforms = ["jvm"],
+    # Optional in the plugin's POM, and Gradle-only.
+    excluded_artifacts = ["org.jetbrains.compose.hot-reload:hot-reload-gradle-plugin"],
+    lock_file = "//bazel/maven:proguard_install.json",
     repositories = [
         "https://repo1.maven.org/maven2",
         "https://plugins.gradle.org/m2",
     ],
-    resolve_stdlib = True,
+    version_conflict_policy = "pinned",
 )
 
 # AGP and its builder: MockableJarGenerator makes the android.jar Android host tests run on (#1022); the app
 # build (#1023) runs their manifest merger, R class writer, ApkFlinger, R8 and profile compiler as AGP does.
-maven_kmp.install(
+maven.install(
     name = "android_tools",
-    catalog = "//:libs.versions.toml",
-    force_bundles = ["build-tool-pins"],
-    libraries = [
-        "android-builder",
-        "android-gradle-plugin",
+    artifacts = [
+        "com.android.tools.build:builder:9.4.1",
+        "com.android.tools.build:gradle:9.4.1",
+        "com.android.tools.build:gradle-api:9.4.1",
+        # Transitive versions held at the newest (see version_conflict_policy).
+        "com.google.code.findbugs:jsr305:3.0.2",
+        "com.google.code.gson:gson:2.14.0",
+        "com.google.crypto.tink:tink:1.24.0",
+        "com.google.errorprone:error_prone_annotations:2.50.0",
+        "com.google.guava:failureaccess:1.0.3",
+        "com.google.guava:guava:33.7.2-jre",
+        "com.google.j2objc:j2objc-annotations:3.1",
+        "com.google.protobuf:protobuf-java-util:4.36.2",
+        "com.google.protobuf:protobuf-java:4.36.2",
+        "com.squareup:javawriter:2.5.1",
+        "commons-io:commons-io:2.22.0",
+        "org.apache.httpcomponents:httpclient:4.5.14",
+        "org.checkerframework:checker-qual:4.3.1",
+        "org.ow2.asm:asm-analysis:9.11.1",
+        "org.ow2.asm:asm-commons:9.11.1",
+        "org.ow2.asm:asm-tree:9.11.1",
+        "org.ow2.asm:asm-util:9.11.1",
+        "org.ow2.asm:asm:9.11.1",
+        "org.slf4j:slf4j-api:1.7.36",
     ],
-    lock_file = "//bazel/kmp/deps:android_tools.lock.json",
-    platforms = ["jvm"],
+    lock_file = "//bazel/maven:android_tools_install.json",
     repositories = [
         "https://maven.google.com",
         "https://repo1.maven.org/maven2",
     ],
-    resolve_stdlib = True,
+    version_conflict_policy = "pinned",
 )
 
-# Android lint (#1025): the lint-gradle AGP resolves to run lint, on its own classpath as AGP runs it.
-maven_kmp.install(
+# Android lint (#1025): the lint-gradle AGP resolves to run lint (its version is always AGP's + 23).
+maven.install(
     name = "android_lint",
-    catalog = "//:libs.versions.toml",
-    force_bundles = ["build-tool-pins"],
-    libraries = ["android-lint-gradle"],
-    lock_file = "//bazel/kmp/deps:android_lint.lock.json",
-    platforms = ["jvm"],
+    artifacts = [
+        "com.android.tools.lint:lint-gradle:32.4.1",
+        # Transitive versions held at the newest (see version_conflict_policy).
+        "com.google.code.findbugs:jsr305:3.0.2",
+        "com.google.code.gson:gson:2.14.0",
+        "com.google.errorprone:error_prone_annotations:2.50.0",
+        "com.google.guava:failureaccess:1.0.3",
+        "com.google.guava:guava:33.7.2-jre",
+        "com.google.j2objc:j2objc-annotations:3.1",
+        "com.google.protobuf:protobuf-java:4.36.2",
+        "commons-io:commons-io:2.22.0",
+        "org.apache.httpcomponents:httpclient:4.5.14",
+        "org.ow2.asm:asm-analysis:9.11.1",
+        "org.ow2.asm:asm-commons:9.11.1",
+        "org.ow2.asm:asm-tree:9.11.1",
+        "org.ow2.asm:asm:9.11.1",
+    ],
+    lock_file = "//bazel/maven:android_lint_install.json",
     repositories = [
         "https://maven.google.com",
         "https://repo1.maven.org/maven2",
     ],
-    resolve_stdlib = True,
+    version_conflict_policy = "pinned",
 )
+# gradle-api's POM depends back on AGP (runtime scope; its Gradle module metadata doesn't), a cycle Bazel refuses.
+maven.amend_artifact(
+    name = "android_tools",
+    coordinates = "com.android.tools.build:gradle-api",
+    exclusions = ["com.android.tools.build:gradle"],
+)
+use_repo(maven, "android_lint", "android_tools", "detekt_cli", "dokka", "kover", "ktlint_cli", "proguard", "schemaspy")
 
-use_repo(maven_kmp, "android_lint", "android_tools", "detekt_cli", "dokka", "ktlint_cli", "maven_kmp", "proguard", "schemaspy")
+use_repo(maven_kmp, "maven_kmp")
 
 android_sdk = use_extension("//bazel/kmp/android:extensions.bzl", "android_sdk")
+android_sdk.agp(version = "9.4.1")
+
+# Keep target_sdk and the CI emulators (build.yml, android-release-smoke-test.yml) on one level. compile_sdk runs
+# ahead: androidx Compose 1.12 compiles against API 37, a compile-time floor that needs no emulator move.
+android_sdk.levels(
+    compile_sdk = 37,
+    min_sdk = 30,
+    target_sdk = 36,
+)
 use_repo(android_sdk, "aapt2", "android_sdk")

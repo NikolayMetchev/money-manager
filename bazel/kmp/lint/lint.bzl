@@ -10,8 +10,8 @@ per-source-set detekt tasks do.
 
 load("@rules_java//java:java_test.bzl", "java_test")
 
-_KTLINT = Label("@ktlint_cli//:ktlint_cli_jvm")
-_DETEKT = Label("@detekt_cli//:detekt_cli_jvm")
+_KTLINT = Label("@ktlint_cli//:com_pinterest_ktlint_ktlint_cli")
+_DETEKT = Label("@detekt_cli//:dev_detekt_detekt_cli")
 _DETEKT_CONFIG = Label("//:detekt.yml")
 _EDITORCONFIGS = Label("//:editorconfigs")
 

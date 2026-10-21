@@ -112,17 +112,8 @@ kt_metadata_group(
     deps = ["@maven_kmp//:org_jetbrains_kotlin_kotlin_test_metadata"],
 )
 
-# Fails when a lockfile no longer matches its MODULE.bazel maven_kmp.install or the catalog.
+# Fails when the lockfile no longer matches its MODULE.bazel maven_kmp.install or the catalog.
 test_suite(
     name = "maven_kmp_lock_test",
-    tests = [
-        "@android_lint//:lock_test",
-        "@android_tools//:lock_test",
-        "@detekt_cli//:lock_test",
-        "@dokka//:lock_test",
-        "@ktlint_cli//:lock_test",
-        "@maven_kmp//:lock_test",
-        "@proguard//:lock_test",
-        "@schemaspy//:lock_test",
-    ],
+    tests = ["@maven_kmp//:lock_test"],
 )

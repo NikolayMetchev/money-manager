@@ -1,4 +1,4 @@
-// The KMP Maven resolver (#1000): resolves catalog libraries for every platform from Gradle Module Metadata
+// The KMP Maven resolver (#1000): resolves MODULE.bazel's maven_kmp libraries for every platform from Gradle Module Metadata
 // and writes the lockfile the `maven_kmp` module extension reads.
 //
 // rules_jvm_external reads POMs, but a Kotlin Multiplatform library's root POM names no platform's files:
@@ -28,8 +28,8 @@ func (m *multi) Set(v string) error { *m = append(*m, v); return nil }
 // nothing changed rewrites the same bytes.
 type Lock struct {
 	Version int `json:"version"`
-	// Inputs are what the lock was resolved from; the module extension compares them with MODULE.bazel and
-	// the catalog to say when a re-pin is due.
+	// Inputs are what the lock was resolved from; the module extension compares them with MODULE.bazel to say
+	// when a re-pin is due.
 	Inputs struct {
 		Libraries map[string]string `json:"libraries"` // alias → group:artifact:version
 		Forces    map[string]string `json:"forces"`    // module → version, on every platform
@@ -40,16 +40,14 @@ type Lock struct {
 		// LibraryPlatforms limit a library to some platforms (alias → platforms), as Gradle only resolves a
 		// library for the source sets that declare it: the desktop Compose jars are no Android library.
 		LibraryPlatforms map[string][]string `json:"library_platforms,omitempty"`
-		Excludes        []string          `json:"excludes"`
-		// ResolveStdlib: the Kotlin stdlib is resolved like any library, for a tool run on its own classpath.
-		ResolveStdlib bool `json:"resolve_stdlib,omitempty"`
+		Excludes         []string            `json:"excludes"`
 	} `json:"inputs"`
-	// Names are the Bazel target names, without the platform suffix: a catalog library by its alias
+	// Names are the Bazel target names, without the platform suffix: a library by its alias
 	// (kotlinx-coroutines-core → kotlinx_coroutines_core), anything else by its coordinate.
 	Names map[string]string `json:"names"`
 	// Packages are what each module's files declare, for Gazelle's import resolution.
 	Packages map[string][]string `json:"packages"`
-	// Skipped are catalog libraries with no variant for a platform (JVM-only libraries on native).
+	// Skipped are libraries with no variant for a platform (JVM-only libraries on native).
 	Skipped   map[string][]string            `json:"skipped,omitempty"`
 	Artifacts map[string]map[string]Resolved `json:"artifacts"` // module → platform → resolution
 }
@@ -58,27 +56,25 @@ var nonIdent = regexp.MustCompile(`[^A-Za-z0-9_]`)
 
 func main() {
 	var libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes multi
-	toml := flag.String("toml", "libs.versions.toml", "the version catalog")
+	kotlin := flag.String("kotlin", "", "the Kotlin release the toolchain's stdlib and kotlin-test are")
 	out := flag.String("lock", "bazel/kmp/deps/maven_kmp.lock.json", "the lockfile to write")
-	flag.Var(&libraries, "library", "a catalog library alias to resolve (repeatable)")
+	flag.Var(&libraries, "library", "alias=group:artifact:version: a library to resolve (repeatable)")
 	flag.Var(&libraryPlatforms, "library-platforms", "alias=platform,…: resolve a library for these platforms only (repeatable)")
 	flag.Var(&platformNames, "platform", "a platform to resolve for: jvm, linuxX64, … (repeatable)")
-	flag.Var(&forces, "force", "module=version-ref: pin a module to a catalog version on every platform (repeatable)")
-	flag.Var(&classpathForces, "classpath-force", "module=version-ref: pin a module on the JVM and in common metadata only (repeatable)")
+	flag.Var(&forces, "force", "module=version: pin a module on every platform (repeatable)")
+	flag.Var(&classpathForces, "classpath-force", "module=version: pin a module on the JVM and in common metadata only (repeatable)")
 	flag.Var(&repos, "repository", "url[=group-regex,…]: a repository, in order, optionally limited to groups (repeatable)")
 	flag.Var(&excludes, "exclude", "group:artifact never to resolve, whoever depends on it (repeatable)")
-	stdlib := flag.Bool("resolve-stdlib", false, "resolve the Kotlin stdlib too, for a tool (JVM only); else it comes from the toolchain")
 	flag.Parse()
-	if err := run(*toml, *out, libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes, *stdlib); err != nil {
+	if err := run(*kotlin, *out, libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes); err != nil {
 		fmt.Fprintln(os.Stderr, "resolver:", err)
 		os.Exit(1)
 	}
 }
 
-func run(tomlPath, out string, libraries, libraryPlatformSpecs, platformNames, forceSpecs, classpathForceSpecs, repoSpecs, excludes []string, resolveStdlib bool) error {
-	cat, err := ReadCatalog(tomlPath)
-	if err != nil {
-		return err
+func run(kotlin, out string, libraries, libraryPlatformSpecs, platformNames, forceSpecs, classpathForceSpecs, repoSpecs, excludes []string) error {
+	if kotlin == "" {
+		return fmt.Errorf("--kotlin is required")
 	}
 	var repos []Repository
 	for _, spec := range repoSpecs {
@@ -94,10 +90,9 @@ func run(tomlPath, out string, libraries, libraryPlatformSpecs, platformNames, f
 	parseForces := func(flag string, specs []string) (map[string]string, error) {
 		forced := map[string]string{}
 		for _, spec := range specs {
-			module, ref, ok := strings.Cut(spec, "=")
-			v, known := cat.Versions[ref]
-			if !ok || !known {
-				return nil, fmt.Errorf("--%s %s: want module=version-ref with a [versions] entry", flag, spec)
+			module, v, ok := strings.Cut(spec, "=")
+			if !ok || v == "" || strings.Count(module, ":") != 1 {
+				return nil, fmt.Errorf("--%s %s: want group:artifact=version", flag, spec)
 			}
 			forced[module] = v
 		}
@@ -121,7 +116,6 @@ func run(tomlPath, out string, libraries, libraryPlatformSpecs, platformNames, f
 	lock.Inputs.Platforms = platformNames
 	// Never null: MODULE.bazel's empty list must read back as one.
 	lock.Inputs.Excludes = append([]string{}, excludes...)
-	lock.Inputs.ResolveStdlib = resolveStdlib
 	only := map[string]map[string]bool{}
 	for _, spec := range libraryPlatformSpecs {
 		alias, names, ok := strings.Cut(spec, "=")
@@ -142,10 +136,14 @@ func run(tomlPath, out string, libraries, libraryPlatformSpecs, platformNames, f
 	}
 	var roots []Coordinate
 	var rootAliases []string
-	for _, alias := range libraries {
-		c, ok := cat.Libraries[alias]
+	for _, spec := range libraries {
+		alias, coordinates, ok := strings.Cut(spec, "=")
 		if !ok {
-			return fmt.Errorf("--library %s: not in %s", alias, tomlPath)
+			return fmt.Errorf("--library %s: want alias=group:artifact:version", spec)
+		}
+		c, err := ParseCoordinate(coordinates)
+		if err != nil {
+			return fmt.Errorf("--library %s: %w", spec, err)
 		}
 		roots = append(roots, c)
 		rootAliases = append(rootAliases, alias)
@@ -154,7 +152,6 @@ func run(tomlPath, out string, libraries, libraryPlatformSpecs, platformNames, f
 	}
 
 	resolver := NewResolver(NewFetcher(repos), forced, excludes)
-	resolver.resolveStdlib = resolveStdlib
 	resolver.classpathForces = classpathForced
 	for _, name := range platformNames {
 		if p, ok := platforms[name]; ok && !p.Common {
@@ -164,8 +161,8 @@ func run(tomlPath, out string, libraries, libraryPlatformSpecs, platformNames, f
 	// Every other platform's stdlib and kotlin-test come from the toolchain; common code compiles against
 	// their metadata jars.
 	toolchain := []Coordinate{
-		{"org.jetbrains.kotlin", "kotlin-stdlib", cat.Versions["kotlin"]},
-		{"org.jetbrains.kotlin", "kotlin-test", cat.Versions["kotlin"]},
+		{"org.jetbrains.kotlin", "kotlin-stdlib", kotlin},
+		{"org.jetbrains.kotlin", "kotlin-test", kotlin},
 	}
 	type result struct {
 		platform string

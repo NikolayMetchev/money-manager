@@ -1,8 +1,8 @@
 # Codecov configuration
 # https://docs.codecov.com/docs/codecovyml-reference
 
-# Build and Test uploads one coverage report per commit (`unit`: the Kotlin JVM and Android tests under
-# `bazel coverage`). The instrumented job uploads test results only, which don't count as a build, so waiting
+# Build and Test uploads one coverage report per commit (`unit`: the Kotlin JVM and Android host tests under the
+# IntelliJ coverage engine, `bazel/kmp/testing/coverage.sh`). The instrumented job uploads test results only, which don't count as a build, so waiting
 # for a second upload would hold back the PR comment and status forever.
 codecov:
   notify:
@@ -15,3 +15,9 @@ flags:
 comment:
   layout: "header, diff, flags, components"
   require_changes: false
+
+# Code only a device or emulator runs (SharedPreferences, the Storage Access Framework): the coverage run is the JVM
+# and Android host tests, which never reach it, so it would only count against the patch and project targets.
+# Native source sets need no entry: no coverage run instruments them, so they never reach the report.
+ignore:
+  - "**/src/androidMain/**"

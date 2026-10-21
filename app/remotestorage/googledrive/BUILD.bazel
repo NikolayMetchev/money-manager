@@ -84,13 +84,16 @@ kmp_test(
     ],
     plugins = ["serialization"],
     deps = [
+        "//app/importfilesource/core",
         "//app/remotestorage/core",
         "//bazel/kmp/deps:kotlin_test",
         "//test/utils/credentialvault",
         "//utils/httpclient",
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:kotlinx_serialization_json",
         "@maven_kmp//:ktor_client_core",
+        "@maven_kmp//:ktor_client_mock",
         "@maven_kmp//:ktor_http",
     ],
 )

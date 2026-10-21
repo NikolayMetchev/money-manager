@@ -1,6 +1,6 @@
 """`maven_kmp` module extension: Kotlin Multiplatform libraries from the KMP lockfile (#1000).
 
-`bazel run @maven_kmp//:pin` resolves the configured catalog libraries for every platform with
+`bazel run @maven_kmp//:pin` resolves the install's `artifacts` for every platform with
 //bazel/kmp/resolver (Gradle Module Metadata, not POMs) into `maven_kmp.lock.json`. This extension turns the
 lockfile into one `http_file` per file and the hub repository `@maven_kmp`, where each library has a target
 per platform, named like modules: `@maven_kmp//:kotlinx_io_core_jvm`, `…:kotlinx_io_core_linuxX64`.
@@ -8,46 +8,36 @@ On the `metadata` platform (#1010) a library is the common metadata jar instead,
 per source set the resolver found our targets all see (`kotlinx_io_core_metadata`).
 
 Each `install` is its own resolution and hub repository (`name`, default `maven_kmp`), as each Gradle configuration
-resolves on its own: the lint tools (`@ktlint_cli`, `@detekt_cli`, #1015) keep the Kotlin compiler their release
-was built with, which the app's graph would otherwise raise to ours.
+resolves on its own. The build's JVM tools are plain Maven artifacts and use rules_jvm_external's `maven` instead.
 
-When MODULE.bazel or the catalog no longer match what the lockfile was resolved from, the build keeps using
+When MODULE.bazel no longer matches what the lockfile was resolved from, the build keeps using
 the lockfile, and `//bazel/kmp/deps:maven_kmp_lock_test` fails with the command that re-pins it.
 """
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
-load("//bazel/kmp/deps:catalog.bzl", "catalog")
 
-def _forces(libraries, bundles, install):
-    """module → catalog version key: every library of each `force_bundles` bundle (every platform, as Gradle's
-    `configurations.all`), and `forces` (JVM and metadata only, as Gradle's classpath substitutions)."""
-    forces = {}
-    for name in install.force_bundles:
-        if name not in bundles:
-            fail("maven_kmp.install: no bundle %s in the catalog" % name)
-        for alias in bundles[name]:
-            lib = libraries.get(alias, {})
-            if "module" not in lib or "version.ref" not in lib:
-                fail("maven_kmp.install: bundle %s's %s isn't a `module` + `version.ref` library" % (name, alias))
-            forces[lib["module"]] = lib["version.ref"]
-    classpath = {m: ref for m, ref in install.forces.items() if m not in forces}
-    return forces, classpath
+def _module(coordinates):
+    parts = coordinates.split(":")
+    if len(parts) != 3 or not all(parts):
+        fail("maven_kmp.install: want group:artifact:version, got %r" % coordinates)
+    return parts[0] + ":" + parts[1]
 
-def _expected_inputs(versions, libraries, forces, classpath_forces, install):
-    libs = {}
-    for alias in install.libraries:
-        lib = libraries.get(alias)
-        if not lib or "module" not in lib:
-            fail("maven_kmp.install: %s isn't a `module = …` library in the catalog" % alias)
-        libs[alias] = "%s:%s" % (lib["module"], versions.get(lib.get("version.ref"), lib.get("version", "")))
-    pinned = {module: versions.get(ref, "?" + ref) for module, ref in forces.items()}
-    inputs = {"excludes": install.excludes, "forces": pinned, "libraries": libs, "platforms": install.platforms}
-    if classpath_forces:
-        inputs["classpath_forces"] = {module: versions.get(ref, "?" + ref) for module, ref in classpath_forces.items()}
+def _expected_inputs(install):
+    for module in install.classpath_forces:
+        if module in install.forces:
+            fail("maven_kmp.install: %s is in both forces and classpath_forces" % module)
+    for coordinates in install.artifacts.values():
+        _module(coordinates)
+    inputs = {
+        "excludes": install.excludes,
+        "forces": install.forces,
+        "libraries": install.artifacts,
+        "platforms": install.platforms,
+    }
+    if install.classpath_forces:
+        inputs["classpath_forces"] = install.classpath_forces
     if install.library_platforms:
         inputs["library_platforms"] = install.library_platforms
-    if install.resolve_stdlib:
-        inputs["resolve_stdlib"] = True
     return inputs
 
 def _file_repo(file):
@@ -220,13 +210,10 @@ def _install(module_ctx, install, files, archives):
     """One install: its hub repository's BUILD content and why its lockfile is stale (or "")."""
     lock_path = _lock_path(install.lock_file)
     lock = json.decode(module_ctx.read(install.lock_file))
-    versions, libraries, bundles = catalog(module_ctx.read(install.catalog))
-    forces, classpath_forces = _forces(libraries, bundles, install)
-    expected = _expected_inputs(versions, libraries, forces, classpath_forces, install)
     stale = ""
-    if lock["inputs"] != expected:
-        stale = ("%s is out of date with MODULE.bazel's maven_kmp.install(name = %r) or " % (lock_path, install.name) +
-                 "%s. Re-pin with `bazel run @%s//:pin`." % (_lock_path(install.catalog), install.name))
+    if lock["inputs"] != _expected_inputs(install):
+        stale = ("%s is out of date with MODULE.bazel's maven_kmp.install(name = %r). " % (lock_path, install.name) +
+                 "Re-pin with `bazel run @%s//:pin`." % install.name)
 
     names = lock["names"]
     targets = []
@@ -245,16 +232,14 @@ def _install(module_ctx, install, files, archives):
             targets.append(_target(names[module], platform, resolved, names, lock["artifacts"]))
 
     pin_args = ["$(rootpath @money_manager//bazel/kmp/resolver)", "--lock", lock_path]
-    pin_args += ["--toml", _lock_path(install.catalog)]
-    pin_args += ["--library=" + alias for alias in install.libraries]
+    pin_args += ["--kotlin", install.kotlin]
+    pin_args += ["--library=%s=%s" % (a, c) for a, c in sorted(install.artifacts.items())]
     pin_args += ["--library-platforms=%s=%s" % (a, ",".join(p)) for a, p in sorted(install.library_platforms.items())]
     pin_args += ["--platform=" + p for p in install.platforms]
-    pin_args += ["--force=%s=%s" % (m, ref) for m, ref in sorted(forces.items())]
-    pin_args += ["--classpath-force=%s=%s" % (m, ref) for m, ref in sorted(classpath_forces.items())]
+    pin_args += ["--force=%s=%s" % (m, v) for m, v in sorted(install.forces.items())]
+    pin_args += ["--classpath-force=%s=%s" % (m, v) for m, v in sorted(install.classpath_forces.items())]
     pin_args += ["--repository=" + r for r in install.repositories]
     pin_args += ["--exclude=" + e for e in install.excludes]
-    if install.resolve_stdlib:
-        pin_args.append("--resolve-stdlib")
     for alias, actual in sorted(install.aliases.items()):
         targets.append('alias(name = "%s", actual = ":%s")\n' % (alias, actual))
     return _HEADER.format(pin_args = repr(pin_args)) + "\n" + "\n".join(targets), stale
@@ -288,13 +273,20 @@ maven_kmp = module_extension(
             "aliases": attr.string_dict(
                 doc = "name → one of the hub's targets, for a tool that expects another name for it (rules_jvm_external's).",
             ),
-            "catalog": attr.label(mandatory = True, doc = "The version catalog (libs.versions.toml)."),
-            "excludes": attr.string_list(doc = "group:artifact never resolved, whoever depends on it."),
-            "force_bundles": attr.string_list(doc = "Catalog bundles whose every library is forced to its version."),
-            "forces": attr.string_dict(
-                doc = "module → catalog [versions] key: Gradle's classpath substitutions, so JVM and metadata only.",
+            "artifacts": attr.string_dict(
+                doc = "alias → group:artifact:version: the libraries to resolve, named by alias in the hub.",
             ),
-            "libraries": attr.string_list(doc = "Catalog library aliases to resolve."),
+            "classpath_forces": attr.string_dict(
+                doc = "group:artifact → version: Gradle's classpath substitutions, so JVM and metadata only.",
+            ),
+            "excludes": attr.string_list(doc = "group:artifact never resolved, whoever depends on it."),
+            "forces": attr.string_dict(
+                doc = "group:artifact → version on every platform, whoever asks for it (Gradle's `configurations.all`).",
+            ),
+            "kotlin": attr.string(
+                mandatory = True,
+                doc = "The Kotlin release the toolchain's stdlib and kotlin-test are; never resolved from Maven.",
+            ),
             "library_platforms": attr.string_list_dict(
                 doc = """alias → the platforms it resolves for (default: all), as Gradle only resolves a library for
                 the source sets declaring it: the desktop Compose jars are no Android library.""",
@@ -303,13 +295,10 @@ maven_kmp = module_extension(
             "name": attr.string(
                 default = "maven_kmp",
                 doc = "The hub repository. Each install resolves on its own, as each Gradle configuration does " +
-                      "(a tool's classpath never meets the app's), into its own lockfile.",
+                      "into its own lockfile.",
             ),
             "platforms": attr.string_list(doc = "android, jvm, metadata, linuxX64, linuxArm64, macosArm64, mingwX64."),
             "repositories": attr.string_list(doc = "url[=group-regex,…], in order."),
-            "resolve_stdlib": attr.bool(
-                doc = "Resolve the Kotlin stdlib like any library, for a tool's own classpath (else the toolchain's).",
-            ),
         }),
     },
 )
