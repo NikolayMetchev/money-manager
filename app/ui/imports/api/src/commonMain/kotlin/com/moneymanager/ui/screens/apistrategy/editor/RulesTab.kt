@@ -28,12 +28,6 @@ internal fun RulesTab(
 ) {
     val ruleLists = state.config.ruleLists()
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            "Each list runs top to bottom over every record of its kind: each rule whose conditions all hold applies " +
-                "its actions, and the first rule to claim a value wins.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         if (ruleLists.isEmpty()) {
             Text("This strategy has no endpoints yet: add one on the Endpoints tab.", style = MaterialTheme.typography.bodyMedium)
         }
