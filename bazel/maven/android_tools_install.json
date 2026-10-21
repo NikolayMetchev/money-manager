@@ -22,7 +22,7 @@
     "org.ow2.asm:asm-commons": -1014527714,
     "org.ow2.asm:asm-tree": 23327086,
     "org.ow2.asm:asm-util": -787144750,
-    "org.slf4j:slf4j-api": 1626561419,
+    "org.slf4j:slf4j-api": -1626237844,
     "repositories": 1670674627
   },
   "__RESOLVED_ARTIFACTS_HASH": {
@@ -42,8 +42,8 @@
     "com.android.tools.build:builder": -975664877,
     "com.android.tools.build:builder-model": 706058705,
     "com.android.tools.build:builder-test-api": 1788487479,
-    "com.android.tools.build:bundletool": 1281151574,
-    "com.android.tools.build:gradle": -18848445,
+    "com.android.tools.build:bundletool": 1107670465,
+    "com.android.tools.build:gradle": -1654284457,
     "com.android.tools.build:gradle-api": -1702680815,
     "com.android.tools.build:gradle-common-api": -133065819,
     "com.android.tools.build:gradle-settings-api": 1852748880,
@@ -135,7 +135,7 @@
     "org.ow2.asm:asm-commons": 1705619162,
     "org.ow2.asm:asm-tree": -1950755079,
     "org.ow2.asm:asm-util": 450118060,
-    "org.slf4j:slf4j-api": -844459515,
+    "org.slf4j:slf4j-api": -736053657,
     "org.tensorflow:tensorflow-lite-metadata": 410429157
   },
   "artifacts": {
@@ -795,9 +795,9 @@
     },
     "org.slf4j:slf4j-api": {
       "shasums": {
-        "jar": "d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0"
+        "jar": "7e1446499b359675d8aabe6af2de86b85e72ae8a2a932c0b40d0e5ba57097439"
       },
-      "version": "1.7.36"
+      "version": "2.0.20"
     },
     "org.tensorflow:tensorflow-lite-metadata": {
       "shasums": {

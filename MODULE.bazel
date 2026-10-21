@@ -537,7 +537,7 @@ maven.install(
         "org.ow2.asm:asm-tree:9.11.1",
         "org.ow2.asm:asm-util:9.11.1",
         "org.ow2.asm:asm:9.11.1",
-        "org.slf4j:slf4j-api:1.7.36",
+        "org.slf4j:slf4j-api:2.0.20",
     ],
     lock_file = "//bazel/maven:android_tools_install.json",
     repositories = [
