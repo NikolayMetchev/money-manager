@@ -13,7 +13,10 @@ import java.util.jar.JarFile;
  * (and caches it with them). The agent's argument is the Kover agent jar. Its manifest puts the jar on the boot class
  * path by its Maven file name, which a runfiles path doesn't keep, so this adds it there itself: the instrumented
  * classes call into the agent's runtime from every class loader.
+ *
+ * <p>The JVM calls {@link #premain} through the jar's {@code Premain-Class}, which no code references.
  */
+@SuppressWarnings("unused")
 public final class CoverageAgent {
   private CoverageAgent() {}
 
