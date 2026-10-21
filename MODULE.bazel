@@ -83,7 +83,7 @@ http_archive(
 # After changing any of this, re-pin: bazel run @maven_kmp//:pin
 ANDROIDX_ACTIVITY_COMPOSE = "1.13.0"  # renovate: androidx.activity:activity
 ANDROIDX_ANNOTATION = "1.9.1"  # renovate: androidx.annotation:annotation
-ANDROIDX_COLLECTION = "1.5.0"  # renovate: androidx.collection:collection
+ANDROIDX_COLLECTION = "1.7.0"  # renovate: androidx.collection:collection
 ANDROIDX_COMPOSE = "1.12.1"  # renovate: androidx.compose.animation:animation
 ANDROIDX_COMPOSE_MATERIAL3 = "1.4.0"  # renovate: androidx.compose.material3:material3
 ANDROIDX_COMPOSE_MATERIAL_ICONS = "1.7.8"  # renovate: androidx.compose.material:material-icons-core
