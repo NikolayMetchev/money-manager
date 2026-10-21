@@ -381,6 +381,16 @@ class ImportQifE2ETest {
             waitForIdle()
             waitUntilExactlyOneExists(hasText("second.qif"), timeoutMillis = 15000)
             onNodeWithText("Unimported (0)").assertExists()
+
+            // Re-import both through the bulk dialog; nothing changed, so it re-runs them in place.
+            onNodeWithText("Re-import all (2)").performClick()
+            waitUntilExactlyOneExists(hasText("Re-import all imported files"), timeoutMillis = 15000)
+            waitUntilAtLeastOneExists(hasText("Re-import 2 files") and isEnabled(), timeoutMillis = 15000)
+            onNodeWithText("Re-import 2 files").performClick()
+            waitUntilAtLeastOneExists(hasText("Re-imported 2 files", substring = true), timeoutMillis = 20000)
+            onNodeWithText("Done").performClick()
+            waitUntilDoesNotExist(hasText("Re-import all imported files"), timeoutMillis = 15000)
+            waitForIdle()
         }
     }
 }
