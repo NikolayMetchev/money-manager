@@ -64,7 +64,7 @@ timeout; use at least 20 minutes.
 | `bazel run //:format` | Regenerate the BUILD files (Gazelle), then ktlint -F |
 | `bazel run //:gazelle` | Regenerate the BUILD files only |
 | `bazel/renovate/repin.sh` | Re-pin every lockfile (after changing `MODULE.bazel`) |
-| `bazel test --config=coverage $(bazel query 'attr(name, "^test_(jvm\|android)$", tests(//...))')`, then `bazel/kmp/testing/coverage.sh coverage.lcov` | Coverage (the IntelliJ engine), one LCOV report |
+| `bazel test --config=coverage $(bazel query 'attr(name, "^test_(jvm\|android)$", tests(//...))')`, then `bazel/kmp/testing/coverage.sh coverage.xml` | Coverage (the IntelliJ engine), one JaCoCo-format XML report |
 
 Target naming: a module `//utils/files:files` builds as `:files_jvm`, `:files_android` and `:files_<target>`
 (`_linuxX64`, `_linuxArm64`, `_macosArm64`, `_mingwX64`); its tests are `:test_jvm`, `:test_android` (host),

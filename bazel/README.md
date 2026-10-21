@@ -284,11 +284,12 @@ release's `mm-<os>-<arch>` (`pkg_tar` keeping the exec bit; a copied `.exe` on W
 ## Coverage, tools and Pages
 
 - **Coverage**: `bazel test --config=coverage $(bazel query 'attr(name, "^test_(jvm|android)$", tests(//...))')`,
-  then `bazel/kmp/testing/coverage.sh coverage.lcov` (pass the same Bazel flags, such as `--config=rbe`). The JVM and
+  then `bazel/kmp/testing/coverage.sh coverage.xml` (pass the same Bazel flags, such as `--config=rbe`). The JVM and
   Android host tests run under the IntelliJ coverage engine, Kover's JVM agent (`CoverageAgent` starts it), and each
   leaves a binary report in its `test.outputs`. The agent doesn't rewrite jars, so only the test actions change.
   `coverage.sh` merges the reports over the production modules' `_jvm`/`_android` jars (not `test/` fixtures, tests or
-  SQLDelight code) with `kover-cli` and writes LCOV with repository paths. A module's code is credited to every test
+  SQLDelight code) with `kover-cli` into one XML report in JaCoCo's format. It names files by package, and Codecov maps them onto
+  the repository's paths. A module's code is credited to every test
   that runs it. Native and device tests aren't covered: nothing instruments them. Don't use `bazel coverage`, which
   is JaCoCo.
 - **Tools**: `tools/*` and `app/db/schemaspy` are ordinary modules plus `java_binary`s.

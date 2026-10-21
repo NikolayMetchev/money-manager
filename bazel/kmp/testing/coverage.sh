@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
-# One LCOV report from the JVM and Android host tests, run first with `--config=coverage`, which leaves each test's
+# One coverage report (Kover's XML, which is JaCoCo's format) from the JVM and Android host tests, run first with `--config=coverage`, which leaves each test's
 # binary report (coverage.ic, from the IntelliJ coverage engine) in its test.outputs. It counts the production
 # modules' classes (each module's _jvm and _android jars, without SQLDelight's generated code), and credits a line to
 # every test that ran it, not only its own module's.
 #
-# Usage: bazel/kmp/testing/coverage.sh <lcov-file> [bazel flags, such as --config=rbe]
+# Usage: bazel/kmp/testing/coverage.sh <xml-file> [bazel flags, such as --config=rbe]
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 
 out=$(realpath -m "$1")
 shift
 flags=("$@" --config=coverage)
-work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT
 
 testlogs=$(bazel info "${flags[@]}" bazel-testlogs)
 reports=()
@@ -36,11 +34,7 @@ for jar in $(bazel cquery "${flags[@]}" "$libs" --output=files | grep '\.jar$' |
   classfiles+=(--classfiles "$PWD/$jar")
 done
 
-# Only the HTML report reads sources, but the reporter wants at least one root. coverage_lcov.py looks a file up in
-# them in order: a platform file with a common file's name is the one the JVM class came from, so the JVM's go first.
-mapfile -t roots < <(for set in jvmMain jvmAndroidMain main commonMain androidMain; do
-  find app utils tools -type d -path "*/src/$set/kotlin" | sort
-done)
+# The XML names files by package, and Codecov maps them onto the repository's paths. Only the HTML report reads
+# sources, but the reporter wants a source root.
 bazel run "${flags[@]}" //bazel/kmp/testing:kover_cli -- report "${reports[@]}" "${classfiles[@]}" \
-  --src "$PWD/${roots[0]}" --xml "$work/coverage.xml"
-python3 -I bazel/kmp/testing/coverage_lcov.py "$work/coverage.xml" "$out" "${roots[@]}"
+  --src "$PWD/app" --xml "$out"

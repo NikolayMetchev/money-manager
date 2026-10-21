@@ -116,17 +116,19 @@ jobs:
       - name: Test
         run: bazel test $BAZEL_FLAGS -- //... //app/main/jvm:release_service_providers_test 2>&1 | tee test.log
 
-      # The JVM and Android host tests' coverage reports, merged into one LCOV report (bazel/kmp/testing/coverage.sh).
+      # The JVM and Android host tests' coverage reports, merged into one XML report (bazel/kmp/testing/coverage.sh).
       # It credits code to every test that runs it, not only its own module's.
       - name: Coverage
         if: ${{ !cancelled() }}
-        run: bazel/kmp/testing/coverage.sh coverage.lcov $BAZEL_FLAGS 2>&1 | tee coverage.log
+        run: bazel/kmp/testing/coverage.sh coverage.xml $BAZEL_FLAGS 2>&1 | tee coverage.log
 
       - name: Coverage summary
         run: |
-          awk -F: '/^SF:/{f++} /^LF:/{lf+=$2} /^LH:/{lh+=$2}
-            END{printf "### Coverage\n%d files, %d of %d lines (%.1f%%)\n", f, lh, lf, 100*lh/lf}' \
-            coverage.lcov >> "$GITHUB_STEP_SUMMARY"
+          # The report's own totals are its last LINE counter.
+          files=$(grep -c '<sourcefile ' coverage.xml)
+          grep -o '<counter type="LINE" missed="[0-9]*" covered="[0-9]*"' coverage.xml | tail -1 | tr -c '0-9' ' ' |
+            awk -v f="$files" '{printf "### Coverage\n%d files, %d of %d lines (%.1f%%)\n", f, $2, $1+$2, 100*$2/($1+$2)}' \
+            >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
@@ -134,7 +136,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit
           name: unit
-          files: coverage.lcov
+          files: coverage.xml
           disable_search: true
           fail_ci_if_error: false
 
