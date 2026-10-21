@@ -1,0 +1,20 @@
+# A module with every source set the browser rules know (#84). Not Gazelle's: it only writes the
+# `src/<sourceSet>/kotlin` layout.
+load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp:web.bzl", "WEB_TARGETS")
+
+kmp_library(
+    name = "greeting",
+    common_srcs = glob(["common/greeting/*.kt"]),
+    js_srcs = glob(["js/greeting/*.kt"]),
+    jvm_srcs = glob(["jvm/greeting/*.kt"]),
+    native_srcs = glob(["native/greeting/*.kt"]),
+    native_targets = ["linuxX64"],
+    non_jvm_srcs = glob(["nonJvm/greeting/*.kt"]),
+    plugins = ["serialization"],
+    visibility = ["//bazel/kmp/web/tests:__subpackages__"],
+    wasm_js_srcs = glob(["wasmJs/greeting/*.kt"]),
+    web_srcs = glob(["web/greeting/*.kt"]),
+    web_targets = WEB_TARGETS,
+    deps = ["@maven_kmp//:kotlinx_serialization_json"],
+)

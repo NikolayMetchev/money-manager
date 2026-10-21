@@ -146,13 +146,15 @@ def run_konan(ctx, tool, target, arguments, inputs, outputs, mnemonic, progress_
         progress_message = progress_message,
     )
 
-def run_kotlin_metadata(ctx, arguments, inputs, outputs, mnemonic, progress_message):
-    """Runs the common metadata compiler (Gradle's `compileCommonMainKotlinMetadata`) from konan's jar.
+def run_kotlinc(ctx, tool, arguments, inputs, outputs, mnemonic, progress_message):
+    """Runs one of the other compilers konan's jar carries: `kotlinc-metadata` (the common metadata compiler,
+    Gradle's `compileCommonMainKotlinMetadata`), `kotlinc-js` (Kotlin/JS) or `kotlinc-wasm` (Kotlin/Wasm).
 
-    It needs none of a target's konan dependencies, so it runs on any exec host.
+    They need none of a target's konan dependencies, so they run on any exec host.
 
     Args:
         ctx: the rule context; its rule must list `TOOLCHAIN_TYPE` in `toolchains`.
+        tool: the compiler (see KonanLauncher's COMPILERS).
         arguments: the compiler's arguments (a list of `Args` or strings).
         inputs: depset or list of the action's own inputs.
         outputs: the action's outputs.
@@ -163,7 +165,7 @@ def run_kotlin_metadata(ctx, arguments, inputs, outputs, mnemonic, progress_mess
     _launch(
         ctx,
         kn,
-        tool = "kotlinc-metadata",
+        tool = tool,
         arguments = arguments,
         inputs = inputs,
         tool_inputs = [kn.dist_files],

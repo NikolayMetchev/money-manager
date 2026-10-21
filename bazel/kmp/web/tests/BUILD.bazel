@@ -1,0 +1,13 @@
+load("@bazel_skylib//rules:build_test.bzl", "build_test")
+load("//bazel/kmp:web.bzl", "WEB_TARGETS")
+
+# Every compile of greeting/ (each with its own fragments), and hello/ linked for both browser targets.
+build_test(
+    name = "web_rules_test",
+    targets = ["//bazel/kmp/web/tests/greeting:greeting_" + p for p in [
+                  "jvm",
+                  "linuxX64",
+                  "metadata",
+              ] + WEB_TARGETS] +
+              ["//bazel/kmp/web/tests/hello:hello_%s_program" % t for t in WEB_TARGETS],
+)

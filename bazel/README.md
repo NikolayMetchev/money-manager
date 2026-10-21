@@ -224,6 +224,22 @@ release's `mm-<os>-<arch>` (`pkg_tar` keeping the exec bit; a copied `.exe` on W
 (`kmp/distribution.bzl`) is `mm-jvm/bin/` start scripts and `mm-jvm/lib/`, module jars named after their path
 (`app-db-core-jvm.jar`).
 
+## Browser (`wasmJs`, `js`)
+
+The web app (#84) compiles for Kotlin/Wasm (`wasmJs`) and Kotlin/JS (`js`) in `web.bzl`. konan's compiler jar carries
+the Kotlin/JS and Kotlin/Wasm compilers too, so `run_kotlinc` (`toolchain.bzl`) runs them as it runs the metadata
+compiler (`kotlinc-js`, `kotlinc-wasm`; `KonanLauncher` maps each to its compiler class), with the native compiler
+plugins. Nothing else is downloaded: the browser stdlib and kotlin-test are their Maven klibs at the toolchain's
+version (`@maven_kmp`, resolved like the metadata ones).
+
+A module lists its browser targets in `web_targets`, and each compiles to `:<name>_wasmJs` / `:<name>_js` over
+`common ← nonJvm ← web ← wasmJs|js`: `webMain` is what both browser targets share, and `nonJvmMain` (named only when a
+module has it) is what they share with native, which then compiles `common ← nonJvm ← native ← …`. A module with web
+targets compiles its commonMain metadata against `metadataWeb` (see Maven) with `-Xtarget-platform=…,JS,WasmJs`, and
+`:<name>_metadataWeb` names that compile for the web modules that depend on it. `kt_web_executable` links a module's
+klib into a production program (`-Xir-dce`): ES modules, plus the `.wasm` and its glue on wasmJs.
+`//bazel/kmp/web/tests` builds a module with every source set, and a program, for both targets.
+
 ## Desktop
 
 - **Compose UI**: `app/ui/*`, `utils/compose/*` and `test/app/ui` are JVM-only (no native `kmp_targets`). JVM

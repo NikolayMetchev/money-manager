@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 /**
@@ -31,8 +32,9 @@ import java.util.stream.Stream;
  * <p>{@code run_konan} passes the tool's arguments in params files ({@code @file}, one argument per line), as
  * a module's command line can pass Windows' 32767-character limit; this reads them back.
  *
- * <p>The tool {@code kotlinc-metadata} isn't konan's: it is the common metadata compiler, which konan's jar
- * carries too (Gradle's {@code compileCommonMainKotlinMetadata}), run with the same compiler plugins.
+ * <p>The tools in {@link #COMPILERS} aren't konan's: konan's jar carries the common metadata compiler (Gradle's
+ * {@code compileCommonMainKotlinMetadata}) and the Kotlin/JS and Kotlin/Wasm compilers too, so they run with the
+ * same compiler plugins.
  */
 public final class KonanLauncher {
   private static final String INCLUDE = "-Xinclude=";
@@ -43,7 +45,11 @@ public final class KonanLauncher {
 
   private static final String TEMP = "{temp}";
 
-  private static final String METADATA = "kotlinc-metadata";
+  private static final Map<String, String> COMPILERS =
+      Map.of(
+          "kotlinc-metadata", "org.jetbrains.kotlin.cli.metadata.KotlinMetadataCompiler",
+          "kotlinc-js", "org.jetbrains.kotlin.cli.js.K2JSCompiler",
+          "kotlinc-wasm", "org.jetbrains.kotlin.cli.js.KotlinWasmCompiler");
 
   private static final String LIBRARY_PATH = "-libraryPath";
 
@@ -90,8 +96,8 @@ public final class KonanLauncher {
     }
     int exitCode = 0;
     try {
-      if (args.length > 0 && args[0].equals(METADATA)) {
-        exitCode = compileMetadata(Arrays.copyOfRange(args, 1, args.length));
+      if (args.length > 0 && COMPILERS.containsKey(args[0])) {
+        exitCode = compile(COMPILERS.get(args[0]), Arrays.copyOfRange(args, 1, args.length));
       } else {
         Method main = Class.forName("org.jetbrains.kotlin.cli.utilities.MainKt").getMethod("main", String[].class);
         main.invoke(null, (Object) args);
@@ -108,9 +114,9 @@ public final class KonanLauncher {
     }
   }
 
-  private static int compileMetadata(String[] args) throws Exception {
+  private static int compile(String compilerClass, String[] args) throws Exception {
     Class<?> cliCompiler = Class.forName("org.jetbrains.kotlin.cli.common.CLICompiler");
-    Object compiler = Class.forName("org.jetbrains.kotlin.cli.metadata.KotlinMetadataCompiler").getConstructor().newInstance();
+    Object compiler = Class.forName(compilerClass).getConstructor().newInstance();
     Object exitCode = cliCompiler.getMethod("doMainNoExit", cliCompiler, String[].class).invoke(null, compiler, args);
     return (Integer) exitCode.getClass().getMethod("getCode").invoke(exitCode);
   }

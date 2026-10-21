@@ -28,6 +28,7 @@ load("//bazel/kmp/dokka:dokka.bzl", "dokka_module")
 load("//bazel/kmp/checks:checks.bzl", "kmp_forbidden_deps", "kmp_reference_check", "kmp_unused_deps")
 load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
 load(":resources.bzl", "kmp_resource_jar")
+load(":web.bzl", "kt_web_klib")
 load(":native.bzl", "BUILDS_ON", "CROSS_PLATFORMS", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_cross_test_binary", "kt_native_executable", "kt_native_klib", "kt_native_test_binary")
 load("//bazel/kmp/plugins:plugins.bzl", "plugin_deps", "plugin_labels")
 load("//bazel/kmp/android:apk.bzl", "android_apk")
@@ -148,9 +149,14 @@ def kmp_library(
         linux_srcs = [],
         apple_srcs = [],
         mingw_srcs = [],
+        non_jvm_srcs = [],
+        web_srcs = [],
+        wasm_js_srcs = [],
+        js_srcs = [],
         android = False,
         jvm = True,
         native_targets = [],
+        web_targets = [],
         deps = [],
         jvm_android_deps = [],
         jvm_deps = [],
@@ -159,6 +165,10 @@ def kmp_library(
         linux_deps = [],
         apple_deps = [],
         mingw_deps = [],
+        non_jvm_deps = [],
+        web_deps = [],
+        wasm_js_deps = [],
+        js_deps = [],
         exports = [],
         jvm_android_exports = [],
         jvm_exports = [],
@@ -174,7 +184,8 @@ def kmp_library(
         keep_deps = [],
         resources = [],
         visibility = None):
-    """A Kotlin Multiplatform module. Emits `:<name>_jvm`, `:<name>_android` and `:<name>_<target>` per native target.
+    """A Kotlin Multiplatform module. Emits `:<name>_jvm`, `:<name>_android` and `:<name>_<target>` per native and
+    browser target.
 
     The Android compile is AGP's Kotlin compile of an Android library:
     `commonMain ← jvmAndroidMain ← androidMain` against the SDK's `android.jar` (`//bazel/kmp/android`), on the
@@ -191,11 +202,17 @@ def kmp_library(
         linux_srcs: `src/linuxMain/kotlin` sources.
         apple_srcs: `src/appleMain/kotlin` sources.
         mingw_srcs: `src/mingwMain/kotlin` sources.
+        non_jvm_srcs: `src/nonJvmMain/kotlin` sources: what the native and browser targets share.
+        web_srcs: `src/webMain/kotlin` sources: what wasmJs and js share.
+        wasm_js_srcs: `src/wasmJsMain/kotlin` sources.
+        js_srcs: `src/jsMain/kotlin` sources.
         android: whether the module has an Android target (`:<name>_android`).
         jvm: whether it has a JVM one: an Android app (`com.android.application`) has only `:<name>_android`.
             The JVM and Android compiles take Gradle's Kotlin module name (`_module_name`), which a
             `com.android.application` module names differently.
         native_targets: the Kotlin/Native targets, by KGP's names (`linuxX64`, …).
+        web_targets: the browser targets (`wasmJs`, `js`; web.bzl). A module with any compiles its commonMain
+            metadata against `metadataWeb`, and gets `:<name>_metadataWeb` for the web modules that depend on it.
         deps: `commonMain` `implementation` dependencies, by module label. A compilation has one
             classpath, as in KGP.
         jvm_android_deps: `jvmAndroidMain` dependencies (the JVM's and Android's).
@@ -205,6 +222,10 @@ def kmp_library(
         linux_deps: `linuxMain` dependencies (only on Linux targets).
         apple_deps: `appleMain` dependencies.
         mingw_deps: `mingwMain` dependencies.
+        non_jvm_deps: `nonJvmMain` dependencies (the native and browser targets').
+        web_deps: `webMain` dependencies.
+        wasm_js_deps: `wasmJsMain` dependencies.
+        js_deps: `jsMain` dependencies.
         exports: `commonMain` `api` dependencies: on the classpath of everything that depends on this module.
         jvm_android_exports: `jvmAndroidMain` `api` dependencies.
         jvm_exports: `jvmMain` `api` dependencies.
@@ -228,7 +249,8 @@ def kmp_library(
         visibility: the targets' visibility. A restricted module also gets `:<name>_for_tests`, testonly and
             public, which every module's tests use instead.
     """
-    hand_written = common_srcs + jvm_android_srcs + jvm_srcs + android_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs
+    hand_written = (common_srcs + jvm_android_srcs + jvm_srcs + android_srcs + native_srcs + linux_srcs + apple_srcs +
+                    mingw_srcs + non_jvm_srcs + web_srcs + wasm_js_srcs + js_srcs)
     kmp_lint(name, hand_written)
     if forbidden_reference:
         kmp_reference_check(
@@ -240,7 +262,7 @@ def kmp_library(
         )
     if forbidden_deps:
         bytecode = {p: name + "_" + p for p in (["jvm"] if jvm else []) + (["android"] if android else [])}
-        _forbidden_deps(name, forbidden_deps, bytecode, {t: name + "_" + t for t in native_targets}, BUILDS_ON)
+        _forbidden_deps(name, forbidden_deps, bytecode, {t: name + "_" + t for t in native_targets + web_targets}, BUILDS_ON)
     # Exports are kmp_export directives, a person's say-so (some only generated code uses: Metro's graph,
     # SQLDelight's queries), so only what imports brought is checked.
     declared = deps + jvm_android_deps + (jvm_deps if jvm else android_deps)
@@ -313,15 +335,23 @@ def kmp_library(
         )
         if not jvm and android_fragments.srcs:
             _unused_deps(name, name + "_android", declared, keep_deps, "android")
-    if native_targets:
+    if native_targets or web_targets:
         package = native.package_name()
         kt_metadata_library(
             name = name + "_metadata",
             module = "%s:%s" % (package.replace("/", "."), package.replace("/", "-")),
             srcs = common_srcs,
             generated = generated_native,
-            deps = _on("metadata", deps + exports),
+            deps = _on("metadataWeb" if web_targets else "metadata", deps + exports),
             plugins = plugin_labels(plugins, "native"),
+            web = bool(web_targets),
+            visibility = visibility,
+        )
+    if web_targets:
+        # Its own metadata already sees only what the browser does; web modules that depend on it name this.
+        native.alias(
+            name = name + "_metadataWeb",
+            actual = ":" + name + "_metadata",
             visibility = visibility,
         )
     for target in native_targets:
@@ -332,12 +362,27 @@ def kmp_library(
             target = target,
             common_srcs = common_srcs,
             common_generated = generated_native,
+            non_jvm_srcs = non_jvm_srcs,
             native_srcs = native_srcs,
             family_srcs = _family(target, linux_srcs, apple_srcs, mingw_srcs),
-            deps = _on(target, deps + native_deps + _family(target, linux_deps, apple_deps, mingw_deps) + exports),
+            deps = _on(target, deps + non_jvm_deps + native_deps + _family(target, linux_deps, apple_deps, mingw_deps) + exports),
             plugins = plugin_labels(plugins, "native"),
             exec_compatible_with = ["//bazel/platforms:compiles_klibs"],
             target_compatible_with = BUILDS_ON.get(target, []),
+            visibility = visibility,
+        )
+    for target in web_targets:
+        # As on native, a klib's dependencies are always transitive.
+        kt_web_klib(
+            name = name + "_" + target,
+            target = target,
+            common_srcs = common_srcs,
+            common_generated = generated_native,
+            non_jvm_srcs = non_jvm_srcs,
+            web_srcs = web_srcs,
+            target_srcs = wasm_js_srcs if target == "wasmJs" else js_srcs,
+            deps = _on(target, deps + non_jvm_deps + web_deps + (wasm_js_deps if target == "wasmJs" else js_deps) + exports),
+            plugins = plugin_labels(plugins, "native"),
             visibility = visibility,
         )
     if jvm:
@@ -363,7 +408,8 @@ def kmp_library(
     if visibility and "//visibility:public" not in visibility:
         # `visibility` keeps main code out (verifyNoWriteRepositoryUsage), but Gradle's check only reads main
         # sources: any module's tests may use the module. `:<name>_for_tests` is testonly, so only tests can.
-        for platform in (["jvm"] if jvm else []) + (["android"] if android else []) + (["metadata"] + native_targets if native_targets else []):
+        metadata = (["metadata"] if native_targets or web_targets else []) + (["metadataWeb"] if web_targets else [])
+        for platform in (["jvm"] if jvm else []) + (["android"] if android else []) + metadata + native_targets + web_targets:
             native.alias(
                 name = "%s_for_tests_%s" % (name, platform),
                 actual = ":%s_%s" % (name, platform),

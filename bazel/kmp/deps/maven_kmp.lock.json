@@ -16977,6 +16977,16 @@
       }
     },
     "org.jetbrains.kotlin:kotlin-stdlib": {
+      "js": {
+        "version": "2.4.21",
+        "files": [
+          {
+            "name": "kotlin-stdlib-js-2.4.21.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-js/2.4.21/kotlin-stdlib-js-2.4.21.klib",
+            "sha256": "1c2181c291848fdc00161dce3ab6f886a04a6085fa7beb27e4e436f301e8075c"
+          }
+        ]
+      },
       "metadata": {
         "version": "2.4.21",
         "files": [
@@ -17001,10 +17011,30 @@
         ],
         "source_sets": [
           "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "2.4.21",
+        "files": [
+          {
+            "name": "kotlin-stdlib-wasm-js-2.4.21.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-wasm-js/2.4.21/kotlin-stdlib-wasm-js-2.4.21.klib",
+            "sha256": "48c2061061d0744487e1dfc1969a0de582b26c0094ea3f2ae986ea2ff2c25693"
+          }
         ]
       }
     },
     "org.jetbrains.kotlin:kotlin-test": {
+      "js": {
+        "version": "2.4.21",
+        "files": [
+          {
+            "name": "kotlin-test-js-2.4.21.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-test-js/2.4.21/kotlin-test-js-2.4.21.klib",
+            "sha256": "e2b2ec0975944fa444b184695369830f2693f0d77be74a7e23d5854d00a269fd"
+          }
+        ]
+      },
       "metadata": {
         "version": "2.4.21",
         "files": [
@@ -17031,6 +17061,16 @@
         "source_sets": [
           "annotationsCommonMain",
           "assertionsCommonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "2.4.21",
+        "files": [
+          {
+            "name": "kotlin-test-wasm-js-2.4.21.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-test-wasm-js/2.4.21/kotlin-test-wasm-js-2.4.21.klib",
+            "sha256": "dfc1df84d34ec052b2454f72ed6de357f644a01ad39e8d80676bacffae541caf"
+          }
         ]
       }
     },

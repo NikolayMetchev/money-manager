@@ -232,6 +232,8 @@ exclude:
       - app/terminal/src/jvmMain/kotlin/com/moneymanager/terminal/TerminalFacts.jvm.kt
       # [1] — the Metro plugin test's fixture provides a constant so the test can assert the graph built it.
       - bazel/kmp/plugins/tests/src/commonMain/kotlin/com/moneymanager/bazel/plugins/Plugins.kt
+      # The browser rules' fixture: each platform's actual names its platform.
+      - bazel/kmp/web/tests/greeting/jvm/greeting/Platform.kt
 
   # [4] — deliberate no-op bodies: the Android onCreate-for-existing-DB branch and the Android
   # scrollbar actuals (Android has no desktop-style scrollbars).
@@ -352,6 +354,8 @@ exclude:
       - utils/localsettings/di/src/commonMain/kotlin/com/moneymanager/localsettings/di/LocalSettingsModule.kt
       - bazel/kmp/plugins/tests/metro/contributor/src/commonMain/kotlin/com/moneymanager/bazel/metro/contributor/GreetingModule.kt
       - bazel/kmp/plugins/tests/src/commonMain/kotlin/com/moneymanager/bazel/plugins/Plugins.kt
+      # [5] — the browser rules' fixture: greeting() is called by the web-only hello program, in no module.
+      - bazel/kmp/web/tests/greeting/common/greeting/Greeting.kt
       # [5] — actuals of common expects (BigDecimal/BigInteger, Currency, the file pickers, the vault path
       # resolver, the crypto catalog file, the remote cache location, the test database loader) and
       # MainActivity, which the Android manifest names.
