@@ -413,7 +413,7 @@ maven.install(
         "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.4.21",
         "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.4.21",
         "org.jetbrains.kotlin:kotlin-stdlib:2.4.21",
-        "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.11.0",
+        "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.12.0",
     ],
     lock_file = "//bazel/maven:detekt_cli_install.json",
     repositories = ["https://repo1.maven.org/maven2"],
