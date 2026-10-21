@@ -61,15 +61,15 @@ internal fun ApiStrategyConfig.ruleLists(): List<ApiRuleList> {
         dataEndpoints
             .withIndex()
             .filter { it.value.kind != ApiEndpointKind.BANK_TRANSACTIONS }
-            .mapIndexed { number, (index, endpoint) -> endpoint.ruleList("Data endpoint ${number + 1}", index) }
+            .mapIndexed { number, (index, endpoint) -> endpoint.ruleList(number + 1, index) }
     return listOfNotNull(accountsRules, bankFeedRules) + endpointRules
 }
 
 private fun ApiDataEndpoint.ruleList(
-    label: String,
+    number: Int,
     index: Int,
 ): ApiRuleList {
-    val title = "$label: ${kind.name} (${endpoint.path})"
+    val title = "$number. ${kind.name} (${endpoint.path})"
 
     fun ApiStrategyConfig.withEndpoint(transform: ApiDataEndpoint.() -> ApiDataEndpoint) =
         copy(dataEndpoints = dataEndpoints.mapIndexed { i, e -> if (i == index) e.transform() else e })
