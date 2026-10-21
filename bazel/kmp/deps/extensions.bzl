@@ -8,8 +8,7 @@ On the `metadata` platform (#1010) a library is the common metadata jar instead,
 per source set the resolver found our targets all see (`kotlinx_io_core_metadata`).
 
 Each `install` is its own resolution and hub repository (`name`, default `maven_kmp`), as each Gradle configuration
-resolves on its own: the lint tools (`@ktlint_cli`, `@detekt_cli`, #1015) keep the Kotlin compiler their release
-was built with, which the app's graph would otherwise raise to ours.
+resolves on its own. The build's JVM tools are plain Maven artifacts and use rules_jvm_external's `maven` instead.
 
 When MODULE.bazel or the catalog no longer match what the lockfile was resolved from, the build keeps using
 the lockfile, and `//bazel/kmp/deps:maven_kmp_lock_test` fails with the command that re-pins it.
@@ -46,8 +45,6 @@ def _expected_inputs(versions, libraries, forces, classpath_forces, install):
         inputs["classpath_forces"] = {module: versions.get(ref, "?" + ref) for module, ref in classpath_forces.items()}
     if install.library_platforms:
         inputs["library_platforms"] = install.library_platforms
-    if install.resolve_stdlib:
-        inputs["resolve_stdlib"] = True
     return inputs
 
 def _file_repo(file):
@@ -253,8 +250,6 @@ def _install(module_ctx, install, files, archives):
     pin_args += ["--classpath-force=%s=%s" % (m, ref) for m, ref in sorted(classpath_forces.items())]
     pin_args += ["--repository=" + r for r in install.repositories]
     pin_args += ["--exclude=" + e for e in install.excludes]
-    if install.resolve_stdlib:
-        pin_args.append("--resolve-stdlib")
     for alias, actual in sorted(install.aliases.items()):
         targets.append('alias(name = "%s", actual = ":%s")\n' % (alias, actual))
     return _HEADER.format(pin_args = repr(pin_args)) + "\n" + "\n".join(targets), stale
@@ -303,13 +298,10 @@ maven_kmp = module_extension(
             "name": attr.string(
                 default = "maven_kmp",
                 doc = "The hub repository. Each install resolves on its own, as each Gradle configuration does " +
-                      "(a tool's classpath never meets the app's), into its own lockfile.",
+                      "into its own lockfile.",
             ),
             "platforms": attr.string_list(doc = "android, jvm, metadata, linuxX64, linuxArm64, macosArm64, mingwX64."),
             "repositories": attr.string_list(doc = "url[=group-regex,…], in order."),
-            "resolve_stdlib": attr.bool(
-                doc = "Resolve the Kotlin stdlib like any library, for a tool's own classpath (else the toolchain's).",
-            ),
         }),
     },
 )

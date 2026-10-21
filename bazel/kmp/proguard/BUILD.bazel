@@ -14,8 +14,8 @@ java_binary(
     srcs = ["src/com/moneymanager/bazel/kmp/proguard/ProguardRunner.java"],
     main_class = "com.moneymanager.bazel.kmp.proguard.ProguardRunner",
     visibility = ["//visibility:public"],
-    runtime_deps = ["@proguard//:compose_gradle_plugin_jvm"],
-    deps = ["@proguard//:proguard_base_jvm"],
+    runtime_deps = ["@proguard//:org_jetbrains_compose_compose_gradle_plugin"],
+    deps = ["@proguard//:com_guardsquare_proguard_base"],
 )
 
 # Gradle's verifyProguardServiceProviders: a java_test's main class (use_testrunner = False) over a

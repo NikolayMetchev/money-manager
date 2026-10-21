@@ -11,6 +11,7 @@ module(
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "rules_java", version = "9.9.0")
+bazel_dep(name = "rules_jvm_external", version = "7.2")
 bazel_dep(name = "rules_pkg", version = "1.3.0")
 bazel_dep(name = "rules_kotlin", version = "2.4.21")
 bazel_dep(name = "rules_shell", version = "0.8.0")
@@ -88,8 +89,8 @@ maven_kmp.install(
         "org.jetbrains.kotlin:kotlin-gradle-plugin",
     ],
     # These modules always resolve to the catalog version, whoever asks for them (and so does every library
-    # of the build-tool-pins bundle).
-    force_bundles = ["build-tool-pins"],
+    # of the transitive-pins bundle).
+    force_bundles = ["transitive-pins"],
     forces = {
         "androidx.activity:activity": "androidx-activity-compose",
         "androidx.annotation:annotation": "androidx-annotation",
@@ -318,119 +319,187 @@ maven_kmp.install(
     ],
 )
 
-# The lint tools (#1015), each resolved on its own like the Gradle configuration (`ktlint`, `detekt`) it matches:
-# only the build-tool-pins bundle applies to those.
-maven_kmp.install(
+# The JVM tools the build runs, each resolved on its own (the KMP libraries above need maven_kmp's variant
+# resolution; these are plain Maven artifacts). Renovate bumps the versions here; `bazel/renovate/repin.sh` re-pins.
+# Maven resolution keeps the version a POM asks for, often years old (logback, protobuf, guava, asm), and doesn't read
+# Gradle's module metadata, which moves a KMP library's `-jvm` artifact and the Kotlin stdlib to the newest any
+# dependency asks for. So an install lists those transitive libraries too, at their newest, and
+# `version_conflict_policy = "pinned"` makes the listed versions win.
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+
+# The lint tools (#1015).
+maven.install(
     name = "detekt_cli",
-    catalog = "//:libs.versions.toml",
-    force_bundles = ["build-tool-pins"],
-    libraries = ["detekt-cli"],
-    lock_file = "//bazel/kmp/deps:detekt_cli.lock.json",
-    platforms = ["jvm"],
+    artifacts = [
+        "dev.detekt:detekt-cli:2.0.0-alpha.6",
+        # Transitive versions held at the newest (see version_conflict_policy).
+        "com.google.errorprone:error_prone_annotations:2.50.0",
+        "dev.drewhamilton.poko:poko-annotations-jvm:0.23.2",
+        "org.checkerframework:checker-qual:4.3.1",
+        "org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.4.21",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.4.21",
+        "org.jetbrains.kotlin:kotlin-stdlib:2.4.21",
+        "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.11.0",
+    ],
+    lock_file = "//bazel/maven:detekt_cli_install.json",
     repositories = ["https://repo1.maven.org/maven2"],
-    resolve_stdlib = True,
+    version_conflict_policy = "pinned",
 )
 
-maven_kmp.install(
+maven.install(
     name = "ktlint_cli",
-    catalog = "//:libs.versions.toml",
-    force_bundles = ["build-tool-pins"],
-    libraries = ["ktlint-cli"],
-    lock_file = "//bazel/kmp/deps:ktlint_cli.lock.json",
-    platforms = ["jvm"],
+    artifacts = [
+        "com.pinterest.ktlint:ktlint-cli:1.8.0",
+        # Transitive versions held at the newest (see version_conflict_policy).
+        "ch.qos.logback:logback-classic:1.6.5",
+        "ch.qos.logback:logback-core:1.6.5",
+        "dev.drewhamilton.poko:poko-annotations-jvm:0.23.2",
+        "org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.4.21",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.4.21",
+        "org.jetbrains.kotlin:kotlin-stdlib:2.4.21",
+        "org.jetbrains:annotations:23.0.0",
+        "org.slf4j:slf4j-api:2.0.19",
+    ],
+    lock_file = "//bazel/maven:ktlint_cli_install.json",
     repositories = ["https://repo1.maven.org/maven2"],
-    resolve_stdlib = True,
+    version_conflict_policy = "pinned",
 )
 
-# Dokka (#1027), the KDoc site: its CLI (a fat jar, with Dokka's core) and the plugins the Gradle plugin runs.
-maven_kmp.install(
+# Dokka (#1027), the KDoc site: its CLI (a fat jar, with Dokka's core) and the plugins the Gradle plugin ran.
+maven.install(
     name = "dokka",
-    catalog = "//:libs.versions.toml",
-    force_bundles = ["build-tool-pins"],
-    libraries = [
-        "dokka-all-modules-page-plugin",
-        "dokka-analysis-kotlin-symbols",
-        "dokka-base",
-        "dokka-cli",
-        "dokka-templating-plugin",
+    artifacts = [
+        "org.jetbrains.dokka:all-modules-page-plugin:2.2.0",
+        "org.jetbrains.dokka:analysis-kotlin-symbols:2.2.0",
+        "org.jetbrains.dokka:dokka-base:2.2.0",
+        "org.jetbrains.dokka:dokka-cli:2.2.0",
+        "org.jetbrains.dokka:templating-plugin:2.2.0",
+        # Transitive versions held at the newest (see version_conflict_policy).
+        "org.jetbrains.kotlin:kotlin-stdlib-common:2.0.21",
     ],
-    lock_file = "//bazel/kmp/deps:dokka.lock.json",
-    platforms = ["jvm"],
+    lock_file = "//bazel/maven:dokka_install.json",
     repositories = ["https://repo1.maven.org/maven2"],
-    resolve_stdlib = True,
+    version_conflict_policy = "pinned",
 )
 
-# SchemaSpy (#1027), on its own classpath as in app/db/schemaspy's Gradle `schemaspy` configuration, with the
-# SQLite JDBC driver it reads the schema through.
-maven_kmp.install(
+# SchemaSpy (#1027), with the SQLite JDBC driver it reads the schema through.
+maven.install(
     name = "schemaspy",
-    catalog = "//:libs.versions.toml",
-    force_bundles = ["build-tool-pins"],
-    libraries = [
-        "schemaspy",
-        "sqldelight-sqlite-driver",
+    artifacts = [
+        "org.schemaspy:schemaspy:7.0.2",
+        "org.xerial:sqlite-jdbc:3.53.4.0",
+        # Transitive versions held at the newest (see version_conflict_policy).
+        "ch.qos.logback:logback-classic:1.6.5",
+        "ch.qos.logback:logback-core:1.6.5",
+        "commons-io:commons-io:2.22.0",
+        "org.ow2.asm:asm-analysis:9.11.1",
+        "org.ow2.asm:asm-commons:9.11.1",
+        "org.ow2.asm:asm-tree:9.11.1",
+        "org.ow2.asm:asm-util:9.11.1",
+        "org.ow2.asm:asm:9.11.1",
+        "org.slf4j:slf4j-api:2.0.19",
     ],
-    lock_file = "//bazel/kmp/deps:schemaspy.lock.json",
-    platforms = ["jvm"],
+    lock_file = "//bazel/maven:schemaspy_install.json",
     repositories = ["https://repo1.maven.org/maven2"],
-    resolve_stdlib = True,
+    version_conflict_policy = "pinned",
 )
 
 # The desktop app's ProGuard (#1019), with the Compose Gradle plugin for the default rules it applies.
-maven_kmp.install(
+maven.install(
     name = "proguard",
-    catalog = "//:libs.versions.toml",
-    # Optional in the plugin's POM, and Gradle-only.
-    excludes = ["org.jetbrains.compose.hot-reload:hot-reload-gradle-plugin"],
-    force_bundles = ["build-tool-pins"],
-    libraries = [
-        "compose-gradle-plugin",
-        "proguard-base",
+    artifacts = [
+        "com.guardsquare:proguard-base:7.10.0",
+        "org.jetbrains.compose:compose-gradle-plugin:1.12.2",
+        # Transitive versions held at the newest (see version_conflict_policy).
+        "com.google.code.gson:gson:2.14.0",
+        "com.google.errorprone:error_prone_annotations:2.50.0",
     ],
-    lock_file = "//bazel/kmp/deps:proguard.lock.json",
-    platforms = ["jvm"],
+    # Optional in the plugin's POM, and Gradle-only.
+    excluded_artifacts = ["org.jetbrains.compose.hot-reload:hot-reload-gradle-plugin"],
+    lock_file = "//bazel/maven:proguard_install.json",
     repositories = [
         "https://repo1.maven.org/maven2",
         "https://plugins.gradle.org/m2",
     ],
-    resolve_stdlib = True,
+    version_conflict_policy = "pinned",
 )
 
 # AGP and its builder: MockableJarGenerator makes the android.jar Android host tests run on (#1022); the app
 # build (#1023) runs their manifest merger, R class writer, ApkFlinger, R8 and profile compiler as AGP does.
-maven_kmp.install(
+maven.install(
     name = "android_tools",
-    catalog = "//:libs.versions.toml",
-    force_bundles = ["build-tool-pins"],
-    libraries = [
-        "android-builder",
-        "android-gradle-plugin",
+    artifacts = [
+        "com.android.tools.build:builder:9.4.1",
+        "com.android.tools.build:gradle:9.4.1",
+        "com.android.tools.build:gradle-api:9.4.1",
+        # Transitive versions held at the newest (see version_conflict_policy).
+        "com.google.code.findbugs:jsr305:3.0.2",
+        "com.google.code.gson:gson:2.14.0",
+        "com.google.crypto.tink:tink:1.24.0",
+        "com.google.errorprone:error_prone_annotations:2.50.0",
+        "com.google.guava:failureaccess:1.0.3",
+        "com.google.guava:guava:33.7.2-jre",
+        "com.google.j2objc:j2objc-annotations:3.1",
+        "com.google.protobuf:protobuf-java-util:4.36.2",
+        "com.google.protobuf:protobuf-java:4.36.2",
+        "com.squareup:javawriter:2.5.1",
+        "commons-io:commons-io:2.22.0",
+        "org.apache.httpcomponents:httpclient:4.5.14",
+        "org.checkerframework:checker-qual:4.3.1",
+        "org.ow2.asm:asm-analysis:9.11.1",
+        "org.ow2.asm:asm-commons:9.11.1",
+        "org.ow2.asm:asm-tree:9.11.1",
+        "org.ow2.asm:asm-util:9.11.1",
+        "org.ow2.asm:asm:9.11.1",
+        "org.slf4j:slf4j-api:1.7.36",
     ],
-    lock_file = "//bazel/kmp/deps:android_tools.lock.json",
-    platforms = ["jvm"],
+    lock_file = "//bazel/maven:android_tools_install.json",
     repositories = [
         "https://maven.google.com",
         "https://repo1.maven.org/maven2",
     ],
-    resolve_stdlib = True,
+    version_conflict_policy = "pinned",
 )
 
-# Android lint (#1025): the lint-gradle AGP resolves to run lint, on its own classpath as AGP runs it.
-maven_kmp.install(
+# Android lint (#1025): the lint-gradle AGP resolves to run lint (its version is always AGP's + 23).
+maven.install(
     name = "android_lint",
-    catalog = "//:libs.versions.toml",
-    force_bundles = ["build-tool-pins"],
-    libraries = ["android-lint-gradle"],
-    lock_file = "//bazel/kmp/deps:android_lint.lock.json",
-    platforms = ["jvm"],
+    artifacts = [
+        "com.android.tools.lint:lint-gradle:32.4.1",
+        # Transitive versions held at the newest (see version_conflict_policy).
+        "com.google.code.findbugs:jsr305:3.0.2",
+        "com.google.code.gson:gson:2.14.0",
+        "com.google.errorprone:error_prone_annotations:2.50.0",
+        "com.google.guava:failureaccess:1.0.3",
+        "com.google.guava:guava:33.7.2-jre",
+        "com.google.j2objc:j2objc-annotations:3.1",
+        "com.google.protobuf:protobuf-java:4.36.2",
+        "commons-io:commons-io:2.22.0",
+        "org.apache.httpcomponents:httpclient:4.5.14",
+        "org.ow2.asm:asm-analysis:9.11.1",
+        "org.ow2.asm:asm-commons:9.11.1",
+        "org.ow2.asm:asm-tree:9.11.1",
+        "org.ow2.asm:asm:9.11.1",
+    ],
+    lock_file = "//bazel/maven:android_lint_install.json",
     repositories = [
         "https://maven.google.com",
         "https://repo1.maven.org/maven2",
     ],
-    resolve_stdlib = True,
+    version_conflict_policy = "pinned",
 )
+# gradle-api's POM depends back on AGP (runtime scope; its Gradle module metadata doesn't), a cycle Bazel refuses.
+maven.amend_artifact(
+    name = "android_tools",
+    coordinates = "com.android.tools.build:gradle-api",
+    exclusions = ["com.android.tools.build:gradle"],
+)
+use_repo(maven, "android_lint", "android_tools", "detekt_cli", "dokka", "ktlint_cli", "proguard", "schemaspy")
 
-use_repo(maven_kmp, "android_lint", "android_tools", "detekt_cli", "dokka", "ktlint_cli", "maven_kmp", "proguard", "schemaspy")
+use_repo(maven_kmp, "maven_kmp")
 
 android_sdk = use_extension("//bazel/kmp/android:extensions.bzl", "android_sdk")
+android_sdk.agp(version = "9.4.1")
 use_repo(android_sdk, "aapt2", "android_sdk")

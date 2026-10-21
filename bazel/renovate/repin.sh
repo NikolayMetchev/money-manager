@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Re-pins everything a version bump leaves stale (#1029), so a Renovate PR needs no hand edits: the Kotlin/Native
-# toolchain when Kotlin moved, every maven_kmp lockfile (`bazel run @<hub>//:pin`), MODULE.bazel.lock, and the
+# toolchain when Kotlin moved, every Maven lockfile (`bazel run @<hub>//:pin`: maven_kmp's and the tools'
+# rules_jvm_external ones), MODULE.bazel.lock, and the
 # BUILD files Gazelle writes (a library's packages can move). renovate-pins.yml runs it on Renovate's branches;
 # run it by hand after editing the catalog or MODULE.bazel.
 #
@@ -19,6 +20,10 @@ fi
 
 for hub in $(sed -n 's|.*lock_file = "//bazel/kmp/deps:\(.*\)\.lock\.json".*|\1|p' MODULE.bazel); do
   bazel run "@$hub//:pin"
+done
+# rules_jvm_external refuses to build from a lockfile its maven.install no longer matches; REPIN=1 lets the pin run.
+for hub in $(sed -n 's|.*lock_file = "//bazel/maven:\(.*\)_install\.json".*|\1|p' MODULE.bazel); do
+  REPIN=1 bazel run "@$hub//:pin"
 done
 
 bazel mod deps --lockfile_mode=update
