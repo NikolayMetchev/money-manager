@@ -72,7 +72,7 @@ internal fun DataEndpointsEditor(
             ) {
                 Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     EditorCardHeader(
-                        title = "Data endpoint ${index + 1}",
+                        title = "${index + 1}.",
                         onRemove = { onChange(endpoints.filterIndexed { i, _ -> i != index }) },
                         enabled = enabled,
                     )

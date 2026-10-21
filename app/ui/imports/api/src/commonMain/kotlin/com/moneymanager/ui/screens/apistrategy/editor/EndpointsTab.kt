@@ -78,14 +78,6 @@ internal fun EndpointsTab(
 
         Spacer(Modifier.padding(top = 4.dp))
         HorizontalDivider()
-        SectionHeader("Data endpoints")
-        Text(
-            text =
-                "Further endpoints whose items are imported (an exchange's trades, orders, deposits, withdrawals), " +
-                    "each producing a different kind of record.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         val bankFeed = state.config.dataEndpoints.filter { it.kind == ApiEndpointKind.BANK_TRANSACTIONS }
         DataEndpointsEditor(
             endpoints = state.config.dataEndpoints.filter { it.kind != ApiEndpointKind.BANK_TRANSACTIONS },
