@@ -166,8 +166,12 @@ export function opfsStore(pool) {
   const path = (name) => new URL(name, "file://localhost/").pathname;
   const exists = (name) => pool.getFileNames().includes(path(name));
   return {
-    // The databases, not their journals.
-    list: () => pool.getFileNames().filter((name) => !name.endsWith("-journal")),
+    // The databases, not their journals, by the names they were opened under.
+    list: () =>
+      pool
+        .getFileNames()
+        .filter((file) => file.startsWith("/") && !file.endsWith("-journal"))
+        .map((file) => decodeURIComponent(file.slice(1))),
     open: (name) => {
       const db = new pool.OpfsSAHPoolDb(name);
       // The pool has no WAL (no shared memory between handles), and a rollback journal it keeps itself.
