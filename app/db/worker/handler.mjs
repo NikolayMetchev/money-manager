@@ -159,7 +159,11 @@ export function deserialize(sqlite3, bytes) {
 // Databases as files in the opfs-sahpool VFS's pool (`pool` is its utility object). A database open in one tab
 // holds the pool's access handles, so the worker takes a Web Lock before installing it.
 export function opfsStore(pool) {
-  const exists = (name) => pool.getFileNames().includes(name);
+  // Opening a file stores it under its name resolved as a URL path ("a.db" is "/a.db"), but the pool's other calls
+  // (importDb, exportFile, unlink, getFileNames) take that stored path as given, so every name is resolved first.
+  // Otherwise a restore writes a second file beside the one the database opens.
+  const path = (name) => new URL(name, "file://localhost/").pathname;
+  const exists = (name) => pool.getFileNames().includes(path(name));
   return {
     open: (name) => {
       const db = new pool.OpfsSAHPoolDb(name);
@@ -170,10 +174,10 @@ export function opfsStore(pool) {
     close: (name, db) => db.close(),
     exists,
     delete: (name) => {
-      for (const file of [name, `${name}-journal`]) if (exists(file)) pool.unlink(file);
+      for (const file of [name, `${name}-journal`]) if (exists(file)) pool.unlink(path(file));
     },
-    read: (name) => pool.exportFile(name),
-    write: (name, bytes) => pool.importDb(name, bytes),
+    read: (name) => pool.exportFile(path(name)),
+    write: (name, bytes) => pool.importDb(path(name), bytes),
   };
 }
 
