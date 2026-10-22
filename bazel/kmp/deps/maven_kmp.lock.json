@@ -99,8 +99,8 @@
       "mosaic-tty": "com.jakewharton.mosaic:mosaic-tty:0.18.0",
       "mosaic-tty-terminal": "com.jakewharton.mosaic:mosaic-tty-terminal:0.18.0",
       "play-services-auth": "com.google.android.gms:play-services-auth:22.0.0",
-      "poi": "org.apache.poi:poi:5.5.1",
-      "poi-ooxml": "org.apache.poi:poi-ooxml:5.5.1",
+      "poi": "org.apache.poi:poi:6.0.0",
+      "poi-ooxml": "org.apache.poi:poi-ooxml:6.0.0",
       "sqldelight-android-driver": "app.cash.sqldelight:android-driver:2.4.1",
       "sqldelight-compiler-env": "app.cash.sqldelight:compiler-env:2.4.1",
       "sqldelight-coroutines-extensions": "app.cash.sqldelight:coroutines-extensions:2.4.1",
@@ -7745,6 +7745,20 @@
       }
     },
     "biz.aQute.bnd:biz.aQute.bnd.annotation": {
+      "android": {
+        "version": "7.1.0",
+        "files": [
+          {
+            "name": "biz.aQute.bnd.annotation-7.1.0.jar",
+            "url": "https://repo1.maven.org/maven2/biz/aQute/bnd/biz.aQute.bnd.annotation/7.1.0/biz.aQute.bnd.annotation-7.1.0.jar",
+            "sha256": "f69c2de3a695c113d125ac8053c92a680a3ce9d02ea25845095cf2d4626a7663"
+          }
+        ],
+        "deps": [
+          "org.osgi:org.osgi.resource",
+          "org.osgi:org.osgi.service.serviceloader"
+        ]
+      },
       "jvm": {
         "version": "7.1.0",
         "files": [
@@ -8798,6 +8812,16 @@
       }
     },
     "com.google.errorprone:error_prone_annotations": {
+      "android": {
+        "version": "2.51.0",
+        "files": [
+          {
+            "name": "error_prone_annotations-2.51.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.51.0/error_prone_annotations-2.51.0.jar",
+            "sha256": "51a6d8348c7e307e47183859c07597dc8a2899c5d1b6f18a471bccaa3203d5cf"
+          }
+        ]
+      },
       "jvm": {
         "version": "2.51.0",
         "files": [
@@ -9772,22 +9796,22 @@
     },
     "commons-codec:commons-codec": {
       "android": {
-        "version": "1.20.0",
+        "version": "1.23.0",
         "files": [
           {
-            "name": "commons-codec-1.20.0.jar",
-            "url": "https://repo1.maven.org/maven2/commons-codec/commons-codec/1.20.0/commons-codec-1.20.0.jar",
-            "sha256": "6af66595f9f6a7bb58ce66518d6888d40b547c366d2262f06676eee19528ff66"
+            "name": "commons-codec-1.23.0.jar",
+            "url": "https://repo1.maven.org/maven2/commons-codec/commons-codec/1.23.0/commons-codec-1.23.0.jar",
+            "sha256": "47504a3ce71d73a1b0af07675546b8d8c5af87f82ef12b6381f9eb3c17dd5a5b"
           }
         ]
       },
       "jvm": {
-        "version": "1.20.0",
+        "version": "1.23.0",
         "files": [
           {
-            "name": "commons-codec-1.20.0.jar",
-            "url": "https://repo1.maven.org/maven2/commons-codec/commons-codec/1.20.0/commons-codec-1.20.0.jar",
-            "sha256": "6af66595f9f6a7bb58ce66518d6888d40b547c366d2262f06676eee19528ff66"
+            "name": "commons-codec-1.23.0.jar",
+            "url": "https://repo1.maven.org/maven2/commons-codec/commons-codec/1.23.0/commons-codec-1.23.0.jar",
+            "sha256": "47504a3ce71d73a1b0af07675546b8d8c5af87f82ef12b6381f9eb3c17dd5a5b"
           }
         ]
       }
@@ -13038,22 +13062,22 @@
     },
     "org.apache.commons:commons-collections4": {
       "android": {
-        "version": "4.5.0",
+        "version": "4.6.0",
         "files": [
           {
-            "name": "commons-collections4-4.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-collections4/4.5.0/commons-collections4-4.5.0.jar",
-            "sha256": "00f93263c267be201b8ae521b44a7137271b16688435340bf629db1bac0a5845"
+            "name": "commons-collections4-4.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-collections4/4.6.0/commons-collections4-4.6.0.jar",
+            "sha256": "4e0d0896bac5356cead277bac0283f09813e14417e3e84e0c86b573b54d218a3"
           }
         ]
       },
       "jvm": {
-        "version": "4.5.0",
+        "version": "4.6.0",
         "files": [
           {
-            "name": "commons-collections4-4.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-collections4/4.5.0/commons-collections4-4.5.0.jar",
-            "sha256": "00f93263c267be201b8ae521b44a7137271b16688435340bf629db1bac0a5845"
+            "name": "commons-collections4-4.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/commons/commons-collections4/4.6.0/commons-collections4-4.6.0.jar",
+            "sha256": "4e0d0896bac5356cead277bac0283f09813e14417e3e84e0c86b573b54d218a3"
           }
         ]
       }
@@ -13136,13 +13160,20 @@
     },
     "org.apache.logging.log4j:log4j-api": {
       "android": {
-        "version": "2.24.3",
+        "version": "2.26.1",
         "files": [
           {
-            "name": "log4j-api-2.24.3.jar",
-            "url": "https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-api/2.24.3/log4j-api-2.24.3.jar",
-            "sha256": "5b4a0a0cd0e751ded431c162442bdbdd53328d1f8bb2bae5fc1bbeee0f66d80f"
+            "name": "log4j-api-2.26.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-api/2.26.1/log4j-api-2.26.1.jar",
+            "sha256": "f1810a4704ccce019d02bba029dc02a4f2ac0c997f647b465e7d409c1927f822"
           }
+        ],
+        "compile_only_deps": [
+          "biz.aQute.bnd:biz.aQute.bnd.annotation",
+          "com.google.errorprone:error_prone_annotations",
+          "org.jspecify:jspecify",
+          "org.osgi:org.osgi.annotation.bundle",
+          "org.osgi:org.osgi.annotation.versioning"
         ]
       },
       "jvm": {
@@ -13213,12 +13244,12 @@
     },
     "org.apache.poi:poi": {
       "android": {
-        "version": "5.5.1",
+        "version": "6.0.0",
         "files": [
           {
-            "name": "poi-5.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi/5.5.1/poi-5.5.1.jar",
-            "sha256": "6c52e876ca75775a11b56e4b36a7541f682827f56406725fcd87560b792ee3d8"
+            "name": "poi-6.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi/6.0.0/poi-6.0.0.jar",
+            "sha256": "4977f1ae04e1c77e42c81dd94cca008e0d81ff8d0daa8b85e2a0740c3c1da3cc"
           }
         ],
         "deps": [
@@ -13231,12 +13262,12 @@
         ]
       },
       "jvm": {
-        "version": "5.5.1",
+        "version": "6.0.0",
         "files": [
           {
-            "name": "poi-5.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi/5.5.1/poi-5.5.1.jar",
-            "sha256": "6c52e876ca75775a11b56e4b36a7541f682827f56406725fcd87560b792ee3d8"
+            "name": "poi-6.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi/6.0.0/poi-6.0.0.jar",
+            "sha256": "4977f1ae04e1c77e42c81dd94cca008e0d81ff8d0daa8b85e2a0740c3c1da3cc"
           }
         ],
         "deps": [
@@ -13251,12 +13282,12 @@
     },
     "org.apache.poi:poi-ooxml": {
       "android": {
-        "version": "5.5.1",
+        "version": "6.0.0",
         "files": [
           {
-            "name": "poi-ooxml-5.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi-ooxml/5.5.1/poi-ooxml-5.5.1.jar",
-            "sha256": "bd7be2fdfe3fd2c1684fa813351c2798fd636b44f6236e0674500d4f8ff1c2f9"
+            "name": "poi-ooxml-6.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi-ooxml/6.0.0/poi-ooxml-6.0.0.jar",
+            "sha256": "759d97d608ef03b8aa701f56fef0cf9c67fac49f7fa0de4be43c01ca97542c9c"
           }
         ],
         "deps": [
@@ -13271,12 +13302,12 @@
         ]
       },
       "jvm": {
-        "version": "5.5.1",
+        "version": "6.0.0",
         "files": [
           {
-            "name": "poi-ooxml-5.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi-ooxml/5.5.1/poi-ooxml-5.5.1.jar",
-            "sha256": "bd7be2fdfe3fd2c1684fa813351c2798fd636b44f6236e0674500d4f8ff1c2f9"
+            "name": "poi-ooxml-6.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi-ooxml/6.0.0/poi-ooxml-6.0.0.jar",
+            "sha256": "759d97d608ef03b8aa701f56fef0cf9c67fac49f7fa0de4be43c01ca97542c9c"
           }
         ],
         "deps": [
@@ -13293,12 +13324,12 @@
     },
     "org.apache.poi:poi-ooxml-lite": {
       "android": {
-        "version": "5.5.1",
+        "version": "6.0.0",
         "files": [
           {
-            "name": "poi-ooxml-lite-5.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi-ooxml-lite/5.5.1/poi-ooxml-lite-5.5.1.jar",
-            "sha256": "e6e37adeb6d6ee8b40ec491ad955d934d8f99827ab050f105b18286e59b1d9e7"
+            "name": "poi-ooxml-lite-6.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi-ooxml-lite/6.0.0/poi-ooxml-lite-6.0.0.jar",
+            "sha256": "d722039d325de73562ec79758253e6a659750a53d2e8e998bb3da54c0ad157fc"
           }
         ],
         "deps": [
@@ -13306,12 +13337,12 @@
         ]
       },
       "jvm": {
-        "version": "5.5.1",
+        "version": "6.0.0",
         "files": [
           {
-            "name": "poi-ooxml-lite-5.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi-ooxml-lite/5.5.1/poi-ooxml-lite-5.5.1.jar",
-            "sha256": "e6e37adeb6d6ee8b40ec491ad955d934d8f99827ab050f105b18286e59b1d9e7"
+            "name": "poi-ooxml-lite-6.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/poi/poi-ooxml-lite/6.0.0/poi-ooxml-lite-6.0.0.jar",
+            "sha256": "d722039d325de73562ec79758253e6a659750a53d2e8e998bb3da54c0ad157fc"
           }
         ],
         "deps": [
@@ -13321,12 +13352,12 @@
     },
     "org.apache.xmlbeans:xmlbeans": {
       "android": {
-        "version": "5.3.0",
+        "version": "5.4.1",
         "files": [
           {
-            "name": "xmlbeans-5.3.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/apache/xmlbeans/xmlbeans/5.3.0/xmlbeans-5.3.0.jar",
-            "sha256": "6cc69da3b4d35b83c5e477cd4daba204e44109833e34af2b9a8a2c8788289917"
+            "name": "xmlbeans-5.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/xmlbeans/xmlbeans/5.4.1/xmlbeans-5.4.1.jar",
+            "sha256": "b8fe946b41983e86496a7a68508af82a41daafd0e2a2cc8c9302c53fcbd9802c"
           }
         ],
         "deps": [
@@ -13334,12 +13365,12 @@
         ]
       },
       "jvm": {
-        "version": "5.3.0",
+        "version": "5.4.1",
         "files": [
           {
-            "name": "xmlbeans-5.3.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/apache/xmlbeans/xmlbeans/5.3.0/xmlbeans-5.3.0.jar",
-            "sha256": "6cc69da3b4d35b83c5e477cd4daba204e44109833e34af2b9a8a2c8788289917"
+            "name": "xmlbeans-5.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/apache/xmlbeans/xmlbeans/5.4.1/xmlbeans-5.4.1.jar",
+            "sha256": "b8fe946b41983e86496a7a68508af82a41daafd0e2a2cc8c9302c53fcbd9802c"
           }
         ],
         "deps": [
@@ -15948,6 +15979,19 @@
       }
     },
     "org.osgi:org.osgi.annotation.bundle": {
+      "android": {
+        "version": "2.0.0",
+        "files": [
+          {
+            "name": "org.osgi.annotation.bundle-2.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/osgi/org.osgi.annotation.bundle/2.0.0/org.osgi.annotation.bundle-2.0.0.jar",
+            "sha256": "b9c9546ec5be3ebc2e85ba4919150ad76d64594805282fc895133a47d264a7ae"
+          }
+        ],
+        "deps": [
+          "org.osgi:org.osgi.annotation.versioning"
+        ]
+      },
       "jvm": {
         "version": "2.0.0",
         "files": [
@@ -15963,6 +16007,16 @@
       }
     },
     "org.osgi:org.osgi.annotation.versioning": {
+      "android": {
+        "version": "1.1.2",
+        "files": [
+          {
+            "name": "org.osgi.annotation.versioning-1.1.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/osgi/org.osgi.annotation.versioning/1.1.2/org.osgi.annotation.versioning-1.1.2.jar",
+            "sha256": "f51f235e80df8ffbc30ef1b557b6ea38a696632d675404ec117e952978b8b863"
+          }
+        ]
+      },
       "jvm": {
         "version": "1.1.2",
         "files": [
@@ -15975,6 +16029,16 @@
       }
     },
     "org.osgi:org.osgi.resource": {
+      "android": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "org.osgi.resource-1.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/osgi/org.osgi.resource/1.0.0/org.osgi.resource-1.0.0.jar",
+            "sha256": "81fc50f1f1d38a4af28e131907d4afe213249aab05060484edca0e60c4af9b4a"
+          }
+        ]
+      },
       "jvm": {
         "version": "1.0.0",
         "files": [
@@ -15987,6 +16051,16 @@
       }
     },
     "org.osgi:org.osgi.service.serviceloader": {
+      "android": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "org.osgi.service.serviceloader-1.0.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/osgi/org.osgi.service.serviceloader/1.0.0/org.osgi.service.serviceloader-1.0.0.jar",
+            "sha256": "8f876ce2a9aa4e95b1f1952950255103e2487425050a654f3285447ba601c154"
+          }
+        ]
+      },
       "jvm": {
         "version": "1.0.0",
         "files": [
