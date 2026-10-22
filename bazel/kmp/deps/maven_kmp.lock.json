@@ -114,7 +114,7 @@
     },
     "forces": {
       "com.google.code.findbugs:jsr305": "3.0.2",
-      "com.google.errorprone:error_prone_annotations": "2.50.0",
+      "com.google.errorprone:error_prone_annotations": "2.51.0",
       "com.squareup:javawriter": "2.5.1",
       "commons-io:commons-io": "2.22.0",
       "dev.drewhamilton.poko:poko-annotations": "0.23.2"
@@ -8799,12 +8799,12 @@
     },
     "com.google.errorprone:error_prone_annotations": {
       "jvm": {
-        "version": "2.50.0",
+        "version": "2.51.0",
         "files": [
           {
-            "name": "error_prone_annotations-2.50.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.50.0/error_prone_annotations-2.50.0.jar",
-            "sha256": "4667724877f1d37a689202da191e23efa7657c62eef93ccdac406eccfe5cdd0a"
+            "name": "error_prone_annotations-2.51.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.51.0/error_prone_annotations-2.51.0.jar",
+            "sha256": "51a6d8348c7e307e47183859c07597dc8a2899c5d1b6f18a471bccaa3203d5cf"
           }
         ]
       }

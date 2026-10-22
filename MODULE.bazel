@@ -107,7 +107,7 @@ COMPOSE_MATERIAL3_DESKTOP = "1.9.0"  # renovate: org.jetbrains.compose.material3
 COMPOSE_MATERIAL_ICONS_DESKTOP = "1.7.3"  # renovate: org.jetbrains.compose.material:material-icons-core-desktop
 COMPOSE_PLUGIN = "1.12.2"  # renovate: org.jetbrains.compose.animation:animation-core-desktop
 CRYPTOGRAPHY = "0.6.0"  # renovate: dev.whyoleg.cryptography:cryptography-bigint
-ERRORPRONE = "2.50.0"  # renovate: com.google.errorprone:error_prone_annotations
+ERRORPRONE = "2.51.0"  # renovate: com.google.errorprone:error_prone_annotations
 JAVAWRITER = "2.5.1"  # renovate: com.squareup:javawriter
 JETBRAINS_ANNOTATIONS = "26.1.0"  # renovate: org.jetbrains:annotations
 JETBRAINS_NAVIGATION3 = "1.1.2"  # renovate: org.jetbrains.androidx.navigation3:navigation3-ui-desktop
@@ -406,7 +406,7 @@ maven.install(
     artifacts = [
         "dev.detekt:detekt-cli:2.0.0-alpha.6",
         # Transitive versions held at the newest (see version_conflict_policy).
-        "com.google.errorprone:error_prone_annotations:2.50.0",
+        "com.google.errorprone:error_prone_annotations:2.51.0",
         "dev.drewhamilton.poko:poko-annotations-jvm:0.23.2",
         "org.checkerframework:checker-qual:4.3.1",
         "org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21",
@@ -522,7 +522,7 @@ maven.install(
         "com.google.code.findbugs:jsr305:3.0.2",
         "com.google.code.gson:gson:2.14.0",
         "com.google.crypto.tink:tink:1.24.0",
-        "com.google.errorprone:error_prone_annotations:2.50.0",
+        "com.google.errorprone:error_prone_annotations:2.51.0",
         "com.google.guava:failureaccess:1.0.3",
         "com.google.guava:guava:33.7.2-jre",
         "com.google.j2objc:j2objc-annotations:3.1",
@@ -555,7 +555,7 @@ maven.install(
         # Transitive versions held at the newest (see version_conflict_policy).
         "com.google.code.findbugs:jsr305:3.0.2",
         "com.google.code.gson:gson:2.14.0",
-        "com.google.errorprone:error_prone_annotations:2.50.0",
+        "com.google.errorprone:error_prone_annotations:2.51.0",
         "com.google.guava:failureaccess:1.0.3",
         "com.google.guava:guava:33.7.2-jre",
         "com.google.j2objc:j2objc-annotations:3.1",
