@@ -12,12 +12,17 @@ import com.moneymanager.di.params.AppComponentParams
 import com.moneymanager.session.DatabaseSessions
 import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.LocalBuildLabel
+import com.moneymanager.ui.screens.apistrategy.LocalApiDownloadNotice
 import kotlinx.browser.document
 
 private val logger = Logger.withTag("Main")
 
 /** Where :dist puts the database worker, relative to the page. */
 private const val WORKER_URL = "node_modules/@moneymanager/sqlite-worker/worker.mjs"
+
+private const val API_DOWNLOAD_NOTICE =
+    "Most providers' APIs refuse requests from a web page, so downloads here usually fail. Download with the " +
+        "desktop app or the mm command line instead, and keep the database on Google Drive to see it here."
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
@@ -38,7 +43,10 @@ fun main() {
     // loader.mjs records the build it started (wasmJs or js).
     val target = document.documentElement?.getAttribute("data-target")
     ComposeViewport(checkNotNull(document.body)) {
-        CompositionLocalProvider(LocalBuildLabel provides target) {
+        CompositionLocalProvider(
+            LocalBuildLabel provides target,
+            LocalApiDownloadNotice provides API_DOWNLOAD_NOTICE,
+        ) {
             AppStartupHost(
                 databaseManager = component.databaseManager,
                 appVersion = component.appVersion,

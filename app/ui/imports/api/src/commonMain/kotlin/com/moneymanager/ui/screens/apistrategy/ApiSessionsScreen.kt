@@ -333,6 +333,11 @@ fun ApiSessionsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        if (LocalApiDownloadNotice.current != null) {
+            ApiDownloadNoticeBanner()
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
         if (vaultBundle == null) {
             CredentialsLockedBanner(reason = "Show your API credentials")
             Spacer(modifier = Modifier.height(12.dp))
