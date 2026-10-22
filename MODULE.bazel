@@ -498,7 +498,7 @@ maven.install(
         "org.jetbrains.compose:compose-gradle-plugin:1.12.2",
         # Transitive versions held at the newest (see version_conflict_policy).
         "com.google.code.gson:gson:2.14.0",
-        "com.google.errorprone:error_prone_annotations:2.50.0",
+        "com.google.errorprone:error_prone_annotations:2.51.0",
     ],
     # Optional in the plugin's POM, and Gradle-only.
     excluded_artifacts = ["org.jetbrains.compose.hot-reload:hot-reload-gradle-plugin"],
