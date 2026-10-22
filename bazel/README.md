@@ -285,7 +285,8 @@ kotlinx-browser redeclares `kotlin-dom-api-compat`'s DOM classes with the overlo
 can't use an import map, so `web/dist.mjs` rewrites each bare import to a relative path, resolved as a bundler would
 for the browser (`exports` with the `browser` condition, else `module`, else `main`). The loader picks wasmJs when the
 browser validates a tiny WasmGC module, js otherwise (`?target=js` forces it). `bazel run //app/main/web:serve -- 8080`
-serves the site on 127.0.0.1 with Node (`web/serve.mjs`).
+serves the site on 127.0.0.1 with Node (`web/serve.mjs`), and Pages publishes it at `<pages-url>/app/`. Every path in
+it is relative, so it runs under any prefix.
 
 ## Desktop
 
@@ -366,8 +367,8 @@ serves the site on 127.0.0.1 with Node (`web/serve.mjs`).
   `bazel run //tools/strategy-catalog:generate_bundled_currencies` and `bazel run //tools/crypto-dataset:generate`
   write into the workspace (`BUILD_WORKSPACE_DIRECTORY`).
 - **Pages** (`pages/`): `//webpage:site` is the artifact `static.yml` uploads: `webpage/*.html` with SchemaSpy's
-  schema docs (`database/`; its action runs locally, since it needs the host's Graphviz), the strategy catalog and
-  `kdoc/`. `modules-graph.md` is written from `bazel query` (`pages/module_graph.py`).
+  schema docs (`database/`; its action runs locally, since it needs the host's Graphviz), the strategy catalog,
+  `kdoc/` and the browser app (`app/`, `//app/main/web:dist`). `modules-graph.md` is written from `bazel query` (`pages/module_graph.py`).
 - **KDoc** (`kmp/dokka`): every `kmp_library` has a manual `:<name>_dokka`, and `//webpage:kdoc` aggregates the
   modules `webpage/kdoc_modules.bzl` lists (no schemaspy, `app/main/*`, `test/*` or `tools/*`), so a new module joins
   there. The Kotlin analysis goes on Dokka's plugins classpath beside dokka-base (it reads enum members' docs from

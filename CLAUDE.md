@@ -170,7 +170,7 @@ workflow because label events start it: any other label's run skips, without can
 | `tools/{strategy-catalog,crypto-dataset}/` | Build-time tools: catalog site renderer; crypto dataset builder |
 | `test/{app/db,app/ui,app/remotestorage,utils/credentialvault}/` | Test fixtures only (see **Testing**); `app/remotestorage` is the in-memory cloud store (`InMemoryStorageProvider`, `SingleProviderFactory`) |
 | `app/main/jvm/` | JVM Desktop entry point |
-| `app/main/web/` | Browser entry point (wasmJs and js) and `:dist`, the site: a loader that picks wasmJs where the browser has WasmGC, else js, with the database worker and npm packages beside it (see `bazel/README.md`, "Browser"). No import folders or API imports yet |
+| `app/main/web/` | Browser entry point (wasmJs and js) and `:dist`, the site: a loader that picks wasmJs where the browser has WasmGC, else js, with the database worker and npm packages beside it (see `bazel/README.md`, "Browser"), published by Pages at `<pages-url>/app/`. No import folders or API imports yet |
 | `app/main/android/` | Android entry point |
 | `app/main/cli/` | `mm`, the command-line client (Clikt): native executables for every native target, plus a JVM build the desktop installer starts as `mm-jvm` on its bundled runtime — see **CLI** |
 | `app/main/android-smoketest/` | Self-instrumenting UiAutomator smoke test of the R8-minified release APK (`bazel test //app/main/android-smoketest:smoketest_test`, on a device) |

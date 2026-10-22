@@ -9,6 +9,7 @@ pages_site(
     name = "site",
     srcs = glob(["*.html"]),
     generated = {
+        "//app/main/web:dist": "app",
         "//app/db/schemaspy:docs": "database",
         ":kdoc": "kdoc",
         "//tools/strategy-catalog:catalog_site": ".",

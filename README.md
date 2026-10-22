@@ -57,7 +57,7 @@ A personal finance money manager built with **Kotlin Multiplatform** and **Compo
 | JVM (Desktop) | ✅ Supported — Windows / macOS / Linux distributions |
 | Android | ✅ Supported |
 | iOS | ⚠️ Planned |
-| Web (JS/WASM) | ⚠️ In progress — runs locally (`bazel run //app/main/web:serve`); databases live in the browser (OPFS). No import folders or API imports yet |
+| Web (JS/WASM) | ⚠️ In progress — [open it in your browser](https://nikolaymetchev.github.io/money-manager/app/), or serve it locally (`bazel run //app/main/web:serve`); databases live in the browser (OPFS). No import folders or API imports yet |
 | Native | ⚠️ CLI only — `mm` for Linux x64/ARM64, macOS ARM64, Windows x64 |
 
 ## Command line (mm)

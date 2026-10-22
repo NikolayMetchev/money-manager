@@ -52,6 +52,8 @@ kt_web_dist(
     srcs = glob(["site/*"]),
     programs = [":program_" + target for target in WEB_TARGETS],
     runtime_jars = ["@maven_kmp//:skiko_js_wasm_runtime_jvm"],
+    # Pages publishes it at app/.
+    visibility = ["//webpage:__pkg__"],
 )
 
 # `bazel run //app/main/web:serve [-- <port>]` serves the site at http://127.0.0.1:8080/ (the address a Google sign-in origin names).
