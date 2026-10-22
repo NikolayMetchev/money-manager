@@ -244,7 +244,7 @@ fun MoneyManagerApp(
                                     Column {
                                         Text(currentScreen.title)
                                         Text(
-                                            text = listOfNotNull("v$appVersion", LocalBuildLabel.current).joinToString(" · "),
+                                            text = listOfNotNull("v${appVersion.value}", LocalBuildLabel.current).joinToString(" · "),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                                         )
