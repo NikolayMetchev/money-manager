@@ -1,8 +1,10 @@
-"""The default desktop Google OAuth client, for `kotlin_constants(obfuscated = …)` (#1011).
+"""The default Google OAuth clients, for `kotlin_constants(obfuscated = …)` (#1011): the desktop client and the
+browser's web client (#84).
 
-The values come from `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` (CI's secrets), else the
-gitignored `secrets/google-oauth.properties` (`clientId`, `clientSecret`), else empty, so a build without them
-still compiles and the feature reports "not configured". They're XOR-obfuscated here, at repository time, so
+The values come from `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` / `GOOGLE_OAUTH_WEB_CLIENT_ID` (CI's
+secrets), else the gitignored `secrets/google-oauth.properties` (`clientId`, `clientSecret`, `webClientId`), else
+empty, so a build without them still compiles and the feature reports "not configured" (the browser offers no
+Google Drive). They're XOR-obfuscated here, at repository time, so
 the plaintext never becomes an action input or a cache key, and the
 `GOCSPX-…` literal never lands in an output for secret scanners to match. A speed bump, not protection: the
 real safeguards are the Cloud project's quota cap and rotating the client.
@@ -44,15 +46,16 @@ def _google_oauth_repo_impl(rctx):
     for name, env, key in [
         ("client_id", "GOOGLE_OAUTH_CLIENT_ID", "clientId"),
         ("client_secret", "GOOGLE_OAUTH_CLIENT_SECRET", "clientSecret"),
+        ("web_client_id", "GOOGLE_OAUTH_WEB_CLIENT_ID", "webClientId"),
     ]:
         # Trimmed before the emptiness check: a CI secret's trailing newline would embed an invalid credential.
         value = (rctx.getenv(env) or "").strip() or properties.get(key, "")
         rctx.file(name + ".hex", xor_obfuscate(value), executable = False)
-    rctx.file("BUILD.bazel", 'exports_files(["client_id.hex", "client_secret.hex"])\n', executable = False)
+    rctx.file("BUILD.bazel", 'exports_files(["client_id.hex", "client_secret.hex", "web_client_id.hex"])\n', executable = False)
 
 _google_oauth_repo = repository_rule(
     implementation = _google_oauth_repo_impl,
-    environ = ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
+    environ = ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_WEB_CLIENT_ID"],
     local = True,
 )
 

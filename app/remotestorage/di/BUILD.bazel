@@ -29,6 +29,7 @@ kmp_library(
     ],
     plugins = ["metro"],
     visibility = ["//visibility:public"],
+    web_deps = ["//app/remotestorage/googledrive"],
     web_srcs = glob(["src/webMain/kotlin/**/*.kt"]),
     web_targets = [
         "wasmJs",

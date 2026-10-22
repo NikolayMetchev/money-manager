@@ -304,7 +304,7 @@
     },
     "//bazel/kmp/constants:google_oauth.bzl%google_oauth": {
       "general": {
-        "bzlTransitiveDigest": "5tExqUU7Opnk7wni7jMEmFPH6s6S6p4hUY49Gb1vfbE=",
+        "bzlTransitiveDigest": "OgSftMWhHinX2TLgc1FOkVFRgYbEq0O0ypRMiOXKCDY=",
         "usagesDigest": "KnI9ddib7BMxIy5MBFlmouKInNdm480VDE3R00Zw+4I=",
         "recordedInputs": [],
         "generatedRepoSpecs": {

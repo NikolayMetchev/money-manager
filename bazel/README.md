@@ -92,9 +92,9 @@ PR, and `renovate-pins.yml` runs the script on it. 3 is by hand.
   `commonMain` and the leaf are always named, empty or not (K2 takes a lone common fragment for the platform's own).
 - **Generated constants** (`kmp/constants`): native has no classpath resources, so data a module ships is compiled
   into commonMain: `kotlin_constants`, joined with `# gazelle:kmp_generated_srcs :<target>` (the app version from
-  `VERSION`, the crypto catalog, the default Google OAuth client). The OAuth client is XOR-obfuscated in the
-  `@google_oauth` repository (from `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`, else `secrets/google-oauth.properties`), so
-  the plaintext is never an action input.
+  `VERSION`, the crypto catalog, the default Google OAuth clients). The OAuth clients are XOR-obfuscated in the
+  `@google_oauth` repository (from `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET` and the browser's `GOOGLE_OAUTH_WEB_CLIENT_ID`,
+  else `secrets/google-oauth.properties`), so the plaintext is never an action input.
 - **Bundled SQLite** (`utils/sqlite3`, `kmp/sqlite`): `@sqlite_amalgamation` downloads the amalgamation
   `sqlite_amalgamation.version(…)` pins in `MODULE.bazel` (SHA-256 checked), `kmp_static_library` compiles it per target with
   konan's own clang and `llvm-ar`, and `kmp_cinterop` embeds the archive in a klib (`-staticLibrary`).

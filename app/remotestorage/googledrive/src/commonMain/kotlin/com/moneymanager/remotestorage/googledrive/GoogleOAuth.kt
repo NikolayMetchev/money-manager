@@ -43,10 +43,8 @@ class GoogleOAuth(
                 parameters.append("response_type", "code")
                 parameters.append("scope", scopes.joinToString(" "))
                 // offline + consent forces Google to return a refresh token we can reuse silently later.
-                // select_account shows the account chooser instead of silently using the browser's
-                // default Google account, which may not be the one the user wants to connect.
                 parameters.append("access_type", "offline")
-                parameters.append("prompt", "select_account consent")
+                parameters.append("prompt", GOOGLE_SIGN_IN_PROMPT)
                 // state binds this request to the callback so a forged redirect can't inject a code (CSRF).
                 parameters.append("state", state)
             }.buildString()
@@ -105,6 +103,13 @@ class GoogleOAuth(
         val json: Json = Json { ignoreUnknownKeys = true }
     }
 }
+
+/**
+ * What Google shows at every interactive sign-in, on every platform (the desktop and CLI consent URL, the browser's
+ * token popup): the account chooser, rather than silently taking the browser's default Google account, which may not
+ * be the one the person wants to connect, and the consent screen, which the loopback flow needs for a refresh token.
+ */
+const val GOOGLE_SIGN_IN_PROMPT = "select_account consent"
 
 /** Least-privilege scope: the app can only see and manage files it created. */
 const val DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file"

@@ -301,7 +301,9 @@ re-hydrates it (decrypt → inflate → write local `.db` → rebuild materializ
   (runs on JVM, Android, native **and** the browser; the Google Java SDK is JVM-only and not used). Sign-in is a
   `GoogleAccessTokenSource`: on desktop and in the CLI the installed-app loopback flow
   (`app/remotestorage/googledrive/loopback`), with the redirect received on raw `ktor-network` sockets; on Android
-  Google Identity Services. The only platform-specific piece of the loopback flow is `BrowserLauncher`: `DesktopBrowserLauncher` (JVM), `SystemBrowserLauncher`
+  Google Identity Services; in the browser GIS's token model (`BrowserGoogleAccessTokenSource`, `webMain`): a popup
+  grants an access token for the build's "Web application" client (`GOOGLE_OAUTH_WEB_CLIENT_ID`), held in memory
+  only, with no refresh token, so the vault keeps nothing and a build without the client offers no Drive. The only platform-specific piece of the loopback flow is `BrowserLauncher`: `DesktopBrowserLauncher` (JVM), `SystemBrowserLauncher`
   (native), or `PrintUrlBrowserLauncher` for headless/SSH use.
 - `app/remotestorage/sync` — composes `DatabaseManager` + `ArchiveCodec` + a provider:
   `RemoteDatabaseSyncService` (the pipeline) and `RemoteDatabaseController` (session-scoped facade that
