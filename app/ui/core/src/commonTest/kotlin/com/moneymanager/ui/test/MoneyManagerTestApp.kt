@@ -14,6 +14,9 @@ import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.database.di.toAppServices
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.importfilesource.ImportFileSource
+import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.presenter.error.GlobalSchemaErrorState
 import com.moneymanager.ui.MoneyManagerApp
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
@@ -35,6 +38,11 @@ private sealed class TestDatabaseState {
     ) : TestDatabaseState()
 }
 
+/** Like the desktop app, the tests offer import folders (and so the Directories tab), but never open one. */
+private object NoFolderAccess : ImportFileSourceFactory {
+    override suspend fun create(directory: ImportDirectory): ImportFileSource = error("UI tests don't open import folders")
+}
+
 /**
  * Test wrapper composable that handles database opening and calls MoneyManagerApp.
  * This provides the same interface as the old MoneyManagerApp that handled database loading.
@@ -45,6 +53,7 @@ internal object MoneyManagerTestApp {
         databaseManager: DatabaseManager,
         appVersion: AppVersion,
         completeSetupWizard: Boolean = true,
+        importFileSourceFactory: ImportFileSourceFactory? = NoFolderAccess,
     ) {
         val scope = rememberCoroutineScope()
         var databaseState by remember { mutableStateOf<TestDatabaseState>(TestDatabaseState.Loading) }
@@ -102,6 +111,7 @@ internal object MoneyManagerTestApp {
                     databaseLocation = state.location,
                     services = dc.toAppServices(dc.importEngine),
                     onRequestSwitchDatabase = {},
+                    importFileSourceFactory = importFileSourceFactory,
                 )
             }
 

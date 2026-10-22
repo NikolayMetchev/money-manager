@@ -48,6 +48,15 @@ npm_package = rule(
     provides = [NpmPackageInfo],
 )
 
+WebProgramInfo = provider(
+    doc = "A linked browser program.",
+    fields = {
+        "dir": "The directory holding `<base_name>.mjs` (and its `.wasm`).",
+        "npm": "depset of the npm packages it imports.",
+        "target": "The KGP target name.",
+    },
+)
+
 def _npm(deps):
     return depset(transitive = [d[WebKlibInfo].npm for d in deps])
 
@@ -177,18 +186,15 @@ def link_web(ctx, out, base_name, include, libraries, production, mnemonic):
         args.add_all(["-target", "es2015"])
     args.add_all(["-ir-output-dir", out.path, "-ir-output-name", base_name])
     args.add("-Xir-module-name=" + base_name)
-    if ctx.attr.target == "js":
-        # Libraries built with an older Kotlin can call DOM declarations a newer kotlin-dom-api-compat changed
-        # (ktor 3.6.0, built with 2.3, calls `EventTarget.addEventListener(String, (Event) -> Unit)`, which 2.4's
-        # doesn't have). KGP links those as warnings, the call throwing only if it runs, so the js link does too.
-        # wasmJs takes its DOM from kotlinx-browser and stays strict.
-        args.add("-Xpartial-linkage-loglevel=WARNING")
-    else:
-        args.add_all(["-Werror", "-Xpartial-linkage-loglevel=ERROR"])
+    args.add_all(["-Werror", "-Xpartial-linkage-loglevel=ERROR"])
     if production:
         args.add("-Xir-dce")
     args.add("-Xinclude=" + include.path)
-    args.add_joined("-libraries", [k for k in libraries.to_list() if k != include], join_with = ctx.configuration.host_path_separator)
+    # Every klib before the klibs it depends on. The linker takes a class from the first library that declares it, and
+    # on js kotlinx-browser redeclares kotlin-dom-api-compat's DOM classes with the overloads libraries are compiled
+    # against (`EventTarget.addEventListener(String, (Event) -> Unit)`, which Compose and ktor call).
+    ordered = depset(order = "topological", transitive = [libraries])
+    args.add_joined("-libraries", [k for k in ordered.to_list() if k != include], join_with = ctx.configuration.host_path_separator)
     run_kotlinc(
         ctx,
         tool = compiler.tool,
@@ -211,7 +217,7 @@ def _executable_impl(ctx):
         production = True,
         mnemonic = "KotlinWebLink",
     )
-    return [DefaultInfo(files = depset([out]))]
+    return [DefaultInfo(files = depset([out])), WebProgramInfo(dir = out, npm = library.npm, target = ctx.attr.target)]
 
 kt_web_executable = rule(
     implementation = _executable_impl,
@@ -221,7 +227,60 @@ kt_web_executable = rule(
         "library": attr.label(mandatory = True, providers = [WebKlibInfo], doc = "The klib whose `main` is the program."),
         "target": attr.string(mandatory = True, values = WEB_TARGETS),
     },
+    provides = [WebProgramInfo],
     toolchains = [TOOLCHAIN_TYPE],
+)
+
+def _dist_impl(ctx):
+    lines = []
+    inputs = []
+    packages = {}
+    for program in ctx.attr.programs:
+        info = program[WebProgramInfo]
+        lines.append("program\t%s\t%s" % (info.target, info.dir.path))
+        inputs.append(info.dir)
+        for jar in ctx.files.runtime_jars:
+            lines.append("jar\t%s\t%s" % (info.target, jar.path))
+        for package in info.npm.to_list():
+            if package.name in packages and packages[package.name] != package.package_json:
+                fail("two versions of the npm package %s" % package.name)
+            if package.name not in packages:
+                packages[package.name] = package.package_json
+                prefix = package.package_json.path[:-len("package.json")]
+                lines.append("package\t" + package.name)
+                for f in package.files:
+                    lines.append("file\tnode_modules/%s/%s\t%s" % (package.name, f.path[len(prefix):], f.path))
+                    inputs.append(f)
+    inputs.extend(ctx.files.runtime_jars)
+    for f in ctx.files.srcs:
+        lines.append("file\t%s\t%s" % (f.basename, f.path))
+        inputs.append(f)
+    manifest = ctx.actions.declare_file(ctx.label.name + ".manifest")
+    ctx.actions.write(manifest, "\n".join(lines) + "\n")
+
+    out = ctx.actions.declare_directory(ctx.label.name)
+    ctx.actions.run(
+        executable = ctx.toolchains["@rules_nodejs//nodejs:toolchain_type"].nodeinfo.node,
+        arguments = [ctx.file._script.path, out.path, manifest.path],
+        inputs = inputs + [manifest, ctx.file._script],
+        outputs = [out],
+        mnemonic = "KotlinWebDist",
+        progress_message = "Laying out the site %{label}",
+    )
+    return [DefaultInfo(files = depset([out]), runfiles = ctx.runfiles(files = [out]))]
+
+kt_web_dist = rule(
+    implementation = _dist_impl,
+    doc = """A browser site in one directory, served as is: each program in a directory named after its target with the
+    runtime jars' files beside it, the npm packages under `node_modules` with every bare import rewritten to a relative
+    path (browsers resolve none, and a worker can't use an import map), and `srcs` at the root.""",
+    attrs = {
+        "programs": attr.label_list(mandatory = True, providers = [WebProgramInfo]),
+        "runtime_jars": attr.label_list(allow_files = [".jar"], doc = "Jars of browser files every program loads beside itself (Skiko's)."),
+        "srcs": attr.label_list(allow_files = True, doc = "Files for the site's root (the page and its loader)."),
+        "_script": attr.label(default = "//bazel/kmp/web:dist.mjs", allow_single_file = True),
+    },
+    toolchains = ["@rules_nodejs//nodejs:toolchain_type"],
 )
 
 def _test_impl(ctx):

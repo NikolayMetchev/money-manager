@@ -69,13 +69,17 @@ private fun chooseFiles(
         const finish = (files) => { if (!done) { done = true; onPicked(files); } };
         input.addEventListener("cancel", () => finish([]));
         input.addEventListener("change", () => {
+            // A function, not `=> ({ … })`: Kotlin/JS reprints js() code, and prints an arrow returning an object
+            // literal without its parentheses, which then reads as a block of labels, a syntax error.
             Promise.all(Array.from(input.files || []).map((file) =>
-                (binary ? file.arrayBuffer().then((buffer) => new Int8Array(buffer)) : file.text()).then((content) => ({
-                    name: file.name,
-                    lastModified: file.lastModified,
-                    text: binary ? null : content,
-                    bytes: binary ? content : null,
-                }))))
+                (binary ? file.arrayBuffer().then((buffer) => new Int8Array(buffer)) : file.text()).then(function (content) {
+                    return {
+                        name: file.name,
+                        lastModified: file.lastModified,
+                        text: binary ? null : content,
+                        bytes: binary ? content : null,
+                    };
+                })))
                 .then(finish, () => finish([]));
         });
         input.click();

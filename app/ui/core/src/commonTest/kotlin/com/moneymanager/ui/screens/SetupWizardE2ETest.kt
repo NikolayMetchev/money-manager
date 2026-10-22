@@ -50,6 +50,8 @@ class SetupWizardE2ETest {
                     databaseManager = SetupTestDatabaseManager(databaseManager, testDbLocation!!),
                     appVersion = AppVersion("1.0.0-test"),
                     completeSetupWizard = false,
+                    // Without folders the wizard is the currency step alone.
+                    importFileSourceFactory = null,
                 )
             }
 
@@ -82,6 +84,8 @@ class SetupWizardE2ETest {
                     databaseManager = SetupTestDatabaseManager(databaseManager, testDbLocation!!),
                     appVersion = AppVersion("1.0.0-test"),
                     completeSetupWizard = false,
+                    // Without folders the wizard is the currency step alone.
+                    importFileSourceFactory = null,
                 )
             }
 

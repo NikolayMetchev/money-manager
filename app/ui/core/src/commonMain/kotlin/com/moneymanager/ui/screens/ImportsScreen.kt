@@ -108,47 +108,22 @@ fun ImportsScreen(
     onTransactionsImported: () -> Unit,
     onBrowsePassThroughCatalog: () -> Unit = {},
     onReconciliationLegClick: (ReconciliationLeg) -> Unit = {},
+    tabs: List<ImportTab> = ImportTab.entries,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
-            Tab(
-                selected = selectedTab == ImportTab.DIRECTORIES,
-                onClick = { onTabSelected(ImportTab.DIRECTORIES) },
-                text = { Text("Directories") },
-            )
-            Tab(
-                selected = selectedTab == ImportTab.CSV,
-                onClick = { onTabSelected(ImportTab.CSV) },
-                text = { Text("CSV") },
-            )
-            Tab(
-                selected = selectedTab == ImportTab.QIF,
-                onClick = { onTabSelected(ImportTab.QIF) },
-                text = { Text("QIF") },
-            )
-            Tab(
-                selected = selectedTab == ImportTab.API,
-                onClick = { onTabSelected(ImportTab.API) },
-                text = { Text("API") },
-            )
-            Tab(
-                selected = selectedTab == ImportTab.MISC,
-                onClick = { onTabSelected(ImportTab.MISC) },
-                text = { Text("Misc") },
-            )
-            Tab(
-                selected = selectedTab == ImportTab.TIMELINE,
-                onClick = { onTabSelected(ImportTab.TIMELINE) },
-                text = { Text("Timeline") },
-            )
-            Tab(
-                selected = selectedTab == ImportTab.RECONCILIATION,
-                onClick = { onTabSelected(ImportTab.RECONCILIATION) },
-                text = { Text("Reconciliation") },
-            )
+        // A tab this front end can't offer (Directories without an import file source) opens the first one instead.
+        val shownTab = selectedTab.takeIf { it in tabs } ?: tabs.first()
+        PrimaryTabRow(selectedTabIndex = tabs.indexOf(shownTab)) {
+            tabs.forEach { tab ->
+                Tab(
+                    selected = shownTab == tab,
+                    onClick = { onTabSelected(tab) },
+                    text = { Text(tab.label) },
+                )
+            }
         }
 
-        when (selectedTab) {
+        when (shownTab) {
             ImportTab.DIRECTORIES -> {
                 ImportDirectoriesScreen(
                     importDirectoryService = importDirectoryService,
@@ -392,3 +367,15 @@ private fun MiscImportsTab(
         }
     }
 }
+
+private val ImportTab.label: String
+    get() =
+        when (this) {
+            ImportTab.DIRECTORIES -> "Directories"
+            ImportTab.CSV -> "CSV"
+            ImportTab.QIF -> "QIF"
+            ImportTab.API -> "API"
+            ImportTab.MISC -> "Misc"
+            ImportTab.TIMELINE -> "Timeline"
+            ImportTab.RECONCILIATION -> "Reconciliation"
+        }

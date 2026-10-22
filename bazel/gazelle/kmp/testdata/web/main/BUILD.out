@@ -1,0 +1,20 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_generate true
+# gazelle:kmp_targets web
+# gazelle:kmp_main_platform web
+
+kmp_library(
+    name = "main",
+    jvm = False,
+    visibility = ["//visibility:public"],
+    web_deps = [
+        "//lib/app",
+        "@maven_kmp//:kotlinx_browser",
+    ],
+    web_srcs = glob(["src/main/kotlin/**/*.kt"]),
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+)

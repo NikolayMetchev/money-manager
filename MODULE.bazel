@@ -148,6 +148,9 @@ MOSAIC = "0.18.0"  # renovate: com.jakewharton.mosaic:mosaic-runtime
 PLAY_SERVICES_AUTH = "22.0.0"  # renovate: com.google.android.gms:play-services-auth
 POI = "6.0.0"  # renovate: org.apache.poi:poi
 POKO = "0.23.2"  # renovate: dev.drewhamilton.poko:poko-annotations
+# Skiko's web klibs and the runtime they load (skiko.mjs and skiko.wasm, which the browser app ships beside its program)
+# must be one release, as the Compose Gradle plugin keeps them: the version is forced on the klibs too.
+SKIKO = "0.150.2"  # renovate: org.jetbrains.skiko:skiko
 SLF4J = "2.0.20"  # renovate: org.slf4j:slf4j-api
 SQLDELIGHT = "2.4.1"  # renovate: app.cash.sqldelight:android-driver
 TURBINE = "1.2.1"  # renovate: app.cash.turbine:turbine
@@ -271,6 +274,7 @@ maven_kmp.install(
         "play-services-auth": "com.google.android.gms:play-services-auth:" + PLAY_SERVICES_AUTH,
         "poi": "org.apache.poi:poi:" + POI,
         "poi-ooxml": "org.apache.poi:poi-ooxml:" + POI,
+        "skiko-js-wasm-runtime": "org.jetbrains.skiko:skiko-js-wasm-runtime:" + SKIKO,
         "sqldelight-android-driver": "app.cash.sqldelight:android-driver:" + SQLDELIGHT,
         "sqldelight-compiler-env": "app.cash.sqldelight:compiler-env:" + SQLDELIGHT,
         "sqldelight-async-extensions": "app.cash.sqldelight:async-extensions:" + SQLDELIGHT,
@@ -338,6 +342,8 @@ maven_kmp.install(
         "com.squareup:javawriter": JAVAWRITER,
         "commons-io:commons-io": COMMONS_IO,
         "dev.drewhamilton.poko:poko-annotations": POKO,
+        "org.jetbrains.skiko:skiko": SKIKO,
+        "org.jetbrains.skiko:skiko-wasm-js": SKIKO,
     },
     # The Kotlin release the toolchain's stdlib and kotlin-test are (rules_kotlin's): common code compiles against
     # their metadata jars.
@@ -405,6 +411,8 @@ maven_kmp.install(
         "metro-compiler": ["jvm"],
         "mokkery-plugin": ["jvm"],
         "play-services-auth": ["android"],
+        # A jar of browser files, not a library: one copy is enough.
+        "skiko-js-wasm-runtime": ["jvm"],
         "sqldelight-android-driver": ["android"],
         "sqldelight-compiler-env": ["jvm"],
         "sqldelight-dialect-sqlite": ["jvm"],

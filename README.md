@@ -57,7 +57,7 @@ A personal finance money manager built with **Kotlin Multiplatform** and **Compo
 | JVM (Desktop) | ✅ Supported — Windows / macOS / Linux distributions |
 | Android | ✅ Supported |
 | iOS | ⚠️ Planned |
-| Web (JS/WASM) | ⚠️ Planned |
+| Web (JS/WASM) | ⚠️ In progress — runs locally (`bazel run //app/main/web:serve`); databases live in the browser (OPFS). No import folders or API imports yet |
 | Native | ⚠️ CLI only — `mm` for Linux x64/ARM64, macOS ARM64, Windows x64 |
 
 ## Command line (mm)
@@ -127,8 +127,8 @@ The main modules (see [`CLAUDE.md`](CLAUDE.md) for the full table and the
 | `app/remotestorage/*` | Remote-storage provider interface, Google Drive backend, hydrate/push sync |
 | `app/strategies/`, `app/strategycatalog/` | Built-in strategy definitions; browse/install the published catalog |
 | `app/di/core/` | Metro DI graph |
-| `app/ui/*` | Compose UI (JVM/Android) |
-| `app/main/jvm/`, `app/main/android/`, `app/main/cli/` | Desktop, Android and `mm` CLI entry points |
+| `app/ui/*` | Compose UI (JVM, Android and the browser) |
+| `app/main/jvm/`, `app/main/android/`, `app/main/web/`, `app/main/cli/` | Desktop, Android, browser and `mm` CLI entry points |
 | `app/db/schemaspy/` | Generates the published SchemaSpy database docs |
 
 ## Building & Running
@@ -142,6 +142,7 @@ The main modules (see [`CLAUDE.md`](CLAUDE.md) for the full table and the
 | `bazel build //...` | Build everything |
 | `bazel test //...` | Run every test this machine can run (plus ktlint, detekt and Android lint) |
 | `bazel run //app/main/jvm:app` | Run the desktop application |
+| `bazel run //app/main/web:serve -- 8080` | Serve the browser app on http://127.0.0.1:8080 (wasmJs, or js where the browser lacks WasmGC) |
 | `bazel build //app/main/android:debug` | Build the Android debug APK (`bazel-bin/app/main/android/debug.apk`) |
 | `bazel build //app/main/cli:mm-jvm` | Build the JVM `mm` into `bazel-bin/app/main/cli/mm-jvm/bin/mm-jvm` |
 | `bazel build //app/main/cli:mm` | Link the native `mm` for this machine (`bazel-bin/app/main/cli/mm_<target>/mm.kexe`) |

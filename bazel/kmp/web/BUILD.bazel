@@ -1,0 +1,6 @@
+# kt_web_dist's layout script (web.bzl), and the local server a site's :serve runs.
+exports_files([
+    "dist.mjs",
+    "serve.mjs",
+    "serve.sh",
+])

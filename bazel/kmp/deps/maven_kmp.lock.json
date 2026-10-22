@@ -108,6 +108,7 @@
       "play-services-auth": "com.google.android.gms:play-services-auth:22.0.0",
       "poi": "org.apache.poi:poi:6.0.0",
       "poi-ooxml": "org.apache.poi:poi-ooxml:6.0.0",
+      "skiko-js-wasm-runtime": "org.jetbrains.skiko:skiko-js-wasm-runtime:0.150.2",
       "sqldelight-android-driver": "app.cash.sqldelight:android-driver:2.4.1",
       "sqldelight-async-extensions": "app.cash.sqldelight:async-extensions:2.4.1",
       "sqldelight-compiler-env": "app.cash.sqldelight:compiler-env:2.4.1",
@@ -125,7 +126,9 @@
       "com.google.errorprone:error_prone_annotations": "2.51.0",
       "com.squareup:javawriter": "2.5.1",
       "commons-io:commons-io": "2.22.0",
-      "dev.drewhamilton.poko:poko-annotations": "0.23.2"
+      "dev.drewhamilton.poko:poko-annotations": "0.23.2",
+      "org.jetbrains.skiko:skiko": "0.150.2",
+      "org.jetbrains.skiko:skiko-wasm-js": "0.150.2"
     },
     "classpath_forces": {
       "androidx.activity:activity": "1.13.0",
@@ -361,6 +364,9 @@
       ],
       "play-services-auth": [
         "android"
+      ],
+      "skiko-js-wasm-runtime": [
+        "jvm"
       ],
       "sqldelight-android-driver": [
         "android"
@@ -671,6 +677,7 @@
     "org.jetbrains.skiko:skiko-awt-runtime-macos-arm64": "org_jetbrains_skiko_skiko_awt_runtime_macos_arm64",
     "org.jetbrains.skiko:skiko-awt-runtime-macos-x64": "org_jetbrains_skiko_skiko_awt_runtime_macos_x64",
     "org.jetbrains.skiko:skiko-awt-runtime-windows-x64": "org_jetbrains_skiko_skiko_awt_runtime_windows_x64",
+    "org.jetbrains.skiko:skiko-js-wasm-runtime": "skiko_js_wasm_runtime",
     "org.jetbrains.skiko:skiko-wasm-js": "org_jetbrains_skiko_skiko_wasm_js",
     "org.jetbrains:annotations": "org_jetbrains_annotations",
     "org.jgrapht:jgrapht-core": "org_jgrapht_jgrapht_core",
@@ -4146,6 +4153,7 @@
     "org.jetbrains.skiko:skiko-awt-runtime-macos-arm64": null,
     "org.jetbrains.skiko:skiko-awt-runtime-macos-x64": null,
     "org.jetbrains.skiko:skiko-awt-runtime-windows-x64": null,
+    "org.jetbrains.skiko:skiko-js-wasm-runtime": null,
     "org.jetbrains.skiko:skiko-wasm-js": [
       "org.jetbrains.skia",
       "org.jetbrains.skia.icu",
@@ -21770,6 +21778,18 @@
         ],
         "deps": [
           "org.jetbrains.skiko:skiko-awt"
+        ]
+      }
+    },
+    "org.jetbrains.skiko:skiko-js-wasm-runtime": {
+      "jvm": {
+        "version": "0.150.2",
+        "files": [
+          {
+            "name": "skiko-js-wasm-runtime-0.150.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko-js-wasm-runtime/0.150.2/skiko-js-wasm-runtime-0.150.2.jar",
+            "sha256": "811eaada148b986be198ad5d966f239ce0b3fbdd05994c1efbd0aa5f8074ff79"
+          }
         ]
       }
     },
