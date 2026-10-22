@@ -23,9 +23,11 @@ import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.files.SystemTemporaryDirectory
@@ -84,25 +86,31 @@ class ImportsPresenterTest {
 
     // A database with one local import folder holding a file no strategy matches.
     private fun withImports(test: suspend (SessionImports, TaskManager, CoroutineScope) -> Unit) =
-        runBlocking {
-            val location = createTestDatabaseLocation()
-            val folder = Path(SystemTemporaryDirectory, "mm-imports-${Uuid.random()}")
-            SystemFileSystem.createDirectories(folder)
-            writeText(Path(folder, "unknown.csv"), "Foo,Bar\n1,2\n")
-            val vault = inMemoryCredentialVault()
-            val session = DatabaseSessions(createTestDatabaseManager(), InMemoryLocalSettings(), vault).open(location)
-            val scope = CoroutineScope(SupervisorJob())
-            try {
-                session.addFolder(folder)
-                test(SessionImports(session.services, vault, LocalFolders), TaskManager(scope), scope)
-            } finally {
-                scope.cancel()
-                session.database.close()
-                deleteTestDatabase(location)
-                SystemFileSystem.list(folder).forEach { SystemFileSystem.delete(it) }
-                SystemFileSystem.delete(folder)
-            }
+        runTest {
+            // Real time, off runTest's scheduler: in the context, Turbine would collect on its virtual clock, while the
+            // import runs on real dispatchers.
+            CoroutineScope(Dispatchers.Default.limitedParallelism(1)).async { runImports(test) }.await()
         }
+
+    private suspend fun runImports(test: suspend (SessionImports, TaskManager, CoroutineScope) -> Unit) {
+        val location = createTestDatabaseLocation()
+        val folder = Path(SystemTemporaryDirectory, "mm-imports-${Uuid.random()}")
+        SystemFileSystem.createDirectories(folder)
+        writeText(Path(folder, "unknown.csv"), "Foo,Bar\n1,2\n")
+        val vault = inMemoryCredentialVault()
+        val session = DatabaseSessions(createTestDatabaseManager(), InMemoryLocalSettings(), vault).open(location)
+        val scope = CoroutineScope(SupervisorJob())
+        try {
+            session.addFolder(folder)
+            test(SessionImports(session.services, vault, LocalFolders), TaskManager(scope), scope)
+        } finally {
+            scope.cancel()
+            session.database.close()
+            deleteTestDatabase(location)
+            SystemFileSystem.list(folder).forEach { SystemFileSystem.delete(it) }
+            SystemFileSystem.delete(folder)
+        }
+    }
 
     private suspend fun DatabaseSession.addFolder(folder: Path) {
         val now = Clock.System.now()

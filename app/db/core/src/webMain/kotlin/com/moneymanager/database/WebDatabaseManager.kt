@@ -53,6 +53,12 @@ class WebDatabaseManager(
 
     override suspend fun databaseExists(location: DbLocation): Boolean = request("exists", location).exists == true
 
+    /** Every database in the worker's store, for a person to pick one: the browser has no file dialog for them. */
+    suspend fun listDatabases(): List<DbLocation> {
+        val names = checkNotNull(channel.send(sqliteRequest("list", null)).names)
+        return (0 until names.length).mapNotNull { names[it]?.toString() }.map(::DbLocation)
+    }
+
     override fun getDefaultLocation(): DbLocation = DbLocation("/$DEFAULT_DATABASE_NAME")
 
     override suspend fun backupDatabase(location: DbLocation): DbLocation {

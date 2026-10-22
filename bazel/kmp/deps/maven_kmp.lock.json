@@ -42,11 +42,15 @@
       "compose-desktop-macos-arm64": "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64:1.12.2",
       "compose-desktop-macos-x64": "org.jetbrains.compose.desktop:desktop-jvm-macos-x64:1.12.2",
       "compose-desktop-windows-x64": "org.jetbrains.compose.desktop:desktop-jvm-windows-x64:1.12.2",
+      "compose-foundation": "org.jetbrains.compose.foundation:foundation:1.12.2",
       "compose-foundation-desktop": "org.jetbrains.compose.foundation:foundation-desktop:1.12.2",
       "compose-foundation-layout-desktop": "org.jetbrains.compose.foundation:foundation-layout-desktop:1.12.2",
+      "compose-material-icons-core": "org.jetbrains.compose.material:material-icons-core:1.7.3",
       "compose-material-icons-core-desktop": "org.jetbrains.compose.material:material-icons-core-desktop:1.7.3",
+      "compose-material3": "org.jetbrains.compose.material3:material3:1.9.0",
       "compose-material3-desktop": "org.jetbrains.compose.material3:material3-desktop:1.9.0",
       "compose-runtime": "org.jetbrains.compose.runtime:runtime:1.12.2",
+      "compose-ui": "org.jetbrains.compose.ui:ui:1.12.2",
       "compose-ui-desktop": "org.jetbrains.compose.ui:ui-desktop:1.12.2",
       "compose-ui-geometry-desktop": "org.jetbrains.compose.ui:ui-geometry-desktop:1.12.2",
       "compose-ui-graphics-desktop": "org.jetbrains.compose.ui:ui-graphics-desktop:1.12.2",
@@ -60,6 +64,7 @@
       "cryptography-provider-openssl3-prebuilt": "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt:0.6.0",
       "cryptography-provider-webcrypto": "dev.whyoleg.cryptography:cryptography-provider-webcrypto:0.6.0",
       "cryptography-random": "dev.whyoleg.cryptography:cryptography-random:0.6.0",
+      "jetbrains-navigation3-ui": "org.jetbrains.androidx.navigation3:navigation3-ui:1.2.0",
       "jetbrains-navigation3-ui-desktop": "org.jetbrains.androidx.navigation3:navigation3-ui-desktop:1.2.0",
       "junit": "junit:junit:4.13.2",
       "kermit": "co.touchlab:kermit:2.2.0",
@@ -263,17 +268,37 @@
       "compose-desktop-windows-x64": [
         "jvm"
       ],
+      "compose-foundation": [
+        "js",
+        "metadataWeb",
+        "wasmJs"
+      ],
       "compose-foundation-desktop": [
         "jvm"
       ],
       "compose-foundation-layout-desktop": [
         "jvm"
       ],
+      "compose-material-icons-core": [
+        "js",
+        "metadataWeb",
+        "wasmJs"
+      ],
       "compose-material-icons-core-desktop": [
         "jvm"
       ],
+      "compose-material3": [
+        "js",
+        "metadataWeb",
+        "wasmJs"
+      ],
       "compose-material3-desktop": [
         "jvm"
+      ],
+      "compose-ui": [
+        "js",
+        "metadataWeb",
+        "wasmJs"
       ],
       "compose-ui-desktop": [
         "jvm"
@@ -295,6 +320,11 @@
       ],
       "compose-ui-util-desktop": [
         "jvm"
+      ],
+      "jetbrains-navigation3-ui": [
+        "js",
+        "metadataWeb",
+        "wasmJs"
       ],
       "jetbrains-navigation3-ui-desktop": [
         "jvm"
@@ -568,6 +598,7 @@
     "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose": "org_jetbrains_androidx_lifecycle_lifecycle_runtime_compose",
     "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel": "org_jetbrains_androidx_lifecycle_lifecycle_viewmodel",
     "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate": "org_jetbrains_androidx_lifecycle_lifecycle_viewmodel_savedstate",
+    "org.jetbrains.androidx.navigation3:navigation3-ui": "jetbrains_navigation3_ui",
     "org.jetbrains.androidx.navigation3:navigation3-ui-desktop": "jetbrains_navigation3_ui_desktop",
     "org.jetbrains.androidx.navigationevent:navigationevent-compose": "org_jetbrains_androidx_navigationevent_navigationevent_compose",
     "org.jetbrains.androidx.savedstate:savedstate": "org_jetbrains_androidx_savedstate_savedstate",
@@ -584,17 +615,19 @@
     "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64": "compose_desktop_macos_arm64",
     "org.jetbrains.compose.desktop:desktop-jvm-macos-x64": "compose_desktop_macos_x64",
     "org.jetbrains.compose.desktop:desktop-jvm-windows-x64": "compose_desktop_windows_x64",
-    "org.jetbrains.compose.foundation:foundation": "org_jetbrains_compose_foundation_foundation",
+    "org.jetbrains.compose.foundation:foundation": "compose_foundation",
     "org.jetbrains.compose.foundation:foundation-desktop": "compose_foundation_desktop",
     "org.jetbrains.compose.foundation:foundation-layout": "org_jetbrains_compose_foundation_foundation_layout",
     "org.jetbrains.compose.foundation:foundation-layout-desktop": "compose_foundation_layout_desktop",
+    "org.jetbrains.compose.material3:material3": "compose_material3",
     "org.jetbrains.compose.material3:material3-desktop": "compose_material3_desktop",
     "org.jetbrains.compose.material:material": "org_jetbrains_compose_material_material",
+    "org.jetbrains.compose.material:material-icons-core": "compose_material_icons_core",
     "org.jetbrains.compose.material:material-icons-core-desktop": "compose_material_icons_core_desktop",
     "org.jetbrains.compose.material:material-ripple": "org_jetbrains_compose_material_material_ripple",
     "org.jetbrains.compose.runtime:runtime": "compose_runtime",
     "org.jetbrains.compose.runtime:runtime-saveable": "org_jetbrains_compose_runtime_runtime_saveable",
-    "org.jetbrains.compose.ui:ui": "org_jetbrains_compose_ui_ui",
+    "org.jetbrains.compose.ui:ui": "compose_ui",
     "org.jetbrains.compose.ui:ui-backhandler": "org_jetbrains_compose_ui_ui_backhandler",
     "org.jetbrains.compose.ui:ui-desktop": "compose_ui_desktop",
     "org.jetbrains.compose.ui:ui-geometry": "org_jetbrains_compose_ui_ui_geometry",
@@ -3491,6 +3524,11 @@
     "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose": null,
     "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel": null,
     "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate": null,
+    "org.jetbrains.androidx.navigation3:navigation3-ui": [
+      "androidx.navigation3",
+      "androidx.navigation3.scene",
+      "androidx.navigation3.ui"
+    ],
     "org.jetbrains.androidx.navigation3:navigation3-ui-desktop": [
       "androidx.navigation3",
       "androidx.navigation3.scene",
@@ -3613,6 +3651,14 @@
       "androidx.compose.foundation.layout",
       "androidx.compose.foundation.layout.internal"
     ],
+    "org.jetbrains.compose.material3:material3": [
+      "androidx.compose.material3",
+      "androidx.compose.material3.carousel",
+      "androidx.compose.material3.internal",
+      "androidx.compose.material3.l10n",
+      "androidx.compose.material3.pulltorefresh",
+      "androidx.compose.material3.tokens"
+    ],
     "org.jetbrains.compose.material3:material3-desktop": [
       "androidx.compose.material3",
       "androidx.compose.material3.carousel",
@@ -3626,6 +3672,19 @@
       "androidx.compose.material.internal",
       "androidx.compose.material.l10n",
       "androidx.compose.material.pullrefresh"
+    ],
+    "org.jetbrains.compose.material:material-icons-core": [
+      "androidx.compose.material.icons",
+      "androidx.compose.material.icons.automirrored.filled",
+      "androidx.compose.material.icons.automirrored.outlined",
+      "androidx.compose.material.icons.automirrored.rounded",
+      "androidx.compose.material.icons.automirrored.sharp",
+      "androidx.compose.material.icons.automirrored.twotone",
+      "androidx.compose.material.icons.filled",
+      "androidx.compose.material.icons.outlined",
+      "androidx.compose.material.icons.rounded",
+      "androidx.compose.material.icons.sharp",
+      "androidx.compose.material.icons.twotone"
     ],
     "org.jetbrains.compose.material:material-icons-core-desktop": [
       "androidx.compose.material.icons",
@@ -4053,6 +4112,7 @@
       "org.jetbrains.skia.skottie",
       "org.jetbrains.skia.sksg",
       "org.jetbrains.skia.svg",
+      "org.jetbrains.skia.webext",
       "org.jetbrains.skiko",
       "org.jetbrains.skiko.context",
       "org.jetbrains.skiko.graphicapi",
@@ -4060,7 +4120,6 @@
       "org.jetbrains.skiko.node",
       "org.jetbrains.skiko.redrawer",
       "org.jetbrains.skiko.swing",
-      "org.jetbrains.skiko.w3c",
       "org.jetbrains.skiko.wasm",
       "org.jetbrains.skiko.windows"
     ],
@@ -4096,11 +4155,12 @@
       "org.jetbrains.skia.skottie",
       "org.jetbrains.skia.sksg",
       "org.jetbrains.skia.svg",
+      "org.jetbrains.skia.webext",
       "org.jetbrains.skiko",
       "org.jetbrains.skiko.context",
+      "org.jetbrains.skiko.internal",
       "org.jetbrains.skiko.node",
       "org.jetbrains.skiko.redrawer",
-      "org.jetbrains.skiko.w3c",
       "org.jetbrains.skiko.wasm"
     ],
     "org.jetbrains:annotations": [
@@ -4285,31 +4345,16 @@
       "org.jetbrains.kotlinx:kotlinx-browser"
     ],
     "metadata": [
-      "app.cash.sqldelight:native-driver",
-      "dev.whyoleg.cryptography:cryptography-provider-jdk",
-      "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt",
       "dev.whyoleg.cryptography:cryptography-provider-webcrypto",
-      "io.github.ehsannarmani:compose-charts",
       "junit:junit",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml",
       "org.jetbrains.kotlinx:kotlinx-browser"
     ],
     "metadataWeb": [
-      "app.cash.sqldelight:native-driver",
-      "com.jakewharton.mosaic:mosaic-runtime",
-      "com.jakewharton.mosaic:mosaic-terminal",
-      "com.jakewharton.mosaic:mosaic-testing",
-      "com.jakewharton.mosaic:mosaic-tty",
-      "com.jakewharton.mosaic:mosaic-tty-terminal",
-      "dev.whyoleg.cryptography:cryptography-provider-jdk",
-      "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt",
-      "dev.whyoleg.cryptography:cryptography-provider-webcrypto",
-      "io.github.ehsannarmani:compose-charts",
       "junit:junit",
       "org.apache.poi:poi",
-      "org.apache.poi:poi-ooxml",
-      "org.jetbrains.kotlinx:kotlinx-browser"
+      "org.apache.poi:poi-ooxml"
     ],
     "mingwX64": [
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
@@ -5274,6 +5319,42 @@
           "androidx.collection:collection"
         ]
       },
+      "metadata": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-retain-metadata-1.12.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-retain/1.12.1/runtime-retain-1.12.1.jar",
+            "sha256": "a36ab1096486f5a88591ea86f6ed52f112c3f84f1bf9c3343dc192d3410e842a"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-retain-metadata-1.12.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-retain/1.12.1/runtime-retain-1.12.1.jar",
+            "sha256": "a36ab1096486f5a88591ea86f6ed52f112c3f84f1bf9c3343dc192d3410e842a"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "wasmJs": {
         "version": "1.12.1",
         "files": [
@@ -5929,12 +6010,12 @@
         ]
       },
       "js": {
-        "version": "2.10.0",
+        "version": "2.11.0",
         "files": [
           {
-            "name": "lifecycle-common-js-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-js/2.10.0/lifecycle-common-js-2.10.0.klib",
-            "sha256": "7d7bf1831105ec8a2eed13e2f5517a4ca6cb362edc788da2e5cb17eedcdd4d59"
+            "name": "lifecycle-common-js-2.11.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-js/2.11.0/lifecycle-common-js-2.11.0.klib",
+            "sha256": "26d609cf18d5716ff18aa22289a3aa0f1a4b882a85fbcc913bd760cf6b106aa6"
           }
         ],
         "deps": [
@@ -6056,12 +6137,12 @@
         ]
       },
       "wasmJs": {
-        "version": "2.10.0",
+        "version": "2.11.0",
         "files": [
           {
-            "name": "lifecycle-common-wasm-js-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-wasm-js/2.10.0/lifecycle-common-wasm-js-2.10.0.klib",
-            "sha256": "17964f83c0a5ac166833539f36423195dff2cb0e2ef5cf15596295615739e8c3"
+            "name": "lifecycle-common-wasm-js-2.11.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-wasm-js/2.11.0/lifecycle-common-wasm-js-2.11.0.klib",
+            "sha256": "9dd925f7c94d5e40a0fd0f93829005a1af0bbbcf385ff73c63612a46cec6894b"
           }
         ],
         "deps": [
@@ -6151,18 +6232,21 @@
         ]
       },
       "js": {
-        "version": "2.10.0",
+        "version": "2.11.0",
         "files": [
           {
-            "name": "lifecycle-runtime-js-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-js/2.10.0/lifecycle-runtime-js-2.10.0.klib",
-            "sha256": "2207eed839c43c007554dc92136def1d25fffb92cc39bf2843314fde7c12c9c5"
+            "name": "lifecycle-runtime-js-2.11.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-js/2.11.0/lifecycle-runtime-js-2.11.0.klib",
+            "sha256": "a6794025526743ae688d887a511b3d5155cb57a610f47830581e8efd599d1099"
           }
         ],
         "deps": [
           "androidx.annotation:annotation",
           "androidx.lifecycle:lifecycle-common",
           "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection"
         ]
       },
       "jvm": {
@@ -6276,17 +6360,20 @@
         ]
       },
       "wasmJs": {
-        "version": "2.10.0",
+        "version": "2.11.0",
         "files": [
           {
-            "name": "lifecycle-runtime-wasm-js-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-wasm-js/2.10.0/lifecycle-runtime-wasm-js-2.10.0.klib",
-            "sha256": "5ca3a1abd168bc8b150521d62fbce65522da486cf2af4215c0ebe9a4d4fe4488"
+            "name": "lifecycle-runtime-wasm-js-2.11.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-wasm-js/2.11.0/lifecycle-runtime-wasm-js-2.11.0.klib",
+            "sha256": "cd5be533d2b73bfd432e5968cf724979f36378492491cbeea4594bcc9a7b9ea3"
           }
         ],
         "deps": [
           "androidx.annotation:annotation",
           "androidx.lifecycle:lifecycle-common"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection"
         ]
       }
     },
@@ -6308,12 +6395,12 @@
         ]
       },
       "js": {
-        "version": "2.10.0",
+        "version": "2.11.0",
         "files": [
           {
-            "name": "lifecycle-runtime-compose-js-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-js/2.10.0/lifecycle-runtime-compose-js-2.10.0.klib",
-            "sha256": "af681e5824b8bd5aac2ccae7334ed6885f08cfa428f78fa603aabb164cc98535"
+            "name": "lifecycle-runtime-compose-js-2.11.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-js/2.11.0/lifecycle-runtime-compose-js-2.11.0.klib",
+            "sha256": "ca2c00d166e25496b6ec11cedf9a782c488d086939f22b81f244f97750669eba"
           }
         ],
         "deps": [
@@ -6435,12 +6522,12 @@
         ]
       },
       "wasmJs": {
-        "version": "2.10.0",
+        "version": "2.11.0",
         "files": [
           {
-            "name": "lifecycle-runtime-compose-wasm-js-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-wasm-js/2.10.0/lifecycle-runtime-compose-wasm-js-2.10.0.klib",
-            "sha256": "efa46bf1c0919e97446973942d66c9e5b96f913eae85f20e5f72a40d4bd36c10"
+            "name": "lifecycle-runtime-compose-wasm-js-2.11.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-wasm-js/2.11.0/lifecycle-runtime-compose-wasm-js-2.11.0.klib",
+            "sha256": "4c0b9069472156409ba765d4c16b6cb802980606f70e834098bd6e8b28d48d53"
           }
         ],
         "deps": [
@@ -6488,18 +6575,21 @@
         ]
       },
       "js": {
-        "version": "2.10.0",
+        "version": "2.11.0",
         "files": [
           {
-            "name": "lifecycle-viewmodel-js-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-js/2.10.0/lifecycle-viewmodel-js-2.10.0.klib",
-            "sha256": "acd06e0b1705f05a9e0eb289848164d80de8966e11f88e57a5596635ced4ba97"
+            "name": "lifecycle-viewmodel-js-2.11.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-js/2.11.0/lifecycle-viewmodel-js-2.11.0.klib",
+            "sha256": "2dc987e6e353e02eedfc0c1190498a43fb9e3f09b85b57da9e97ab60e80093f4"
           }
         ],
         "deps": [
           "androidx.annotation:annotation",
           "org.jetbrains.kotlin:kotlin-dom-api-compat",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection"
         ]
       },
       "jvm": {
@@ -6519,22 +6609,84 @@
           "androidx.collection:collection"
         ]
       },
-      "wasmJs": {
-        "version": "2.10.0",
+      "metadata": {
+        "version": "2.11.0",
         "files": [
           {
-            "name": "lifecycle-viewmodel-wasm-js-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-wasm-js/2.10.0/lifecycle-viewmodel-wasm-js-2.10.0.klib",
-            "sha256": "73f18fc89d02337561d94d28212f05b8b12be4792e1df21bc5fd03c4050b6a00"
+            "name": "lifecycle-viewmodel-metadata-2.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel/2.11.0/lifecycle-viewmodel-2.11.0.jar",
+            "sha256": "7cba4aa1ce8a69e5a54cdb76b2e6b6e5bd636d733b76b82d23130a436dbfa7f4"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "2.11.0",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel-metadata-2.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel/2.11.0/lifecycle-viewmodel-2.11.0.jar",
+            "sha256": "7cba4aa1ce8a69e5a54cdb76b2e6b6e5bd636d733b76b82d23130a436dbfa7f4"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "2.11.0",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel-wasm-js-2.11.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-wasm-js/2.11.0/lifecycle-viewmodel-wasm-js-2.11.0.klib",
+            "sha256": "c4c967eb36e83c1a26f7b813d717f18559e156d6fc615fa6e6610a0a2f6da964"
           }
         ],
         "deps": [
           "androidx.annotation:annotation",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection"
         ]
       }
     },
     "androidx.lifecycle:lifecycle-viewmodel-compose": {
+      "js": {
+        "version": "2.11.0",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel-compose-js-2.11.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-compose-js/2.11.0/lifecycle-viewmodel-compose-js-2.11.0.klib",
+            "sha256": "06c91001eeb4a25aed22dca20458b9a5ae41965e27c7ca97e239ac70b18454a0"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.lifecycle:lifecycle-common",
+          "androidx.lifecycle:lifecycle-viewmodel",
+          "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "runtime_deps": [
+          "androidx.lifecycle:lifecycle-runtime-compose"
+        ]
+      },
       "jvm": {
         "version": "2.11.0",
         "files": [
@@ -6542,6 +6694,51 @@
             "name": "lifecycle-viewmodel-compose-desktop-2.11.0.jar",
             "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-compose-desktop/2.11.0/lifecycle-viewmodel-compose-desktop-2.11.0.jar",
             "sha256": "1b4c58125c7b3693444f40c8ab76881d17fa74726860c24872a3dec3e0fad34b"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.lifecycle:lifecycle-common",
+          "androidx.lifecycle:lifecycle-viewmodel",
+          "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "runtime_deps": [
+          "androidx.lifecycle:lifecycle-runtime-compose"
+        ]
+      },
+      "metadataWeb": {
+        "version": "2.11.0",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel-compose-metadata-2.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-compose/2.11.0/lifecycle-viewmodel-compose-2.11.0.jar",
+            "sha256": "b2b0e8629a53bcd9308b649c34fe113b9002f1ae852e9f7b9987314da39be924"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.lifecycle:lifecycle-common",
+          "androidx.lifecycle:lifecycle-runtime-compose",
+          "androidx.lifecycle:lifecycle-viewmodel",
+          "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "2.11.0",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel-compose-wasm-js-2.11.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-compose-wasm-js/2.11.0/lifecycle-viewmodel-compose-wasm-js-2.11.0.klib",
+            "sha256": "626eef5d606751a9e9d8481456c67286ca46fa6662b7f52fabd7bfd862ee7989"
           }
         ],
         "deps": [
@@ -6600,12 +6797,12 @@
         ]
       },
       "js": {
-        "version": "2.10.0",
+        "version": "2.11.0",
         "files": [
           {
-            "name": "lifecycle-viewmodel-savedstate-js-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate-js/2.10.0/lifecycle-viewmodel-savedstate-js-2.10.0.klib",
-            "sha256": "56fc699f333320f555a11444f2b19d9898018d0c7f4f2ccdb973cfa39829aa3a"
+            "name": "lifecycle-viewmodel-savedstate-js-2.11.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate-js/2.11.0/lifecycle-viewmodel-savedstate-js-2.11.0.klib",
+            "sha256": "182b19c14e1e7ef9eade9d0c6a4bc4277c26b0effe95d5fee8274f3e96e98403"
           }
         ],
         "deps": [
@@ -6617,6 +6814,7 @@
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ],
         "runtime_deps": [
+          "androidx.collection:collection",
           "androidx.lifecycle:lifecycle-common"
         ]
       },
@@ -6641,13 +6839,57 @@
           "androidx.lifecycle:lifecycle-common"
         ]
       },
-      "wasmJs": {
-        "version": "2.10.0",
+      "metadata": {
+        "version": "2.11.0",
         "files": [
           {
-            "name": "lifecycle-viewmodel-savedstate-wasm-js-2.10.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate-wasm-js/2.10.0/lifecycle-viewmodel-savedstate-wasm-js-2.10.0.klib",
-            "sha256": "8996af7508c7202f1eae80bc8ae173c1372cd99d27cdcaf9853841c23794fe83"
+            "name": "lifecycle-viewmodel-savedstate-metadata-2.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate/2.11.0/lifecycle-viewmodel-savedstate-2.11.0.jar",
+            "sha256": "eac96037ba6a2349828154d3d2c9c92ae0c94f377eb2eb93e99754f3a7f8e279"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-common",
+          "androidx.lifecycle:lifecycle-viewmodel",
+          "androidx.savedstate:savedstate",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "2.11.0",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel-savedstate-metadata-2.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate/2.11.0/lifecycle-viewmodel-savedstate-2.11.0.jar",
+            "sha256": "eac96037ba6a2349828154d3d2c9c92ae0c94f377eb2eb93e99754f3a7f8e279"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-common",
+          "androidx.lifecycle:lifecycle-viewmodel",
+          "androidx.savedstate:savedstate",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "2.11.0",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel-savedstate-wasm-js-2.11.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate-wasm-js/2.11.0/lifecycle-viewmodel-savedstate-wasm-js-2.11.0.klib",
+            "sha256": "b0798ce9ab60c54408c7ad034010583d4284105e9ae6910724235a00bb787e36"
           }
         ],
         "deps": [
@@ -6658,6 +6900,7 @@
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ],
         "runtime_deps": [
+          "androidx.collection:collection",
           "androidx.lifecycle:lifecycle-common"
         ]
       }
@@ -7156,6 +7399,24 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
+      "js": {
+        "version": "1.1.1",
+        "files": [
+          {
+            "name": "navigationevent-compose-js-1.1.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-compose-js/1.1.1/navigationevent-compose-js-1.1.1.klib",
+            "sha256": "e5a8a274fd4bbdb07cb3038649fecd1c9daf70e3ddf18b9b500b02002b4220ca"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.navigationevent:navigationevent",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
       "jvm": {
         "version": "1.2.0",
         "files": [
@@ -7170,6 +7431,42 @@
           "androidx.navigationevent:navigationevent"
         ],
         "runtime_deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigationevent-compose-metadata-1.2.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-compose/1.2.0/navigationevent-compose-1.2.0.jar",
+            "sha256": "ae3ccb12c181b20c601cc7710be112448128addbabcbf704ff51768b18a4d58b"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.navigationevent:navigationevent",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.1.1",
+        "files": [
+          {
+            "name": "navigationevent-compose-wasm-js-1.1.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-compose-wasm-js/1.1.1/navigationevent-compose-wasm-js-1.1.1.klib",
+            "sha256": "f6b515ad2f45464df805f3d8cda612c3f2bbe437e24e7bdd521c617344408b32"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.navigationevent:navigationevent"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.kotlinx:kotlinx-browser",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       }
@@ -8507,6 +8804,42 @@
           "co.touchlab:stately-concurrency"
         ]
       },
+      "metadata": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "native-driver-metadata-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/native-driver/2.4.1/native-driver-2.4.1.jar",
+            "sha256": "2ddc4f65c788c77ad8e3d348361b8458ce51430e40002369f5d884641841e195"
+          }
+        ],
+        "deps": [
+          "app.cash.sqldelight:runtime",
+          "co.touchlab:sqliter-driver",
+          "co.touchlab:stately-concurrency"
+        ],
+        "source_sets": [
+          "nativeMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "native-driver-metadata-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/native-driver/2.4.1/native-driver-2.4.1.jar",
+            "sha256": "2ddc4f65c788c77ad8e3d348361b8458ce51430e40002369f5d884641841e195"
+          }
+        ],
+        "deps": [
+          "app.cash.sqldelight:runtime",
+          "co.touchlab:sqliter-driver",
+          "co.touchlab:stately-concurrency"
+        ],
+        "source_sets": [
+          "nativeMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.4.1",
         "files": [
@@ -9185,6 +9518,32 @@
           }
         ]
       },
+      "metadata": {
+        "version": "1.3.3",
+        "files": [
+          {
+            "name": "sqliter-driver-metadata-1.3.3.jar",
+            "url": "https://repo1.maven.org/maven2/co/touchlab/sqliter-driver/1.3.3/sqliter-driver-1.3.3.jar",
+            "sha256": "f3c7101afe3f777f556f1bba22a720a447f8431fcb95edcea4edf09f964d8eb0"
+          }
+        ],
+        "source_sets": [
+          "nativeCommonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.3.3",
+        "files": [
+          {
+            "name": "sqliter-driver-metadata-1.3.3.jar",
+            "url": "https://repo1.maven.org/maven2/co/touchlab/sqliter-driver/1.3.3/sqliter-driver-1.3.3.jar",
+            "sha256": "f3c7101afe3f777f556f1bba22a720a447f8431fcb95edcea4edf09f964d8eb0"
+          }
+        ],
+        "source_sets": [
+          "nativeCommonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.3.3",
         "files": [
@@ -9239,6 +9598,32 @@
         ],
         "deps": [
           "co.touchlab:stately-strict"
+        ]
+      },
+      "metadata": {
+        "version": "2.1.0",
+        "files": [
+          {
+            "name": "stately-concurrency-metadata-2.1.0.jar",
+            "url": "https://repo1.maven.org/maven2/co/touchlab/stately-concurrency/2.1.0/stately-concurrency-2.1.0.jar",
+            "sha256": "17e7322040da7bbe69be0d5d857df355665cb655b5508795591c6b70cfea7a90"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "2.1.0",
+        "files": [
+          {
+            "name": "stately-concurrency-metadata-2.1.0.jar",
+            "url": "https://repo1.maven.org/maven2/co/touchlab/stately-concurrency/2.1.0/stately-concurrency-2.1.0.jar",
+            "sha256": "17e7322040da7bbe69be0d5d857df355665cb655b5508795591c6b70cfea7a90"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -10413,6 +10798,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "0.6.1",
+        "files": [
+          {
+            "name": "cite-api-metadata-0.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/cite/cite-api/0.6.1/cite-api-0.6.1.jar",
+            "sha256": "3226a439b1932873e6eca701150d7f7cf3d26b02514b21d907eae0b6d6fdaa86"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.6.1",
         "files": [
@@ -10491,6 +10889,22 @@
         ]
       },
       "metadata": {
+        "version": "0.1.0",
+        "files": [
+          {
+            "name": "finalization-hook-metadata-0.1.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/finalization/finalization-hook/0.1.0/finalization-hook-0.1.0.jar",
+            "sha256": "cce3fb5546fb692f680f80b896dfd0d4aaa4b4f002214c48abd865d0a009983f"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
         "version": "0.1.0",
         "files": [
           {
@@ -10648,6 +11062,29 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-runtime-metadata-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-runtime/0.18.0/mosaic-runtime-0.18.0.jar",
+            "sha256": "2c99ef2176a84f71298f641e2ff043232235c41cc38c3281dcd777f135932f5c"
+          }
+        ],
+        "deps": [
+          "com.jakewharton.mosaic:mosaic-terminal",
+          "com.jakewharton.mosaic:mosaic-tty-terminal",
+          "de.cketti.unicode:kotlin-codepoints",
+          "dev.drewhamilton.poko:poko-annotations",
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.18.0",
         "files": [
@@ -10750,6 +11187,24 @@
         ]
       },
       "metadata": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-terminal-metadata-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-terminal/0.18.0/mosaic-terminal-0.18.0.jar",
+            "sha256": "1fce99396764b7ca1de455df6cbdc979ffd04ef5c94792cf18f719394ce05d8c"
+          }
+        ],
+        "deps": [
+          "com.jakewharton.cite:cite-api",
+          "dev.drewhamilton.poko:poko-annotations",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
         "version": "0.18.0",
         "files": [
           {
@@ -10887,6 +11342,25 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-testing-metadata-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-testing/0.18.0/mosaic-testing-0.18.0.jar",
+            "sha256": "b576f3f177a55c09afb2589976319ead0dbc319861566bbe737441311be053cd"
+          }
+        ],
+        "deps": [
+          "com.jakewharton.mosaic:mosaic-runtime",
+          "dev.drewhamilton.poko:poko-annotations",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.18.0",
         "files": [
@@ -10971,6 +11445,19 @@
         ]
       },
       "metadata": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-tty-metadata-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-tty/0.18.0/mosaic-tty-0.18.0.jar",
+            "sha256": "7fe51cfb205df583ebd289c373cbd5507681836155708db1357a1bb4935c8d23"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
         "version": "0.18.0",
         "files": [
           {
@@ -11085,6 +11572,25 @@
         ]
       },
       "metadata": {
+        "version": "0.18.0",
+        "files": [
+          {
+            "name": "mosaic-tty-terminal-metadata-0.18.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/jakewharton/mosaic/mosaic-tty-terminal/0.18.0/mosaic-tty-terminal-0.18.0.jar",
+            "sha256": "20178c942fb2a02cee107ec6050793314c2f6911669de4f93d1dce890ae3cec0"
+          }
+        ],
+        "deps": [
+          "com.jakewharton.finalization:finalization-hook",
+          "com.jakewharton.mosaic:mosaic-terminal",
+          "com.jakewharton.mosaic:mosaic-tty",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
         "version": "0.18.0",
         "files": [
           {
@@ -11319,6 +11825,19 @@
         ]
       },
       "metadata": {
+        "version": "0.11.0",
+        "files": [
+          {
+            "name": "kotlin-codepoints-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/de/cketti/unicode/kotlin-codepoints/0.11.0/kotlin-codepoints-0.11.0.jar",
+            "sha256": "4976ac8bcac0030da952cc05450e9e655598263f4648ac26c369b32a303ef062"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
         "version": "0.11.0",
         "files": [
           {
@@ -12162,6 +12681,46 @@
           "org.jetbrains.kotlinx:kotlinx-serialization-json"
         ]
       },
+      "metadata": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-base-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-base/0.6.0/cryptography-provider-base-0.6.0.jar",
+            "sha256": "fff9910f057b8f601368054442022d632d6f7e44f0420bde1fd816cc45db9199"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-core",
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1",
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1-modules",
+          "dev.whyoleg.cryptography:cryptography-serialization-pem",
+          "org.jetbrains.kotlinx:kotlinx-serialization-json"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-base-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-base/0.6.0/cryptography-provider-base-0.6.0.jar",
+            "sha256": "fff9910f057b8f601368054442022d632d6f7e44f0420bde1fd816cc45db9199"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-core",
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1",
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1-modules",
+          "dev.whyoleg.cryptography:cryptography-serialization-pem",
+          "org.jetbrains.kotlinx:kotlinx-serialization-json"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.6.0",
         "files": [
@@ -12231,6 +12790,26 @@
         "runtime_deps": [
           "dev.whyoleg.cryptography:cryptography-provider-base"
         ]
+      },
+      "metadata": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-jdk-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-jdk/0.6.0/cryptography-provider-jdk-0.6.0.jar",
+            "sha256": "089e24417bf9f6c34eec5720eebb2cbcc82ea2855ecef90133eb17e1079d5868"
+          }
+        ]
+      },
+      "metadataWeb": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-jdk-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-jdk/0.6.0/cryptography-provider-jdk-0.6.0.jar",
+            "sha256": "089e24417bf9f6c34eec5720eebb2cbcc82ea2855ecef90133eb17e1079d5868"
+          }
+        ]
       }
     },
     "dev.whyoleg.cryptography:cryptography-provider-openssl3-api": {
@@ -12289,6 +12868,40 @@
         "deps": [
           "dev.whyoleg.cryptography:cryptography-core",
           "dev.whyoleg.cryptography:cryptography-provider-base"
+        ]
+      },
+      "metadata": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-openssl3-api-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-openssl3-api/0.6.0/cryptography-provider-openssl3-api-0.6.0.jar",
+            "sha256": "3b7c1882cbf52e3cce8922a501196223b1fd68c7f0d3d851ca25dd1bb49651d3"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-core",
+          "dev.whyoleg.cryptography:cryptography-provider-base"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-openssl3-api-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-openssl3-api/0.6.0/cryptography-provider-openssl3-api-0.6.0.jar",
+            "sha256": "3b7c1882cbf52e3cce8922a501196223b1fd68c7f0d3d851ca25dd1bb49651d3"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-core",
+          "dev.whyoleg.cryptography:cryptography-provider-base"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -12366,6 +12979,38 @@
           "dev.whyoleg.cryptography:cryptography-provider-openssl3-api"
         ]
       },
+      "metadata": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-openssl3-prebuilt-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-openssl3-prebuilt/0.6.0/cryptography-provider-openssl3-prebuilt-0.6.0.jar",
+            "sha256": "238a719a666fb1c9a78b72e8c363994106483895955406d4c5f2c2a1cbeac759"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-provider-openssl3-api"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-openssl3-prebuilt-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-openssl3-prebuilt/0.6.0/cryptography-provider-openssl3-prebuilt-0.6.0.jar",
+            "sha256": "238a719a666fb1c9a78b72e8c363994106483895955406d4c5f2c2a1cbeac759"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-provider-openssl3-api"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.6.0",
         "files": [
@@ -12401,6 +13046,22 @@
         ],
         "runtime_deps": [
           "dev.whyoleg.cryptography:cryptography-provider-base"
+        ]
+      },
+      "metadataWeb": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-provider-webcrypto-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-provider-webcrypto/0.6.0/cryptography-provider-webcrypto-0.6.0.jar",
+            "sha256": "def5d844d17543b5e2e7dc3697ad801249294a9af43c863e4660f288ae718458"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "wasmJs": {
@@ -12617,6 +13278,40 @@
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ]
       },
+      "metadata": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-asn1-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-asn1/0.6.0/cryptography-serialization-asn1-0.6.0.jar",
+            "sha256": "7e10d9269c1ee0146c26ac9ff354d326f6e15b5d4fdef49648ce641f48feb4dc"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-bigint",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-asn1-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-asn1/0.6.0/cryptography-serialization-asn1-0.6.0.jar",
+            "sha256": "7e10d9269c1ee0146c26ac9ff354d326f6e15b5d4fdef49648ce641f48feb4dc"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-bigint",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.6.0",
         "files": [
@@ -12726,6 +13421,38 @@
           "dev.whyoleg.cryptography:cryptography-serialization-asn1"
         ]
       },
+      "metadata": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-asn1-modules-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-asn1-modules/0.6.0/cryptography-serialization-asn1-modules-0.6.0.jar",
+            "sha256": "142e739fc9f67ddac233f5d07f03cca006614b99fb7bf4421acc8f10e8d30460"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-asn1-modules-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-asn1-modules/0.6.0/cryptography-serialization-asn1-modules-0.6.0.jar",
+            "sha256": "142e739fc9f67ddac233f5d07f03cca006614b99fb7bf4421acc8f10e8d30460"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-serialization-asn1"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.6.0",
         "files": [
@@ -12831,6 +13558,38 @@
         ],
         "deps": [
           "org.jetbrains.kotlinx:kotlinx-io-core"
+        ]
+      },
+      "metadata": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-pem-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-pem/0.6.0/cryptography-serialization-pem-0.6.0.jar",
+            "sha256": "6dae8c55558875b58e24a960bb7ed1f0c8d2001094a675e4854a0624792a3fc2"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-serialization-pem-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-serialization-pem/0.6.0/cryptography-serialization-pem-0.6.0.jar",
+            "sha256": "6dae8c55558875b58e24a960bb7ed1f0c8d2001094a675e4854a0624792a3fc2"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-core"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "mingwX64": {
@@ -13024,6 +13783,38 @@
         ],
         "runtime_deps": [
           "org.jetbrains.compose.foundation:foundation"
+        ]
+      },
+      "metadata": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "compose-charts-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/io/github/ehsannarmani/compose-charts/1.0.0/compose-charts-1.0.0.jar",
+            "sha256": "4ad2d5bae5604eacaa7355c57eccee38fa40b07ea93d5b5bfc08c5f55a09f698"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.foundation:foundation"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "compose-charts-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/io/github/ehsannarmani/compose-charts/1.0.0/compose-charts-1.0.0.jar",
+            "sha256": "4ad2d5bae5604eacaa7355c57eccee38fa40b07ea93d5b5bfc08c5f55a09f698"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.foundation:foundation"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "wasmJs": {
@@ -16176,11 +16967,27 @@
         ]
       },
       "metadata": {
-        "version": "2.9.5",
+        "version": "2.9.6",
         "files": [
           {
-            "name": "lifecycle-common-2.9.5.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-common/2.9.5/lifecycle-common-2.9.5.jar",
+            "name": "lifecycle-common-2.9.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-common/2.9.6/lifecycle-common-2.9.6.jar",
+            "sha256": "b21a149fe28cccc7ece37b55098d10027aba3d2e0db31d12d3cdc907ded2368a"
+          }
+        ],
+        "deps": [
+          "androidx.lifecycle:lifecycle-common"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "2.9.6",
+        "files": [
+          {
+            "name": "lifecycle-common-2.9.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-common/2.9.6/lifecycle-common-2.9.6.jar",
             "sha256": "b21a149fe28cccc7ece37b55098d10027aba3d2e0db31d12d3cdc907ded2368a"
           }
         ],
@@ -16272,16 +17079,34 @@
         ]
       },
       "metadata": {
-        "version": "2.9.5",
+        "version": "2.9.6",
         "files": [
           {
-            "name": "lifecycle-runtime-2.9.5.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime/2.9.5/lifecycle-runtime-2.9.5.jar",
+            "name": "lifecycle-runtime-2.9.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime/2.9.6/lifecycle-runtime-2.9.6.jar",
             "sha256": "9dd583b709136e0aafe60e1b90249bf63bc80cd7ba6e0641ce74a1ab3613c64f"
           }
         ],
         "deps": [
-          "androidx.lifecycle:lifecycle-runtime"
+          "androidx.lifecycle:lifecycle-runtime",
+          "org.jetbrains.androidx.lifecycle:lifecycle-common"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "2.9.6",
+        "files": [
+          {
+            "name": "lifecycle-runtime-2.9.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime/2.9.6/lifecycle-runtime-2.9.6.jar",
+            "sha256": "9dd583b709136e0aafe60e1b90249bf63bc80cd7ba6e0641ce74a1ab3613c64f"
+          }
+        ],
+        "deps": [
+          "androidx.lifecycle:lifecycle-runtime",
+          "org.jetbrains.androidx.lifecycle:lifecycle-common"
         ],
         "source_sets": [
           "commonMain"
@@ -16415,12 +17240,31 @@
         ]
       },
       "metadata": {
-        "version": "2.9.5",
+        "version": "2.9.6",
         "files": [
           {
-            "name": "lifecycle-runtime-compose-2.9.5.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose/2.9.5/lifecycle-runtime-compose-2.9.5.jar",
-            "sha256": "64f4a647f40b64cd728612712a86f88e13dd9d663bc68afaacc226b2b904ff24"
+            "name": "lifecycle-runtime-compose-2.9.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose/2.9.6/lifecycle-runtime-compose-2.9.6.jar",
+            "sha256": "adb75b2b89d68f338d9420b8b24dd9ba5368872a4fc70e32282c2fa0f193a0fc"
+          }
+        ],
+        "deps": [
+          "androidx.lifecycle:lifecycle-runtime-compose",
+          "org.jetbrains.androidx.lifecycle:lifecycle-common",
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime",
+          "org.jetbrains.compose.runtime:runtime"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "2.9.6",
+        "files": [
+          {
+            "name": "lifecycle-runtime-compose-2.9.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose/2.9.6/lifecycle-runtime-compose-2.9.6.jar",
+            "sha256": "adb75b2b89d68f338d9420b8b24dd9ba5368872a4fc70e32282c2fa0f193a0fc"
           }
         ],
         "deps": [
@@ -16497,6 +17341,22 @@
           "androidx.lifecycle:lifecycle-viewmodel"
         ]
       },
+      "metadata": {
+        "version": "2.9.6",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel-2.9.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-viewmodel/2.9.6/lifecycle-viewmodel-2.9.6.jar",
+            "sha256": "9ecd2bc61365fb4fa3f6f284aba92148dbfd3d1aca38662ad54bcecac2ab5546"
+          }
+        ],
+        "deps": [
+          "androidx.lifecycle:lifecycle-viewmodel"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "wasmJs": {
         "version": "2.9.6",
         "files": [
@@ -16549,6 +17409,24 @@
           "org.jetbrains.androidx.savedstate:savedstate"
         ]
       },
+      "metadata": {
+        "version": "2.9.6",
+        "files": [
+          {
+            "name": "lifecycle-viewmodel-savedstate-2.9.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-viewmodel-savedstate/2.9.6/lifecycle-viewmodel-savedstate-2.9.6.jar",
+            "sha256": "74239398cb1f20a8113b37b93d309f1f57494a14f70d6578648e8bb083f80f5d"
+          }
+        ],
+        "deps": [
+          "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel",
+          "org.jetbrains.androidx.savedstate:savedstate"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "wasmJs": {
         "version": "2.9.6",
         "files": [
@@ -16565,6 +17443,88 @@
         ],
         "runtime_deps": [
           "org.jetbrains.androidx.lifecycle:lifecycle-common"
+        ]
+      }
+    },
+    "org.jetbrains.androidx.navigation3:navigation3-ui": {
+      "js": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-ui-js-1.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/navigation3/navigation3-ui-js/1.2.0/navigation3-ui-js-1.2.0.klib",
+            "sha256": "d701d0f55d8f661efa89d0c6460d812fd903d5ed41ade91284cdd2386312e4e0"
+          }
+        ],
+        "deps": [
+          "androidx.navigation3:navigation3-runtime",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.androidx.navigationevent:navigationevent-compose",
+          "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ],
+        "runtime_deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.lifecycle:lifecycle-runtime-compose"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-ui-metadata-1.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/navigation3/navigation3-ui/1.2.0/navigation3-ui-1.2.0.jar",
+            "sha256": "a088253a249784c2878d89fe82d6650c5bff378eb0ce1ebc449bc9025e470c41"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.lifecycle:lifecycle-runtime-compose",
+          "androidx.navigation3:navigation3-runtime",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.androidx.navigationevent:navigationevent-compose",
+          "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-ui-wasm-js-1.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/navigation3/navigation3-ui-wasm-js/1.2.0/navigation3-ui-wasm-js-1.2.0.klib",
+            "sha256": "d13f44ea7d1abc40b90b005a26150b35633dcb31e4ae0d0795946a76fb13932f"
+          }
+        ],
+        "deps": [
+          "androidx.navigation3:navigation3-runtime",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.androidx.navigationevent:navigationevent-compose",
+          "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui"
+        ],
+        "runtime_deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.lifecycle:lifecycle-runtime-compose"
         ]
       }
     },
@@ -16597,6 +17557,21 @@
       }
     },
     "org.jetbrains.androidx.navigationevent:navigationevent-compose": {
+      "js": {
+        "version": "1.1.0",
+        "files": [
+          {
+            "name": "navigationevent-compose-js-1.1.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/navigationevent/navigationevent-compose-js/1.1.0/navigationevent-compose-js-1.1.0.klib",
+            "sha256": "1015ef6cc1282811dbb0b1ba4800779d5f5fe1e66d7e33f7d3d5c2e3f6e45bd7"
+          }
+        ],
+        "deps": [
+          "androidx.navigationevent:navigationevent-compose",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ]
+      },
       "jvm": {
         "version": "1.1.0",
         "files": [
@@ -16604,6 +17579,37 @@
             "name": "navigationevent-compose-desktop-1.1.0.jar",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/navigationevent/navigationevent-compose-desktop/1.1.0/navigationevent-compose-desktop-1.1.0.jar",
             "sha256": "0514f5d5c14de3b422c48a4eaf1d9dd2ce265041339e4c51ce30db8da1690874"
+          }
+        ],
+        "deps": [
+          "androidx.navigationevent:navigationevent-compose",
+          "org.jetbrains.compose.runtime:runtime"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.1.0",
+        "files": [
+          {
+            "name": "navigationevent-compose-1.1.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/navigationevent/navigationevent-compose/1.1.0/navigationevent-compose-1.1.0.jar",
+            "sha256": "26c0c8ba35740bc66d9288a385eab8a7450762d260556db63c241339895a908f"
+          }
+        ],
+        "deps": [
+          "androidx.navigationevent:navigationevent-compose",
+          "org.jetbrains.compose.runtime:runtime"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.1.0",
+        "files": [
+          {
+            "name": "navigationevent-compose-wasm-js-1.1.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/navigationevent/navigationevent-compose-wasm-js/1.1.0/navigationevent-compose-wasm-js-1.1.0.klib",
+            "sha256": "6e7d98425e402a4ec15a2151ff2cda820c25b751018c24dff989caaf12dca3d2"
           }
         ],
         "deps": [
@@ -16642,6 +17648,38 @@
         "files": null,
         "deps": [
           "androidx.savedstate:savedstate"
+        ]
+      },
+      "metadata": {
+        "version": "1.3.6",
+        "files": [
+          {
+            "name": "savedstate-1.3.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/savedstate/savedstate/1.3.6/savedstate-1.3.6.jar",
+            "sha256": "0741a750940978c7e8b1605f117be62e399fd57a7625ab1ae80a28a2ca0f3415"
+          }
+        ],
+        "deps": [
+          "androidx.savedstate:savedstate"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.3.6",
+        "files": [
+          {
+            "name": "savedstate-1.3.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/savedstate/savedstate/1.3.6/savedstate-1.3.6.jar",
+            "sha256": "0741a750940978c7e8b1605f117be62e399fd57a7625ab1ae80a28a2ca0f3415"
+          }
+        ],
+        "deps": [
+          "androidx.savedstate:savedstate"
+        ],
+        "source_sets": [
+          "commonMain"
         ]
       },
       "wasmJs": {
@@ -16702,6 +17740,42 @@
           "org.jetbrains.compose.runtime:runtime"
         ]
       },
+      "metadata": {
+        "version": "1.3.6",
+        "files": [
+          {
+            "name": "savedstate-compose-1.3.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/savedstate/savedstate-compose/1.3.6/savedstate-compose-1.3.6.jar",
+            "sha256": "61b8b51d04b4d992e8e1b618ad4cf117324301e492ad06a058fc96cdf861b780"
+          }
+        ],
+        "deps": [
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.androidx.savedstate:savedstate",
+          "org.jetbrains.compose.runtime:runtime"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.3.6",
+        "files": [
+          {
+            "name": "savedstate-compose-1.3.6.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/savedstate/savedstate-compose/1.3.6/savedstate-compose-1.3.6.jar",
+            "sha256": "61b8b51d04b4d992e8e1b618ad4cf117324301e492ad06a058fc96cdf861b780"
+          }
+        ],
+        "deps": [
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.androidx.savedstate:savedstate",
+          "org.jetbrains.compose.runtime:runtime"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "wasmJs": {
         "version": "1.3.6",
         "files": [
@@ -16736,24 +17810,25 @@
         ]
       },
       "js": {
-        "version": "1.10.1",
+        "version": "1.12.2",
         "files": [
           {
-            "name": "animation-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation-js/1.10.1/animation-js-1.10.1.klib",
-            "sha256": "792fe2717545351a7282b63fcd49409742c007f879847e67d9784d1fa0a0cfb3"
+            "name": "animation-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation-js/1.12.2/animation-js-1.12.2.klib",
+            "sha256": "08d0b8834fdfa5501f9516a2820105b5b95521fbb80b6eac3bc4c1d8890a8a58"
           }
         ],
         "deps": [
           "org.jetbrains.compose.animation:animation-core",
           "org.jetbrains.compose.foundation:foundation-layout",
           "org.jetbrains.compose.runtime:runtime",
-          "org.jetbrains.compose.ui:ui",
           "org.jetbrains.compose.ui:ui-geometry",
           "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ],
         "runtime_deps": [
-          "org.jetbrains.compose.collection-internal:collection",
+          "androidx.collection:collection",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-graphics",
           "org.jetbrains.compose.ui:ui-util"
         ]
       },
@@ -16779,24 +17854,71 @@
           "org.jetbrains.compose.ui:ui-util"
         ]
       },
-      "wasmJs": {
+      "metadata": {
         "version": "1.10.1",
         "files": [
           {
-            "name": "animation-wasm-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation-wasm-js/1.10.1/animation-wasm-js-1.10.1.klib",
-            "sha256": "9adfd148e1993ed95c40d40b5ffbf1570cf71ea0334a2b52ff9139b0f0181012"
+            "name": "animation-1.10.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation/1.10.1/animation-1.10.1.jar",
+            "sha256": "9747436cf1633b6e655059febdde7c249102bd5ff3c7bd8dbb496c0a9c2d936d"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.animation:animation-core",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.compose.ui:ui-util"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "animation-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation/1.12.2/animation-1.12.2.jar",
+            "sha256": "7e3d0284f2eb12196795bdfa6804e246eab5166f8c7891508b460dbc9cb221fc"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.animation:animation-core",
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-util"
+        ],
+        "source_sets": [
+          "commonMain",
+          "nonAndroidMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "animation-wasm-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation-wasm-js/1.12.2/animation-wasm-js-1.12.2.klib",
+            "sha256": "fd6b0b9265fbcba8e0f3ea19567c3fcd453e625f09e6bdf51309add54ca949fe"
           }
         ],
         "deps": [
           "org.jetbrains.compose.animation:animation-core",
           "org.jetbrains.compose.foundation:foundation-layout",
           "org.jetbrains.compose.runtime:runtime",
-          "org.jetbrains.compose.ui:ui",
           "org.jetbrains.compose.ui:ui-geometry"
         ],
         "runtime_deps": [
-          "org.jetbrains.compose.collection-internal:collection",
+          "androidx.collection:collection",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-graphics",
           "org.jetbrains.compose.ui:ui-util"
         ]
       }
@@ -16819,27 +17941,28 @@
         ]
       },
       "js": {
-        "version": "1.10.1",
+        "version": "1.12.2",
         "files": [
           {
-            "name": "animation-core-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation-core-js/1.10.1/animation-core-js-1.10.1.klib",
-            "sha256": "656d1fb87e09a113cf6a5b9e3d512cbdf811687fa01da60bf13bd213401820ab"
+            "name": "animation-core-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation-core-js/1.12.2/animation-core-js-1.12.2.klib",
+            "sha256": "d206e9ef5f3d290584eca388c128be77adbfc6190f1d146d0045fa3e4b7d9a24"
           }
         ],
         "deps": [
           "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ],
         "runtime_deps": [
-          "org.jetbrains.compose.annotation-internal:annotation",
+          "androidx.collection:collection",
           "org.jetbrains.compose.collection-internal:collection",
           "org.jetbrains.compose.runtime:runtime",
           "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-graphics",
           "org.jetbrains.compose.ui:ui-unit",
           "org.jetbrains.compose.ui:ui-util",
-          "org.jetbrains.kotlin:kotlinx-atomicfu-runtime",
-          "org.jetbrains.kotlinx:atomicfu"
+          "org.jetbrains.kotlin:kotlinx-atomicfu-runtime"
         ]
       },
       "jvm": {
@@ -16863,26 +17986,73 @@
           "org.jetbrains.compose.ui:ui-util"
         ]
       },
-      "wasmJs": {
+      "metadata": {
         "version": "1.10.1",
         "files": [
           {
-            "name": "animation-core-wasm-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation-core-wasm-js/1.10.1/animation-core-wasm-js-1.10.1.klib",
-            "sha256": "6d7fb894ad16546b1d50bbae0530b3ac40cbcc7c5c7d1bc5fab36a1057a8b8ef"
+            "name": "animation-core-1.10.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation-core/1.10.1/animation-core-1.10.1.jar",
+            "sha256": "bfc4f43d664575ac10db61649212f45392f968247f96ae91e1a73e4bd0a204f3"
           }
         ],
         "deps": [
-          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
-        ],
-        "runtime_deps": [
           "org.jetbrains.compose.annotation-internal:annotation",
           "org.jetbrains.compose.collection-internal:collection",
           "org.jetbrains.compose.runtime:runtime",
           "org.jetbrains.compose.ui:ui",
           "org.jetbrains.compose.ui:ui-unit",
           "org.jetbrains.compose.ui:ui-util",
-          "org.jetbrains.kotlinx:atomicfu"
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "animation-core-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation-core/1.12.2/animation-core-1.12.2.jar",
+            "sha256": "856030c34d84adb0feea651ef55d053203aebd200dbdb8192815c50131316336"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "animation-core-wasm-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/animation/animation-core-wasm-js/1.12.2/animation-core-wasm-js-1.12.2.klib",
+            "sha256": "697c81fabb076e3d94fec294b5a5b7c3ea78742e7a1240fe49f8d95d4e07584e"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util"
         ]
       }
     },
@@ -16942,11 +18112,11 @@
         ]
       },
       "js": {
-        "version": "1.10.1",
+        "version": "1.10.0",
         "files": [
           {
-            "name": "annotation-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/annotation-internal/annotation-js/1.10.1/annotation-js-1.10.1.klib",
+            "name": "annotation-js-1.10.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/annotation-internal/annotation-js/1.10.0/annotation-js-1.10.0.klib",
             "sha256": "772c19a5e4de38adc073b917464de7696d3eacf69eaf6537524432f3a793c5b1"
           }
         ],
@@ -16962,12 +18132,44 @@
           "androidx.annotation:annotation"
         ]
       },
-      "wasmJs": {
+      "metadata": {
         "version": "1.10.1",
         "files": [
           {
-            "name": "annotation-wasm-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/annotation-internal/annotation-wasm-js/1.10.1/annotation-wasm-js-1.10.1.klib",
+            "name": "annotation-1.10.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/annotation-internal/annotation/1.10.1/annotation-1.10.1.jar",
+            "sha256": "59a0e9b77b3e1f61d3e3f0df8f99ed2a12b168ded809ea39e6fd75eeff94be12"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.9.1",
+        "files": [
+          {
+            "name": "annotation-1.9.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/annotation-internal/annotation/1.9.1/annotation-1.9.1.jar",
+            "sha256": "597b893edebd7ec3ee66f3c63c91e3c23733f896745d17bc72aef6618a47a68f"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.10.0",
+        "files": [
+          {
+            "name": "annotation-wasm-js-1.10.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/annotation-internal/annotation-wasm-js/1.10.0/annotation-wasm-js-1.10.0.klib",
             "sha256": "e198217f9b872a94baa3cea1bb51865ea65a4a94ab9ba9ccec66be9f43728d90"
           }
         ],
@@ -16985,11 +18187,11 @@
         ]
       },
       "js": {
-        "version": "1.10.1",
+        "version": "1.10.0",
         "files": [
           {
-            "name": "collection-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/collection-internal/collection-js/1.10.1/collection-js-1.10.1.klib",
+            "name": "collection-js-1.10.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/collection-internal/collection-js/1.10.0/collection-js-1.10.0.klib",
             "sha256": "6fc35c9c4cb507a52ecc41b30b59740de22a30b8b6c37fbba5e0580bf0b44354"
           }
         ],
@@ -17033,12 +18235,28 @@
         ]
       },
       "metadata": {
-        "version": "1.8.2",
+        "version": "1.10.1",
         "files": [
           {
-            "name": "collection-1.8.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/collection-internal/collection/1.8.2/collection-1.8.2.jar",
-            "sha256": "ed73891406046b98739f34f4befe60f62091c28706f2cb36330297fd9fd88129"
+            "name": "collection-1.10.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/collection-internal/collection/1.10.1/collection-1.10.1.jar",
+            "sha256": "367b8ea28496dc024531a0fe97576dd76864bb066ffa09ba2141f73c79bf3c3d"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.9.1",
+        "files": [
+          {
+            "name": "collection-1.9.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/collection-internal/collection/1.9.1/collection-1.9.1.jar",
+            "sha256": "5220f63792fc68e0004b33b88b70e89a1d5d46a94a036ceb4ec8f53ab4b3f41e"
           }
         ],
         "deps": [
@@ -17062,11 +18280,11 @@
         ]
       },
       "wasmJs": {
-        "version": "1.10.1",
+        "version": "1.10.0",
         "files": [
           {
-            "name": "collection-wasm-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/collection-internal/collection-wasm-js/1.10.1/collection-wasm-js-1.10.1.klib",
+            "name": "collection-wasm-js-1.10.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/collection-internal/collection-wasm-js/1.10.0/collection-wasm-js-1.10.0.klib",
             "sha256": "66ec177eb2c1bff4075dfbca127d260a6eb190256025f00aea7179d09a74aafa"
           }
         ],
@@ -17177,29 +18395,28 @@
         ]
       },
       "js": {
-        "version": "1.10.1",
+        "version": "1.12.2",
         "files": [
           {
-            "name": "foundation-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation-js/1.10.1/foundation-js-1.10.1.klib",
-            "sha256": "2499cac73a9bb8516fc04d35006c01cd2c06a77b4e6285df7e363f684a1f47f4"
+            "name": "foundation-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation-js/1.12.2/foundation-js-1.12.2.klib",
+            "sha256": "9abdb80f07c17758d910a2199bec29dcae9629ed5a8de2b91a9d5ae3d24a38d8"
           }
         ],
         "deps": [
+          "androidx.collection:collection",
           "org.jetbrains.compose.animation:animation",
           "org.jetbrains.compose.runtime:runtime",
           "org.jetbrains.compose.ui:ui",
           "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.skiko:skiko"
         ],
         "runtime_deps": [
-          "org.jetbrains.compose.annotation-internal:annotation",
-          "org.jetbrains.compose.collection-internal:collection",
           "org.jetbrains.compose.foundation:foundation-layout",
           "org.jetbrains.compose.ui:ui-text",
           "org.jetbrains.compose.ui:ui-util",
-          "org.jetbrains.kotlin:kotlinx-atomicfu-runtime",
-          "org.jetbrains.kotlinx:atomicfu"
+          "org.jetbrains.kotlin:kotlinx-atomicfu-runtime"
         ]
       },
       "jvm": {
@@ -17226,28 +18443,76 @@
           "org.jetbrains.runtime:jbr-api"
         ]
       },
-      "wasmJs": {
+      "metadata": {
         "version": "1.10.1",
         "files": [
           {
-            "name": "foundation-wasm-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation-wasm-js/1.10.1/foundation-wasm-js-1.10.1.klib",
-            "sha256": "0a92ed5f2c69b7f90447c6218e658479f5a5322222134d936927ddf1f27ce6d0"
+            "name": "foundation-1.10.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation/1.10.1/foundation-1.10.1.jar",
+            "sha256": "e1922ed2a810b419e53f3b621a09d22783a1bb853d6f427da9f3201209712b1f"
           }
         ],
         "deps": [
           "org.jetbrains.compose.animation:animation",
-          "org.jetbrains.compose.runtime:runtime",
-          "org.jetbrains.compose.ui:ui",
-          "org.jetbrains.skiko:skiko"
-        ],
-        "runtime_deps": [
           "org.jetbrains.compose.annotation-internal:annotation",
           "org.jetbrains.compose.collection-internal:collection",
           "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-text",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:atomicfu"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "foundation-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation/1.12.2/foundation-1.12.2.jar",
+            "sha256": "0205f5d393967c37a360a1840e9b630bcd6149f3730ce8830789ae62d049d4e9"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
           "org.jetbrains.compose.ui:ui-text",
           "org.jetbrains.compose.ui:ui-util",
           "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "source_sets": [
+          "commonMain",
+          "skikoMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "foundation-wasm-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation-wasm-js/1.12.2/foundation-wasm-js-1.12.2.klib",
+            "sha256": "57d6e039e5ad27b200922fdf1017f7732dccd9f387fe408265f7c80987aa7394"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.ui:ui-text",
+          "org.jetbrains.compose.ui:ui-util",
           "org.jetbrains.kotlinx:kotlinx-browser"
         ]
       }
@@ -17294,12 +18559,12 @@
         ]
       },
       "js": {
-        "version": "1.10.1",
+        "version": "1.12.2",
         "files": [
           {
-            "name": "foundation-layout-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation-layout-js/1.10.1/foundation-layout-js-1.10.1.klib",
-            "sha256": "94ce2cd435c1f80e003cea2a6a61496563c1cc785486f4e6383522e3722e12fc"
+            "name": "foundation-layout-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation-layout-js/1.12.2/foundation-layout-js-1.12.2.klib",
+            "sha256": "ebe1c438640e4918179fd4e900ce87e29e1fabd4ea3dea6ff82f4fbf2a92b0ee"
           }
         ],
         "deps": [
@@ -17307,9 +18572,9 @@
           "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ],
         "runtime_deps": [
-          "org.jetbrains.compose.annotation-internal:annotation",
-          "org.jetbrains.compose.collection-internal:collection",
+          "androidx.collection:collection",
           "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-unit",
           "org.jetbrains.compose.ui:ui-util"
         ]
       },
@@ -17332,22 +18597,63 @@
           "org.jetbrains.compose.ui:ui-util"
         ]
       },
-      "wasmJs": {
+      "metadata": {
         "version": "1.10.1",
         "files": [
           {
-            "name": "foundation-layout-wasm-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation-layout-wasm-js/1.10.1/foundation-layout-wasm-js-1.10.1.klib",
-            "sha256": "347ae040f1c529007de82f8e9c1e65c90245017f58f14966d83005f675518b2d"
+            "name": "foundation-layout-1.10.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation-layout/1.10.1/foundation-layout-1.10.1.jar",
+            "sha256": "2392e6e030bf59d0316169f017dbdc37c4ec4f8a7ef7bd4ce551c27a07c20912"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-util"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "foundation-layout-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation-layout/1.12.2/foundation-layout-1.12.2.jar",
+            "sha256": "eef6a1f78be2f3a6324f71e92d4396dbf45a69328a222494a9fd908f92772b3a"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util"
+        ],
+        "source_sets": [
+          "commonMain",
+          "skikoMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "foundation-layout-wasm-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/foundation/foundation-layout-wasm-js/1.12.2/foundation-layout-wasm-js-1.12.2.klib",
+            "sha256": "653c22e96df089adbdb321793fa5fc317374e555cddf1156b221d608ebf981db"
           }
         ],
         "deps": [
           "org.jetbrains.compose.ui:ui"
         ],
         "runtime_deps": [
-          "org.jetbrains.compose.annotation-internal:annotation",
-          "org.jetbrains.compose.collection-internal:collection",
+          "androidx.collection:collection",
           "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-unit",
           "org.jetbrains.compose.ui:ui-util"
         ]
       }
@@ -17370,6 +18676,91 @@
           "org.jetbrains.compose.runtime:runtime",
           "org.jetbrains.compose.ui:ui-unit",
           "org.jetbrains.compose.ui:ui-util"
+        ]
+      }
+    },
+    "org.jetbrains.compose.material3:material3": {
+      "js": {
+        "version": "1.9.0",
+        "files": [
+          {
+            "name": "material3-js-1.9.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/material3/material3-js/1.9.0/material3-js-1.9.0.klib",
+            "sha256": "505ed85ee8ef577b99643bc918214eb9ff47a27df2df5020e682bd1e63d0adb7"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.foundation:foundation",
+          "org.jetbrains.compose.material:material-ripple",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-text",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.animation:animation-core",
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.ui:ui-backhandler",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlin:kotlinx-atomicfu-runtime",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-datetime"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.9.0",
+        "files": [
+          {
+            "name": "material3-1.9.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/material3/material3/1.9.0/material3-1.9.0.jar",
+            "sha256": "0be26b1746e5baae437dbf820daefef7e107b648846f97e7b411dcd1de4f6433"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.animation:animation-core",
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.foundation:foundation",
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.material:material-ripple",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-backhandler",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-text",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:atomicfu"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.9.0",
+        "files": [
+          {
+            "name": "material3-wasm-js-1.9.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/material3/material3-wasm-js/1.9.0/material3-wasm-js-1.9.0.klib",
+            "sha256": "8049ab369302ed777837903f1b1018ffa3856e59a33b9c78afbd00d8dc34f46c"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.foundation:foundation",
+          "org.jetbrains.compose.material:material-ripple",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-text"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.animation:animation-core",
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.foundation:foundation-layout",
+          "org.jetbrains.compose.ui:ui-backhandler",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-datetime"
         ]
       }
     },
@@ -17428,6 +18819,59 @@
         ]
       }
     },
+    "org.jetbrains.compose.material:material-icons-core": {
+      "js": {
+        "version": "1.7.3",
+        "files": [
+          {
+            "name": "material-icons-core-js-1.7.3.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/material/material-icons-core-js/1.7.3/material-icons-core-js-1.7.3.klib",
+            "sha256": "ac77047429412a27ddc95f8a7cc92281822941c496671b350397a326bd8066b6"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.ui:ui",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-unit"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.7.3",
+        "files": [
+          {
+            "name": "material-icons-core-1.7.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/material/material-icons-core/1.7.3/material-icons-core-1.7.3.jar",
+            "sha256": "de5a0c277e1598c121d2c4606cc03bdffebd059e32b3494ddfb84c08d51da701"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.ui:ui"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.7.3",
+        "files": [
+          {
+            "name": "material-icons-core-wasm-js-1.7.3.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/material/material-icons-core-wasm-js/1.7.3/material-icons-core-wasm-js-1.7.3.klib",
+            "sha256": "b49e6d71be88de8ff909b7b741f21b744c7d24d7c73e2949e75dfbf581561020"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.ui:ui"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-unit"
+        ]
+      }
+    },
     "org.jetbrains.compose.material:material-icons-core-desktop": {
       "jvm": {
         "version": "1.7.3",
@@ -17448,6 +18892,26 @@
       }
     },
     "org.jetbrains.compose.material:material-ripple": {
+      "js": {
+        "version": "1.9.1",
+        "files": [
+          {
+            "name": "material-ripple-js-1.9.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/material/material-ripple-js/1.9.1/material-ripple-js-1.9.1.klib",
+            "sha256": "419b8b5b2f79ce418f923141a1d1f5ddd8b9ccfbce1945ce7aca9781d06d2b34"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.foundation:foundation",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      },
       "jvm": {
         "version": "1.12.2",
         "files": [
@@ -17464,6 +18928,45 @@
         "runtime_deps": [
           "androidx.collection:collection",
           "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.ui:ui-util"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.9.1",
+        "files": [
+          {
+            "name": "material-ripple-1.9.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/material/material-ripple/1.9.1/material-ripple-1.9.1.jar",
+            "sha256": "292d2b3fbbbcc24bb326f3f642dac9a8cd55e18d5b518365bac6daca23a5cf74"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.foundation:foundation",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-util"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.9.1",
+        "files": [
+          {
+            "name": "material-ripple-wasm-js-1.9.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/material/material-ripple-wasm-js/1.9.1/material-ripple-wasm-js-1.9.1.klib",
+            "sha256": "bda9643924505945fcc48c3ed297120c59166cb7603c443edb4e75aba1436856"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.foundation:foundation",
+          "org.jetbrains.compose.runtime:runtime"
+        ],
+        "runtime_deps": [
+          "org.jetbrains.compose.animation:animation",
+          "org.jetbrains.compose.collection-internal:collection",
           "org.jetbrains.compose.ui:ui-util"
         ]
       }
@@ -17654,6 +19157,42 @@
           "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose"
         ]
       },
+      "metadata": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "runtime-saveable-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/runtime/runtime-saveable/1.12.2/runtime-saveable-1.12.2.jar",
+            "sha256": "df706f39cb0cceab1b580c32c0b87d855224758dfac2d98ddd6243e2ba628a36"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime-saveable",
+          "org.jetbrains.androidx.savedstate:savedstate-compose",
+          "org.jetbrains.compose.runtime:runtime"
+        ],
+        "source_sets": [
+          "redirectCommonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "runtime-saveable-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/runtime/runtime-saveable/1.12.2/runtime-saveable-1.12.2.jar",
+            "sha256": "df706f39cb0cceab1b580c32c0b87d855224758dfac2d98ddd6243e2ba628a36"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime-saveable",
+          "org.jetbrains.androidx.savedstate:savedstate-compose",
+          "org.jetbrains.compose.runtime:runtime"
+        ],
+        "source_sets": [
+          "redirectCommonMain"
+        ]
+      },
       "wasmJs": {
         "version": "1.12.2",
         "files": [
@@ -17700,17 +19239,19 @@
         ]
       },
       "js": {
-        "version": "1.10.1",
+        "version": "1.12.2",
         "files": [
           {
-            "name": "ui-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-js/1.10.1/ui-js-1.10.1.klib",
-            "sha256": "6bf29733baff139b8a89dbaada0099e49d03e711f3cb5596d7680f0944c08d73"
+            "name": "ui-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-js/1.12.2/ui-js-1.12.2.klib",
+            "sha256": "e8e04ee282dfb232a8c150f8275b89fcac51f804113926ff859e57bc7b0bf97d"
           }
         ],
         "deps": [
+          "androidx.annotation:annotation",
           "androidx.compose.runtime:runtime-retain",
-          "org.jetbrains.androidx.lifecycle:lifecycle-common",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose",
           "org.jetbrains.compose.runtime:runtime-saveable",
           "org.jetbrains.compose.ui:ui-geometry",
           "org.jetbrains.compose.ui:ui-graphics",
@@ -17718,20 +19259,22 @@
           "org.jetbrains.compose.ui:ui-unit",
           "org.jetbrains.compose.ui:ui-util",
           "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-browser",
           "org.jetbrains.skiko:skiko"
         ],
         "runtime_deps": [
-          "androidx.navigationevent:navigationevent",
-          "org.jetbrains.androidx.lifecycle:lifecycle-runtime",
-          "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-viewmodel-compose",
+          "androidx.lifecycle:lifecycle-viewmodel-savedstate",
           "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel",
           "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "org.jetbrains.androidx.navigationevent:navigationevent-compose",
           "org.jetbrains.compose.annotation-internal:annotation",
           "org.jetbrains.compose.collection-internal:collection",
           "org.jetbrains.compose.runtime:runtime",
           "org.jetbrains.compose.ui:ui-backhandler",
           "org.jetbrains.kotlin:kotlinx-atomicfu-runtime",
-          "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
@@ -17767,29 +19310,18 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
-      "wasmJs": {
+      "metadata": {
         "version": "1.10.1",
         "files": [
           {
-            "name": "ui-wasm-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-wasm-js/1.10.1/ui-wasm-js-1.10.1.klib",
-            "sha256": "658974c0a11daad8678e1778e1212867803bd3dbddc9c8107441040be17d0167"
+            "name": "ui-1.10.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui/1.10.1/ui-1.10.1.jar",
+            "sha256": "aca32b05689bb4116ac10eeeb283a57d0cb7ea1efcd97621d4643f5cb44fec6c"
           }
         ],
         "deps": [
           "androidx.compose.runtime:runtime-retain",
           "org.jetbrains.androidx.lifecycle:lifecycle-common",
-          "org.jetbrains.compose.runtime:runtime-saveable",
-          "org.jetbrains.compose.ui:ui-geometry",
-          "org.jetbrains.compose.ui:ui-graphics",
-          "org.jetbrains.compose.ui:ui-text",
-          "org.jetbrains.compose.ui:ui-unit",
-          "org.jetbrains.compose.ui:ui-util",
-          "org.jetbrains.kotlinx:kotlinx-browser",
-          "org.jetbrains.skiko:skiko"
-        ],
-        "runtime_deps": [
-          "androidx.navigationevent:navigationevent",
           "org.jetbrains.androidx.lifecycle:lifecycle-runtime",
           "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose",
           "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel",
@@ -17797,8 +19329,88 @@
           "org.jetbrains.compose.annotation-internal:annotation",
           "org.jetbrains.compose.collection-internal:collection",
           "org.jetbrains.compose.runtime:runtime",
-          "org.jetbrains.compose.ui:ui-backhandler",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-text",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util",
           "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui/1.12.2/ui-1.12.2.jar",
+            "sha256": "002699b67fd985e9bafb67aa4322f4b2034bf0a9998c7ebdc484aa61d0b1ac2c"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime-retain",
+          "androidx.lifecycle:lifecycle-viewmodel-compose",
+          "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose",
+          "org.jetbrains.androidx.navigationevent:navigationevent-compose",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-text",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "source_sets": [
+          "commonMain",
+          "skikoMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-wasm-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-wasm-js/1.12.2/ui-wasm-js-1.12.2.klib",
+            "sha256": "623ce219fd9e8153eda1947a28aab0e3ed4184deff1f08925167cebad8f95d8a"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime-retain",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-text",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-browser",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-viewmodel-compose",
+          "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel",
+          "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate",
+          "org.jetbrains.androidx.navigationevent:navigationevent-compose",
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-backhandler",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.jetbrains.skiko:skiko-wasm-js"
         ]
@@ -17806,20 +19418,20 @@
     },
     "org.jetbrains.compose.ui:ui-backhandler": {
       "js": {
-        "version": "1.10.1",
+        "version": "1.12.2",
         "files": [
           {
-            "name": "ui-backhandler-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-backhandler-js/1.10.1/ui-backhandler-js-1.10.1.klib",
-            "sha256": "a6cdfaa7abd41b4f27c03ad43effef40e6fe06f1dfebcf66b0186faa13490b75"
+            "name": "ui-backhandler-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-backhandler-js/1.12.2/ui-backhandler-js-1.12.2.klib",
+            "sha256": "5183fbf67b949a0b35323c7d15684927cd17116013c7ddf1a8bb5521dfa2d98d"
           }
         ],
         "deps": [
           "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ],
         "runtime_deps": [
-          "androidx.navigationevent:navigationevent",
-          "org.jetbrains.compose.annotation-internal:annotation",
+          "androidx.annotation:annotation",
+          "org.jetbrains.androidx.navigationevent:navigationevent-compose",
           "org.jetbrains.compose.runtime:runtime",
           "org.jetbrains.compose.ui:ui-util",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
@@ -17842,18 +19454,37 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
-      "wasmJs": {
-        "version": "1.10.1",
+      "metadataWeb": {
+        "version": "1.12.2",
         "files": [
           {
-            "name": "ui-backhandler-wasm-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-backhandler-wasm-js/1.10.1/ui-backhandler-wasm-js-1.10.1.klib",
-            "sha256": "6ba5f00ba40d847c186ddb503b445c2591a9d8963db0b91c32299b688ee91c6b"
+            "name": "ui-backhandler-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-backhandler/1.12.2/ui-backhandler-1.12.2.jar",
+            "sha256": "1cbc77ff4e3031f1d7f1d9ae8ae6e82c81ed084b85fa38d353f150543d7e8e77"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-backhandler-wasm-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-backhandler-wasm-js/1.12.2/ui-backhandler-wasm-js-1.12.2.klib",
+            "sha256": "6cb43b537503966c9fbe635becfda83ae07607ff457526cab8c88da0bf8057b5"
           }
         ],
         "runtime_deps": [
-          "androidx.navigationevent:navigationevent",
-          "org.jetbrains.compose.annotation-internal:annotation",
+          "androidx.annotation:annotation",
+          "org.jetbrains.androidx.navigationevent:navigationevent-compose",
           "org.jetbrains.compose.runtime:runtime",
           "org.jetbrains.compose.ui:ui-util",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
@@ -17907,12 +19538,12 @@
         ]
       },
       "js": {
-        "version": "1.10.1",
+        "version": "1.12.2",
         "files": [
           {
-            "name": "ui-geometry-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-geometry-js/1.10.1/ui-geometry-js-1.10.1.klib",
-            "sha256": "f361436bebacf3acd570b4b0d98d6102764b1b77700d9d5dd7dd38bad2c0141a"
+            "name": "ui-geometry-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-geometry-js/1.12.2/ui-geometry-js-1.12.2.klib",
+            "sha256": "95b97058a934e3d5bc0edccd3124baaef79d65b364e07a4c3c7f935b52ec0055"
           }
         ],
         "deps": [
@@ -17937,13 +19568,47 @@
           "org.jetbrains.compose.ui:ui-util"
         ]
       },
-      "wasmJs": {
+      "metadata": {
         "version": "1.10.1",
         "files": [
           {
-            "name": "ui-geometry-wasm-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-geometry-wasm-js/1.10.1/ui-geometry-wasm-js-1.10.1.klib",
-            "sha256": "e160ecad36c71561bb4e7ff5798969bb4a07708a444b4f36e6a61629cbd757af"
+            "name": "ui-geometry-1.10.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-geometry/1.10.1/ui-geometry-1.10.1.jar",
+            "sha256": "16ee911b8b3e51d69cc08981d95723a1682d578fefaf7f8e8a54d5555bf85925"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-util"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-geometry-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-geometry/1.12.2/ui-geometry-1.12.2.jar",
+            "sha256": "b9cb13d0db999d5ad3fb8da5a6d4f0813c3998ceaf4dea3031c2196778ee3c60"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-util"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-geometry-wasm-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-geometry-wasm-js/1.12.2/ui-geometry-wasm-js-1.12.2.klib",
+            "sha256": "292ef7de5ca2ccaac72566132f3b0137655e4ae962899fcb20af57fa41eb9924"
           }
         ],
         "runtime_deps": [
@@ -17985,24 +19650,24 @@
         ]
       },
       "js": {
-        "version": "1.10.1",
+        "version": "1.12.2",
         "files": [
           {
-            "name": "ui-graphics-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-graphics-js/1.10.1/ui-graphics-js-1.10.1.klib",
-            "sha256": "033e4f4c0c5182a2de385a0e0fcd1e30aa749b46cb418fe39d895429d0f5e6ad"
+            "name": "ui-graphics-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-graphics-js/1.12.2/ui-graphics-js-1.12.2.klib",
+            "sha256": "9912a1e48de7ada161b09546656682a0b7df217904e31445bed5c631baf88c87"
           }
         ],
         "deps": [
+          "androidx.annotation:annotation",
           "org.jetbrains.compose.ui:ui-unit",
           "org.jetbrains.kotlin:kotlin-dom-api-compat",
           "org.jetbrains.skiko:skiko"
         ],
         "runtime_deps": [
-          "org.jetbrains.compose.annotation-internal:annotation",
+          "androidx.collection:collection",
           "org.jetbrains.compose.collection-internal:collection",
           "org.jetbrains.compose.runtime:runtime",
-          "org.jetbrains.compose.ui:ui-geometry",
           "org.jetbrains.compose.ui:ui-util"
         ]
       },
@@ -18026,24 +19691,67 @@
           "org.jetbrains.compose.ui:ui-util"
         ]
       },
-      "wasmJs": {
+      "metadata": {
         "version": "1.10.1",
         "files": [
           {
-            "name": "ui-graphics-wasm-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-graphics-wasm-js/1.10.1/ui-graphics-wasm-js-1.10.1.klib",
-            "sha256": "b9d9cd8a5446f7469667bda71663ed82c5a052cb943e0048a2accae5b25752de"
+            "name": "ui-graphics-1.10.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-graphics/1.10.1/ui-graphics-1.10.1.jar",
+            "sha256": "3771d0df250c09e0e938d07073c089eaeb6612cb8ca86153bdb0d70443e04b97"
           }
         ],
         "deps": [
-          "org.jetbrains.compose.ui:ui-unit",
-          "org.jetbrains.skiko:skiko"
-        ],
-        "runtime_deps": [
           "org.jetbrains.compose.annotation-internal:annotation",
           "org.jetbrains.compose.collection-internal:collection",
           "org.jetbrains.compose.runtime:runtime",
           "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-graphics-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-graphics/1.12.2/ui-graphics-1.12.2.jar",
+            "sha256": "16807b2b81ac0a1d28f0c82b6c0dab1ce59ce403a97aa7d26c9ce7bd523a270a"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "source_sets": [
+          "commonMain",
+          "skikoMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-graphics-wasm-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-graphics-wasm-js/1.12.2/ui-graphics-wasm-js-1.12.2.klib",
+            "sha256": "68f081779c65c15e6ce73d3fe47809f9490462b64ac52b8425364330064677eb"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.runtime:runtime",
           "org.jetbrains.compose.ui:ui-util",
           "org.jetbrains.skiko:skiko-wasm-js"
         ]
@@ -18122,29 +19830,28 @@
         ]
       },
       "js": {
-        "version": "1.10.1",
+        "version": "1.12.2",
         "files": [
           {
-            "name": "ui-text-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-text-js/1.10.1/ui-text-js-1.10.1.klib",
-            "sha256": "a254275b8959c9fe79be9d85a21590e3048a13fa8d5d919b25112e6fa0a18611"
+            "name": "ui-text-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-text-js/1.12.2/ui-text-js-1.12.2.klib",
+            "sha256": "c48cc017ae051bcf6054cbac6050885961704556a22598af1f4c6af9d19f60c5"
           }
         ],
         "deps": [
           "org.jetbrains.compose.ui:ui-graphics",
           "org.jetbrains.compose.ui:ui-unit",
           "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.skiko:skiko"
         ],
         "runtime_deps": [
-          "org.jetbrains.compose.annotation-internal:annotation",
+          "androidx.collection:collection",
           "org.jetbrains.compose.collection-internal:collection",
           "org.jetbrains.compose.runtime:runtime",
           "org.jetbrains.compose.runtime:runtime-saveable",
-          "org.jetbrains.compose.ui:ui-geometry",
           "org.jetbrains.compose.ui:ui-util",
           "org.jetbrains.kotlin:kotlinx-atomicfu-runtime",
-          "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
@@ -18171,28 +19878,77 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
-      "wasmJs": {
+      "metadata": {
         "version": "1.10.1",
         "files": [
           {
-            "name": "ui-text-wasm-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-text-wasm-js/1.10.1/ui-text-wasm-js-1.10.1.klib",
-            "sha256": "d9d678c4afc8405762de93658abfca64ab7b6ec8c8d5cd92d851233d9456ac26"
+            "name": "ui-text-1.10.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-text/1.10.1/ui-text-1.10.1.jar",
+            "sha256": "b537d0b3bb23ec795a1b35627deaa93703cfd0733bc7b2dc346415df06243a91"
           }
         ],
         "deps": [
-          "org.jetbrains.compose.ui:ui-graphics",
-          "org.jetbrains.compose.ui:ui-unit",
-          "org.jetbrains.skiko:skiko"
-        ],
-        "runtime_deps": [
           "org.jetbrains.compose.annotation-internal:annotation",
           "org.jetbrains.compose.collection-internal:collection",
           "org.jetbrains.compose.runtime:runtime",
           "org.jetbrains.compose.runtime:runtime-saveable",
           "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-unit",
           "org.jetbrains.compose.ui:ui-util",
           "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-text-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-text/1.12.2/ui-text-1.12.2.jar",
+            "sha256": "dde3f95b44553326d8626e2f76dd803d44b464729d452cbca27a51b8fd85cf89"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "source_sets": [
+          "commonMain",
+          "skikoMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-text-wasm-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-text-wasm-js/1.12.2/ui-text-wasm-js-1.12.2.klib",
+            "sha256": "f428c3c8d6089b54bbefdee5ee11513b982edd4beb8debc21d649c50fcb05933"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.ui:ui-graphics",
+          "org.jetbrains.compose.ui:ui-unit",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.skiko:skiko"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.runtime:runtime-saveable",
+          "org.jetbrains.compose.ui:ui-util",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.jetbrains.skiko:skiko-wasm-js"
         ]
@@ -18254,22 +20010,27 @@
         ]
       },
       "js": {
-        "version": "1.10.1",
+        "version": "1.12.2",
         "files": [
           {
-            "name": "ui-unit-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-unit-js/1.10.1/ui-unit-js-1.10.1.klib",
-            "sha256": "141b92d04cdea5ee1ee3b3539c1c6e40f0363b6a3186f7842ad8a493197674c4"
+            "name": "ui-unit-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-unit-js/1.12.2/ui-unit-js-1.12.2.klib",
+            "sha256": "bdbb4751eafe7551dfcdecbf0aedc385c0c19be19b6a863bc48f3214f2a8cc52"
           }
         ],
         "deps": [
+          "androidx.annotation:annotation",
           "org.jetbrains.compose.ui:ui-geometry",
-          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu"
         ],
         "runtime_deps": [
+          "androidx.collection:collection",
           "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.collection-internal:collection",
           "org.jetbrains.compose.runtime:runtime",
-          "org.jetbrains.compose.ui:ui-util"
+          "org.jetbrains.compose.ui:ui-util",
+          "org.jetbrains.kotlin:kotlinx-atomicfu-runtime"
         ]
       },
       "jvm": {
@@ -18291,20 +20052,64 @@
           "org.jetbrains.compose.ui:ui-util"
         ]
       },
-      "wasmJs": {
+      "metadata": {
         "version": "1.10.1",
         "files": [
           {
-            "name": "ui-unit-wasm-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-unit-wasm-js/1.10.1/ui-unit-wasm-js-1.10.1.klib",
-            "sha256": "6d5ce74977a92e5dd742f6e80fb920909afdd43845289350024d3f76330048c4"
+            "name": "ui-unit-1.10.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-unit/1.10.1/ui-unit-1.10.1.jar",
+            "sha256": "92107f897d6d868fc33e7e4eddc3e874ca9aeb22d87127646ac8ed2b676bc47a"
           }
         ],
         "deps": [
-          "org.jetbrains.compose.ui:ui-geometry"
+          "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.compose.ui:ui-util"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-unit-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-unit/1.12.2/ui-unit-1.12.2.jar",
+            "sha256": "2a3b120dfa31dbfa3d3ddf327cff4a1c15f050ff0c19e64f69c1e241db6a072a"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime",
+          "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.compose.ui:ui-util"
+        ],
+        "source_sets": [
+          "commonMain",
+          "nonAndroidMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-unit-wasm-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-unit-wasm-js/1.12.2/ui-unit-wasm-js-1.12.2.klib",
+            "sha256": "e3bad6ab50574bbbdf157b88795c6a7536a57c9d5c625f5a3ec215c9cae1114f"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.compose.ui:ui-geometry",
+          "org.jetbrains.kotlinx:atomicfu"
         ],
         "runtime_deps": [
+          "androidx.collection:collection",
           "org.jetbrains.compose.annotation-internal:annotation",
+          "org.jetbrains.compose.collection-internal:collection",
           "org.jetbrains.compose.runtime:runtime",
           "org.jetbrains.compose.ui:ui-util"
         ]
@@ -18343,19 +20148,21 @@
         ]
       },
       "js": {
-        "version": "1.10.1",
+        "version": "1.12.2",
         "files": [
           {
-            "name": "ui-util-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-util-js/1.10.1/ui-util-js-1.10.1.klib",
-            "sha256": "97d938d4396e78ff4a6fbc65e6d7ddec52cc468716bf08416a7cf5baed637dde"
+            "name": "ui-util-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-util-js/1.12.2/ui-util-js-1.12.2.klib",
+            "sha256": "099182b6042dc536d36134bee2f68e2fb05b2a6f0ad4fe7a1cd7b591bb97b00a"
           }
         ],
         "deps": [
           "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ],
         "runtime_deps": [
-          "org.jetbrains.compose.collection-internal:collection"
+          "androidx.collection:collection",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.runtime:runtime"
         ]
       },
       "jvm": {
@@ -18372,17 +20179,52 @@
           "org.jetbrains.compose.runtime:runtime"
         ]
       },
-      "wasmJs": {
+      "metadata": {
         "version": "1.10.1",
         "files": [
           {
-            "name": "ui-util-wasm-js-1.10.1.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-util-wasm-js/1.10.1/ui-util-wasm-js-1.10.1.klib",
-            "sha256": "5bcf815cb272c2f7c78a87bb8b2516d8343cccd4b454e4657993c6f2a3cab5bc"
+            "name": "ui-util-1.10.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-util/1.10.1/ui-util-1.10.1.jar",
+            "sha256": "f0adcb93a17f27b5548314207db8aaf98faed62e3db2d22ca98c499ea2bc23ed"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.compose.collection-internal:collection"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-util-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-util/1.12.2/ui-util-1.12.2.jar",
+            "sha256": "3650828fdf751ef5f95673766b770bac878ab288de083580487c4720af66903d"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "org.jetbrains.compose.runtime:runtime"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "ui-util-wasm-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/ui/ui-util-wasm-js/1.12.2/ui-util-wasm-js-1.12.2.klib",
+            "sha256": "579f0679a33bff18e0f5ba078a4408681c8740dd08d6b14ca3ad7104c670af6e"
           }
         ],
         "runtime_deps": [
-          "org.jetbrains.compose.collection-internal:collection"
+          "androidx.collection:collection",
+          "org.jetbrains.compose.collection-internal:collection",
+          "org.jetbrains.compose.runtime:runtime"
         ]
       }
     },
@@ -18701,6 +20543,19 @@
         ],
         "deps": [
           "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ]
+      },
+      "metadataWeb": {
+        "version": "0.5.0",
+        "files": [
+          {
+            "name": "kotlinx-browser-metadata-0.5.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-browser/0.5.0/kotlinx-browser-0.5.0.jar",
+            "sha256": "a59afe6bcb25b30914b0a2d0ae9ed9ba7adcfaf9911b7324a5a5bd98150af102"
+          }
+        ],
+        "source_sets": [
+          "webMain"
         ]
       },
       "wasmJs": {
@@ -19764,18 +21619,19 @@
     },
     "org.jetbrains.skiko:skiko": {
       "js": {
-        "version": "0.9.37.4",
+        "version": "0.150.2",
         "files": [
           {
-            "name": "skiko-js-0.9.37.4.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko-js/0.9.37.4/skiko-js-0.9.37.4.klib",
-            "sha256": "213a740896393d4dae075176c59f93b8dceeacd0fa8de164113d11bc2158b33c"
+            "name": "skiko-js-0.150.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko-js/0.150.2/skiko-js-0.150.2.klib",
+            "sha256": "1a5980e5b79ebfa5d670d7f311b06a8d4ff7a5b34cad0d3e3eb32e5519a78ebe"
           }
         ],
         "deps": [
           "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ],
         "runtime_deps": [
+          "org.jetbrains.kotlinx:kotlinx-browser",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
@@ -19794,16 +21650,33 @@
           "org.jetbrains.runtime:jbr-api"
         ]
       },
-      "wasmJs": {
-        "version": "0.9.37.4",
+      "metadataWeb": {
+        "version": "0.150.2",
         "files": [
           {
-            "name": "skiko-wasm-js-0.9.37.4.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko-wasm-js/0.9.37.4/skiko-wasm-js-0.9.37.4.klib",
-            "sha256": "c986a678fed24dd4dc094c70dad6853a3d364b24c29efd64135d5c058215f2a5"
+            "name": "skiko-metadata-0.150.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko/0.150.2/skiko-0.150.2.jar",
+            "sha256": "7f5100bb4aac99ff4b896ddf5a59e8c73cfe4c0f83c5951762a08f848565a8a8"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "wasmJs": {
+        "version": "0.150.2",
+        "files": [
+          {
+            "name": "skiko-wasm-js-0.150.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko-wasm-js/0.150.2/skiko-wasm-js-0.150.2.klib",
+            "sha256": "fb74865dff63368b8f6b5de04ca5e03fa2ae0d1ff9e798c3d77adebe56260d4a"
           }
         ],
         "runtime_deps": [
+          "org.jetbrains.kotlinx:kotlinx-browser",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       }
@@ -19902,15 +21775,16 @@
     },
     "org.jetbrains.skiko:skiko-wasm-js": {
       "wasmJs": {
-        "version": "0.9.37.4",
+        "version": "0.150.2",
         "files": [
           {
-            "name": "skiko-wasm-js-0.9.37.4.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko-wasm-js/0.9.37.4/skiko-wasm-js-0.9.37.4.klib",
-            "sha256": "c986a678fed24dd4dc094c70dad6853a3d364b24c29efd64135d5c058215f2a5"
+            "name": "skiko-wasm-js-0.150.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/skiko/skiko-wasm-js/0.150.2/skiko-wasm-js-0.150.2.klib",
+            "sha256": "fb74865dff63368b8f6b5de04ca5e03fa2ae0d1ff9e798c3d77adebe56260d4a"
           }
         ],
         "runtime_deps": [
+          "org.jetbrains.kotlinx:kotlinx-browser",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       }

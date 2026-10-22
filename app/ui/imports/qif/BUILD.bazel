@@ -1,7 +1,8 @@
 load("//bazel/kmp:defs.bzl", "kmp_library")
 
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android
+# gazelle:kmp_targets android web
+# gazelle:kmp_web_tests false
 # gazelle:kmp_device_test_srcs src/commonTest/kotlin
 # gazelle:kmp_device_test_resources src/commonTest/resources
 
@@ -10,9 +11,16 @@ kmp_library(
     android = True,
     android_deps = ["@maven_kmp//:androidx_compose_material3"],
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    js_deps = ["@maven_kmp//:compose_material3"],
     jvm_deps = ["@maven_kmp//:compose_material3_desktop"],
+    metadata_deps = ["@maven_kmp//:compose_material3"],
     plugins = ["compose"],
     visibility = ["//visibility:public"],
+    wasm_js_deps = ["@maven_kmp//:compose_material3"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     deps = [
         "//app/csvimporter",
         "//app/importdirectory",
@@ -32,11 +40,11 @@ kmp_library(
         "//utils/compose/filePicker",
         "//utils/parsers/qif",
         "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:compose_foundation",
+        "@maven_kmp//:compose_ui",
         "@maven_kmp//:kermit",
         "@maven_kmp//:kotlinx_coroutines_core",
-        "@maven_kmp//:org_jetbrains_compose_foundation_foundation",
         "@maven_kmp//:org_jetbrains_compose_foundation_foundation_layout",
-        "@maven_kmp//:org_jetbrains_compose_ui_ui",
         "@maven_kmp//:org_jetbrains_compose_ui_ui_text",
     ],
 )

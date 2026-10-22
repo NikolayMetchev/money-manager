@@ -29,5 +29,6 @@ kmp_library(
         "//app/importfilesource/localfolder",
         "//app/model/importdirectory",
         "//app/remotestorage/googledrive",
+        "//app/remotestorage/googledrive/loopback",
     ],
 )

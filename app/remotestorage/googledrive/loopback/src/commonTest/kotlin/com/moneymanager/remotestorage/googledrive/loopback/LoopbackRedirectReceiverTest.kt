@@ -1,4 +1,4 @@
-package com.moneymanager.remotestorage.googledrive
+package com.moneymanager.remotestorage.googledrive.loopback
 
 import com.moneymanager.httpclient.platformHttpClient
 import com.moneymanager.remotestorage.RemoteAuthException

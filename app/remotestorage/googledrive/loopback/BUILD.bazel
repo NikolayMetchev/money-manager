@@ -1,0 +1,57 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_generate true
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_export //app/remotestorage/googledrive
+
+kmp_library(
+    name = "loopback",
+    android = True,
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["serialization"],
+    visibility = ["//visibility:public"],
+    exports = ["//app/remotestorage/googledrive"],
+    deps = [
+        "//app/remotestorage/core",
+        "//utils/coroutines",
+        "//utils/credentialvault",
+        "//utils/httpclient",
+        "@maven_kmp//:atomicfu",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:ktor_client_auth",
+        "@maven_kmp//:ktor_client_core",
+        "@maven_kmp//:ktor_http",
+        "@maven_kmp//:ktor_io",
+        "@maven_kmp//:ktor_network",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    android = True,
+    associate = ":loopback",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["serialization"],
+    deps = [
+        "//app/remotestorage/core",
+        "//app/remotestorage/googledrive",
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/utils/credentialvault",
+        "//utils/httpclient",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:ktor_client_core",
+    ],
+)

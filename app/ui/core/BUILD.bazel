@@ -1,7 +1,8 @@
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android
+# gazelle:kmp_targets android web
+# gazelle:kmp_web_tests false
 # gazelle:kmp_android_host_tests false
 # gazelle:kmp_keep_dep //bazel/kmp/deps:compose_desktop_current_os jvmTest
 # gazelle:kmp_test_jvm_flags -Djava.awt.headless=true -Dskiko.test.harness=true
@@ -21,13 +22,29 @@ kmp_library(
         "@maven_kmp//:kotlinx_coroutines_android",
     ],
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    js_deps = [
+        "@maven_kmp//:compose_material3",
+        "@maven_kmp//:jetbrains_navigation3_ui",
+    ],
     jvm_deps = [
         "@maven_kmp//:compose_material3_desktop",
         "@maven_kmp//:jetbrains_navigation3_ui_desktop",
     ],
     keep_deps = ["@maven_kmp//:kotlinx_coroutines_android"],
+    metadata_deps = [
+        "@maven_kmp//:compose_material3",
+        "@maven_kmp//:jetbrains_navigation3_ui",
+    ],
     plugins = ["compose"],
     visibility = ["//visibility:public"],
+    wasm_js_deps = [
+        "@maven_kmp//:compose_material3",
+        "@maven_kmp//:jetbrains_navigation3_ui",
+    ],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     deps = [
         "//app/apiimport",
         "//app/csvimporter",
@@ -71,10 +88,10 @@ kmp_library(
         "//utils/regex",
         "@maven_kmp//:androidx_compose_runtime",
         "@maven_kmp//:androidx_navigation3_runtime",
+        "@maven_kmp//:compose_foundation",
+        "@maven_kmp//:compose_ui",
         "@maven_kmp//:kotlinx_coroutines_core",
-        "@maven_kmp//:org_jetbrains_compose_foundation_foundation",
         "@maven_kmp//:org_jetbrains_compose_foundation_foundation_layout",
-        "@maven_kmp//:org_jetbrains_compose_ui_ui",
         "@maven_kmp//:org_jetbrains_compose_ui_ui_text",
     ],
 )
@@ -122,8 +139,8 @@ kmp_test(
         "@maven_kmp//:ktor_client_core",
         "@maven_kmp//:ktor_client_mock",
         "@maven_kmp//:ktor_http",
-        "@maven_kmp//:androidx_compose_ui",
         "//utils/regex",
+        "@maven_kmp//:compose_ui",
     ],
     device_manifest = "src/androidDeviceTest/AndroidManifest.xml",
     device_resources = glob(["src/commonTest/resources/**"]),

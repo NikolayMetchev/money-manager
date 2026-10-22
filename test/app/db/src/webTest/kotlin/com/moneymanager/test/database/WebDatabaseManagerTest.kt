@@ -18,8 +18,7 @@ import kotlin.test.assertTrue
 
 /**
  * The browser's driver and manager over the worker's own handler (in memory, in this process). The shared DB suite
- * (app/db/core) runs here once the modules its tests link reach the browser; these pin down what only the browser
- * does: values crossing the message boundary, transactions taking turns on the one connection, and files in the
+ * (app/db/core) runs in the browser too; these pin down what only the browser does: values crossing the message boundary, transactions taking turns on the one connection, and files in the
  * worker's store.
  */
 class WebDatabaseManagerTest {
@@ -160,6 +159,20 @@ class WebDatabaseManagerTest {
             val failing = WebDatabaseManager(MemorySqliteChannel, currenciesToSeed = { error("no currencies") })
             assertFailsWith<IllegalStateException> { failing.openDatabase(location) }
             assertFalse(manager.databaseExists(location))
+        }
+
+    @Test
+    fun `the store lists its databases`() =
+        runTest {
+            val location = createTestDatabaseLocation()
+            val web = manager as WebDatabaseManager
+            try {
+                manager.openDatabase(location).close()
+                assertTrue(location in web.listDatabases())
+            } finally {
+                deleteTestDatabase(location)
+            }
+            assertFalse(location in web.listDatabases())
         }
 
     private suspend fun assetCount(database: MoneyManagerDatabaseWrapper): Long =

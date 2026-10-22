@@ -171,9 +171,10 @@ exclude:
       - app/db/repository/src/commonMain/kotlin/com/moneymanager/database/repository/ApiSessionReadRepositoryImpl.kt
       - app/db/repository/src/commonMain/kotlin/com/moneymanager/database/repository/QifImportReadRepositoryImpl.kt
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/write/CsvImportStrategyInsert.kt
-      # [5] — legGroups calls LazyListScope.item; showConnections calls ComposeUiTest.setContent.
+      # [5] — legGroups calls LazyListScope.item; showConnections and show call ComposeUiTest.setContent.
       - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/ReconciliationScreen.kt
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/credentials/ApiConnectionsVaultE2ETest.kt
+      - app/ui/foundation/src/commonTest/kotlin/com/moneymanager/ui/foundation/NamedDatabaseDialogTest.kt
 
   # KonanLauncher loads the Kotlin/Native compiler reflectively: the KotlinMetadataCompiler it passes IS a
   # CLICompiler, but only at run time, so the linter sees an Object.
@@ -441,6 +442,8 @@ exclude:
       - utils/compose/filePicker/src/commonMain/kotlin/com/moneymanager/compose/filepicker/FileSaver.kt
       - utils/compose/filePicker/src/commonMain/kotlin/com/moneymanager/compose/filepicker/FileSaverLauncher.kt
       - utils/compose/filePicker/src/commonMain/kotlin/com/moneymanager/compose/filepicker/FolderPickerLauncher.kt
+      # Only the jvm and browser pickers (actuals) call mimeTypesToExtensions.
+      - utils/compose/filePicker/src/commonMain/kotlin/com/moneymanager/compose/filepicker/MimeTypes.kt
       - utils/compose/filePicker/src/jvmMain/kotlin/com/moneymanager/compose/filepicker/FilePickerLauncher.kt
       - utils/compose/filePicker/src/jvmMain/kotlin/com/moneymanager/compose/filepicker/FileSaverLauncher.kt
       - utils/compose/filePicker/src/jvmMain/kotlin/com/moneymanager/compose/filepicker/FolderPickerLauncher.kt

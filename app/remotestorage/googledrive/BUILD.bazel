@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_plugins serialization
 # gazelle:kmp_export //app/importfilesource/core
 # gazelle:kmp_export //app/remotestorage/core
@@ -44,6 +44,10 @@ kmp_library(
     ],
     plugins = ["serialization"],
     visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = [
         "//app/importfilesource/core",
         "//app/remotestorage/core",
@@ -55,14 +59,12 @@ kmp_library(
     deps = [
         "//utils/coroutines",
         "//utils/httpclient",
-        "@maven_kmp//:atomicfu",
         "@maven_kmp//:cryptography_random",
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_io_core",
         "@maven_kmp//:kotlinx_serialization_json",
         "@maven_kmp//:ktor_http",
         "@maven_kmp//:ktor_io",
-        "@maven_kmp//:ktor_network",
         "@maven_kmp//:ktor_utils",
     ],
 )
@@ -84,13 +86,16 @@ kmp_test(
         "mingwX64",
     ],
     plugins = ["serialization"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     deps = [
         "//app/importfilesource/core",
         "//app/remotestorage/core",
         "//bazel/kmp/deps:kotlin_test",
         "//test/utils/credentialvault",
         "//utils/httpclient",
-        "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_coroutines_test",
         "@maven_kmp//:kotlinx_serialization_json",
         "@maven_kmp//:ktor_client_core",

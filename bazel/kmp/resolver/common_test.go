@@ -113,6 +113,53 @@ func TestOnlyWebMetadataExcludesWhatTheBrowserLacks(t *testing.T) {
 	}
 }
 
+// A platform the library doesn't publish (Compose on Linux), or publishes as another module (its Android variant is
+// AndroidX's), leaves the shared source sets to the platforms it does.
+func TestAPlatformWithoutAVariantDoesNotNarrowCommonMetadata(t *testing.T) {
+	var jar bytes.Buffer
+	w := zip.NewWriter(&jar)
+	for name, body := range map[string]string{
+		"commonMain/default/manifest": "",
+		"skikoMain/default/manifest":  "",
+		"META-INF/kotlin-project-structure-metadata.json": `{"projectStructure": {
+			"variants": [
+				{"name": "androidApiElements", "sourceSet": []},
+				{"name": "desktopApiElements", "sourceSet": ["commonMain", "skikoMain"]},
+				{"name": "wasmJsApiElements", "sourceSet": ["commonMain", "skikoMain", "webMain"]}
+			],
+			"sourceSets": [{"name": "commonMain"}, {"name": "skikoMain"}]}}`,
+	} {
+		f, _ := w.Create(name)
+		f.Write([]byte(body))
+	}
+	w.Close()
+	module := `{"variants": [
+		{"name": "metadataApiElements",
+		 "attributes": {"org.gradle.usage": "kotlin-metadata", "org.jetbrains.kotlin.platform.type": "common"},
+		 "files": [{"name": "lib-metadata-1.jar", "url": "lib-1.jar", "sha256": "x"}]},
+		{"name": "desktopApiElements-published",
+		 "attributes": {"org.gradle.usage": "java-api", "org.jetbrains.kotlin.platform.type": "jvm"}},
+		{"name": "wasmJsApiElements-published",
+		 "attributes": {"org.gradle.usage": "kotlin-api", "org.jetbrains.kotlin.platform.type": "wasm",
+			"org.jetbrains.kotlin.wasm.target": "js"}}]}`
+	path, body := pom("g", "lib", "1", "")
+	f := repository(t, map[string][]byte{
+		path:                    body,
+		"/g/lib/1/lib-1.module": []byte(module),
+		"/g/lib/1/lib-1.jar":    jar.Bytes(),
+	})
+	r := NewResolver(f, nil, nil)
+	r.consumers = []Platform{platforms["android"], platforms["jvm"], platforms["linuxX64"], platforms["wasmJs"]}
+
+	n, err := r.node(platforms[metadataWeb], Coordinate{"g", "lib", "1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"commonMain", "skikoMain"}; !reflect.DeepEqual(n.sourceSets, want) {
+		t.Errorf("source sets = %v, want %v", n.sourceSets, want)
+	}
+}
+
 func TestExcludingWhereAVariantPointsLeavesItEmpty(t *testing.T) {
 	path, body := pom("g", "lib", "1", "")
 	module := `{"variants": [

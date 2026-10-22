@@ -1,0 +1,17 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_targets web
+
+kmp_library(
+    name = "ui",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    js_deps = ["@maven_kmp//:material3"],
+    jvm_deps = ["@maven_kmp//:material3_desktop"],
+    metadata_deps = ["@maven_kmp//:material3"],
+    visibility = ["//visibility:public"],
+    wasm_js_deps = ["@maven_kmp//:material3"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+)
