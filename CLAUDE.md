@@ -105,7 +105,7 @@ regenerated, not reported. Dependency submission reads the lockfiles (`bazel/kmp
 `renovate-pins.yml` re-pins Renovate's PRs.
 
 **Qodana** (`qodana.yml`, inspections in `qodana.yaml`) scans a PR in PR mode: it reports only problems in the files the
-PR changes. Pushes to main and manual runs scan everything, so anything PR mode misses shows up on main. A change whose
+PR changes. It doesn't run on main; a manual run (`workflow_dispatch`) scans a branch in full. A change whose
 effects reach other modules (a shared API, the DI graph, `qodana.yaml`, the inspection profile) should carry the
 `qodana-full` label, which reruns the PR's scan in full; removing the label goes back to PR mode. Qodana has its own
 workflow because label events start it: any other label's run skips, without cancelling the scan in progress.
