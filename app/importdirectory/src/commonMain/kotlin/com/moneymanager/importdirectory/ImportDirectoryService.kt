@@ -538,8 +538,8 @@ class ImportDirectoryService(
             ).also { sourceAccountId?.let { importEngine.setLastQifAccount(it) } }
         }
 
-    // The account each of [folders]' files belongs to: the folder's own if one was set since planning,
-    // else one named after the folder (an existing account of that name, or a new one), kept on the folder
+    // The account each of [folders]' files belongs to: the folder's own or its parent's if one was set since
+    // planning, else one named after the folder (an existing account of that name, or a new one), kept on the folder
     // so the folder list shows it and the person can change it there.
     private suspend fun <K> folderAccounts(folders: Map<K, ImportDirectoryId>): Map<K, AccountId> {
         val accounts =
@@ -547,8 +547,11 @@ class ImportDirectoryService(
                 .distinct()
                 .mapNotNull { id ->
                     val directory = importDirectoryRepository.getDirectoryById(id).first() ?: return@mapNotNull null
+                    val parentAccountId =
+                        directory.parentId?.let { importDirectoryRepository.getDirectoryById(it).first()?.accountId }
                     val accountId =
                         directory.accountId
+                            ?: parentAccountId
                             ?: importEngine
                                 .createAccount(
                                     Account(id = AccountId(0), name = directory.folderName, openingDate = Clock.System.now()),
