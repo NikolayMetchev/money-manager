@@ -1,9 +1,8 @@
-package com.moneymanager.ui.screens.csv
+package com.moneymanager.ui.components.imports
 
-import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.StagedImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
@@ -16,10 +15,10 @@ private const val PATH_SEPARATOR = " / "
  * One strategy's files within a tab; [key] is null for the "no strategy"/"unknown strategy" bucket.
  * [actionable] is false only for the transient "still matching" bucket, which has no scoped action yet.
  */
-internal data class CsvStrategyGroup(
+data class StagedImportStrategyGroup<F : StagedImport<*>>(
     val key: CsvImportStrategyId?,
     val label: String,
-    val imports: List<CsvImport>,
+    val imports: List<F>,
     val isWarning: Boolean = false,
     val actionable: Boolean = true,
 )
@@ -30,17 +29,17 @@ internal data class CsvStrategyGroup(
  * subfolders derived from discovered directories' display paths. [strategyGroups] holds the files
  * directly in this folder; [allImports] everything beneath it, for the folder's "Import all".
  */
-internal data class CsvDirectoryNode(
+data class StagedImportDirectoryNode<F : StagedImport<*>>(
     val key: String,
     val label: String,
     val provider: ImportDirectoryProvider?,
-    val strategyGroups: List<CsvStrategyGroup>,
-    val children: List<CsvDirectoryNode>,
+    val strategyGroups: List<StagedImportStrategyGroup<F>>,
+    val children: List<StagedImportDirectoryNode<F>>,
 ) {
-    val allImports: List<CsvImport> = strategyGroups.flatMap { it.imports } + children.flatMap { it.allImports }
+    val allImports: List<F> = strategyGroups.flatMap { it.imports } + children.flatMap { it.allImports }
 }
 
-/** How an import directory is named in the CSV imports list; matches the import-directories screen. */
+/** How an import directory is named in the imports lists; matches the import-directories screen. */
 internal fun ImportDirectory.listLabel(): String = displayPath ?: folderRef
 
 internal fun ImportDirectoryProvider.label(): String =
@@ -51,13 +50,13 @@ internal fun ImportDirectoryProvider.label(): String =
 
 /**
  * Resolves each import's source directories (sorted by label) from [importDirectories] (see
- * `ImportDirectoryReadRepository.csvImportDirectories`). Directories no longer known are dropped, so an
- * import whose every directory was removed reads as manually added.
+ * `ImportDirectoryReadRepository.csvImportDirectories`/`qifImportDirectories`). Directories no longer
+ * known are dropped, so an import whose every directory was removed reads as manually added.
  */
-internal fun resolveImportDirectories(
-    importDirectories: Map<CsvImportId, List<ImportDirectoryId>>,
+fun <K> resolveImportDirectories(
+    importDirectories: Map<K, List<ImportDirectoryId>>,
     directories: List<ImportDirectory>,
-): Map<CsvImportId, List<ImportDirectory>> {
+): Map<K, List<ImportDirectory>> {
     val byId = directories.associateBy { it.id }
     return importDirectories
         .mapValues { (_, ids) -> ids.distinct().mapNotNull(byId::get).sortedBy { it.listLabel() } }
@@ -71,12 +70,12 @@ internal fun resolveImportDirectories(
  * chains holding no files of their own collapse into one "A / B" node. Roots are sorted by label with
  * manually added files last.
  */
-internal fun buildUnimportedDirectoryTree(
-    unimported: List<CsvImport>,
-    importDirectories: Map<CsvImportId, List<ImportDirectory>>,
+fun <K : Any, F : StagedImport<K>> buildUnimportedDirectoryTree(
+    unimported: List<F>,
+    importDirectories: Map<K, List<ImportDirectory>>,
     directories: List<ImportDirectory>,
-    matches: Map<CsvImportId, CsvImportStrategy?>?,
-): List<CsvDirectoryNode> {
+    matches: Map<K, CsvImportStrategy?>?,
+): List<StagedImportDirectoryNode<F>> {
     val byId = directories.associateBy { it.id }
     val (placed, manual) = unimported.partition { importDirectories[it.id]?.firstOrNull() != null }
     val roots =
@@ -108,13 +107,13 @@ private fun relativeSegments(
     return if (path.startsWith(prefix)) path.removePrefix(prefix).split(PATH_SEPARATOR) else listOf(path)
 }
 
-private fun buildNode(
+private fun <K : Any, F : StagedImport<K>> buildNode(
     key: String,
     label: String,
     provider: ImportDirectoryProvider?,
-    entries: List<Pair<List<String>, CsvImport>>,
-    matches: Map<CsvImportId, CsvImportStrategy?>?,
-): CsvDirectoryNode {
+    entries: List<Pair<List<String>, F>>,
+    matches: Map<K, CsvImportStrategy?>?,
+): StagedImportDirectoryNode<F> {
     val (here, deeper) = entries.partition { it.first.isEmpty() }
     val children =
         deeper
@@ -123,10 +122,10 @@ private fun buildNode(
                 buildNode("$key/$segment", segment, provider, items.map { it.first.drop(1) to it.second }, matches).compacted()
             }.sortedBy { it.label.lowercase() }
     val strategyGroups = if (here.isEmpty()) emptyList() else buildUnimportedStrategyGroups(here.map { it.second }, matches)
-    return CsvDirectoryNode(key, label, provider, strategyGroups, children)
+    return StagedImportDirectoryNode(key, label, provider, strategyGroups, children)
 }
 
-private tailrec fun CsvDirectoryNode.compacted(): CsvDirectoryNode {
+private tailrec fun <F : StagedImport<*>> StagedImportDirectoryNode<F>.compacted(): StagedImportDirectoryNode<F> {
     val only = children.singleOrNull()
     if (strategyGroups.isNotEmpty() || only == null) return this
     return only.copy(label = "$label$PATH_SEPARATOR${only.label}").compacted()
@@ -134,32 +133,32 @@ private tailrec fun CsvDirectoryNode.compacted(): CsvDirectoryNode {
 
 /**
  * Groups already-imported files by the strategy they were last applied with — a field every
- * [CsvImport] already carries, so no extra queries are needed. Sorted by label, with a fallback
+ * [StagedImport] already carries, so no extra queries are needed. Sorted by label, with a fallback
  * "Unknown strategy" bucket for imports whose applied strategy has since been deleted or otherwise lost
  * its name.
  */
-internal fun buildImportedStrategyGroups(importedList: List<CsvImport>): List<CsvStrategyGroup> =
+fun <F : StagedImport<*>> buildImportedStrategyGroups(importedList: List<F>): List<StagedImportStrategyGroup<F>> =
     importedList
         .groupBy { it.lastAppliedStrategyId }
         .map { (id, files) ->
             val label = files.firstOrNull { !it.lastAppliedStrategyName.isNullOrBlank() }?.lastAppliedStrategyName
-            CsvStrategyGroup(key = id, label = label ?: "Unknown strategy", imports = files)
+            StagedImportStrategyGroup(key = id, label = label ?: "Unknown strategy", imports = files)
         }.sortedBy { it.label.lowercase() }
 
 /**
- * Groups unimported files by their auto-matched strategy ([matches], built by content/filename-aware
- * `selectForCsv` since these files have no stored strategy yet). Files with no match ([matches] value
- * null) form a "No strategy" group surfaced first with warning styling, so they're never lost among
- * matched files. While [matches] hasn't finished resolving, every file is shown under one "Matching
- * strategies…" bucket with no scoped action, rather than leaving the tab blank.
+ * Groups unimported files by their auto-matched strategy ([matches], built the way "Import all" matches,
+ * since these files have no stored strategy yet). Files with no match ([matches] value null) form a
+ * "No strategy" group surfaced first with warning styling, so they're never lost among matched files.
+ * While [matches] hasn't finished resolving, every file is shown under one "Matching strategies…" bucket
+ * with no scoped action, rather than leaving the tab blank.
  */
-internal fun buildUnimportedStrategyGroups(
-    unimported: List<CsvImport>,
-    matches: Map<CsvImportId, CsvImportStrategy?>?,
-): List<CsvStrategyGroup> {
+fun <K : Any, F : StagedImport<K>> buildUnimportedStrategyGroups(
+    unimported: List<F>,
+    matches: Map<K, CsvImportStrategy?>?,
+): List<StagedImportStrategyGroup<F>> {
     if (matches == null) {
         return listOf(
-            CsvStrategyGroup(key = null, label = "Matching strategies…", imports = unimported, actionable = false),
+            StagedImportStrategyGroup(key = null, label = "Matching strategies…", imports = unimported, actionable = false),
         )
     }
     val byStrategyId = unimported.groupBy { matches[it.id]?.id }
@@ -168,11 +167,12 @@ internal fun buildUnimportedStrategyGroups(
     val withStrategy =
         byStrategyId.entries
             .filter { it.key != null }
-            .map { (id, files) -> CsvStrategyGroup(key = id, label = strategyById[id]?.name ?: "Unknown strategy", imports = files) }
-            .sortedBy { it.label.lowercase() }
+            .map { (id, files) ->
+                StagedImportStrategyGroup(key = id, label = strategyById[id]?.name ?: "Unknown strategy", imports = files)
+            }.sortedBy { it.label.lowercase() }
     return buildList {
         if (noStrategy.isNotEmpty()) {
-            add(CsvStrategyGroup(key = null, label = "No strategy", imports = noStrategy, isWarning = true))
+            add(StagedImportStrategyGroup(key = null, label = "No strategy", imports = noStrategy, isWarning = true))
         }
         addAll(withStrategy)
     }

@@ -2,7 +2,7 @@ package com.moneymanager.domain.model.qif
 
 /**
  * The fixed column names QIF records are presented as, so QIF can reuse the CSV strategy engine.
- * Domain vocabulary (db-free), so both the database (which seeds the built-in QIF strategy) and the
+ * Domain vocabulary (db-free), so both the database (and the built-in QIF strategies) and the
  * QIF importer can reference the same names.
  */
 object QifColumns {

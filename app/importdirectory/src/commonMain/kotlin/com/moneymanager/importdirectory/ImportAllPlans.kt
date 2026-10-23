@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -18,7 +19,7 @@ enum class NeedsAttentionReason(
     val description: String,
 ) {
     NO_STRATEGY("no strategy matches it"),
-    NEEDS_SOURCE_ACCOUNT("its strategy needs a source account and its folder has none"),
+    NEEDS_SOURCE_ACCOUNT("its strategy needs a source account and no import folder gives one"),
 
     /** A re-download whose new copy lost rows that were already imported: unimport it to replace it. */
     REDOWNLOAD_BLOCKED("its new copy no longer has rows that were imported, so it was left as it was"),
@@ -38,13 +39,15 @@ data class NeedsAttention(
 
 /**
  * What a CSV "import all" over [files] will do, worked out before anything is written: each file's
- * matched strategy ([matches], null = no match), the account each file's import directory gives it, and
- * the files a person must resolve ([needsAttention]). The rest is what the apply step needs.
+ * matched strategy ([matches], null = no match), the account each file's import directory gives it, the
+ * folders whose files need an account none is set for ([folders]: applying names one after the folder),
+ * and the files a person must resolve ([needsAttention]). The rest is what the apply step needs.
  */
 data class CsvImportAllPlan(
     val files: List<CsvImport>,
     val matches: Map<CsvImportId, CsvImportStrategy?>,
     val directoryAccounts: Map<CsvImportId, AccountId>,
+    val folders: Map<CsvImportId, ImportDirectoryId>,
     val needsAttention: List<NeedsAttention>,
     val strategies: List<CsvImportStrategy>,
     val currencies: List<Currency>,
@@ -67,19 +70,21 @@ data class CsvImportAllPlan(
 /**
  * What a QIF "import all" over [files] will do. QIF always matches *some* strategy when one exists, so
  * the question is mostly the source account: [directoryAccounts] covers files from a folder with one,
- * and [defaultSourceAccountId] (the last account a QIF import used) preselects the shared pick.
+ * [folders] files from a folder without one (applying names an account after the folder), and
+ * [defaultSourceAccountId] (the last account a QIF import used) preselects the shared pick.
  */
 data class QifImportAllPlan(
     val files: List<QifImport>,
     val directoryAccounts: Map<QifImportId, AccountId>,
+    val folders: Map<QifImportId, ImportDirectoryId>,
     val defaultSourceAccountId: AccountId?,
     val needsAttention: List<NeedsAttention>,
     val strategies: List<CsvImportStrategy>,
     val currencies: List<Currency>,
     private val blockedIds: Set<QifImportId>,
 ) {
-    /** Some file has no folder account, so the dialog offers a shared one. */
-    val needsSourceAccount: Boolean get() = files.any { it.id !in directoryAccounts }
+    /** Some file came from no folder, so the dialog offers a shared account. */
+    val needsSourceAccount: Boolean get() = files.any { it.id !in directoryAccounts && it.id !in folders }
 
     fun unattended(): QifImportAllPlan =
         copy(

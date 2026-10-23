@@ -1,4 +1,4 @@
-package com.moneymanager.ui.screens.csv
+package com.moneymanager.ui.components.imports
 
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
@@ -14,7 +14,7 @@ import kotlin.test.assertEquals
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-class CsvImportGroupsTest {
+class StagedImportGroupsTest {
     private val monzoA = csvImport("monzo-a.csv")
     private val monzoB = csvImport("monzo-b.csv")
     private val unmatched = csvImport("weird.csv")

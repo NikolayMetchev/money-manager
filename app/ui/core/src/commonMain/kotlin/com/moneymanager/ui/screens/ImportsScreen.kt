@@ -178,6 +178,8 @@ fun ImportsScreen(
                     importDirectoryService = importDirectoryService,
                     qifImportRepository = qifImportRepository,
                     importTimelineRepository = importTimelineRepository,
+                    importDirectoryRepository = importDirectoryRepository,
+                    csvImportStrategyRepository = csvImportStrategyRepository,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,

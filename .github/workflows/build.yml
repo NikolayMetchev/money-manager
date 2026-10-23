@@ -481,9 +481,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # `rbe-mac`, as Native Tests (macosArm64) runs: the bundled `mm`'s klib compiles go to BuildBuddy
+          # (and hit that job's cache) instead of compiling one by one on the runner.
           - name: macOS
             os: macos-latest
-            config: cache
+            config: rbe-mac
           - name: Windows
             os: windows-latest
             config: cache

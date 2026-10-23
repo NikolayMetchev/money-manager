@@ -129,30 +129,58 @@ class ImportDirectoryReadRepositoryImpl(
                 }.toUnambiguousMap()
         }
 
+    override suspend fun csvImportFoldersWithoutAccount(): Map<CsvImportId, ImportDirectoryId> =
+        withContext(coroutineContext) {
+            selectQueries
+                .selectStagedImportFoldersWithoutAccount()
+                .awaitAsList()
+                .mapNotNull { row ->
+                    val csvImportId = row.csv_import_id ?: return@mapNotNull null
+                    CsvImportId(Uuid.parse(csvImportId)) to ImportDirectoryId(Uuid.parse(row.directory_id))
+                }.toUnambiguousMap()
+        }
+
+    override suspend fun qifImportFoldersWithoutAccount(): Map<QifImportId, ImportDirectoryId> =
+        withContext(coroutineContext) {
+            selectQueries
+                .selectStagedImportFoldersWithoutAccount()
+                .awaitAsList()
+                .mapNotNull { row ->
+                    val qifImportId = row.qif_import_id ?: return@mapNotNull null
+                    QifImportId(Uuid.parse(qifImportId)) to ImportDirectoryId(Uuid.parse(row.directory_id))
+                }.toUnambiguousMap()
+        }
+
     override fun csvImportDirectories(): Flow<Map<CsvImportId, List<ImportDirectoryId>>> =
         selectQueries
             .selectCsvImportDirectories()
             .asFlow()
             .mapToList(coroutineContext)
-            .map { rows ->
-                rows
-                    .groupBy(
-                        { CsvImportId(Uuid.parse(it.csv_import_id)) },
-                        { ImportDirectoryId(Uuid.parse(it.directory_id)) },
-                    ).mapValues { (_, directoryIds) -> directoryIds.distinct() }
-            }
+            .map { rows -> rows.groupDirectories({ CsvImportId(Uuid.parse(it.csv_import_id)) }, { it.directory_id }) }
+
+    override fun qifImportDirectories(): Flow<Map<QifImportId, List<ImportDirectoryId>>> =
+        selectQueries
+            .selectQifImportDirectories()
+            .asFlow()
+            .mapToList(coroutineContext)
+            .map { rows -> rows.groupDirectories({ QifImportId(Uuid.parse(it.qif_import_id)) }, { it.directory_id }) }
+
+    private fun <R, K> List<R>.groupDirectories(
+        importId: (R) -> K,
+        directoryId: (R) -> String,
+    ): Map<K, List<ImportDirectoryId>> =
+        groupBy(importId) { ImportDirectoryId(Uuid.parse(directoryId(it))) }.mapValues { (_, ids) -> ids.distinct() }
 
     /**
      * A staged import can be reused (by content checksum) across more than one directory, so the same
-     * import id can appear here paired with a DIFFERENT directory's account. Collapsing that with a
-     * plain `toMap()` would pick an arbitrary, order-dependent account. Instead, keep an id only when
-     * every row for it agrees on the account; an id with conflicting accounts is dropped rather than
-     * resolved to a possibly-wrong one, so its caller falls back to its own default (a shared override,
-     * or prompting).
+     * import id can appear here paired with a DIFFERENT directory's account (or folder). Collapsing that
+     * with a plain `toMap()` would pick an arbitrary, order-dependent one. Instead, keep an id only when
+     * every row for it agrees; an id with conflicting values is dropped rather than resolved to a
+     * possibly-wrong one, so its caller falls back to its own default (a shared override, or prompting).
      */
-    private fun <K> List<Pair<K, AccountId>>.toUnambiguousMap(): Map<K, AccountId> =
+    private fun <K, V> List<Pair<K, V>>.toUnambiguousMap(): Map<K, V> =
         groupBy({ it.first }, { it.second })
-            .mapNotNull { (id, accountIds) -> accountIds.toSet().singleOrNull()?.let { id to it } }
+            .mapNotNull { (id, values) -> values.toSet().singleOrNull()?.let { id to it } }
             .toMap()
 
     private fun toDomain(entity: Import_directory): ImportDirectory =

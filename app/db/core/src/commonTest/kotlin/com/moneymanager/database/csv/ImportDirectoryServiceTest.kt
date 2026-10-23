@@ -98,6 +98,18 @@ class ImportDirectoryServiceTest : DbTest() {
         $transactionId,19/11/2023,21:15:00,Faster payment,Some Merchant,,Transfers,-25.00,GBP,-25.00,GBP,,,,To Some Merchant,,,
         """.trimIndent()
 
+    // An American Express statement, so the built-in Amex QIF strategy recognises it.
+    private fun qif(payee: String): String =
+        """
+        !Type:CCard
+        D01/02/2024
+        N$payee
+        T-12.50
+        P$payee
+        M Process Date 01/02/2024
+        ^
+        """.trimIndent()
+
     private fun service(
         factory: ImportFileSourceFactory?,
         deviceId: DeviceId = repositories.deviceId,
@@ -310,6 +322,98 @@ class ImportDirectoryServiceTest : DbTest() {
                     .issues
                     .single()
                     .startsWith("loose-monzo.csv: "),
+            )
+        }
+
+    @Test
+    fun `files from a folder without an account import onto an account named after that folder`() =
+        runDbTest {
+            repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
+            val root = directory("Statements")
+            val factory =
+                FakeFileSourceFactory(
+                    mapOf(
+                        root.folderRef to FakeFolder(subfolders = listOf("${root.folderRef}/Santander", "${root.folderRef}/Amex")),
+                        "${root.folderRef}/Santander" to FakeFolder(files = mapOf("santander.qif" to qif("Coffee"))),
+                        "${root.folderRef}/Amex" to
+                            FakeFolder(files = mapOf("amex.qif" to qif("Lunch"), "monzo.csv" to monzoCsv("tx_amex"))),
+                    ),
+                )
+
+            val (result, _) = backgroundScope.runTask { service(factory).importAll(this) }
+
+            assertEquals(emptyList(), result.needsAttention, "every file's folder names its account")
+            assertEquals(2, result.qif.filesImported)
+            assertEquals(1, result.csv.filesImported)
+            val accounts = repositories.accountRepository.getAllAccounts().first()
+            val accountNames = accounts.map { it.name }
+            assertTrue("Santander" in accountNames && "Amex" in accountNames, accountNames.toString())
+            assertFalse("Statements" in accountNames, "the top-level folder holds no files, so it names no account")
+            val directories = repositories.importDirectoryRepository.getAllDirectories().first()
+            assertNull(directories.single { it.id == root.id }.accountId)
+            for (folder in listOf("Santander", "Amex")) {
+                val accountId = accounts.single { it.name == folder }.id
+                assertEquals(accountId, directories.single { it.folderRef.endsWith("/$folder") }.accountId, "kept on the $folder folder")
+            }
+            val amexId = accounts.single { it.name == "Amex" }.id
+            val amexPayees =
+                repositories.transactionRepository
+                    .getTransactionsByAccount(amexId)
+                    .first()
+                    .map { transfer -> accounts.single { it.id == transfer.targetAccountId }.name }
+            assertEquals(setOf("Lunch", "Some Merchant"), amexPayees.toSet(), "the folder's QIF and CSV both land on its account")
+        }
+
+    @Test
+    fun `a folder reuses an existing account of its name`() =
+        runDbTest {
+            val existing = monzoAccount()
+            val dir = directory("Monzo Main")
+            val factory = FakeFileSourceFactory(mapOf(dir.folderRef to FakeFolder(files = mapOf("nov.csv" to monzoCsv("tx_1")))))
+
+            val (result, _) = backgroundScope.runTask { service(factory).importAll(this) }
+
+            assertEquals(1, result.csv.filesImported)
+            assertEquals(
+                existing,
+                repositories.importDirectoryRepository
+                    .getDirectoryById(dir.id)
+                    .first()
+                    ?.accountId,
+            )
+            assertEquals(
+                1,
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .count { it.name == "Monzo Main" },
+            )
+        }
+
+    @Test
+    fun `a subfolder still inherits the account set on its top-level folder`() =
+        runDbTest {
+            val account = monzoAccount()
+            val root = directory("root", accountId = account)
+            val factory =
+                FakeFileSourceFactory(
+                    mapOf(
+                        root.folderRef to FakeFolder(subfolders = listOf("${root.folderRef}/2023")),
+                        "${root.folderRef}/2023" to FakeFolder(files = mapOf("nov.qif" to qif("Coffee"))),
+                    ),
+                )
+
+            val (result, _) = backgroundScope.runTask { service(factory).importAll(this) }
+
+            assertEquals(1, result.qif.filesImported)
+            assertEquals(
+                listOf("Monzo Main"),
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .filter { it.name == "Monzo Main" || it.name == "2023" }
+                    .map { it.name },
+                "the set account wins over the folder's name",
             )
         }
 

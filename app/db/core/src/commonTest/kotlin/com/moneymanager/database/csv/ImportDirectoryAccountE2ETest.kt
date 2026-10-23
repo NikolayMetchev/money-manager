@@ -184,6 +184,22 @@ class ImportDirectoryAccountE2ETest : DbTest() {
         }
 
     @Test
+    fun `qifImportDirectories maps each scanned QIF file to its directory`() =
+        runDbTest {
+            val first = directory("First", accountId = null)
+            val second = directory("Second", accountId = null)
+            stageInto(first, "first.qif", "!Type:Bank\nD19/11/2023\nT-25.00\nPSome Merchant\n^\n")
+            stageInto(second, "second.csv", monzoCsv("tx-second"))
+
+            val qif =
+                repositories.qifImportRepository
+                    .getAllImports()
+                    .first()
+                    .single()
+            assertEquals(mapOf(qif.id to listOf(first.id)), repositories.importDirectoryRepository.qifImportDirectories().first())
+        }
+
+    @Test
     fun twoDirectoriesWithDifferentAccounts_eachFileLandsOnItsOwnAccount() =
         runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
@@ -280,50 +296,5 @@ class ImportDirectoryAccountE2ETest : DbTest() {
                     .id
             val personalTransfers = repositories.transactionRepository.getTransactionsByAccount(personalId).first()
             assertEquals(1, personalTransfers.count { it.sourceAccountId == personalId && it.targetAccountId == merchantId })
-        }
-
-    @Test
-    fun topLevelDirectoryWithNoExplicitAccount_autoCreatesOneMatchingItsName() =
-        runDbTest {
-            repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
-            val dir = directory("Monzo Joint", accountId = null)
-            stageInto(dir, "nov.csv", monzoCsv("tx_auto"))
-
-            // The account is resolved (and the directory updated to point at it) as soon as it's scanned,
-            // before any bulk-import run even happens.
-            val resolved = repositories.importDirectoryRepository.getDirectoryById(dir.id).first()
-            assertEquals(
-                repositories.accountRepository
-                    .getAllAccounts()
-                    .first()
-                    .first { it.name == "Monzo Joint" }
-                    .id,
-                resolved?.accountId,
-            )
-
-            val result = applyAllUnimported()
-            assertEquals(1, result.filesImported)
-            assertEquals(0, result.filesSkippedNoStrategy, "the auto-created account resolves the ambiguity")
-        }
-
-    @Test
-    fun topLevelDirectoryWithNoExplicitAccount_reusesAnExistingAccountOfTheSameName() =
-        runDbTest {
-            repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
-            val existingId =
-                repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Monzo Joint", openingDate = now), Source.Manual)
-
-            val dir = directory("Monzo Joint", accountId = null)
-            stageInto(dir, "nov.csv", monzoCsv("tx_reuse"))
-
-            val resolved = repositories.importDirectoryRepository.getDirectoryById(dir.id).first()
-            assertEquals(existingId, resolved?.accountId, "the pre-existing account of the same name is reused, not duplicated")
-            assertEquals(
-                1,
-                repositories.accountRepository
-                    .getAllAccounts()
-                    .first()
-                    .count { it.name == "Monzo Joint" },
-            )
         }
 }

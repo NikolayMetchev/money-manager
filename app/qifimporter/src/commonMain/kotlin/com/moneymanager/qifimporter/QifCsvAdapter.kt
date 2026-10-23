@@ -18,8 +18,8 @@ import kotlin.uuid.Uuid
  * [CsvRow.rowIndex] = `recordIndex`, so all resulting transfers link back to the source record.
  */
 object QifCsvAdapter {
-    // The fixed column names are owned by QifColumns (db-free domain vocabulary) so the database can
-    // seed the built-in QIF strategy against the same names without depending on this adapter; callers
+    // The fixed column names are owned by QifColumns (db-free domain vocabulary) so the built-in QIF
+    // strategies are written against the same names without depending on this adapter; callers
     // that need an individual column name reference QifColumns directly.
 
     /** Fixed column headers, in order, presented to the CSV engine. */

@@ -33,9 +33,9 @@ import com.moneymanager.ui.components.AccountPicker
  * for local; browsed from the user's Drive hierarchy via a popup for Google Drive), and an optional
  * account. The account is the source account used for scanned files whose strategy has no
  * SOURCE_ACCOUNT mapping — set it to disambiguate two folders of identically-formatted files (e.g.
- * separate Monzo main/joint account exports). Left blank, the first download resolves it automatically:
- * an existing account named exactly this directory's name, or a newly created one (see
- * `ensureDirectoryAccount` in `ImportDirectoryScanner.kt`). The directory only downloads files into the
+ * separate Monzo main/joint account exports). Left blank, each folder's files get an account named after
+ * the folder they came from (a subfolder's own name, not this one's) the first time "Import All" needs
+ * one (see `folderAccounts` in `ImportDirectoryService`). The directory only downloads files into the
  * Imports section — the user runs "Import All" there.
  */
 @Composable
@@ -162,7 +162,7 @@ fun AddImportDirectoryDialog(
                 AccountPicker(
                     selectedAccountId = accountId,
                     onAccountSelected = { accountId = it },
-                    label = "Account for files in this folder (optional — auto-resolved by name if left blank)",
+                    label = "Account for files in this folder (optional — named after each file's folder if left blank)",
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,

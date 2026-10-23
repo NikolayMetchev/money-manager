@@ -1,16 +1,10 @@
 package com.moneymanager.ui.screens.qif
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,9 +15,12 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
 import com.moneymanager.csvimporter.sha256Hex
 import com.moneymanager.domain.model.QifImportId
+import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
@@ -34,14 +31,13 @@ import com.moneymanager.importengineapi.setQifImportIgnored
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.qif.QifParser
-import com.moneymanager.ui.components.imports.ImportFileCard
 import com.moneymanager.ui.components.imports.ImportStatusMessage
-import com.moneymanager.ui.components.imports.ImportTab
-import com.moneymanager.ui.components.imports.ImportTabsRow
 import com.moneymanager.ui.components.imports.ImportsEmptyMessage
 import com.moneymanager.ui.components.imports.ImportsScreenHeader
-import com.moneymanager.ui.components.imports.emptyImportTabMessage
+import com.moneymanager.ui.components.imports.StagedImportCard
+import com.moneymanager.ui.components.imports.StagedImportsTabs
 import com.moneymanager.ui.components.imports.importPickedFiles
+import com.moneymanager.ui.components.imports.rememberStagedImportsData
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -52,6 +48,8 @@ fun QifImportsScreen(
     importDirectoryService: ImportDirectoryService,
     qifImportRepository: QifImportReadRepository,
     importTimelineRepository: ImportTimelineReadRepository,
+    importDirectoryRepository: ImportDirectoryReadRepository,
+    csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
@@ -67,6 +65,17 @@ fun QifImportsScreen(
     val dateRanges by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyMap()) {
         importTimelineRepository.getQifImportDateRanges().map { ranges -> ranges.associateBy { it.fileId } }
     }
+    val data =
+        rememberStagedImportsData(
+            imports = imports,
+            importDirectoryRepository = importDirectoryRepository,
+            csvImportStrategyRepository = csvImportStrategyRepository,
+            accountRepository = accountRepository,
+            importDirectoryIds = { qifImportDirectories() },
+            sourceAccounts = { qifImportSourceAccounts() },
+            matchStrategies = importDirectoryService::matchQifStrategies,
+        )
+
     var isImporting by remember { mutableStateOf(false) }
     var importMessage by remember { mutableStateOf<String?>(null) }
     var importMessageIsError by remember { mutableStateOf(false) }
@@ -125,108 +134,63 @@ fun QifImportsScreen(
         if (imports.isEmpty() && !isImporting) {
             ImportsEmptyMessage("No QIF files added yet. Click '+ Import QIF' to add one or more.")
         } else {
-            // Split files into those still needing a strategy applied vs. already imported, so a large
-            // set of files is easy to work through. The Unimported tab is the default/actionable one.
-            val unimported = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt == null } }
-            val importedList = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt != null } }
-            val ignoredList = remember(imports) { imports.filter { it.ignored } }
-            var selectedTab by remember { mutableStateOf(ImportTab.UNIMPORTED) }
+            // The list to run "Import all" against (a folder's or strategy group's files, or every unimported
+            // file when launched from the top-level button); null hides the dialog.
+            var importAllScope by remember { mutableStateOf<List<QifImport>?>(null) }
+            // Same idea for "Re-import all".
+            var reimportAllScope by remember { mutableStateOf<List<QifImport>?>(null) }
 
-            ImportTabsRow(
-                selectedTab = selectedTab,
-                unimportedCount = unimported.size,
-                importedCount = importedList.size,
-                ignoredCount = ignoredList.size,
-                onTabSelected = { selectedTab = it },
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            var showImportAll by remember { mutableStateOf(false) }
-            if (selectedTab == ImportTab.UNIMPORTED && unimported.isNotEmpty()) {
-                Button(
-                    onClick = { showImportAll = true },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Import all (${unimported.size})")
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            var showReimportAll by remember { mutableStateOf(false) }
-            if (selectedTab == ImportTab.IMPORTED && importedList.isNotEmpty()) {
-                Button(
-                    onClick = { showReimportAll = true },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Re-import all (${importedList.size})")
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            if (showImportAll) {
+            importAllScope?.let { scoped ->
                 QifImportAllDialog(
-                    unimported = unimported,
+                    unimported = scoped,
                     importDirectoryService = importDirectoryService,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
-                    onDismiss = { showImportAll = false },
-                    onComplete = { showImportAll = false },
+                    onDismiss = { importAllScope = null },
+                    onComplete = { importAllScope = null },
                 )
             }
 
-            if (showReimportAll) {
+            reimportAllScope?.let { scoped ->
                 QifReimportAllDialog(
-                    imported = importedList,
+                    imported = scoped,
                     importDirectoryService = importDirectoryService,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     personRepository = personRepository,
-                    onDismiss = { showReimportAll = false },
-                    onComplete = { showReimportAll = false },
+                    onDismiss = { reimportAllScope = null },
+                    onComplete = { reimportAllScope = null },
                 )
             }
 
-            val shown =
-                when (selectedTab) {
-                    ImportTab.UNIMPORTED -> unimported
-                    ImportTab.IMPORTED -> importedList
-                    else -> ignoredList
-                }
-            if (shown.isEmpty()) {
-                ImportsEmptyMessage(emptyImportTabMessage(selectedTab))
-            } else {
-                val ignoredTab = selectedTab == ImportTab.IGNORED
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(shown, key = { it.id.toString() }) { import ->
-                        ImportFileCard(
-                            fileName = import.originalFileName,
-                            metadataText =
-                                buildString {
-                                    append("${import.recordCount} records")
-                                    append(" · ${import.accountType}")
-                                    if (import.unsupportedCount > 0) {
-                                        append(" · ${import.unsupportedCount} unsupported")
-                                    }
-                                },
-                            addedAt = import.importTimestamp,
-                            errorCount = import.errorCount,
-                            lastAppliedAt = import.lastAppliedAt,
-                            applicationCount = import.applicationCount,
-                            lastAppliedStrategyName = import.lastAppliedStrategyName,
-                            dateRange = dateRanges[import.id.id.toString()],
-                            ignored = ignoredTab,
-                            onClick = { onImportClick(import.id) },
-                            onSetIgnored = { ignore ->
-                                scope.launch { importEngine.setQifImportIgnored(import.id, ignore) }
-                            },
-                        )
-                    }
-                }
+            StagedImportsTabs(
+                imports = imports,
+                data = data,
+                onImportAll = { importAllScope = it },
+                onReimportAll = { reimportAllScope = it },
+                onSetIgnored = { files, ignore ->
+                    scope.launch { files.forEach { importEngine.setQifImportIgnored(it.id, ignore) } }
+                },
+            ) { import, placement ->
+                StagedImportCard(
+                    import = import,
+                    placement = placement,
+                    metadataText =
+                        buildString {
+                            append("${import.recordCount} records")
+                            append(" · ${import.accountType}")
+                            if (import.unsupportedCount > 0) {
+                                append(" · ${import.unsupportedCount} unsupported")
+                            }
+                        },
+                    dateRange = dateRanges[import.id.id.toString()],
+                    sourceAccountName = data.sourceAccountName(import),
+                    sourceDirectories = data.importDirectories[import.id].orEmpty(),
+                    onClick = { onImportClick(import.id) },
+                    onSetIgnored = { ignore -> scope.launch { importEngine.setQifImportIgnored(import.id, ignore) } },
+                )
             }
         }
     }
