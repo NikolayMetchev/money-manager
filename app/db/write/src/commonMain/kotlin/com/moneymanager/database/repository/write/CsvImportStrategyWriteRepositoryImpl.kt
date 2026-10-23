@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.json.CsvStrategyJsonCodec
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.insertStrategy
@@ -67,7 +68,7 @@ class CsvImportStrategyWriteRepositoryImpl(
                     writeQueries.deleteXlsxWorksheet(strategy.id.id.toString())
                 }
                 val persistedRevisionId =
-                    selectQueries.selectById(strategy.id.id.toString()).executeAsOne().revision_id
+                    selectQueries.selectById(strategy.id.id.toString()).awaitAsOne().revision_id
                 writeQueries.insertSource(
                     strategy_id = strategy.id.id.toString(),
                     revision_id = persistedRevisionId,

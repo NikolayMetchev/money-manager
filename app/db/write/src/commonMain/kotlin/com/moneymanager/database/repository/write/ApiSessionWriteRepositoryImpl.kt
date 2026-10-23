@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
@@ -35,7 +36,7 @@ class ApiSessionWriteRepositoryImpl(
                 writeQueries.transactionWithResult {
                     val strategy = strategyId.id.toString()
                     writeQueries.insertCredentialIfAbsent(created_at = createdAt.toEpochMilliseconds(), strategy_id = strategy)
-                    selectQueries.selectCredentialIdByStrategy(strategy).executeAsOne()
+                    selectQueries.selectCredentialIdByStrategy(strategy).awaitAsOne()
                 }
             ApiCredentialId(id)
         }
@@ -50,7 +51,7 @@ class ApiSessionWriteRepositoryImpl(
                     .updateCredentialStrategy(
                         strategy_id = strategyId?.id?.toString(),
                         id = credentialId.id,
-                    ).await()
+                    )
             check(affected == 1L) { "Expected to update one credential ($credentialId) strategy, but $affected rows matched" }
         }
 
@@ -69,7 +70,7 @@ class ApiSessionWriteRepositoryImpl(
                         expires_at = expiresAt?.toEpochMilliseconds(),
                         credential_id = credentialId?.id,
                     )
-                    writeQueries.lastInsertRowId().executeAsOne()
+                    writeQueries.lastInsertRowId().awaitAsOne()
                 }
             ApiSessionId(id)
         }
@@ -88,7 +89,7 @@ class ApiSessionWriteRepositoryImpl(
                         method = method,
                         url = url,
                     )
-                    val requestId = writeQueries.lastInsertRowId().executeAsOne()
+                    val requestId = writeQueries.lastInsertRowId().awaitAsOne()
 
                     headers.forEach { (key, value) ->
                         writeQueries.insertRequestHeader(
@@ -130,7 +131,7 @@ class ApiSessionWriteRepositoryImpl(
                         session_id = sessionId.id,
                         json = json,
                     )
-                    writeQueries.lastInsertRowId().executeAsOne()
+                    writeQueries.lastInsertRowId().awaitAsOne()
                 }
             ApiResponseId(id)
         }
@@ -157,7 +158,7 @@ class ApiSessionWriteRepositoryImpl(
                         transaction_id = transactionId?.id,
                         error_message = errorMessage,
                     )
-                    writeQueries.lastInsertApiResponseTransactionId().executeAsOne()
+                    writeQueries.lastInsertApiResponseTransactionId().awaitAsOne()
                 }
             ApiResponseTransactionId(id)
         }
@@ -197,6 +198,6 @@ class ApiSessionWriteRepositoryImpl(
                     revision_id = revisionId,
                     imported_at = importedAt.toEpochMilliseconds(),
                     import_duration_millis = importDurationMillis,
-                ).await()
+                )
         }
 }

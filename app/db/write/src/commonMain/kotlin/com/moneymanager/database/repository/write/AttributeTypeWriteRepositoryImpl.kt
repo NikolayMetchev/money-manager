@@ -1,5 +1,7 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
@@ -19,12 +21,12 @@ class AttributeTypeWriteRepositoryImpl(
         withContext(Dispatchers.Default) {
             writeQueries.transactionWithResult {
                 // Try to find existing
-                val existing = selectQueries.selectByName(name).executeAsOneOrNull()
+                val existing = selectQueries.selectByName(name).awaitAsOneOrNull()
                 existing?.let { AttributeTypeId(it.id) }
                     ?: run {
                         // Insert and get the new ID
                         writeQueries.insert(name)
-                        val newId = selectQueries.selectByName(name).executeAsOne().id
+                        val newId = selectQueries.selectByName(name).awaitAsOne().id
                         AttributeTypeId(newId)
                     }
             }

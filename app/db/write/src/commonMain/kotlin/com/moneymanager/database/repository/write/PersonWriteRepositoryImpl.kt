@@ -1,5 +1,7 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.DeviceId
@@ -36,7 +38,7 @@ class PersonWriteRepositoryImpl(
                         middle_name = person.middleName,
                         last_name = person.lastName,
                     )
-                    val newId = personWriteQueries.lastInsertRowId().executeAsOne()
+                    val newId = personWriteQueries.lastInsertRowId().awaitAsOne()
                     database.recordSource(deviceId, EntityType.PERSON, newId, 1L, source)
                     newId
                 }
@@ -55,7 +57,7 @@ class PersonWriteRepositoryImpl(
                     last_name = person.lastName,
                     id = person.id.id,
                 )
-                val revision = personSelectQueries.selectRevisionById(person.id.id).executeAsOne()
+                val revision = personSelectQueries.selectRevisionById(person.id.id).awaitAsOne()
                 database.recordSource(deviceId, EntityType.PERSON, person.id.id, revision, source)
             }
         }
@@ -89,9 +91,9 @@ class PersonWriteRepositoryImpl(
                             )
                         },
                         bumpRevisionOnly = { personWriteQueries.bumpRevisionOnly(effectivePersonId.id) },
-                        selectRevision = { personSelectQueries.selectRevisionById(effectivePersonId.id).executeAsOne() },
+                        selectRevision = { personSelectQueries.selectRevisionById(effectivePersonId.id).awaitAsOne() },
                         selectCurrentSlot = { id ->
-                            attributeSelectQueries.selectById(id).executeAsOneOrNull()?.let {
+                            attributeSelectQueries.selectById(id).awaitAsOneOrNull()?.let {
                                 it.attribute_type_id to it.group_key
                             }
                         },

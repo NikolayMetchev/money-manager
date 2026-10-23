@@ -1,5 +1,7 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
@@ -80,7 +82,7 @@ class CsvImportReadRepositoryImpl(
     ): List<CsvRow> =
         withContext(coroutineContext) {
             val import =
-                csvImportSelectQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                     ?: return@withContext emptyList()
 
             tableManager.queryRows(
@@ -96,7 +98,7 @@ class CsvImportReadRepositoryImpl(
         withContext(coroutineContext) {
             entitySourceSelectQueries
                 .selectAccountIdsCreatedByCsvImport(id.id.toString())
-                .executeAsList()
+                .awaitAsList()
                 .map { AccountId(it) }
                 .toSet()
         }
@@ -105,7 +107,7 @@ class CsvImportReadRepositoryImpl(
         withContext(coroutineContext) {
             entitySourceSelectQueries
                 .selectTransferIdsCreatedByCsvImport(id.id.toString())
-                .executeAsList()
+                .awaitAsList()
                 .map { TransferId(it) }
                 .toSet()
         }
@@ -114,7 +116,7 @@ class CsvImportReadRepositoryImpl(
         withContext(coroutineContext) {
             entitySourceSelectQueries
                 .selectTradeIdsCreatedByCsvImport(id.id.toString())
-                .executeAsList()
+                .awaitAsList()
                 .map { TradeId(it) }
                 .toSet()
         }
@@ -129,7 +131,7 @@ class CsvImportReadRepositoryImpl(
             if (transactionIds.isEmpty()) return@withContext emptyMap()
             csvImportSelectQueries
                 .selectAllImports(::toCsvImportRecord)
-                .executeAsList()
+                .awaitAsList()
                 .filter { it.importId != excluding.id.toString() }
                 .mapNotNull { other ->
                     tableManager
@@ -143,20 +145,20 @@ class CsvImportReadRepositoryImpl(
         withContext(coroutineContext) {
             entitySourceSelectQueries
                 .selectHistoricalSourceAccounts()
-                .executeAsList()
+                .awaitAsList()
                 .associate { CsvImportId(Uuid.parse(it.csv_import_id)) to AccountId(requireNotNull(it.account_id)) }
         }
 
     override suspend fun findImportsByChecksum(checksum: String): List<CsvImport> =
         withContext(coroutineContext) {
-            csvImportSelectQueries.selectImportsByChecksum(checksum, ::toCsvImportRecord).executeAsList().map { import ->
+            csvImportSelectQueries.selectImportsByChecksum(checksum, ::toCsvImportRecord).awaitAsList().map { import ->
                 toCsvImport(import)
             }
         }
 
     override suspend fun getXlsxBlob(id: CsvImportId): XlsxImportBlob? =
         withContext(coroutineContext) {
-            csvImportSelectQueries.selectXlsxBlob(id.id.toString()).executeAsOneOrNull()?.let { blob ->
+            csvImportSelectQueries.selectXlsxBlob(id.id.toString()).awaitAsOneOrNull()?.let { blob ->
                 XlsxImportBlob(fileBytes = blob.file_bytes, worksheetName = blob.worksheet_name)
             }
         }
@@ -234,7 +236,7 @@ class CsvImportReadRepositoryImpl(
         return toInt()
     }
 
-    private fun toCsvImport(
+    private suspend fun toCsvImport(
         record: CsvImportRecord,
         columns: List<CsvColumn> = emptyList(),
     ): CsvImport =
@@ -262,7 +264,7 @@ class CsvImportReadRepositoryImpl(
             columns = columns,
         )
 
-    private fun toCsvImport(
+    private suspend fun toCsvImport(
         importId: String,
         tableName: String,
         originalFileName: String,
@@ -283,7 +285,7 @@ class CsvImportReadRepositoryImpl(
         lastAppliedStrategyName: String?,
         lastAppliedAtMs: Long?,
         lastUnimportedAtMs: Long?,
-        columns: List<CsvColumn> = loadColumns(importId),
+        columns: List<CsvColumn>? = null,
     ): CsvImport =
         CsvImport(
             id = CsvImportId(Uuid.parse(importId)),
@@ -292,7 +294,7 @@ class CsvImportReadRepositoryImpl(
             importTimestamp = Instant.fromEpochMilliseconds(importTimestampMs),
             rowCount = rowCount,
             columnCount = columnCount,
-            columns = columns,
+            columns = columns ?: loadColumns(importId),
             deviceInfo =
                 createDeviceInfo(
                     platformName = platformName,
@@ -318,10 +320,10 @@ class CsvImportReadRepositoryImpl(
             lastUnimportedAt = lastUnimportedAtMs?.let(Instant::fromEpochMilliseconds),
         )
 
-    private fun loadColumns(importId: String): List<CsvColumn> =
+    private suspend fun loadColumns(importId: String): List<CsvColumn> =
         csvImportSelectQueries
             .selectColumnsByImportId(importId)
-            .executeAsList()
+            .awaitAsList()
             .map { col ->
                 CsvColumn(
                     id = CsvColumnId(Uuid.parse(col.id)),

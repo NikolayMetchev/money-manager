@@ -3,8 +3,7 @@
 package com.moneymanager.bazel.sqldelight
 
 import app.cash.sqldelight.Query
-import app.cash.sqldelight.TransacterImpl
-import app.cash.sqldelight.db.QueryResult
+import app.cash.sqldelight.SuspendingTransacterImpl
 import app.cash.sqldelight.db.SqlDriver
 import kotlin.Any
 import kotlin.Long
@@ -12,7 +11,7 @@ import kotlin.String
 
 public class LedgerQueries(
   driver: SqlDriver,
-) : TransacterImpl(driver) {
+) : SuspendingTransacterImpl(driver) {
   public fun <T : Any> selectAll(mapper: (
     id: Long,
     name: String,
@@ -30,12 +29,12 @@ public class LedgerQueries(
   /**
    * @return The number of rows updated.
    */
-  public fun insert(name: String, balance: Long): QueryResult<Long> {
+  public suspend fun insert(name: String, balance: Long): Long {
     val result = driver.execute(613_090_307, """INSERT INTO ledger (name, balance) VALUES (?, ?)""", 2) {
           var parameterIndex = 0
           bindString(parameterIndex++, name)
           bindLong(parameterIndex++, balance)
-        }
+        }.await()
     notifyQueries(613_090_307) { emit ->
       emit("ledger")
     }

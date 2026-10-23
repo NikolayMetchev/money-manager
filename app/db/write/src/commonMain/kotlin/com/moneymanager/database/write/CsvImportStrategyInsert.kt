@@ -9,7 +9,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
  * `xlsx_import_strategy` satellite row when it targets an Excel worksheet. Shared by the runtime
  * repository (user-created strategies) and the seeder (built-in strategies). created_at/updated_at are filled by the table's DEFAULT (current time).
  */
-fun CsvImportStrategyWriteQueries.insertStrategy(strategy: CsvImportStrategy) {
+suspend fun CsvImportStrategyWriteQueries.insertStrategy(strategy: CsvImportStrategy) {
     insert(
         id = strategy.id.id.toString(),
         name = strategy.name,

@@ -1,5 +1,7 @@
 package com.moneymanager.database.repository
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
@@ -52,19 +54,14 @@ class TradeReadRepositoryImpl(
 
     override suspend fun countTradesByAccount(accountId: AccountId): Long =
         withContext(Dispatchers.Default) {
-            selectQueries.countByAccount(accountId.id).executeAsOne()
+            selectQueries.countByAccount(accountId.id).awaitAsOne()
         }
 
     override suspend fun accountsWithTrades(accountIds: Collection<AccountId>): Set<AccountId> =
         withContext(Dispatchers.Default) {
-            accountIds
-                .asSequence()
-                .map { it.id }
-                .distinct()
-                .chunked(MAX_IDS_PER_TWO_SIDED_QUERY)
-                .flatMap { chunk ->
-                    selectQueries.selectAccountsWithTrades(chunk).executeAsList()
-                }.mapTo(mutableSetOf(), ::AccountId)
+            queryInChunks(accountIds.map { it.id }, MAX_IDS_PER_TWO_SIDED_QUERY) { chunk ->
+                selectQueries.selectAccountsWithTrades(chunk).awaitAsList()
+            }.mapTo(mutableSetOf(), ::AccountId)
         }
 
     override suspend fun getTradesByAccountsAndDateRange(
@@ -89,7 +86,7 @@ class TradeReadRepositoryImpl(
                                 maxTimestamp = maxTimestamp.toEpochMilliseconds(),
                                 accountIds = chunk,
                                 mapper = TradeMapper::mapRaw,
-                            ).executeAsList()
+                            ).awaitAsList()
                     }.distinctBy { it.id }
             }
         }

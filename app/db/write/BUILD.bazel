@@ -66,6 +66,7 @@ kmp_library(
     deps = [
         "//utils/regex",
         "@maven_kmp//:kotlinx_serialization_json",
+        "@maven_kmp//:sqldelight_async_extensions",
         "@maven_kmp//:sqldelight_coroutines_extensions",
     ],
 )

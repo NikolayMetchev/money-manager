@@ -1,5 +1,6 @@
 package com.moneymanager.database
 
+import app.cash.sqldelight.async.coroutines.await
 import app.cash.sqldelight.db.SqlDriver
 import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.currency.IsoCurrency
@@ -65,7 +66,7 @@ abstract class FileDatabaseManager(
                     database.transaction {
                         onProgress(Progress.counted("Creating the database schema...", 4, OPEN_STEPS))
                         // Lookups, the system device and GBP are seeded inside Schema.create (the :app:db:seed module).
-                        MoneyManagerDatabase.Schema.create(driver)
+                        MoneyManagerDatabase.Schema.create(driver).await()
                         // The rest of the bundled ISO 4217 list is seeded here for a freshly created database.
                         onProgress(Progress.counted("Adding default currencies...", 5, OPEN_STEPS))
                         DatabaseConfig.seedCurrencies(database, currenciesToSeed())

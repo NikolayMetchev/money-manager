@@ -205,6 +205,14 @@ the local copy, so user-created ones don't show up as a change. A JDK bump that 
 
 **SQLDelight** schema files: `app/db/schema/src/commonMain/sqldelight/com/moneymanager/database/sql/`
 
+**Async queries**: the queries are generated with `generateAsync`, because the browser's worker driver can't block, so
+every query and transaction suspends on every platform. Read with `awaitAsList`/`awaitAsOne`/`awaitAsOneOrNull`
+(`app.cash.sqldelight.async.coroutines`), never `executeAs*`, which compiles but throws on an async result. Hand-written
+SQL goes through `MoneyManagerDatabaseWrapper.rawQuery`/`execute`. A sync driver (Android's `AndroidSqliteDriver`)
+takes `Schema.synchronous()`. **Never `withContext` inside a `transaction {}`**: the JVM and native drivers keep the
+open transaction per thread, so a body that hops threads runs on another connection, outside it
+(`SuspendingTransactionTest`).
+
 **BETA — no DB versioning yet**: The app is in BETA and database versioning/migrations are not
 implemented (tracked in [issue #426](https://github.com/NikolayMetchev/money-manager/issues/426)).
 Until that lands, **do not make backward-compatible DB changes or write migration code**. The
@@ -660,7 +668,7 @@ set of writes.
    toolchain's `jvm_target` (`bazel/kmp/BUILD.bazel`)
 2. **Metro**: Keep the Kotlin version compatible with Metro (`KOTLIN` and `METRO` in `MODULE.bazel`; Renovate bumps
    them together). Graphs must be `interface`; binding containers `object`
-3. **SQLDelight**: `execute()`/`update()`/`delete()` return `Long`, not `Unit`
+3. **SQLDelight**: write queries are `suspend` and return `Long`, not `Unit`; read with `awaitAs*`, never `executeAs*`
 4. **Kotlin bumps**: Kotlin, `rules_kotlin` and the Kotlin/Native pins move together — see
    [`bazel/README.md`](bazel/README.md), "Bumping Kotlin"
 5. **`jvmAndroidMain`**: code shared by JVM and Android only goes in `src/jvmAndroidMain/kotlin` (tests in

@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.json.ApiStrategyJsonCodec
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.ApiImportStrategyId
@@ -65,7 +66,7 @@ class ApiImportStrategyWriteRepositoryImpl(
                 // persisted value back instead of deriving it from the (possibly stale) snapshot.
                 // This keeps the source row aligned with the audit row the update trigger writes.
                 val persistedRevisionId =
-                    selectQueries.selectById(strategy.id.id.toString()).executeAsOne().revision_id
+                    selectQueries.selectById(strategy.id.id.toString()).awaitAsOne().revision_id
                 writeQueries.insertSource(
                     strategy_id = strategy.id.id.toString(),
                     revision_id = persistedRevisionId,

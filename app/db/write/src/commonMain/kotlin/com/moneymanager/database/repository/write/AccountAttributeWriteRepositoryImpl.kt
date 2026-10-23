@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
@@ -30,7 +31,7 @@ class AccountAttributeWriteRepositoryImpl(
                     value,
                     groupKey,
                 )
-                writeQueries.selectLastInsertedId().executeAsOne()
+                writeQueries.selectLastInsertedId().awaitAsOne()
             }
         }
 
@@ -50,7 +51,7 @@ class AccountAttributeWriteRepositoryImpl(
                         value,
                         groupKey,
                     )
-                    writeQueries.selectLastInsertedId().executeAsOne()
+                    writeQueries.selectLastInsertedId().awaitAsOne()
                 } finally {
                     database.endCreationMode()
                 }

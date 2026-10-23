@@ -1,5 +1,7 @@
 package com.moneymanager.database.repository
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
@@ -70,7 +72,7 @@ class ImportDirectoryReadRepositoryImpl(
         withContext(coroutineContext) {
             selectQueries
                 .selectFileByRef(id.id.toString(), fileRef)
-                .executeAsOneOrNull()
+                .awaitAsOneOrNull()
                 ?.let {
                     toFileDomain(
                         it.directory_id,
@@ -88,7 +90,7 @@ class ImportDirectoryReadRepositoryImpl(
 
     override suspend fun getTrackedFilesForCsvImport(id: CsvImportId): List<ImportDirectoryFile> =
         withContext(coroutineContext) {
-            selectQueries.selectFilesForCsvImport(id.id.toString()).executeAsList().map {
+            selectQueries.selectFilesForCsvImport(id.id.toString()).awaitAsList().map {
                 toFileDomain(
                     it.directory_id,
                     it.file_name,
@@ -107,7 +109,7 @@ class ImportDirectoryReadRepositoryImpl(
         withContext(coroutineContext) {
             selectQueries
                 .selectStagedImportAccounts()
-                .executeAsList()
+                .awaitAsList()
                 .mapNotNull { row ->
                     val csvImportId = row.csv_import_id ?: return@mapNotNull null
                     val accountId = row.account_id ?: return@mapNotNull null
@@ -119,7 +121,7 @@ class ImportDirectoryReadRepositoryImpl(
         withContext(coroutineContext) {
             selectQueries
                 .selectStagedImportAccounts()
-                .executeAsList()
+                .awaitAsList()
                 .mapNotNull { row ->
                     val qifImportId = row.qif_import_id ?: return@mapNotNull null
                     val accountId = row.account_id ?: return@mapNotNull null

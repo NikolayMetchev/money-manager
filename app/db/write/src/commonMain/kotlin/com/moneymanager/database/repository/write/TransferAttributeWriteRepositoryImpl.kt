@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.TransferId
@@ -30,7 +31,7 @@ class TransferAttributeWriteRepositoryImpl(
                     groupKey,
                 )
                 // Get the inserted ID using last_insert_rowid()
-                writeQueries.selectLastInsertedId().executeAsOne()
+                writeQueries.selectLastInsertedId().awaitAsOne()
             }
         }
 

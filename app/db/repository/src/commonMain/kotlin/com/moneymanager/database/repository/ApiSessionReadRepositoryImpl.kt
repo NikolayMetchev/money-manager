@@ -1,5 +1,7 @@
 package com.moneymanager.database.repository
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
@@ -39,7 +41,7 @@ class ApiSessionReadRepositoryImpl(
 
     override suspend fun getAllCredentials(): List<ApiCredential> =
         withContext(Dispatchers.Default) {
-            selectQueries.selectAllCredentials().executeAsList().map { it.toApiCredential() }
+            selectQueries.selectAllCredentials().awaitAsList().map { it.toApiCredential() }
         }
 
     override fun getCredentialsFlow(): Flow<List<ApiCredential>> =
@@ -51,27 +53,27 @@ class ApiSessionReadRepositoryImpl(
 
     override suspend fun getSessionsByCredential(credentialId: ApiCredentialId): List<ApiSession> =
         withContext(Dispatchers.Default) {
-            selectQueries.selectByCredentialId(credentialId.id).executeAsList().map { it.toApiSession() }
+            selectQueries.selectByCredentialId(credentialId.id).awaitAsList().map { it.toApiSession() }
         }
 
     override suspend fun getSessionById(id: ApiSessionId): ApiSession? =
         withContext(Dispatchers.Default) {
-            selectQueries.selectById(id.id).executeAsOneOrNull()?.toApiSession()
+            selectQueries.selectById(id.id).awaitAsOneOrNull()?.toApiSession()
         }
 
     override suspend fun getSessionsByDevice(deviceId: DeviceId): List<ApiSession> =
         withContext(Dispatchers.Default) {
-            selectQueries.selectByDeviceId(deviceId.id).executeAsList().map { it.toApiSession() }
+            selectQueries.selectByDeviceId(deviceId.id).awaitAsList().map { it.toApiSession() }
         }
 
     override suspend fun getSessions(now: Instant): List<ApiSession> =
         withContext(Dispatchers.Default) {
-            selectQueries.selectSessions(now.toEpochMilliseconds()).executeAsList().map { it.toApiSession() }
+            selectQueries.selectSessions(now.toEpochMilliseconds()).awaitAsList().map { it.toApiSession() }
         }
 
     override suspend fun getRequestsBySession(sessionId: ApiSessionId): List<ApiRequest> =
         withContext(Dispatchers.Default) {
-            val requests = selectQueries.selectRequestsBySession(sessionId.id).executeAsList()
+            val requests = selectQueries.selectRequestsBySession(sessionId.id).awaitAsList()
             val requestIds = requests.map { it.id }
             val headersByRequestId =
                 if (requestIds.isEmpty()) {
@@ -79,7 +81,7 @@ class ApiSessionReadRepositoryImpl(
                 } else {
                     selectQueries
                         .selectHeadersByRequestIds(requestIds)
-                        .executeAsList()
+                        .awaitAsList()
                         .groupBy { it.request_id }
                 }
 
@@ -95,18 +97,18 @@ class ApiSessionReadRepositoryImpl(
         withContext(Dispatchers.Default) {
             selectQueries
                 .selectDownloadWatermarksByCredential(credentialId.id, excludingSessionId.id)
-                .executeAsList()
+                .awaitAsList()
                 .associate { row -> row.endpoint_key to Instant.fromEpochMilliseconds(row.covers_until) }
         }
 
     override suspend fun getResponsesBySession(sessionId: ApiSessionId): List<ApiResponse> =
         withContext(Dispatchers.Default) {
-            selectQueries.selectResponsesBySession(sessionId.id).executeAsList().map { it.toApiResponse() }
+            selectQueries.selectResponsesBySession(sessionId.id).awaitAsList().map { it.toApiResponse() }
         }
 
     override suspend fun getResponseTransactions(responseId: ApiResponseId): List<ApiResponseTransaction> =
         withContext(Dispatchers.Default) {
-            selectQueries.selectResponseTransactionsByResponseId(responseId.id).executeAsList().map { row ->
+            selectQueries.selectResponseTransactionsByResponseId(responseId.id).awaitAsList().map { row ->
                 ApiResponseTransaction(
                     id = ApiResponseTransactionId(row.id),
                     responseId = ApiResponseId(row.response_id),
@@ -120,7 +122,7 @@ class ApiSessionReadRepositoryImpl(
 
     override suspend fun getResponseTransactionsBySession(sessionId: ApiSessionId): List<ApiResponseTransaction> =
         withContext(Dispatchers.Default) {
-            selectQueries.selectResponseTransactionsBySession(sessionId.id).executeAsList().map { row ->
+            selectQueries.selectResponseTransactionsBySession(sessionId.id).awaitAsList().map { row ->
                 ApiResponseTransaction(
                     id = ApiResponseTransactionId(row.id),
                     responseId = ApiResponseId(row.response_id),
@@ -136,7 +138,7 @@ class ApiSessionReadRepositoryImpl(
         withContext(Dispatchers.Default) {
             selectQueries
                 .selectImportedSessionRevisions()
-                .executeAsList()
+                .awaitAsList()
                 .map { ApiSessionImportRevision(ApiSessionId(it.session_id), it.revision_id) }
                 .toSet()
         }
@@ -145,7 +147,7 @@ class ApiSessionReadRepositoryImpl(
         withContext(Dispatchers.Default) {
             entitySourceSelectQueries
                 .selectAccountIdsCreatedByApiSession(sessionId.id)
-                .executeAsList()
+                .awaitAsList()
                 .map { AccountId(it) }
                 .toSet()
         }
@@ -154,7 +156,7 @@ class ApiSessionReadRepositoryImpl(
         withContext(Dispatchers.Default) {
             entitySourceSelectQueries
                 .selectTransferIdsCreatedByApiSession(sessionId.id)
-                .executeAsList()
+                .awaitAsList()
                 .map { TransferId(it) }
                 .toSet()
         }
@@ -163,7 +165,7 @@ class ApiSessionReadRepositoryImpl(
         withContext(Dispatchers.Default) {
             entitySourceSelectQueries
                 .selectTradeIdsCreatedByApiSession(sessionId.id)
-                .executeAsList()
+                .awaitAsList()
                 .map { TradeId(it) }
                 .toSet()
         }

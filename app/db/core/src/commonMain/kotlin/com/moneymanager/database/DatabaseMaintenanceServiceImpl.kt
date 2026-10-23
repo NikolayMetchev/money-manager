@@ -1,5 +1,6 @@
 package com.moneymanager.database
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import kotlinx.coroutines.Dispatchers
@@ -72,8 +73,8 @@ class DatabaseMaintenanceServiceImpl(
      * Rebuilds both materialized views from scratch by enumerating every transaction leg
      * (transfer + trade) and aggregating in Kotlin BigInteger.
      */
-    private fun recompute() {
-        val legs = balanceLegsQueries.selectAllTransactionLegs().executeAsList()
+    private suspend fun recompute() {
+        val legs = balanceLegsQueries.selectAllTransactionLegs().awaitAsList()
         transferWriteQueries.transaction {
             // Account balances: sum signed amounts of non-excluded legs, per (account, asset).
             transferWriteQueries.deleteAllAccountBalances()

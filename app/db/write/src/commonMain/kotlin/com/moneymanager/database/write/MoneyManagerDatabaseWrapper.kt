@@ -1,8 +1,13 @@
 package com.moneymanager.database.write
 
+import app.cash.sqldelight.ExecutableQuery
+import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOne
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlCursor
 import app.cash.sqldelight.db.SqlDriver
+import app.cash.sqldelight.db.SqlPreparedStatement
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.database.sql.write.MoneyManagerDatabase as WriteDatabase
 
@@ -86,30 +91,13 @@ class MoneyManagerDatabaseWrapper(
      * stable "has the data changed since last sync?" signal that ignores our own view maintenance. Only
      * equality of two tokens is meaningful (it is a hash, not a counter).
      */
-    fun dataChangeToken(): Long {
-        val auditTables = mutableListOf<String>()
-        executeQuery(
-            null,
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name GLOB '*_audit'",
-            { cursor ->
-                while (cursor.next().value) {
-                    cursor.getString(0)?.let(auditTables::add)
-                }
-                QueryResult.Unit
-            },
-            0,
-        )
+    suspend fun dataChangeToken(): Long {
+        val auditTables =
+            rawQuery("SELECT name FROM sqlite_master WHERE type = 'table' AND name GLOB '*_audit'") { it.getString(0)!! }
+                .awaitAsList()
         val auditRowCount =
             auditTables.sumOf { table ->
-                executeQuery(
-                    null,
-                    "SELECT COUNT(*) FROM $table",
-                    { cursor ->
-                        cursor.next()
-                        QueryResult.Value(cursor.getLong(0)!!)
-                    },
-                    0,
-                ).value
+                rawQuery("SELECT COUNT(*) FROM $table") { it.getLong(0)!! }.awaitAsOne()
             }
         return foldReconciliationTablesInto(foldAccountMappingsInto(foldSettingsInto(auditRowCount)))
     }
@@ -118,60 +106,31 @@ class MoneyManagerDatabaseWrapper(
      * Mixes the non-audited `account_mapping` table into [base] with a rolling hash. Row count catches
      * inserts/deletes; summing ids catches which rows exist; summing updated_at catches in-place edits.
      */
-    private fun foldAccountMappingsInto(base: Long): Long {
-        var token = base
-        executeQuery(
-            null,
+    private suspend fun foldAccountMappingsInto(base: Long): Long =
+        rawQuery(
             "SELECT COUNT(*), COALESCE(SUM(id), 0), COALESCE(SUM(updated_at), 0) FROM account_mapping",
-            { cursor ->
-                if (cursor.next().value) {
-                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(0)!!
-                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(1)!!
-                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(2)!!
-                }
-                QueryResult.Unit
-            },
-            0,
-        )
-        return token
-    }
+        ) { cursor -> List(3) { cursor.getLong(it)!! } }
+            .awaitAsOneOrNull()
+            .mixInto(base)
 
     /**
      * Mixes the non-audited `reconciliation_account_link` and `trade_attribute` tables into [base], like
      * [foldAccountMappingsInto]: their edits must register as unsynced.
      */
-    private fun foldReconciliationTablesInto(base: Long): Long {
-        var token = base
-        executeQuery(
-            null,
-            "SELECT COUNT(*), COALESCE(SUM(shadow_account_id * 31 + real_account_id), 0), " +
-                "COALESCE(SUM(created_at), 0) FROM reconciliation_account_link",
-            { cursor ->
-                if (cursor.next().value) {
-                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(0)!!
-                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(1)!!
-                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(2)!!
-                }
-                QueryResult.Unit
-            },
-            0,
-        )
+    private suspend fun foldReconciliationTablesInto(base: Long): Long {
+        val links =
+            rawQuery(
+                "SELECT COUNT(*), COALESCE(SUM(shadow_account_id * 31 + real_account_id), 0), " +
+                    "COALESCE(SUM(created_at), 0) FROM reconciliation_account_link",
+            ) { cursor -> List(3) { cursor.getLong(it)!! } }.awaitAsOneOrNull()
         // trade_attribute has no updated_at, and a value can change in place (e.g. an exclusion reason), so
         // fold every row's content; SQLite has no string hash, hence the Kotlin fold. The table is small.
-        executeQuery(
-            null,
-            "SELECT trade_id, attribute_type_id, attribute_value FROM trade_attribute ORDER BY trade_id, attribute_type_id",
-            { cursor ->
-                while (cursor.next().value) {
-                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(0)!!
-                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(1)!!
-                    token = token * SETTINGS_HASH_PRIME + cursor.getString(2)!!.hashCode()
-                }
-                QueryResult.Unit
-            },
-            0,
-        )
-        return token
+        val tradeAttributes =
+            rawQuery(
+                "SELECT trade_id, attribute_type_id, attribute_value FROM trade_attribute ORDER BY trade_id, attribute_type_id",
+            ) { cursor -> listOf(cursor.getLong(0)!!, cursor.getLong(1)!!, cursor.getString(2)!!.hashCode().toLong()) }
+                .awaitAsList()
+        return tradeAttributes.fold(links.mixInto(base)) { token, row -> row.mixInto(token) }
     }
 
     /**
@@ -179,22 +138,15 @@ class MoneyManagerDatabaseWrapper(
      * tracked setting (default currency, last QIF account) yields a different token even though the
      * settings table appends no audit rows. A missing row leaves [base] unchanged.
      */
-    private fun foldSettingsInto(base: Long): Long {
-        var token = base
-        executeQuery(
-            null,
+    private suspend fun foldSettingsInto(base: Long): Long =
+        rawQuery(
             "SELECT COALESCE(default_currency_id, 0), COALESCE(last_qif_account_id, 0) FROM settings WHERE id = 1",
-            { cursor ->
-                if (cursor.next().value) {
-                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(0)!!
-                    token = token * SETTINGS_HASH_PRIME + cursor.getLong(1)!!
-                }
-                QueryResult.Unit
-            },
-            0,
-        )
-        return token
-    }
+        ) { cursor -> List(2) { cursor.getLong(it)!! } }
+            .awaitAsOneOrNull()
+            .mixInto(base)
+
+    /** Folds one row's values into [token] with the rolling hash; a missing row leaves it unchanged. */
+    private fun List<Long>?.mixInto(token: Long): Long = this?.fold(token) { acc, value -> acc * SETTINGS_HASH_PRIME + value } ?: token
 
     /**
      * Returns the SQLite object-level size breakdown using `dbstat`.
@@ -202,34 +154,30 @@ class MoneyManagerDatabaseWrapper(
      * The list is sorted by descending on-disk size.
      * If `dbstat` is unavailable in the current SQLite build, returns an empty list.
      */
-    fun getDbSizeBreakdown(): List<DbObjectSize> =
+    suspend fun getDbSizeBreakdown(): List<DbObjectSize> =
         runCatching {
-            val result = mutableListOf<DbObjectSize>()
-            executeQuery(
-                null,
-                """
-                SELECT
-                    name,
-                    COUNT(*) AS page_count,
-                    SUM(pgsize) AS total_bytes
-                FROM dbstat
-                WHERE name IS NOT NULL AND name != ''
-                GROUP BY name
-                ORDER BY total_bytes DESC, name ASC
-                """.trimIndent(),
-                { cursor ->
-                    while (cursor.next().value) {
-                        val objectName = cursor.getString(0)
-                        val pageCount = cursor.getLong(1)
-                        val totalBytes = cursor.getLong(2)
-                        if (objectName != null && pageCount != null && totalBytes != null) {
-                            result += DbObjectSize(objectName = objectName, pageCount = pageCount, totalBytes = totalBytes)
-                        }
+            val result =
+                rawQuery(
+                    """
+                    SELECT
+                        name,
+                        COUNT(*) AS page_count,
+                        SUM(pgsize) AS total_bytes
+                    FROM dbstat
+                    WHERE name IS NOT NULL AND name != ''
+                    GROUP BY name
+                    ORDER BY total_bytes DESC, name ASC
+                    """.trimIndent(),
+                ) { cursor ->
+                    val objectName = cursor.getString(0)
+                    val pageCount = cursor.getLong(1)
+                    val totalBytes = cursor.getLong(2)
+                    if (objectName != null && pageCount != null && totalBytes != null) {
+                        listOf(DbObjectSize(objectName = objectName, pageCount = pageCount, totalBytes = totalBytes))
+                    } else {
+                        emptyList()
                     }
-                    QueryResult.Unit
-                },
-                0,
-            )
+                }.awaitAsList().flatten()
             // Enrich with object type, plus row/column counts for tables (non-tables stay null).
             val types = sqliteMasterTypes()
             val columnCounts = tableColumnCounts()
@@ -244,31 +192,14 @@ class MoneyManagerDatabaseWrapper(
         }.getOrDefault(emptyList())
 
     /** Returns the object type (table/index/trigger/view) keyed by name, from `sqlite_master`. */
-    private fun sqliteMasterTypes(): Map<String, String> {
-        val types = mutableMapOf<String, String>()
-        executeQuery(
-            null,
-            "SELECT name, type FROM sqlite_master WHERE name IS NOT NULL AND type IS NOT NULL",
-            { cursor ->
-                while (cursor.next().value) {
-                    val name = cursor.getString(0)
-                    val type = cursor.getString(1)
-                    if (name != null && type != null) {
-                        types[name] = type
-                    }
-                }
-                QueryResult.Unit
-            },
-            0,
-        )
-        return types
-    }
+    private suspend fun sqliteMasterTypes(): Map<String, String> =
+        rawQuery("SELECT name, type FROM sqlite_master WHERE name IS NOT NULL AND type IS NOT NULL") { cursor ->
+            cursor.getString(0)!! to cursor.getString(1)!!
+        }.awaitAsList().toMap()
 
     /** Returns column counts keyed by table name (tables only, from `sqlite_master`). */
-    private fun tableColumnCounts(): Map<String, Long> {
-        val counts = mutableMapOf<String, Long>()
-        executeQuery(
-            null,
+    private suspend fun tableColumnCounts(): Map<String, Long> =
+        rawQuery(
             """
             SELECT m.name, COUNT(ti.cid)
             FROM sqlite_master m
@@ -276,72 +207,49 @@ class MoneyManagerDatabaseWrapper(
             WHERE m.type = 'table'
             GROUP BY m.name
             """.trimIndent(),
-            { cursor ->
-                while (cursor.next().value) {
-                    val name = cursor.getString(0)
-                    val count = cursor.getLong(1)
-                    if (name != null && count != null) {
-                        counts[name] = count
-                    }
-                }
-                QueryResult.Unit
-            },
-            0,
-        )
-        return counts
-    }
+        ) { cursor -> cursor.getString(0)!! to cursor.getLong(1)!! }.awaitAsList().toMap()
 
     /** Returns `COUNT(*)` for a table, or null if it can't be queried. */
-    private fun tableRowCount(tableName: String): Long? =
+    private suspend fun tableRowCount(tableName: String): Long? =
         runCatching {
             // tableName comes from sqlite_master (trusted schema); still quote-escape defensively.
             val quoted = "\"" + tableName.replace("\"", "\"\"") + "\""
-            var count: Long? = null
-            executeQuery(
-                null,
-                "SELECT COUNT(*) FROM $quoted",
-                { cursor ->
-                    if (cursor.next().value) {
-                        count = cursor.getLong(0)
-                    }
-                    QueryResult.Unit
-                },
-                0,
-            )
-            count
+            rawQuery("SELECT COUNT(*) FROM $quoted") { it.getLong(0)!! }.awaitAsOneOrNull()
         }.getOrNull()
 
-    /**
-     * Execute a SQL statement on the database.
-     * Delegates to the underlying SqlDriver.
-     */
-    fun execute(
+    /** Executes a SQL statement on the underlying driver, returning the number of rows it changed. */
+    suspend fun execute(
         identifier: Int?,
         sql: String,
         parameters: Int,
-    ) = driver.execute(identifier, sql, parameters)
+        binders: (SqlPreparedStatement.() -> Unit)? = null,
+    ): Long = driver.execute(identifier, sql, parameters, binders).await()
 
     /**
-     * Execute a SQL query on the database.
-     * Delegates to the underlying SqlDriver.
+     * A query over hand-written SQL (dynamic table names, `sqlite_master`), mapping each row with [mapper]. Run it
+     * with SQLDelight's `awaitAsList`/`awaitAsOne`, which read the cursor whether the driver is blocking or not.
      */
-    fun <R> executeQuery(
-        identifier: Int?,
+    fun <T : Any> rawQuery(
         sql: String,
-        mapper: (SqlCursor) -> QueryResult<R>,
-        parameters: Int,
-    ): QueryResult<R> = driver.executeQuery(identifier, sql, mapper, parameters)
+        parameters: Int = 0,
+        binders: (SqlPreparedStatement.() -> Unit)? = null,
+        mapper: (SqlCursor) -> T,
+    ): ExecutableQuery<T> =
+        object : ExecutableQuery<T>(mapper) {
+            override fun <R> execute(mapper: (SqlCursor) -> QueryResult<R>): QueryResult<R> =
+                driver.executeQuery(null, sql, mapper, parameters, binders)
+        }
 
     /**
      * Execute a SQL statement with string parameters.
      * Used for dynamic SQL where parameters need to be bound safely.
      */
-    fun executeWithParams(
+    suspend fun executeWithParams(
         sql: String,
         parameterCount: Int,
         parameters: List<String>,
     ) {
-        driver.execute(null, sql, parameterCount) {
+        execute(null, sql, parameterCount) {
             parameters.forEachIndexed { index, value ->
                 bindString(index, value)
             }
@@ -354,7 +262,7 @@ class MoneyManagerDatabaseWrapper(
      * Use this when creating a transfer with initial attributes.
      * Must be paired with [endCreationMode] to restore normal trigger behavior.
      */
-    fun beginCreationMode() {
+    suspend fun beginCreationMode() {
         execute(null, "INSERT INTO _creation_mode (active) VALUES (1)", 0)
     }
 
@@ -362,7 +270,7 @@ class MoneyManagerDatabaseWrapper(
      * Disables creation mode by clearing _creation_mode table.
      * Restores normal trigger behavior (bump revision on attribute changes).
      */
-    fun endCreationMode() {
+    suspend fun endCreationMode() {
         execute(null, "DELETE FROM _creation_mode", 0)
     }
 
@@ -473,29 +381,15 @@ class MoneyManagerDatabaseWrapper(
      *
      * @return List of auditable table names, sorted alphabetically
      */
-    fun getAuditableTables(): List<String> {
-        val tables = mutableListOf<String>()
-        executeQuery(
-            null,
+    suspend fun getAuditableTables(): List<String> =
+        rawQuery(
             """
             SELECT name FROM sqlite_master
             WHERE type = 'table'
             AND name NOT LIKE 'sqlite_%'
             ORDER BY name
             """.trimIndent(),
-            { cursor ->
-                while (cursor.next().value) {
-                    val tableName = cursor.getString(0) ?: continue
-                    if (!isExcludedFromAudit(tableName)) {
-                        tables.add(tableName)
-                    }
-                }
-                QueryResult.Unit
-            },
-            0,
-        )
-        return tables
-    }
+        ) { it.getString(0)!! }.awaitAsList().filterNot(::isExcludedFromAudit)
 
     /**
      * Gets all column names for a specific table.
@@ -504,22 +398,8 @@ class MoneyManagerDatabaseWrapper(
      * @param tableName The name of the table to query
      * @return List of column names in the order they appear in the table
      */
-    fun getTableColumns(tableName: String): List<String> {
-        val columns = mutableListOf<String>()
-        executeQuery(
-            null,
-            "PRAGMA table_info($tableName)",
-            { cursor ->
-                while (cursor.next().value) {
-                    val columnName = cursor.getString(1) ?: continue
-                    columns.add(columnName)
-                }
-                QueryResult.Unit
-            },
-            0,
-        )
-        return columns
-    }
+    suspend fun getTableColumns(tableName: String): List<String> =
+        rawQuery("PRAGMA table_info($tableName)") { it.getString(1)!! }.awaitAsList()
 
     private companion object {
         /** Odd prime used to mix settings values into the data-change token (collision-resistant fold). */

@@ -89,14 +89,14 @@ private data class DatabaseName(
     }
 }
 
-/** The Gradle extension's defaults (SqlDelightDatabase): no async, `SELECT *` expanded, no excluded columns. */
+/** The Gradle extension's defaults (SqlDelightDatabase), but async, as the browser's worker driver needs: `SELECT *` expanded, no excluded columns. */
 private data class DatabaseOptions(
     override val packageName: String,
     override val className: String,
     override val dependencies: List<SqlDelightDatabaseName>,
     override val deriveSchemaFromMigrations: Boolean = false,
     override val treatNullAsUnknownForEquality: Boolean = false,
-    override val generateAsync: Boolean = false,
+    override val generateAsync: Boolean = true,
     override val expandSelectStar: Boolean = true,
     override val codegenExcludedColumns: Set<String> = emptySet(),
 ) : SqlDelightDatabaseOptions

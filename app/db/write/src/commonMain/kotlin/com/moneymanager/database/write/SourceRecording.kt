@@ -1,5 +1,7 @@
 package com.moneymanager.database.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Source
@@ -14,7 +16,7 @@ import com.moneymanager.domain.model.toSourceType
  * INSIDE their own transaction (it does not open one), immediately after inserting/updating the
  * entity, so source recording is atomic with the change and can never be forgotten.
  */
-fun MoneyManagerDatabaseWrapper.recordSource(
+suspend fun MoneyManagerDatabaseWrapper.recordSource(
     deviceId: DeviceId,
     entityType: EntityType,
     entityId: Long,
@@ -37,7 +39,7 @@ fun MoneyManagerDatabaseWrapper.recordSource(
         // persisted source type (mirroring the API branch): INSERT OR IGNORE above keeps any pre-existing
         // row for this (entity, revision), so only attach CSV/QIF detail when that row is actually CSV/QIF.
         is Source.Csv -> {
-            val entitySource = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).executeAsOne()
+            val entitySource = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).awaitAsOne()
             if (entitySource.source_type_id == SourceType.CSV_IMPORT.id.toLong()) {
                 entitySourceWriteQueries.insertCsvSource(
                     id = entitySource.id,
@@ -48,7 +50,7 @@ fun MoneyManagerDatabaseWrapper.recordSource(
         }
 
         is Source.Qif -> {
-            val entitySource = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).executeAsOne()
+            val entitySource = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).awaitAsOne()
             if (entitySource.source_type_id == SourceType.QIF_IMPORT.id.toLong()) {
                 entitySourceWriteQueries.insertQifSource(
                     id = entitySource.id,
@@ -70,9 +72,9 @@ fun MoneyManagerDatabaseWrapper.recordSource(
                             entityType.id,
                             entityId,
                             revisionId,
-                        ).executeAsOne()
+                        ).awaitAsOne()
                 if (entitySource.source_type_id == SourceType.API.id.toLong() &&
-                    entitySourceSelectQueries.selectApiEntitySourceId(entitySource.id).executeAsOneOrNull() == null
+                    entitySourceSelectQueries.selectApiEntitySourceId(entitySource.id).awaitAsOneOrNull() == null
                 ) {
                     entitySourceWriteQueries.insertApiSource(
                         id = entitySource.id,

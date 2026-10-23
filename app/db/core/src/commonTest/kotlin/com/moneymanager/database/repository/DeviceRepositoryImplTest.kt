@@ -1,6 +1,6 @@
 package com.moneymanager.database.repository
 
-import app.cash.sqldelight.db.QueryResult
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.test.database.DbTest
@@ -23,27 +23,11 @@ class DeviceRepositoryImplTest : DbTest() {
      * Test-only query: selectAllPlatforms
      * Retrieves all platforms using raw SQL.
      */
-    private fun selectAllPlatforms(): List<PlatformRecord> {
-        val sql = "SELECT id, name FROM platform"
-        return database
-            .executeQuery(
-                identifier = null,
-                sql = sql,
-                mapper = { cursor ->
-                    val results = mutableListOf<PlatformRecord>()
-                    while (cursor.next().value) {
-                        results.add(
-                            PlatformRecord(
-                                id = cursor.getLong(0)!!,
-                                name = cursor.getString(1)!!,
-                            ),
-                        )
-                    }
-                    QueryResult.Value(results)
-                },
-                parameters = 0,
-            ).value
-    }
+    private suspend fun selectAllPlatforms(): List<PlatformRecord> =
+        database
+            .rawQuery("SELECT id, name FROM platform") { cursor ->
+                PlatformRecord(id = cursor.getLong(0)!!, name = cursor.getString(1)!!)
+            }.awaitAsList()
 
     @Test
     fun `getOrCreateDevice should create device and return valid id`() =

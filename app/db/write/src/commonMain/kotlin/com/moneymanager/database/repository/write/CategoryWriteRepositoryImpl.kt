@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.Category
@@ -30,7 +31,7 @@ class CategoryWriteRepositoryImpl(
                     name = category.name,
                     parent_id = category.parentId,
                 )
-                val id = writeQueries.lastInsertRowId().executeAsOne()
+                val id = writeQueries.lastInsertRowId().awaitAsOne()
                 database.recordSource(deviceId, EntityType.CATEGORY, id, 1L, source)
                 id
             }
@@ -47,7 +48,7 @@ class CategoryWriteRepositoryImpl(
                     parent_id = category.parentId,
                     id = category.id,
                 )
-                val revision = selectQueries.selectRevisionById(category.id).executeAsOne()
+                val revision = selectQueries.selectRevisionById(category.id).awaitAsOne()
                 database.recordSource(deviceId, EntityType.CATEGORY, category.id, revision, source)
             }
         }

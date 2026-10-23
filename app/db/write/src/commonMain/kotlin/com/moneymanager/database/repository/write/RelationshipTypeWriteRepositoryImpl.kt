@@ -1,5 +1,7 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.repository.RelationshipTypeReadRepository
@@ -18,11 +20,11 @@ class RelationshipTypeWriteRepositoryImpl(
     override suspend fun getOrCreate(name: String): RelationshipTypeId =
         withContext(Dispatchers.Default) {
             writeQueries.transactionWithResult {
-                val existing = selectQueries.selectByName(name).executeAsOneOrNull()
+                val existing = selectQueries.selectByName(name).awaitAsOneOrNull()
                 existing?.let { RelationshipTypeId(it.id) }
                     ?: run {
                         writeQueries.insert(name)
-                        val newId = selectQueries.selectByName(name).executeAsOne().id
+                        val newId = selectQueries.selectByName(name).awaitAsOne().id
                         RelationshipTypeId(newId)
                     }
             }

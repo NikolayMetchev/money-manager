@@ -1,5 +1,7 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.AccountId
@@ -58,13 +60,13 @@ class TradeWriteRepositoryImpl(
                             to_asset_id = toAmount.asset.id.id,
                             to_amount = toAmount.amount.toString(),
                             occurrence = occurrence.toLong(),
-                        ).executeAsOneOrNull()
+                        ).awaitAsOneOrNull()
                 if (existing != null) {
                     return@transactionWithResult TradeCreateResult(TradeId(existing), created = false)
                 }
                 // Allocate a transaction id (insert + last_insert_rowid must share a connection).
                 transactionIdWriteQueries.insert()
-                val id = transactionIdWriteQueries.lastInsertedId().executeAsOne()
+                val id = transactionIdWriteQueries.lastInsertedId().awaitAsOne()
                 writeQueries.insert(
                     id = id,
                     revision_id = 1L,

@@ -2,7 +2,7 @@
 
 package com.moneymanager.bazel.sqldelight
 
-import app.cash.sqldelight.Transacter
+import app.cash.sqldelight.SuspendingTransacter
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.db.SqlSchema
@@ -12,11 +12,11 @@ import kotlin.String
 import kotlin.Unit
 import kotlin.collections.List
 
-public interface MoneyManagerDatabase : Transacter {
+public interface MoneyManagerDatabase : SuspendingTransacter {
   public val ledgerQueries: LedgerQueries
 
   public companion object {
-    public val Schema: SqlSchema<QueryResult.Value<Unit>>
+    public val Schema: SqlSchema<QueryResult.AsyncValue<Unit>>
       get() = MoneyManagerDatabase::class.schema
 
     public operator fun invoke(driver: SqlDriver): MoneyManagerDatabase = MoneyManagerDatabase::class.newInstance(driver)

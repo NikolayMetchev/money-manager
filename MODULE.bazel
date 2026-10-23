@@ -267,6 +267,7 @@ maven_kmp.install(
         "poi-ooxml": "org.apache.poi:poi-ooxml:" + POI,
         "sqldelight-android-driver": "app.cash.sqldelight:android-driver:" + SQLDELIGHT,
         "sqldelight-compiler-env": "app.cash.sqldelight:compiler-env:" + SQLDELIGHT,
+        "sqldelight-async-extensions": "app.cash.sqldelight:async-extensions:" + SQLDELIGHT,
         "sqldelight-coroutines-extensions": "app.cash.sqldelight:coroutines-extensions:" + SQLDELIGHT,
         "sqldelight-dialect-sqlite": "app.cash.sqldelight:sqlite-3-25-dialect:" + SQLDELIGHT,
         "sqldelight-gradle-plugin": "app.cash.sqldelight:gradle-plugin:" + SQLDELIGHT,

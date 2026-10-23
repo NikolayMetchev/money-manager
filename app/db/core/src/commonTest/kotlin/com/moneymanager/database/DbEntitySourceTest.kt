@@ -1,5 +1,6 @@
 package com.moneymanager.database
 
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntityType
@@ -43,14 +44,14 @@ class DbEntitySourceTest : DbTest() {
             )
 
             val revisionOne =
-                queries.selectEntitySourceForRevision(EntityType.ACCOUNT.id, 99L, 1L).executeAsOneOrNull()
+                queries.selectEntitySourceForRevision(EntityType.ACCOUNT.id, 99L, 1L).awaitAsOneOrNull()
             val revisionTwo =
-                queries.selectEntitySourceForRevision(EntityType.ACCOUNT.id, 99L, 2L).executeAsOneOrNull()
+                queries.selectEntitySourceForRevision(EntityType.ACCOUNT.id, 99L, 2L).awaitAsOneOrNull()
 
             assertNotNull(revisionOne)
             assertNotNull(revisionTwo)
             assertNotEquals(revisionOne.id, revisionTwo.id)
-            assertNotNull(queries.selectApiEntitySourceId(id = revisionOne.id).executeAsOneOrNull())
-            assertNotNull(queries.selectApiEntitySourceId(id = revisionTwo.id).executeAsOneOrNull())
+            assertNotNull(queries.selectApiEntitySourceId(id = revisionOne.id).awaitAsOneOrNull())
+            assertNotNull(queries.selectApiEntitySourceId(id = revisionTwo.id).awaitAsOneOrNull())
         }
 }

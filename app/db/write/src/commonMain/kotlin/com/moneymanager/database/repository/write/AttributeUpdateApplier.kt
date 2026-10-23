@@ -3,16 +3,16 @@ package com.moneymanager.database.repository.write
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.NewAttribute
 
-internal fun applyAttributeChangesInCreationMode(
+internal suspend fun applyAttributeChangesInCreationMode(
     database: MoneyManagerDatabaseWrapper,
     deletedAttributeIds: Set<Long>,
     updatedAttributes: Map<Long, NewAttribute>,
     newAttributes: List<NewAttribute>,
-    selectCurrentSlot: (Long) -> Pair<Long, String>?,
-    deleteById: (Long) -> Unit,
-    insertAttribute: (NewAttribute) -> Unit,
-    insertAttributeForUpdatedType: (NewAttribute) -> Unit,
-    updateValue: (value: String, id: Long) -> Unit,
+    selectCurrentSlot: suspend (Long) -> Pair<Long, String>?,
+    deleteById: suspend (Long) -> Unit,
+    insertAttribute: suspend (NewAttribute) -> Unit,
+    insertAttributeForUpdatedType: suspend (NewAttribute) -> Unit,
+    updateValue: suspend (value: String, id: Long) -> Unit,
 ) {
     database.beginCreationMode()
     try {
@@ -42,19 +42,19 @@ internal fun applyAttributeChangesInCreationMode(
     }
 }
 
-internal fun updateEntityWithAttributes(
+internal suspend fun updateEntityWithAttributes(
     database: MoneyManagerDatabaseWrapper,
     hasEntityChanges: Boolean,
     deletedAttributeIds: Set<Long>,
     updatedAttributes: Map<Long, NewAttribute>,
     newAttributes: List<NewAttribute>,
-    updateEntity: () -> Unit,
-    bumpRevisionOnly: () -> Unit,
-    selectRevision: () -> Long,
-    selectCurrentSlot: (Long) -> Pair<Long, String>?,
-    deleteById: (Long) -> Unit,
-    insertAttribute: (NewAttribute) -> Unit,
-    updateValue: (value: String, id: Long) -> Unit,
+    updateEntity: suspend () -> Unit,
+    bumpRevisionOnly: suspend () -> Unit,
+    selectRevision: suspend () -> Long,
+    selectCurrentSlot: suspend (Long) -> Pair<Long, String>?,
+    deleteById: suspend (Long) -> Unit,
+    insertAttribute: suspend (NewAttribute) -> Unit,
+    updateValue: suspend (value: String, id: Long) -> Unit,
 ): Long {
     val hasAttributeChanges =
         deletedAttributeIds.isNotEmpty() ||

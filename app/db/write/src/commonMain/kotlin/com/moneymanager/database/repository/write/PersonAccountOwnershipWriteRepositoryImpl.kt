@@ -1,5 +1,7 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.AccountId
@@ -33,7 +35,7 @@ class PersonAccountOwnershipWriteRepositoryImpl(
                     person_id = personId.id,
                     account_id = accountId.id,
                 )
-                val id = personWriteQueries.ownershipLastInsertRowId().executeAsOne()
+                val id = personWriteQueries.ownershipLastInsertRowId().awaitAsOne()
                 database.recordSource(deviceId, EntityType.PERSON_ACCOUNT_OWNERSHIP, id, 1L, source)
                 // A manual ownership change is a change to the account, so bump its revision and record
                 // it in the account audit trail (the ownership change is matched to that revision in the
@@ -50,7 +52,7 @@ class PersonAccountOwnershipWriteRepositoryImpl(
             personWriteQueries.transaction {
                 // deleteOwnership is only reachable from manual account editing, so removing an owner is
                 // a change to the account: bump its revision so it shows in the account audit trail.
-                val accountId = personSelectQueries.ownershipSelectById(id).executeAsOneOrNull()?.account_id
+                val accountId = personSelectQueries.ownershipSelectById(id).awaitAsOneOrNull()?.account_id
                 personWriteQueries.ownershipDelete(id)
                 accountId?.let { accountWriteQueries.bumpRevisionOnly(it) }
             }

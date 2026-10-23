@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
@@ -78,7 +79,7 @@ class ImportDirectoryWriteRepositoryImpl(
                     id = directory.id.id.toString(),
                 )
                 val persistedRevisionId =
-                    selectQueries.selectById(directory.id.id.toString()).executeAsOne().revision_id
+                    selectQueries.selectById(directory.id.id.toString()).awaitAsOne().revision_id
                 writeQueries.insertSource(
                     directory_id = directory.id.id.toString(),
                     revision_id = persistedRevisionId,
@@ -123,7 +124,7 @@ class ImportDirectoryWriteRepositoryImpl(
                 )
                 // The csv/qif import lives in a 1:1 child table; replace it so a re-import (or a
                 // file that no longer stages anything) leaves exactly the right child row.
-                val fileId = selectQueries.selectFileByRef(directoryId.id.toString(), fileRef).executeAsOne().id
+                val fileId = selectQueries.selectFileByRef(directoryId.id.toString(), fileRef).awaitAsOne().id
                 writeQueries.deleteCsvImportForFile(fileId)
                 writeQueries.deleteQifImportForFile(fileId)
                 csvImportId?.let { writeQueries.insertCsvImportForFile(fileId, it.id.toString()) }
