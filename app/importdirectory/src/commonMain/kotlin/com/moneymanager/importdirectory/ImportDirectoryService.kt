@@ -474,7 +474,7 @@ class ImportDirectoryService(
         val needsAttention = mutableListOf<NeedsAttention>()
         val blockedIds = mutableSetOf<QifImportId>()
         for (file in files) {
-            val rows = QifCsvAdapter.toRows(qifImportRepository.getImportRecords(file.id, STRATEGY_CONTENT_SAMPLE_SIZE, 0))
+            val rows = qifSampleRows(file)
             // An empty file imports nothing either way, so it's nothing to resolve.
             if (rows.isEmpty()) continue
             val strategy = qifStrategies.selectForQifContent(rows, QifCsvAdapter.columns)
@@ -638,6 +638,15 @@ class ImportDirectoryService(
 
     private suspend fun unimportedCsvFiles(): List<CsvImport> =
         csvImportRepository.getAllImports().first().filter { !it.ignored && it.lastAppliedAt == null }
+
+    /** QIF equivalent of [matchCsvStrategies]. */
+    suspend fun matchQifStrategies(files: List<QifImport>): Map<QifImportId, CsvImportStrategy?> {
+        val qifStrategies = csvImportStrategyRepository.getAllStrategies().first().qifCompatible()
+        return files.associate { it.id to qifStrategies.selectForQifContent(qifSampleRows(it), QifCsvAdapter.columns) }
+    }
+
+    private suspend fun qifSampleRows(file: QifImport) =
+        QifCsvAdapter.toRows(qifImportRepository.getImportRecords(file.id, STRATEGY_CONTENT_SAMPLE_SIZE, 0))
 
     private suspend fun unimportedQifFiles(): List<QifImport> =
         qifImportRepository.getAllImports().first().filter { !it.ignored && it.lastAppliedAt == null }

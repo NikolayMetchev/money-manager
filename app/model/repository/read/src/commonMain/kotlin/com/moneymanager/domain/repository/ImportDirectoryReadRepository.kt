@@ -54,4 +54,7 @@ interface ImportDirectoryReadRepository {
      * leaving the import list unchanged, so watching imports alone would miss it.
      */
     fun csvImportDirectories(): Flow<Map<CsvImportId, List<ImportDirectoryId>>>
+
+    /** QIF equivalent of [csvImportDirectories]. */
+    fun qifImportDirectories(): Flow<Map<QifImportId, List<ImportDirectoryId>>>
 }

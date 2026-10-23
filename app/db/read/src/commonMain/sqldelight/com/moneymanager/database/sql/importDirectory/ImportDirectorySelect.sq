@@ -62,3 +62,9 @@ selectCsvImportDirectories:
 SELECT c.csv_import_id, f.directory_id
 FROM import_directory_file f
 JOIN import_directory_file_csv_import c ON c.file_id = f.id;
+
+-- QIF equivalent of selectCsvImportDirectories.
+selectQifImportDirectories:
+SELECT q.qif_import_id, f.directory_id
+FROM import_directory_file f
+JOIN import_directory_file_qif_import q ON q.file_id = f.id;

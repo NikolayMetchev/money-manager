@@ -1,6 +1,6 @@
 @file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 
-package com.moneymanager.ui.screens.csv
+package com.moneymanager.ui.components.imports
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -35,20 +35,26 @@ private fun cardContent(
 ): @Composable () -> Unit =
     {
         MaterialTheme {
-            CsvImportCard(
+            StagedImportCard(
                 import = unimported,
+                placement =
+                    StagedImportCardPlacement(
+                        ignored = false,
+                        showDirectories = false,
+                        matchedStrategyName = matchedStrategyName,
+                        noMatchingStrategy = noMatchingStrategy,
+                    ),
+                metadataText = "1 rows, 1 columns",
                 dateRange = null,
                 sourceAccountName = null,
+                sourceDirectories = emptyList(),
                 onClick = {},
-                ignored = false,
                 onSetIgnored = {},
-                matchedStrategyName = matchedStrategyName,
-                noMatchingStrategy = noMatchingStrategy,
             )
         }
     }
 
-class CsvImportCardTest {
+class StagedImportCardTest {
     @Test
     fun unmatchedFile_warnsThatNoStrategyMatches() {
         runMoneyManagerComposeUiTest {

@@ -184,6 +184,22 @@ class ImportDirectoryAccountE2ETest : DbTest() {
         }
 
     @Test
+    fun `qifImportDirectories maps each scanned QIF file to its directory`() =
+        runDbTest {
+            val first = directory("First", accountId = null)
+            val second = directory("Second", accountId = null)
+            stageInto(first, "first.qif", "!Type:Bank\nD19/11/2023\nT-25.00\nPSome Merchant\n^\n")
+            stageInto(second, "second.csv", monzoCsv("tx-second"))
+
+            val qif =
+                repositories.qifImportRepository
+                    .getAllImports()
+                    .first()
+                    .single()
+            assertEquals(mapOf(qif.id to listOf(first.id)), repositories.importDirectoryRepository.qifImportDirectories().first())
+        }
+
+    @Test
     fun twoDirectoriesWithDifferentAccounts_eachFileLandsOnItsOwnAccount() =
         runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")

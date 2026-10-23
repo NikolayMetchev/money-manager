@@ -156,13 +156,20 @@ class ImportDirectoryReadRepositoryImpl(
             .selectCsvImportDirectories()
             .asFlow()
             .mapToList(coroutineContext)
-            .map { rows ->
-                rows
-                    .groupBy(
-                        { CsvImportId(Uuid.parse(it.csv_import_id)) },
-                        { ImportDirectoryId(Uuid.parse(it.directory_id)) },
-                    ).mapValues { (_, directoryIds) -> directoryIds.distinct() }
-            }
+            .map { rows -> rows.groupDirectories({ CsvImportId(Uuid.parse(it.csv_import_id)) }, { it.directory_id }) }
+
+    override fun qifImportDirectories(): Flow<Map<QifImportId, List<ImportDirectoryId>>> =
+        selectQueries
+            .selectQifImportDirectories()
+            .asFlow()
+            .mapToList(coroutineContext)
+            .map { rows -> rows.groupDirectories({ QifImportId(Uuid.parse(it.qif_import_id)) }, { it.directory_id }) }
+
+    private fun <R, K> List<R>.groupDirectories(
+        importId: (R) -> K,
+        directoryId: (R) -> String,
+    ): Map<K, List<ImportDirectoryId>> =
+        groupBy(importId) { ImportDirectoryId(Uuid.parse(directoryId(it))) }.mapValues { (_, ids) -> ids.distinct() }
 
     /**
      * A staged import can be reused (by content checksum) across more than one directory, so the same
