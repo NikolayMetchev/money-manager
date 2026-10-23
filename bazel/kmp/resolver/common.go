@@ -15,6 +15,10 @@ import (
 // the dependencies those source sets declare (the variant lists every source set's: Ktor's Darwin engine too).
 const metadataPlatform = "metadata"
 
+// metadataWeb is the same for modules that also compile for the browser: the source sets JVM, Android, native and
+// the web platforms all share (Platform.SeesWeb).
+const metadataWeb = "metadataWeb"
+
 const structureMetadata = "META-INF/kotlin-project-structure-metadata.json"
 
 type projectStructure struct {
@@ -52,7 +56,7 @@ func (r *Resolver) loadMetadata(p Platform, c Coordinate, dir string, module *Gr
 	}
 	f := variant.Files[0]
 	file := File{Name: f.Name, URL: dir + "/" + f.URL, Sha256: f.Sha256}
-	sourceSets, needs, err := r.visibleSourceSets(c, module, file)
+	sourceSets, needs, err := r.visibleSourceSets(p, c, module, file)
 	if err != nil {
 		return nil, err
 	}
@@ -72,8 +76,8 @@ func (r *Resolver) loadMetadata(p Platform, c Coordinate, dir string, module *Gr
 }
 
 // visibleSourceSets are the library's source sets that every consumer target's variant includes, and the
-// modules they depend on.
-func (r *Resolver) visibleSourceSets(c Coordinate, module *GradleModule, file File) ([]string, map[string]bool, error) {
+// modules they depend on. The web platforms are consumers only of `metadataWeb` (Platform.SeesWeb).
+func (r *Resolver) visibleSourceSets(p Platform, c Coordinate, module *GradleModule, file File) ([]string, map[string]bool, error) {
 	body, err := r.fetch.get(file.URL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", file.Name, err)
@@ -113,6 +117,9 @@ func (r *Resolver) visibleSourceSets(c Coordinate, module *GradleModule, file Fi
 	}
 	var visible map[string]bool
 	for _, consumer := range r.consumers {
+		if consumer.Web != "" && !p.SeesWeb {
+			continue
+		}
 		sets, ok := consumerSourceSets(consumer, module, byVariant)
 		if !ok {
 			return nil, nil, fmt.Errorf("%s: no variant for %s in its project structure: %w", c, consumer.Name, errNoVariant)
@@ -161,7 +168,7 @@ func (r *Resolver) visibleSourceSets(c Coordinate, module *GradleModule, file Fi
 // project structure (without the root module's `-published`), or the stdlib's one merged native variant.
 func consumerSourceSets(p Platform, module *GradleModule, byVariant map[string][]string) ([]string, bool) {
 	usage := "java-api"
-	if p.Konan != "" {
+	if p.IsKlib() {
 		usage = "kotlin-api"
 	}
 	names := []string{p.Name + "ApiElements"}

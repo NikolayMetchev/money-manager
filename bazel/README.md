@@ -161,6 +161,13 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
 - The `android` platform takes a library's `androidJvm` variant (an AAR: `classes.jar` merged with its `libs/` jars),
   else a JVM one, never androidx's `*Stubs`; `library_platforms` limits a library to the platforms that use it (the
   `-desktop` jars to `jvm`, the androidx roots to `android`).
+- The browser platforms (#84) take a library's `kotlin-api` klib like native does: `wasmJs` is Kotlin/Wasm's `js`
+  target (never WASI), `js` Kotlin/JS's IR compiler. Their hub targets are `kt_web_import`/`kt_web_group`
+  (`kmp/web.bzl`, `WebKlibInfo`).
+- Common metadata comes in two views. `metadata` holds the source sets that JVM, Android and native share;
+  `metadataWeb` holds those the web platforms share too, so it's never wider (no `concurrentMain` in
+  kotlinx-coroutines). Only modules that compile for the browser compile their `commonMain` against
+  `metadataWeb`, so adding web targets never takes an API away from a module without them.
 - The Kotlin stdlib comes from the toolchain. Each
   `maven_kmp.install(name = …)` is its own resolution and hub repository. `artifacts` maps each library's alias to its
   `group:artifact:version`, written in `MODULE.bazel` with the platforms and repositories. A version several

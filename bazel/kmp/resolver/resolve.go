@@ -14,8 +14,14 @@ type Platform struct {
 	Name string // jvm, linuxX64, …
 	// konan's target name for a native platform, empty on the JVM.
 	Konan string
-	// Common is the `metadata` platform: the common metadata variant (common.go).
+	// Web is the Kotlin/JS IR or Kotlin/Wasm platform type (`js`, `wasm`) of a browser platform, empty elsewhere.
+	Web string
+	// Common is a `metadata` platform: the common metadata variant (common.go).
 	Common bool
+	// SeesWeb is the common metadata platform of modules that also compile for the browser (`metadataWeb`): the
+	// source sets its consumers share include the web platforms'. `metadata` leaves them out, so a module without
+	// web targets keeps seeing what JVM, Android and native share (kotlinx-coroutines' `concurrentMain`).
+	SeesWeb bool
 	// Android is the KMP Android library target's compilation (#1021): a library's Android variant (an AAR), or
 	// its JVM one.
 	Android bool
@@ -28,8 +34,15 @@ var platforms = map[string]Platform{
 	"linuxX64":       {Name: "linuxX64", Konan: "linux_x64"},
 	"macosArm64":     {Name: "macosArm64", Konan: "macos_arm64"},
 	"mingwX64":       {Name: "mingwX64", Konan: "mingw_x64"},
+	"wasmJs":         {Name: "wasmJs", Web: "wasm"},
+	"js":             {Name: "js", Web: "js"},
 	metadataPlatform: {Name: metadataPlatform, Common: true},
+	metadataWeb:      {Name: metadataWeb, Common: true, SeesWeb: true},
 }
+
+// IsKlib is a platform whose libraries are klibs Gradle resolves by `kotlin-api` usage alone (no runtime variant
+// to follow, no POM-only fallback): native and the browser.
+func (p Platform) IsKlib() bool { return p.Konan != "" || p.Web != "" }
 
 const jvmVersion = 25
 
@@ -63,7 +76,7 @@ func (r *Resolver) forced(p Platform, module string) (string, bool) {
 	if v, ok := r.forces[module]; ok {
 		return v, true
 	}
-	if p.Konan == "" {
+	if !p.IsKlib() {
 		v, ok := r.classpathForces[module]
 		return v, ok
 	}
@@ -106,6 +119,9 @@ func wants(p Platform, usage string, a attrs) int {
 	if p.Android {
 		return wantsAndroid(usage, a, platform, hasPlatform)
 	}
+	if p.Web != "" {
+		return wantsWeb(p, a, platform)
+	}
 	if p.Konan == "" {
 		if hasPlatform && platform != "jvm" {
 			return 0
@@ -128,6 +144,25 @@ func wants(p Platform, usage string, a attrs) int {
 	}
 	if v, _ := a.str("org.jetbrains.kotlin.native.target"); v != p.Konan {
 		return 0
+	}
+	return 2
+}
+
+// wantsWeb is wants for a browser platform: Kotlin/Wasm's `js` target (not WASI), or Kotlin/JS's IR compiler (not
+// the legacy one).
+func wantsWeb(p Platform, a attrs, platform string) int {
+	if platform != p.Web {
+		return 0
+	}
+	switch p.Web {
+	case "wasm":
+		if v, _ := a.str("org.jetbrains.kotlin.wasm.target"); v != "js" {
+			return 0
+		}
+	case "js":
+		if v, ok := a.str("org.jetbrains.kotlin.js.compiler"); ok && v != "ir" {
+			return 0
+		}
 	}
 	return 2
 }
@@ -199,7 +234,8 @@ type node struct {
 type Resolver struct {
 	fetch  *Fetcher
 	forces map[string]string // module → version
-	// classpathForces apply on the JVM and to common metadata, not on native (Gradle's classpath substitutions).
+	// classpathForces apply on the JVM and to common metadata, not on native or the browser (Gradle's classpath
+	// substitutions).
 	classpathForces map[string]string
 	excludes        map[string]bool
 	// consumers are the platforms common code is compiled for, whose variants decide what it sees.
@@ -241,7 +277,7 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 	}
 	module, err := r.fetch.gradleModule(dir, c)
 	if errors.Is(err, errNotFound) {
-		if p.Konan != "" || p.Common {
+		if p.IsKlib() || p.Common {
 			return nil, fmt.Errorf("%s: %w (it has no Gradle Module Metadata)", c, errNoVariant)
 		}
 		return r.loadPom(p, c, dir)
@@ -253,7 +289,7 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 		return r.loadMetadata(p, c, dir, module)
 	}
 	compileUsage, runtimeUsage := "java-api", "java-runtime"
-	if p.Konan != "" {
+	if p.IsKlib() {
 		compileUsage, runtimeUsage = "kotlin-api", ""
 	}
 	api := pick(p, compileUsage, module.Variants)

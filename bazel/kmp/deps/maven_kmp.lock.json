@@ -156,12 +156,15 @@
     },
     "platforms": [
       "android",
+      "js",
       "jvm",
       "linuxArm64",
       "linuxX64",
       "macosArm64",
       "metadata",
-      "mingwX64"
+      "metadataWeb",
+      "mingwX64",
+      "wasmJs"
     ],
     "library_platforms": {
       "androidx-activity": [
@@ -596,6 +599,7 @@
     "org.jetbrains.compose.ui:ui-util": "org_jetbrains_compose_ui_ui_util",
     "org.jetbrains.compose.ui:ui-util-desktop": "compose_ui_util_desktop",
     "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable": "kotlin_compose_compiler_plugin_embeddable",
+    "org.jetbrains.kotlin:kotlin-dom-api-compat": "org_jetbrains_kotlin_kotlin_dom_api_compat",
     "org.jetbrains.kotlin:kotlin-reflect": "org_jetbrains_kotlin_kotlin_reflect",
     "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable": "kotlin_serialization_compiler_plugin_embeddable",
     "org.jetbrains.kotlin:kotlin-stdlib": "org_jetbrains_kotlin_kotlin_stdlib",
@@ -2825,6 +2829,10 @@
       "io.ktor.client.call",
       "io.ktor.client.content",
       "io.ktor.client.engine",
+      "io.ktor.client.engine.js",
+      "io.ktor.client.engine.js.browser",
+      "io.ktor.client.engine.js.compatibility",
+      "io.ktor.client.fetch",
       "io.ktor.client.io",
       "io.ktor.client.network.sockets",
       "io.ktor.client.plugins",
@@ -2890,6 +2898,7 @@
       "io.ktor.utils.io.core",
       "io.ktor.utils.io.core.internal",
       "io.ktor.utils.io.errors",
+      "io.ktor.utils.io.js",
       "io.ktor.utils.io.jvm.javaio",
       "io.ktor.utils.io.jvm.nio",
       "io.ktor.utils.io.locks",
@@ -2900,6 +2909,7 @@
       "io.ktor.network.interop",
       "io.ktor.network.selector",
       "io.ktor.network.sockets",
+      "io.ktor.network.sockets.nodejs",
       "io.ktor.network.util"
     ],
     "io.ktor:ktor-network-tls": [
@@ -3787,6 +3797,31 @@
       "androidx.compose.compiler.plugins.kotlin.lower",
       "androidx.compose.compiler.plugins.kotlin.lower.hiddenfromobjc"
     ],
+    "org.jetbrains.kotlin:kotlin-dom-api-compat": [
+      "kotlin.browser",
+      "kotlin.dom",
+      "kotlinx.browser",
+      "kotlinx.dom",
+      "org.khronos.webgl",
+      "org.w3c.css.masking",
+      "org.w3c.dom",
+      "org.w3c.dom.clipboard",
+      "org.w3c.dom.css",
+      "org.w3c.dom.encryptedmedia",
+      "org.w3c.dom.events",
+      "org.w3c.dom.mediacapture",
+      "org.w3c.dom.mediasource",
+      "org.w3c.dom.parsing",
+      "org.w3c.dom.pointerevents",
+      "org.w3c.dom.svg",
+      "org.w3c.dom.url",
+      "org.w3c.fetch",
+      "org.w3c.files",
+      "org.w3c.notifications",
+      "org.w3c.performance",
+      "org.w3c.workers",
+      "org.w3c.xhr"
+    ],
     "org.jetbrains.kotlin:kotlin-reflect": [
       "kotlin.reflect.full",
       "kotlin.reflect.jvm",
@@ -3869,6 +3904,8 @@
       "org.jetbrains.kotlinx.serialization.compiler.fir.services",
       "org.jetbrains.kotlinx.serialization.compiler.resolve"
     ],
+    "org.jetbrains.kotlin:kotlin-stdlib": null,
+    "org.jetbrains.kotlin:kotlin-test": null,
     "org.jetbrains.kotlinx:atomicfu": [
       "interop",
       "kotlinx.atomicfu",
@@ -3926,6 +3963,7 @@
       "kotlinx.datetime",
       "kotlinx.datetime.format",
       "kotlinx.datetime.internal",
+      "kotlinx.datetime.internal.JSJoda",
       "kotlinx.datetime.internal.format",
       "kotlinx.datetime.internal.format.formatter",
       "kotlinx.datetime.internal.format.parser",
@@ -3939,6 +3977,7 @@
       "kotlinx.io",
       "kotlinx.io.files",
       "kotlinx.io.internal",
+      "kotlinx.io.node",
       "kotlinx.io.unsafe"
     ],
     "org.jetbrains.kotlinx:kotlinx-serialization-core": [
@@ -4130,6 +4169,19 @@
       "app.cash.sqldelight:native-driver",
       "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt"
     ],
+    "js": [
+      "app.cash.sqldelight:native-driver",
+      "com.jakewharton.mosaic:mosaic-runtime",
+      "com.jakewharton.mosaic:mosaic-terminal",
+      "com.jakewharton.mosaic:mosaic-testing",
+      "com.jakewharton.mosaic:mosaic-tty",
+      "com.jakewharton.mosaic:mosaic-tty-terminal",
+      "dev.whyoleg.cryptography:cryptography-provider-jdk",
+      "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt",
+      "junit:junit",
+      "org.apache.poi:poi",
+      "org.apache.poi:poi-ooxml"
+    ],
     "jvm": [
       "app.cash.sqldelight:native-driver",
       "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt"
@@ -4164,9 +4216,36 @@
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml"
     ],
+    "metadataWeb": [
+      "app.cash.sqldelight:native-driver",
+      "com.jakewharton.mosaic:mosaic-runtime",
+      "com.jakewharton.mosaic:mosaic-terminal",
+      "com.jakewharton.mosaic:mosaic-testing",
+      "com.jakewharton.mosaic:mosaic-tty",
+      "com.jakewharton.mosaic:mosaic-tty-terminal",
+      "dev.whyoleg.cryptography:cryptography-provider-jdk",
+      "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt",
+      "io.github.ehsannarmani:compose-charts",
+      "junit:junit",
+      "org.apache.poi:poi",
+      "org.apache.poi:poi-ooxml"
+    ],
     "mingwX64": [
       "dev.whyoleg.cryptography:cryptography-provider-jdk",
       "io.github.ehsannarmani:compose-charts",
+      "junit:junit",
+      "org.apache.poi:poi",
+      "org.apache.poi:poi-ooxml"
+    ],
+    "wasmJs": [
+      "app.cash.sqldelight:native-driver",
+      "com.jakewharton.mosaic:mosaic-runtime",
+      "com.jakewharton.mosaic:mosaic-terminal",
+      "com.jakewharton.mosaic:mosaic-testing",
+      "com.jakewharton.mosaic:mosaic-tty",
+      "com.jakewharton.mosaic:mosaic-tty-terminal",
+      "dev.whyoleg.cryptography:cryptography-provider-jdk",
+      "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt",
       "junit:junit",
       "org.apache.poi:poi",
       "org.apache.poi:poi-ooxml"
@@ -4258,6 +4337,19 @@
           }
         ]
       },
+      "js": {
+        "version": "1.9.1",
+        "files": [
+          {
+            "name": "annotation-js-1.9.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-js/1.9.1/annotation-js-1.9.1.klib",
+            "sha256": "bce021c6476db59d6b82bcb305dafaa8cd6da48a791e7ffb95bd886ae2bfc65f"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ]
+      },
       "jvm": {
         "version": "1.11.0",
         "files": [
@@ -4311,6 +4403,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "annotation-metadata-1.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation/1.11.0/annotation-1.11.0.jar",
+            "sha256": "cef5f2f3dee9d6c7f07bf70976951761bbddbda4de3974de6636d7f065f2b90b"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.9.1",
         "files": [
@@ -4318,6 +4423,16 @@
             "name": "annotation.klib",
             "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-mingwx64/1.9.1/annotation-mingwx64-1.9.1.klib",
             "sha256": "6c3f8d14851b4c49cefa95f66475ff8b384ce03ce39ebf64b931530217141465"
+          }
+        ]
+      },
+      "wasmJs": {
+        "version": "1.9.1",
+        "files": [
+          {
+            "name": "annotation-wasm-js-1.9.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-wasm-js/1.9.1/annotation-wasm-js-1.9.1.klib",
+            "sha256": "5e87a5014d86c4a23b7dc08f049d39b38ec95d2cdf7ee63273f73ef04e3b08fd"
           }
         ]
       }
@@ -4462,6 +4577,22 @@
         ]
       },
       "metadata": {
+        "version": "1.7.0",
+        "files": [
+          {
+            "name": "collection-metadata-1.7.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/collection/collection/1.7.0/collection-1.7.0.jar",
+            "sha256": "7448e7a5294028d417b79b37bc4557596eab2c634ff2c1a13683ebea556d820c"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
         "version": "1.7.0",
         "files": [
           {
@@ -4693,6 +4824,21 @@
           "androidx.collection:collection"
         ]
       },
+      "js": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-js-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-js/1.12.1/runtime-js-1.12.1.klib",
+            "sha256": "ee339f2748271af945efa60b6cbe19ef59f6c30cc0b4456a64b8ac3c03aec7ab"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
       "jvm": {
         "version": "1.12.1",
         "files": [
@@ -4776,6 +4922,24 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-metadata-1.12.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime/1.12.1/runtime-1.12.1.jar",
+            "sha256": "530dcacf4311dec991866fe6ce9a62d17be0e11071938b7fb1f99b2ea76d70b4"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.12.1",
         "files": [
@@ -4791,6 +4955,20 @@
           "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
+      },
+      "wasmJs": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-wasm-js-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-wasm-js/1.12.1/runtime-wasm-js-1.12.1.klib",
+            "sha256": "a22f3b2d09edcd7b6b01815c93bce1cb895ec2175a38d329a9c07e0ca26a557e"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
       }
     },
     "androidx.compose.runtime:runtime-annotation": {
@@ -4802,6 +4980,19 @@
             "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-android/1.12.1/runtime-annotation-android-1.12.1.aar",
             "sha256": "071d6200f5f34ffb5ce69cc19ee8db577c188832bb472779213d4633eca26565"
           }
+        ]
+      },
+      "js": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-annotation-js-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-js/1.12.1/runtime-annotation-js-1.12.1.klib",
+            "sha256": "a1f25da7f277f440f70545afce08c712d1c32bccda73bd45bb401915e6953ca1"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ]
       },
       "jvm": {
@@ -4857,6 +5048,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-annotation-metadata-1.12.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation/1.12.1/runtime-annotation-1.12.1.jar",
+            "sha256": "190e363a7f2951794f5b4f0986da454f39a425b87799b2d592c2a78972d175df"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.12.1",
         "files": [
@@ -4864,6 +5068,16 @@
             "name": "runtime-annotation-mingwX64Main-1.12.1.klib",
             "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-mingwx64/1.12.1/runtime-annotation-mingwx64-1.12.1.klib",
             "sha256": "c9519efcfe908c9248dbfb1bb2e95ab6a010f9d8f2b0d728ea23e06d0ba7b954"
+          }
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-annotation-wasm-js-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-wasm-js/1.12.1/runtime-annotation-wasm-js-1.12.1.klib",
+            "sha256": "98a73f977d9d11cabebf39f301b1004cec190424f3215f57a0a1c7cd022a95a9"
           }
         ]
       }
@@ -4941,6 +5155,21 @@
         "runtime_deps": [
           "androidx.collection:collection",
           "androidx.lifecycle:lifecycle-runtime-compose"
+        ]
+      },
+      "js": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-saveable-js-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable-js/1.12.1/runtime-saveable-js-1.12.1.klib",
+            "sha256": "e6b19e318090dc3e2ad082524743b94cd289514310fb223a78d9e664cfe06a98"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ]
       },
       "jvm": {
@@ -5028,6 +5257,25 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-saveable-metadata-1.12.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable/1.12.1/runtime-saveable-1.12.1.jar",
+            "sha256": "d7ac307d586b2caabf0bdec4949a21c8f49a653fa688e662d9f4a7eb2d94756e"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.lifecycle:lifecycle-runtime-compose",
+          "androidx.savedstate:savedstate-compose"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.12.1",
         "files": [
@@ -5041,6 +5289,20 @@
           "androidx.collection:collection",
           "androidx.compose.runtime:runtime",
           "androidx.lifecycle:lifecycle-runtime-compose",
+          "androidx.savedstate:savedstate-compose"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.1",
+        "files": [
+          {
+            "name": "runtime-saveable-wasm-js-1.12.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable-wasm-js/1.12.1/runtime-saveable-wasm-js-1.12.1.klib",
+            "sha256": "191fc19d322f2e54784133fce52c9e1ed0edcbbb5fb8df9a038701a0cd0b4400"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
           "androidx.savedstate:savedstate-compose"
         ]
       }
@@ -5578,6 +5840,23 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "2.11.0",
+        "files": [
+          {
+            "name": "lifecycle-common-metadata-2.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common/2.11.0/lifecycle-common-2.11.0.jar",
+            "sha256": "a9bd29ac86677987501ab7d023609734ae07a67de0b1390e158c1aa89eeb3eb2"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.10.0",
         "files": [
@@ -5749,6 +6028,24 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "2.11.0",
+        "files": [
+          {
+            "name": "lifecycle-runtime-metadata-2.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime/2.11.0/lifecycle-runtime-2.11.0.jar",
+            "sha256": "7f248525126dc0ba56e3b0daa254a9d2c9d66ce5d2f7ba74a81f862920601e93"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-common"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.10.0",
         "files": [
@@ -5842,6 +6139,24 @@
         ]
       },
       "metadata": {
+        "version": "2.11.0",
+        "files": [
+          {
+            "name": "lifecycle-runtime-compose-metadata-2.11.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose/2.11.0/lifecycle-runtime-compose-2.11.0.jar",
+            "sha256": "045938bff680337cff50481caf7d96431ef1ce9f2f38e164791003923b880cea"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime",
+          "androidx.lifecycle:lifecycle-runtime"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
+      "metadataWeb": {
         "version": "2.11.0",
         "files": [
           {
@@ -6060,6 +6375,25 @@
           "androidx.lifecycle:lifecycle-runtime"
         ]
       },
+      "js": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-runtime-js-1.2.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-js/1.2.0/navigation3-runtime-js-1.2.0.klib",
+            "sha256": "f726e946262c499915a1cceed6f42b670f841669dcc3995be1368d686be104f6"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.navigationevent:navigationevent",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
       "jvm": {
         "version": "1.2.0",
         "files": [
@@ -6165,6 +6499,29 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-runtime-metadata-1.2.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime/1.2.0/navigation3-runtime-1.2.0.jar",
+            "sha256": "7083749cf5bfb33ede0f9da4102c9b4a0e820752656bda680434fcda166532a8"
+          }
+        ],
+        "deps": [
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
+          "androidx.lifecycle:lifecycle-runtime",
+          "androidx.navigationevent:navigationevent",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.2.0",
         "files": [
@@ -6179,6 +6536,24 @@
           "androidx.compose.runtime:runtime",
           "androidx.compose.runtime:runtime-saveable",
           "androidx.lifecycle:lifecycle-runtime",
+          "androidx.navigationevent:navigationevent",
+          "androidx.savedstate:savedstate",
+          "androidx.savedstate:savedstate-compose",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigation3-runtime-wasm-js-1.2.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-wasm-js/1.2.0/navigation3-runtime-wasm-js-1.2.0.klib",
+            "sha256": "21fb2e36a63d3e0b69ed8ed220bca51d35cf16f0f45de611fe8f0456bd6a9202"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.compose.runtime:runtime-saveable",
           "androidx.navigationevent:navigationevent",
           "androidx.savedstate:savedstate",
           "androidx.savedstate:savedstate-compose",
@@ -6258,6 +6633,21 @@
           "androidx.core:core-viewtree",
           "org.jetbrains.kotlinx:kotlinx-coroutines-android",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "js": {
+        "version": "1.1.1",
+        "files": [
+          {
+            "name": "navigationevent-js-1.1.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-js/1.1.1/navigationevent-js-1.1.1.klib",
+            "sha256": "d0a0f853867359c9fadc8cd4d7c76b1cb5c65439299d2871d61761ddd5be69a9"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ]
       },
       "jvm": {
@@ -6348,6 +6738,25 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.2.0",
+        "files": [
+          {
+            "name": "navigationevent-metadata-1.2.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent/1.2.0/navigationevent-1.2.0.jar",
+            "sha256": "78ec036661adff7569720399f5bdb1bcdf01b8ce11fdfd91fb47e6ee5db50966"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.compose.runtime:runtime-annotation",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.1.1",
         "files": [
@@ -6363,6 +6772,20 @@
           "androidx.compose.runtime:runtime-annotation",
           "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.1.1",
+        "files": [
+          {
+            "name": "navigationevent-wasm-js-1.1.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-wasm-js/1.1.1/navigationevent-wasm-js-1.1.1.klib",
+            "sha256": "b449f3fcf62a633aec3e7d1d57b8aeaf32742d89bb1da21e4815d7aa001c40db"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.compose.runtime:runtime-annotation"
         ]
       }
     },
@@ -6444,6 +6867,22 @@
           "androidx.core:core-ktx",
           "androidx.core:core-viewtree",
           "androidx.lifecycle:lifecycle-common"
+        ]
+      },
+      "js": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-js-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-js/1.5.0/savedstate-js-1.5.0.klib",
+            "sha256": "4a5c6415b08dc68e69c93a08a9fb1ec49dbdb5c8dbf423716e0de16941604463"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ]
       },
       "jvm": {
@@ -6539,6 +6978,26 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-metadata-1.5.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate/1.5.0/savedstate-1.5.0.jar",
+            "sha256": "af20b2cf3a1b8f5e2fbcf5a11158e6908db5ec856b75afc06441f1d1b5001ab6"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
+          "androidx.collection:collection",
+          "androidx.lifecycle:lifecycle-common",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.5.0",
         "files": [
@@ -6553,6 +7012,21 @@
           "androidx.collection:collection",
           "androidx.lifecycle:lifecycle-common",
           "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-wasm-js-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-wasm-js/1.5.0/savedstate-wasm-js-1.5.0.klib",
+            "sha256": "02bb90d1173b771a9eb4ff9d2440bbe50202f0d9b0578abb2f5b47b1c27285ef"
+          }
+        ],
+        "deps": [
+          "androidx.annotation:annotation",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ]
@@ -6575,6 +7049,21 @@
         ],
         "runtime_deps": [
           "androidx.core:core-ktx"
+        ]
+      },
+      "js": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-compose-js-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-compose-js/1.5.0/savedstate-compose-js-1.5.0.klib",
+            "sha256": "7ed32e5a7c90097032e4ece5106fc3c9d5fa90ec9807820542a71ce6b421cec5"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.savedstate:savedstate",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ]
       },
       "jvm": {
@@ -6650,6 +7139,23 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-compose-metadata-1.5.0.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-compose/1.5.0/savedstate-compose-1.5.0.jar",
+            "sha256": "06df9c7e62514ae808aef85709ad790659e1e6a2b6c6f259de03717dc81bad45"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.savedstate:savedstate"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.5.0",
         "files": [
@@ -6657,6 +7163,20 @@
             "name": "savedstate-compose-mingwX64Main-1.5.0.klib",
             "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-compose-mingwx64/1.5.0/savedstate-compose-mingwx64-1.5.0.klib",
             "sha256": "9d6e464e52d17a03a0f22780d621fe98875ebc15ff0661916192be39d1b343d3"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "androidx.savedstate:savedstate"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "savedstate-compose-wasm-js-1.5.0.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-compose-wasm-js/1.5.0/savedstate-compose-wasm-js-1.5.0.klib",
+            "sha256": "7cc6d441d3f029e56f55c7452613c6c59de3aaa18e6d8346df679c13849eb19c"
           }
         ],
         "deps": [
@@ -7016,6 +7536,21 @@
           "androidx.core:core-ktx"
         ]
       },
+      "js": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "molecule-runtime-js-2.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/app/cash/molecule/molecule-runtime-js/2.2.0/molecule-runtime-js-2.2.0.klib",
+            "sha256": "b2aa075a20c3d9140729e86bb8baa6927bdf89b816eab631101f4c9d034c79ae"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
       "jvm": {
         "version": "2.2.0",
         "files": [
@@ -7089,6 +7624,23 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "molecule-runtime-metadata-2.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/molecule/molecule-runtime/2.2.0/molecule-runtime-2.2.0.jar",
+            "sha256": "9396a8e2dbd882d934897b71615a16f549b5b05d685a9f74dc55aef6bc406a1e"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.2.0",
         "files": [
@@ -7096,6 +7648,20 @@
             "name": "molecule-runtime-mingwX64Main-2.2.0.klib",
             "url": "https://repo1.maven.org/maven2/app/cash/molecule/molecule-runtime-mingwx64/2.2.0/molecule-runtime-mingwx64-2.2.0.klib",
             "sha256": "b529c6df404661aa25767384c329e898f10f083e47a187ca594d5c059bb71843"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "molecule-runtime-wasm-js-2.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/app/cash/molecule/molecule-runtime-wasm-js/2.2.0/molecule-runtime-wasm-js-2.2.0.klib",
+            "sha256": "d2da67227bc9a66b2865de998dfaafe73406c9174c741b5bd10c39b8c880e484"
           }
         ],
         "deps": [
@@ -7216,6 +7782,23 @@
           "concurrentMain"
         ]
       },
+      "metadataWeb": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "sqldelight-async-extensions-metadata-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/async-extensions/2.4.1/async-extensions-2.4.1.jar",
+            "sha256": "cb2724401eb6332fa4ebbf65c8819efca6ef7a286d16eb32da0bcc9ebabe842d"
+          }
+        ],
+        "deps": [
+          "app.cash.sqldelight:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.4.1",
         "files": [
@@ -7277,6 +7860,21 @@
         ],
         "runtime_deps": [
           "app.cash.sqldelight:async-extensions"
+        ]
+      },
+      "js": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "sqldelight-coroutines-extensions-js-2.4.1.klib",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/coroutines-extensions-js/2.4.1/coroutines-extensions-js-2.4.1.klib",
+            "sha256": "f38fa1f2c61790931f57fe9fa1cbb6525cb83e8cc0a38ad8d8155cb0f2c08f59"
+          }
+        ],
+        "deps": [
+          "app.cash.sqldelight:runtime",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
       "jvm": {
@@ -7359,6 +7957,24 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "sqldelight-coroutines-extensions-metadata-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/coroutines-extensions/2.4.1/coroutines-extensions-2.4.1.jar",
+            "sha256": "96f39d97bae454082a580a3b421fec5ff1faf89507cd5de1b12f164dd3b2ca45"
+          }
+        ],
+        "deps": [
+          "app.cash.sqldelight:async-extensions",
+          "app.cash.sqldelight:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.4.1",
         "files": [
@@ -7370,6 +7986,20 @@
         ],
         "deps": [
           "app.cash.sqldelight:async-extensions",
+          "app.cash.sqldelight:runtime",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "sqldelight-coroutines-extensions-wasm-js-2.4.1.klib",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/coroutines-extensions-wasm-js/2.4.1/coroutines-extensions-wasm-js-2.4.1.klib",
+            "sha256": "9d19a4013d1ccf7e76fe796f75d25c413358f5cd8f7c643d1347d4eaf7e9ff9f"
+          }
+        ],
+        "deps": [
           "app.cash.sqldelight:runtime",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
@@ -7510,6 +8140,19 @@
           }
         ]
       },
+      "js": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "runtime-js-2.4.1.klib",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/runtime-js/2.4.1/runtime-js-2.4.1.klib",
+            "sha256": "c38841b4a2413dd1621a9aa2a6226f9f6f4212bf631ce7ae1aebe6dbdbada002"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ]
+      },
       "jvm": {
         "version": "2.4.1",
         "files": [
@@ -7563,6 +8206,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "runtime-metadata-2.4.1.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/runtime/2.4.1/runtime-2.4.1.jar",
+            "sha256": "a986b0c6d09d85f1cc5a1daa0e4f10c442e1753c2283fc37eb98885ff3566091"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.4.1",
         "files": [
@@ -7570,6 +8226,16 @@
             "name": "runtime-mingwX64Main-2.4.1.klib",
             "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/runtime-mingwx64/2.4.1/runtime-mingwx64-2.4.1.klib",
             "sha256": "7a57d9929f04f4343608934f684cc7aef83e8e5ed41bec73ec864a0ab253babd"
+          }
+        ]
+      },
+      "wasmJs": {
+        "version": "2.4.1",
+        "files": [
+          {
+            "name": "runtime-wasm-js-2.4.1.klib",
+            "url": "https://repo1.maven.org/maven2/app/cash/sqldelight/runtime-wasm-js/2.4.1/runtime-wasm-js-2.4.1.klib",
+            "sha256": "9a7a59480ce4828cd75758bafb1204f0b147c1af8efbfa7eccded47e328659d4"
           }
         ]
       }
@@ -7654,6 +8320,20 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-test"
         ]
       },
+      "js": {
+        "version": "1.2.1",
+        "files": [
+          {
+            "name": "Turbine-js.klib",
+            "url": "https://repo1.maven.org/maven2/app/cash/turbine/turbine-js/1.2.1/turbine-js-1.2.1.klib",
+            "sha256": "a76f2a4f3d429a88311129bc59bcd8814f7ada409735f0fd67eb1959cf4570a6"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
       "jvm": {
         "version": "1.2.1",
         "files": [
@@ -7729,6 +8409,23 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.2.1",
+        "files": [
+          {
+            "name": "Turbine-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/app/cash/turbine/turbine/1.2.1/turbine-1.2.1.jar",
+            "sha256": "3a5b990fade2c74a5c04bb992213c5efedce31bfa93f412cfadc379d5390979d"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-test"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.2.1",
         "files": [
@@ -7741,6 +8438,19 @@
         "deps": [
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.jetbrains.kotlinx:kotlinx-coroutines-test"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.2.1",
+        "files": [
+          {
+            "name": "Turbine-wasm-js.klib",
+            "url": "https://repo1.maven.org/maven2/app/cash/turbine/turbine-wasm-js/1.2.1/turbine-wasm-js-1.2.1.klib",
+            "sha256": "739eec211ccac977148979acf3dd323353654beb3e524f99dcd677bb50b61999"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       }
     },
@@ -7786,6 +8496,20 @@
         ],
         "deps": [
           "co.touchlab:kermit-core"
+        ]
+      },
+      "js": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "kermit-js-2.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/co/touchlab/kermit-js/2.2.0/kermit-js-2.2.0.klib",
+            "sha256": "25a5e24012b97dd75c7ee634c860c95a79d028b68d57482eea5b0f24b334b22e"
+          }
+        ],
+        "deps": [
+          "co.touchlab:kermit-core",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ]
       },
       "jvm": {
@@ -7856,6 +8580,22 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "kermit-metadata-2.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/co/touchlab/kermit/2.2.0/kermit-2.2.0.jar",
+            "sha256": "5a32e34f11ecd7cff96ebb0416e2bc317584f260a8c25b740838ca295a347bfc"
+          }
+        ],
+        "deps": [
+          "co.touchlab:kermit-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.2.0",
         "files": [
@@ -7863,6 +8603,19 @@
             "name": "kermit-mingwX64Main-2.2.0.klib",
             "url": "https://repo1.maven.org/maven2/co/touchlab/kermit-mingwx64/2.2.0/kermit-mingwx64-2.2.0.klib",
             "sha256": "c41c1c4b1e3a9479210e076a6fede31d9f3b115cf3ced4e7ee1a8b3a7b958ce6"
+          }
+        ],
+        "deps": [
+          "co.touchlab:kermit-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "kermit-wasm-js-2.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/co/touchlab/kermit-wasm-js/2.2.0/kermit-wasm-js-2.2.0.klib",
+            "sha256": "f4e742b91152d61a9f286ce8c913cba2f4e31c470c11f0aecaa6c144b934983f"
           }
         ],
         "deps": [
@@ -7879,6 +8632,19 @@
             "url": "https://repo1.maven.org/maven2/co/touchlab/kermit-core-android/2.2.0/kermit-core-android-2.2.0.aar",
             "sha256": "4bb156659756633a2edf211fbe08b4cf8d124b899dfe6693e970f517d37d07bd"
           }
+        ]
+      },
+      "js": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "kermit-core-js-2.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/co/touchlab/kermit-core-js/2.2.0/kermit-core-js-2.2.0.klib",
+            "sha256": "64f71610733d28f99aada6e1f9cba552fb3b0b3aa2617f876d1b3cd0ab7cb156"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ]
       },
       "jvm": {
@@ -7939,6 +8705,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "kermit-core-metadata-2.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/co/touchlab/kermit-core/2.2.0/kermit-core-2.2.0.jar",
+            "sha256": "48e25cb5955a1284913de0d2c82d59abe8b6f28fe2096b3ecf7af10aada606d7"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.2.0",
         "files": [
@@ -7946,6 +8725,16 @@
             "name": "kermit-core-mingwX64Main-2.2.0.klib",
             "url": "https://repo1.maven.org/maven2/co/touchlab/kermit-core-mingwx64/2.2.0/kermit-core-mingwx64-2.2.0.klib",
             "sha256": "71dacc7f416738f985163ed6fc2b2525c0aab851e966b7237e75faae662f272d"
+          }
+        ]
+      },
+      "wasmJs": {
+        "version": "2.2.0",
+        "files": [
+          {
+            "name": "kermit-core-wasm-js-2.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/co/touchlab/kermit-core-wasm-js/2.2.0/kermit-core-wasm-js-2.2.0.klib",
+            "sha256": "06fb9450151bf381a32a656801bab795f113aa6661fa01f2b7461b72b4b075bb"
           }
         ]
       }
@@ -8123,6 +8912,21 @@
           "com.github.ajalt.mordant:mordant"
         ]
       },
+      "js": {
+        "version": "5.1.0",
+        "files": [
+          {
+            "name": "clikt-mordant-js.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-js/5.1.0/clikt-js-5.1.0.klib",
+            "sha256": "34b74bac16ba80f1e0770f1111c1ef5a4a1c4096dbb4c931ea5f67c36268c54c"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.clikt:clikt-core",
+          "com.github.ajalt.mordant:mordant",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ]
+      },
       "jvm": {
         "version": "5.1.0",
         "files": [
@@ -8196,6 +9000,23 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "5.1.0",
+        "files": [
+          {
+            "name": "clikt-mordant-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt/5.1.0/clikt-5.1.0.jar",
+            "sha256": "fa84a8d57b909921a1fd6719cf1714e4da85f143d478f623476bb361cc21abdc"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.clikt:clikt-core",
+          "com.github.ajalt.mordant:mordant"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "5.1.0",
         "files": [
@@ -8203,6 +9024,20 @@
             "name": "clikt-mordant-mingwX64Main.klib",
             "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-mingwx64/5.1.0/clikt-mingwx64-5.1.0.klib",
             "sha256": "3dbae09f30c226fbddb4c3bf3f550e3c38830543263ec368becfee02661d5f17"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.clikt:clikt-core",
+          "com.github.ajalt.mordant:mordant"
+        ]
+      },
+      "wasmJs": {
+        "version": "5.1.0",
+        "files": [
+          {
+            "name": "clikt-mordant-wasm-js.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-wasm-js/5.1.0/clikt-wasm-js-5.1.0.klib",
+            "sha256": "2e0e196538c6ba472e4b0881ce76d73a76874167d10aeb84404b26b0c42b659a"
           }
         ],
         "deps": [
@@ -8220,6 +9055,19 @@
             "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-jvm/5.1.0/clikt-core-jvm-5.1.0.jar",
             "sha256": "7f78049fa8159bac05ce09ddef4313248d4cad0014a744214c1150d14e3661e7"
           }
+        ]
+      },
+      "js": {
+        "version": "5.1.0",
+        "files": [
+          {
+            "name": "clikt-js.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-js/5.1.0/clikt-core-js-5.1.0.klib",
+            "sha256": "f7782de5cb0b1fba28d90157f25fd5f3c01fa74aae873920a74282caf3156d30"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ]
       },
       "jvm": {
@@ -8275,6 +9123,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "5.1.0",
+        "files": [
+          {
+            "name": "clikt-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core/5.1.0/clikt-core-5.1.0.jar",
+            "sha256": "2eff59eb6f9ff5acd635246d66737d2586995b932a9eaad7e70b271122e37c04"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "5.1.0",
         "files": [
@@ -8282,6 +9143,16 @@
             "name": "clikt-mingwX64Main.klib",
             "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-mingwx64/5.1.0/clikt-core-mingwx64-5.1.0.klib",
             "sha256": "532b92307ac92f9b55cd463bbe447238aeff705870fc108f2a666774468213c4"
+          }
+        ]
+      },
+      "wasmJs": {
+        "version": "5.1.0",
+        "files": [
+          {
+            "name": "clikt-wasm-js.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-wasm-js/5.1.0/clikt-core-wasm-js-5.1.0.klib",
+            "sha256": "b3a60e5ff1252e9b26dcfe465220d88d50a4e586cfbe6dc8c4c5a8e70ab7690d"
           }
         ]
       }
@@ -8295,6 +9166,19 @@
             "url": "https://repo1.maven.org/maven2/com/github/ajalt/colormath/colormath-jvm/3.7.0/colormath-jvm-3.7.0.jar",
             "sha256": "e15f04f0ab6da0cbfa43326d12fc5e59d159200e28d72fdbf2a72b472277917d"
           }
+        ]
+      },
+      "js": {
+        "version": "3.7.0",
+        "files": [
+          {
+            "name": "colormath-js.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/colormath/colormath-js/3.7.0/colormath-js-3.7.0.klib",
+            "sha256": "aefb6e54ec5992ccde824dfcf134a4f62219d1b34e30df2c855d24f08080412b"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ]
       },
       "jvm": {
@@ -8350,6 +9234,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.7.0",
+        "files": [
+          {
+            "name": "colormath-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/colormath/colormath/3.7.0/colormath-3.7.0.jar",
+            "sha256": "e892bc2a0e1b66078ed856afb3c79a864521290904cbf31fa04779e8d6567fcb"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.7.0",
         "files": [
@@ -8357,6 +9254,16 @@
             "name": "colormath-mingwX64Main.klib",
             "url": "https://repo1.maven.org/maven2/com/github/ajalt/colormath/colormath-mingwx64/3.7.0/colormath-mingwx64-3.7.0.klib",
             "sha256": "4ca3de7e9f9d29409a819107097a0d4542dcfd2befa74ab4b863e5d3f791d4d2"
+          }
+        ]
+      },
+      "wasmJs": {
+        "version": "3.7.0",
+        "files": [
+          {
+            "name": "colormath-wasm-js.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/colormath/colormath-wasm-js/3.7.0/colormath-wasm-js-3.7.0.klib",
+            "sha256": "80dbf107eb396eac4f6fa796b99e3e0ddf7cc46a17d8d7aab769fd446fff007d"
           }
         ]
       }
@@ -8378,6 +9285,20 @@
           "com.github.ajalt.mordant:mordant-jvm-ffm",
           "com.github.ajalt.mordant:mordant-jvm-graal-ffi",
           "com.github.ajalt.mordant:mordant-jvm-jna"
+        ]
+      },
+      "js": {
+        "version": "3.0.2",
+        "files": [
+          {
+            "name": "mordant-omnibus-js.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-js/3.0.2/mordant-js-3.0.2.klib",
+            "sha256": "5aa23fb3a287eaccddf4e14d20fd26692756f7caf24eaf1caf58936e46533048"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.mordant:mordant-core",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ]
       },
       "jvm": {
@@ -8453,6 +9374,22 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.0.2",
+        "files": [
+          {
+            "name": "mordant-omnibus-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant/3.0.2/mordant-3.0.2.jar",
+            "sha256": "090984d202692ffef447e88dfe2c63693a5de29670da0831b863bc284da147e2"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.mordant:mordant-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.0.2",
         "files": [
@@ -8460,6 +9397,19 @@
             "name": "mordant-omnibus.klib",
             "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-mingwx64/3.0.2/mordant-mingwx64-3.0.2.klib",
             "sha256": "b98a2373565d73b01b280187901e453fbc43d646b576dd750f9a516991313524"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.mordant:mordant-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.0.2",
+        "files": [
+          {
+            "name": "mordant-omnibus-wasm-js.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-wasm-js/3.0.2/mordant-wasm-js-3.0.2.klib",
+            "sha256": "4f41ff1c06054a84ab79869837fe5468fb76faac4459d882eb0917cf544792bd"
           }
         ],
         "deps": [
@@ -8479,6 +9429,20 @@
         ],
         "deps": [
           "com.github.ajalt.colormath:colormath"
+        ]
+      },
+      "js": {
+        "version": "3.1.0",
+        "files": [
+          {
+            "name": "mordant-js.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-js/3.1.0/mordant-core-js-3.1.0.klib",
+            "sha256": "d60bec5d0ec6ff722d70516e572347557559d66a7228f39e421cd145719d8dcd"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.colormath:colormath",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ]
       },
       "jvm": {
@@ -8549,6 +9513,22 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.1.0",
+        "files": [
+          {
+            "name": "mordant-metadata.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core/3.1.0/mordant-core-3.1.0.jar",
+            "sha256": "ee696ca6ebe46957d407bcc6c87856c444f80e6faf7e3f0e4bdcdf7d8b9db7bd"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.colormath:colormath"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.1.0",
         "files": [
@@ -8556,6 +9536,19 @@
             "name": "mordant-mingwX64Main.klib",
             "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-mingwx64/3.1.0/mordant-core-mingwx64-3.1.0.klib",
             "sha256": "1bf39714effcb068c0a8bb47ab22ef43ef8610245e15849ed2527a90edaa17d3"
+          }
+        ],
+        "deps": [
+          "com.github.ajalt.colormath:colormath"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.1.0",
+        "files": [
+          {
+            "name": "mordant-wasm-js.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-wasm-js/3.1.0/mordant-core-wasm-js-3.1.0.klib",
+            "sha256": "f4406505dc54fd3ada09940c52f52de9be3f9e8550def9a7c2b6b317f6a23f57"
           }
         ],
         "deps": [
@@ -8856,6 +9849,19 @@
           }
         ]
       },
+      "js": {
+        "version": "0.3.10",
+        "files": [
+          {
+            "name": "bignum-js-0.3.10.klib",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-js/0.3.10/bignum-js-0.3.10.klib",
+            "sha256": "e324f08f897767d98ec88acd908ff741fc022fea2f84d70388e4434a771f0497"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ]
+      },
       "jvm": {
         "version": "0.3.10",
         "files": [
@@ -8909,6 +9915,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "0.3.10",
+        "files": [
+          {
+            "name": "bignum-metadata-0.3.10.jar",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum/0.3.10/bignum-0.3.10.jar",
+            "sha256": "9183f3da7a4944ca41ef9f79f51a6a178cbc021936de44e6e9265c6f040eb45c"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.3.10",
         "files": [
@@ -8916,6 +9935,16 @@
             "name": "bignum.klib",
             "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-mingwx64/0.3.10/bignum-mingwx64-0.3.10.klib",
             "sha256": "c4e5cfe254f7246af325b46ae17c0a5e03edbc6b9fb318a42f3d6b011dfae649"
+          }
+        ]
+      },
+      "wasmJs": {
+        "version": "0.3.10",
+        "files": [
+          {
+            "name": "bignum-wasm-js-0.3.10.klib",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-wasm-js/0.3.10/bignum-wasm-js-0.3.10.klib",
+            "sha256": "94fe7ed94e2a79291b29d4c90be87245a499161227de71aefd3f4311f407ff54"
           }
         ]
       }
@@ -9977,6 +11006,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "0.23.2",
+        "files": [
+          {
+            "name": "poko-annotations-metadata-0.23.2.jar",
+            "url": "https://repo1.maven.org/maven2/dev/drewhamilton/poko/poko-annotations/0.23.2/poko-annotations-0.23.2.jar",
+            "sha256": "ed932b2ad2688861b1a4f6c154af5b5327ab594e66326cb537d5a134c82508a3"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.23.2",
         "files": [
@@ -10023,6 +11065,16 @@
             "name": "mokkery-core-jvm-3.5.1.jar",
             "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-jvm/3.5.1/mokkery-core-jvm-3.5.1.jar",
             "sha256": "10e385c1467b8dcc795d024812c02c82c8d4da1d447114ee1cb592246316985e"
+          }
+        ]
+      },
+      "js": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-core-js-3.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-js/3.5.1/mokkery-core-js-3.5.1.klib",
+            "sha256": "adc655e70a5bcfb07bd9b1e87616c2101e010f39a603242f82636c276183b1e9"
           }
         ]
       },
@@ -10079,6 +11131,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-core-metadata-3.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core/3.5.1/mokkery-core-3.5.1.jar",
+            "sha256": "e1f763dddd933776aee93f6023351cdb0fad00be1748adf8ce49f98c448661a5"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.5.1",
         "files": [
@@ -10086,6 +11151,16 @@
             "name": "mokkery-core-mingwX64Main-3.5.1.klib",
             "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-mingwx64/3.5.1/mokkery-core-mingwx64-3.5.1.klib",
             "sha256": "9c83779b98b37368d6cd7d272a8270c65c5ac91cc0ebfed7c893a2a1ca9fd511"
+          }
+        ]
+      },
+      "wasmJs": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-core-wasm-js-3.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-wasm-js/3.5.1/mokkery-core-wasm-js-3.5.1.klib",
+            "sha256": "9c1fb9030197c593319cf0d875c765dd730b05ad7defe9810edf36680a131b8c"
           }
         ]
       }
@@ -10117,6 +11192,20 @@
         ],
         "runtime_deps": [
           "dev.drewhamilton.poko:poko-annotations"
+        ]
+      },
+      "js": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-runtime-js-3.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-js/3.5.1/mokkery-runtime-js-3.5.1.klib",
+            "sha256": "2c6e47fc36c960d0d95a0797ad7886525f3d6f40c9ab01e3e31c3d79e2a7530a"
+          }
+        ],
+        "deps": [
+          "dev.mokkery:mokkery-core",
+          "org.jetbrains.kotlinx:atomicfu"
         ]
       },
       "jvm": {
@@ -10197,6 +11286,23 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-runtime-metadata-3.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime/3.5.1/mokkery-runtime-3.5.1.jar",
+            "sha256": "e2644966781888e3e52875bd33f9381d2c40637f1e55435965b91973da7bd64b"
+          }
+        ],
+        "deps": [
+          "dev.drewhamilton.poko:poko-annotations",
+          "dev.mokkery:mokkery-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.5.1",
         "files": [
@@ -10211,6 +11317,20 @@
           "dev.mokkery:mokkery-core",
           "org.jetbrains.kotlinx:atomicfu"
         ]
+      },
+      "wasmJs": {
+        "version": "3.5.1",
+        "files": [
+          {
+            "name": "mokkery-runtime-wasm-js-3.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-wasm-js/3.5.1/mokkery-runtime-wasm-js-3.5.1.klib",
+            "sha256": "739902ba85c79297db02632cc163540251bfa78ebb4136585dc5505816103c1e"
+          }
+        ],
+        "deps": [
+          "dev.mokkery:mokkery-core",
+          "org.jetbrains.kotlinx:atomicfu"
+        ]
       }
     },
     "dev.whyoleg.cryptography:cryptography-bigint": {
@@ -10222,6 +11342,20 @@
             "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-bigint-jvm/0.6.0/cryptography-bigint-jvm-0.6.0.jar",
             "sha256": "a261719def5aff7e04b1b6d3970511bd21b2bccb8f3ee9c427e4f302cf46d625"
           }
+        ]
+      },
+      "js": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-bigint-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-bigint-js/0.6.0/cryptography-bigint-js-0.6.0.klib",
+            "sha256": "6aa5859b1027953fb929ce6aa5fd187d28c584666ad4efff289b514970b595aa"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ]
       },
       "jvm": {
@@ -10289,6 +11423,22 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-bigint-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-bigint/0.6.0/cryptography-bigint-0.6.0.jar",
+            "sha256": "f9ea0dfed6367211ff916d751ace38e36fd34946ad7ab340bee2bc024812bd6c"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.6.0",
         "files": [
@@ -10296,6 +11446,19 @@
             "name": "cryptography-bigint-mingwX64Main-0.6.0.klib",
             "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-bigint-mingwx64/0.6.0/cryptography-bigint-mingwx64-0.6.0.klib",
             "sha256": "6fca328b3f010f4baa2e5975906117fd624b1735baf1105de8ae9af26b0672c2"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-bigint-wasm-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-bigint-wasm-js/0.6.0/cryptography-bigint-wasm-js-0.6.0.klib",
+            "sha256": "1af9f025113da3b8661593a6ab0181f52d25a96a4a1b6841fdfcc5687823f58c"
           }
         ],
         "deps": [
@@ -10316,6 +11479,22 @@
         "deps": [
           "dev.whyoleg.cryptography:cryptography-bigint",
           "dev.whyoleg.cryptography:cryptography-random",
+          "org.jetbrains.kotlinx:kotlinx-io-core"
+        ]
+      },
+      "js": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-core-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-core-js/0.6.0/cryptography-core-js-0.6.0.klib",
+            "sha256": "4607912c7529c428fd7e92f498b6edb012910c9d5b2547caa713e2cc0f2f1038"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-bigint",
+          "dev.whyoleg.cryptography:cryptography-random",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
           "org.jetbrains.kotlinx:kotlinx-io-core"
         ]
       },
@@ -10397,6 +11576,24 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-core-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-core/0.6.0/cryptography-core-0.6.0.jar",
+            "sha256": "9fed5b29b1b5b0d11cdf08a02c8473bb63e02a776de9db2d5e2f9a57104886ad"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-bigint",
+          "dev.whyoleg.cryptography:cryptography-random",
+          "org.jetbrains.kotlinx:kotlinx-io-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.6.0",
         "files": [
@@ -10404,6 +11601,21 @@
             "name": "cryptography-core-mingwX64Main-0.6.0.klib",
             "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-core-mingwx64/0.6.0/cryptography-core-mingwx64-0.6.0.klib",
             "sha256": "110b6bd448898d2c89540230b99300c3186a9fbbf984e95705614b80fb7d1e2a"
+          }
+        ],
+        "deps": [
+          "dev.whyoleg.cryptography:cryptography-bigint",
+          "dev.whyoleg.cryptography:cryptography-random",
+          "org.jetbrains.kotlinx:kotlinx-io-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-core-wasm-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-core-wasm-js/0.6.0/cryptography-core-wasm-js-0.6.0.klib",
+            "sha256": "270938da35c1a4ab6124d5cc62917c3d352300740ed3188d422fda78b4787639"
           }
         ],
         "deps": [
@@ -10718,6 +11930,19 @@
           }
         ]
       },
+      "js": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-random-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-random-js/0.6.0/cryptography-random-js-0.6.0.klib",
+            "sha256": "0d77dc14ff828b25c4a2a69263d695c89bde47aa727cbb64f5e3fb45ad7bad43"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ]
+      },
       "jvm": {
         "version": "0.6.0",
         "files": [
@@ -10771,6 +11996,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-random-metadata-0.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-random/0.6.0/cryptography-random-0.6.0.jar",
+            "sha256": "b391dcf0c4823fa3bf8f5de6f0fa98d5c6368f98a96d02306892d01589704c73"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.6.0",
         "files": [
@@ -10778,6 +12016,16 @@
             "name": "cryptography-random-mingwX64Main-0.6.0.klib",
             "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-random-mingwx64/0.6.0/cryptography-random-mingwx64-0.6.0.klib",
             "sha256": "f267031c64ebe0e3333a3608cc586efaabc127a90869c79822e76d9580400712"
+          }
+        ]
+      },
+      "wasmJs": {
+        "version": "0.6.0",
+        "files": [
+          {
+            "name": "cryptography-random-wasm-js-0.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/whyoleg/cryptography/cryptography-random-wasm-js/0.6.0/cryptography-random-wasm-js-0.6.0.klib",
+            "sha256": "ead88390cd21d90c779f46a1a4f723301c34003ee839337f15b189371734a05e"
           }
         ]
       }
@@ -11051,6 +12299,19 @@
           }
         ]
       },
+      "js": {
+        "version": "1.4.5",
+        "files": [
+          {
+            "name": "runtime-js-1.4.5.klib",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-js/1.4.5/runtime-js-1.4.5.klib",
+            "sha256": "07782ad5d62bbc971e8e627afa51c0fbbcaaa99b96bf19c8a904eb6e9d7f6346"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ]
+      },
       "jvm": {
         "version": "1.4.5",
         "files": [
@@ -11104,6 +12365,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.4.5",
+        "files": [
+          {
+            "name": "runtime-metadata-1.4.5.jar",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime/1.4.5/runtime-1.4.5.jar",
+            "sha256": "b92cdf5738251e6b31493feab4b036941e1f8810a018f1b9b13ab628044406b5"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.4.5",
         "files": [
@@ -11111,6 +12385,16 @@
             "name": "runtime-mingwX64Main-1.4.5.klib",
             "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-mingwx64/1.4.5/runtime-mingwx64-1.4.5.klib",
             "sha256": "77717dc67597ef91d0d5593d604839a63209ccc4d574f64795173e526343cc9b"
+          }
+        ]
+      },
+      "wasmJs": {
+        "version": "1.4.5",
+        "files": [
+          {
+            "name": "runtime-wasm-js-1.4.5.klib",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-wasm-js/1.4.5/runtime-wasm-js-1.4.5.klib",
+            "sha256": "1858e2921f0637c4bfdd9eeb2f5400160f0d99b38e5e9890d87a2a206c8fbda7"
           }
         ]
       }
@@ -11129,6 +12413,19 @@
           "org.jetbrains.compose.foundation:foundation"
         ]
       },
+      "js": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "compose-charts-js.klib",
+            "url": "https://repo1.maven.org/maven2/io/github/ehsannarmani/compose-charts-js/1.0.0/compose-charts-js-1.0.0.klib",
+            "sha256": "d0aa3b7f16227f5c0033d07ed6123a53ed62d36b3e59d6b4390fd2f718ff2eb0"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ]
+      },
       "jvm": {
         "version": "1.0.0",
         "files": [
@@ -11140,6 +12437,16 @@
         ],
         "runtime_deps": [
           "org.jetbrains.compose.foundation:foundation"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.0.0",
+        "files": [
+          {
+            "name": "compose-charts-wasm-js.klib",
+            "url": "https://repo1.maven.org/maven2/io/github/ehsannarmani/compose-charts-wasm-js/1.0.0/compose-charts-wasm-js-1.0.0.klib",
+            "sha256": "6353036929210933872b1819366673bee2d0fa69c1320552444fcf9815d90978"
+          }
         ]
       }
     },
@@ -11172,6 +12479,22 @@
           "io.ktor:ktor-client-core",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.slf4j:slf4j-api"
+        ]
+      },
+      "js": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-auth-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-js/3.6.0/ktor-client-auth-js-3.6.0.klib",
+            "sha256": "6614c125343d006908a95c6ce397c439a73ba2d40c799beae5fd058dffbf54f8"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
       "jvm": {
@@ -11251,6 +12574,23 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-auth-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth/3.6.0/ktor-client-auth-3.6.0.jar",
+            "sha256": "2ae2530a061ad20eb49733dca7ca3a2a04190c280192844c34ff328e17418493"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -11258,6 +12598,21 @@
             "name": "ktor-client-auth-mingwX64Main-3.6.0.klib",
             "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-mingwx64/3.6.0/ktor-client-auth-mingwx64-3.6.0.klib",
             "sha256": "71ba4bb62df5d023c44fde483a8486806fc536cf095b26a798518d28faf3f779"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-auth-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-wasm-js/3.6.0/ktor-client-auth-wasm-js-3.6.0.klib",
+            "sha256": "c49d0e915faa15241e55f2fb1889c7ffdc45c96c590a47f2d0a2726292d0230d"
           }
         ],
         "deps": [
@@ -11308,6 +12663,26 @@
         ],
         "runtime_deps": [
           "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j"
+        ]
+      },
+      "js": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-core-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-js/3.6.0/ktor-client-core-js-3.6.0.klib",
+            "sha256": "78489c68d8c4ca505538b319c1edfe2bfa8d9eaea2315142f6c68a09e1c21aaa"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-events",
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-http-cio",
+          "io.ktor:ktor-sse",
+          "io.ktor:ktor-websocket-serialization",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
       "jvm": {
@@ -11411,6 +12786,27 @@
           "jvmAndPosixMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-core-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core/3.6.0/ktor-client-core-3.6.0.jar",
+            "sha256": "50ccade1e574d946603407be700b88b94a865f47311ed83374e7a24e57f67a57"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-events",
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-http-cio",
+          "io.ktor:ktor-sse",
+          "io.ktor:ktor-websocket-serialization",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -11418,6 +12814,25 @@
             "name": "ktor-client-core-mingwX64Main-3.6.0.klib",
             "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-mingwx64/3.6.0/ktor-client-core-mingwx64-3.6.0.klib",
             "sha256": "71670a988a60179ee74647606f49358731c70481bb6c17b105b8c32ae5c5cf62"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-events",
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-http-cio",
+          "io.ktor:ktor-sse",
+          "io.ktor:ktor-websocket-serialization",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-core-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-wasm-js/3.6.0/ktor-client-core-wasm-js-3.6.0.klib",
+            "sha256": "da9274375d5abb4205a6b91b997d3e206c2aab03dc04a19d08fce78c05736bc5"
           }
         ],
         "deps": [
@@ -11510,6 +12925,22 @@
           "org.slf4j:slf4j-api"
         ]
       },
+      "js": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-engine-defaults-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-js/3.6.0/ktor-client-engine-defaults-js-3.6.0.klib",
+            "sha256": "2a9915e8818d0e36c466e98bd165763a1fd4923f6473d94cdd07af55b61d0a70"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -11588,6 +13019,20 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
+      "metadataWeb": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-engine-defaults-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults/3.6.0/ktor-client-engine-defaults-3.6.0.jar",
+            "sha256": "db8c15f15e475361481d534af7fb5a93608d9e038e33dcf880f8ef2a8f5e8f50"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -11600,6 +13045,21 @@
         "deps": [
           "io.ktor:ktor-client-core",
           "io.ktor:ktor-client-winhttp",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-engine-defaults-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-wasm-js/3.6.0/ktor-client-engine-defaults-wasm-js-3.6.0.klib",
+            "sha256": "b1ce9937675ffa7690ff33c10dfce7cc60e92d321dda7b6d46f2b4eff7b4d780"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
           "org.jetbrains.kotlinx:atomicfu",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
@@ -11620,6 +13080,23 @@
           "io.ktor:ktor-http",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.slf4j:slf4j-api"
+        ]
+      },
+      "js": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-mock-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-js/3.6.0/ktor-client-mock-js-3.6.0.klib",
+            "sha256": "6f63682f9a9a1feac4d7331510f8e4d9278e1601bd1fe667905f3d5001432f1b"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "io.ktor:ktor-http",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
       "jvm": {
@@ -11704,6 +13181,24 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-mock-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock/3.6.0/ktor-client-mock-3.6.0.jar",
+            "sha256": "535a6149b991698f4f0238860991ae4fb75424d0c1e2f3e155cd65863201b363"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "io.ktor:ktor-http",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -11711,6 +13206,22 @@
             "name": "ktor-client-mock-mingwX64Main-3.6.0.klib",
             "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-mingwx64/3.6.0/ktor-client-mock-mingwx64-3.6.0.klib",
             "sha256": "dad465925eb2412a28632cb03acb8b5d3652d141b8b85f967fd8bc7e43b070b5"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-client-core",
+          "io.ktor:ktor-http",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-client-mock-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-wasm-js/3.6.0/ktor-client-mock-wasm-js-3.6.0.klib",
+            "sha256": "281f3c85f2191dd48357507a2899789cfdfe2b8e70c220c55e6d956dcd22ffe1"
           }
         ],
         "deps": [
@@ -11796,6 +13307,22 @@
           "org.slf4j:slf4j-api"
         ]
       },
+      "js": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-events-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-js/3.6.0/ktor-events-js-3.6.0.klib",
+            "sha256": "3cbc4e06689ac834194e18eefedfa742d1b7ce2c34514057552a012c36c55357"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
       "jvm": {
         "version": "3.6.0",
         "files": [
@@ -11873,6 +13400,23 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-events-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events/3.6.0/ktor-events-3.6.0.jar",
+            "sha256": "cb6b7f195fd9c83b172712fb1368bb99ee601c233aebeffb9edf172b6a102a40"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -11880,6 +13424,21 @@
             "name": "ktor-events-mingwX64Main-3.6.0.klib",
             "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-mingwx64/3.6.0/ktor-events-mingwx64-3.6.0.klib",
             "sha256": "ef2dc627719b9521de3c9777d46d0872f5906e4b8cef97ac17f8fef428fbc0de"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-events-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-wasm-js/3.6.0/ktor-events-wasm-js-3.6.0.klib",
+            "sha256": "f0e958564cf705b62ba7f65e2578c2371fded6f561ec1794bafddffcb37aa3f6"
           }
         ],
         "deps": [
@@ -11904,6 +13463,23 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.jetbrains.kotlinx:kotlinx-serialization-core",
           "org.slf4j:slf4j-api"
+        ]
+      },
+      "js": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-http-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-js/3.6.0/ktor-http-js-3.6.0.klib",
+            "sha256": "bf0f5a349cc55e2d14bf3dbf3470d04f5c571c274d7c0c2c100301e068747f2b"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ]
       },
       "jvm": {
@@ -11988,6 +13564,24 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-http-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http/3.6.0/ktor-http-3.6.0.jar",
+            "sha256": "dc8cd84b0a592ef609c09cd6523516c4c6d2c6a6f24954cc2a41edd178dde037"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -11995,6 +13589,22 @@
             "name": "ktor-http-mingwX64Main-3.6.0.klib",
             "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-mingwx64/3.6.0/ktor-http-mingwx64-3.6.0.klib",
             "sha256": "87e91e0bf8be9681cc0587a9b5cb69304860a19038ca81ea09ce930a320fb6d8"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-http-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-wasm-js/3.6.0/ktor-http-wasm-js-3.6.0.klib",
+            "sha256": "7b54e9c145d8ef6ffcb2e79ebc64ee78e6c9e2e3187bb489ddbaf9ae34f20a1e"
           }
         ],
         "deps": [
@@ -12021,6 +13631,23 @@
           "io.ktor:ktor-network",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.slf4j:slf4j-api"
+        ]
+      },
+      "js": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-http-cio-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-js/3.6.0/ktor-http-cio-js-3.6.0.klib",
+            "sha256": "f433beec33284a01a474d19c5fe8fa50699f25f4e52b93eab492e4790556b7a1"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-io",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
       "jvm": {
@@ -12107,6 +13734,24 @@
           "jvmAndPosixMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-http-cio-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio/3.6.0/ktor-http-cio-3.6.0.jar",
+            "sha256": "3659febd812086d17c40dddc85889f1d8d7c371e9b8cfa8e16c65f3c97d5650f"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-io",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -12114,6 +13759,22 @@
             "name": "ktor-http-cio-mingwX64Main-3.6.0.klib",
             "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-mingwx64/3.6.0/ktor-http-cio-mingwx64-3.6.0.klib",
             "sha256": "8d1bf9677e0d8d4dc2e6f6079f9f6bf49dcae67ffde3c0037c3ef374c28de1c9"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-io",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-http-cio-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-wasm-js/3.6.0/ktor-http-cio-wasm-js-3.6.0.klib",
+            "sha256": "db9da0f4362cfca1cbc45c6925f28e2a8b4c878b6c9c00ebed3239f01e89f83d"
           }
         ],
         "deps": [
@@ -12138,6 +13799,22 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.jetbrains.kotlinx:kotlinx-io-core",
           "org.slf4j:slf4j-api"
+        ]
+      },
+      "js": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-io-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-js/3.6.0/ktor-io-js-3.6.0.klib",
+            "sha256": "1c7c58595e9d6be197cf864d6d9e31a9aa0736de59206d13710233eae32f2e3f"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-io-core"
         ]
       },
       "jvm": {
@@ -12233,6 +13910,23 @@
           "jvmAndPosixMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-io-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io/3.6.0/ktor-io-3.6.0.jar",
+            "sha256": "32a750ed346a1f4497aa27696e68ca45eb7d294c3caba08f308d77fe312b3395"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-io-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -12245,6 +13939,21 @@
             "name": "ktor-io-mingwX64Cinterop-mutexMain-3.6.0.klib",
             "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-mingwx64/3.6.0/ktor-io-mingwx64-3.6.0-cinterop-mutex.klib",
             "sha256": "bbf01c02e0c5c5fb1bb94d23d097d40caf98f55f3cf057c7250dcdf7c92087d0"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-io-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-io-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-wasm-js/3.6.0/ktor-io-wasm-js-3.6.0.klib",
+            "sha256": "a6f2d3df41b2e438035deeb5a816bebe884f408feac79a94735e1f06343561c2"
           }
         ],
         "deps": [
@@ -12268,6 +13977,22 @@
           "io.ktor:ktor-utils",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.slf4j:slf4j-api"
+        ]
+      },
+      "js": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-network-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-js/3.6.0/ktor-network-js-3.6.0.klib",
+            "sha256": "00aea9a117c20523ce4da163d9bbb619f1eb3217b084ca98a133b6c4d7367925"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
       "jvm": {
@@ -12367,6 +14092,23 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-network-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network/3.6.0/ktor-network-3.6.0.jar",
+            "sha256": "cea1854f150d0a73c2bfc0eb0d3386951bb86b0dfc2b7bc9b86fb100eea13b31"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -12379,6 +14121,21 @@
             "name": "ktor-network-mingwX64Cinterop-afunixMain-3.6.0.klib",
             "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-mingwx64/3.6.0/ktor-network-mingwx64-3.6.0-cinterop-afunix.klib",
             "sha256": "f755088f7a055ce021c16b207643729810f21f859cf372b39977a1ff57b1566d"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-network-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-wasm-js/3.6.0/ktor-network-wasm-js-3.6.0.klib",
+            "sha256": "352b64161893e3ec0bf40b994b6cd3c46d552b719a76d1ff1e43a30db93ab87f"
           }
         ],
         "deps": [
@@ -12438,6 +14195,22 @@
           "io.ktor:ktor-websockets",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.slf4j:slf4j-api"
+        ]
+      },
+      "js": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-serialization-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-js/3.6.0/ktor-serialization-js-3.6.0.klib",
+            "sha256": "cea8789eca02e87198fe4b42b23769b8cf2e16441c00143a801d6aa834ccba2e"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-websockets",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
       "jvm": {
@@ -12517,6 +14290,23 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-serialization-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization/3.6.0/ktor-serialization-3.6.0.jar",
+            "sha256": "fd2aef1509733ca48e84c7953cc772e76816842895c9373a72d42accf6c10e56"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-websockets",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -12524,6 +14314,21 @@
             "name": "ktor-serialization-mingwX64Main-3.6.0.klib",
             "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-mingwx64/3.6.0/ktor-serialization-mingwx64-3.6.0.klib",
             "sha256": "2767547e3ad64235eebd6a7eaf1638fc70c306e4d821b8c986c32d916e9c8ea5"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-websockets",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-serialization-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-wasm-js/3.6.0/ktor-serialization-wasm-js-3.6.0.klib",
+            "sha256": "de5fb768e3f62d65fbe7be41128d2d678d734e94542f890e91105be4e96e09b5"
           }
         ],
         "deps": [
@@ -12547,6 +14352,22 @@
           "io.ktor:ktor-utils",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.slf4j:slf4j-api"
+        ]
+      },
+      "js": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-sse-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-js/3.6.0/ktor-sse-js-3.6.0.klib",
+            "sha256": "d0ccd9e69f77aaade614baddc6bd7d3e7ae89372bc6e8c5d8c00ad66fe1306df"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
       "jvm": {
@@ -12626,6 +14447,23 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-sse-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse/3.6.0/ktor-sse-3.6.0.jar",
+            "sha256": "1f4838ddb7d57e84bdd3913af4b40627662abdbca2fba8921b867f1a62d0bf5d"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -12633,6 +14471,21 @@
             "name": "ktor-sse-mingwX64Main-3.6.0.klib",
             "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-mingwx64/3.6.0/ktor-sse-mingwx64-3.6.0.klib",
             "sha256": "2b08e71aca2a0b74ae2d08d532b85cb7cc8e610dfc6ed7d3532752a8eb68a6fd"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-sse-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-wasm-js/3.6.0/ktor-sse-wasm-js-3.6.0.klib",
+            "sha256": "8f58410f431eb8f7f398133163b6498e1e4417e29cc0c17597ee23e74d6550d8"
           }
         ],
         "deps": [
@@ -12657,6 +14510,23 @@
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.jetbrains.kotlinx:kotlinx-serialization-core",
           "org.slf4j:slf4j-api"
+        ]
+      },
+      "js": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-utils-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-js/3.6.0/ktor-utils-js-3.6.0.klib",
+            "sha256": "70fb6fc74e41fc380797f0c3b8551ee37843133caf4584fc6ce43542a91fb4ae"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-io",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ]
       },
       "jvm": {
@@ -12756,6 +14626,24 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-utils-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils/3.6.0/ktor-utils-3.6.0.jar",
+            "sha256": "5aca932a872b735b4af37acfc74b79932ca73b921cef6617ad28001daefb73a5"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-io",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -12763,6 +14651,22 @@
             "name": "ktor-utils-mingwX64Main-3.6.0.klib",
             "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-mingwx64/3.6.0/ktor-utils-mingwx64-3.6.0.klib",
             "sha256": "c73caf9cb4b283b67a51c425407c32499940c37b42a7988e0a39091fc912dcbf"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-io",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-utils-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-wasm-js/3.6.0/ktor-utils-wasm-js-3.6.0.klib",
+            "sha256": "318519c10dd69af33d5c86b12e53a00e06dc439512331d1b0fb21977abbb6e34"
           }
         ],
         "deps": [
@@ -12787,6 +14691,22 @@
           "io.ktor:ktor-serialization",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.slf4j:slf4j-api"
+        ]
+      },
+      "js": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-websocket-serialization-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-js/3.6.0/ktor-websocket-serialization-js-3.6.0.klib",
+            "sha256": "357efe9e15e754d9a9fdd772072cc80d132a3130753c9638725a56577d349971"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-serialization",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
       "jvm": {
@@ -12866,6 +14786,23 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-websocket-serialization-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization/3.6.0/ktor-websocket-serialization-3.6.0.jar",
+            "sha256": "b7455559d7413f9c0b30889209f824401a2434d8f5cc5ea0ad388b48543b753b"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-serialization",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -12873,6 +14810,21 @@
             "name": "ktor-websocket-serialization-mingwX64Main-3.6.0.klib",
             "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-mingwx64/3.6.0/ktor-websocket-serialization-mingwx64-3.6.0.klib",
             "sha256": "22ee656f003e28e332dcf160c5fea5b4c2aa5347a6056868b6bd2d6a17002c9a"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-serialization",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-websocket-serialization-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-wasm-js/3.6.0/ktor-websocket-serialization-wasm-js-3.6.0.klib",
+            "sha256": "c2d74634bb8973a9f92205a1ee63babf79456bf77ff8e26b56bc34580960ad92"
           }
         ],
         "deps": [
@@ -12897,6 +14849,23 @@
           "io.ktor:ktor-utils",
           "org.jetbrains.kotlinx:kotlinx-coroutines-core",
           "org.slf4j:slf4j-api"
+        ]
+      },
+      "js": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-websockets-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-js/3.6.0/ktor-websockets-js-3.6.0.klib",
+            "sha256": "b50640f05c1f407156f1c139a632599d7af705b02934167463198a54c5834fe3"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         ]
       },
       "jvm": {
@@ -12981,6 +14950,24 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-websockets-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets/3.6.0/ktor-websockets-3.6.0.jar",
+            "sha256": "e639140b0db0d00d27f6437fe8b438743033b424e43a1a9be61f91643c9f12d0"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "3.6.0",
         "files": [
@@ -12988,6 +14975,22 @@
             "name": "ktor-websockets-mingwX64Main-3.6.0.klib",
             "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-mingwx64/3.6.0/ktor-websockets-mingwx64-3.6.0.klib",
             "sha256": "77431b6936b4ec66f4f7f57ad2f4f521280e253ee444b8d723eea4c9907c58e3"
+          }
+        ],
+        "deps": [
+          "io.ktor:ktor-http",
+          "io.ktor:ktor-utils",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "3.6.0",
+        "files": [
+          {
+            "name": "ktor-websockets-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-wasm-js/3.6.0/ktor-websockets-wasm-js-3.6.0.klib",
+            "sha256": "f028b35d54e0797215cdbd059d0f2ecbd19358aa95f5970f7c99c79a94394861"
           }
         ],
         "deps": [
@@ -14345,6 +16348,20 @@
           "androidx.compose.runtime:runtime"
         ]
       },
+      "js": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "runtime-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/runtime/runtime-js/1.12.2/runtime-js-1.12.2.klib",
+            "sha256": "018a7d42d7a5aa966911aea3e9cb4d3e27ea900c52ee1b03fea08b528424ac6c"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime",
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ]
+      },
       "jvm": {
         "version": "1.12.2",
         "files": null
@@ -14404,6 +16421,22 @@
           "redirectCommonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "runtime-metadata-1.12.2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/runtime/runtime/1.12.2/runtime-1.12.2.jar",
+            "sha256": "6ac0a3c72f0f2324308bbb26d2bf3781fb48206b275638168fcf540e6ba58cd4"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime"
+        ],
+        "source_sets": [
+          "redirectCommonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.12.2",
         "files": [
@@ -14411,6 +16444,19 @@
             "name": "runtime-mingwX64Main-1.12.2.klib",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/runtime/runtime-mingwx64/1.12.2/runtime-mingwx64-1.12.2.klib",
             "sha256": "7b962c83bb7ceceb337b6f1c8823a17c7d9992db70dcb52a771f00a53ed103ef"
+          }
+        ],
+        "deps": [
+          "androidx.compose.runtime:runtime"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.2",
+        "files": [
+          {
+            "name": "runtime-wasm-js-1.12.2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/compose/runtime/runtime-wasm-js/1.12.2/runtime-wasm-js-1.12.2.klib",
+            "sha256": "74b4fcc943325a9fe1c240ab13f7fc47c5d4b15cc3c6c6b208f8b804dab2a536"
           }
         ],
         "deps": [
@@ -14894,6 +16940,18 @@
         ]
       }
     },
+    "org.jetbrains.kotlin:kotlin-dom-api-compat": {
+      "js": {
+        "version": "2.4.21",
+        "files": [
+          {
+            "name": "kotlin-dom-api-compat-2.4.21.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-dom-api-compat/2.4.21/kotlin-dom-api-compat-2.4.21.klib",
+            "sha256": "3d49afe6919e33e33fdbdb5b58438a891cc8db27f10f542ee631ad4492601cfb"
+          }
+        ]
+      }
+    },
     "org.jetbrains.kotlin:kotlin-reflect": {
       "jvm": {
         "version": "2.4.20",
@@ -14931,10 +16989,37 @@
         "source_sets": [
           "commonMain"
         ]
+      },
+      "metadataWeb": {
+        "version": "2.4.21",
+        "files": [
+          {
+            "name": "kotlin-stdlib-2.4.21-all.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.21/kotlin-stdlib-2.4.21-all.jar",
+            "sha256": "74d9d7cf112bbf3d14612bb9fb867456a0ae36398d330df8178f0de42a61f476"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
       }
     },
     "org.jetbrains.kotlin:kotlin-test": {
       "metadata": {
+        "version": "2.4.21",
+        "files": [
+          {
+            "name": "kotlin-test-2.4.21-all.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-test/2.4.21/kotlin-test-2.4.21-all.jar",
+            "sha256": "51d2160793bdd145390829a5ba0dceb45f5e02924be4aac671c3912e4afc8c92"
+          }
+        ],
+        "source_sets": [
+          "annotationsCommonMain",
+          "assertionsCommonMain"
+        ]
+      },
+      "metadataWeb": {
         "version": "2.4.21",
         "files": [
           {
@@ -14957,6 +17042,16 @@
             "name": "atomicfu-jvm-0.33.0.jar",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu-jvm/0.33.0/atomicfu-jvm-0.33.0.jar",
             "sha256": "cdc94bfe4f739a0121860e61977d5c1e6a3d53c21f2471493393ba9e900d394e"
+          }
+        ]
+      },
+      "js": {
+        "version": "0.33.0",
+        "files": [
+          {
+            "name": "atomicfu-js-0.33.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu-js/0.33.0/atomicfu-js-0.33.0.klib",
+            "sha256": "b861cae7eb3ee2e482cff3754d2fc6c7b9f80a68e95fe5aec2055fc724b24a92"
           }
         ]
       },
@@ -15029,6 +17124,19 @@
           "concurrentMain"
         ]
       },
+      "metadataWeb": {
+        "version": "0.33.0",
+        "files": [
+          {
+            "name": "atomicfu-metadata-0.33.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu/0.33.0/atomicfu-0.33.0.jar",
+            "sha256": "615c47eadfab66b5fa859ea6f11f540cec8613e4cbabe24c60753f220a793da8"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.33.0",
         "files": [
@@ -15041,6 +17149,16 @@
             "name": "atomicfu-mingwX64Cinterop-interopMain-0.33.0.klib",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu-mingwx64/0.33.0/atomicfu-mingwx64-0.33.0-cinterop-interop.klib",
             "sha256": "76b6852a6f0085fdc6c8fcddec3665cbfe042e994f371f95d3c583190ba493b8"
+          }
+        ]
+      },
+      "wasmJs": {
+        "version": "0.33.0",
+        "files": [
+          {
+            "name": "atomicfu-wasm-js-0.33.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/atomicfu-wasm-js/0.33.0/atomicfu-wasm-js-0.33.0.klib",
+            "sha256": "4004e61e2173d1efda43117df74e7e2ae62d2ab04b44ed8cf1cf0856149cf1ad"
           }
         ]
       }
@@ -15072,6 +17190,20 @@
         ],
         "deps": [
           "org.jetbrains:annotations"
+        ]
+      },
+      "js": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-js-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-js/1.11.0/kotlinx-coroutines-core-js-1.11.0.klib",
+            "sha256": "bc7fb914a83606b79a798070fe22495fd5a2795620a73e2a31cee0b0b82695bb"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu"
         ]
       },
       "jvm": {
@@ -15143,6 +17275,22 @@
           "concurrentMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-metadata-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core/1.11.0/kotlinx-coroutines-core-1.11.0.jar",
+            "sha256": "04e7737fb15cf5f3aed83a91141a5303a0b2acd886f5bbc35cdbe791ad63dfee"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.11.0",
         "files": [
@@ -15150,6 +17298,19 @@
             "name": "kotlinx-coroutines-core-mingwX64Main-1.11.0.klib",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-mingwx64/1.11.0/kotlinx-coroutines-core-mingwx64-1.11.0.klib",
             "sha256": "371cff91d0dd0cd2dccacaa53468554276b85f64fad1c0f607ef2d7af55548dd"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-core-wasm-js-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-wasm-js/1.11.0/kotlinx-coroutines-core-wasm-js-1.11.0.klib",
+            "sha256": "1280b9f74850a4892a3641efa2a5779e5423b84aa7077cc60ddd50decbab921f"
           }
         ],
         "deps": [
@@ -15265,6 +17426,21 @@
           "org.jetbrains:annotations"
         ]
       },
+      "js": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-test-js-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-test-js/1.11.0/kotlinx-coroutines-test-js-1.11.0.klib",
+            "sha256": "892318e4a1f59b018e64c54dfd334d23d815f19c795525a222410c999180c12a"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
       "jvm": {
         "version": "1.11.0",
         "files": [
@@ -15338,6 +17514,23 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-test-metadata-1.11.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-test/1.11.0/kotlinx-coroutines-test-1.11.0.jar",
+            "sha256": "8567a0ef58da0d4355b73f708371e84fb39bd28e07788004a8764e3706eb7780"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.11.0",
         "files": [
@@ -15345,6 +17538,20 @@
             "name": "kotlinx-coroutines-test-mingwX64Main-1.11.0.klib",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-test-mingwx64/1.11.0/kotlinx-coroutines-test-mingwx64-1.11.0.klib",
             "sha256": "977e1798bee81a508764538ab4c277b6815ac38066112e35ce456681f34580f2"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:atomicfu",
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.11.0",
+        "files": [
+          {
+            "name": "kotlinx-coroutines-test-wasm-js-1.11.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-test-wasm-js/1.11.0/kotlinx-coroutines-test-wasm-js-1.11.0.klib",
+            "sha256": "6af47fc6e623fdbcb91473c0088be5e7d36ca505f8eac5dba7eea626edfcc599"
           }
         ],
         "deps": [
@@ -15362,6 +17569,20 @@
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-datetime-jvm/0.8.0/kotlinx-datetime-jvm-0.8.0.jar",
             "sha256": "ee44b51f8977c2f51d575299a4fc6782ab3700eba4cfc7fad548cced1543936a"
           }
+        ]
+      },
+      "js": {
+        "version": "0.8.0",
+        "files": [
+          {
+            "name": "kotlinx-datetime-js-0.8.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-datetime-js/0.8.0/kotlinx-datetime-js-0.8.0.klib",
+            "sha256": "81231fbbaec87b618790606f706395334830a5a7f6481ba4caab91678645bf73"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ]
       },
       "jvm": {
@@ -15429,6 +17650,22 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "0.8.0",
+        "files": [
+          {
+            "name": "kotlinx-datetime-metadata-0.8.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-datetime/0.8.0/kotlinx-datetime-0.8.0.jar",
+            "sha256": "18b77f04ea476926749707e1ecbba3436a0c50983478062655374f1f119177a3"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.8.0",
         "files": [
@@ -15436,6 +17673,19 @@
             "name": "kotlinx-datetime-mingwX64Main-0.8.0.klib",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-datetime-mingwx64/0.8.0/kotlinx-datetime-mingwx64-0.8.0.klib",
             "sha256": "fe4dd80745cefac967f7e4e62ebd7bb7be1939d80d401c652b21da18d10d2f2d"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "0.8.0",
+        "files": [
+          {
+            "name": "kotlinx-datetime-wasm-js-0.8.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-datetime-wasm-js/0.8.0/kotlinx-datetime-wasm-js-0.8.0.klib",
+            "sha256": "5d84e1a3fb30f15337bf78259ca76ca4bba67a7690d9ae07da9bdbc75b88b5ed"
           }
         ],
         "deps": [
@@ -15452,6 +17702,19 @@
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-jvm/0.9.1/kotlinx-io-bytestring-jvm-0.9.1.jar",
             "sha256": "8589de0b7c476bfdd02a24641685f609ade72f5e595cf2909c168acdba7e6ba4"
           }
+        ]
+      },
+      "js": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-bytestring-js-0.9.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-js/0.9.1/kotlinx-io-bytestring-js-0.9.1.klib",
+            "sha256": "40200ccc060124092e240150a219738c9f9796c9c83beeb4558d14c292d067a2"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ]
       },
       "jvm": {
@@ -15507,6 +17770,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-bytestring-metadata-0.9.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring/0.9.1/kotlinx-io-bytestring-0.9.1.jar",
+            "sha256": "4a2bb55f9f428df0bfa775ac540640cc0e6d633ec66f520cd2157bfe10be2f48"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.9.1",
         "files": [
@@ -15514,6 +17790,16 @@
             "name": "kotlinx-io-bytestring-mingwX64Main-0.9.1.klib",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-mingwx64/0.9.1/kotlinx-io-bytestring-mingwx64-0.9.1.klib",
             "sha256": "396151414a8b90c46dfd6e4c4d6e8179f4e59007eb5c4a788fad5c6c2951ba3f"
+          }
+        ]
+      },
+      "wasmJs": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-bytestring-wasm-js-0.9.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-wasm-js/0.9.1/kotlinx-io-bytestring-wasm-js-0.9.1.klib",
+            "sha256": "10ce72250403ffd2b8f44661cfca112ea3d9b3a1270579cc58ee99b5ee613dee"
           }
         ]
       }
@@ -15529,6 +17815,20 @@
           }
         ],
         "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-bytestring"
+        ]
+      },
+      "js": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-core-js-0.9.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-js/0.9.1/kotlinx-io-core-js-0.9.1.klib",
+            "sha256": "3e875365924808228a2febbffeaff6459c0ecab015017304bfffe7fa92bf944a"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
           "org.jetbrains.kotlinx:kotlinx-io-bytestring"
         ]
       },
@@ -15600,6 +17900,22 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-core-metadata-0.9.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core/0.9.1/kotlinx-io-core-0.9.1.jar",
+            "sha256": "ef28b5f0ee3d666ff5078f6e1b08c08d10a3fe2a169141dfc763de96eaafbcad"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-bytestring"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "0.9.1",
         "files": [
@@ -15607,6 +17923,19 @@
             "name": "kotlinx-io-core-mingwX64Main-0.9.1.klib",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-mingwx64/0.9.1/kotlinx-io-core-mingwx64-0.9.1.klib",
             "sha256": "aaafcfcb5c9cf54542a81bd946a470848d07498249d741af8c940fbb38d13e2d"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-io-bytestring"
+        ]
+      },
+      "wasmJs": {
+        "version": "0.9.1",
+        "files": [
+          {
+            "name": "kotlinx-io-core-wasm-js-0.9.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-wasm-js/0.9.1/kotlinx-io-core-wasm-js-0.9.1.klib",
+            "sha256": "b3fe4f7afc8879fa7e0f7c482ecb99b0efadd915bfc6d21f87b43384bdfcc4a2"
           }
         ],
         "deps": [
@@ -15623,6 +17952,19 @@
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.12.0/kotlinx-serialization-core-jvm-1.12.0.jar",
             "sha256": "bcfddcac76159058ba0953af05938c17111d238cd41be7191874656454d62f1a"
           }
+        ]
+      },
+      "js": {
+        "version": "1.12.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-core-js-1.12.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-js/1.12.0/kotlinx-serialization-core-js-1.12.0.klib",
+            "sha256": "261fab5f6e96d3c0249f00194498025746d2cfe7795204733e1839db7d8b53f9"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
         ]
       },
       "jvm": {
@@ -15678,6 +18020,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.12.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-core-metadata-1.12.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core/1.12.0/kotlinx-serialization-core-1.12.0.jar",
+            "sha256": "e4d4b24318e2dd6d6fff8bf2a92e93270237438d6ca97d13542cc1bfd1eb7a34"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.12.0",
         "files": [
@@ -15685,6 +18040,16 @@
             "name": "kotlinx-serialization-core-mingwX64Main-1.12.0.klib",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-mingwx64/1.12.0/kotlinx-serialization-core-mingwx64-1.12.0.klib",
             "sha256": "69c22b7f4f03a932189b6e2b126873cc46a4cd17bf4fbf141319b9dbc26d937a"
+          }
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-core-wasm-js-1.12.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-wasm-js/1.12.0/kotlinx-serialization-core-wasm-js-1.12.0.klib",
+            "sha256": "fde8ad760d5a137b1fbf9b5b009e05e6d3ce00483460d16ac4d78067b8f1be63"
           }
         ]
       }
@@ -15700,6 +18065,20 @@
           }
         ],
         "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "js": {
+        "version": "1.12.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-json-js-1.12.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-js/1.12.0/kotlinx-serialization-json-js-1.12.0.klib",
+            "sha256": "7c17ca55d3322aa18f87de7d9f6ecf8397da025cfd733192599f2b88cf9eca6d"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat",
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ]
       },
@@ -15771,6 +18150,22 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "1.12.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-json-metadata-1.12.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json/1.12.0/kotlinx-serialization-json-1.12.0.jar",
+            "sha256": "8ba4a911b74e9e73b1af1bdc8bb98432d8ce421f378db535616e2efac4c9dcae"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "1.12.0",
         "files": [
@@ -15778,6 +18173,19 @@
             "name": "kotlinx-serialization-json-mingwX64Main-1.12.0.klib",
             "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-mingwx64/1.12.0/kotlinx-serialization-json-mingwx64-1.12.0.klib",
             "sha256": "156fdcc713f1c8e670aaf12d51f817ed8d1eb41ac8b8a3de92ed14f96dc0cd87"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlinx:kotlinx-serialization-core"
+        ]
+      },
+      "wasmJs": {
+        "version": "1.12.0",
+        "files": [
+          {
+            "name": "kotlinx-serialization-json-wasm-js-1.12.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-wasm-js/1.12.0/kotlinx-serialization-json-wasm-js-1.12.0.klib",
+            "sha256": "62a75feab6c382b591804183523bb57dc7a3c385ae29dd198de51a9a7ecc88ac"
           }
         ],
         "deps": [
@@ -16117,6 +18525,19 @@
           }
         ]
       },
+      "js": {
+        "version": "2.4.21-2.4.5",
+        "files": [
+          {
+            "name": "mappie-api-js-2.4.21-2.4.5.klib",
+            "url": "https://repo1.maven.org/maven2/tech/mappie/mappie-api-js/2.4.21-2.4.5/mappie-api-js-2.4.21-2.4.5.klib",
+            "sha256": "3351573c5be1c72d0fc7117a9389fb9500cd666cd425234bf3964e11d8809512"
+          }
+        ],
+        "deps": [
+          "org.jetbrains.kotlin:kotlin-dom-api-compat"
+        ]
+      },
       "jvm": {
         "version": "2.4.21-2.4.5",
         "files": [
@@ -16170,6 +18591,19 @@
           "commonMain"
         ]
       },
+      "metadataWeb": {
+        "version": "2.4.21-2.4.5",
+        "files": [
+          {
+            "name": "mappie-api-metadata-2.4.21-2.4.5.jar",
+            "url": "https://repo1.maven.org/maven2/tech/mappie/mappie-api/2.4.21-2.4.5/mappie-api-2.4.21-2.4.5.jar",
+            "sha256": "3a70a2f4cb7ab84ea7c4e00fe0005924b5c8d4bb7b1d8bcce78e90df969f75bc"
+          }
+        ],
+        "source_sets": [
+          "commonMain"
+        ]
+      },
       "mingwX64": {
         "version": "2.4.21-2.4.5",
         "files": [
@@ -16177,6 +18611,16 @@
             "name": "mappie-api-mingwX64Main-2.4.21-2.4.5.klib",
             "url": "https://repo1.maven.org/maven2/tech/mappie/mappie-api-mingwx64/2.4.21-2.4.5/mappie-api-mingwx64-2.4.21-2.4.5.klib",
             "sha256": "e49a697ca7324f3fafcbfe276acda604a1267c08a966b5073d5b210827c318c4"
+          }
+        ]
+      },
+      "wasmJs": {
+        "version": "2.4.21-2.4.5",
+        "files": [
+          {
+            "name": "mappie-api-wasm-js-2.4.21-2.4.5.klib",
+            "url": "https://repo1.maven.org/maven2/tech/mappie/mappie-api-wasm-js/2.4.21-2.4.5/mappie-api-wasm-js-2.4.21-2.4.5.klib",
+            "sha256": "fa732e9338cdd9131e72474aa8880f632f0d6b57499fb55125113f07ee04faf7"
           }
         ]
       }
