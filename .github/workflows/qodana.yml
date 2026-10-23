@@ -1,12 +1,11 @@
 # Qodana (qodana.yaml), apart from build.yml because it also triggers on labels: adding or removing the `qodana-full`
 # label switches a PR between PR mode and a full scan (#1093). Every other label event (Renovate labels its PRs)
 # still starts a run, so it gets a concurrency group of its own, cancelling nothing, and its jobs skip.
+# It doesn't run on pushes to main: a PR's scan is the check, and a manual run scans any branch in full.
 name: Qodana
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
     types: [ opened, synchronize, reopened, labeled, unlabeled ]
@@ -37,7 +36,7 @@ jobs:
           persist-credentials: false  # read-only job, no git push
       - name: Filter changed paths
         id: filter
-        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request'
         uses: dorny/paths-filter@v4
         with:
           predicate-quantifier: 'every'
@@ -68,8 +67,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # On PRs check out the actual PR commit, not the merge commit; on
-          # push/workflow_dispatch fall back to the triggered ref.
+            # On PRs check out the actual PR commit, not the merge commit; on
+          # workflow_dispatch fall back to the triggered ref.
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0  # a full history is required for pull request analysis
           persist-credentials: false  # read-only job, no git push
@@ -120,7 +119,7 @@ jobs:
           # PRs report only problems in the files they change, so a misbuilt project model can't fail a PR over code
           # it never touched (#1093). The cost: a change in one module can make another module's code flaggable and
           # still pass. Label such a PR `qodana-full` (a shared API, the DI graph, qodana.yaml, the inspection
-          # profile) to scan it in full; pushes to main and manual runs always scan in full, as the backstop.
+          # profile) to scan it in full; manual runs always scan in full.
           pr-mode: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'qodana-full') }}
           use-caches: false
           # Sync builds the generated sources (SQLDelight, kotlin_constants) the model needs, and the Bazel plugin opens
