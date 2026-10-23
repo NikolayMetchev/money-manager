@@ -1,7 +1,15 @@
 """Kotlin/Wasm (`wasmJs`) and Kotlin/JS (`js`) libraries (#84), the browser counterpart of native.bzl.
 
-Both compile to klibs with the same compiler, so one provider and one set of rules serve both targets.
+A module compiles to one klib per browser target in a single K2 invocation over its fragments, like KGP:
+`common ← nonJvm ← web ← wasmJs|js`, where `nonJvm` is the source set the browser shares with native and is only
+named when the module has it. The compilers are the ones konan's jar carries (`run_kotlinc`), so the compiler
+plugins are the native ones, and a program is linked from klibs into JavaScript (and WebAssembly) the way KGP's
+`browser { binaries.executable() }` does.
 """
+
+load(":native.bzl", "fragment_args", "non_jvm_chain", "unique_name")
+load("//bazel/kmp/native:toolchain.bzl", "TOOLCHAIN_TYPE", "run_kotlinc")
+load("//bazel/kmp/plugins:plugins.bzl", "NativePluginInfo", "native_plugin_args")
 
 # The browser targets, by KGP's target name: Kotlin/Wasm for browsers (not WASI), and Kotlin/JS's IR compiler.
 WEB_TARGETS = ["wasmJs", "js"]
@@ -13,6 +21,152 @@ WebKlibInfo = provider(
         "target": "The KGP target name (`wasmJs`, `js`).",
         "transitive_klibs": "depset of this klib and every klib it needs, for -libraries.",
     },
+)
+
+# Each target's compiler, and the flags that pick its flavour.
+_COMPILER = {
+    "js": struct(tool = "kotlinc-js", flags = []),
+    "wasmJs": struct(tool = "kotlinc-wasm", flags = ["-Xwasm-target=wasm-js"]),
+}
+
+def _stdlib(ctx):
+    return ctx.attr._stdlib_wasm_js if ctx.attr.target == "wasmJs" else ctx.attr._stdlib_js
+
+def _libraries(ctx, deps):
+    """Every klib `deps` need, the stdlib included."""
+    return depset(transitive = [d[WebKlibInfo].transitive_klibs for d in deps + [_stdlib(ctx)]])
+
+def _compile_klib(ctx, out, chain, deps, friends, module_name, mnemonic):
+    compiler = _COMPILER[ctx.attr.target]
+    transitive = _libraries(ctx, deps + friends)
+    args = ctx.actions.args()
+    args.add_all(compiler.flags)
+
+    # The klib is `<ir-output-dir>/<ir-output-name>.klib`.
+    args.add_all(["-ir-output-dir", out.dirname, "-ir-output-name", out.basename[:-len(".klib")]])
+    args.add("-Xir-module-name=" + module_name)
+    args.add_all(["-Werror", "-Xexpect-actual-classes"])
+    plugin_jars = native_plugin_args(args, ctx.attr.plugins)
+    srcs = fragment_args(args, chain)
+    args.add_joined("-libraries", transitive, join_with = ctx.configuration.host_path_separator)
+    friend_klibs = [f[WebKlibInfo].klib for f in friends if f[WebKlibInfo].klib]
+    if friend_klibs:
+        args.add_joined(friend_klibs, join_with = ctx.configuration.host_path_separator, format_joined = "-Xfriend-modules=%s")
+    run_kotlinc(
+        ctx,
+        tool = compiler.tool,
+        arguments = [args],
+        inputs = depset(srcs + plugin_jars, transitive = [transitive]),
+        outputs = [out],
+        mnemonic = mnemonic,
+        progress_message = "Compiling Kotlin %{label} for " + ctx.attr.target,
+    )
+    return WebKlibInfo(
+        klib = out,
+        target = ctx.attr.target,
+        transitive_klibs = depset([out], transitive = [transitive]),
+    )
+
+def web_chain(ctx, suffix):
+    """The module's fragments for `ctx.attr.target`, named by source set (`commonMain`, `wasmJsTest`, …)."""
+    chain = non_jvm_chain(ctx) + [
+        ("web", ctx.files.web_srcs),
+        (ctx.attr.target, ctx.files.target_srcs),
+    ]
+    return [(fragment + suffix, files) for fragment, files in chain]
+
+def _klib_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + ".klib")
+    info = _compile_klib(
+        ctx,
+        out = out,
+        chain = web_chain(ctx, "Main"),
+        deps = ctx.attr.deps,
+        friends = [],
+        module_name = unique_name(ctx.label, ""),
+        mnemonic = "KotlinWebCompile",
+    )
+    return [DefaultInfo(files = depset([out])), info]
+
+_STDLIB_ATTRS = {
+    "_stdlib_js": attr.label(default = "@maven_kmp//:org_jetbrains_kotlin_kotlin_stdlib_js", providers = [WebKlibInfo]),
+    "_stdlib_wasm_js": attr.label(default = "@maven_kmp//:org_jetbrains_kotlin_kotlin_stdlib_wasmJs", providers = [WebKlibInfo]),
+}
+
+WEB_SRC_ATTRS = _STDLIB_ATTRS | {
+    "common_generated": attr.label_list(allow_files = True, doc = "Directories of generated commonMain sources."),
+    "common_srcs": attr.label_list(allow_files = [".kt"]),
+    "non_jvm_srcs": attr.label_list(allow_files = [".kt"], doc = "nonJvmMain: shared with the native targets."),
+    "plugins": attr.label_list(providers = [NativePluginInfo], doc = "Compiler plugins, in the order they run."),
+    "target": attr.string(mandatory = True, values = WEB_TARGETS),
+    "target_srcs": attr.label_list(allow_files = [".kt"], doc = "The target's own source set (wasmJsMain, jsMain)."),
+    "web_srcs": attr.label_list(allow_files = [".kt"], doc = "webMain: shared by wasmJs and js."),
+}
+
+kt_web_klib = rule(
+    implementation = _klib_impl,
+    doc = "A module's klib for one browser target.",
+    attrs = WEB_SRC_ATTRS | {
+        "deps": attr.label_list(providers = [WebKlibInfo]),
+    },
+    provides = [WebKlibInfo],
+    toolchains = [TOOLCHAIN_TYPE],
+)
+
+def link_web(ctx, out, base_name, include, libraries, production, mnemonic):
+    """Links the klib `include` and its `libraries` into `out`, a directory: `<base_name>.mjs`, plus
+    `<base_name>.wasm` and the glue modules it imports on wasmJs.
+
+    A production link (KGP's `productionExecutable`) drops unreachable code; a development one (its tests') keeps
+    it and links faster.
+    """
+    compiler = _COMPILER[ctx.attr.target]
+    args = ctx.actions.args()
+    args.add_all(compiler.flags)
+    args.add("-Xir-produce-js")
+    if ctx.attr.target == "js":
+        # ES modules (`.mjs`), as the wasm glue is.
+        args.add_all(["-target", "es2015"])
+    args.add_all(["-ir-output-dir", out.path, "-ir-output-name", base_name])
+    args.add("-Xir-module-name=" + base_name)
+    args.add_all(["-Werror", "-Xpartial-linkage-loglevel=ERROR"])
+    if production:
+        args.add("-Xir-dce")
+    args.add("-Xinclude=" + include.path)
+    args.add_joined("-libraries", [k for k in libraries.to_list() if k != include], join_with = ctx.configuration.host_path_separator)
+    run_kotlinc(
+        ctx,
+        tool = compiler.tool,
+        arguments = [args],
+        inputs = libraries,
+        outputs = [out],
+        mnemonic = mnemonic,
+        progress_message = "Linking %{label} for " + ctx.attr.target,
+    )
+
+def _executable_impl(ctx):
+    library = ctx.attr.library[WebKlibInfo]
+    out = ctx.actions.declare_directory(ctx.label.name)
+    link_web(
+        ctx,
+        out = out,
+        base_name = ctx.attr.base_name,
+        include = library.klib,
+        libraries = depset(transitive = [library.transitive_klibs, _stdlib(ctx)[WebKlibInfo].transitive_klibs]),
+        production = True,
+        mnemonic = "KotlinWebLink",
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+kt_web_executable = rule(
+    implementation = _executable_impl,
+    doc = "A browser program for one target, `<base_name>.mjs` in a directory: KGP's production executable.",
+    attrs = _STDLIB_ATTRS | {
+        "base_name": attr.string(mandatory = True, doc = "The entry module's name, without `.mjs`."),
+        "library": attr.label(mandatory = True, providers = [WebKlibInfo], doc = "The klib whose `main` is the program."),
+        "target": attr.string(mandatory = True, values = WEB_TARGETS),
+    },
+    toolchains = [TOOLCHAIN_TYPE],
 )
 
 def _import_impl(ctx):

@@ -1,7 +1,8 @@
 """Kotlin/Native compile and test-link rules (#999), the native counterpart of the JVM compile in defs.bzl.
 
 A module compiles to one klib per konan target in a single K2 invocation over its fragments, like KGP:
-`common ← native ← linux|apple|mingw ← <target>` (the default hierarchy template), leaving out empty ones.
+`common ← native ← linux|apple|mingw ← <target>` (the default hierarchy template). A module that shares code
+with the browser (#84) has `nonJvm` between `common` and `native`, as web.bzl has it under `web`.
 Tests compile to their own klib (with the main klib as a friend, so they see `internal`), and are linked
 into a program with `-generate-test-runner`.
 """
@@ -34,7 +35,7 @@ FAMILIES = {
     "mingwX64": "mingw",
 }
 
-def _fragment_args(args, chain):
+def fragment_args(args, chain):
     """Adds -Xmulti-platform fragment flags and the sources for the `[(fragment, files), …]` chain, root first.
 
     A file may be a directory of generated sources (SQLDelight's), expanded when the action runs.
@@ -64,7 +65,7 @@ def _compile_klib(ctx, kgp_target, out, chain, fragment_suffix, deps, friends, m
     plugin_jars = native_plugin_args(args, plugins)
 
     # konanc names fragments by source set (commonMain, linuxX64Test, …), as KGP does.
-    srcs = _fragment_args(args, [(f + fragment_suffix, files) for f, files in chain])
+    srcs = fragment_args(args, [(f + fragment_suffix, files) for f, files in chain])
     args.add_all(transitive, before_each = "-library")
     friend_klibs = [f[KlibInfo].klib for f in friends if f[KlibInfo].klib]
     if friend_klibs:
@@ -85,15 +86,21 @@ def _compile_klib(ctx, kgp_target, out, chain, fragment_suffix, deps, friends, m
         transitive_klibs = depset([out], transitive = [transitive]),
     )
 
+def non_jvm_chain(ctx):
+    """`common`, then `nonJvm` when the module has it: the source set native and the browser share."""
+    chain = [("common", ctx.files.common_srcs + ctx.files.common_generated)]
+    if ctx.files.non_jvm_srcs:
+        chain.append(("nonJvm", ctx.files.non_jvm_srcs))
+    return chain
+
 def _chain(ctx, kgp_target):
-    return [
-        ("common", ctx.files.common_srcs + ctx.files.common_generated),
+    return non_jvm_chain(ctx) + [
         ("native", ctx.files.native_srcs),
         (FAMILIES[kgp_target], ctx.files.family_srcs),
         (kgp_target, ctx.files.target_srcs),
     ]
 
-def _unique_name(label, suffix):
+def unique_name(label, suffix):
     """KGP's klib unique name: `utils.bigdecimal:utils-bigdecimal` for //utils/bigdecimal (#999 keeps the
     native-convention's naming after the full project path, so same-named modules never clash)."""
     package = label.package
@@ -119,7 +126,7 @@ def _klib_impl(ctx):
         mnemonic = "KotlinNativeCompile",
         deps = ctx.attr.deps,
         friends = [],
-        module_name = _unique_name(ctx.label, ""),
+        module_name = unique_name(ctx.label, ""),
         short_name = ctx.attr.module,
         plugins = ctx.attr.plugins,
     )
@@ -131,6 +138,7 @@ _SRC_ATTRS = {
     "plugins": attr.label_list(providers = [NativePluginInfo], doc = "Compiler plugins, in the order they run."),
     "family_srcs": attr.label_list(allow_files = [".kt"], doc = "linuxMain, appleMain or mingwMain."),
     "native_srcs": attr.label_list(allow_files = [".kt"]),
+    "non_jvm_srcs": attr.label_list(allow_files = [".kt"], doc = "nonJvmMain: shared with the browser targets."),
     "target": attr.string(mandatory = True, values = KONAN_TARGETS.keys()),
     "target_srcs": attr.label_list(allow_files = [".kt"], doc = "The target's own source set (linuxX64Main)."),
 }
@@ -206,7 +214,7 @@ def _test_impl(ctx):
         mnemonic = "KotlinNativeTestCompile",
         deps = ctx.attr.deps,
         friends = [ctx.attr.associate],
-        module_name = _unique_name(ctx.attr.associate.label, "_test"),
+        module_name = unique_name(ctx.attr.associate.label, "_test"),
         short_name = ctx.attr.module + "_test",
         plugins = ctx.attr.plugins,
     )
@@ -400,7 +408,7 @@ def _cinterop_impl(ctx):
     deps = depset(transitive = [d[KlibInfo].transitive_klibs for d in ctx.attr.deps])
     args = ctx.actions.args()
     args.add_all(["-target", target, "-def", ctx.file.def_file, "-o", out])
-    args.add_all(["-Xmodule-name", _unique_name(ctx.label, "-cinterop-" + ctx.attr.interop)])
+    args.add_all(["-Xmodule-name", unique_name(ctx.label, "-cinterop-" + ctx.attr.interop)])
     for lib in ctx.files.static_libraries:
         # cinterop embeds each -staticLibrary it finds on -libraryPath into the klib, which every binary then links.
         args.add_all(["-libraryPath", lib.dirname, "-staticLibrary", lib.basename])

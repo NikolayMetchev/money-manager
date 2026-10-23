@@ -6,11 +6,12 @@ one of them. Gradle catches it by compiling commonMain on its own against each d
 so does `<module>_metadata`, which every module with native targets gets.
 
 A Maven library's common metadata is a jar of one unpacked klib per source set; `@maven_kmp` extracts the
-ones our targets all see (the resolver's `source_sets`), and a module's own compiles to an unpacked klib. The
-compiler is konan's (`run_kotlin_metadata`), so the plugins are the native ones.
+ones our targets all see (the resolver's `source_sets`), and a module's own compiles to an unpacked klib. A
+module with browser targets compiles against `metadataWeb`, the source sets the browser sees too. The
+compiler is konan's (`run_kotlinc`), so the plugins are the native ones.
 """
 
-load("//bazel/kmp/native:toolchain.bzl", "TOOLCHAIN_TYPE", "run_kotlin_metadata")
+load("//bazel/kmp/native:toolchain.bzl", "TOOLCHAIN_TYPE", "run_kotlinc")
 load("//bazel/kmp/plugins:plugins.bzl", "NativePluginInfo", "native_plugin_args")
 
 KtMetadataInfo = provider(
@@ -59,7 +60,7 @@ kt_metadata_group = rule(
 )
 
 def _library_impl(ctx):
-    deps = ctx.attr.deps + [ctx.attr._stdlib]
+    deps = ctx.attr.deps + [ctx.attr._stdlib_web if ctx.attr.web else ctx.attr._stdlib]
     srcs = ctx.files.srcs + ctx.files.generated
     if not srcs:
         # Nothing of its own to check (a cinterop-only module); dependents see its dependencies.
@@ -71,12 +72,14 @@ def _library_impl(ctx):
     args.add_all(["-module-name", ctx.attr.module])
 
     # Common code compiles for every platform; KGP names them all, and -Werror holds as in the platform compiles.
-    args.add_all(["-Xmulti-platform", "-Xtarget-platform=JVM,Native", "-Werror", "-Xexpect-actual-classes"])
+    platforms = "JVM,Native" + (",JS,WasmJs" if ctx.attr.web else "")
+    args.add_all(["-Xmulti-platform", "-Xtarget-platform=" + platforms, "-Werror", "-Xexpect-actual-classes"])
     plugin_jars = native_plugin_args(args, ctx.attr.plugins)
     args.add_joined("-classpath", transitive.classpath, join_with = ctx.configuration.host_path_separator)
     args.add_all(srcs, expand_directories = True)
-    run_kotlin_metadata(
+    run_kotlinc(
         ctx,
+        tool = "kotlinc-metadata",
         arguments = [args],
         inputs = depset(srcs + plugin_jars, transitive = [transitive.files]),
         outputs = [out],
@@ -97,7 +100,9 @@ kt_metadata_library = rule(
         "module": attr.string(mandatory = True, doc = "The klib's unique name."),
         "plugins": attr.label_list(providers = [NativePluginInfo], doc = "Compiler plugins, in the order they run."),
         "srcs": attr.label_list(allow_files = [".kt"]),
+        "web": attr.bool(doc = "Whether the module compiles for the browser too: its deps are then `metadataWeb`'s."),
         "_stdlib": attr.label(default = "@maven_kmp//:org_jetbrains_kotlin_kotlin_stdlib_metadata", providers = [KtMetadataInfo]),
+        "_stdlib_web": attr.label(default = "@maven_kmp//:org_jetbrains_kotlin_kotlin_stdlib_metadataWeb", providers = [KtMetadataInfo]),
     },
     provides = [KtMetadataInfo],
     toolchains = [TOOLCHAIN_TYPE],

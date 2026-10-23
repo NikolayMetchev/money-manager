@@ -158,8 +158,8 @@ func run(kotlin, out string, libraries, libraryPlatformSpecs, platformNames, for
 			resolver.consumers = append(resolver.consumers, p)
 		}
 	}
-	// Every other platform's stdlib and kotlin-test come from the toolchain; common code compiles against
-	// their metadata jars.
+	// The JVM's and Kotlin/Native's stdlib and kotlin-test come from the toolchain. Common code compiles against
+	// their metadata jars, and the browser platforms against their klibs, at the toolchain's version.
 	toolchain := []Coordinate{
 		{"org.jetbrains.kotlin", "kotlin-stdlib", kotlin},
 		{"org.jetbrains.kotlin", "kotlin-test", kotlin},
@@ -186,7 +186,7 @@ func run(kotlin, out string, libraries, libraryPlatformSpecs, platformNames, for
 					platformRoots = append(platformRoots, c)
 				}
 			}
-			if p.Common {
+			if p.Common || p.Web != "" {
 				platformRoots = append(platformRoots, toolchain...)
 			}
 			resolved, skipped, err := resolver.Resolve(p, platformRoots)
@@ -216,11 +216,15 @@ func run(kotlin, out string, libraries, libraryPlatformSpecs, platformNames, for
 		}
 	}
 	fetcher := resolver.fetch
+	fromToolchain := map[string]bool{}
+	for _, c := range toolchain {
+		fromToolchain[c.Module()] = true
+	}
 	for module, byPlatform := range lock.Artifacts {
 		set := map[string]bool{}
-		// A metadata jar declares what the module's platform files do; the stdlib's is no import's library.
+		// A metadata jar declares what the module's platform files do, and the stdlib is no import's library.
 		for name, res := range byPlatform {
-			if platforms[name].Common {
+			if platforms[name].Common || fromToolchain[module] {
 				continue
 			}
 			for _, file := range res.Files {

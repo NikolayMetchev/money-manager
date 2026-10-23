@@ -4,6 +4,7 @@
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 load("//bazel/kmp:metadata.bzl", "kt_metadata_group")
 load("//bazel/kmp:native.bzl", "kt_native_group")
+load("//bazel/kmp:web.bzl", "WEB_TARGETS", "kt_web_group")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -106,11 +107,27 @@ kt_jvm_library(
     for target in NATIVE_TARGETS
 ]
 
+# In the browser, kotlin-test is its Maven klib at the toolchain's version, resolved with the stdlib's.
+[
+    kt_web_group(
+        name = "kotlin_test_" + target,
+        target = target,
+        deps = ["@maven_kmp//:org_jetbrains_kotlin_kotlin_test_" + target],
+    )
+    for target in WEB_TARGETS
+]
+
 # Common code sees kotlin-test's common metadata, resolved with the stdlib's (#1010).
-kt_metadata_group(
-    name = "kotlin_test_metadata",
-    deps = ["@maven_kmp//:org_jetbrains_kotlin_kotlin_test_metadata"],
-)
+[
+    kt_metadata_group(
+        name = "kotlin_test_" + metadata,
+        deps = ["@maven_kmp//:org_jetbrains_kotlin_kotlin_test_" + metadata],
+    )
+    for metadata in [
+        "metadata",
+        "metadataWeb",
+    ]
+]
 
 # Fails when the lockfile no longer matches its MODULE.bazel maven_kmp.install or the catalog.
 test_suite(
