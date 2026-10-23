@@ -116,6 +116,8 @@ fun ApiConnectionsScreen(
             }
         }
 
+        ApiDownloadNoticeBanner()
+
         if (sorted.isEmpty()) {
             Text(
                 "No API strategies installed yet. Install one from the strategy catalog first.",

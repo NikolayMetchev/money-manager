@@ -27,6 +27,7 @@ kmp_library(
         "@maven_kmp//:kermit",
         "@maven_kmp//:kotlinx_browser",
         "//app/db/worker",
+        "//app/ui/imports/api",
         "@maven_kmp//:androidx_compose_runtime",
     ],
     web_srcs = glob(["src/main/kotlin/**/*.kt"]),
