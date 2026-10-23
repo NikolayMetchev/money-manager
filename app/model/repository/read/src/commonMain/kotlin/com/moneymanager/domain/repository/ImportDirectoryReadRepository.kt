@@ -38,6 +38,16 @@ interface ImportDirectoryReadRepository {
     suspend fun qifImportSourceAccounts(): Map<QifImportId, AccountId>
 
     /**
+     * The folder each staged CSV import came from, for imports that neither their folder nor its parent
+     * gives an account: a bulk import run names their account after that folder. An import staged from
+     * more than one such folder is left out.
+     */
+    suspend fun csvImportFoldersWithoutAccount(): Map<CsvImportId, ImportDirectoryId>
+
+    /** QIF equivalent of [csvImportFoldersWithoutAccount]. */
+    suspend fun qifImportFoldersWithoutAccount(): Map<QifImportId, ImportDirectoryId>
+
+    /**
      * The directories every directory-scanned CSV import was staged from. A list because an import can be
      * reused (by content checksum) across more than one directory. Imports added via the file picker have
      * no entry. A flow over the link table itself: a scan that reuses an existing import only adds a link,

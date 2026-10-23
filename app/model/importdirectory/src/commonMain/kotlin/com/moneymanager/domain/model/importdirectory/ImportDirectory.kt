@@ -43,7 +43,8 @@ enum class ImportDirectoryProvider(
  * @property accountId The account files scanned from this folder belong to, used as the source
  *   account for strategies with no `SOURCE_ACCOUNT` mapping (e.g. two folders of identically-formatted
  *   Monzo exports, one per account). Null on a discovered subfolder inherits the parent directory's
- *   account; null with no parent (or no account there either) falls back to the import dialog's pick.
+ *   account; null with no parent (or no account there either) gets an account named after the
+ *   folder ([folderName]) the first time an import run needs one.
  */
 data class ImportDirectory(
     val id: ImportDirectoryId,
@@ -61,6 +62,9 @@ data class ImportDirectory(
     val updatedAt: Instant,
     override val source: Source = Source.Manual,
 ) : Auditable {
+    /** The folder's own name: what the person called a top-level folder, else a discovered subfolder's last path segment. */
+    val folderName: String get() = if (topLevel) name else name.substringAfterLast(" / ")
+
     /** Whether [device] can reach this folder: a LOCAL folder lives on the one device that added it, the others are shared. */
     fun isOn(device: DeviceId): Boolean = provider != ImportDirectoryProvider.LOCAL || deviceId == device
 }

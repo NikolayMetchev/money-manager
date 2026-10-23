@@ -17,12 +17,14 @@ import com.moneymanager.csvimporter.redownloadImportDirectory
 import com.moneymanager.csvimporter.scanImportDirectory
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.QifImportId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.TransferField
@@ -44,8 +46,10 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createImportDirectory
 import com.moneymanager.importengineapi.setLastQifAccount
+import com.moneymanager.importengineapi.updateImportDirectory
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.qifimporter.bulkApplyQif
@@ -390,11 +394,12 @@ class ImportDirectoryService(
         val files = imports ?: unimportedCsvFiles()
         val strategies = csvImportStrategyRepository.getAllStrategies().first()
         val directoryAccounts = importDirectoryRepository.csvImportSourceAccounts()
+        val foldersWithoutAccount = importDirectoryRepository.csvImportFoldersWithoutAccount()
         val matches = matchCsvStrategies(files, strategies)
-        val needsSourceAccountIds =
-            files
-                .filter { file -> matches[file.id]?.needsSourceAccountOverride() == true && file.id !in directoryAccounts }
-                .mapTo(mutableSetOf()) { it.id }
+        val needingAccount =
+            files.filter { file -> matches[file.id]?.needsSourceAccountOverride() == true && file.id !in directoryAccounts }
+        val folders = needingAccount.mapNotNull { file -> foldersWithoutAccount[file.id]?.let { file.id to it } }.toMap()
+        val needsSourceAccountIds = needingAccount.filter { it.id !in folders }.mapTo(mutableSetOf()) { it.id }
         val needsAttention =
             files.mapNotNull { file ->
                 when {
@@ -407,6 +412,7 @@ class ImportDirectoryService(
             files = files,
             matches = matches,
             directoryAccounts = directoryAccounts,
+            folders = folders,
             needsAttention = needsAttention,
             strategies = strategies,
             currencies = currencyRepository.getAllCurrencies().first(),
@@ -426,8 +432,9 @@ class ImportDirectoryService(
     ): Map<CsvImportId, CsvImportStrategy?> = files.associate { it.id to matchCsvStrategy(it, strategies, preferLastApplied = false) }
 
     /**
-     * Applies [plan]. A file whose folder gives no account uses [sourceAccountOverride] when its strategy
-     * needs one; files with no matching strategy are skipped and counted.
+     * Applies [plan]. A file from a folder without an account gets one named after the folder; a file from
+     * no folder uses [sourceAccountOverride] when its strategy needs one. Files with no matching strategy
+     * are skipped and counted.
      */
     suspend fun applyCsvImportAll(
         plan: CsvImportAllPlan,
@@ -450,7 +457,7 @@ class ImportDirectoryService(
                 passThroughAccounts = plan.passThroughAccounts,
                 cryptoRepository = cryptoRepository,
                 attributeAccountMatchers = plan.attributeAccountMatchers,
-                directoryAccounts = plan.directoryAccounts,
+                directoryAccounts = plan.directoryAccounts + folderAccounts(plan.folders),
                 tradeRepository = tradeRepository,
                 refreshViews = refreshViews,
             )
@@ -462,6 +469,8 @@ class ImportDirectoryService(
         val strategies = csvImportStrategyRepository.getAllStrategies().first()
         val qifStrategies = strategies.qifCompatible()
         val directoryAccounts = importDirectoryRepository.qifImportSourceAccounts()
+        val foldersWithoutAccount = importDirectoryRepository.qifImportFoldersWithoutAccount()
+        val folders = mutableMapOf<QifImportId, ImportDirectoryId>()
         val needsAttention = mutableListOf<NeedsAttention>()
         val blockedIds = mutableSetOf<QifImportId>()
         for (file in files) {
@@ -476,7 +485,9 @@ class ImportDirectoryService(
                     }
 
                     file.id !in directoryAccounts && strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT] == null -> {
-                        NeedsAttentionReason.NEEDS_SOURCE_ACCOUNT
+                        val folder = foldersWithoutAccount[file.id]
+                        if (folder != null) folders[file.id] = folder
+                        NeedsAttentionReason.NEEDS_SOURCE_ACCOUNT.takeIf { folder == null }
                     }
 
                     else -> {
@@ -491,6 +502,7 @@ class ImportDirectoryService(
         return QifImportAllPlan(
             files = files,
             directoryAccounts = directoryAccounts,
+            folders = folders,
             defaultSourceAccountId = lastQifAccountId(),
             needsAttention = needsAttention,
             strategies = strategies,
@@ -499,7 +511,10 @@ class ImportDirectoryService(
         )
     }
 
-    /** Applies [plan] with [sourceAccountId] for files whose folder has no account, and remembers that account. */
+    /**
+     * Applies [plan]: a file from a folder without an account gets one named after the folder, and one from
+     * no folder uses [sourceAccountId], which is remembered.
+     */
     suspend fun applyQifImportAll(
         plan: QifImportAllPlan,
         sourceAccountId: AccountId?,
@@ -518,10 +533,31 @@ class ImportDirectoryService(
                 maintenance = maintenance,
                 importEngine = importEngine,
                 onProgress = onProgress,
-                directoryAccounts = plan.directoryAccounts,
+                directoryAccounts = plan.directoryAccounts + folderAccounts(plan.folders),
                 refreshViews = refreshViews,
             ).also { sourceAccountId?.let { importEngine.setLastQifAccount(it) } }
         }
+
+    // The account each of [folders]' files belongs to: the folder's own if one was set since planning,
+    // else one named after the folder (an existing account of that name, or a new one), kept on the folder
+    // so the folder list shows it and the person can change it there.
+    private suspend fun <K> folderAccounts(folders: Map<K, ImportDirectoryId>): Map<K, AccountId> {
+        val accounts =
+            folders.values
+                .distinct()
+                .mapNotNull { id ->
+                    val directory = importDirectoryRepository.getDirectoryById(id).first() ?: return@mapNotNull null
+                    val accountId =
+                        directory.accountId
+                            ?: importEngine
+                                .createAccount(
+                                    Account(id = AccountId(0), name = directory.folderName, openingDate = Clock.System.now()),
+                                    Source.System,
+                                ).also { importEngine.updateImportDirectory(directory.copy(accountId = it), Source.System) }
+                    id to accountId
+                }.toMap()
+        return folders.mapNotNull { (file, folder) -> accounts[folder]?.let { file to it } }.toMap()
+    }
 
     /** Plans a CSV "re-import all" over [imports]: each file keeps the strategy it was last imported with. */
     suspend fun planCsvReimportAll(imports: List<CsvImport>): CsvReimportAllPlan {

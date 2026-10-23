@@ -2,22 +2,17 @@ package com.moneymanager.csvimporter
 
 import co.touchlab.kermit.Logger
 import com.moneymanager.coroutines.ioDispatcher
-import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.QifImportId
-import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createCsvImport
 import com.moneymanager.importengineapi.createQifImport
 import com.moneymanager.importengineapi.createXlsxImport
 import com.moneymanager.importengineapi.recordDirectoryFileImported
-import com.moneymanager.importengineapi.updateImportDirectory
 import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.qif.QifParser
@@ -60,11 +55,6 @@ internal fun isSupportedImportFile(fileName: String): Boolean = supportedKind(fi
  * Every file is scanned in its own coroutine on [ioDispatcher], so downloads run concurrently. The
  * engine doesn't serialize writes itself, so every database step holds [dbLock]; callers scanning
  * several directories at once must share one lock between them.
- *
- * A top-level [directory] with no [ImportDirectory.accountId] set gets one resolved automatically
- * before scanning: an existing account named exactly [ImportDirectory.name] if one exists, else a
- * newly created one (see [ensureDirectoryAccount]) — the user can still override it via "Set account".
- * Discovered subfolders (`topLevel == false`) are left alone; they inherit their parent's account.
  */
 @Suppress("LongParameterList")
 suspend fun scanImportDirectory(
@@ -77,9 +67,6 @@ suspend fun scanImportDirectory(
     dbLock: Mutex = Mutex(),
     onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
 ): ScanResult {
-    if (directory.topLevel && directory.accountId == null) {
-        dbLock.withLock { ensureDirectoryAccount(directory, importEngine) }
-    }
     val entries = fileSource.list()
     val context =
         ScanContext(directory, fileSource, importDirectoryRepository, csvImportRepository, qifImportRepository, importEngine, dbLock)
@@ -291,21 +278,3 @@ private suspend fun stageQif(
 }
 
 private fun ImportFileEntry.lastModifiedInstant(): Instant = lastModifiedEpochMs?.let(Instant::fromEpochMilliseconds) ?: Clock.System.now()
-
-/**
- * Resolves [directory]'s account by name — an existing account named exactly [ImportDirectory.name],
- * or a newly created one — and persists it onto the directory. [ImportEngine.createAccount] already
- * matches by name before creating (idempotent), so this never creates a second account for a name
- * that already exists; it only needs to decide whether the directory should point at it.
- */
-private suspend fun ensureDirectoryAccount(
-    directory: ImportDirectory,
-    importEngine: ImportEngine,
-) {
-    val accountId =
-        importEngine.createAccount(
-            Account(id = AccountId(0), name = directory.name, openingDate = Clock.System.now()),
-            Source.System,
-        )
-    importEngine.updateImportDirectory(directory.copy(accountId = accountId), Source.System)
-}
