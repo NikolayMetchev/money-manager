@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_sqldelight_package com.moneymanager.database.sql.seed
 # gazelle:kmp_sqldelight_dep //app/db/schema:sqldelight
 # gazelle:kmp_export //app/db/schema
@@ -27,5 +27,9 @@ kmp_library(
     ],
     sqldelight = ":sqldelight",
     visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = ["//app/db/schema"],
 )

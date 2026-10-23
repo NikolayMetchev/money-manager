@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_export //app/db/read
 # gazelle:kmp_export //app/db/schema
 # gazelle:kmp_export //app/model/accountmapping
@@ -28,6 +28,10 @@ kmp_library(
         "mingwX64",
     ],
     visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = [
         "//app/db/read",
         "//app/db/schema",

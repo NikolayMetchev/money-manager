@@ -22,7 +22,8 @@ import com.moneymanager.database.sql.write.MoneyManagerDatabase as WriteDatabase
  * `database.accountSelectQueries`, …) compiles unchanged.
  */
 class MoneyManagerDatabaseWrapper(
-    private val driver: SqlDriver,
+    // The browser's DatabaseManager snapshots through its own driver.
+    val driver: SqlDriver,
 ) : MoneyManagerDatabase by MoneyManagerDatabase(driver) {
     private val writeDb = WriteDatabase(driver)
 

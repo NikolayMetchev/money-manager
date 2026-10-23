@@ -59,7 +59,8 @@ func (f *Fetcher) npmDepsOf(file File) (map[string]string, error) {
 	return nil, nil
 }
 
-var exactVersion = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
+// An exact semver version, a pre-release tag included (@sqlite.org/sqlite-wasm publishes `3.54.1-build1`).
+var exactVersion = regexp.MustCompile(`^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$`)
 
 // npmResolver pins npm packages and everything they need into `into`, by name@version.
 type npmResolver struct {

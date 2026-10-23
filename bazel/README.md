@@ -173,6 +173,10 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
   (`@JsModule`), as hub targets per browser platform (`@maven_kmp//:js_joda_timezone`), and `npm_forces` pins a
   package whoever asks for it, as Yarn's `resolutions` does. Only exact versions resolve: a range needs a force.
   Each package is an `http_archive` with an `npm_package` target, carried along `WebKlibInfo.npm` to the programs.
+  Our own JavaScript is an `npm_package` too, wrapped per browser platform in a `kt_web_group` with the packages it
+  imports (`//app/db/worker`), so a module depends on it like a library (`# gazelle:kmp_keep_dep … webMain`).
+- `js` klibs compile with `-target es2015`, as the program links: the frontend then checks `@JsModule` declarations
+  as ES imports (a UMD module would also need `@JsNonModule`).
 - Common metadata comes in two views. `metadata` holds the source sets that JVM, Android and native share;
   `metadataWeb` holds those the web platforms share too, so it's never wider (no `concurrentMain` in
   kotlinx-coroutines). Only modules that compile for the browser compile their `commonMain` against

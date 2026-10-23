@@ -137,6 +137,7 @@ workflow because label events start it: any other label's run skips, without can
 | `app/model/{apistrategy,accountmapping,csv,qif,csvstrategy,importdirectory,passthrough,reconciliation,timeline}/` | One module per `domain.model` sub-package. All depend on `model/core`; `qif`→`csv`, `csvstrategy`→`qif`+`accountmapping` |
 | `app/model/repository/read/`, `app/model/repository/write/` | `*ReadRepository` / `*WriteRepository` interfaces. `write` depends on `read` (each write interface extends its read) |
 | `app/db/schema/`, `app/db/read/`, `app/db/repository/`, `app/db/write/`, `app/db/core/` | SQLDelight schema; generated read SQL + Mappie mappers + JSON codecs; read repository impls; write SQL + impls; `DatabaseManager` and services |
+| `app/db/worker/` | The browser's database worker, in JavaScript: sqlite-wasm (the npm `@sqlite.org/sqlite-wasm`) behind one message per request (`handler.mjs`), over OPFS in the app (`worker.mjs`) and over memory in the browser targets' tests (`memory.mjs`) |
 | `app/db/seed/`, `app/db/schemaspy/` | Static seed SQL; SchemaSpy docs generator for the Pages site |
 | `app/cryptodata/` | Bundled crypto asset catalog plus its refresher/installer (built by `tools/crypto-dataset`) |
 | `app/tasks/` | The one progress type `Progress` (every import, download, DB open and cloud sync reports it), its `PhasedProgress`/`WeightedProgress` folding helpers, and `TaskManager`: background tasks as a `StateFlow`, deduped by key, with child tasks and cancellation. Pure coroutines, so the UI, CLI and TUI share it; the Compose `TaskPanel` (`app/ui/foundation`) only collects it |
@@ -227,7 +228,16 @@ so existing local databases are expected to be deleted/recreated rather than mig
 the desktop app never set it, so every database it created reads as version 0, and SQLiter would take that as
 "create the schema" (the native manager passes `NO_VERSION_CHECK`). A database file moves freely between the
 desktop app and the CLI. The one runtime top-up: a database created before a `platform` row existed gains it on
-that platform's first device write (`insertOrIgnorePlatform`).
+that platform's first device write (`insertOrIgnorePlatform`). Every manager that creates its own schema does it
+through `createSchema` (`DatabaseBootstrap.kt`), and a failed creation deletes the file.
+
+**The browser** (`WebDatabaseManager`, `app/db/core` `webMain`) keeps its databases as files in OPFS, in a worker
+(`app/db/worker`) running sqlite-wasm's `opfs-sahpool` VFS (no WAL; a Web Lock keeps it to one tab). `WebSqliteDriver`
+sends each statement over a `SqliteChannel` and is our own, not SQLDelight's web-worker-driver: that one binds a
+`Long` as a JavaScript number, which rounds a 1e18-scale amount. 64-bit integers cross as decimal text both ways. The
+worker has one connection per database, so writes take turns on a mutex (a transaction holds it throughout) and reads
+never wait, seeing uncommitted rows. The browser targets' tests run the worker's own handler in-process over memory
+(`MemorySqliteChannel`, `test/app/db`).
 
 **Mappie** generates type-safe mappers from database entities to domain models. Annotate mapper interfaces with `@Mapper`.
 
@@ -648,8 +658,9 @@ set of writes.
   code both browser targets share in `webMain`. So far: `utils/{bigdecimal,currency,humanreadable,files,httpclient}`, `utils/parsers/{csv,qif}`, `app/di/scope`,
   `app/model/*`, `app/importengineapi`, `app/tasks`, `app/cryptodata`, `utils/{regex,coroutines,rest}`,
   `utils/parsers/xlsx` (unsupported there, as on native), `app/importfilesource/core`, the importers
-  (`app/{csvimporter,qifimporter,apiimporter,importer}`), `app/{reconciliation,strategies,query}` and
-  `app/presenter/{core,accounts,transactions}`. The browser app is a `DeviceInfo.Web` host (OS and browser from the
+  (`app/{csvimporter,qifimporter,apiimporter,importer}`), `app/{reconciliation,strategies,query}`,
+  `app/presenter/{core,accounts,transactions}`, the database (`app/db/{schema,seed,read,write,repository,core,di}`,
+  `app/di/params`, `test/app/db`; `app/db/core`'s own suite waits for the modules its tests link). The browser app is a `DeviceInfo.Web` host (OS and browser from the
   user agent; platform row `WEB`, 4). What only the browser lacks goes behind a shared helper rather than per call
   site: `compileRegex` for patterns, `ioDispatcher` for I/O, and suspending crypto (`sha256Hex`, `ScaCrypto`), since
   WebCrypto never blocks. kotlinx-datetime's zone database is the npm `@js-joda/timezone`, imported by

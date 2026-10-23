@@ -76,3 +76,15 @@ func TestNpmClosureRejectsARange(t *testing.T) {
 		t.Fatalf("got %v, want an error naming b@^2.0.0", err)
 	}
 }
+
+func TestNpmClosureAcceptsAPreReleaseVersion(t *testing.T) {
+	server := npmServer(t, map[string]string{"/a/3.54.1-build1": npmMeta(`{}`, `{}`, `{}`)})
+	r := npmResolver{fetch: NewFetcher(nil), registry: server.URL, forces: map[string]string{}, into: map[string]NpmPackage{}}
+
+	if err := r.closure(map[string]string{"a": "3.54.1-build1"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := r.into["a@3.54.1-build1"]; !ok {
+		t.Errorf("a@3.54.1-build1 not pinned: %v", r.into)
+	}
+}

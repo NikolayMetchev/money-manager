@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_export //app/remotestorage/googledrive jvmMain
 # gazelle:kmp_export //app/remotestorage/googledrive nativeMain
 
@@ -22,4 +22,10 @@ kmp_library(
         "mingwX64",
     ],
     visibility = ["//visibility:public"],
+    web_deps = ["//app/db/core"],
+    web_srcs = glob(["src/webMain/kotlin/**/*.kt"]),
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
 )

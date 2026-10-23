@@ -356,7 +356,8 @@
       "org.jetbrains.kotlin:kotlin-gradle-plugin"
     ],
     "npm": {
-      "js-joda-timezone": "@js-joda/timezone@3.1.0"
+      "js-joda-timezone": "@js-joda/timezone@3.1.0",
+      "sqlite-wasm": "@sqlite.org/sqlite-wasm@3.54.1-build1"
     },
     "npm_forces": {
       "@js-joda/core": "6.3.0"
@@ -20254,6 +20255,12 @@
         "@js-joda/core": "6.3.0"
       }
     },
+    "@sqlite.org/sqlite-wasm@3.54.1-build1": {
+      "name": "@sqlite.org/sqlite-wasm",
+      "version": "3.54.1-build1",
+      "url": "https://registry.npmjs.org/@sqlite.org/sqlite-wasm/-/sqlite-wasm-3.54.1-build1.tgz",
+      "integrity": "sha512-foW427VBLJ3G87bsnvQTZCc9zYe0Fq1wH0pz1I6BlKLKXcArIAyTkHtq0iT2llmhcMQt9T/p6l5PpQQh+6O8uQ=="
+    },
     "ws@8.20.1": {
       "name": "ws",
       "version": "8.20.1",
@@ -20262,6 +20269,7 @@
     }
   },
   "npm_libraries": {
-    "js-joda-timezone": "@js-joda/timezone@3.1.0"
+    "js-joda-timezone": "@js-joda/timezone@3.1.0",
+    "sqlite-wasm": "@sqlite.org/sqlite-wasm@3.54.1-build1"
   }
 }
