@@ -1,5 +1,6 @@
 package com.moneymanager.database.api
 
+import com.moneymanager.apiimport.ApiDownloadAndImportAllResult
 import com.moneymanager.apiimport.ApiDownloadOutcome
 import com.moneymanager.apiimport.ApiImportService
 import com.moneymanager.apiimport.ApiSessionImportStatus
@@ -243,6 +244,39 @@ class ApiImportServiceTest : DbTest() {
                     ?.transactionCount,
             )
             assertEquals(0, materializedViewRefreshes, "the caller refreshes once itself")
+        }
+
+    @Test
+    fun `a session already being imported elsewhere comes back as failed and the queue moves on`() =
+        runTest {
+            val monzo = connection("Monzo")
+            val vault = unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzoSecrets)))
+            val service = service(vault)
+            backgroundScope.runTask { service.downloadAndImportAll(this, listOf(monzo), importSessions = false) }
+            val earlier = repositories.apiSessionRepository.getSessionsByDevice(deviceId()).single()
+            val manager = TaskManager(backgroundScope)
+            val release = CompletableDeferred<Unit>()
+            manager.start(apiImportTaskKey(earlier.id), "Elsewhere", "") {
+                release.await()
+                "done"
+            }
+            val result = CompletableDeferred<ApiDownloadAndImportAllResult>()
+
+            manager.start("test", "Test", "") {
+                result.complete(service.downloadAndImportAll(this, listOf(monzo)))
+                "done"
+            }
+
+            val sessions = result.await().sessions
+            release.complete(Unit)
+            val failed = sessions.single { it.session.id == earlier.id }
+            assertEquals(ApiSessionImportStatus.FAILED, failed.status)
+            assertEquals("an import of it was already running", failed.error)
+            assertEquals(
+                listOf(ApiSessionImportStatus.IMPORTED),
+                sessions.filter { it.session.id != earlier.id }.map { it.status },
+                "the next session still imports",
+            )
         }
 
     @Test

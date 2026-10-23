@@ -173,6 +173,7 @@ def kmp_library(
         forbidden_reference_allowed = [],
         keep_deps = [],
         resources = [],
+        tags = [],
         visibility = None):
     """A Kotlin Multiplatform module. Emits `:<name>_jvm`, `:<name>_android` and `:<name>_<target>` per native target.
 
@@ -225,6 +226,8 @@ def kmp_library(
         keep_deps: dependencies no source uses (`kmp_keep_dep`), which `:<name>_unused_deps` leaves alone.
         resources: the JVM classpath resources, from `src/{common,jvmAndroid,jvm}Main/resources`: one jar, a
             file in a later source set replacing the same path in an earlier one, as Gradle merges them.
+        tags: tags of the JVM and Android compiles, such as `kt_abi_plugin_incompatible` (dependents compile
+            against the full jar rather than its ABI jar).
         visibility: the targets' visibility. A restricted module also gets `:<name>_for_tests`, testonly and
             public, which every module's tests use instead.
     """
@@ -273,6 +276,7 @@ def kmp_library(
                 srcs = [sqldelight],
                 deps = _on(platform, exports),
                 exports = _on(platform, exports),
+                tags = tags,
                 visibility = ["//visibility:private"],
             )
         jvm_android_exports = jvm_android_exports + [":" + name + "_sqldelight"]
@@ -293,6 +297,7 @@ def kmp_library(
             resource_jars = _resource_jars(name, "Main", resources),
             # Dispatchers.Main on every JVM runtime classpath.
             runtime_deps = [Label("@maven_kmp//:kotlinx_coroutines_swing_jvm")],
+            tags = tags,
             visibility = visibility,
         )
         if fragments.srcs:
@@ -309,6 +314,7 @@ def kmp_library(
             exports = _on("android", exports + jvm_android_exports + android_exports),
             module_name = module_name,
             plugins = plugin_labels(plugins, "jvm"),
+            tags = tags,
             visibility = visibility,
         )
         if not jvm and android_fragments.srcs:

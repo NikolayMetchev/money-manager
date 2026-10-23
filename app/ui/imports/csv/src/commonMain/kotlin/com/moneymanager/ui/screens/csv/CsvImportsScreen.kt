@@ -615,7 +615,7 @@ private fun resolveSourceAccountName(
 
 @Suppress("LongParameterList")
 @Composable
-private fun CsvImportCard(
+internal fun CsvImportCard(
     import: CsvImport,
     dateRange: ImportFileDateRange?,
     sourceAccountName: String?,
