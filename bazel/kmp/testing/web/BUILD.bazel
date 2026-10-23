@@ -1,0 +1,8 @@
+load("//bazel/kmp:web.bzl", "node_runtime")
+
+package(default_visibility = ["//visibility:public"])
+
+# kmp_test's browser tests: KnTestLauncher runs `node runner.mjs test.mjs` (see defs.bzl).
+exports_files(["runner.mjs"])
+
+node_runtime(name = "node")

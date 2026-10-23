@@ -169,6 +169,51 @@ kt_web_executable = rule(
     toolchains = [TOOLCHAIN_TYPE],
 )
 
+def _test_impl(ctx):
+    associate = ctx.attr.associate[WebKlibInfo]
+    info = _compile_klib(
+        ctx,
+        out = ctx.actions.declare_file(ctx.label.name + "_test.klib"),
+        chain = web_chain(ctx, "Test"),
+        deps = ctx.attr.deps,
+        friends = [ctx.attr.associate],
+        module_name = unique_name(ctx.attr.associate.label, "_test"),
+        mnemonic = "KotlinWebTestCompile",
+    )
+
+    # The test klib's generated `main` registers every test with kotlin-test's adapter (runner.mjs).
+    out = ctx.actions.declare_directory(ctx.label.name)
+    link_web(
+        ctx,
+        out = out,
+        base_name = "test",
+        include = info.klib,
+        libraries = info.transitive_klibs,
+        production = False,
+        mnemonic = "KotlinWebTestLink",
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+kt_web_test_program = rule(
+    implementation = _test_impl,
+    doc = "A module's tests for one browser target, linked into `test.mjs` in a directory for runner.mjs.",
+    attrs = WEB_SRC_ATTRS | {
+        "associate": attr.label(mandatory = True, providers = [WebKlibInfo]),
+        "deps": attr.label_list(providers = [WebKlibInfo]),
+    },
+    toolchains = [TOOLCHAIN_TYPE],
+)
+
+def _node_impl(ctx):
+    node = ctx.toolchains["@rules_nodejs//nodejs:runtime_toolchain_type"].nodeinfo.node
+    return [DefaultInfo(files = depset([node]))]
+
+node_runtime = rule(
+    implementation = _node_impl,
+    doc = "The `node` binary for the target platform, from rules_nodejs' toolchain, for a test's data.",
+    toolchains = ["@rules_nodejs//nodejs:runtime_toolchain_type"],
+)
+
 def _import_impl(ctx):
     deps = [d[WebKlibInfo].transitive_klibs for d in ctx.attr.deps]
     return [

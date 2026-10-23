@@ -238,7 +238,14 @@ module has it) is what they share with native, which then compiles `common ← n
 targets compiles its commonMain metadata against `metadataWeb` (see Maven) with `-Xtarget-platform=…,JS,WasmJs`, and
 `:<name>_metadataWeb` names that compile for the web modules that depend on it. `kt_web_executable` links a module's
 klib into a production program (`-Xir-dce`): ES modules, plus the `.wasm` and its glue on wasmJs.
-`//bazel/kmp/web/tests` builds a module with every source set, and a program, for both targets.
+`//bazel/kmp/web/tests` builds and tests a module with every source set, and links a program, for both targets.
+
+`kmp_test`'s `web_targets` link the test klib (unoptimised) into `:<name>_<target>_bin/test.mjs`, and `:<name>_wasmJs`
+/ `:<name>_js` run it in Node on every host. Node is rules_nodejs' toolchain only, pinned in `MODULE.bazel` with each
+platform's SHA-256 (no npm): Renovate bumps `NODE`, and `bazel/renovate/repin.sh` rewrites the SHA-256s from
+nodejs.org's `SHASUMS256.txt` (`repin_node.py`). `testing/web/runner.mjs` defines the `describe`/`it` globals kotlin-test's adapter
+registers tests with, runs them (awaiting async ones) and prints TeamCity service messages, which `KnTestLauncher
+--node` turns into `test.xml` exactly as it does a native test binary's; `--test_filter` works the same way.
 
 ## Desktop
 

@@ -28,7 +28,7 @@ load("//bazel/kmp/dokka:dokka.bzl", "dokka_module")
 load("//bazel/kmp/checks:checks.bzl", "kmp_forbidden_deps", "kmp_reference_check", "kmp_unused_deps")
 load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
 load(":resources.bzl", "kmp_resource_jar")
-load(":web.bzl", "kt_web_klib")
+load(":web.bzl", "kt_web_klib", "kt_web_test_program")
 load(":native.bzl", "BUILDS_ON", "CROSS_PLATFORMS", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_cross_test_binary", "kt_native_executable", "kt_native_klib", "kt_native_test_binary")
 load("//bazel/kmp/plugins:plugins.bzl", "plugin_deps", "plugin_labels")
 load("//bazel/kmp/android:apk.bzl", "android_apk")
@@ -434,7 +434,12 @@ def kmp_test(
         linux_srcs = [],
         apple_srcs = [],
         mingw_srcs = [],
+        non_jvm_srcs = [],
+        web_srcs = [],
+        wasm_js_srcs = [],
+        js_srcs = [],
         native_targets = [],
+        web_targets = [],
         android = False,
         deps = [],
         jvm_android_deps = [],
@@ -444,6 +449,10 @@ def kmp_test(
         linux_deps = [],
         apple_deps = [],
         mingw_deps = [],
+        non_jvm_deps = [],
+        web_deps = [],
+        wasm_js_deps = [],
+        js_deps = [],
         plugins = [],
         data = [],
         size = "medium",
@@ -456,15 +465,18 @@ def kmp_test(
         device_deps = [],
         device_manifest = None,
         device_resources = []):
-    """A module's tests. Emits `:<name>_jvm`, `:<name>_android`, `:<name>_device`, `:<name>_<target>` per native target
-    and `:<name>_<target>_cross` (manual) per target in `CROSS_PLATFORMS`, its test binary built for that platform.
+    """A module's tests. Emits `:<name>_jvm`, `:<name>_android`, `:<name>_device`, `:<name>_<target>` per native and
+    browser target, and `:<name>_<target>_cross` (manual) per target in `CROSS_PLATFORMS`, its test binary built for
+    that platform.
 
     JVM tests are JUnit 4, run by `//bazel/kmp/testing:KmpJUnitRunner`. Android host tests (AGP's
     `testAndroidHostTest`) are `commonTest ← jvmAndroidTest ← androidHostTest` compiled against the module's
     Android compile, run the same way on a JVM with AGP's mockable android.jar
     (`//bazel/kmp/android:mockable_android_jar`), which returns default values as the Android convention asks. Native tests are linked with konan's
     test runner and run by `//bazel/kmp/testing:native_launcher`; a target's tests only run where its
-    executables do (`RUNS_ON`), so on Linux x64 only `_linuxX64` runs.
+    executables do (`RUNS_ON`), so on Linux x64 only `_linuxX64` runs. Browser tests (`_wasmJs`, `_js`) are linked
+    into an ES module and run on every host, in the pinned Node by `//bazel/kmp/testing/web:runner.mjs`, which
+    reports to the same launcher.
 
     Args:
         name: the test name.
@@ -477,7 +489,12 @@ def kmp_test(
         linux_srcs: `src/linuxTest/kotlin` sources.
         apple_srcs: `src/appleTest/kotlin` sources.
         mingw_srcs: `src/mingwTest/kotlin` sources.
+        non_jvm_srcs: `src/nonJvmTest/kotlin` sources: the native and browser targets'.
+        web_srcs: `src/webTest/kotlin` sources.
+        wasm_js_srcs: `src/wasmJsTest/kotlin` sources.
+        js_srcs: `src/jsTest/kotlin` sources.
         native_targets: the Kotlin/Native targets to test on, by KGP's names.
+        web_targets: the browser targets to test on (`wasmJs`, `js`).
         android: run the tests as Android host tests too (the associate must be an Android `kmp_library`).
         deps: test dependencies (Gradle `implementation` on `commonTest`), by module label.
         jvm_android_deps: `jvmAndroidTest` dependencies.
@@ -487,6 +504,10 @@ def kmp_test(
         linux_deps: `linuxTest` dependencies.
         apple_deps: `appleTest` dependencies.
         mingw_deps: `mingwTest` dependencies.
+        non_jvm_deps: `nonJvmTest` dependencies.
+        web_deps: `webTest` dependencies.
+        wasm_js_deps: `wasmJsTest` dependencies.
+        js_deps: `jsTest` dependencies.
         plugins: compiler plugins by name, as for kmp_library, plus `mokkery`.
         data: files the tests read at run time, from the workspace root (the runfiles' working directory).
         size: the Bazel test size. Gradle has no test timeout, so the default is medium (300 s); give a slower
@@ -556,7 +577,7 @@ def kmp_test(
             name,
             forbidden_deps,
             {"jvm": name + "_jvm_lib"} if fragments.srcs else {},
-            {t: "%s_%s_bin" % (name, t) for t in native_targets},
+            {t: "%s_%s_bin" % (name, t) for t in native_targets + web_targets},
             RUNS_ON,
         )
     module = associate.rpartition(":")[2] if ":" in associate else associate.rpartition("/")[2]
@@ -569,9 +590,10 @@ def kmp_test(
             target = target,
             associate = platform_label(associate, target),
             common_srcs = common_srcs,
+            non_jvm_srcs = non_jvm_srcs,
             native_srcs = native_srcs,
             family_srcs = _family(target, linux_srcs, apple_srcs, mingw_srcs),
-            deps = _on(target, deps + native_deps + _family(target, linux_deps, apple_deps, mingw_deps)),
+            deps = _on(target, deps + non_jvm_deps + native_deps + _family(target, linux_deps, apple_deps, mingw_deps)),
             plugins = plugin_labels(plugins, "native"),
             target_compatible_with = RUNS_ON[target],
         )
@@ -593,6 +615,39 @@ def kmp_test(
                 platform = CROSS_PLATFORMS[target],
                 tags = ["manual"],
             )
+
+    for target in web_targets:
+        program = "%s_%s_bin" % (name, target)
+        kt_web_test_program(
+            name = program,
+            testonly = True,
+            target = target,
+            associate = platform_label(associate, target),
+            common_srcs = common_srcs,
+            non_jvm_srcs = non_jvm_srcs,
+            web_srcs = web_srcs,
+            target_srcs = wasm_js_srcs if target == "wasmJs" else js_srcs,
+            deps = _on(target, deps + non_jvm_deps + web_deps + (wasm_js_deps if target == "wasmJs" else js_deps)),
+            plugins = plugin_labels(plugins, "native"),
+        )
+        java_test(
+            name = "%s_%s" % (name, target),
+            size = size,
+            main_class = "com.moneymanager.bazel.kmp.testing.KnTestLauncher",
+            use_testrunner = False,
+            args = [
+                "--node",
+                "$(rootpath %s)" % Label("//bazel/kmp/testing/web:node"),
+                "$(rootpath %s)" % Label("//bazel/kmp/testing/web:runner.mjs"),
+                "$(rootpath :%s)/test.mjs" % program,
+            ],
+            data = [
+                ":" + program,
+                Label("//bazel/kmp/testing/web:node"),
+                Label("//bazel/kmp/testing/web:runner.mjs"),
+            ] + data,
+            runtime_deps = [Label("//bazel/kmp/testing:native_launcher_lib")],
+        )
 
 def _device_test(name, associate, srcs, deps_of_plugins, plugins, deps, manifest, resources):
     """`:<name>_device`: a library's device tests, as AGP builds and runs them (its `androidDeviceTest`)."""
