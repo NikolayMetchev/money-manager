@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -129,8 +128,10 @@ fun <K : Any, F : StagedImport<K>> StagedImportsTabs(
         selectedTab == ImportTab.IGNORED -> {
             // Ignored files span every strategy and need no scoped bulk action, so this tab stays flat.
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(shown, key = { it.id.toString() }) { file ->
-                    card(file, StagedImportCardPlacement(ignored = true, showDirectories = true))
+                // Indexed `items` throughout: Qodana reports the List overload's import as unused when the
+                // element type is generic.
+                items(shown.size, key = { shown[it].id.toString() }) { index ->
+                    card(shown[index], StagedImportCardPlacement(ignored = true, showDirectories = true))
                 }
             }
         }
@@ -184,9 +185,9 @@ fun <K : Any, F : StagedImport<K>> StagedImportsTabs(
                         )
                     }
                     if (expanded) {
-                        items(group.imports, key = { it.id.toString() }) { file ->
+                        items(group.imports.size, key = { group.imports[it].id.toString() }) { index ->
                             card(
-                                file,
+                                group.imports[index],
                                 StagedImportCardPlacement(ignored = false, showDirectories = true, offerUnimport = true),
                             )
                         }
@@ -255,7 +256,9 @@ private fun <F : StagedImport<*>> LazyListScope.directoryTreeItems(
             )
         }
         if (groupExpanded) {
-            items(group.imports, key = { it.id.toString() }) { file -> card(file, group, groupIndent + TREE_INDENT) }
+            items(group.imports.size, key = { group.imports[it].id.toString() }) { index ->
+                card(group.imports[index], group, groupIndent + TREE_INDENT)
+            }
         }
     }
 }
