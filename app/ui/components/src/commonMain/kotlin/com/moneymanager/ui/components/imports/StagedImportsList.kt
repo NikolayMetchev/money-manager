@@ -129,8 +129,8 @@ fun <K : Any, F : StagedImport<K>> StagedImportsTabs(
         selectedTab == ImportTab.IGNORED -> {
             // Ignored files span every strategy and need no scoped bulk action, so this tab stays flat.
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(shown, key = { it.id.toString() }) { import ->
-                    card(import, StagedImportCardPlacement(ignored = true, showDirectories = true))
+                items(shown, key = { it.id.toString() }) { file ->
+                    card(file, StagedImportCardPlacement(ignored = true, showDirectories = true))
                 }
             }
         }
@@ -184,9 +184,9 @@ fun <K : Any, F : StagedImport<K>> StagedImportsTabs(
                         )
                     }
                     if (expanded) {
-                        items(group.imports, key = { it.id.toString() }) { import ->
+                        items(group.imports, key = { it.id.toString() }) { file ->
                             card(
-                                import,
+                                file,
                                 StagedImportCardPlacement(ignored = false, showDirectories = true, offerUnimport = true),
                             )
                         }
@@ -255,7 +255,7 @@ private fun <F : StagedImport<*>> LazyListScope.directoryTreeItems(
             )
         }
         if (groupExpanded) {
-            items(group.imports, key = { it.id.toString() }) { import -> card(import, group, groupIndent + TREE_INDENT) }
+            items(group.imports, key = { it.id.toString() }) { file -> card(file, group, groupIndent + TREE_INDENT) }
         }
     }
 }

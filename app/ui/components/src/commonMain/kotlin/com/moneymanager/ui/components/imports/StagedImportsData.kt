@@ -80,11 +80,11 @@ fun <K : Any, F : StagedImport<K>> rememberStagedImportsData(
         importDirectoryRepository.getAllDirectories()
     }
     val directoryIds by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyMap()) {
-        importDirectoryRepository.importDirectoryIds()
+        importDirectoryIds(importDirectoryRepository)
     }
     var directoryAccounts by remember { mutableStateOf<Map<K, AccountId>>(emptyMap()) }
     LaunchedEffect(imports) {
-        directoryAccounts = importDirectoryRepository.sourceAccounts()
+        directoryAccounts = sourceAccounts(importDirectoryRepository)
     }
     val importDirectories = remember(directoryIds, directories) { resolveImportDirectories(directoryIds, directories) }
 
