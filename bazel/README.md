@@ -239,6 +239,9 @@ targets compiles its commonMain metadata against `metadataWeb` (see Maven) with 
 `:<name>_metadataWeb` names that compile for the web modules that depend on it. `kt_web_executable` links a module's
 klib into a production program (`-Xir-dce`): ES modules, plus the `.wasm` and its glue on wasmJs.
 `//bazel/kmp/web/tests` builds and tests a module with every source set, and links a program, for both targets.
+Gazelle writes `web_targets` from `# gazelle:kmp_targets … wasmJs js` (`web` is both), maps `nonJvm`/`web`/`wasmJs`/`js`
+`Main` and `Test` dirs to their attributes, and resolves an import per browser target when no library has it for
+both; the DOM (`kotlinx.browser`, `org.w3c`) is the stdlib's.
 
 `kmp_test`'s `web_targets` link the test klib (unoptimised) into `:<name>_<target>_bin/test.mjs`, and `:<name>_wasmJs`
 / `:<name>_js` run it in Node on every host. Node is rules_nodejs' toolchain only, pinned in `MODULE.bazel` with each

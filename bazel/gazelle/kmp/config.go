@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -19,8 +20,8 @@ const (
 	// kmp_generate true|false: whether this directory's module gets generated targets. Off by default until
 	// every module builds with Bazel (#1008).
 	generateDirective = "kmp_generate"
-	// kmp_targets android linuxX64 linuxArm64 …: the module's targets besides the JVM: `android`
-	// and its Kotlin/Native targets.
+	// kmp_targets android linuxX64 linuxArm64 wasmJs js …: the module's targets besides the JVM: `android`, its
+	// Kotlin/Native targets and its browser ones (`web` is both `wasmJs` and `js`).
 	targetsDirective = "kmp_targets"
 	// kmp_plugins name …: compiler plugins to apply besides the ones inferred from the sources.
 	pluginsDirective = "kmp_plugins"
@@ -78,6 +79,9 @@ const (
 
 const androidTarget = "android"
 
+// webTargets are the browser targets, in kmp_library's order; `web` in kmp_targets names them all.
+var webTargets = []string{"wasmJs", "js"}
+
 // keepDep is one kmp_keep_dep or kmp_export: the label, the platform whose deps it joins, and whether it's
 // the tests'.
 type keepDep struct {
@@ -88,7 +92,8 @@ type keepDep struct {
 type kmpConfig struct {
 	generate          bool
 	android           bool
-	targets           []string
+	targets           []string // Kotlin/Native
+	web               []string // wasmJs, js
 	plugins           []string
 	exports           []keepDep
 	sqldelightPackage string
@@ -116,6 +121,7 @@ type kmpConfig struct {
 func (c *kmpConfig) clone() *kmpConfig {
 	out := *c
 	out.targets = append([]string(nil), c.targets...)
+	out.web = append([]string(nil), c.web...)
 	out.plugins = append([]string(nil), c.plugins...)
 	// Per-module settings don't carry into subdirectories.
 	out.exports = nil
@@ -163,12 +169,25 @@ func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
 			case generateDirective:
 				kc.generate = d.Value == "true"
 			case targetsDirective:
-				kc.android, kc.targets = false, nil
+				kc.android, kc.targets, kc.web = false, nil, nil
+				web := map[string]bool{}
 				for _, t := range strings.Fields(d.Value) {
-					if t == androidTarget {
+					switch {
+					case t == androidTarget:
 						kc.android = true
-					} else {
+					case t == "web":
+						for _, w := range webTargets {
+							web[w] = true
+						}
+					case slices.Contains(webTargets, t):
+						web[t] = true
+					default:
 						kc.targets = append(kc.targets, t)
+					}
+				}
+				for _, w := range webTargets {
+					if web[w] {
+						kc.web = append(kc.web, w)
 					}
 				}
 			case pluginsDirective:

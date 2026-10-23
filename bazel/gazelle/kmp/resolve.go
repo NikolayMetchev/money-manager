@@ -29,8 +29,8 @@ func (*kmpLang) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 func (*kmpLang) Embeds(r *rule.Rule, from label.Label) []label.Label { return nil }
 
 // Libraries the toolchain, the distribution and the Android SDK (android.jar, on every Android compile) provide:
-// no dependency to add.
-var builtin = []string{"kotlin.", "java.", "javax.", "sun.", "kotlinx.cinterop.", "platform.", "android."}
+// no dependency to add. The browser's stdlib has the DOM (`kotlinx.browser`, `org.w3c`).
+var builtin = []string{"kotlin.", "java.", "javax.", "sun.", "kotlinx.cinterop.", "platform.", "android.", "kotlinx.browser.", "org.w3c."}
 
 // Dependencies kotlin.* names stand for, which aren't Maven libraries here.
 var kotlinLibraries = map[string]string{
@@ -148,17 +148,23 @@ type platform struct {
 var (
 	commonPlatform     = &platform{"", "deps", "exports", nil}
 	jvmAndroidPlatform = &platform{"jvmAndroid", "jvm_android_deps", "jvm_android_exports", commonPlatform}
-	nativePlatform     = &platform{"native", "native_deps", "", commonPlatform}
-	platforms          = []*platform{
+	// On native and the browser every klib dependency is transitive anyway, so their source sets need no exports.
+	nonJvmPlatform = &platform{"nonJvm", "non_jvm_deps", "", commonPlatform}
+	nativePlatform = &platform{"native", "native_deps", "", nonJvmPlatform}
+	webPlatform    = &platform{"web", "web_deps", "", nonJvmPlatform}
+	platforms      = []*platform{
 		commonPlatform,
 		jvmAndroidPlatform,
 		{"jvm", "jvm_deps", "jvm_exports", jvmAndroidPlatform},
 		{"android", "android_deps", "android_exports", jvmAndroidPlatform},
+		nonJvmPlatform,
 		nativePlatform,
-		// On native every klib dependency is transitive anyway, so the family source sets need no exports.
 		{"linux", "linux_deps", "", nativePlatform},
 		{"apple", "apple_deps", "", nativePlatform},
 		{"mingw", "mingw_deps", "", nativePlatform},
+		webPlatform,
+		{"wasmJs", "wasm_js_deps", "", webPlatform},
+		{"js", "js_deps", "", webPlatform},
 		// androidDeviceTest is its own compilation: commonTest's dependencies don't reach it.
 		{"androidDevice", "device_deps", "", nil},
 	}
@@ -189,10 +195,12 @@ func setDeps(r *rule.Rule, depsAttr, exportsAttr string, deps, exports map[strin
 	}
 }
 
-// leaves are a rule's compilations below its common code: the JVM's, Android's and the native targets'.
+// leaves are a rule's compilations below its common code: the JVM's, Android's, the native targets' and the
+// browser targets'.
 type leaves struct {
 	android bool
 	native  []string
+	web     []string
 }
 
 // leaf is one group of compilations sharing a deps attribute, and the lockfile platforms they resolve on.
@@ -206,15 +214,30 @@ func (l leaves) below(group string) []leaf {
 	jvm := leaf{"jvm", []string{"jvm"}}
 	android := leaf{"android", []string{"android"}}
 	var out []leaf
+	nonJvm := func() {
+		if len(l.native) > 0 {
+			out = append(out, leaf{"native", l.native})
+		}
+		// Each browser target its own: a library may have only one of them (Skiko's wasm runtime).
+		for _, w := range l.web {
+			out = append(out, leaf{w, []string{w}})
+		}
+	}
 	switch group {
 	case "":
 		out = append(out, jvm)
 		if l.android {
 			out = append(out, android)
 		}
-		if len(l.native) > 0 {
-			out = append(out, leaf{"native", l.native})
+		nonJvm()
+	case "nonJvm":
+		nonJvm()
+	case "web":
+		for _, w := range l.web {
+			out = append(out, leaf{w, []string{w}})
 		}
+	case "wasmJs", "js":
+		out = append(out, leaf{group, []string{group}})
 	case "jvmAndroid":
 		out = append(out, jvm)
 		if l.android {

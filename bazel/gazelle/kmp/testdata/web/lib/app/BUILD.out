@@ -1,0 +1,35 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "app",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    js_deps = ["@maven_kmp//:skiko_js_runtime"],
+    js_srcs = glob(["src/jsMain/kotlin/**/*.kt"]),
+    native_targets = ["linuxX64"],
+    non_jvm_deps = ["@maven_kmp//:kotlinx_io_core"],
+    non_jvm_srcs = glob(["src/nonJvmMain/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+    wasm_js_deps = ["@maven_kmp//:skiko_wasm_runtime"],
+    wasm_js_srcs = glob(["src/wasmJsMain/kotlin/**/*.kt"]),
+    web_deps = ["@maven_kmp//:ktor_client_js"],
+    web_srcs = glob(["src/webMain/kotlin/**/*.kt"]),
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+    deps = ["@maven_kmp//:kotlinx_coroutines_core"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":app",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = ["linuxX64"],
+    web_deps = ["@maven_kmp//:kotlinx_coroutines_test"],
+    web_srcs = glob(["src/webTest/kotlin/**/*.kt"]),
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+    deps = ["//bazel/kmp/deps:kotlin_test"],
+)

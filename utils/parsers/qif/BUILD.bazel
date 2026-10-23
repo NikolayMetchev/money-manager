@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
@@ -14,6 +14,10 @@ kmp_library(
         "mingwX64",
     ],
     visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
 )
 
 kmp_test(
@@ -26,6 +30,10 @@ kmp_test(
         "linuxX64",
         "macosArm64",
         "mingwX64",
+    ],
+    web_targets = [
+        "wasmJs",
+        "js",
     ],
     deps = ["//bazel/kmp/deps:kotlin_test"],
 )

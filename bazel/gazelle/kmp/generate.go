@@ -18,7 +18,8 @@ import (
 type sourceSet struct {
 	dir      string // commonMain
 	srcsAttr string // common_srcs
-	platform string // which deps attribute its imports go to: "" (common), "jvmAndroid", "jvm", "android", "native" or a family
+	platform string // which deps attribute its imports go to: "" (common), "jvmAndroid", "jvm", "android", "nonJvm", "native", a native
+	// family, "web" or a browser target
 }
 
 var mainSets = []sourceSet{
@@ -26,10 +27,14 @@ var mainSets = []sourceSet{
 	{"jvmAndroidMain", "jvm_android_srcs", "jvmAndroid"},
 	{"jvmMain", "jvm_srcs", "jvm"},
 	{"androidMain", "android_srcs", "android"},
+	{"nonJvmMain", "non_jvm_srcs", "nonJvm"},
 	{"nativeMain", "native_srcs", "native"},
 	{"linuxMain", "linux_srcs", "linux"},
 	{"appleMain", "apple_srcs", "apple"},
 	{"mingwMain", "mingw_srcs", "mingw"},
+	{"webMain", "web_srcs", "web"},
+	{"wasmJsMain", "wasm_js_srcs", "wasmJs"},
+	{"jsMain", "js_srcs", "js"},
 	// A kotlin("jvm") module's only compilation is the JVM leaf.
 	{"main", "jvm_srcs", "jvm"},
 }
@@ -39,10 +44,14 @@ var testSets = []sourceSet{
 	{"jvmAndroidTest", "jvm_android_srcs", "jvmAndroid"},
 	{"jvmTest", "jvm_srcs", "jvm"},
 	{"androidHostTest", "android_srcs", "android"},
+	{"nonJvmTest", "non_jvm_srcs", "nonJvm"},
 	{"nativeTest", "native_srcs", "native"},
 	{"linuxTest", "linux_srcs", "linux"},
 	{"appleTest", "apple_srcs", "apple"},
 	{"mingwTest", "mingw_srcs", "mingw"},
+	{"webTest", "web_srcs", "web"},
+	{"wasmJsTest", "wasm_js_srcs", "wasmJs"},
+	{"jsTest", "js_srcs", "js"},
 	{"test", "jvm_srcs", "jvm"},
 }
 
@@ -52,7 +61,7 @@ var deviceSet = sourceSet{"androidDeviceTest", "device_srcs", "androidDevice"}
 
 // imports is what GenerateRules hands Resolve for one rule: the imported names per platform.
 type imports struct {
-	byPlatform map[string][]string // "" | jvmAndroid | jvm | android | native | linux | apple | mingw → imported names
+	byPlatform map[string][]string // a source set's platform (sourceSet.platform) → imported names
 	keep       map[string][]string // platform → labels kept by kmp_keep_dep
 	packages   []string            // the module's own packages (not dependencies)
 	test       bool
@@ -183,6 +192,9 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	if len(kc.targets) > 0 {
 		lib.SetAttr("native_targets", kc.targets)
 	}
+	if len(kc.web) > 0 {
+		lib.SetAttr("web_targets", kc.web)
+	}
 	if len(plugins) > 0 {
 		lib.SetAttr("plugins", sorted(plugins))
 	}
@@ -232,7 +244,7 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	}
 	lib.SetPrivateAttr(packagesKey, ownPackages)
 	res.Gen = append(res.Gen, lib)
-	res.Imports = append(res.Imports, imports{byPlatform: keys(main.imports), keep: kc.kept(false), packages: ownPackages, leaves: leaves{android: kc.android, native: kc.targets}})
+	res.Imports = append(res.Imports, imports{byPlatform: keys(main.imports), keep: kc.kept(false), packages: ownPackages, leaves: leaves{android: kc.android, native: kc.targets, web: kc.web}})
 
 	tSets := testSets
 	if !kc.android {
@@ -250,9 +262,12 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 			t.SetAttr(set.srcsAttr, glob(set.dir))
 		}
 		// Tests that are all JVM (jvmTest only) have no native test binary, as KGP's native test tasks find no
-		// sources.
-		if len(kc.targets) > 0 && runsOnNative(testSetsPresent) {
+		// sources; the same goes for the browser's.
+		if len(kc.targets) > 0 && runsOn(testSetsPresent, nativeSets) {
 			t.SetAttr("native_targets", kc.targets)
+		}
+		if len(kc.web) > 0 && runsOn(testSetsPresent, webSets) {
+			t.SetAttr("web_targets", kc.web)
 		}
 		hostTests := kc.android && !kc.noHostTests && runsOnAndroid(testSetsPresent)
 		if hostTests {
@@ -307,8 +322,11 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		}
 		res.Gen = append(res.Gen, t)
 		testLeaves := leaves{android: hostTests}
-		if runsOnNative(testSetsPresent) {
+		if runsOn(testSetsPresent, nativeSets) {
 			testLeaves.native = kc.targets
+		}
+		if runsOn(testSetsPresent, webSets) {
+			testLeaves.web = kc.web
 		}
 		res.Imports = append(res.Imports, imports{byPlatform: keys(tests.imports), keep: kc.kept(true), test: true, associate: name, leaves: testLeaves})
 	}
@@ -427,9 +445,16 @@ func runsOnAndroid(sets []sourceSet) bool {
 	return false
 }
 
-func runsOnNative(sets []sourceSet) bool {
+// The source sets each Kotlin/Native and each browser compilation is made of.
+var (
+	nativeSets = map[string]bool{"": true, "nonJvm": true, "native": true, "linux": true, "apple": true, "mingw": true}
+	webSets    = map[string]bool{"": true, "nonJvm": true, "web": true, "wasmJs": true, "js": true}
+)
+
+// runsOn is whether any of the tests' source sets is in a compilation made of `compiled`.
+func runsOn(sets []sourceSet, compiled map[string]bool) bool {
 	for _, set := range sets {
-		if set.platform != "jvm" && set.platform != "jvmAndroid" && set.platform != "android" {
+		if compiled[set.platform] {
 			return true
 		}
 	}
