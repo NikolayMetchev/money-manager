@@ -4,7 +4,7 @@ import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughRule
 import com.moneymanager.regex.PortableRegex
 import com.moneymanager.regex.compileRegex
-import com.moneymanager.regex.find
+import com.moneymanager.regex.firstMatch
 
 /**
  * One peeled conduit hop of a pass-through chain.
@@ -102,7 +102,7 @@ class PassThroughDetector(
         detection: PortableRegex,
     ): String {
         val merchantRegex = compiled[rule.merchantPattern]
-        val match = merchantRegex?.find(description)
+        val match = merchantRegex?.firstMatch(description)
         if (match != null) {
             return substituteTemplate(rule.merchantTemplate, match).trim()
         }

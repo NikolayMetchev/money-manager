@@ -12,7 +12,7 @@ class CompileRegexTest {
     fun `inline flags apply`() {
         val regex = compileRegex("(?i)^CRV\\*\\s*(.+)$")
 
-        assertEquals("Navan", regex.find("crv*Navan")?.groupValues?.get(1))
+        assertEquals("Navan", regex.firstMatch("crv*Navan")?.groupValues?.get(1))
         assertTrue(compileRegex("(?im)^a$").containsMatchIn("x\nA"))
         assertTrue(compileRegex("(?i)(?m)^a$").containsMatchIn("x\nA"))
         assertTrue(compileRegex("x(?i)abc").matches("xABC"))
@@ -20,11 +20,10 @@ class CompileRegexTest {
     }
 
     @Test
-    fun `the pattern and options are kept as given`() {
+    fun `the pattern is kept as given and its options apply`() {
         val regex = compileRegex("(?i)x", RegexOption.IGNORE_CASE)
 
         assertEquals("(?i)x", regex.pattern)
-        assertEquals(setOf(RegexOption.IGNORE_CASE), regex.options)
         assertTrue(compileRegex("abc", RegexOption.IGNORE_CASE).matches("ABC"))
         assertFalse(compileRegex("abc").matches("ABC"))
     }
@@ -33,12 +32,12 @@ class CompileRegexTest {
     fun `Java syntax works on every platform`() {
         assertTrue(compileRegex("^\\Qa.b*c\\E$").matches("a.b*c"))
         assertFalse(compileRegex("^\\Qa.b\\E$").matches("axb"))
-        assertEquals("42", compileRegex("(?<=£)\\d+").find("cost £42")?.value)
+        assertEquals("42", compileRegex("(?<=£)\\d+").firstMatch("cost £42")?.value)
         assertFalse(compileRegex("a++a").containsMatchIn("aaa"))
         assertEquals(
             "b",
             compileRegex("(?<name>b)")
-                .find("ab")
+                .firstMatch("ab")
                 ?.groups
                 ?.get(1)
                 ?.value,
@@ -60,7 +59,7 @@ class CompileRegexTest {
     @Test
     fun `replaceFirst replaces the first match`() {
         assertEquals("b-a", compileRegex("a").replaceFirst("a-a", "b"))
-        assertNull(compileRegex("z").find("abc"))
+        assertNull(compileRegex("z").firstMatch("abc"))
     }
 
     @Test

@@ -110,7 +110,7 @@ class AccountMappingExportServiceTest : DbTest() {
                     .id
             assertEquals(mapOf("TESCO" to tesco, "AMZN" to amazon, "SAINSBURY" to groceries), mappingsByPattern())
             val stored = repositories.accountMappingRepository.getAllMappings().first()
-            assertEquals(true, stored.all { it.valuePattern.options.contains(RegexOption.IGNORE_CASE) })
+            assertEquals(true, stored.all { it.valuePattern.containsMatchIn(it.valuePattern.pattern.lowercase()) })
         }
 
     @Test

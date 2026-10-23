@@ -10,8 +10,6 @@ actual class PortableRegex actual constructor(
 
     actual val pattern: String get() = regex.pattern
 
-    actual val options: Set<RegexOption> get() = regex.options
-
     actual fun containsMatchIn(input: CharSequence): Boolean = regex.containsMatchIn(input)
 
     actual infix fun matches(input: CharSequence): Boolean = regex.matches(input)
@@ -24,4 +22,4 @@ actual class PortableRegex actual constructor(
     override fun toString(): String = regex.toString()
 }
 
-actual fun PortableRegex.find(input: CharSequence): MatchResult? = regex.find(input)
+actual fun PortableRegex.firstMatch(input: CharSequence): MatchResult? = regex.find(input)

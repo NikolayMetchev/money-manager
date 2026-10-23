@@ -15,8 +15,6 @@ expect class PortableRegex(
     /** The pattern as written, flags and quoting included. */
     val pattern: String
 
-    val options: Set<RegexOption>
-
     fun containsMatchIn(input: CharSequence): Boolean
 
     infix fun matches(input: CharSequence): Boolean
@@ -29,6 +27,6 @@ expect class PortableRegex(
 
 /**
  * The first match in [input]. An extension, not a member: a member with [Regex.find]'s defaulted `startIndex` can't be
- * actualized by a typealias.
+ * actualized by a typealias. Nor is it called `find`, or [Regex]'s own member would shadow it where the two are one.
  */
-expect fun PortableRegex.find(input: CharSequence): MatchResult?
+expect fun PortableRegex.firstMatch(input: CharSequence): MatchResult?
