@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Money Manager — a Kotlin Multiplatform personal finance app for desktop and Android.">
+  <meta name="description" content="Money Manager — a Kotlin Multiplatform personal finance app for desktop, Android and the browser.">
   <title>Money Manager</title>
   <style>
     :root {
@@ -112,11 +112,12 @@
 <body>
   <header>
     <h1>💰 Money Manager</h1>
-    <p class="tagline">A personal finance app built with Kotlin Multiplatform and Compose Multiplatform — running natively on desktop and Android.</p>
+    <p class="tagline">A personal finance app built with Kotlin Multiplatform and Compose Multiplatform — on desktop, Android and in the browser.</p>
     <span class="badge">BETA</span>
     <div class="links">
       <a class="primary" href="https://github.com/NikolayMetchev/money-manager">View on GitHub</a>
       <a href="https://github.com/NikolayMetchev/money-manager/releases">Releases</a>
+      <a href="app/index.html">Open in your browser</a>
       <a href="cli.html">Command line</a>
       <a href="database/index.html">Database schema</a>
       <a href="modules.html">Module tree</a>
@@ -137,7 +138,7 @@
         It is also an exploration of what can be achieved with
         <a href="https://kotlinlang.org/docs/multiplatform.html">Kotlin Multiplatform</a> and
         <a href="https://www.jetbrains.com/compose-multiplatform/">Compose Multiplatform</a>:
-        a single codebase that ships a desktop (JVM) app and an Android app.
+        a single codebase that ships a desktop (JVM) app, an Android app and a browser app.
       </p>
     </section>
 
@@ -154,6 +155,7 @@
             <li>Cloud-backed databases (Google Drive, encrypted)</li>
             <li>Desktop (JVM) app</li>
             <li>Android app</li>
+            <li><a href="app/index.html">Browser app</a> (WebAssembly, or JavaScript where the browser lacks WasmGC): no import folders or API imports yet</li>
             <li><code>mm</code> command-line client (Linux, macOS, Windows)</li>
             <li>Automated deploys</li>
           </ul>
@@ -165,7 +167,7 @@
             <li>Forecasting and budgeting</li>
             <li>Multi-user support</li>
             <li>Reconciliation support</li>
-            <li>iOS and Web (JS/WASM) versions</li>
+            <li>iOS version</li>
             <li>AI classification of transactions</li>
             <li>Export to GnuCash</li>
           </ul>
