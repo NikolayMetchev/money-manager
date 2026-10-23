@@ -4,6 +4,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.repository.AccountMappingReadRepository
+import com.moneymanager.regex.PortableRegex
 
 interface AccountMappingWriteRepository : AccountMappingReadRepository {
     /**
@@ -15,7 +16,7 @@ interface AccountMappingWriteRepository : AccountMappingReadRepository {
      * @return The ID of the created mapping
      */
     suspend fun createMapping(
-        valuePattern: Regex,
+        valuePattern: PortableRegex,
         accountId: AccountId,
         strategyId: CsvImportStrategyId? = null,
     ): Long

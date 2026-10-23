@@ -2,6 +2,7 @@ package com.moneymanager.domain.model.accountmapping
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
+import com.moneymanager.regex.PortableRegex
 import kotlin.time.Instant
 
 /**
@@ -29,7 +30,7 @@ import kotlin.time.Instant
 data class AccountMapping(
     val id: Long,
     val strategyId: CsvImportStrategyId? = null,
-    val valuePattern: Regex,
+    val valuePattern: PortableRegex,
     val accountId: AccountId,
     val createdAt: Instant,
     val updatedAt: Instant,

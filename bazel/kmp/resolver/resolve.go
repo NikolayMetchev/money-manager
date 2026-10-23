@@ -64,6 +64,8 @@ type Resolved struct {
 	CompileOnly []string `json:"compile_only_deps,omitempty"`
 	// SourceSets are the klib directories of a `metadata` jar our common code sees.
 	SourceSets []string `json:"source_sets,omitempty"`
+	// Npm are the npm packages a browser klib needs at runtime, by name: its `package.json` dependencies.
+	Npm map[string]string `json:"npm,omitempty"`
 }
 
 // fromToolchain modules come from the Kotlin toolchain instead, at the compiler's own version, as KGP does.

@@ -1,5 +1,6 @@
 package com.moneymanager.importdirectory
 
+import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.BulkFileStatus
@@ -55,8 +56,6 @@ import com.moneymanager.tasks.Progress
 import com.moneymanager.tasks.TaskScope
 import com.moneymanager.tasks.formatElapsedTime
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -176,7 +175,7 @@ class ImportDirectoryService(
                     val runScope = this
 
                     fun startDownload(dir: ImportDirectory) {
-                        runScope.launch(Dispatchers.IO) {
+                        runScope.launch(ioDispatcher) {
                             // The child task is marked failed; the run records it and moves on.
                             containingFailure(dir, "download this folder", Unit) {
                                 val result =
@@ -194,7 +193,7 @@ class ImportDirectoryService(
                     inScope
                         .filter { it.topLevel }
                         .map { root ->
-                            async(Dispatchers.IO) {
+                            async(ioDispatcher) {
                                 task.child(subfolderSearchTaskKey(root.id), "Subfolders of ${root.name}", "Searching…") {
                                     containingFailure(root, "search its subfolders", 0) {
                                         createSubdirectories(root, dirsByRef, ::startDownload)
@@ -229,7 +228,7 @@ class ImportDirectoryService(
         try {
             coroutineScope {
                 val created =
-                    async(Dispatchers.IO) {
+                    async(ioDispatcher) {
                         if (directory.topLevel) {
                             // A failed search is reported without cancelling the folder's own download.
                             try {
@@ -248,7 +247,7 @@ class ImportDirectoryService(
                         }
                     }
                 val scan =
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         task.child(
                             folderDownloadTaskKey(directory.id),
                             directory.name,
@@ -281,7 +280,7 @@ class ImportDirectoryService(
             result +=
                 try {
                     task.child(folderDownloadTaskKey(folder.id), folder.name, "Listing files…") {
-                        withContext(Dispatchers.IO) {
+                        withContext(ioDispatcher) {
                             writeLock.withLock {
                                 redownloadImportDirectory(
                                     directory = folder,

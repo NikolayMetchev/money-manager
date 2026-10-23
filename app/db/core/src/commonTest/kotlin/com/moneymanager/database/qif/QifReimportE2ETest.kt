@@ -9,6 +9,7 @@ import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.deleteAccountMapping
 import com.moneymanager.qifimporter.bulkApplyQif
 import com.moneymanager.qifimporter.bulkReimportQif
+import com.moneymanager.regex.compileRegex
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.installBuiltInCsvStrategies
@@ -181,7 +182,7 @@ class QifReimportE2ETest : DbTest() {
             val brokerageId =
                 repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Brokerage", openingDate = now))
             repositories.importEngine.createAccountMapping(
-                valuePattern = Regex("VANGUARD", RegexOption.IGNORE_CASE),
+                valuePattern = compileRegex("VANGUARD", RegexOption.IGNORE_CASE),
                 accountId = brokerageId,
             )
 
@@ -234,7 +235,7 @@ class QifReimportE2ETest : DbTest() {
             val brokerageId =
                 repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Brokerage", openingDate = now))
             repositories.importEngine.createAccountMapping(
-                valuePattern = Regex("VANGUARD", RegexOption.IGNORE_CASE),
+                valuePattern = compileRegex("VANGUARD", RegexOption.IGNORE_CASE),
                 accountId = brokerageId,
             )
             val mappingId =

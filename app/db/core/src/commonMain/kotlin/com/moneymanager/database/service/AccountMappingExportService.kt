@@ -13,6 +13,7 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.createAccountMappings
+import com.moneymanager.regex.compileRegex
 import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
 
@@ -124,7 +125,7 @@ class AccountMappingExportService(
                     val account = accountsByName[mappingExport.accountName] ?: return@mapNotNull null
                     AccountMapping(
                         id = 0,
-                        valuePattern = Regex(mappingExport.valuePattern, RegexOption.IGNORE_CASE),
+                        valuePattern = compileRegex(mappingExport.valuePattern, RegexOption.IGNORE_CASE),
                         accountId = account.id,
                         createdAt = now,
                         updatedAt = now,

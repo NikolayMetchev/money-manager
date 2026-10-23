@@ -9,15 +9,15 @@ import kotlin.io.encoding.Base64
 private const val RSA_KEY_SIZE = 2048
 
 /** Generates a fresh RSA-2048 key pair, PEM-encoded (PKCS#8 private, X.509 public). */
-fun generateScaKeyPair(): ScaKeyPair {
+suspend fun generateScaKeyPair(): ScaKeyPair {
     val pair =
         CryptographyProvider.Default
             .get(RSA.PKCS1)
             .keyPairGenerator(RSA_KEY_SIZE.bits, SHA256)
-            .generateKeyBlocking()
+            .generateKey()
     return ScaKeyPair(
-        privateKeyPem = pair.privateKey.encodeToByteArrayBlocking(RSA.PrivateKey.Format.PEM.Generic).decodeToString(),
-        publicKeyPem = pair.publicKey.encodeToByteArrayBlocking(RSA.PublicKey.Format.PEM.Generic).decodeToString(),
+        privateKeyPem = pair.privateKey.encodeToByteArray(RSA.PrivateKey.Format.PEM.Generic).decodeToString(),
+        publicKeyPem = pair.publicKey.encodeToByteArray(RSA.PublicKey.Format.PEM.Generic).decodeToString(),
     )
 }
 
@@ -25,7 +25,7 @@ fun generateScaKeyPair(): ScaKeyPair {
  * Signs [oneTimeToken] with the PKCS#8 PEM [privateKeyPem] using SHA-256 with RSA (PKCS#1 v1.5) and
  * returns the Base64-encoded signature — the value an SCA-protected API expects in its signature header.
  */
-fun signScaChallenge(
+suspend fun signScaChallenge(
     privateKeyPem: String,
     oneTimeToken: String,
 ): String {
@@ -33,6 +33,6 @@ fun signScaChallenge(
         CryptographyProvider.Default
             .get(RSA.PKCS1)
             .privateKeyDecoder(SHA256)
-            .decodeFromByteArrayBlocking(RSA.PrivateKey.Format.PEM.Generic, privateKeyPem.encodeToByteArray())
-    return Base64.encode(privateKey.signatureGenerator().generateSignatureBlocking(oneTimeToken.encodeToByteArray()))
+            .decodeFromByteArray(RSA.PrivateKey.Format.PEM.Generic, privateKeyPem.encodeToByteArray())
+    return Base64.encode(privateKey.signatureGenerator().generateSignature(oneTimeToken.encodeToByteArray()))
 }

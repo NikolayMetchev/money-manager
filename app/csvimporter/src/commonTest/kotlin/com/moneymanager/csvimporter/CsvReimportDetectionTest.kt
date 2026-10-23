@@ -39,6 +39,7 @@ import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.PassThroughDetector
+import com.moneymanager.regex.compileRegex
 import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -135,7 +136,7 @@ class CsvReimportDetectionTest {
         return AccountMapping(
             id = id,
             strategyId = strategyId,
-            valuePattern = Regex(pattern, RegexOption.IGNORE_CASE),
+            valuePattern = compileRegex(pattern, RegexOption.IGNORE_CASE),
             accountId = accountId,
             createdAt = now,
             updatedAt = now,

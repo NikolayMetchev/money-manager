@@ -34,6 +34,7 @@ kmp_library(
         "@maven_kmp//:ktor_client_core",
     ],
     deps = [
+        "//utils/coroutines",
         "//utils/files",
         "//utils/httpclient",
         "@maven_kmp//:kotlinx_io_core",

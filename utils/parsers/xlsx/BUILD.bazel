@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_export //utils/parsers/csv
 # gazelle:kmp_keep_dep @maven_kmp//:poi_ooxml jvmMain
 
@@ -16,14 +16,18 @@ kmp_library(
     ],
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
     keep_deps = ["@maven_kmp//:poi_ooxml"],
-    native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
     native_targets = [
         "linuxArm64",
         "linuxX64",
         "macosArm64",
         "mingwX64",
     ],
+    non_jvm_srcs = glob(["src/nonJvmMain/kotlin/**/*.kt"]),
     visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = ["//utils/parsers/csv"],
 )
 

@@ -1,5 +1,23 @@
 // Runs a Kotlin/JS or Kotlin/Wasm test program in Node and reports each test as a TeamCity service message.
+import { existsSync } from "node:fs";
+import { registerHooks } from "node:module";
 import { pathToFileURL } from "node:url";
+
+// The npm packages the program's klibs name (kotlinx-datetime's `@js-joda/core`) are laid out as npm installs them
+// next to the program (web.bzl's node_modules), and its bare imports resolve from there.
+const modules = process.argv[2].replace(/\/test\.mjs$/, "_node_modules");
+if (existsSync(modules)) {
+  const parentURL = pathToFileURL(`${modules}/program.mjs`).href;
+  const bare = /^(?![./]|[a-z]+:)/;
+  registerHooks({
+    resolve: (specifier, context, next) => next(specifier, bare.test(specifier) ? { ...context, parentURL } : context),
+  });
+}
+
+// A browser's global object is also `window`, and some libraries reach browser globals through it (Molecule's clock
+// reads `window.performance`). Node has the same globals but no `window`, and none of the DOM, so libraries that
+// look for a browser through `window.document` or `window.addEventListener` still see Node.
+globalThis.window ??= globalThis;
 
 const root = { name: "", suites: [], tests: [], skip: false };
 let current = root;

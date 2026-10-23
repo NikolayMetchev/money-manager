@@ -1,5 +1,6 @@
 package com.moneymanager.remotestorage.googledrive
 
+import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.importfilesource.ImportSubfolder
@@ -9,8 +10,6 @@ import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
@@ -29,7 +28,7 @@ class DriveImportFileSource(
     private val httpClient = tokenSource.httpClient
 
     override suspend fun list(): List<ImportFileEntry> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val driveQuery = "'$folderId' in parents and trashed = false and mimeType != '$FOLDER_MIME_TYPE'"
             fetchAllPages(httpClient, driveQuery, "nextPageToken,files($FILE_FIELDS)") { body ->
                 val page = json.decodeFromString<DriveFileList>(body)
@@ -38,12 +37,12 @@ class DriveImportFileSource(
         }
 
     override suspend fun listSubfolders(): List<ImportSubfolder> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             listChildFolders(tokenSource, folderId).map { ImportSubfolder(ref = it.id, name = it.name) }
         }
 
     override suspend fun download(fileRef: String): ByteArray =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             val response =
                 httpClient.get("$FILES_ENDPOINT/$fileRef") {
                     url {
@@ -133,7 +132,7 @@ class DriveImportFileSource(
             tokenSource: GoogleAccessTokenSource,
             parentId: String,
         ): List<DriveFolder> =
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 val driveQuery =
                     if (parentId == SHARED_WITH_ME_FOLDER_ID) {
                         "sharedWithMe = true and mimeType = '$FOLDER_MIME_TYPE' and trashed = false"

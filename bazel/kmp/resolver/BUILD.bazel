@@ -8,6 +8,7 @@ go_library(
         "coordinate.go",
         "main.go",
         "metadata.go",
+        "npm.go",
         "packages.go",
         "resolve.go",
     ],
@@ -27,6 +28,7 @@ go_test(
     srcs = [
         "common_test.go",
         "metadata_test.go",
+        "npm_test.go",
         "resolve_test.go",
     ],
     embed = [":resolver_lib"],

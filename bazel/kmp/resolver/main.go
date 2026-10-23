@@ -41,6 +41,10 @@ type Lock struct {
 		// library for the source sets that declare it: the desktop Compose jars are no Android library.
 		LibraryPlatforms map[string][]string `json:"library_platforms,omitempty"`
 		Excludes         []string            `json:"excludes"`
+		// Npm are npm packages our own code imports (`@JsModule`), alias → name@version, and NpmForces pin an npm
+		// package's version whoever asks for it, as a Yarn `resolutions` entry does.
+		Npm       map[string]string `json:"npm,omitempty"`
+		NpmForces map[string]string `json:"npm_forces,omitempty"`
 	} `json:"inputs"`
 	// Names are the Bazel target names, without the platform suffix: a library by its alias
 	// (kotlinx-coroutines-core → kotlinx_coroutines_core), anything else by its coordinate.
@@ -50,12 +54,16 @@ type Lock struct {
 	// Skipped are libraries with no variant for a platform (JVM-only libraries on native).
 	Skipped   map[string][]string            `json:"skipped,omitempty"`
 	Artifacts map[string]map[string]Resolved `json:"artifacts"` // module → platform → resolution
+	// Npm are the npm packages the browser klibs and Inputs.Npm need, and theirs, by name@version.
+	Npm map[string]NpmPackage `json:"npm,omitempty"`
+	// NpmLibraries are Inputs.Npm's packages as Npm names them, with NpmForces applied: alias → name@version.
+	NpmLibraries map[string]string `json:"npm_libraries,omitempty"`
 }
 
 var nonIdent = regexp.MustCompile(`[^A-Za-z0-9_]`)
 
 func main() {
-	var libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes multi
+	var libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes, npmLibraries, npmForces multi
 	kotlin := flag.String("kotlin", "", "the Kotlin release the toolchain's stdlib and kotlin-test are")
 	out := flag.String("lock", "bazel/kmp/deps/maven_kmp.lock.json", "the lockfile to write")
 	flag.Var(&libraries, "library", "alias=group:artifact:version: a library to resolve (repeatable)")
@@ -65,14 +73,20 @@ func main() {
 	flag.Var(&classpathForces, "classpath-force", "module=version: pin a module on the JVM and in common metadata only (repeatable)")
 	flag.Var(&repos, "repository", "url[=group-regex,…]: a repository, in order, optionally limited to groups (repeatable)")
 	flag.Var(&excludes, "exclude", "group:artifact never to resolve, whoever depends on it (repeatable)")
+	flag.Var(&npmLibraries, "npm", "alias=name@version: an npm package our code imports (repeatable)")
+	flag.Var(&npmForces, "npm-force", "name=version: pin an npm package, whoever asks for it (repeatable)")
 	flag.Parse()
-	if err := run(*kotlin, *out, libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes); err != nil {
+	npm := npmInputs{libraries: npmLibraries, forces: npmForces}
+	if err := run(*kotlin, *out, libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes, npm); err != nil {
 		fmt.Fprintln(os.Stderr, "resolver:", err)
 		os.Exit(1)
 	}
 }
 
-func run(kotlin, out string, libraries, libraryPlatformSpecs, platformNames, forceSpecs, classpathForceSpecs, repoSpecs, excludes []string) error {
+// npmInputs are the --npm and --npm-force specs.
+type npmInputs struct{ libraries, forces []string }
+
+func run(kotlin, out string, libraries, libraryPlatformSpecs, platformNames, forceSpecs, classpathForceSpecs, repoSpecs, excludes []string, npmSpecs npmInputs) error {
 	if kotlin == "" {
 		return fmt.Errorf("--kotlin is required")
 	}
@@ -243,6 +257,57 @@ func run(kotlin, out string, libraries, libraryPlatformSpecs, platformNames, for
 		}
 		sort.Strings(pkgs)
 		lock.Packages[module] = pkgs
+	}
+	resolveNpm := npmResolver{fetch: fetcher, registry: npmRegistry, forces: map[string]string{}, into: map[string]NpmPackage{}}
+	for _, spec := range npmSpecs.forces {
+		name, v, ok := strings.Cut(spec, "=")
+		if !ok || name == "" || v == "" {
+			return fmt.Errorf("--npm-force %s: want name=version", spec)
+		}
+		resolveNpm.forces[name] = v
+	}
+	if len(resolveNpm.forces) > 0 {
+		lock.Inputs.NpmForces = resolveNpm.forces
+	}
+	for _, spec := range npmSpecs.libraries {
+		alias, pkg, ok := strings.Cut(spec, "=")
+		at := strings.LastIndex(pkg, "@")
+		if !ok || at <= 0 {
+			return fmt.Errorf("--npm %s: want alias=name@version", spec)
+		}
+		if lock.Inputs.Npm == nil {
+			lock.Inputs.Npm, lock.NpmLibraries = map[string]string{}, map[string]string{}
+		}
+		lock.Inputs.Npm[alias] = pkg
+		deps := resolveNpm.pinned(map[string]string{pkg[:at]: pkg[at+1:]})
+		if err := resolveNpm.closure(deps); err != nil {
+			return err
+		}
+		lock.NpmLibraries[alias] = npmKey(pkg[:at], deps[pkg[:at]])
+	}
+	for _, byPlatform := range lock.Artifacts {
+		for name, res := range byPlatform {
+			if platforms[name].Web == "" {
+				continue
+			}
+			for _, file := range res.Files {
+				deps, err := fetcher.npmDepsOf(file)
+				if err != nil {
+					return err
+				}
+				deps = resolveNpm.pinned(deps)
+				if len(deps) > 0 {
+					res.Npm = deps
+				}
+				if err := resolveNpm.closure(deps); err != nil {
+					return err
+				}
+			}
+			byPlatform[name] = res
+		}
+	}
+	if len(resolveNpm.into) > 0 {
+		lock.Npm = resolveNpm.into
 	}
 	if err := checkNames(lock.Names); err != nil {
 		return err

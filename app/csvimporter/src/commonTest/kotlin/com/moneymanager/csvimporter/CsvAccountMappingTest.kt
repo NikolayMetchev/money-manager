@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
+import com.moneymanager.regex.compileRegex
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -115,7 +116,7 @@ class CsvAccountMappingTest {
         return AccountMapping(
             id = id,
             strategyId = strategyId,
-            valuePattern = Regex(pattern, RegexOption.IGNORE_CASE),
+            valuePattern = compileRegex(pattern, RegexOption.IGNORE_CASE),
             accountId = accountId,
             createdAt = now,
             updatedAt = now,

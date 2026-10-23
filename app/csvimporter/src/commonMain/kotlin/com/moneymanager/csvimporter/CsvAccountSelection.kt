@@ -3,6 +3,8 @@ package com.moneymanager.csvimporter
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
+import com.moneymanager.regex.compileRegex
+import com.moneymanager.regex.escapeRegex
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -41,7 +43,7 @@ fun buildPendingAccountMappings(
                 PendingAccountMappingKey(
                     pattern =
                         discoveredMapping.matchedPattern
-                            ?: "^${Regex.escape(discoveredMapping.csvValue)}$",
+                            ?: "^${escapeRegex(discoveredMapping.csvValue)}$",
                     accountId = selectedAccountId,
                 )
             }
@@ -50,7 +52,7 @@ fun buildPendingAccountMappings(
         .mapIndexed { index, mapping ->
             AccountMapping(
                 id = -(index + 1).toLong(),
-                valuePattern = Regex(mapping.pattern, RegexOption.IGNORE_CASE),
+                valuePattern = compileRegex(mapping.pattern, RegexOption.IGNORE_CASE),
                 accountId = mapping.accountId,
                 createdAt = now,
                 updatedAt = now,

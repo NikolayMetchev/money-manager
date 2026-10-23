@@ -53,6 +53,7 @@ import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalCurrencyKey
+import com.moneymanager.regex.compileRegex
 import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -366,7 +367,7 @@ class CsvStrategyExportService(
                     AccountMapping(
                         id = 0,
                         strategyId = strategy.id,
-                        valuePattern = Regex(mappingExport.valuePattern, RegexOption.IGNORE_CASE),
+                        valuePattern = compileRegex(mappingExport.valuePattern, RegexOption.IGNORE_CASE),
                         accountId = account.id,
                         createdAt = now,
                         updatedAt = now,

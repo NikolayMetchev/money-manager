@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.rules.ColumnRecord
 import com.moneymanager.domain.model.rules.RuleEvaluator
+import com.moneymanager.regex.compileRegex
 
 /** Number of leading rows sampled when content-scoring a file against a strategy. */
 const val STRATEGY_CONTENT_SAMPLE_SIZE = 50
@@ -99,6 +100,6 @@ fun List<CsvImportStrategy>.selectForCsv(
 private fun CsvImportStrategy.matchesFileName(fileName: String): Boolean {
     val pattern = config.fileNamePattern?.takeIf { it.isNotBlank() } ?: return false
     // A malformed user-entered pattern must not break selection for every other strategy.
-    return runCatching { Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(fileName) }
+    return runCatching { compileRegex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(fileName) }
         .getOrDefault(false)
 }

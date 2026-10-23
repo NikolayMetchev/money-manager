@@ -48,5 +48,8 @@ kmp_library(
         "//app/tasks",
         "//utils/bigdecimal",
     ],
-    deps = ["@maven_kmp//:kotlinx_coroutines_core"],
+    deps = [
+        "//utils/regex",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
 )

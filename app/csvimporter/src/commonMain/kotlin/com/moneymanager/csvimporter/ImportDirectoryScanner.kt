@@ -1,6 +1,7 @@
 package com.moneymanager.csvimporter
 
 import co.touchlab.kermit.Logger
+import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
@@ -21,8 +22,6 @@ import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.qif.QifParser
 import com.moneymanager.xlsx.createXlsxParser
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -58,7 +57,7 @@ internal fun isSupportedImportFile(fileName: String): Boolean = supportedKind(fi
  * entirely; otherwise the file is downloaded and sha256-confirmed. A changed file produces a fresh
  * staging row; a bad file is recorded as a failure and does not abort the scan.
  *
- * Every file is scanned in its own coroutine on [Dispatchers.IO], so downloads run concurrently. The
+ * Every file is scanned in its own coroutine on [ioDispatcher], so downloads run concurrently. The
  * engine doesn't serialize writes itself, so every database step holds [dbLock]; callers scanning
  * several directories at once must share one lock between them.
  *
@@ -92,7 +91,7 @@ suspend fun scanImportDirectory(
         coroutineScope {
             entries
                 .map { entry ->
-                    async(Dispatchers.IO) {
+                    async(ioDispatcher) {
                         context.scanFile(entry).also { progressLock.withLock { onProgress(++done, entries.size) } }
                     }
                 }.awaitAll()
@@ -168,7 +167,7 @@ private suspend fun ScanContext.scanFile(entry: ImportFileEntry): FileOutcome {
         // CSV/QIF) would both corrupt the checksum and lose data, so it branches before decoding.
         val rawBytes = fileSource.download(entry.ref)
         val content = if (kind == SupportedKind.XLSX) null else rawBytes.decodeToString()
-        val checksum = content?.let(::sha256Hex) ?: sha256Hex(rawBytes)
+        val checksum = if (content != null) sha256Hex(content) else sha256Hex(rawBytes)
 
         dbLock.withLock {
             // Content unchanged despite a moved timestamp: advance the cursor, don't re-stage.

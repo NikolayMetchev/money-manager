@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_plugins compose
 # gazelle:kmp_export //app/model/core
 # gazelle:kmp_export //app/query
@@ -22,6 +22,10 @@ kmp_library(
     ],
     plugins = ["compose"],
     visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = [
         "//app/model/core",
         "//app/query",
@@ -44,6 +48,10 @@ kmp_test(
     plugins = [
         "compose",
         "mokkery",
+    ],
+    web_targets = [
+        "wasmJs",
+        "js",
     ],
     deps = [
         "//app/model/core",

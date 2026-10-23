@@ -1,5 +1,6 @@
 package com.moneymanager.remotestorage.googledrive
 
+import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.remotestorage.RemoteAuthException
 import io.ktor.http.Parameters
 import io.ktor.http.parseQueryString
@@ -11,8 +12,6 @@ import io.ktor.network.sockets.openReadChannel
 import io.ktor.network.sockets.openWriteChannel
 import io.ktor.utils.io.readLine
 import io.ktor.utils.io.writeStringUtf8
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -109,7 +108,7 @@ internal class LoopbackRedirectReceiver private constructor(
 
         /** Binds a fresh loopback port for one sign-in attempt. */
         suspend fun bind(): LoopbackRedirectReceiver {
-            val selector = SelectorManager(Dispatchers.IO)
+            val selector = SelectorManager(ioDispatcher)
             val serverSocket =
                 runCatching { aSocket(selector).tcp().bind(LOOPBACK_HOST, 0) }
                     .onFailure { selector.close() }

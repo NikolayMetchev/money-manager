@@ -48,4 +48,5 @@ kmp_library(
         "//app/model/qif",
         "//app/model/repository/read",
     ],
+    deps = ["//utils/regex"],
 )

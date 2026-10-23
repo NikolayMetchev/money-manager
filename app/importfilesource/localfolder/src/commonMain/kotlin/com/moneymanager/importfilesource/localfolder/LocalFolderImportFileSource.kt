@@ -1,5 +1,6 @@
 package com.moneymanager.importfilesource.localfolder
 
+import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.files.absolutePath
 import com.moneymanager.files.expandTilde
 import com.moneymanager.files.lastModifiedEpochMs
@@ -7,8 +8,6 @@ import com.moneymanager.files.readBytes
 import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.importfilesource.ImportSubfolder
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 import kotlinx.io.IOException
 import kotlinx.io.files.FileMetadata
@@ -30,7 +29,7 @@ class LocalFolderImportFileSource(
     private val folder = Path(expandTilde(folderPath))
 
     override suspend fun list(): List<ImportFileEntry> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             requireListing()
                 .filter { (_, metadata) -> metadata.isRegularFile }
                 .map { (file, metadata) ->
@@ -44,7 +43,7 @@ class LocalFolderImportFileSource(
         }
 
     override suspend fun listSubfolders(): List<ImportSubfolder> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             requireListing()
                 .filter { (_, metadata) -> metadata.isDirectory }
                 .map { (dir, _) -> ImportSubfolder(ref = absolutePath(dir).toString(), name = dir.name) }
@@ -52,7 +51,7 @@ class LocalFolderImportFileSource(
         }
 
     override suspend fun download(fileRef: String): ByteArray =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             readBytes(Path(folder, fileRef))
         }
 

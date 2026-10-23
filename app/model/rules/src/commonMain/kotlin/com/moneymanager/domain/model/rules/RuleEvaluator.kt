@@ -1,6 +1,9 @@
 package com.moneymanager.domain.model.rules
 
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.regex.PortableRegex
+import com.moneymanager.regex.compileRegex
+import com.moneymanager.regex.firstMatch
 
 /**
  * One row or item a strategy's rules are evaluated against. A CSV row exposes its columns by name; an
@@ -37,10 +40,10 @@ class ColumnRecord(
  * (rules run against every row, and compiling in place would dominate the cost). Not thread-safe.
  */
 class RuleEvaluator {
-    private val patternCache = HashMap<String, Regex>()
+    private val patternCache = HashMap<String, PortableRegex>()
 
     /** [pattern] compiled case-insensitively, the convention for every pattern a strategy declares. */
-    fun regex(pattern: String): Regex = patternCache.getOrPut(pattern) { Regex(pattern, RegexOption.IGNORE_CASE) }
+    fun regex(pattern: String): PortableRegex = patternCache.getOrPut(pattern) { compileRegex(pattern, RegexOption.IGNORE_CASE) }
 
     /** Whether every one of [conditions] holds for [record] (true for an empty list). */
     fun all(
@@ -181,7 +184,7 @@ class RuleEvaluator {
                 .firstOrNull { it.isNotBlank() }
                 .orEmpty()
         val value = if (naming.trim) read.trim() else read
-        val match = naming.pattern?.let { pattern -> value.takeIf { it.isNotBlank() }?.let { regex(pattern).find(it) } }
+        val match = naming.pattern?.let { pattern -> value.takeIf { it.isNotBlank() }?.let { regex(pattern).firstMatch(it) } }
         if (naming.pattern != null && match == null) return null
         val accountName = renderName(naming, naming.name, value, match).ifBlank { naming.fallbackName.orEmpty() }
         val personName =
@@ -211,7 +214,7 @@ class RuleEvaluator {
         value: String,
         extraction: Extraction,
     ): String? {
-        val match = regex(extraction.pattern).find(value) ?: return null
+        val match = regex(extraction.pattern).firstMatch(value) ?: return null
         return substituteTemplate(extraction.outputTemplate, match)
     }
 }

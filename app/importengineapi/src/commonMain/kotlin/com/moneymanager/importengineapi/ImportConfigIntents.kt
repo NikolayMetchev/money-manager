@@ -19,6 +19,7 @@ import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.qif.QifImportRecord
+import com.moneymanager.regex.PortableRegex
 import kotlin.time.Instant
 
 /*
@@ -113,7 +114,7 @@ sealed interface ApiStrategyMutation {
 sealed interface AccountMappingMutation {
     data class Create(
         val key: String,
-        val valuePattern: Regex,
+        val valuePattern: PortableRegex,
         val accountId: AccountId,
         val strategyId: CsvImportStrategyId? = null,
     ) : AccountMappingMutation

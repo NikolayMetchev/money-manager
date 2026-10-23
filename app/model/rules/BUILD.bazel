@@ -26,7 +26,10 @@ kmp_library(
         "//app/model/core",
         "@maven_kmp//:kotlinx_serialization_core",
     ],
-    deps = ["//utils/bigdecimal"],
+    deps = [
+        "//utils/bigdecimal",
+        "//utils/regex",
+    ],
 )
 
 kmp_test(

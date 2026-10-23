@@ -5,7 +5,7 @@ import com.moneymanager.csv.CsvParseResult
 /**
  * Reads `.xlsx` (and legacy `.xls`) workbooks as tabular data, so a worksheet can be treated exactly
  * like a CSV file: first row = headers, remaining rows = data. Implemented with Apache POI on JVM only;
- * the Android and native `actual`s return [UnsupportedXlsxParser] (see [createXlsxParser]).
+ * the Android, native and browser `actual`s return [UnsupportedXlsxParser] (see [createXlsxParser]).
  */
 interface XlsxParser {
     /** Worksheet names in workbook order. */
@@ -28,7 +28,7 @@ class XlsxUnsupportedPlatformException(
 ) : UnsupportedOperationException(message)
 
 /**
- * The [XlsxParser] of every platform without Apache POI (Android, native). Each call fails with
+ * The [XlsxParser] of every platform without Apache POI (Android, native, the browser). Each call fails with
  * [XlsxUnsupportedPlatformException], so an xlsx file fails on its own instead of aborting a whole import.
  */
 internal object UnsupportedXlsxParser : XlsxParser {

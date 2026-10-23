@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.repository.AccountMappingReadRepository
+import com.moneymanager.regex.compileRegex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -40,7 +41,7 @@ class AccountMappingReadRepositoryImpl(
         AccountMapping(
             id = entity.id,
             strategyId = entity.strategy_id?.let { CsvImportStrategyId(Uuid.parse(it)) },
-            valuePattern = Regex(entity.value_pattern, RegexOption.IGNORE_CASE),
+            valuePattern = compileRegex(entity.value_pattern, RegexOption.IGNORE_CASE),
             accountId = AccountId(entity.account_id),
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),
             updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),

@@ -37,6 +37,7 @@ import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.PassThroughDetector
+import com.moneymanager.regex.compileRegex
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -1527,7 +1528,7 @@ class CsvTransferMapperTest {
         return AccountMapping(
             id = id,
             strategyId = strategyId,
-            valuePattern = Regex(".*Amazoncouk.*", RegexOption.IGNORE_CASE),
+            valuePattern = compileRegex(".*Amazoncouk.*", RegexOption.IGNORE_CASE),
             accountId = accountId,
             createdAt = now,
             updatedAt = now,
