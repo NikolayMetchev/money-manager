@@ -99,6 +99,7 @@ import com.moneymanager.ui.screens.people.PeopleScreen
 import com.moneymanager.ui.screens.people.PersonAuditScreen
 import com.moneymanager.ui.screens.qif.QifImportDetailScreen
 import com.moneymanager.ui.screens.qif.QifStrategyEditorScreen
+import com.moneymanager.ui.screens.settings.DatabaseReplacement
 import com.moneymanager.ui.screens.settings.DatabaseSizeBreakdownScreen
 import com.moneymanager.ui.screens.settings.SettingsScreen
 import com.moneymanager.ui.screens.settings.StrategyCatalogScreen
@@ -123,7 +124,7 @@ fun MoneyManagerApp(
     databaseLocation: DbLocation,
     services: AppServices,
     onRequestSwitchDatabase: (DbLocation) -> Unit,
-    onReloadFromRemote: () -> Unit = {},
+    onReplaceDatabase: (DatabaseReplacement) -> Unit = {},
     remoteController: RemoteDatabaseController? = null,
     database: MoneyManagerDatabaseWrapper? = null,
     strategySyncController: StrategySyncController? = null,
@@ -380,7 +381,7 @@ fun MoneyManagerApp(
                                     if (syncState.status == SyncStatus.CONFLICT) {
                                         showConflictDownloadConfirm = true
                                     } else {
-                                        onReloadFromRemote()
+                                        remoteController?.let { controller -> onReplaceDatabase { controller.download(it) } }
                                     }
                                 },
                             )
@@ -489,7 +490,7 @@ fun MoneyManagerApp(
                                                 maintenance = services.imports.maintenance,
                                                 currentDatabaseLocation = databaseLocation,
                                                 onRequestSwitchDatabase = onRequestSwitchDatabase,
-                                                onReloadFromRemote = onReloadFromRemote,
+                                                onReplaceDatabase = onReplaceDatabase,
                                                 onShowDbSizeBreakdown = {
                                                     navigationHistory.navigateTo(Screen.DatabaseSizeBreakdown)
                                                 },
@@ -1079,7 +1080,7 @@ fun MoneyManagerApp(
                         confirmButton = {
                             TextButton(onClick = {
                                 showConflictDownloadConfirm = false
-                                onReloadFromRemote()
+                                remoteController?.let { controller -> onReplaceDatabase { controller.download(it) } }
                             }) { Text("Discard local") }
                         },
                         dismissButton = {

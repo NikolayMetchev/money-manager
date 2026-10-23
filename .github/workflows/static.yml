@@ -57,6 +57,9 @@ jobs:
         # SchemaSpy needs the `dot` binary to render schema relationship diagrams (its action runs here).
         run: sudo apt-get update && sudo apt-get install -y graphviz
       - name: Build the site
+        env:
+          # The browser app's Google Drive sign-in (a "Web application" OAuth client); without it the app offers no Drive.
+          GOOGLE_OAUTH_WEB_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_WEB_CLIENT_ID }}
         # //webpage:site is webpage/'s pages with the schema docs (database/), the strategy catalog
         # (strategy-library/, which the app fetches from <pages-url>/strategy-library/index.json), the
         # KDoc (kdoc/) and the browser app (app/, #84) at their paths (#1027).

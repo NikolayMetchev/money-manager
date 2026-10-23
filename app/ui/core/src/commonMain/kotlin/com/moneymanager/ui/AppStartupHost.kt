@@ -231,32 +231,32 @@ private fun AppStartupContent(
                         )
                     }
                 },
-                // Re-hydrate the bound cloud database in place. Unlike a switch (different file), this
-                // overwrites the *currently open* working copy, so the live connection must be closed
-                // first — otherwise SQLite reports the database as busy/locked (notably on Android).
-                onReloadFromRemote = {
-                    if (remoteController != null) {
-                        // Disable the download/upload actions immediately (before the loading screen takes
-                        // over), so a second click can't kick off a concurrent reload.
-                        remoteController.beginBusy()
-                        scope.launch {
-                            val loaded = databaseState as? AppDatabaseState.Loaded ?: return@launch
+                // Unlike a switch (to another file), a replacement may overwrite the *currently open* working
+                // copy, so the session closes the live connection first and reopens what the replacement returns.
+                onReplaceDatabase = { replacement ->
+                    // Disable the download/upload actions immediately (before the loading screen takes over), so
+                    // a second click can't start a concurrent replacement.
+                    remoteController?.beginBusy()
+                    scope.launch {
+                        val loaded = databaseState as? AppDatabaseState.Loaded ?: return@launch
+                        databaseState = AppDatabaseState.Loading(Progress.counted("Downloading from cloud…", 0, 100))
+                        onDatabaseReady(null, null)
+                        try {
                             databaseState =
-                                AppDatabaseState.Loading(Progress.counted("Downloading from cloud…", 0, 100))
-                            onDatabaseReady(null, null)
-                            try {
-                                databaseState =
-                                    AppDatabaseState.Loaded(
-                                        sessions.reloadFromRemote(loaded.session) { progress ->
-                                            databaseState = AppDatabaseState.Loading(progress)
-                                        },
-                                    )
-                            } catch (expected: CancellationException) {
-                                throw expected
-                            } catch (expected: Exception) {
-                                onErrorLog("Failed to download database from cloud", expected)
-                                databaseState = AppDatabaseState.Error(loaded.location, expected)
-                            }
+                                AppDatabaseState.Loaded(
+                                    sessions.replaceOpen(
+                                        loaded.session,
+                                        { progress -> databaseState = AppDatabaseState.Loading(progress) },
+                                        replacement,
+                                    ),
+                                )
+                        } catch (expected: CancellationException) {
+                            throw expected
+                        } catch (expected: Exception) {
+                            onErrorLog("Failed to replace the open database", expected)
+                            // A download or a wrong password fails before the working copy is touched, so go back
+                            // to it and say why, rather than leaving the person on an error screen.
+                            if (load(loaded.location) == null) switchError = loaded.location to expected
                         }
                     }
                 },

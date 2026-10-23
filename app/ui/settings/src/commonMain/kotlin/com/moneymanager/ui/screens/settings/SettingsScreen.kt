@@ -152,7 +152,7 @@ fun SettingsScreen(
     maintenance: Maintenance,
     currentDatabaseLocation: DbLocation,
     onRequestSwitchDatabase: (DbLocation) -> Unit,
-    onReloadFromRemote: () -> Unit = {},
+    onReplaceDatabase: (DatabaseReplacement) -> Unit = {},
     onShowDbSizeBreakdown: () -> Unit = {},
     onRunSetupWizard: () -> Unit = {},
     remoteController: RemoteDatabaseController? = null,
@@ -234,7 +234,7 @@ fun SettingsScreen(
                 database = database,
                 currentDatabaseLocation = currentDatabaseLocation,
                 onRequestSwitchDatabase = onRequestSwitchDatabase,
-                onReloadFromRemote = onReloadFromRemote,
+                onReplaceDatabase = onReplaceDatabase,
             )
         }
 

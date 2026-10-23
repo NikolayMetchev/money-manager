@@ -158,17 +158,26 @@ class DatabaseSessions(
     }
 
     /**
-     * Re-downloads the bound cloud database over [current]'s working copy and reopens it. [current] is
-     * closed first, since restoring over a still-open handle fails as busy/locked (notably on Android).
+     * Closes [current], runs [replace] (which may write over its working copy) and opens the location [replace]
+     * returns. Anything that can replace the open database's file goes through here, since writing over a still-open
+     * handle fails as busy/locked (on Android, and always in the browser) or leaves the app reading the old file.
      */
+    suspend fun replaceOpen(
+        current: DatabaseSession,
+        onProgress: (Progress) -> Unit = {},
+        replace: suspend (onProgress: (Progress) -> Unit) -> DbLocation,
+    ): DatabaseSession {
+        current.database.close()
+        return open(replace(onProgress), onProgress = onProgress)
+    }
+
+    /** Re-downloads the bound cloud database over [current]'s working copy and reopens it. */
     suspend fun reloadFromRemote(
         current: DatabaseSession,
         onProgress: (Progress) -> Unit = {},
     ): DatabaseSession {
         val controller = requireNotNull(remoteController) { "Reloading a cloud database needs a remote controller" }
-        current.database.close()
-        val location = controller.download(onProgress)
-        return open(location, onProgress = onProgress)
+        return replaceOpen(current, onProgress) { controller.download(it) }
     }
 
     /** Replaces the database at [location] with a fresh one, keeping a [backup] of the old file or deleting it. */

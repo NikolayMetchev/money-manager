@@ -20,6 +20,7 @@ kotlin_constants(
     obfuscated = {
         "@google_oauth//:client_id.hex": "CLIENT_ID",
         "@google_oauth//:client_secret.hex": "CLIENT_SECRET",
+        "@google_oauth//:web_client_id.hex": "WEB_CLIENT_ID",
     },
     object = "GeneratedGoogleOAuth",
     package = "com.moneymanager.remotestorage.googledrive",
@@ -44,6 +45,7 @@ kmp_library(
     ],
     plugins = ["serialization"],
     visibility = ["//visibility:public"],
+    web_srcs = glob(["src/webMain/kotlin/**/*.kt"]),
     web_targets = [
         "wasmJs",
         "js",
@@ -86,6 +88,7 @@ kmp_test(
         "mingwX64",
     ],
     plugins = ["serialization"],
+    web_srcs = glob(["src/webTest/kotlin/**/*.kt"]),
     web_targets = [
         "wasmJs",
         "js",

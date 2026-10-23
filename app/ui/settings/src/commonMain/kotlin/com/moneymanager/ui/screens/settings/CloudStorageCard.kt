@@ -45,6 +45,12 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 /**
+ * Writes a database over the open one, reporting progress, and returns the location to open afterwards. The app root
+ * owns the database's lifecycle, so it closes the open database before running it and reopens what it returns.
+ */
+typealias DatabaseReplacement = suspend (onProgress: (Progress) -> Unit) -> DbLocation
+
+/**
  * Settings card for backing the active database with a remote-storage provider (issue #86): create a
  * remote copy of the current database, open one from a provider, or sync the active one.
  */
@@ -54,7 +60,7 @@ fun CloudStorageCard(
     database: MoneyManagerDatabaseWrapper,
     currentDatabaseLocation: DbLocation,
     onRequestSwitchDatabase: (DbLocation) -> Unit,
-    onReloadFromRemote: () -> Unit,
+    onReplaceDatabase: (DatabaseReplacement) -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val uriHandler = LocalUriHandler.current
@@ -163,10 +169,8 @@ fun CloudStorageCard(
                 }
             }
 
-            // Re-hydrating overwrites the *currently open* working copy, so the live database must be
-            // closed before restore (or SQLite reports it busy, notably on Android). The app root owns
-            // the database lifecycle, so it performs the close → download → reopen as one operation.
-            fun download() = onReloadFromRemote()
+            // Re-hydrating overwrites the *currently open* working copy.
+            fun download() = onReplaceDatabase { controller.download(it) }
 
             BoundState(
                 providerLabel = providerLabel,
@@ -275,10 +279,17 @@ fun CloudStorageCard(
         password: String,
     ) {
         openType = null
+        val target = remoteCacheLocation(file.name)
+        // The archive's working copy is the open database (say, a copy kept from an earlier open): the download
+        // overwrites it, so it has to be closed first, and the root reopens it.
+        if (target == currentDatabaseLocation) {
+            onReplaceDatabase { onProgress -> controller.openRemote(type.id, config, file, target, password, onProgress) }
+            return
+        }
         busy = true
         scope.launch {
             runCatching {
-                controller.openRemote(type.id, config, file, remoteCacheLocation(file.name), password) {
+                controller.openRemote(type.id, config, file, target, password) {
                     syncProgress = it
                 }
             }.onSuccess { location ->
