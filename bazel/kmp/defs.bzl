@@ -169,6 +169,7 @@ def kmp_library(
         web_deps = [],
         wasm_js_deps = [],
         js_deps = [],
+        metadata_deps = [],
         exports = [],
         jvm_android_exports = [],
         jvm_exports = [],
@@ -227,6 +228,9 @@ def kmp_library(
         web_deps: `webMain` dependencies.
         wasm_js_deps: `wasmJsMain` dependencies.
         js_deps: `jsMain` dependencies.
+        metadata_deps: what only `:<name>_metadata` adds: a package each target takes from a different library
+            (Material 3 is androidx's on Android, `-desktop` on the JVM), so `deps` has none, gets the one the
+            common metadata resolves.
         exports: `commonMain` `api` dependencies: on the classpath of everything that depends on this module.
         jvm_android_exports: `jvmAndroidMain` `api` dependencies.
         jvm_exports: `jvmMain` `api` dependencies.
@@ -348,7 +352,7 @@ def kmp_library(
             module = "%s:%s" % (package.replace("/", "."), package.replace("/", "-")),
             srcs = common_srcs,
             generated = generated_native,
-            deps = _on("metadataWeb" if web_targets else "metadata", deps + exports),
+            deps = _on("metadataWeb" if web_targets else "metadata", deps + metadata_deps + exports),
             plugins = plugin_labels(plugins, "native"),
             web = bool(web_targets),
             visibility = visibility,

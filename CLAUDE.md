@@ -131,7 +131,7 @@ workflow because label events start it: any other label's run skips, without can
 | `utils/parsers/{csv,qif,xlsx}/` | File-format parsers |
 | `utils/rest/` | Shared Ktor `ApiClient`, request signing, SCA challenge signing (`ScaCrypto`: RSA keys + SHA256withRSA on cryptography-kotlin, so native too; suspending, as WebCrypto has no blocking calls) and API traffic recording |
 | `utils/httpclient/` | The one place the Ktor engine is chosen: `platformHttpClient()` runs on Ktor's `ktor-client-engine-defaults` (OkHttp on JVM/Android, Curl on Linux, Darwin on macOS, WinHttp on Windows; native TLS comes from the OS or the statically linked libcurl), found by engine discovery. Build every production `HttpClient` with it, never with a named engine. ProGuard keeps `OkHttpEngineContainer` for the ServiceLoader lookup |
-| `utils/compose/{filePicker,scrollbar}/` | Platform file/folder pickers and scrollbar widgets |
+| `utils/compose/{filePicker,scrollbar}/` | Platform file/folder pickers and scrollbar widgets. In the browser a picker is an `<input type=file>`, a save is a download, and folders are unsupported |
 | `app/model/core/` | The flat `domain.model` package: entities, ids, `Money`, audit entries. Depends on nothing but `utils/bigdecimal` and `utils/files` (and, in the browser, the zone database `@js-joda/timezone`) |
 | `app/model/rules/` | The strategy vocabulary that CSV and API share: `StrategyRule`/`RuleAction` and their `RuleEngine`, `Condition`, `ValueExpr`, `AssetCodeRules`, `FeeRule`, `ForeignAmount`, `RuleEvaluator` — see **Import Strategies** |
 | `app/model/{apistrategy,accountmapping,csv,qif,csvstrategy,importdirectory,passthrough,reconciliation,timeline}/` | One module per `domain.model` sub-package. All depend on `model/core`; `qif`→`csv`, `csvstrategy`→`qif`+`accountmapping` |
@@ -156,7 +156,8 @@ workflow because label events start it: any other label's run skips, without can
 | `app/strategycatalog/` (+ `di/`) | Browse/install the published strategy catalog (`StrategyCatalogController`) |
 | `app/importfilesource/{core,localfolder}/` | `ImportFileSource` abstraction for import directories; local-folder / Android SAF implementations |
 | `app/remotestorage/core/` | Generic `RemoteStorageProvider` interface + factory (DB-free, backend-agnostic) |
-| `app/remotestorage/googledrive/` | Google Drive backend — Drive REST v3 over Ktor (JVM + Android) |
+| `app/remotestorage/googledrive/` | Google Drive backend — Drive REST v3 over Ktor (every platform) |
+| `app/remotestorage/googledrive/loopback/` | The installed-app loopback sign-in (desktop and CLI): `LoopbackRedirectReceiver` on raw `ktor-network` sockets, which the browser has none of, and the vault-backed `googleDriveProvider`/`googleDriveTokenSource` built on it |
 | `app/remotestorage/sync/` | Hydrate/push orchestration (`RemoteDatabaseSyncService`/`RemoteDatabaseController`) |
 | `app/di/scope/`, `app/di/params/` | The `AppScope`/`DatabaseScope` markers, and `AppComponentParams`. Leaf modules, so contributing a DI module costs nothing else |
 | `app/di/core/` | The `AppComponent` graph only. Metro merges contributors off its compile classpath (see **Dependency Injection**) |
@@ -295,9 +296,10 @@ re-hydrates it (decrypt → inflate → write local `.db` → rebuild materializ
   `upload`/`download`/`list`/`delete`) + `RemoteStorageProviderFactory`. **DB-free and crypto-free** on
   purpose, so backends stay reusable and testable. Don't add DB/encryption methods here.
 - `app/remotestorage/googledrive` — Drive REST v3 over the shared **Ktor** client, all in `commonMain`
-  (runs on JVM, Android **and** native; the Google Java SDK is JVM-only and not used). OAuth is the
-  installed-app loopback flow, with the redirect received on raw `ktor-network` sockets. The only
-  platform-specific piece is `BrowserLauncher`: `DesktopBrowserLauncher` (JVM), `SystemBrowserLauncher`
+  (runs on JVM, Android, native **and** the browser; the Google Java SDK is JVM-only and not used). Sign-in is a
+  `GoogleAccessTokenSource`: on desktop and in the CLI the installed-app loopback flow
+  (`app/remotestorage/googledrive/loopback`), with the redirect received on raw `ktor-network` sockets; on Android
+  Google Identity Services. The only platform-specific piece of the loopback flow is `BrowserLauncher`: `DesktopBrowserLauncher` (JVM), `SystemBrowserLauncher`
   (native), or `PrintUrlBrowserLauncher` for headless/SSH use.
 - `app/remotestorage/sync` — composes `DatabaseManager` + `ArchiveCodec` + a provider:
   `RemoteDatabaseSyncService` (the pipeline) and `RemoteDatabaseController` (session-scoped facade that
@@ -552,7 +554,7 @@ stdout carries only the result: prompts, warnings and errors go to stderr, and I
 
 ## UI
 
-**Compose Multiplatform** with Material 3. JVM and Android only.
+**Compose Multiplatform** with Material 3. JVM, Android and the browser (wasmJs, js; the browser app itself is still in progress, #84).
 
 ## Presenters
 
@@ -661,11 +663,16 @@ set of writes.
   tests then run in Node as `:test_wasmJs` and `:test_js`. Code the browser shares with native goes in `nonJvmMain`,
   code both browser targets share in `webMain`. So far: `utils/{bigdecimal,currency,humanreadable,files,httpclient}`, `utils/parsers/{csv,qif}`, `app/di/scope`,
   `app/model/*`, `app/importengineapi`, `app/tasks`, `app/cryptodata`, `utils/{regex,coroutines,rest}`,
-  `utils/parsers/xlsx` (unsupported there, as on native), `app/importfilesource/core`, the importers
+  `utils/parsers/xlsx` (unsupported there, as on native), `app/importfilesource/{core,localfolder}` (local folders build but
+  can't be read: the browser has no file times), the importers
   (`app/{csvimporter,qifimporter,apiimporter,importer}`), `app/{reconciliation,strategies,query}`,
-  `app/presenter/{core,accounts,transactions}`, the database (`app/db/{schema,seed,read,write,repository,core,di}`,
+  `app/presenter/*`, the database (`app/db/{schema,seed,read,write,repository,core,di}`,
   `app/di/params`, `test/app/db`), `utils/{archive,localsettings,credentialvault}` (+ their `di`), `app/{importdirectory,apiimport,session}`
-  and `app/remotestorage/{core,sync}`. `ArchiveCodec` compresses with the browser's `CompressionStream` and encrypts with
+  `app/remotestorage/{core,sync,googledrive}`, `app/strategycatalog` (+ `di`), and the Compose UI: `app/ui/*`,
+  `app/ui/imports/*` and `utils/compose/*`, whose web tests stay off (`kmp_web_tests false`: Compose's tests need a
+  browser canvas). In the browser the database picker lists the databases in the worker's store
+  (`LocalBrowserDatabases`, which the entry point supplies from `WebDatabaseManager.listDatabases`) and asks for a name,
+  like Android's. `ArchiveCodec` compresses with the browser's `CompressionStream` and encrypts with
   WebCrypto, so the browser reads the other platforms' archives (`ArchiveGoldenTest`). Mappie (2.4.21) maps the internal
   `var _hashCode` Kotlin/Wasm's `Any` declares when a mapper's source and target both come from other modules, which
   the wasm link rejects: such a mapper is written out (`AccountMapper`). The browser app is a `DeviceInfo.Web` host (OS and browser from the

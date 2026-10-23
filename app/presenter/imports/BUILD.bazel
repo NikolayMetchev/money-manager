@@ -1,5 +1,7 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
+# Local import folders need file times, which the browser has none of (utils/files): no browser tests.
+# gazelle:kmp_web_tests false
 # gazelle:kmp_android_host_tests false
 # gazelle:kmp_plugins compose
 # gazelle:kmp_export //app/session
@@ -25,6 +27,10 @@ kmp_library(
     ],
     plugins = ["compose"],
     visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = [
         "//app/session",
         "//app/tasks",

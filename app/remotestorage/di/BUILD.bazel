@@ -37,6 +37,7 @@ kmp_library(
     ],
     deps = [
         "//app/remotestorage/googledrive",
+        "//app/remotestorage/googledrive/loopback",
         "@maven_kmp//:metro_runtime",
     ],
 )

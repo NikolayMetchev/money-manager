@@ -13,7 +13,7 @@ import com.moneymanager.remotestorage.googledrive.DriveImportFileSource
 import com.moneymanager.remotestorage.googledrive.GoogleAccessTokenSource
 import com.moneymanager.remotestorage.googledrive.GoogleOAuthDefaults
 import com.moneymanager.remotestorage.googledrive.driveImportFileSource
-import com.moneymanager.remotestorage.googledrive.googleDriveTokenSource
+import com.moneymanager.remotestorage.googledrive.loopback.googleDriveTokenSource
 
 // The desktop JVM app and the native CLI read local folders and Google Drive, signing in to Drive through the
 // installed-app loopback flow with consent opened by a BrowserLauncher. Android has its own SAF and token sources.

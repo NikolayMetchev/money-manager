@@ -1,7 +1,8 @@
 load("//bazel/kmp:defs.bzl", "kmp_library")
 
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android
+# gazelle:kmp_targets android web
+# gazelle:kmp_web_tests false
 # gazelle:kmp_device_test_srcs src/commonTest/kotlin
 # gazelle:kmp_device_test_resources src/commonTest/resources
 
@@ -13,12 +14,28 @@ kmp_library(
         "@maven_kmp//:androidx_compose_material_icons_core",
     ],
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    js_deps = [
+        "@maven_kmp//:compose_material3",
+        "@maven_kmp//:compose_material_icons_core",
+    ],
     jvm_deps = [
         "@maven_kmp//:compose_material3_desktop",
         "@maven_kmp//:compose_material_icons_core_desktop",
     ],
+    metadata_deps = [
+        "@maven_kmp//:compose_material3",
+        "@maven_kmp//:compose_material_icons_core",
+    ],
     plugins = ["compose"],
     visibility = ["//visibility:public"],
+    wasm_js_deps = [
+        "@maven_kmp//:compose_material3",
+        "@maven_kmp//:compose_material_icons_core",
+    ],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     deps = [
         "//app/db/write",
         "//app/importengineapi",
@@ -39,11 +56,11 @@ kmp_library(
         "//utils/humanreadable",
         "@maven_kmp//:androidx_compose_runtime",
         "@maven_kmp//:compose_charts",
+        "@maven_kmp//:compose_foundation",
+        "@maven_kmp//:compose_ui",
         "@maven_kmp//:kermit",
         "@maven_kmp//:kotlinx_coroutines_core",
-        "@maven_kmp//:org_jetbrains_compose_foundation_foundation",
         "@maven_kmp//:org_jetbrains_compose_foundation_foundation_layout",
-        "@maven_kmp//:org_jetbrains_compose_ui_ui",
         "@maven_kmp//:org_jetbrains_compose_ui_ui_geometry",
         "@maven_kmp//:org_jetbrains_compose_ui_ui_text",
     ],

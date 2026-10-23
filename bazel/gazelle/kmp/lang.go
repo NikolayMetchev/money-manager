@@ -47,6 +47,7 @@ var resolvedAttrs = map[string]bool{
 	"web_deps":            true,
 	"wasm_js_deps":        true,
 	"js_deps":             true,
+	"metadata_deps":       true,
 }
 
 // The `*_srcs` globs aren't mergeable: each is fixed for its source set and Gazelle can't merge every glob

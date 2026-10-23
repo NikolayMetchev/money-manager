@@ -99,6 +99,12 @@ func (*kmpLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Remote
 				}
 				add(leaf.platform, dep)
 			}
+			// The common metadata compile still needs one: the library the common metadata resolves.
+			if on := imp.leaves.metadata(); platform == "" && !imp.test && on != "" {
+				if dep, found := resolveImport(c, ix, kc, name, from, named, []string{on}); found {
+					add(metadataPlatform.name, dep)
+				}
+			}
 		}
 	}
 	for platform, labels := range imp.keep {
@@ -152,6 +158,8 @@ var (
 	nonJvmPlatform = &platform{"nonJvm", "non_jvm_deps", "", commonPlatform}
 	nativePlatform = &platform{"native", "native_deps", "", nonJvmPlatform}
 	webPlatform    = &platform{"web", "web_deps", "", nonJvmPlatform}
+	// commonMain's metadata compile alone (a module with native or browser targets has one): what deps can't name.
+	metadataPlatform = &platform{"metadata", "metadata_deps", "", nil}
 	platforms      = []*platform{
 		commonPlatform,
 		jvmAndroidPlatform,
@@ -165,6 +173,7 @@ var (
 		webPlatform,
 		{"wasmJs", "wasm_js_deps", "", webPlatform},
 		{"js", "js_deps", "", webPlatform},
+		metadataPlatform,
 		// androidDeviceTest is its own compilation: commonTest's dependencies don't reach it.
 		{"androidDevice", "device_deps", "", nil},
 	}
@@ -249,6 +258,17 @@ func (l leaves) below(group string) []leaf {
 		out = append(out, android)
 	}
 	return out
+}
+
+// metadata is the lockfile platform commonMain's metadata compile resolves on, or "" when the rule has none.
+func (l leaves) metadata() string {
+	switch {
+	case len(l.web) > 0:
+		return "metadataWeb"
+	case len(l.native) > 0:
+		return "metadata"
+	}
+	return ""
 }
 
 func lockPlatforms(below []leaf) []string {

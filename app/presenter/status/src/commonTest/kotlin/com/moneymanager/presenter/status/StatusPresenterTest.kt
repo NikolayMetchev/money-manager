@@ -23,13 +23,15 @@ import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -132,22 +134,29 @@ class StatusPresenterTest {
     private fun withStatus(
         cloud: Boolean,
         test: suspend (DatabaseSession, RemoteDatabaseController?, CredentialVault, CoroutineScope) -> Unit,
-    ) = runBlocking {
+    ) = runTest(timeout = WHOLE_TEST_TIMEOUT) {
+        // Real time, one coroutine at a time, off runTest's scheduler: in the context, Turbine would collect on its
+        // virtual clock, and the presenter's local-changes poll would spin without waiting. A hang fails the test
+        // rather than the whole CI job.
+        CoroutineScope(Dispatchers.Default.limitedParallelism(1)).async { runStatus(cloud, test) }.await()
+    }
+
+    private suspend fun runStatus(
+        cloud: Boolean,
+        test: suspend (DatabaseSession, RemoteDatabaseController?, CredentialVault, CoroutineScope) -> Unit,
+    ) {
         val location = createTestDatabaseLocation()
         val manager = createTestDatabaseManager()
         val settings = InMemoryLocalSettings()
         val remote = RemoteDatabaseController(RemoteDatabaseSyncService(manager, settings), SingleProviderFactory(provider))
         val session = DatabaseSessions(manager, settings, inMemoryCredentialVault(), remote).open(location)
-        // Actions run on the test's own thread. On a pool thread their state writes would race the composition's
-        // cancellation: under Turbine's Unconfined collector, Molecule sends a frame inline from the global snapshot
-        // lock's write observer while the cancelling thread holds the Recomposer's lock and wants the snapshot's.
-        val scope = CoroutineScope(SupervisorJob() + coroutineContext.minusKey(Job))
+        // Actions run on the test's own one-at-a-time dispatcher. In parallel their state writes would race the
+        // composition's cancellation: under Turbine's Unconfined collector, Molecule sends a frame inline from the global
+        // snapshot lock's write observer while the cancelling thread holds the Recomposer's lock and wants the snapshot's.
+        val scope = CoroutineScope(SupervisorJob() + currentCoroutineContext().minusKey(Job))
         try {
-            // A hang fails the test rather than the whole CI job.
-            withTimeout(WHOLE_TEST_TIMEOUT) {
-                if (cloud) remote.createRemote(provider.id, null, "db.mmdb", location, session.database, "pw")
-                test(session, remote, unlockedCredentialVault(), scope)
-            }
+            if (cloud) remote.createRemote(provider.id, null, "db.mmdb", location, session.database, "pw")
+            test(session, remote, unlockedCredentialVault(), scope)
         } finally {
             scope.cancel()
             session.database.close()

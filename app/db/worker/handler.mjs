@@ -97,6 +97,7 @@ export function createHandler(sqlite3, store) {
     },
     exec: ({ db, sql, params, types }) => exec(database(db), sql, params, types),
     exists: ({ db }) => ({ exists: open.has(db) || store.exists(db) }),
+    list: () => ({ names: store.list() }),
     delete: ({ db }) => {
       const handle = open.get(db);
       if (handle) {
@@ -165,6 +166,12 @@ export function opfsStore(pool) {
   const path = (name) => new URL(name, "file://localhost/").pathname;
   const exists = (name) => pool.getFileNames().includes(path(name));
   return {
+    // The databases, not their journals, by the names they were opened under.
+    list: () =>
+      pool
+        .getFileNames()
+        .filter((file) => file.startsWith("/") && !file.endsWith("-journal"))
+        .map((file) => decodeURIComponent(file.slice(1))),
     open: (name) => {
       const db = new pool.OpfsSAHPoolDb(name);
       // The pool has no WAL (no shared memory between handles), and a rollback journal it keeps itself.
@@ -196,6 +203,7 @@ export function memoryStore(sqlite3) {
       db.close();
     },
     exists: (name) => files.has(name),
+    list: () => [...files.keys()],
     delete: (name) => files.delete(name),
     read: (name) => files.get(name),
     write: (name, bytes) => files.set(name, bytes.slice()),

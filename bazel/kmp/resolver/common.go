@@ -121,8 +121,11 @@ func (r *Resolver) visibleSourceSets(p Platform, c Coordinate, module *GradleMod
 			continue
 		}
 		sets, ok := consumerSourceSets(consumer, module, byVariant)
-		if !ok {
-			return nil, nil, fmt.Errorf("%s: no variant for %s in its project structure: %w", c, consumer.Name, errNoVariant)
+		if !ok || len(sets) == 0 {
+			// No module that uses the library targets a platform it doesn't publish (that compile couldn't resolve
+			// it), so that platform doesn't narrow what they share: Compose's UI has no Linux or Windows variant.
+			// Nor does a variant whose code is another module (JetBrains Compose's Android one is AndroidX's).
+			continue
 		}
 		next := map[string]bool{}
 		for _, s := range sets {
@@ -132,9 +135,12 @@ func (r *Resolver) visibleSourceSets(p Platform, c Coordinate, module *GradleMod
 		}
 		visible = next
 	}
+	if visible == nil {
+		return nil, nil, fmt.Errorf("%s: no variant for any consumer platform in its project structure: %w", c, errNoVariant)
+	}
 	// Android resolves a library's Android variant when it has one (the JVM one otherwise, counted above).
 	for _, name := range []string{"androidReleaseApiElements", "androidApiElements"} {
-		if sets, ok := byVariant[name]; ok {
+		if sets, ok := byVariant[name]; ok && len(sets) > 0 {
 			next := map[string]bool{}
 			for _, s := range sets {
 				if visible[s] {

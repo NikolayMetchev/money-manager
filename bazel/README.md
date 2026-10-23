@@ -114,7 +114,8 @@ PR, and `renovate-pins.yml` runs the script on it. 3 is by hand.
   those already bring every candidate, then to the one whose API brings the rest, and only then to the most specific.
   An import resolves to a library every compilation of its source set has, else per compilation (commonMain's
   Material 3 import is `compose_material3_desktop` on the JVM and `androidx_compose_material3` on Android),
-  preferring `artifacts` libraries over the modules they bring. `android.*` is the SDK.
+  preferring `artifacts` libraries over the modules they bring. Split that way, `deps` has none of them, so
+  `metadata_deps` gives `:<name>_metadata` the one the common metadata resolves (`compose_material3`). `android.*` is the SDK.
 - Directives, for what sources can't say, are per module and not inherited: `kmp_generate true`, `kmp_targets`,
   `kmp_export <label> [sourceSet]` (an API dep: always a dep, and exported), `kmp_keep_dep <label> [sourceSet]` (a dep
   no import explains: Metro contributors, runtime-only libraries), `kmp_plugins`, `kmp_sqldelight_package`,
@@ -180,7 +181,9 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
 - Common metadata comes in two views. `metadata` holds the source sets that JVM, Android and native share;
   `metadataWeb` holds those the web platforms share too, so it's never wider (no `concurrentMain` in
   kotlinx-coroutines). Only modules that compile for the browser compile their `commonMain` against
-  `metadataWeb`, so adding web targets never takes an API away from a module without them.
+  `metadataWeb`, so adding web targets never takes an API away from a module without them. A platform a library
+  doesn't publish, or publishes as another module (JetBrains Compose's Android variant is AndroidX's), doesn't narrow
+  either view: no module using the library compiles for it, so Compose's metadata still has `skikoMain`.
 - The Kotlin stdlib comes from the toolchain. Each
   `maven_kmp.install(name = …)` is its own resolution and hub repository. `artifacts` maps each library's alias to its
   `group:artifact:version`, written in `MODULE.bazel` with the platforms and repositories. A version several

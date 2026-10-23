@@ -47,6 +47,9 @@ external interface SqliteResponse : JsAny {
     val rows: JsArray<JsArray<JsAny?>>?
     val changes: Double?
     val exists: Boolean?
+
+    /** The databases in the worker's store, by name. */
+    val names: JsArray<JsAny?>?
     val size: Double?
     val bytes: Int8Array?
 }
