@@ -2,6 +2,7 @@ package com.moneymanager.ui.components.imports
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -21,7 +22,9 @@ import androidx.compose.ui.unit.dp
 
 /**
  * The title row of an import list screen: the screen title, the Strategies button and the format's
- * own file-picker button, plus any [extraActions] a format adds (e.g. CSV's Excel picker).
+ * own file-picker button, plus any [extraActions] a format adds (e.g. CSV's Excel picker). On a phone the
+ * buttons wrap under the title: squeezed beside it they grew hundreds of pixels tall and left the file list
+ * room for about one card.
  */
 @Composable
 fun ImportsScreenHeader(
@@ -32,10 +35,10 @@ fun ImportsScreenHeader(
     onStrategiesClick: () -> Unit,
     extraActions: @Composable RowScope.() -> Unit = {},
 ) {
-    Row(
+    FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = title,

@@ -3,6 +3,7 @@ package com.moneymanager.ui.screens
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.onAllNodesWithText
@@ -11,6 +12,7 @@ import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
@@ -501,6 +503,9 @@ class ImportMonzoCsvE2ETest {
 
             onNodeWithText("Imported (2)").performClick()
             waitForIdle()
+            // The list composes only the cards that fit, and the two files can land in either order.
+            waitUntilExactlyOneExists(hasText("Re-import all (2)"), timeoutMillis = 15000)
+            onNode(hasScrollToIndexAction()).performScrollToNode(hasText("second.csv"))
             waitUntilExactlyOneExists(hasText("second.csv"), timeoutMillis = 15000)
             onNodeWithText("Unimported (0)").assertExists()
 
