@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Re-pins everything a version bump leaves stale (#1029), so a Renovate PR needs no hand edits: the Kotlin/Native
-# toolchain when Kotlin moved, Node.js's archive SHA-256s, every Maven lockfile (`bazel run @<hub>//:pin`: maven_kmp's and the tools'
-# rules_jvm_external ones), MODULE.bazel.lock, and the
-# BUILD files Gazelle writes (a library's packages can move). renovate-pins.yml runs it on Renovate's branches;
+# toolchain when Kotlin moved, Node.js's archive SHA-256s, Skiko's version (the one Compose was built against), every
+# Maven lockfile (`bazel run @<hub>//:pin`: maven_kmp's and the tools' rules_jvm_external ones), MODULE.bazel.lock, and
+# the BUILD files Gazelle writes (a library's packages can move). renovate-pins.yml runs it on Renovate's branches;
 # run it by hand after editing MODULE.bazel.
 #
 # Not covered: aapt2's pins (bazel/kmp/android/pins.bzl, read from AGP's jar, see there), the SQLite
@@ -19,6 +19,7 @@ if [ "$module_kotlin" != "$pinned_native" ]; then
 fi
 
 python3 bazel/renovate/repin_node.py MODULE.bazel
+python3 bazel/renovate/repin_skiko.py MODULE.bazel
 
 for hub in $(sed -n 's|.*lock_file = "//bazel/kmp/deps:\(.*\)\.lock\.json".*|\1|p' MODULE.bazel); do
   bazel run "@$hub//:pin"
