@@ -23,6 +23,7 @@ INSERT OR IGNORE INTO platform (id, name) VALUES (0, 'SYSTEM');
 INSERT OR IGNORE INTO platform (id, name) VALUES (1, 'JVM');
 INSERT OR IGNORE INTO platform (id, name) VALUES (2, 'ANDROID');
 INSERT OR IGNORE INTO platform (id, name) VALUES (3, 'NATIVE');
+INSERT OR IGNORE INTO platform (id, name) VALUES (4, 'WEB');
 
 -- System device with the well-known fixed id (WellKnownIds.SYSTEM_DEVICE_ID = 1) so every seeded
 -- entity's provenance device_id is a compile-time constant (no last_insert_rowid read-back).

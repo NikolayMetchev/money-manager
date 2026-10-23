@@ -29,8 +29,8 @@ func (*kmpLang) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolve.
 func (*kmpLang) Embeds(r *rule.Rule, from label.Label) []label.Label { return nil }
 
 // Libraries the toolchain, the distribution and the Android SDK (android.jar, on every Android compile) provide:
-// no dependency to add. The browser's stdlib has the DOM (`kotlinx.browser`, `org.w3c`).
-var builtin = []string{"kotlin.", "java.", "javax.", "sun.", "kotlinx.cinterop.", "platform.", "android.", "kotlinx.browser.", "org.w3c."}
+// no dependency to add. The browser's DOM (`kotlinx.browser`, `org.w3c`) isn't: it's the kotlinx-browser library.
+var builtin = []string{"kotlin.", "java.", "javax.", "sun.", "kotlinx.cinterop.", "platform.", "android."}
 
 // Dependencies kotlin.* names stand for, which aren't Maven libraries here.
 var kotlinLibraries = map[string]string{

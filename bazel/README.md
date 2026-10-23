@@ -119,7 +119,7 @@ PR, and `renovate-pins.yml` runs the script on it. 3 is by hand.
   `kmp_export <label> [sourceSet]` (an API dep: always a dep, and exported), `kmp_keep_dep <label> [sourceSet]` (a dep
   no import explains: Metro contributors, runtime-only libraries), `kmp_plugins`, `kmp_sqldelight_package`,
   `kmp_sqldelight_dep`, `kmp_cinterops`, `kmp_generated_srcs`, `kmp_test_size`, `kmp_test_data`,
-  `kmp_test_jvm_flags`, `kmp_test_flaky`, `kmp_android_host_tests`, `kmp_device_test_srcs`,
+  `kmp_test_jvm_flags`, `kmp_test_flaky`, `kmp_android_host_tests`, `kmp_web_tests`, `kmp_device_test_srcs`,
   `kmp_device_test_resources`, `kmp_main_platform`, and the checks below. `# keep` on a dep keeps it too.
 - A run fails when two modules' main sources declare one package (one package, one module).
 - `//bazel/gazelle/kmp:generation_test` holds golden workspaces (`testdata/<case>`, `BUILD.in` → `BUILD.out`; refresh
@@ -163,7 +163,9 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
   `-desktop` jars to `jvm`, the androidx roots to `android`).
 - The browser platforms (#84) take a library's `kotlin-api` klib like native does: `wasmJs` is Kotlin/Wasm's `js`
   target (never WASI), `js` Kotlin/JS's IR compiler. Their hub targets are `kt_web_import`/`kt_web_group`
-  (`kmp/web.bzl`, `WebKlibInfo`).
+  (`kmp/web.bzl`, `WebKlibInfo`). Unlike native they also follow the `kotlin-runtime` variant, as a program links
+  its runtime closure: ktor's wasmJs runtime variant alone brings kotlinx-browser. A runtime dependency with no klib
+  (Compose's `skiko-js-wasm-runtime`, the program's own JavaScript and wasm) is left out.
 - Common metadata comes in two views. `metadata` holds the source sets that JVM, Android and native share;
   `metadataWeb` holds those the web platforms share too, so it's never wider (no `concurrentMain` in
   kotlinx-coroutines). Only modules that compile for the browser compile their `commonMain` against
@@ -241,7 +243,10 @@ klib into a production program (`-Xir-dce`): ES modules, plus the `.wasm` and it
 `//bazel/kmp/web/tests` builds and tests a module with every source set, and links a program, for both targets.
 Gazelle writes `web_targets` from `# gazelle:kmp_targets … wasmJs js` (`web` is both), maps `nonJvm`/`web`/`wasmJs`/`js`
 `Main` and `Test` dirs to their attributes, and resolves an import per browser target when no library has it for
-both; the DOM (`kotlinx.browser`, `org.w3c`) is the stdlib's.
+both. The DOM (`kotlinx.browser`, `org.w3c`) is `@maven_kmp//:kotlinx_browser`, not the stdlib's: Kotlin 2.4's
+wasm stdlib has none, and on js it brings `kotlin-dom-api-compat`, which KGP would add by itself. `# gazelle:kmp_web_tests false` keeps a module's tests
+off the browser targets when they need what a browser lacks (`utils/files`: a file system; it builds for the browser
+only so its dependents can, and the browser app never calls it).
 
 `kmp_test`'s `web_targets` link the test klib (unoptimised) into `:<name>_<target>_bin/test.mjs`, and `:<name>_wasmJs`
 / `:<name>_js` run it in Node on every host. Node is rules_nodejs' toolchain only, pinned in `MODULE.bazel` with each
@@ -249,6 +254,11 @@ platform's SHA-256 (no npm): Renovate bumps `NODE`, and `bazel/renovate/repin.sh
 nodejs.org's `SHASUMS256.txt` (`repin_node.py`). `testing/web/runner.mjs` defines the `describe`/`it` globals kotlin-test's adapter
 registers tests with, runs them (awaiting async ones) and prints TeamCity service messages, which `KnTestLauncher
 --node` turns into `test.xml` exactly as it does a native test binary's; `--test_filter` works the same way.
+
+A wasmJs link fails on any symbol it can't link, as native's does. The js link only warns, as KGP's does (the call
+throws if it runs): ktor 3.6.0's js klibs, built with Kotlin 2.3, call `EventTarget.addEventListener(String, (Event) ->
+Unit)`, which Kotlin 2.4's `kotlin-dom-api-compat` no longer has. A ktor built with 2.4 should let it go back to
+failing.
 
 ## Desktop
 

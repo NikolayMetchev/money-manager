@@ -1,8 +1,9 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_export @maven_kmp//:ktor_client_core
 # gazelle:kmp_keep_dep @maven_kmp//:ktor_client_engine_defaults jvmAndroidMain
 # gazelle:kmp_keep_dep @maven_kmp//:ktor_client_engine_defaults nativeMain
+# gazelle:kmp_keep_dep @maven_kmp//:ktor_client_engine_defaults webMain
 
 load("//bazel/kmp:defs.bzl", "kmp_library")
 
@@ -20,5 +21,10 @@ kmp_library(
         "mingwX64",
     ],
     visibility = ["//visibility:public"],
+    web_deps = ["@maven_kmp//:ktor_client_engine_defaults"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = ["@maven_kmp//:ktor_client_core"],
 )

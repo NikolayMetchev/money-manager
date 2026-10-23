@@ -281,6 +281,7 @@ private fun PlatformOriginRows(
         when (deviceInfo) {
             is DeviceInfo.Jvm -> " (Desktop)"
             is DeviceInfo.Native -> " (CLI)"
+            is DeviceInfo.Web -> " (Browser)"
             is DeviceInfo.Android -> " (Android)"
             null -> ""
         }

@@ -176,6 +176,9 @@ def _target(name, platform, resolved, names, artifacts):
             ", ".join(runtime),
         ) + 'kt_jvm_import(name = "%s%s", jars = [%s], neverlink = True)\n' % (full, _NEVERLINK, ", ".join(files))
     kind = "web" if platform in _WEB else "native"
+    if kind == "web":
+        # A klib's runtime-only dependencies only matter to the link, which takes every klib its deps reach.
+        deps = deps + _labels(names, _through_redirects(artifacts, resolved.get("runtime_deps", []), platform), platform)
     if not files:
         return 'kt_%s_group(name = "%s", target = "%s", deps = [%s])\n' % (kind, full, platform, ", ".join(deps))
     return 'kt_%s_import(name = "%s", target = "%s", klibs = [%s], deps = [%s])\n' % (

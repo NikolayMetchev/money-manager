@@ -266,7 +266,8 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		if len(kc.targets) > 0 && runsOn(testSetsPresent, nativeSets) {
 			t.SetAttr("native_targets", kc.targets)
 		}
-		if len(kc.web) > 0 && runsOn(testSetsPresent, webSets) {
+		webTests := len(kc.web) > 0 && !kc.noWebTests && runsOn(testSetsPresent, webSets)
+		if webTests {
 			t.SetAttr("web_targets", kc.web)
 		}
 		hostTests := kc.android && !kc.noHostTests && runsOnAndroid(testSetsPresent)
@@ -325,7 +326,7 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		if runsOn(testSetsPresent, nativeSets) {
 			testLeaves.native = kc.targets
 		}
-		if runsOn(testSetsPresent, webSets) {
+		if webTests {
 			testLeaves.web = kc.web
 		}
 		res.Imports = append(res.Imports, imports{byPlatform: keys(tests.imports), keep: kc.kept(true), test: true, associate: name, leaves: testLeaves})

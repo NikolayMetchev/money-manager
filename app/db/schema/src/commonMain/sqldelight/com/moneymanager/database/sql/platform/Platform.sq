@@ -1,5 +1,5 @@
--- platform: Lookup table for platform types (SYSTEM, JVM, ANDROID, NATIVE). Ids match the Kotlin
--- Platform enum; a database created before NATIVE existed gains that row on first native use.
+-- platform: Lookup table for platform types (SYSTEM, JVM, ANDROID, NATIVE, WEB). Ids match the Kotlin
+-- Platform enum; a database created before NATIVE or WEB existed gains that row on first use there.
 CREATE TABLE platform (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL UNIQUE

@@ -11,7 +11,10 @@ kmp_library(
     visibility = ["//visibility:public"],
     wasm_js_deps = ["@maven_kmp//:skiko_wasm_runtime"],
     wasm_js_srcs = glob(["src/wasmJsMain/kotlin/**/*.kt"]),
-    web_deps = ["@maven_kmp//:ktor_client_js"],
+    web_deps = [
+        "@maven_kmp//:kotlinx_browser",
+        "@maven_kmp//:ktor_client_js",
+    ],
     web_srcs = glob(["src/webMain/kotlin/**/*.kt"]),
     web_targets = [
         "wasmJs",

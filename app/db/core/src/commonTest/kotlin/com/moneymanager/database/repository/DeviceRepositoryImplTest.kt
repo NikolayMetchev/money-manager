@@ -88,6 +88,7 @@ class DeviceRepositoryImplTest : DbTest() {
             assertEquals("ANDROID", androidPlatform.name)
 
             assertEquals("NATIVE", platforms.find { it.id == 3L }?.name)
+            assertEquals("WEB", platforms.find { it.id == 4L }?.name)
         }
 
     @Test
@@ -99,6 +100,17 @@ class DeviceRepositoryImplTest : DbTest() {
             assertTrue(desktop != cli, "JVM and NATIVE devices must not share a row")
             assertEquals(DeviceInfo.Jvm("Linux", "box"), repositories.deviceRepository.getDeviceById(desktop))
             assertEquals(DeviceInfo.Native("Linux", "box"), repositories.deviceRepository.getDeviceById(cli))
+        }
+
+    @Test
+    fun `a browser is a host device of its own`() =
+        runTest {
+            val desktop = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("Linux", "box"))
+            val browser = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Web("Linux", "Chrome"))
+
+            assertTrue(desktop != browser, "JVM and WEB devices must not share a row")
+            assertEquals(browser, repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Web("Linux", "Chrome")))
+            assertEquals(DeviceInfo.Web("Linux", "Chrome"), repositories.deviceRepository.getDeviceById(browser))
         }
 
     @Test

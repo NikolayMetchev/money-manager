@@ -267,10 +267,10 @@ func TestStubVariantsAreNoVariant(t *testing.T) {
 
 func TestBreakCycles(t *testing.T) {
 	out := map[string]Resolved{
-		"g:plugin": {Deps: []string{"g:api", "g:builder"}},
-		"g:api":    {Deps: []string{"g:common"}, Runtime: []string{"g:plugin"}},
+		"g:plugin":  {Deps: []string{"g:api", "g:builder"}},
+		"g:api":     {Deps: []string{"g:common"}, Runtime: []string{"g:plugin"}},
 		"g:builder": {Runtime: []string{"g:common"}},
-		"g:common": {},
+		"g:common":  {},
 	}
 	breakCycles(out, []Coordinate{{"g", "plugin", "1"}}, nil)
 	if got := out["g:api"].Runtime; len(got) != 0 {
