@@ -247,7 +247,7 @@ class ApiImportServiceTest : DbTest() {
 
     @Test
     fun `a session already being imported elsewhere comes back as failed and the queue moves on`() =
-        runTest {
+        runDbTest {
             val monzo = connection("Monzo")
             val vault = unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzoSecrets)))
             val service = service(vault)
