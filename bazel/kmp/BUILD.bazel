@@ -25,8 +25,8 @@ define_kt_toolchain(
     # unused half is //bazel/kmp/checks's kmp_unused_deps: rules_kotlin's also counts what a dep re-exports.
     experimental_strict_kotlin_deps = "error",
     # Downstream compiles see ABI jars, so a body-only change doesn't recompile dependents. The ABI keeps
-    # Metro's contribution hints (metro/hints) and Compose's $stable fields; a target whose consumers need
-    # more opts out with the kt_abi_plugin_incompatible tag.
+    # Metro's contribution hints (metro/hints) and Compose's $stable fields; a module whose dependents need
+    # more opts out with `tags = ["kt_abi_plugin_incompatible"]` on its kmp_library.
     experimental_use_abi_jars = True,
     # The JDK .bazelrc runs (java_language_version).
     jvm_target = "25",
