@@ -3,7 +3,7 @@ package com.moneymanager.bigdecimal
 import com.ionspin.kotlin.bignum.integer.BigInteger as IonBigInteger
 
 /**
- * Native implementation of BigDecimal, reproducing java.math.BigDecimal exactly.
+ * Native and browser implementation of BigDecimal, reproducing java.math.BigDecimal exactly.
  *
  * Like java.math, the value is [unscaled] × 10^-[scale]. ionspin only supplies the integer arithmetic:
  * its own BigDecimal rounds by significant digits and formats differently, so wrapping it would drift.
