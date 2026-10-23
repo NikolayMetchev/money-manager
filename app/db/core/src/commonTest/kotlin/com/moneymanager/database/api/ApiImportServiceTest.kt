@@ -110,7 +110,7 @@ class ApiImportServiceTest : DbTest() {
             }
         }
 
-    private fun service(
+    private suspend fun service(
         vault: CredentialVault,
         countryCode: String? = "GB",
     ): ApiImportService =
@@ -130,7 +130,7 @@ class ApiImportServiceTest : DbTest() {
             countryCode = { countryCode },
         )
 
-    private fun deviceId(): DeviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+    private suspend fun deviceId(): DeviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
 
     private suspend fun strategy(name: String): ApiImportStrategy =
         repositories.apiImportStrategyRepository

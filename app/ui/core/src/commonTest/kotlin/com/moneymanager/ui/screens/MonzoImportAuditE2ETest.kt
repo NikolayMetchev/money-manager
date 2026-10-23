@@ -15,7 +15,7 @@ import com.moneymanager.apiimporter.downloadApiSessionAccounts
 import com.moneymanager.apiimporter.downloadApiSessionTransactions
 import com.moneymanager.apiimporter.importApiSessionTransactions
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.di.DatabaseComponent
+import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.DeviceInfo
@@ -144,7 +144,7 @@ class MonzoImportAuditE2ETest {
 
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
-                val dc = DatabaseComponent.create(db)
+                val dc = openDatabaseComponent(db)
                 dc.installBuiltInApiStrategies()
 
                 val deviceId =

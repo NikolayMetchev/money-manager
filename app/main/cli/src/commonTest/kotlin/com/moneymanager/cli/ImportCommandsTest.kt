@@ -4,8 +4,8 @@ import com.moneymanager.credentialvault.CredentialBundle
 import com.moneymanager.credentialvault.StoredApiCredential
 import com.moneymanager.credentialvault.testing.TEST_VAULT_PASSWORD
 import com.moneymanager.credentialvault.testing.inMemoryCredentialVault
-import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.di.createImportEngine
+import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.database.di.toAppServices
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -114,7 +114,7 @@ class ImportCommandsTest {
         val db = createTestDatabaseLocation()
         val database = cli.databaseManager.openDatabase(db)
         try {
-            val component = DatabaseComponent.create(database)
+            val component = openDatabaseComponent(database)
             component.installBuiltInCsvStrategies()
             component.installBuiltInApiStrategies()
             val account =
@@ -208,7 +208,7 @@ class ImportCommandsTest {
     private suspend fun runDesktopImports(fixture: Fixture) {
         val database = fixture.cli.databaseManager.openDatabase(fixture.db)
         try {
-            val component = DatabaseComponent.create(database)
+            val component = openDatabaseComponent(database)
             val services = component.toAppServices(component.createImportEngine(EditGate.AlwaysWritable))
             val writeLock = Mutex()
             val sources = TestCli.fileSources(fixture.cli.vault)

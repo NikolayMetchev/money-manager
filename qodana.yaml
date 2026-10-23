@@ -288,7 +288,6 @@ exclude:
       - app/db/core/src/androidMain/kotlin/com/moneymanager/database/AndroidDatabaseManager.kt
       - app/db/di/src/androidMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.android.kt
       - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/DatabaseComponent.kt
-      - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/DeviceIdModule.kt
       - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/RepositoryModule.kt
       - app/db/di/src/jvmMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.jvm.kt
       - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/IdConversions.kt
@@ -474,7 +473,6 @@ exclude:
       - app/db/core/src/androidMain/kotlin/com/moneymanager/database/AndroidDatabaseManager.kt
       - app/db/di/src/androidMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.android.kt
       - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/DatabaseComponent.kt
-      - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/DeviceIdModule.kt
       - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/RepositoryModule.kt
       - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/IdConversions.kt
       - app/db/read/src/commonMain/kotlin/com/moneymanager/database/mapper/InstantConversions.kt

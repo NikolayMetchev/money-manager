@@ -10,6 +10,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.di.DatabaseComponent
+import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.database.di.toAppServices
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
@@ -50,7 +51,7 @@ internal object MoneyManagerTestApp {
 
         suspend fun openAndPrimeDatabase(location: DbLocation): TestDatabaseState.Loaded {
             val database = databaseManager.openDatabase(location)
-            val component = DatabaseComponent.create(database)
+            val component = openDatabaseComponent(database)
             // Force initialization of all lazy properties to detect schema errors early
             component.deviceId
             // Set a default currency to avoid the init dialog blocking E2E tests

@@ -16,7 +16,7 @@ import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.di.DatabaseComponent
+import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
@@ -109,7 +109,7 @@ class ImportMonzoCsvE2ETest {
             // Create and populate the database
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
-                val databaseComponent = DatabaseComponent.create(db)
+                val databaseComponent = openDatabaseComponent(db)
                 databaseComponent.installBuiltInCsvStrategies()
 
                 // Parse and inject CSV data
@@ -266,7 +266,7 @@ class ImportMonzoCsvE2ETest {
 
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
-                val databaseComponent = DatabaseComponent.create(db)
+                val databaseComponent = openDatabaseComponent(db)
                 databaseComponent.installBuiltInCsvStrategies()
 
                 val csvContent = loadTestCsvContent()
@@ -347,7 +347,7 @@ class ImportMonzoCsvE2ETest {
 
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
-                val databaseComponent = DatabaseComponent.create(db)
+                val databaseComponent = openDatabaseComponent(db)
                 databaseComponent.installBuiltInCsvStrategies()
 
                 val csvContent = loadTestCsvContent()
@@ -432,7 +432,7 @@ class ImportMonzoCsvE2ETest {
 
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
-                val databaseComponent = DatabaseComponent.create(db)
+                val databaseComponent = openDatabaseComponent(db)
                 databaseComponent.installBuiltInCsvStrategies()
 
                 databaseComponent.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")

@@ -5,6 +5,7 @@ import com.moneymanager.csvimporter.executeCsvReimport
 import com.moneymanager.csvimporter.planCsvReimport
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.database.di.DatabaseComponent
+import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
@@ -81,7 +82,7 @@ class CsvReimportE2ETest {
         testDbLocation = createTestDatabaseLocation()
         val databaseManager = createTestDatabaseManager()
         val db = databaseManager.openDatabase(testDbLocation!!)
-        val dc = DatabaseComponent.create(db)
+        val dc = openDatabaseComponent(db)
         val importEngine = createImportEngine(dc)
 
         val sourceAccountId =

@@ -18,5 +18,5 @@ interface DeviceWriteRepository : DeviceReadRepository {
      * @param deviceInfo The device information
      * @return The device ID (existing or newly created)
      */
-    fun getOrCreateDevice(deviceInfo: DeviceInfo): DeviceId
+    suspend fun getOrCreateDevice(deviceInfo: DeviceInfo): DeviceId
 }

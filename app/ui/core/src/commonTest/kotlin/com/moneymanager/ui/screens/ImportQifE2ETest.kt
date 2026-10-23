@@ -13,6 +13,7 @@ import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.di.DatabaseComponent
+import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
@@ -142,7 +143,7 @@ class ImportQifE2ETest {
 
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
-                val component = DatabaseComponent.create(db)
+                val component = openDatabaseComponent(db)
                 component.installBuiltInCsvStrategies()
 
                 // Default currency = USD; the apply dialog should pre-select it.
@@ -212,7 +213,7 @@ class ImportQifE2ETest {
 
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
-                val component = DatabaseComponent.create(db)
+                val component = openDatabaseComponent(db)
                 component.installBuiltInCsvStrategies()
                 val usdId = component.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
                 component.settingsRepository.setDefaultCurrencyId(usdId)
@@ -259,7 +260,7 @@ class ImportQifE2ETest {
 
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
-                val component = DatabaseComponent.create(db)
+                val component = openDatabaseComponent(db)
                 component.installBuiltInCsvStrategies()
                 val usdId = component.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
                 component.settingsRepository.setDefaultCurrencyId(usdId)
@@ -328,7 +329,7 @@ class ImportQifE2ETest {
 
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
-                val component = DatabaseComponent.create(db)
+                val component = openDatabaseComponent(db)
                 component.installBuiltInCsvStrategies()
                 val usdId = component.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
                 component.settingsRepository.setDefaultCurrencyId(usdId)

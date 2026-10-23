@@ -21,7 +21,7 @@ import kotlin.time.Instant
 class ApiSessionRepositoryImplTest : DbTest() {
     private val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
 
-    private fun deviceId() = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
+    private suspend fun deviceId() = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
 
     @Test
     fun `createSession returns a positive id`() =

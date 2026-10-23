@@ -6,6 +6,7 @@ import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.di.AppServices
 import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.di.createImportEngine
+import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.database.di.toAppServices
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DbLocation
@@ -116,7 +117,7 @@ class DatabaseSessions(
         val database = databaseManager.openDatabaseWithProgress(location, onProgress)
         return try {
             onProgress(Progress.counted("Preparing application services...", 1, 1))
-            val component = DatabaseComponent.create(database)
+            val component = openDatabaseComponent(database)
             val importEngine = component.createImportEngine(editGate)
             val services = component.toAppServices(importEngine)
             onProgress(Progress.counted("Verifying this device...", 1, 1))
