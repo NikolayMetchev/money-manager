@@ -14,7 +14,6 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.installBuiltInCsvStrategies
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -128,7 +127,7 @@ class SantanderQifE2ETest : DbTest() {
 
     @Test
     fun santanderImport_consolidatesCounterparties_andModelsPeople() =
-        runTest {
+        runDbTest {
             apply(createImport())
 
             val accounts =
@@ -179,7 +178,7 @@ class SantanderQifE2ETest : DbTest() {
 
     @Test
     fun reimportingSameFile_producesOnlyDuplicates() =
-        runTest {
+        runDbTest {
             val qifImport = createImport()
             apply(qifImport)
             val accountsAfterFirst =

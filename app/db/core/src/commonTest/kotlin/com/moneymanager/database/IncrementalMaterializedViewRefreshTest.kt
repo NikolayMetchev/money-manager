@@ -12,7 +12,6 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -130,7 +129,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
     @Test
     fun `INSERT with timestamp after all existing transactions should trigger incremental refresh`() =
-        runTest {
+        runDbTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
             val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
@@ -183,7 +182,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
     @Test
     fun `INSERT with timestamp in middle of existing transactions should trigger incremental refresh`() =
-        runTest {
+        runDbTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
             val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
@@ -235,7 +234,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
     @Test
     fun `INSERT with timestamp before all existing transactions should trigger incremental refresh`() =
-        runTest {
+        runDbTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
             val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
@@ -277,7 +276,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
     @Test
     fun `UPDATE changing timestamp to after all transactions should trigger incremental refresh`() =
-        runTest {
+        runDbTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
             val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
@@ -335,7 +334,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
     @Test
     fun `UPDATE changing accounts should track all 4 account-currency pairs`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
 
             // Create 4 accounts
@@ -410,7 +409,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
     @Test
     fun `DELETE should trigger incremental refresh`() =
-        runTest {
+        runDbTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
             val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
@@ -459,7 +458,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
     @Test
     fun `DELETE removing all transfers for account-currency pair should remove from materialized view`() =
-        runTest {
+        runDbTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
             val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
@@ -508,7 +507,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
     @Test
     fun `INSERT for new account should be handled correctly`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
 
             // Create first account and insert transfer
@@ -567,7 +566,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
     @Test
     fun `INSERT for new currency should be handled correctly`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val (account1Id, account2Id) = createTestAccounts()
 
@@ -617,7 +616,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
     @Test
     fun `Multiple changes between refreshes should be batched correctly`() =
-        runTest {
+        runDbTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
             val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
@@ -695,7 +694,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
     @Test
     fun `Incremental refresh should produce same results as full refresh`() =
-        runTest {
+        runDbTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
             val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!

@@ -9,3 +9,5 @@ actual fun createTestDatabaseLocation(): DbLocation = DbLocation("/moneymanager-
 actual fun deleteTestDatabase(location: DbLocation) {
     runCatching { MemorySqliteChannel.post(sqliteRequest("delete", location.path)) }
 }
+
+actual val testDatabasesAreFiles: Boolean = false

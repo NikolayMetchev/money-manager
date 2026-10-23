@@ -9,9 +9,10 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.TestResult
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.time.Instant
 
 open class DbTest {
@@ -30,23 +31,32 @@ open class DbTest {
      */
     protected open val installBuiltInStrategies: Boolean = false
 
-    @BeforeTest
-    fun setup() =
+    /**
+     * Runs [testBody] against a fresh test database. The database opens inside the test rather than in a
+     * `@BeforeTest`, as the browser's test runner doesn't wait for a `@BeforeTest`'s result (only `@AfterTest` follows
+     * the test's own).
+     */
+    protected fun runDbTest(testBody: suspend TestScope.() -> Unit): TestResult =
         runTest {
-            testDbLocation = createTestDatabaseLocation()
-            database = createTestDatabaseManager(seedAllCurrencies).openDatabase(testDbLocation)
-            repositories = openDatabaseComponent(database)
-            entitySourceQueries = database.entitySourceWriteQueries
-            if (installBuiltInStrategies) {
-                repositories.installBuiltInCsvStrategies()
-                repositories.installBuiltInApiStrategies()
-                repositories.installBuiltInPassThroughs()
-            }
+            openTestDatabase()
+            testBody()
         }
+
+    protected suspend fun openTestDatabase() {
+        testDbLocation = createTestDatabaseLocation()
+        database = createTestDatabaseManager(seedAllCurrencies).openDatabase(testDbLocation)
+        repositories = openDatabaseComponent(database)
+        entitySourceQueries = database.entitySourceWriteQueries
+        if (installBuiltInStrategies) {
+            repositories.installBuiltInCsvStrategies()
+            repositories.installBuiltInApiStrategies()
+            repositories.installBuiltInPassThroughs()
+        }
+    }
 
     @AfterTest
     fun cleanup() {
-        deleteTestDatabase(testDbLocation)
+        if (::testDbLocation.isInitialized) deleteTestDatabase(testDbLocation)
     }
 
     /**

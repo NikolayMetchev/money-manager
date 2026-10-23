@@ -22,7 +22,6 @@ import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -163,7 +162,7 @@ class CsvUnimportE2ETest : DbTest() {
 
     @Test
     fun unimport_deletesCreatedTransfersAndAccounts_andResetsTheFile() =
-        runTest {
+        runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val monzo = createAccount("Monzo")
             val file =
@@ -208,7 +207,7 @@ class CsvUnimportE2ETest : DbTest() {
 
     @Test
     fun unimport_resetsOtherFilesRowsMatchedAgainstItsTransfers() =
-        runTest {
+        runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val monzo = createAccount("Monzo")
             val first = stage("MonzoDataExport.csv", listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee")))
@@ -249,7 +248,7 @@ class CsvUnimportE2ETest : DbTest() {
 
     @Test
     fun unimport_unhidesTheOtherSourcesLegItHadReconciledAway() =
-        runTest {
+        runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val personal = createAccount("Monzo")
             val joint = createAccount("Monzo Joint")
@@ -269,7 +268,7 @@ class CsvUnimportE2ETest : DbTest() {
 
     @Test
     fun unimportAll_removesEveryFile_withoutWarningAboutFilesInTheSet() =
-        runTest {
+        runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val monzo = createAccount("Monzo")
             val first = stage("MonzoDataExport.csv", listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee")))

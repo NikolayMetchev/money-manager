@@ -28,23 +28,25 @@ class ArchiveGoldenTest {
         }
 
     @Test
-    fun `compression writes a zlib stream that round-trips across several buffers`() {
-        val payload = payload()
-        val compressed = deflate(payload)
+    fun `compression writes a zlib stream that round-trips across several buffers`() =
+        runTest {
+            val payload = payload()
+            val compressed = deflate(payload)
 
-        // CMF 0x78 (deflate, 32 KiB window) and a header checksum: the RFC 1950 wrapper java.util.zip writes.
-        assertEquals(0x78, compressed[0].toInt() and 0xFF)
-        assertEquals(0, ((compressed[0].toInt() and 0xFF) * 256 + (compressed[1].toInt() and 0xFF)) % 31)
-        assertContentEquals(payload, inflate(compressed))
-    }
+            // CMF 0x78 (deflate, 32 KiB window) and a header checksum: the RFC 1950 wrapper java.util.zip writes.
+            assertEquals(0x78, compressed[0].toInt() and 0xFF)
+            assertEquals(0, ((compressed[0].toInt() and 0xFF) * 256 + (compressed[1].toInt() and 0xFF)) % 31)
+            assertContentEquals(payload, inflate(compressed))
+        }
 
     @Test
-    fun `a truncated zlib stream is rejected and an empty one inflates to nothing`() {
-        val compressed = deflate(payload())
+    fun `a truncated zlib stream is rejected and an empty one inflates to nothing`() =
+        runTest {
+            val compressed = deflate(payload())
 
-        assertFailsWith<IllegalArgumentException> { inflate(compressed.copyOf(compressed.size / 2)) }
-        assertContentEquals(ByteArray(0), inflate(ByteArray(0)))
-    }
+            assertFailsWith<IllegalArgumentException> { inflate(compressed.copyOf(compressed.size / 2)) }
+            assertContentEquals(ByteArray(0), inflate(ByteArray(0)))
+        }
 
     companion object {
         const val PASSWORD = "golden-archive-password"

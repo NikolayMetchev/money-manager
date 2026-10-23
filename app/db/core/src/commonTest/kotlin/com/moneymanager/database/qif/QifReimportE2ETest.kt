@@ -14,7 +14,6 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.installBuiltInCsvStrategies
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -135,7 +134,7 @@ class QifReimportE2ETest : DbTest() {
 
     @Test
     fun reimportWithNoChange_isNoOp() =
-        runTest {
+        runDbTest {
             apply(createImport())
             val accountsBefore =
                 repositories.accountRepository
@@ -165,7 +164,7 @@ class QifReimportE2ETest : DbTest() {
 
     @Test
     fun reimport_appliesNewGlobalMapping_mergesDuplicateAccount() =
-        runTest {
+        runDbTest {
             apply(createImport())
 
             val vanguard =
@@ -230,7 +229,7 @@ class QifReimportE2ETest : DbTest() {
 
     @Test
     fun reimport_reversesMerge_whenMappingRemoved() =
-        runTest {
+        runDbTest {
             apply(createImport())
             val brokerageId =
                 repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Brokerage", openingDate = now))

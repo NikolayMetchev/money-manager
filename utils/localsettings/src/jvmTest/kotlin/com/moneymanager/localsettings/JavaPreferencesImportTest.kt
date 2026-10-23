@@ -30,11 +30,11 @@ class JavaPreferencesImportTest {
             put(KEY_LAST_DATABASE, "/prefs/money.db")
             put(KEY_LAST_DIRECTORY, "/prefs")
         }
-        val target = FileLocalSettings(file).apply { putString(KEY_LAST_DIRECTORY, "/file") }
+        val target = JsonLocalSettings(FileSettingsText(file)).apply { putString(KEY_LAST_DIRECTORY, "/file") }
 
         importJavaPreferences(target, root, nodePath)
 
-        val reopened = FileLocalSettings(file)
+        val reopened = JsonLocalSettings(FileSettingsText(file))
         assertEquals("/prefs/money.db", reopened.getString(KEY_LAST_DATABASE))
         assertEquals("/file", reopened.getString(KEY_LAST_DIRECTORY))
         assertFalse(root.nodeExists(nodePath))
@@ -46,7 +46,7 @@ class JavaPreferencesImportTest {
         val blocker = IoPath(dir.toString(), "blocker")
         writeText(blocker, "a file where the settings directory should be")
 
-        importJavaPreferences(FileLocalSettings(IoPath(blocker, "settings.json")), root, nodePath)
+        importJavaPreferences(JsonLocalSettings(FileSettingsText(IoPath(blocker, "settings.json"))), root, nodePath)
 
         assertTrue(root.nodeExists(nodePath))
         assertEquals("/prefs/money.db", root.node(nodePath).get(KEY_LAST_DATABASE, null))
@@ -54,9 +54,9 @@ class JavaPreferencesImportTest {
 
     @Test
     fun aMissingNodeIsANoOp() {
-        importJavaPreferences(FileLocalSettings(file), root, nodePath)
+        importJavaPreferences(JsonLocalSettings(FileSettingsText(file)), root, nodePath)
 
-        assertNull(FileLocalSettings(file).getString(KEY_LAST_DATABASE))
+        assertNull(JsonLocalSettings(FileSettingsText(file)).getString(KEY_LAST_DATABASE))
         assertFalse(root.nodeExists(nodePath))
     }
 }

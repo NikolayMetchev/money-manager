@@ -5,7 +5,6 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createPerson
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -13,7 +12,7 @@ import kotlin.test.assertTrue
 class PersonAttributeRepositoryImplTest : DbTest() {
     @Test
     fun `insertInCreationMode records audit without bumping person revision`() =
-        runTest {
+        runDbTest {
             val personId =
                 repositories.personRepository.createPerson(
                     Person(
@@ -47,7 +46,7 @@ class PersonAttributeRepositoryImplTest : DbTest() {
 
     @Test
     fun `insert update delete attribute bumps person revision and records audit trail`() =
-        runTest {
+        runDbTest {
             val personId =
                 repositories.personRepository.createPerson(
                     Person(

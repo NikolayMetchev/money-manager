@@ -25,7 +25,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -250,7 +249,7 @@ class StarlingImportE2ETest : DbTest() {
 
     @Test
     fun `starling feed items import with direction-based sign and minor-unit amounts`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
@@ -323,7 +322,7 @@ class StarlingImportE2ETest : DbTest() {
 
     @Test
     fun `starling import sets identifying attributes and makes personal counterparties owners`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
@@ -422,7 +421,7 @@ class StarlingImportE2ETest : DbTest() {
 
     @Test
     fun `starling counterparties sharing a bank account collapse into one despite different uids`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
@@ -491,7 +490,7 @@ class StarlingImportE2ETest : DbTest() {
 
     @Test
     fun `starling counterparty merges into a pre-existing account that shares its bank details`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
 
@@ -564,7 +563,7 @@ class StarlingImportE2ETest : DbTest() {
 
     @Test
     fun `starling source account adopts a pre-existing account that shares its bank details`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
 
@@ -658,7 +657,7 @@ class StarlingImportE2ETest : DbTest() {
 
     @Test
     fun `starling source account adopts a pre-existing account identified only by a bank external-id`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
 
@@ -727,7 +726,7 @@ class StarlingImportE2ETest : DbTest() {
 
     @Test
     fun `starling source account gets its bank details from the identifiers endpoint`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
@@ -787,7 +786,7 @@ class StarlingImportE2ETest : DbTest() {
 
     @Test
     fun `starling account holder is imported and linked to every account`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val strategy =
@@ -861,7 +860,7 @@ class StarlingImportE2ETest : DbTest() {
 
     @Test
     fun `account holder owns the own account even when people are imported before accounts`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val strategy =
@@ -940,7 +939,7 @@ class StarlingImportE2ETest : DbTest() {
 
     @Test
     fun `backfilling a matched person external id does not create an orphan revision`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val strategy =
@@ -1017,7 +1016,7 @@ class StarlingImportE2ETest : DbTest() {
 
     @Test
     fun `declined starling feed items are imported but excluded from the account balance`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)

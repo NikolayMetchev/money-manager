@@ -5,7 +5,6 @@ import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -61,8 +60,8 @@ private data class ExpectedBalance(
 class MonzoBalanceFixtureE2ETest : DbTest() {
     @Test
     fun `imported monzo balances match fixtures`() =
-        runTest {
-            if (!fixtureDir.exists() || !balancesFile.exists()) return@runTest
+        runDbTest {
+            if (!fixtureDir.exists() || !balancesFile.exists()) return@runDbTest
 
             val sessions = loadSessions()
             val requests = loadRequests()
@@ -73,7 +72,7 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
 
             // Accounts, transactions and people are now downloaded into one session, so collapse the
             // fixture's separate accounts/transactions sessions (same token) into a single session.
-            val firstSession = sessions.minByOrNull { it.id } ?: return@runTest
+            val firstSession = sessions.minByOrNull { it.id } ?: return@runDbTest
             val sessionId =
                 repositories.apiSessionRepository.createSession(
                     deviceId = deviceId,

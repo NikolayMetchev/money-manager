@@ -31,7 +31,6 @@ import io.ktor.http.headersOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -163,7 +162,7 @@ class ApiImportServiceTest : DbTest() {
 
     @Test
     fun `download and import all imports each connection as child tasks and records the import`() =
-        runTest {
+        runDbTest {
             val monzo = connection("Monzo")
             val vault = unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzoSecrets)))
 
@@ -189,7 +188,7 @@ class ApiImportServiceTest : DbTest() {
 
     @Test
     fun `one failing provider does not stop the others`() =
-        runTest {
+        runDbTest {
             val monzo = connection("Monzo")
             val starling = connection("Starling")
             val vault =
@@ -221,7 +220,7 @@ class ApiImportServiceTest : DbTest() {
 
     @Test
     fun `download and import all can only download and can leave the view refresh to the caller`() =
-        runTest {
+        runDbTest {
             val monzo = connection("Monzo")
             val vault = unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzoSecrets)))
             val service = service(vault)
@@ -281,7 +280,7 @@ class ApiImportServiceTest : DbTest() {
 
     @Test
     fun `a session whose counterparties need confirming comes back as needing attention`() =
-        runTest {
+        runDbTest {
             monzoTransactionsJson = MONZO_COUNTERPARTY_TRANSACTIONS_JSON
             val monzo = connection("Monzo")
             val vault = unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzoSecrets)))
@@ -296,7 +295,7 @@ class ApiImportServiceTest : DbTest() {
 
     @Test
     fun `a download with no saved secrets creates no session`() =
-        runTest {
+        runDbTest {
             val monzo = connection("Monzo")
             val vault = unlockedCredentialVault()
 
@@ -309,7 +308,7 @@ class ApiImportServiceTest : DbTest() {
 
     @Test
     fun `an incremental download only asks for what the last session did not reach`() =
-        runTest {
+        runDbTest {
             val monzo = connection("Monzo")
             val vault = unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzoSecrets)))
             val service = service(vault)
@@ -329,7 +328,7 @@ class ApiImportServiceTest : DbTest() {
 
     @Test
     fun `ensure connections creates rows only once the vault is unlocked`() =
-        runTest {
+        runDbTest {
             assertEquals(0, service(inMemoryCredentialVault()).ensureConnections(), "a locked vault is never prompted")
             assertEquals(emptyList(), repositories.apiSessionRepository.getAllCredentials())
 
@@ -342,7 +341,7 @@ class ApiImportServiceTest : DbTest() {
 
     @Test
     fun `the statement region gate follows the device country`() =
-        runTest {
+        runDbTest {
             val wise = strategy("Wise")
             val vault = unlockedCredentialVault()
 

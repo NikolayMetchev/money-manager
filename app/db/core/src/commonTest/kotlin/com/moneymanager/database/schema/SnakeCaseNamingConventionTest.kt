@@ -2,7 +2,6 @@ package com.moneymanager.database.schema
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.test.database.DbTest
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -29,7 +28,7 @@ class SnakeCaseNamingConventionTest : DbTest() {
 
     @Test
     fun `all table and view names use snake_case naming`() =
-        runTest {
+        runDbTest {
             val violations = mutableListOf<String>()
 
             // Get all tables and views
@@ -53,7 +52,7 @@ class SnakeCaseNamingConventionTest : DbTest() {
 
     @Test
     fun `all table and view columns use snake_case naming`() =
-        runTest {
+        runDbTest {
             val violations = mutableListOf<String>()
 
             // Get all tables and views

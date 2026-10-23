@@ -5,7 +5,6 @@ import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.repository.ApiSessionImportRevision
 import com.moneymanager.test.database.DbTest
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -25,7 +24,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `createSession returns a positive id`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val id = repositories.apiSessionRepository.createSession(deviceId, now, null)
             assertTrue(id.id > 0, "Session ID should be positive: $id")
@@ -33,7 +32,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `getSessionById returns the created session`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val id = repositories.apiSessionRepository.createSession(deviceId, now, null)
 
@@ -47,14 +46,14 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `getSessionById returns null for unknown id`() =
-        runTest {
+        runDbTest {
             val session = repositories.apiSessionRepository.getSessionById(ApiSessionId(999L))
             assertNull(session)
         }
 
     @Test
     fun `createSession stores expiresAt correctly`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val expiresAt = now + 1.hours
             val id = repositories.apiSessionRepository.createSession(deviceId, now, expiresAt)
@@ -66,7 +65,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `getSessionsByDevice returns sessions for that device`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             repositories.apiSessionRepository.createSession(deviceId, now, null)
             repositories.apiSessionRepository.createSession(deviceId, now, null)
@@ -78,7 +77,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `getSessions excludes expired sessions`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             // Session expires in 1 hour
             repositories.apiSessionRepository.createSession(deviceId, now, now + 1.hours)
@@ -91,7 +90,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `insertRequest stores method url and headers`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val headerMap =
@@ -126,7 +125,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `getRequestsBySession returns newest first`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
 
@@ -143,7 +142,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `insertResponse stores json`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val responseJson = """{"accounts":[{"id":1}]}"""
@@ -178,7 +177,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `deleteSession cascades to requests headers and responses`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
 
@@ -204,7 +203,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `deleteSession removes the session`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val id = repositories.apiSessionRepository.createSession(deviceId, now, null)
 
@@ -216,7 +215,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `insertResponseTransaction records an error transaction`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val requestId =
@@ -242,7 +241,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `getResponseTransactions returns all entries for a response`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val requestId =
@@ -279,7 +278,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `getResponseTransactionsBySession returns entries for all session responses`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val firstRequestId =
@@ -321,7 +320,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `insertResponseTransaction rejects duplicate json path for response`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val requestId =
@@ -354,7 +353,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `insertResponseTransaction rejects imported state without transaction id`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val requestId =
@@ -379,7 +378,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `getResponseTransactions returns empty for response with no entries`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val requestId =
@@ -397,7 +396,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `deleteSession cascades to api_response_transaction`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
             val requestId =
@@ -426,7 +425,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `markSessionImported tracks imported revision`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
 
@@ -447,7 +446,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
     @Test
     fun `markSessionImported allows re-import for newer revision`() =
-        runTest {
+        runDbTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
 

@@ -10,7 +10,6 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -23,7 +22,7 @@ import kotlin.time.Clock
 class TradeAuditHistoryTest : DbTest() {
     @Test
     fun `engine-created trade has an INSERT audit entry carrying its field values`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val usdId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
             val usd = repositories.currencyRepository.getCurrencyById(usdId).first()!!

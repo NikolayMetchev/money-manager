@@ -28,7 +28,6 @@ import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -166,7 +165,7 @@ class ImportDirectoryServiceTest : DbTest() {
 
     @Test
     fun `download all downloads every folder and the subfolders it discovers`() =
-        runTest {
+        runDbTest {
             val root = directory("root")
             val factory =
                 FakeFileSourceFactory(
@@ -197,7 +196,7 @@ class ImportDirectoryServiceTest : DbTest() {
 
     @Test
     fun `download all keeps going when one folder fails`() =
-        runTest {
+        runDbTest {
             directory("good")
             directory("bad")
             val factory =
@@ -219,7 +218,7 @@ class ImportDirectoryServiceTest : DbTest() {
 
     @Test
     fun `a failed subfolder search does not stop a folder downloading its own files`() =
-        runTest {
+        runDbTest {
             val root = directory("root")
             val factory =
                 FakeFileSourceFactory(
@@ -242,7 +241,7 @@ class ImportDirectoryServiceTest : DbTest() {
 
     @Test
     fun `local folders only scan on the device that added them`() =
-        runTest {
+        runDbTest {
             val dir = directory("local")
             val factory = FakeFileSourceFactory(emptyMap())
             assertTrue(service(factory).isScannable(dir))
@@ -252,7 +251,7 @@ class ImportDirectoryServiceTest : DbTest() {
 
     @Test
     fun `import all plan flags files a person must resolve`() =
-        runTest {
+        runDbTest {
             val account = monzoAccount()
             val withAccount = directory("main", accountId = account)
             val other = directory("other")
@@ -283,7 +282,7 @@ class ImportDirectoryServiceTest : DbTest() {
 
     @Test
     fun `import all applies what needs no decision and reports the rest`() =
-        runTest {
+        runDbTest {
             val account = monzoAccount()
             val withAccount = directory("main", accountId = account)
             val factory =
@@ -316,7 +315,7 @@ class ImportDirectoryServiceTest : DbTest() {
 
     @Test
     fun `import all limited to some folders leaves the others alone`() =
-        runTest {
+        runDbTest {
             val account = monzoAccount()
             val picked = directory("picked", accountId = account)
             val other = directory("other", accountId = account)
@@ -338,7 +337,7 @@ class ImportDirectoryServiceTest : DbTest() {
 
     @Test
     fun `import all can stop after downloading`() =
-        runTest {
+        runDbTest {
             val account = monzoAccount()
             val dir = directory("main", accountId = account)
             val factory = FakeFileSourceFactory(mapOf(dir.folderRef to FakeFolder(files = mapOf("main.csv" to monzoCsv("tx_1")))))
@@ -359,7 +358,7 @@ class ImportDirectoryServiceTest : DbTest() {
 
     @Test
     fun `a re-download that would need an unimport is left for a person`() =
-        runTest {
+        runDbTest {
             val account = monzoAccount()
             val dir = directory("main", accountId = account)
             val first = FakeFileSourceFactory(mapOf(dir.folderRef to FakeFolder(files = mapOf("main.csv" to monzoCsv("tx_1")))))
@@ -378,7 +377,7 @@ class ImportDirectoryServiceTest : DbTest() {
 
     @Test
     fun `import all lists card references no account owns`() =
-        runTest {
+        runDbTest {
             val dir = directory("curve")
             val curveCsv =
                 """

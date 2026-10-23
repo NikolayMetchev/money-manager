@@ -19,7 +19,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -83,7 +82,7 @@ class WiseImportE2ETest : DbTest() {
 
     @Test
     fun `wise profiles balances and statements import into accounts and transactions`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val sessionId =
@@ -178,7 +177,7 @@ class WiseImportE2ETest : DbTest() {
 
     @Test
     fun `importing an accounts-only session creates no accounts`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val sessionId =
@@ -243,7 +242,7 @@ class WiseImportE2ETest : DbTest() {
 
     @Test
     fun `download and import people creates the profile holder and links them to their accounts`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val strategy =
@@ -345,7 +344,7 @@ class WiseImportE2ETest : DbTest() {
 
     @Test
     fun `wise people import matches an existing person by name and adds the wise external id`() =
-        runTest {
+        runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val strategy =

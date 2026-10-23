@@ -15,7 +15,6 @@ import com.moneymanager.test.database.createPerson
 import com.moneymanager.test.database.updateAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -26,7 +25,7 @@ import kotlin.time.Clock
 class AccountRepositoryImplTest : DbTest() {
     @Test
     fun `getPreviousAccountNames maps a former name to the renamed account`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val id =
                 repositories.accountRepository.createAccount(
@@ -42,7 +41,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `getPreviousAccountNames ignores a deleted account that shared a historical name`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             // Account A held "Shared" then was renamed away (audit row: name="Shared", account_id=A).
             val a =
@@ -65,7 +64,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `manual owner add and remove each bump the account revision and record an audit entry`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val person =
                 repositories.personRepository.createPerson(
@@ -96,7 +95,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `import-provenance owner add does not bump the account revision`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val person =
                 repositories.personRepository.createPerson(
@@ -116,7 +115,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `createAccount should insert account and return generated id`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val account =
                 Account(
@@ -136,7 +135,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `createAccount should create multiple accounts`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val accountNames = listOf("Checking", "Savings", "Credit Card", "Investment")
 
@@ -161,7 +160,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `updateAccount should update account name`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val account =
                 Account(
@@ -183,7 +182,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `deleteAccount should remove account`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val account =
                 Account(
@@ -201,7 +200,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `countTransfersByAccount should return zero for account with no transfers`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val accountId =
                 repositories.accountRepository.createAccount(
@@ -215,7 +214,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `countTransfersByAccount should return correct count`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val sourceAccountId =
                 repositories.accountRepository.createAccount(
@@ -258,7 +257,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `mergeAccounts should move transfers to surviving account and delete merged account`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val accountA =
                 repositories.accountRepository.createAccount(
@@ -330,7 +329,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `getLatestAuditedAccountNames resolves a merged-away account name`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val accountA =
                 repositories.accountRepository.createAccount(
@@ -369,7 +368,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `mergeAccounts should fail when transfers exist between the two accounts`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val accountA =
                 repositories.accountRepository.createAccount(
@@ -414,7 +413,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `mergeAccounts carries the deleted accounts identity groups onto the survivor`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val keep =
                 repositories.accountRepository.createAccount(
@@ -449,7 +448,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `mergeAccounts skips an identity the survivor already holds`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val keep =
                 repositories.accountRepository.createAccount(
@@ -477,7 +476,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `mergeAccounts dedups the same identity held under different group keys`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val keep =
                 repositories.accountRepository.createAccount(
@@ -507,7 +506,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `mergeAccounts keeps both values when a group key collides with differing contents`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val keep =
                 repositories.accountRepository.createAccount(
@@ -538,7 +537,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `unmergeAccount should recreate the account then restore owners and move transfers back`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val accountA =
                 repositories.accountRepository.createAccount(
@@ -697,7 +696,7 @@ class AccountRepositoryImplTest : DbTest() {
 
     @Test
     fun `deleteAccount should still work for accounts without transfers`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val accountId =
                 repositories.accountRepository.createAccount(

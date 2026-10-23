@@ -3,7 +3,6 @@ import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -21,7 +20,7 @@ class CurrencyRepositoryImplTest : DbTest() {
 
     @Test
     fun `upsertCurrencyByCode should create new currency when code does not exist`() =
-        runTest {
+        runDbTest {
             // When - use a currency not in the seeded list (non-ISO code)
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("XYZ", "Test Currency")
 
@@ -36,7 +35,7 @@ class CurrencyRepositoryImplTest : DbTest() {
 
     @Test
     fun `upsertCurrencyByCode should return existing ID when currency already exists`() =
-        runTest {
+        runDbTest {
             // Given - EUR is already seeded
             val initialCurrencies = repositories.currencyRepository.getAllCurrencies().first()
             val initialCount = initialCurrencies.size
@@ -55,7 +54,7 @@ class CurrencyRepositoryImplTest : DbTest() {
 
     @Test
     fun `upsertCurrencyByCode should not modify existing currency data`() =
-        runTest {
+        runDbTest {
             // Given
             val originalId = repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val originalCurrency = repositories.currencyRepository.getCurrencyById(originalId).first()
@@ -75,7 +74,7 @@ class CurrencyRepositoryImplTest : DbTest() {
 
     @Test
     fun `upsertCurrencyByCode should handle multiple different currencies`() =
-        runTest {
+        runDbTest {
             // When - upsert seeded currencies (should return existing IDs)
             val usdId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
             val eurId = repositories.currencyRepository.upsertCurrencyByCode("EUR", "Euro")
@@ -96,7 +95,7 @@ class CurrencyRepositoryImplTest : DbTest() {
 
     @Test
     fun `upsertCurrencyByCode should be case sensitive`() =
-        runTest {
+        runDbTest {
             // Given - USD is already seeded
             val initialCount =
                 repositories.currencyRepository
@@ -120,7 +119,7 @@ class CurrencyRepositoryImplTest : DbTest() {
 
     @Test
     fun `upsertCurrencyByCode should handle rapid consecutive calls for same code`() =
-        runTest {
+        runDbTest {
             // Given
             val initialCount =
                 repositories.currencyRepository
@@ -149,7 +148,7 @@ class CurrencyRepositoryImplTest : DbTest() {
 
     @Test
     fun `getAllCurrencies should return seeded currencies for new database`() =
-        runTest {
+        runDbTest {
             val currencies = repositories.currencyRepository.getAllCurrencies().first()
             assertEquals(seededCurrencyCount, currencies.size)
 
@@ -160,7 +159,7 @@ class CurrencyRepositoryImplTest : DbTest() {
 
     @Test
     fun `getAllCurrencies should return all currencies including seeded and new`() =
-        runTest {
+        runDbTest {
             // Given - add a new currency not in seeded list (use a non-ISO code)
             repositories.currencyRepository.upsertCurrencyByCode("XYZ", "Test Currency")
 

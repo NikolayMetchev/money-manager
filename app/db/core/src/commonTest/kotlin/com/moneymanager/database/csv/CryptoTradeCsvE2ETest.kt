@@ -21,7 +21,6 @@ import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -116,7 +115,7 @@ class CryptoTradeCsvE2ETest : DbTest() {
 
     @Test
     fun conversionRow_importsAsTrade_withRealCryptoBalance() =
-        runTest {
+        runDbTest {
             val cash = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Cash", openingDate = now))
             val wallet = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "BTC Wallet", openingDate = now))
 
@@ -172,7 +171,7 @@ class CryptoTradeCsvE2ETest : DbTest() {
 
     @Test
     fun conversionRow_getsImportedStatus_notLeftAsError() =
-        runTest {
+        runDbTest {
             val cash = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Cash", openingDate = now))
             val wallet = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "BTC Wallet", openingDate = now))
             val csvImport = stage()
@@ -191,7 +190,7 @@ class CryptoTradeCsvE2ETest : DbTest() {
 
     @Test
     fun conversionTrade_reimportIsIdempotent() =
-        runTest {
+        runDbTest {
             val cash = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Cash", openingDate = now))
             val wallet = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "BTC Wallet", openingDate = now))
             val strategy = strategy(cash, wallet)

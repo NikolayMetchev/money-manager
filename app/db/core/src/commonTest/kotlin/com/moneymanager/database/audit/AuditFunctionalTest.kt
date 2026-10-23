@@ -15,7 +15,6 @@ import com.moneymanager.test.database.updateAccount
 import com.moneymanager.test.database.updateCategory
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -154,7 +153,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `account INSERT creates audit record with auditTypeId 1`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val account =
                 Account(
@@ -177,7 +176,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `account UPDATE creates audit record with OLD values and auditTypeId 2`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val account =
                 Account(
@@ -211,7 +210,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `account DELETE creates audit record with OLD values and auditTypeId 3`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val account =
                 Account(
@@ -237,7 +236,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `account multiple operations create chronological audit trail`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val account =
                 Account(
@@ -269,7 +268,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `currency INSERT creates audit record`() =
-        runTest {
+        runDbTest {
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("TST", "Test Currency")
             assertNotNull(currencyId)
 
@@ -283,7 +282,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `currency UPDATE creates audit record with OLD values`() =
-        runTest {
+        runDbTest {
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("TST", "Original Name")
             assertNotNull(currencyId)
 
@@ -305,7 +304,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `currency DELETE creates audit record`() =
-        runTest {
+        runDbTest {
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("TST", "Test Currency")
             assertNotNull(currencyId)
 
@@ -322,7 +321,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `category INSERT creates audit record`() =
-        runTest {
+        runDbTest {
             val category =
                 Category(
                     name = "Test Category",
@@ -339,7 +338,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `category UPDATE creates audit record with OLD values`() =
-        runTest {
+        runDbTest {
             val category =
                 Category(
                     name = "Original Category",
@@ -364,7 +363,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `category DELETE creates audit record`() =
-        runTest {
+        runDbTest {
             val category =
                 Category(
                     name = "To Be Deleted",
@@ -384,7 +383,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `transfer INSERT creates audit record`() =
-        runTest {
+        runDbTest {
             val (sourceAccountId, targetAccountId, currency) = setupTransferPrerequisites()
 
             val now = Clock.System.now()
@@ -413,7 +412,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `transfer UPDATE creates audit record with OLD values`() =
-        runTest {
+        runDbTest {
             val (sourceAccountId, targetAccountId, currency) = setupTransferPrerequisites()
 
             val now = Clock.System.now()
@@ -460,7 +459,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `transfer DELETE creates audit record`() =
-        runTest {
+        runDbTest {
             val (sourceAccountId, targetAccountId, currency) = setupTransferPrerequisites()
 
             val now = Clock.System.now()
@@ -488,7 +487,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `transfer UPDATE should increment revisionId in audit record`() =
-        runTest {
+        runDbTest {
             val (sourceAccountId, targetAccountId, currency) = setupTransferPrerequisites()
 
             val now = Clock.System.now()
@@ -543,7 +542,7 @@ class AuditFunctionalTest : DbTest() {
 
     @Test
     fun `transfer multiple UPDATEs should increment revisionId each time`() =
-        runTest {
+        runDbTest {
             val (sourceAccountId, targetAccountId, currency) = setupTransferPrerequisites()
 
             val now = Clock.System.now()

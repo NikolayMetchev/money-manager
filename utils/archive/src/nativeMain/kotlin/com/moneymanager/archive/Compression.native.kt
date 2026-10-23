@@ -31,7 +31,7 @@ private const val BUFFER_SIZE = 8 * 1024
 // The default windowBits (zlib's deflateInit/inflateInit macros, which cinterop doesn't expose) gives the
 // same zlib wrapper as java.util.zip's Deflater/Inflater.
 @OptIn(ExperimentalForeignApi::class)
-internal actual fun deflate(data: ByteArray): ByteArray =
+internal actual suspend fun deflate(data: ByteArray): ByteArray =
     memScoped {
         val stream = zStream()
         check(deflateInit_(stream.ptr, Z_BEST_COMPRESSION, zlibVersion(), sizeOf<z_stream>().convert()) == Z_OK) {
@@ -45,7 +45,7 @@ internal actual fun deflate(data: ByteArray): ByteArray =
     }
 
 @OptIn(ExperimentalForeignApi::class)
-internal actual fun inflate(data: ByteArray): ByteArray =
+internal actual suspend fun inflate(data: ByteArray): ByteArray =
     memScoped {
         val stream = zStream()
         check(inflateInit_(stream.ptr, zlibVersion(), sizeOf<z_stream>().convert()) == Z_OK) { "inflateInit failed" }

@@ -14,7 +14,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -81,7 +80,7 @@ class IncrementalExchangeDownloadE2ETest : DbTest() {
 
     @Test
     fun `a second exchange download fetches only the trailing windows`() =
-        runTest {
+        runDbTest {
             val credentialId = apiConnection("Kraken", now)
 
             val firstPages = download(credentialId)
@@ -93,7 +92,7 @@ class IncrementalExchangeDownloadE2ETest : DbTest() {
 
     @Test
     fun `endpoints sharing a path get their own watermark`() =
-        runTest {
+        runDbTest {
             val credentialId = apiConnection("Kraken", now)
             download(credentialId)
 
@@ -110,7 +109,7 @@ class IncrementalExchangeDownloadE2ETest : DbTest() {
 
     @Test
     fun `forcing a full exchange download ignores the watermark`() =
-        runTest {
+        runDbTest {
             val credentialId = apiConnection("Kraken", now)
 
             val firstPages = download(credentialId)

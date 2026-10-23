@@ -13,7 +13,6 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -37,7 +36,7 @@ class CsvImportRepositoryImplTest : DbTest() {
 
     @Test
     fun `createImport should create import with device info`() =
-        runTest {
+        runDbTest {
             val importId =
                 repositories.csvImportRepository.createImport(
                     fileName = "test.csv",
@@ -60,7 +59,7 @@ class CsvImportRepositoryImplTest : DbTest() {
 
     @Test
     fun `createImport should persist checksum and lastModified`() =
-        runTest {
+        runDbTest {
             val checksum = "abc123def456"
 
             val importId =
@@ -84,7 +83,7 @@ class CsvImportRepositoryImplTest : DbTest() {
 
     @Test
     fun `setImportIgnored should toggle the ignored flag`() =
-        runTest {
+        runDbTest {
             val repo = repositories.csvImportRepository
             val importId =
                 repo.createImport(
@@ -114,7 +113,7 @@ class CsvImportRepositoryImplTest : DbTest() {
 
     @Test
     fun `recordImportApplication should persist latest application metadata and count`() =
-        runTest {
+        runDbTest {
             val monzoStrategy = createStrategy("Monzo")
             val revolutStrategy = createStrategy("Revolut")
 
@@ -156,7 +155,7 @@ class CsvImportRepositoryImplTest : DbTest() {
 
     @Test
     fun `createImport requires checksum and lastModified`() =
-        runTest {
+        runDbTest {
             val checksum = "required_checksum"
 
             val importId =
@@ -176,7 +175,7 @@ class CsvImportRepositoryImplTest : DbTest() {
 
     @Test
     fun `getAllImports should include checksum and lastModified`() =
-        runTest {
+        runDbTest {
             val checksum = "sha256hash"
 
             repositories.csvImportRepository.createImport(
@@ -195,7 +194,7 @@ class CsvImportRepositoryImplTest : DbTest() {
 
     @Test
     fun `findImportsByChecksum should return matching import`() =
-        runTest {
+        runDbTest {
             val checksum = "matching_checksum"
 
             repositories.csvImportRepository.createImport(
@@ -220,7 +219,7 @@ class CsvImportRepositoryImplTest : DbTest() {
 
     @Test
     fun `createImport should reject duplicate checksum`() =
-        runTest {
+        runDbTest {
             val checksum = "duplicate_checksum"
 
             repositories.csvImportRepository.createImport(
@@ -248,7 +247,7 @@ class CsvImportRepositoryImplTest : DbTest() {
 
     @Test
     fun `findImportsByChecksum should return empty list when no matches`() =
-        runTest {
+        runDbTest {
             repositories.csvImportRepository.createImport(
                 fileName = "test.csv",
                 headers = headers,
@@ -263,7 +262,7 @@ class CsvImportRepositoryImplTest : DbTest() {
 
     @Test
     fun `getImportRows should resolve placeholder transfer id from CSV source records`() =
-        runTest {
+        runDbTest {
             val importId =
                 repositories.csvImportRepository.createImport(
                     fileName = "test.csv",

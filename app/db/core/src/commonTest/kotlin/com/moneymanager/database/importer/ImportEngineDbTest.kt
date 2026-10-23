@@ -46,7 +46,6 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -183,7 +182,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun counterpartiesWithDifferentExternalIdsButOneName_collapseToOneAccount() =
-        runTest {
+        runDbTest {
             // A provider can mint several external ids for one merchant within a single import (Monzo
             // issued two ids for "Curve"). Both intents must land on one account, not fork a duplicate.
             val result =
@@ -203,7 +202,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun personalCounterpartiesSharingAName_stayDistinctAccounts() =
-        runTest {
+        runDbTest {
             // Two people can share a name while owning different bank accounts, so a name collision must
             // not merge them — the name fallback applies only to accounts with no bank identity. Account
             // names are globally unique, so the second one is disambiguated by account-number last-4
@@ -243,7 +242,7 @@ class ImportEngineDbTest : DbTest() {
      */
     @Test
     fun accountWithTwoBankIdentities_matchesOnEither() =
-        runTest {
+        runDbTest {
             val key = LocalAccountKey("cash")
             val externalIdType = AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
             val created =
@@ -304,7 +303,7 @@ class ImportEngineDbTest : DbTest() {
      */
     @Test
     fun reimportOfBothBankIdentities_isIdempotent() =
-        runTest {
+        runDbTest {
             val externalIdType = AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
 
             fun batch() =
@@ -349,7 +348,7 @@ class ImportEngineDbTest : DbTest() {
      */
     @Test
     fun importedBankIdentity_storesSortCodeAndAccountNumberInOneUuidGroup() =
-        runTest {
+        runDbTest {
             val result =
                 engine().import(
                     ImportBatch(
@@ -389,7 +388,7 @@ class ImportEngineDbTest : DbTest() {
      */
     @Test
     fun mergedAwayBankIdentity_doesNotResurrectTheAccountOnReimport() =
-        runTest {
+        runDbTest {
             fun incoming() =
                 ImportBatch(
                     accountsToCreate =
@@ -431,7 +430,7 @@ class ImportEngineDbTest : DbTest() {
     /** Unmerging must hand the carried identity back, leaving neither account holding both. */
     @Test
     fun unmergingReturnsTheCarriedBankIdentityToTheRestoredAccount() =
-        runTest {
+        runDbTest {
             val created =
                 engine().import(
                     ImportBatch(
@@ -478,7 +477,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun createAccounts_reusesAnExistingAccountWithTheSameName() =
-        runTest {
+        runDbTest {
             val existing = createSourceAccount()
 
             val ids =
@@ -498,7 +497,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun createsAccountAndTransfer_thenDedupesOnReimport() =
-        runTest {
+        runDbTest {
             val sourceId = createSourceAccount()
             val currency = gbp()
             val source = Source.SampleGenerator
@@ -531,7 +530,7 @@ class ImportEngineDbTest : DbTest() {
      */
     @Test
     fun deletingTransfers_reportsProgress() =
-        runTest {
+        runDbTest {
             val sourceId = createSourceAccount()
             val currency = gbp()
             val counterparty = LocalAccountKey("shop")
@@ -604,7 +603,7 @@ class ImportEngineDbTest : DbTest() {
      */
     @Test
     fun reimportUpdatingAttributes_upsertsWithoutUniqueConstraintCrash() =
-        runTest {
+        runDbTest {
             val sourceId = createSourceAccount()
             val currency = gbp()
             val source = Source.SampleGenerator
@@ -647,7 +646,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun dissimilarTransfer_isImportedNotDeduped() =
-        runTest {
+        runDbTest {
             val sourceId = createSourceAccount()
             val currency = gbp()
             val source = Source.SampleGenerator
@@ -676,7 +675,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun createsPeopleAndOwnership() =
-        runTest {
+        runDbTest {
             val sourceId = createSourceAccount()
             val currency = gbp()
             val source = Source.SampleGenerator
@@ -721,7 +720,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun categoryCreateUpdateDeleteViaImport() =
-        runTest {
+        runDbTest {
             val key = LocalCategoryKey("food")
             val created =
                 engine().import(
@@ -777,7 +776,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun createAccountThenOwnByLocalKey() =
-        runTest {
+        runDbTest {
             val accountKey = LocalAccountKey("savings")
             val personKey = LocalPersonKey("owner")
             val result =
@@ -814,7 +813,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun accountUpdateAndDeleteViaImport() =
-        runTest {
+        runDbTest {
             val key = LocalAccountKey("acct")
             val accountId =
                 engine()
@@ -872,7 +871,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun personDeleteViaImport() =
-        runTest {
+        runDbTest {
             val key = LocalPersonKey("p")
             val personId: PersonId =
                 engine()
@@ -912,7 +911,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun accountMergeAndUnmergeViaImport() =
-        runTest {
+        runDbTest {
             val currency = gbp()
             val keepKey = LocalAccountKey("keep")
             val dropKey = LocalAccountKey("drop")
@@ -959,7 +958,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun conversion_isBookedAsATradeOnTheOwnAccount_excludedWithItsTransfer_andOnlyOnce() =
-        runTest {
+        runDbTest {
             val checkingId = createSourceAccount()
             val gbp = gbp()
             repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
@@ -1037,7 +1036,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun passThrough_expandsIntoTwoLinkedLegs_conduitNetsToZero() =
-        runTest {
+        runDbTest {
             val cardId = createSourceAccount()
             val currency = gbp()
             val source = Source.SampleGenerator
@@ -1131,7 +1130,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun passThrough_spendLegFollowsTheFundingLegsExclusionOnReimport() =
-        runTest {
+        runDbTest {
             val cardId = createSourceAccount()
             val currency = gbp()
             val excluded = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
@@ -1201,7 +1200,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun passThrough_chainExpandsIntoLinkedLegs_everyConduitNetsToZero() =
-        runTest {
+        runDbTest {
             val cardId = createSourceAccount()
             val currency = gbp()
             val source = Source.SampleGenerator
@@ -1306,7 +1305,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun passThrough_chainCancellation_linksEachLegToItsOriginal() =
-        runTest {
+        runDbTest {
             val cardId = createSourceAccount()
             val currency = gbp()
             val source = Source.SampleGenerator
@@ -1515,7 +1514,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun passThrough_incomingRefund_reversesLegsAndLinksToChargeInSameBatch() =
-        runTest {
+        runDbTest {
             val cardId = createSourceAccount()
             val currency = gbp()
             val curve = LocalAccountKey("curve")
@@ -1591,7 +1590,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun passThrough_refundInLaterImport_linksToPersistedCharge() =
-        runTest {
+        runDbTest {
             val cardId = createSourceAccount()
             val currency = gbp()
             val curve = LocalAccountKey("curve")
@@ -1637,7 +1636,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun passThrough_chainOfRefundsAndReversals_linksPairwiseConsumingEachLegOnce() =
-        runTest {
+        runDbTest {
             val cardId = createSourceAccount()
             val currency = gbp()
             val curve = LocalAccountKey("curve")
@@ -1702,7 +1701,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun passThrough_refundInLaterChunk_linksAcrossChunkBoundary() =
-        runTest {
+        runDbTest {
             val cardId = createSourceAccount()
             val currency = gbp()
             val curve = LocalAccountKey("curve")
@@ -1744,7 +1743,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun passThrough_refundWithDifferentAmount_getsNoReversalLink() =
-        runTest {
+        runDbTest {
             val cardId = createSourceAccount()
             val currency = gbp()
             val curve = LocalAccountKey("curve")
@@ -1778,7 +1777,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun passThrough_repeatChargesSameDirection_getNoReversalLink() =
-        runTest {
+        runDbTest {
             val cardId = createSourceAccount()
             val currency = gbp()
             val curve = LocalAccountKey("curve")
@@ -1815,7 +1814,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun updateWithoutExistingIdFailsValidation() =
-        runTest {
+        runDbTest {
             assertFailsWith<IllegalArgumentException> {
                 engine().import(
                     ImportBatch.manualEdits(
@@ -1835,7 +1834,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun cryptoTrade_createsCryptoAssetAndTrade_withFullPrecisionBalances() =
-        runTest {
+        runDbTest {
             val e = engine()
             val bank = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = baseTime))
             val wallet =
@@ -1893,7 +1892,7 @@ class ImportEngineDbTest : DbTest() {
 
     @Test
     fun orderIntents_upsertOrdersAndLinkFills_andStandaloneOrdersImport() =
-        runTest {
+        runDbTest {
             val e = engine()
             val exchange =
                 repositories.accountRepository.createAccount(

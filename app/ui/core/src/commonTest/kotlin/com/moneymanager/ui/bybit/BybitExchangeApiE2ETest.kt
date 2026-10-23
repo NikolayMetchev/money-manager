@@ -16,7 +16,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -112,7 +111,7 @@ class BybitExchangeApiE2ETest : DbTest() {
 
     @Test
     fun `downloads every endpoint page then imports trades transfers earn and derivatives`() =
-        runTest {
+        runDbTest {
             val strategy = bybitStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val credentialId = apiConnection("Bybit", t0)

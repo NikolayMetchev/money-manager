@@ -8,7 +8,6 @@ import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -256,7 +255,7 @@ class BybitCsvApiE2ETest : DbTest() {
 
     @Test
     fun theExportsAloneBalanceTheAccount() =
-        runTest {
+        runDbTest {
             importCsv()
 
             assertEquals(exportBalances, bybitBalances())
@@ -273,7 +272,7 @@ class BybitCsvApiE2ETest : DbTest() {
 
     @Test
     fun theApiAfterTheExportsRebooksNothing() =
-        runTest {
+        runDbTest {
             importCsv()
             importApi()
 
@@ -284,7 +283,7 @@ class BybitCsvApiE2ETest : DbTest() {
 
     @Test
     fun theExportsAfterTheApiRebookNothing() =
-        runTest {
+        runDbTest {
             importApi()
             importCsv()
 

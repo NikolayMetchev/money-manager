@@ -15,7 +15,9 @@ private const val LEGACY_PREFERENCES_NODE = "/com/moneymanager/localsettings"
  * settings an older version left in java.util.prefs into the file.
  */
 val desktopLocalSettings: LocalSettings by lazy {
-    FileLocalSettings(defaultLocalSettingsPath()).also { importJavaPreferences(it, Preferences.userRoot(), LEGACY_PREFERENCES_NODE) }
+    JsonLocalSettings(FileSettingsText(defaultLocalSettingsPath())).also {
+        importJavaPreferences(it, Preferences.userRoot(), LEGACY_PREFERENCES_NODE)
+    }
 }
 
 /**
@@ -25,7 +27,7 @@ val desktopLocalSettings: LocalSettings by lazy {
  * key mustn't cost the others.
  */
 internal fun importJavaPreferences(
-    target: FileLocalSettings,
+    target: JsonLocalSettings,
     root: Preferences,
     nodePath: String,
 ) {

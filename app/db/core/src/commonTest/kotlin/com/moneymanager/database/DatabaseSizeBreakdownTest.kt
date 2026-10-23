@@ -4,7 +4,6 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -13,7 +12,7 @@ import kotlin.time.Clock
 class DatabaseSizeBreakdownTest : DbTest() {
     @Test
     fun getDbSizeBreakdownReturnsSortedRowsWhenDbstatIsAvailable() =
-        runTest {
+        runDbTest {
             repositories.accountRepository.createAccount(
                 Account(id = AccountId(0), name = "Breakdown account", openingDate = Clock.System.now()),
             )
@@ -22,7 +21,7 @@ class DatabaseSizeBreakdownTest : DbTest() {
 
             if (breakdown.isEmpty()) {
                 // Some SQLite builds do not enable dbstat; in that case the API should fail gracefully.
-                return@runTest
+                return@runDbTest
             }
 
             assertTrue(breakdown.all { it.totalBytes > 0 }, "all rows should report positive size")

@@ -4,7 +4,6 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.test.database.DbTest
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -28,7 +27,7 @@ import kotlin.time.Clock
 class QifImportAccountSourceTest : DbTest() {
     @Test
     fun qifSourcedAccountWithoutRecordIndexHasAuditSource() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
 
             val importId =

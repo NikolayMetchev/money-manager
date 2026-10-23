@@ -1,8 +1,5 @@
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
-# The suite links the vault, import directories and API imports, which aren't in the browser yet; the browser's
-# driver and manager are tested in test/app/db's webTest meanwhile.
-# gazelle:kmp_web_tests false
 # gazelle:kmp_android_host_tests false
 # gazelle:kmp_plugins serialization
 # gazelle:kmp_keep_dep //utils/sqlite3 nativeMain
@@ -132,7 +129,6 @@ kmp_test(
         "//test/app/db",
         "//utils/bigdecimal",
         "@maven_kmp//:androidx_test_runner",
-        "@maven_kmp//:kotlinx_coroutines_test",
         "//utils/regex",
         "@maven_kmp//:sqldelight_async_extensions",
     ],
@@ -154,6 +150,10 @@ kmp_test(
     ],
     plugins = ["serialization"],
     resources = glob(["src/commonTest/resources/**"]),
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     deps = [
         "//app/apiimport",
         "//app/apiimporter",

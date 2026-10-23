@@ -8,9 +8,9 @@ import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.accountmapping.export.AccountMappingsExport
 import com.moneymanager.domain.strategy.CsvResolution
 import com.moneymanager.importengineapi.createAccountMapping
+import com.moneymanager.regex.compileRegex
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -30,9 +30,9 @@ class AccountMappingExportServiceTest : DbTest() {
 
     @Test
     fun exportNamesEachMappingsAccount() =
-        runTest {
+        runDbTest {
             val tesco = account("Tesco")
-            repositories.importEngine.createAccountMapping(Regex("TESCO.*"), tesco)
+            repositories.importEngine.createAccountMapping(compileRegex("TESCO.*"), tesco)
 
             val export = service.toExport(repositories.accountMappingRepository.getAllMappings().first(), AppVersion("9.9"))
 
@@ -41,9 +41,9 @@ class AccountMappingExportServiceTest : DbTest() {
 
     @Test
     fun exportRefusesAMappingWhoseAccountIsGone() =
-        runTest {
+        runDbTest {
             val tesco = account("Tesco")
-            repositories.importEngine.createAccountMapping(Regex("TESCO.*"), tesco)
+            repositories.importEngine.createAccountMapping(compileRegex("TESCO.*"), tesco)
             val orphan =
                 repositories.accountMappingRepository
                     .getAllMappings()
@@ -56,7 +56,7 @@ class AccountMappingExportServiceTest : DbTest() {
 
     @Test
     fun parseListsEachUnknownAccountOnce() =
-        runTest {
+        runDbTest {
             account("Tesco")
             val export =
                 AccountMappingsExport(
@@ -76,7 +76,7 @@ class AccountMappingExportServiceTest : DbTest() {
 
     @Test
     fun importCreatesMapsAndSkipsAccountsPerResolution() =
-        runTest {
+        runDbTest {
             val tesco = account("Tesco")
             val groceries = account("Groceries")
             val export =
@@ -115,7 +115,7 @@ class AccountMappingExportServiceTest : DbTest() {
 
     @Test
     fun importWithNothingResolvableWritesNothing() =
-        runTest {
+        runDbTest {
             val count = service.importMappings(AccountMappingsExport("1", listOf(AccountMappingExport("X", "Nobody"))), emptyMap())
 
             assertEquals(0, count)

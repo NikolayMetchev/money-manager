@@ -6,7 +6,6 @@ import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.model.qif.QifRecordSplit
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -37,7 +36,7 @@ class QifImportRepositoryTest : DbTest() {
 
     @Test
     fun createImport_thenReadBack_roundTripsRecordsAndMetadata() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val records =
                 listOf(
@@ -73,7 +72,7 @@ class QifImportRepositoryTest : DbTest() {
 
     @Test
     fun setImportIgnored_togglesTheIgnoredFlag() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val importId = repo.createImport("noise.qif", listOf(bankRecord(0, "-5.00")), "BANK", "ignore_sum", now)
 
@@ -93,7 +92,7 @@ class QifImportRepositoryTest : DbTest() {
 
     @Test
     fun updateRecordStatusesBatch_persistsStatusAndTransferLink() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val importId = repo.createImport("s.qif", listOf(bankRecord(0, "-5.00")), "BANK", "sum", now)
 
@@ -106,7 +105,7 @@ class QifImportRepositoryTest : DbTest() {
 
     @Test
     fun findImportsByChecksum_matchesAndDeleteRemoves() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val importId = repo.createImport("s.qif", listOf(bankRecord(0, "-5.00")), "BANK", "checksum-1", now)
 

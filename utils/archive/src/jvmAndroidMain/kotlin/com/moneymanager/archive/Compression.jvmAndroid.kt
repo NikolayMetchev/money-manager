@@ -6,7 +6,7 @@ import java.util.zip.Inflater
 
 private const val BUFFER_SIZE = 8 * 1024
 
-internal actual fun deflate(data: ByteArray): ByteArray {
+internal actual suspend fun deflate(data: ByteArray): ByteArray {
     val deflater = Deflater(Deflater.BEST_COMPRESSION)
     deflater.setInput(data)
     deflater.finish()
@@ -23,7 +23,7 @@ internal actual fun deflate(data: ByteArray): ByteArray {
     return output.toByteArray()
 }
 
-internal actual fun inflate(data: ByteArray): ByteArray {
+internal actual suspend fun inflate(data: ByteArray): ByteArray {
     val inflater = Inflater()
     inflater.setInput(data)
     val output = ByteArrayOutputStream(maxOf(BUFFER_SIZE, data.size * 2))

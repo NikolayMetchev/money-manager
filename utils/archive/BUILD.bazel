@@ -1,9 +1,10 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_export @maven_kmp//:cryptography_core
 # gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_jdk jvmMain
 # gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_openssl3_prebuilt nativeMain
 # gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_jdk androidMain
+# gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_webcrypto webMain
 
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
@@ -17,6 +18,7 @@ kmp_library(
     keep_deps = [
         "@maven_kmp//:cryptography_provider_jdk",
         "@maven_kmp//:cryptography_provider_openssl3_prebuilt",
+        "@maven_kmp//:cryptography_provider_webcrypto",
     ],
     native_deps = ["@maven_kmp//:cryptography_provider_openssl3_prebuilt"],
     native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
@@ -27,6 +29,16 @@ kmp_library(
         "mingwX64",
     ],
     visibility = ["//visibility:public"],
+    web_deps = [
+        "@maven_kmp//:cryptography_provider_webcrypto",
+        "@maven_kmp//:kotlinx_browser",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+    web_srcs = glob(["src/webMain/kotlin/**/*.kt"]),
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = ["@maven_kmp//:cryptography_core"],
     deps = ["@maven_kmp//:cryptography_random"],
 )
@@ -41,6 +53,10 @@ kmp_test(
         "linuxX64",
         "macosArm64",
         "mingwX64",
+    ],
+    web_targets = [
+        "wasmJs",
+        "js",
     ],
     deps = [
         "//bazel/kmp/deps:kotlin_test",

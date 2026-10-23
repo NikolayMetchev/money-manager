@@ -17,7 +17,6 @@ import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
 import com.moneymanager.importengineapi.updateApiStrategy
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -105,7 +104,7 @@ class KrakenReimportE2ETest : DbTest() {
 
     @Test
     fun `re-import rewrites a withdrawal onto a bridge configured after the fact - excluding the pre-existing bank leg`() =
-        runTest {
+        runDbTest {
             val sessionId = stageAndImport()
 
             val fundingBefore =

@@ -2,7 +2,6 @@ package com.moneymanager.database
 
 import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.test.database.DbTest
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -16,7 +15,7 @@ class SuspendingTransactionTest : DbTest() {
 
     @Test
     fun `a nested transaction sees its enclosing transaction's writes`() =
-        runTest {
+        runDbTest {
             val before = assetCount()
 
             database.transaction {
@@ -32,7 +31,7 @@ class SuspendingTransactionTest : DbTest() {
 
     @Test
     fun `a failure in a nested transaction rolls back the enclosing one`() =
-        runTest {
+        runDbTest {
             val before = assetCount()
 
             assertFailsWith<IllegalStateException> {

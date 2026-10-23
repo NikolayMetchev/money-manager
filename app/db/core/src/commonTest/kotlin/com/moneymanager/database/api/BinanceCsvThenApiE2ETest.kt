@@ -7,7 +7,6 @@ import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -245,7 +244,7 @@ class BinanceCsvThenApiE2ETest : DbTest() {
 
     @Test
     fun theApiImportDoesNotRebookWhatTheStatementExportAlreadyRecorded() =
-        runTest {
+        runDbTest {
             importCsv()
 
             val balancesAfterCsv = binanceBalances()
@@ -275,7 +274,7 @@ class BinanceCsvThenApiE2ETest : DbTest() {
 
     @Test
     fun theApiSupersedesThePlaceholderCounterpartyTheExportLeftForADeposit() =
-        runTest {
+        runDbTest {
             importCsv()
             assertEquals("-0.01", balanceOf("Binance Funding", "BTC"), "the export can only name a placeholder")
 
@@ -293,7 +292,7 @@ class BinanceCsvThenApiE2ETest : DbTest() {
 
     @Test
     fun aWithdrawalTheApiReportsNetOfItsFeeReconcilesAgainstTheExportsGrossRow() =
-        runTest {
+        runDbTest {
             importCsv()
             // The export folds the charge into one row and can only name a placeholder for the far end.
             assertEquals("1134.83", balanceOf("Binance Bank", "GBP"))
@@ -315,7 +314,7 @@ class BinanceCsvThenApiE2ETest : DbTest() {
 
     @Test
     fun reconciledMovementsAreKeptAndLinkedRatherThanDropped() =
-        runTest {
+        runDbTest {
             importCsv()
             importApi()
 

@@ -1,6 +1,6 @@
 // Runs a Kotlin/JS or Kotlin/Wasm test program in Node and reports each test as a TeamCity service message.
 import { existsSync } from "node:fs";
-import { registerHooks } from "node:module";
+import { createRequire, registerHooks } from "node:module";
 import { pathToFileURL } from "node:url";
 
 // The npm packages the program's klibs name (kotlinx-datetime's `@js-joda/core`) are laid out as npm installs them
@@ -18,6 +18,10 @@ if (existsSync(modules)) {
 // reads `window.performance`). Node has the same globals but no `window`, and none of the DOM, so libraries that
 // look for a browser through `window.document` or `window.addEventListener` still see Node.
 globalThis.window ??= globalThis;
+
+// Kotlin/JS libraries reach Node's own modules through a global `require` (kotlinx-io's file system loads `fs`, `os`
+// and `path` that way), which an ES module program doesn't have.
+globalThis.require ??= createRequire(import.meta.url);
 
 const root = { name: "", suites: [], tests: [], skip: false };
 let current = root;

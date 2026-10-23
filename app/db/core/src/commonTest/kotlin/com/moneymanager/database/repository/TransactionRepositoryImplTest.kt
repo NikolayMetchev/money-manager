@@ -9,7 +9,6 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -19,7 +18,7 @@ import kotlin.time.Clock
 class TransactionRepositoryImplTest : DbTest() {
     @Test
     fun `createTransfer should insert transaction and transfer`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
 
             // Create test accounts
@@ -59,7 +58,7 @@ class TransactionRepositoryImplTest : DbTest() {
 
     @Test
     fun `createTransfer should fail when source and target accounts are the same`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
 
             // Create test account
@@ -90,7 +89,7 @@ class TransactionRepositoryImplTest : DbTest() {
 
     @Test
     fun `updateTransfer should fail when changing to same source and target accounts`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
 
             // Create test accounts
@@ -151,7 +150,7 @@ class TransactionRepositoryImplTest : DbTest() {
 
     @Test
     fun `getAccountBalances should return correct balances after single transaction`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
 
             // Create test accounts
@@ -199,7 +198,7 @@ class TransactionRepositoryImplTest : DbTest() {
 
     @Test
     fun `getAccountBalances should return correct balances after multiple transactions`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
 
             // Create test accounts
@@ -285,7 +284,7 @@ class TransactionRepositoryImplTest : DbTest() {
 
     @Test
     fun `getAccountBalances should handle multiple currencies per account`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
 
             // Create test accounts
@@ -357,7 +356,7 @@ class TransactionRepositoryImplTest : DbTest() {
 
     @Test
     fun `getAccountBalances should return empty list when no transactions exist`() =
-        runTest {
+        runDbTest {
             // Create accounts but no transactions
             val now = Clock.System.now()
             repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Checking", openingDate = now))
@@ -372,7 +371,7 @@ class TransactionRepositoryImplTest : DbTest() {
 
     @Test
     fun `deleteTransaction should remove transaction`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
 
             // Create test accounts

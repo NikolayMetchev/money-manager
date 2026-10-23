@@ -11,7 +11,6 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -53,7 +52,7 @@ class TransfersMissingCompanionTest : DbTest() {
 
     @Test
     fun `reports matched transfers until their companion is created`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val wiseEur =
                 repositories.accountRepository.createAccount(
@@ -120,7 +119,7 @@ class TransfersMissingCompanionTest : DbTest() {
 
     @Test
     fun `attribute names are matched exactly`() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val wiseEur =
                 repositories.accountRepository.createAccount(

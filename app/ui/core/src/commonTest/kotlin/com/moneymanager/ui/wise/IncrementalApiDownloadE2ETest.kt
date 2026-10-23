@@ -16,7 +16,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -116,7 +115,7 @@ class IncrementalApiDownloadE2ETest : DbTest() {
 
     @Test
     fun `a second download fetches only the windows the first did not cover`() =
-        runTest {
+        runDbTest {
             val credentialId = apiConnection("Wise", now)
 
             val (_, firstPages) = download(credentialId)
@@ -135,7 +134,7 @@ class IncrementalApiDownloadE2ETest : DbTest() {
 
     @Test
     fun `forcing a full download ignores the watermark`() =
-        runTest {
+        runDbTest {
             val credentialId = apiConnection("Wise", now)
 
             val (_, firstPages) = download(credentialId)
@@ -146,7 +145,7 @@ class IncrementalApiDownloadE2ETest : DbTest() {
 
     @Test
     fun `a failed download does not advance the watermark`() =
-        runTest {
+        runDbTest {
             val credentialId = apiConnection("Wise", now)
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val strategy =

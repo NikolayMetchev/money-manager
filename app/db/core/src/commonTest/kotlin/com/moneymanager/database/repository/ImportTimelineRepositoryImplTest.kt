@@ -18,7 +18,6 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -120,7 +119,7 @@ class ImportTimelineRepositoryImplTest : DbTest() {
 
     @Test
     fun `csv ranges cover min max timestamps and strategy of the latest application`() =
-        runTest {
+        runDbTest {
             setupAccountsAndCurrency()
             val importId = createCsvImport("statement.csv")
             val strategy = createStrategy()
@@ -142,7 +141,7 @@ class ImportTimelineRepositoryImplTest : DbTest() {
 
     @Test
     fun `re-imported transfer with multiple provenance revisions is counted once`() =
-        runTest {
+        runDbTest {
             setupAccountsAndCurrency()
             val importId = createCsvImport("statement.csv")
             val transfer = createTransferAt(earliestTimestamp)
@@ -179,7 +178,7 @@ class ImportTimelineRepositoryImplTest : DbTest() {
 
     @Test
     fun `imports without transactions are absent`() =
-        runTest {
+        runDbTest {
             createCsvImport("unapplied.csv")
 
             assertTrue(
@@ -198,7 +197,7 @@ class ImportTimelineRepositoryImplTest : DbTest() {
 
     @Test
     fun `qif ranges mirror csv shape`() =
-        runTest {
+        runDbTest {
             setupAccountsAndCurrency()
             val qifImportId: QifImportId =
                 repositories.qifImportRepository.createImport(
@@ -238,7 +237,7 @@ class ImportTimelineRepositoryImplTest : DbTest() {
 
     @Test
     fun `api session ranges group by session for a strategy-less credential`() =
-        runTest {
+        runDbTest {
             setupAccountsAndCurrency()
             val sessionId =
                 repositories.apiSessionRepository.createSession(
@@ -281,7 +280,7 @@ class ImportTimelineRepositoryImplTest : DbTest() {
 
     @Test
     fun `manual range covers manually created transfers only`() =
-        runTest {
+        runDbTest {
             setupAccountsAndCurrency()
             createTransferAt(earliestTimestamp, source = Source.Manual)
             createTransferAt(latestTimestamp, source = Source.Manual)
@@ -307,7 +306,7 @@ class ImportTimelineRepositoryImplTest : DbTest() {
 
     @Test
     fun `manual range is null when nothing was entered manually`() =
-        runTest {
+        runDbTest {
             setupAccountsAndCurrency()
             createTransferAt(earliestTimestamp)
 
@@ -316,7 +315,7 @@ class ImportTimelineRepositoryImplTest : DbTest() {
 
     @Test
     fun `getAllDateRanges combines every source`() =
-        runTest {
+        runDbTest {
             setupAccountsAndCurrency()
             val importId = createCsvImport("statement.csv")
             attachCsvProvenance(createTransferAt(earliestTimestamp), importId, rowIndex = 0)

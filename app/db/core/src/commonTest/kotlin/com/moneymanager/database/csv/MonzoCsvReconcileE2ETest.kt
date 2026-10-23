@@ -15,7 +15,6 @@ import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
@@ -147,7 +146,7 @@ class MonzoCsvReconcileE2ETest : DbTest() {
 
     @Test
     fun personalAndJointExports_reconcileTheSharedTransfer_insteadOfDoubleCounting() =
-        runTest {
+        runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val personalId =
                 repositories.importEngine.createAccount(
@@ -204,7 +203,7 @@ class MonzoCsvReconcileE2ETest : DbTest() {
 
     @Test
     fun sameTransactionIdReimported_staysAnOrdinaryDuplicate_notReconciled() =
-        runTest {
+        runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val personalId =
                 repositories.importEngine.createAccount(

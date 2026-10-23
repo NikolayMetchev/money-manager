@@ -4,7 +4,7 @@ package com.moneymanager.localsettings
  * Small cross-platform key/value store for app-level preferences that must live OUTSIDE any
  * money-manager database. Two things need this today: which database to open at startup (the
  * setting cannot be stored inside a database it is meant to select) and the directory last used
- * by a file dialog. Backed by [FileLocalSettings] on desktop JVM and native (one file they share) and by
+ * by a file dialog. Backed by [JsonLocalSettings] on desktop JVM and native (one file they share) and by
  * SharedPreferences on Android.
  */
 interface LocalSettings {

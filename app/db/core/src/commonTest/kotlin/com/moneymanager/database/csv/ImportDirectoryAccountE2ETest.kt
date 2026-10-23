@@ -20,7 +20,6 @@ import com.moneymanager.importfilesource.ImportSubfolder
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
@@ -160,7 +159,7 @@ class ImportDirectoryAccountE2ETest : DbTest() {
 
     @Test
     fun `csvImportDirectories maps each scanned file to its directory and omits manual imports`() =
-        runTest {
+        runDbTest {
             val first = directory("First", accountId = null)
             val second = directory("Second", accountId = null)
             stageInto(first, "first.csv", monzoCsv("tx-first"))
@@ -186,7 +185,7 @@ class ImportDirectoryAccountE2ETest : DbTest() {
 
     @Test
     fun twoDirectoriesWithDifferentAccounts_eachFileLandsOnItsOwnAccount() =
-        runTest {
+        runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val personalId =
                 repositories.importEngine.createAccount(
@@ -220,7 +219,7 @@ class ImportDirectoryAccountE2ETest : DbTest() {
 
     @Test
     fun discoveredSubfolderWithNoAccount_inheritsItsParents() =
-        runTest {
+        runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val jointId =
                 repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Monzo Joint", openingDate = now), Source.Manual)
@@ -246,7 +245,7 @@ class ImportDirectoryAccountE2ETest : DbTest() {
 
     @Test
     fun fileWithNoDirectoryAtAll_fallsBackToTheSharedOverride() =
-        runTest {
+        runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val personalId =
                 repositories.importEngine.createAccount(
@@ -285,7 +284,7 @@ class ImportDirectoryAccountE2ETest : DbTest() {
 
     @Test
     fun topLevelDirectoryWithNoExplicitAccount_autoCreatesOneMatchingItsName() =
-        runTest {
+        runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val dir = directory("Monzo Joint", accountId = null)
             stageInto(dir, "nov.csv", monzoCsv("tx_auto"))
@@ -309,7 +308,7 @@ class ImportDirectoryAccountE2ETest : DbTest() {
 
     @Test
     fun topLevelDirectoryWithNoExplicitAccount_reusesAnExistingAccountOfTheSameName() =
-        runTest {
+        runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val existingId =
                 repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Monzo Joint", openingDate = now), Source.Manual)

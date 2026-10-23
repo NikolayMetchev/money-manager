@@ -16,7 +16,6 @@ import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -31,7 +30,7 @@ import kotlin.uuid.Uuid
 class UpdateProvenanceTest : DbTest() {
     @Test
     fun updatePersonRecordsSource() =
-        runTest {
+        runDbTest {
             val personId =
                 repositories.personRepository.createPerson(
                     Person(id = PersonId(0), firstName = "Ada", middleName = null, lastName = "Lovelace"),
@@ -53,7 +52,7 @@ class UpdateProvenanceTest : DbTest() {
 
     @Test
     fun updateCurrencyRecordsSource() =
-        runTest {
+        runDbTest {
             val currencyId =
                 repositories.currencyRepository.upsertCurrencyByCode("ZAR", "South African Rand", Source.SampleGenerator)
             val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
@@ -69,7 +68,7 @@ class UpdateProvenanceTest : DbTest() {
 
     @Test
     fun updateTransferRecordsSource() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val sourceAccountId =
                 repositories.accountRepository.createAccount(
@@ -114,7 +113,7 @@ class UpdateProvenanceTest : DbTest() {
 
     @Test
     fun updateCsvImportStrategyRecordsSource() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val strategy =
                 CsvImportStrategy(
@@ -141,7 +140,7 @@ class UpdateProvenanceTest : DbTest() {
 
     @Test
     fun updateImportDirectoryRecordsSource() =
-        runTest {
+        runDbTest {
             val now = Clock.System.now()
             val directory =
                 ImportDirectory(

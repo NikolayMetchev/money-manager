@@ -20,7 +20,6 @@ import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -113,7 +112,7 @@ class CryptoCsvReimportE2ETest : DbTest() {
 
     @Test
     fun cryptoCsv_createsAssetOnImport_andReimportIsIdempotent() =
-        runTest {
+        runDbTest {
             val income = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Rewards", openingDate = now))
             val wallet = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "CRO Wallet", openingDate = now))
             val strategy = strategy(income, wallet)

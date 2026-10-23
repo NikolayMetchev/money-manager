@@ -14,7 +14,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
@@ -121,7 +120,7 @@ class IncrementalCursorDownloadE2ETest : DbTest() {
 
     @Test
     fun `a second cursor download stops paging once it reaches the watermark`() =
-        runTest {
+        runDbTest {
             val credentialId = apiConnection("Monzo", now)
 
             // Page 1, page 2, then the empty page that ends the walk.

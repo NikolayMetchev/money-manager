@@ -15,7 +15,6 @@ import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInCsvStrategies
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -27,7 +26,7 @@ import kotlin.test.assertTrue
 class BuiltInCsvStrategyInstallTest : DbTest() {
     @Test
     fun `installing the built-in Wise CSV strategy round-trips through the database`() =
-        runTest {
+        runDbTest {
             repositories.installBuiltInCsvStrategies()
             val strategy =
                 repositories.csvImportStrategyRepository
@@ -107,7 +106,7 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
 
     @Test
     fun `installing the built-in Monzo CSV strategy round-trips through the database`() =
-        runTest {
+        runDbTest {
             repositories.installBuiltInCsvStrategies()
             val strategy =
                 repositories.csvImportStrategyRepository
@@ -154,7 +153,7 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
 
     @Test
     fun `installing the built-in Binance CSV strategy round-trips through the database`() =
-        runTest {
+        runDbTest {
             repositories.installBuiltInCsvStrategies()
             val strategy =
                 repositories.csvImportStrategyRepository

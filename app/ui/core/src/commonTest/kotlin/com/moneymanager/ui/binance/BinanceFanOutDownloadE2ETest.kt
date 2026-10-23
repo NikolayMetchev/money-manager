@@ -14,7 +14,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -57,7 +56,7 @@ class BinanceFanOutDownloadE2ETest : DbTest() {
 
     @Test
     fun `spot-trade fan-out queries only the symbol that survives the exchangeInfo intersection`() =
-        runTest {
+        runDbTest {
             val strategy = binanceStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val credentialId = apiConnection("Binance", now)
@@ -128,7 +127,7 @@ class BinanceFanOutDownloadE2ETest : DbTest() {
 
     @Test
     fun `a second download re-sweeps spot trades but shortens every date-windowed endpoint`() =
-        runTest {
+        runDbTest {
             val strategy = binanceStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val credentialId = apiConnection("Binance", now)
@@ -184,7 +183,7 @@ class BinanceFanOutDownloadE2ETest : DbTest() {
      */
     @Test
     fun `an out-of-range date window is skipped without dropping the rest of the endpoint`() =
-        runTest {
+        runDbTest {
             val strategy = binanceStrategy()
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val credentialId = apiConnection("Binance", now)

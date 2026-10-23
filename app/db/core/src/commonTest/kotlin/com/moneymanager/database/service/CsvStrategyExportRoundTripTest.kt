@@ -6,7 +6,6 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInCsvStrategies
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -23,7 +22,7 @@ import kotlin.time.Clock
 class CsvStrategyExportRoundTripTest : DbTest() {
     @Test
     fun `every seeded csv strategy survives an export-import round trip unchanged`() =
-        runTest {
+        runDbTest {
             val service =
                 CsvStrategyExportService(
                     accountRepository = repositories.accountRepository,

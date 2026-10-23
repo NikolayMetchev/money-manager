@@ -264,7 +264,8 @@ only so its dependents can, and the browser app never calls it).
 platform's SHA-256 (no npm): Renovate bumps `NODE`, and `bazel/renovate/repin.sh` rewrites the SHA-256s from
 nodejs.org's `SHASUMS256.txt` (`repin_node.py`). A test program's npm packages are laid out as npm installs them, in
 `:<name>_<target>_bin_node_modules/node_modules` (symlinks), and the runner resolves the program's bare imports from
-there (`module.registerHooks`). `testing/web/runner.mjs` defines the `describe`/`it` globals kotlin-test's adapter
+there (`module.registerHooks`). It also gives the program a global `require`, which kotlinx-io's js file system loads
+Node's modules with. `testing/web/runner.mjs` defines the `describe`/`it` globals kotlin-test's adapter
 registers tests with, runs them (awaiting async ones) and prints TeamCity service messages, which `KnTestLauncher
 --node` turns into `test.xml` exactly as it does a native test binary's; `--test_filter` works the same way.
 

@@ -2,7 +2,6 @@ package com.moneymanager.database
 
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -14,7 +13,7 @@ import kotlin.test.assertTrue
 class FreshDatabaseHasNoStrategiesTest : DbTest() {
     @Test
     fun `a fresh database has no strategies or pass-through definitions`() =
-        runTest {
+        runDbTest {
             assertTrue(
                 repositories.csvImportStrategyRepository
                     .getAllStrategies()

@@ -2,7 +2,6 @@ package com.moneymanager.database.audit
 
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.test.database.DbTest
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -10,7 +9,7 @@ import kotlin.test.fail
 class AuditTableCoverageTest : DbTest() {
     @Test
     fun `all regular tables have audit tables with matching schema`() =
-        runTest {
+        runDbTest {
             // Get all auditable tables using centralized utility function
             val regularTables = database.getAuditableTables()
 
