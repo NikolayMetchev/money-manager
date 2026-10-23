@@ -59,7 +59,7 @@
       "cryptography-provider-jdk": "dev.whyoleg.cryptography:cryptography-provider-jdk:0.6.0",
       "cryptography-provider-openssl3-prebuilt": "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt:0.6.0",
       "cryptography-random": "dev.whyoleg.cryptography:cryptography-random:0.6.0",
-      "jetbrains-navigation3-ui-desktop": "org.jetbrains.androidx.navigation3:navigation3-ui-desktop:1.1.2",
+      "jetbrains-navigation3-ui-desktop": "org.jetbrains.androidx.navigation3:navigation3-ui-desktop:1.2.0",
       "junit": "junit:junit:4.13.2",
       "kermit": "co.touchlab:kermit:2.2.0",
       "kermit-core": "co.touchlab:kermit-core:2.2.0",
@@ -13730,12 +13730,12 @@
     },
     "org.jetbrains.androidx.navigation3:navigation3-ui-desktop": {
       "jvm": {
-        "version": "1.1.2",
+        "version": "1.2.0",
         "files": [
           {
-            "name": "navigation3-ui-desktop-1.1.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/navigation3/navigation3-ui-desktop/1.1.2/navigation3-ui-desktop-1.1.2.jar",
-            "sha256": "b74001885b88af687e0795b4a4cc80a5fbd7f4ffad2077ab415220afc75021a8"
+            "name": "navigation3-ui-desktop-1.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/androidx/navigation3/navigation3-ui-desktop/1.2.0/navigation3-ui-desktop-1.2.0.jar",
+            "sha256": "e76b629be4a1a97ab83e341312a3bb4acb5379118ce3f9f16ab08cbcede8edcd"
           }
         ],
         "deps": [
