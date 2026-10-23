@@ -149,8 +149,9 @@ PLAY_SERVICES_AUTH = "22.0.0"  # renovate: com.google.android.gms:play-services-
 POI = "6.0.0"  # renovate: org.apache.poi:poi
 POKO = "0.23.2"  # renovate: dev.drewhamilton.poko:poko-annotations
 # Skiko's web klibs and the runtime they load (skiko.mjs and skiko.wasm, which the browser app ships beside its program)
-# must be one release, as the Compose Gradle plugin keeps them: the version is forced on the klibs too.
-SKIKO = "0.150.2"  # renovate: org.jetbrains.skiko:skiko
+# must be one release, as the Compose Gradle plugin keeps them: the version is forced on the klibs too. It is the one
+# COMPOSE_PLUGIN was built against (Compose's klibs link against no other), which bazel/renovate/repin_skiko.py writes.
+SKIKO = "0.150.2"
 SLF4J = "2.0.20"  # renovate: org.slf4j:slf4j-api
 SQLDELIGHT = "2.4.1"  # renovate: app.cash.sqldelight:android-driver
 TURBINE = "1.2.1"  # renovate: app.cash.turbine:turbine
