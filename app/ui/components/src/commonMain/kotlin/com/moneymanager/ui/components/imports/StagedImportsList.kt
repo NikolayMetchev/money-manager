@@ -34,12 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.StagedImport
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
-import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import kotlin.time.Instant
@@ -240,8 +235,10 @@ private fun <F : StagedImport<*>> LazyListScope.directoryTreeItems(
         val groupExpanded = expandedSections[sectionKey] ?: true
         item(key = "header-$sectionKey") {
             val isNoStrategyGroup = group.key == null && group.actionable
+            // Named as a strategy, in a lighter style than a folder, so a folder's strategy split never
+            // reads as subfolders.
             ImportSectionHeader(
-                title = group.label,
+                title = if (group.key != null) "Strategy: ${group.label}" else group.label,
                 count = group.imports.size,
                 expanded = groupExpanded,
                 onToggleExpanded = { expandedSections[sectionKey] = !groupExpanded },
@@ -253,6 +250,7 @@ private fun <F : StagedImport<*>> LazyListScope.directoryTreeItems(
                     },
                 onAction = { if (isNoStrategyGroup) onIgnoreAll(group.imports) else onImportAll(group.imports) },
                 isWarning = group.isWarning,
+                titleStyle = MaterialTheme.typography.labelLarge,
                 indent = groupIndent,
             )
         }
@@ -326,27 +324,6 @@ private fun ImportSectionHeader(
             TextButton(onClick = onAction) { Text(actionLabel) }
         }
     }
-}
-
-/**
- * The account [import]'s transfers were (or will be) created against, for display in the imports list.
- * Prefers the strategy's own hard-coded SOURCE_ACCOUNT (e.g. crypto.com's fixed conduit account) — the
- * true answer whenever one exists — over the file's import-directory account (see
- * `ImportDirectory.accountId`), which only matters for strategies with no fixed source (e.g. Monzo,
- * where the same export format serves any account). Null when neither resolves anything yet (the file
- * has no applied strategy and its directory has none set either).
- */
-internal fun <K : Any> resolveSourceAccountName(
-    import: StagedImport<K>,
-    strategies: List<CsvImportStrategy>,
-    directoryAccounts: Map<K, AccountId>,
-    accounts: List<Account>,
-): String? {
-    val appliedStrategy = import.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
-    val sourceMapping = appliedStrategy?.config?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
-    val hardCodedAccountId = (sourceMapping as? HardCodedAccountMapping)?.accountId
-    val accountId = hardCodedAccountId ?: directoryAccounts[import.id]
-    return accountId?.let { id -> accounts.firstOrNull { it.id == id }?.name }
 }
 
 /**

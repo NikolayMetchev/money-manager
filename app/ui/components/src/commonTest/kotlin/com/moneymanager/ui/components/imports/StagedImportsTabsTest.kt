@@ -117,7 +117,7 @@ class StagedImportsTabsTest {
 
             onNodeWithText("Statements (1)").assertExists()
             onNodeWithText("Santander (1)").assertExists()
-            onNodeWithText("QIF Bank (1)").assertExists()
+            onNodeWithText("Strategy: QIF Bank (1)").assertExists()
             onNodeWithText("santander.qif").assertExists()
             onNodeWithText("$MANUALLY_ADDED_LABEL (1)").assertExists()
             onNodeWithText("⚠ No strategy (1)").assertExists()

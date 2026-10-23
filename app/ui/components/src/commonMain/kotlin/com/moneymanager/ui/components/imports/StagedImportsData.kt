@@ -11,12 +11,16 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.StagedImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
+import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.flow.Flow
+
+internal const val FROM_EACH_ROW = "From each row"
 
 /** What an import list screen reads beside its files, for [StagedImportsTabs] and [StagedImportCard]. */
 class StagedImportsData<K : Any>(
@@ -30,7 +34,26 @@ class StagedImportsData<K : Any>(
     // The account files scanned from each import directory belong to (see ImportDirectory.accountId).
     private val directoryAccounts: Map<K, AccountId>,
 ) {
-    fun sourceAccountName(import: StagedImport<K>): String? = resolveSourceAccountName(import, strategies, directoryAccounts, accounts)
+    /**
+     * The account [import]'s transfers were (or will be) created against, resolved the way an import run
+     * resolves it: the applied (else matched) strategy's own hard-coded SOURCE_ACCOUNT (e.g. crypto.com's
+     * fixed conduit account), else the file's import-directory account (its folder's or its parent's), else
+     * the account named after the file's folder that the run uses or creates, for a strategy with no
+     * SOURCE_ACCOUNT mapping (one that maps it from a column reads it from each row). Null for a manually
+     * added file whose strategy names no account: the person chooses at import.
+     */
+    fun sourceAccountName(import: StagedImport<K>): String? {
+        val strategyId = import.lastAppliedStrategyId ?: matchedStrategies?.get(import.id)?.id
+        val strategy = strategyId?.let { id -> strategies.find { it.id == id } }
+        val sourceMapping = strategy?.config?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
+        val hardCoded = (sourceMapping as? HardCodedAccountMapping)?.accountId
+        (hardCoded ?: directoryAccounts[import.id])?.let { id -> return accounts.firstOrNull { it.id == id }?.name }
+        // Only a strategy with no SOURCE_ACCOUNT mapping takes its account from the folder.
+        if (sourceMapping != null) return FROM_EACH_ROW
+        // A file staged from several folders has no one folder to name its account after.
+        val folderName = importDirectories[import.id]?.singleOrNull()?.folderName ?: return null
+        return if (accounts.any { it.name == folderName }) folderName else "$folderName (created at import)"
+    }
 }
 
 /**

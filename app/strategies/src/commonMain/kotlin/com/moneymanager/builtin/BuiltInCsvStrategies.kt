@@ -56,6 +56,7 @@ object BuiltInCsvStrategies {
     val payPalCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000011")
     val payPalLegacyCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000012")
     val curveTransactionsCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000013")
+    val amexQifStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000014")
 
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
@@ -330,6 +331,9 @@ object BuiltInCsvStrategies {
      */
     private const val BINANCE_TRADE_RECONCILE_WINDOW_SECONDS = 5L
 
+    /** The memo every American Express QIF record ends with; group 1 is the date. */
+    private const val AMEX_PROCESS_DATE = "\\bProcess Date (\\d{2}/\\d{2}/\\d{4})\\s*$"
+
     /**
      * Window for pairing a dust sweep's debit legs to its credit legs. Binance stamps a sweep's rows
      * within the same second or the next one, while distinct sweeps are hours apart.
@@ -348,6 +352,7 @@ object BuiltInCsvStrategies {
         listOf(
             buildQifStrategy(now, qifCurrencyId),
             buildSantanderQifStrategy(now, qifCurrencyId),
+            buildAmexQifStrategy(now, qifCurrencyId),
             buildWiseCsvStrategy(now),
             buildMonzoCsvStrategy(now),
             buildCryptoComCardStrategy(now),
@@ -1734,6 +1739,73 @@ object BuiltInCsvStrategies {
                                     "INTEREST|MAINTAINING THE ACCOUNT|CREDIT FROM|TRANSFER)",
                             ),
                         ),
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Built-in QIF strategy for American Express UK card statements. Every Amex record carries a
+     * "Process Date dd/mm/yyyy" memo (after an optional merchant type such as "RETAIL GOODS"), which
+     * content-matches these files so they don't fall back to the generic [buildQifStrategy]. The payee is
+     * the merchant (the target account); the check-number field holds Amex's own reference, the same in
+     * every statement that covers the transaction, so overlapping exports dedupe on it. Like the other
+     * QIF strategies, the source account and currency are chosen at import time.
+     */
+    fun buildAmexQifStrategy(
+        now: Instant,
+        currencyId: CurrencyId = CurrencyId(1),
+    ): CsvImportStrategy {
+        val fieldMappings =
+            mapOf(
+                accountFromRules(TransferField.TARGET_ACCOUNT),
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = QifColumns.COL_DATE,
+                        dateFormat = "dd/MM/yyyy",
+                    ),
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(
+                        fieldType = TransferField.DESCRIPTION,
+                        value = ValueExpr.of(QifColumns.COL_PAYEE),
+                    ),
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = QifColumns.COL_AMOUNT,
+                    ),
+                TransferField.CURRENCY to HardCodedCurrencyMapping(fieldType = TransferField.CURRENCY, currencyId = currencyId),
+                TransferField.TIMEZONE to HardCodedTimezoneMapping(fieldType = TransferField.TIMEZONE, timezoneId = "UTC"),
+            )
+        val rules =
+            listOf(
+                attribute(QifColumns.COL_CHECK_NUMBER, "amex-reference", unique = true),
+                attribute(
+                    QifColumns.COL_MEMO,
+                    "amex-process-date",
+                    extraction = Extraction(pattern = AMEX_PROCESS_DATE, outputTemplate = "$1"),
+                ),
+                attribute(
+                    QifColumns.COL_MEMO,
+                    "amex-merchant-type",
+                    extraction = Extraction(pattern = "^\\s*(\\S.*?)\\s+Process Date\\b", outputTemplate = "$1"),
+                ),
+                // Negative = a purchase on the card; positive = a refund, payment or cashback.
+                incomingWhenPositive(QifColumns.COL_AMOUNT),
+                accounts(AccountSide.TARGET, AccountNaming(value = ValueExpr.of(QifColumns.COL_PAYEE))),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(amexQifStrategyId),
+            name = "American Express (QIF)",
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = QifColumns.headers.toSet(),
+                    fieldMappings = fieldMappings,
+                    rules = rules,
+                    contentMatchRules = listOf(Condition(QifColumns.COL_MEMO, ConditionOp.MATCHES, AMEX_PROCESS_DATE)),
                 ),
             createdAt = now,
             updatedAt = now,
