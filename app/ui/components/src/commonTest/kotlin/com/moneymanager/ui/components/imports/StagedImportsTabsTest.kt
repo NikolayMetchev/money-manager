@@ -32,7 +32,6 @@ private val statements =
         provider = ImportDirectoryProvider.GDRIVE,
         folderRef = "statements",
         displayPath = "Statements",
-        topLevel = true,
         createdAt = epoch,
         updatedAt = epoch,
     )

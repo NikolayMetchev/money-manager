@@ -70,8 +70,9 @@ fun List<CsvImportStrategy>.qifCompatible(): List<CsvImportStrategy> = filter { 
  * bank-specific strategy is auto-detected from the data (QIF's fixed columns can't distinguish banks).
  * A strategy with no content rules acts as the fallback: when nothing positively matches, the
  * rule-less strategy is returned. Ties are broken deterministically by score, then name, then id.
- * Returns null only when the receiver is empty. Unlike [selectForCsv] there is no filename tier and
- * no minimum-score threshold: QIF files always import with *some* strategy.
+ * Returns null when nothing matches and no strategy is rule-less: a file from a bank no strategy
+ * recognises is left for a person rather than imported with a guess. Unlike [selectForCsv] there is
+ * no filename tier and no minimum-score threshold.
  */
 fun List<CsvImportStrategy>.selectForQifContent(
     rows: List<CsvRow>,
@@ -89,7 +90,6 @@ fun List<CsvImportStrategy>.selectForQifContent(
 
     return filter { it.config.contentMatchRules.isEmpty() }
         .minWithOrNull(compareBy({ it.name }, { it.id.toString() }))
-        ?: first()
 }
 
 /**
@@ -152,7 +152,7 @@ suspend fun bulkApplyQif(
                 return@forEachIndexed
             }
 
-            // Auto-detect the bank strategy from the file's content (Santander vs the generic fallback).
+            // Auto-detect the bank strategy from the file's content.
             val matched = qifStrategies.selectForQifContent(rows, QifCsvAdapter.columns)
             if (matched == null) {
                 outcome(BulkFileStatus.SKIPPED_NO_STRATEGY)

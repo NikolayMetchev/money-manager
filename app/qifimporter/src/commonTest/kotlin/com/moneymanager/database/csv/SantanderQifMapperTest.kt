@@ -173,14 +173,14 @@ class SantanderQifMapperTest {
     }
 
     @Test
-    fun `content auto-detect picks Santander for santander rows and the generic QIF strategy otherwise`() {
+    fun `content auto-detect picks Santander for santander rows and nothing for another bank`() {
         val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now).qifCompatible()
         val santanderRows =
             listOf(row("DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF X, MANDATE NO 1, 5.00", "-5.00"))
         val genericRows = listOf(row("Tesco", "-5.00"))
 
         assertEquals("Santander (QIF)", strategies.selectForQifContent(santanderRows, QifCsvAdapter.columns)?.name)
-        assertEquals("QIF", strategies.selectForQifContent(genericRows, QifCsvAdapter.columns)?.name)
+        assertNull(strategies.selectForQifContent(genericRows, QifCsvAdapter.columns))
     }
 
     /** The new (counterparty) account discovered on the target side, regardless of flip. */

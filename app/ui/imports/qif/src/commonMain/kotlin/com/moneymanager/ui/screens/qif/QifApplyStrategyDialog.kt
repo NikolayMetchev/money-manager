@@ -140,8 +140,8 @@ fun QifApplyStrategyDialog(
 
     LaunchedEffect(qifStrategies, rows) {
         if (selectedStrategy == null) {
-            // Auto-detect the bank strategy from the file's content (e.g. Santander), with the generic
-            // QIF strategy as the fallback. The user can still override via the selector below.
+            // Auto-detect the bank strategy from the file's content (e.g. Santander). With no match the
+            // user picks one via the selector below.
             selectedStrategy = qifStrategies.selectForQifContent(rows, QifCsvAdapter.columns)
         }
     }
@@ -222,10 +222,15 @@ fun QifApplyStrategyDialog(
                     csvColumns = QifCsvAdapter.columns,
                     enabled = !isImporting,
                 )
-                if (qifStrategies.isEmpty()) {
+                if (selectedStrategy == null) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "No QIF strategy matches this file yet. Close and use \"Create Strategy\" to make one.",
+                        text =
+                            if (qifStrategies.isEmpty()) {
+                                "No QIF strategy matches this file yet. Close and use \"Create Strategy\" to make one."
+                            } else {
+                                "No QIF strategy matches this file yet. Pick one above, or close and use \"Create Strategy\"."
+                            },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )

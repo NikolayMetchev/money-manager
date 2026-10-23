@@ -98,12 +98,15 @@ class ImportDirectoryServiceTest : DbTest() {
         $transactionId,19/11/2023,21:15:00,Faster payment,Some Merchant,,Transfers,-25.00,GBP,-25.00,GBP,,,,To Some Merchant,,,
         """.trimIndent()
 
+    // An American Express statement, so the built-in Amex QIF strategy recognises it.
     private fun qif(payee: String): String =
         """
-        !Type:Bank
+        !Type:CCard
         D01/02/2024
+        N$payee
         T-12.50
         P$payee
+        M Process Date 01/02/2024
         ^
         """.trimIndent()
 

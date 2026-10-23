@@ -15,6 +15,7 @@ import com.moneymanager.qifimporter.selectForQifContent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.time.Clock
 
 /** The built-in American Express QIF strategy ([BuiltInCsvStrategies.buildAmexQifStrategy]) over Amex's record shapes. */
@@ -69,12 +70,12 @@ class AmexQifMapperTest {
     }
 
     @Test
-    fun `content auto-detect picks American Express for amex rows only`() {
+    fun `content auto-detect picks American Express for amex rows and nothing for another bank`() {
         val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now).qifCompatible()
         val amexRows = listOf(row("ZIPCAR WIMBLEDON", "-45.00", "  Process Date 21/03/2020"))
         val genericRows = listOf(CsvRow(rowIndex = 1, values = listOf("19/03/2020", "-5.00", "Tesco", "", "", "", "", "", "")))
 
         assertEquals("American Express (QIF)", strategies.selectForQifContent(amexRows, QifCsvAdapter.columns)?.name)
-        assertEquals("QIF", strategies.selectForQifContent(genericRows, QifCsvAdapter.columns)?.name)
+        assertNull(strategies.selectForQifContent(genericRows, QifCsvAdapter.columns))
     }
 }

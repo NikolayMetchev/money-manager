@@ -85,7 +85,6 @@ class ImportQifE2ETest {
     ): CsvImportStrategy =
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
-            // Sorts before the seeded "QIF" strategy so it is the one auto-selected.
             name = "AAA QIF Test",
             config =
                 CsvStrategyConfig(
@@ -206,7 +205,7 @@ class ImportQifE2ETest {
     }
 
     @Test
-    fun builtInQifStrategy_alwaysMatchesOutOfTheBox() {
+    fun builtInQifStrategies_leaveAFileFromAnotherBankWithoutAStrategy() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -217,7 +216,7 @@ class ImportQifE2ETest {
                 component.installBuiltInCsvStrategies()
                 val usdId = component.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
                 component.settingsRepository.setDefaultCurrencyId(usdId)
-                // No user strategy: rely entirely on the seeded built-in "QIF" strategy.
+                // No user strategy, and no built-in recognises this bank.
                 injectQifImport(component)
             }
 
@@ -244,11 +243,8 @@ class ImportQifE2ETest {
             onAllNodesWithText("Apply Strategy").onFirst().performClick()
             waitUntilExactlyOneExists(hasText("Apply Import Strategy"), timeoutMillis = 15000)
 
-            // The built-in "QIF" strategy is auto-selected, so the dialog is ready to import (the
-            // currency defaults to the settings default) and the "no matching strategy" hint is absent.
-            waitUntilAtLeastOneExists(hasText("USD - US Dollar", substring = true), timeoutMillis = 10000)
-            waitForIdle()
-            onNodeWithText("No QIF strategy matches this file yet", substring = true).assertDoesNotExist()
+            // Nothing is guessed: the person is asked to pick or create a strategy.
+            waitUntilAtLeastOneExists(hasText("No QIF strategy matches this file yet", substring = true), timeoutMillis = 10000)
         }
     }
 
