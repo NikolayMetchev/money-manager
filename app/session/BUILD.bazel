@@ -80,6 +80,7 @@ kmp_test(
         "//test/utils/credentialvault",
         "//utils/credentialvault",
         "//utils/localsettings",
+        "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_coroutines_test",
     ],
 )

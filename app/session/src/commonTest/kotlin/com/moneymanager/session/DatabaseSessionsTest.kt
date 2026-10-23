@@ -19,6 +19,7 @@ import com.moneymanager.remotestorage.testing.SingleProviderFactory
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -151,6 +152,48 @@ class DatabaseSessionsTest {
                 assertEquals(cache.toString(), settings.getString(KEY_LAST_DATABASE))
             } finally {
                 session.database.close()
+            }
+        }
+
+    @Test
+    fun reloadFromRemoteReplacesTheOpenWorkingCopy() =
+        withLocations(1) { (location) ->
+            val controller = controller()
+            val session = sessions(controller).open(location)
+            controller.createRemote(OneFileProvider.ID, null, "db.mmdb", location, session.database, "pw")
+            // Not uploaded, so the cloud copy the reload brings back doesn't have it.
+            session.importEngine.createCurrency("ZZZ", "Test")
+
+            val reloaded = sessions(controller).reloadFromRemote(session)
+            try {
+                assertEquals(location, reloaded.location)
+                assertNull(
+                    reloaded.services.accounts.currencyRepository
+                        .getCurrencyByCode("ZZZ")
+                        .first(),
+                )
+            } finally {
+                reloaded.database.close()
+            }
+        }
+
+    @Test
+    fun replaceOpenClosesTheDatabaseBeforeReplacingIt() =
+        withLocations(2) { (current, replacement) ->
+            sessions().open(replacement).database.close()
+            val session = sessions().open(current)
+
+            val replaced =
+                sessions().replaceOpen(session) {
+                    // Writing over the open file would fail on Android and in the browser.
+                    manager.deleteDatabase(current)
+                    replacement
+                }
+            try {
+                assertEquals(replacement, replaced.location)
+                assertFalse(manager.databaseExists(current))
+            } finally {
+                replaced.database.close()
             }
         }
 
