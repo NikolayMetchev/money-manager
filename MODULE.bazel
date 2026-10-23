@@ -150,7 +150,7 @@ POI = "6.0.0"  # renovate: org.apache.poi:poi
 POKO = "0.23.2"  # renovate: dev.drewhamilton.poko:poko-annotations
 # Skiko's web klibs and the runtime they load (skiko.mjs and skiko.wasm, which the browser app ships beside its program)
 # must be one release, as the Compose Gradle plugin keeps them: the version is forced on the klibs too.
-SKIKO = "0.150.2"  # renovate: org.jetbrains.skiko:skiko
+SKIKO = "0.156.0"  # renovate: org.jetbrains.skiko:skiko
 SLF4J = "2.0.20"  # renovate: org.slf4j:slf4j-api
 SQLDELIGHT = "2.4.1"  # renovate: app.cash.sqldelight:android-driver
 TURBINE = "1.2.1"  # renovate: app.cash.turbine:turbine
