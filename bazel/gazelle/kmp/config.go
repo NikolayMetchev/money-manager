@@ -54,7 +54,8 @@ const (
 	// kmp_test_flaky true: retry failing JVM tests, as the Compose modules' Gradle test-retry plugin does.
 	testFlakyDirective = "kmp_test_flaky"
 	// kmp_main_platform android: what a non-KMP module's `src/main` compiles for: the JVM (`kotlin("jvm")`, the
-	// default) or Android (`com.android.application`: the module then has no JVM compile).
+	// default), Android (`com.android.application`) or the browser (`web`: both browser targets, a browser app). A
+	// module that isn't the JVM's has no JVM compile.
 	mainPlatformDirective = "kmp_main_platform"
 	// kmp_android_host_tests false: an Android module whose tests don't run as host tests (Gradle's
 	// `testAndroidHostTest` disabled: the Compose UI feature convention, tests that need a device).
@@ -110,7 +111,7 @@ type kmpConfig struct {
 	testFlaky         bool
 	noHostTests       bool
 	noWebTests        bool
-	androidMain       bool // src/main is the Android leaf (kmp_main_platform android)
+	mainPlatform      string // what src/main compiles for: "" (the JVM), "android" or "web" (kmp_main_platform)
 	visibility        []string
 	forbidDeps        []string
 	forbidReference   string
@@ -140,7 +141,7 @@ func (c *kmpConfig) clone() *kmpConfig {
 	out.testFlaky = false
 	out.noHostTests = false
 	out.noWebTests = false
-	out.androidMain = false
+	out.mainPlatform = ""
 	out.visibility = nil
 	out.forbidDeps = nil
 	out.forbidReference = ""
@@ -217,12 +218,12 @@ func (*kmpLang) Configure(c *config.Config, rel string, f *rule.File) {
 				kc.testFlaky = strings.TrimSpace(d.Value) == "true"
 			case mainPlatformDirective:
 				switch v := strings.TrimSpace(d.Value); v {
-				case "android":
-					kc.androidMain = true
+				case "android", "web":
+					kc.mainPlatform = v
 				case "jvm":
-					kc.androidMain = false
+					kc.mainPlatform = ""
 				default:
-					log.Printf("%s: %s wants jvm or android, got %q", rel, mainPlatformDirective, v)
+					log.Printf("%s: %s wants jvm, android or web, got %q", rel, mainPlatformDirective, v)
 				}
 			case androidHostTestsDirective:
 				kc.noHostTests = strings.TrimSpace(d.Value) == "false"

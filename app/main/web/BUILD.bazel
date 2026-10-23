@@ -1,0 +1,71 @@
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp:web.bzl", "WEB_TARGETS", "kt_web_dist", "kt_web_executable")
+
+# The browser app (#84): src/main compiles for wasmJs and js, and :dist is the site that loads one of them.
+# gazelle:kmp_generate true
+# gazelle:kmp_targets web
+# gazelle:kmp_main_platform web
+# gazelle:kmp_plugins compose
+# The database worker Main.kt starts by URL, which no import names.
+# gazelle:kmp_keep_dep //app/db/worker webMain
+
+kmp_library(
+    name = "web",
+    jvm = False,
+    keep_deps = ["//app/db/worker"],
+    plugins = ["compose"],
+    visibility = ["//visibility:public"],
+    web_deps = [
+        "//app/cryptodata",
+        "//app/db/core",
+        "//app/di/core",
+        "//app/di/params",
+        "//app/session",
+        "//app/ui/core",
+        "@maven_kmp//:compose_ui",
+        "@maven_kmp//:kermit",
+        "@maven_kmp//:kotlinx_browser",
+        "//app/db/worker",
+        "@maven_kmp//:androidx_compose_runtime",
+    ],
+    web_srcs = glob(["src/main/kotlin/**/*.kt"]),
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+)
+
+[
+    kt_web_executable(
+        name = "program_" + target,
+        base_name = "money-manager",
+        library = ":web_" + target,
+        target = target,
+    )
+    for target in WEB_TARGETS
+]
+
+# The site: index.html and loader.mjs, which starts the wasmJs program or, without WasmGC, the js one.
+kt_web_dist(
+    name = "dist",
+    srcs = glob(["site/*"]),
+    programs = [":program_" + target for target in WEB_TARGETS],
+    runtime_jars = ["@maven_kmp//:skiko_js_wasm_runtime_jvm"],
+)
+
+# `bazel run //app/main/web:serve [-- <port>]` serves the site at http://127.0.0.1:8080/ (the address a Google sign-in origin names).
+sh_binary(
+    name = "serve",
+    srcs = ["//bazel/kmp/web:serve.sh"],
+    args = [
+        "$(rootpath //bazel/kmp/testing/web:node)",
+        "$(rootpath //bazel/kmp/web:serve.mjs)",
+        "$(rootpath :dist)",
+    ],
+    data = [
+        ":dist",
+        "//bazel/kmp/testing/web:node",
+        "//bazel/kmp/web:serve.mjs",
+    ],
+)

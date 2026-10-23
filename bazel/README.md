@@ -272,10 +272,20 @@ Node's modules with. `testing/web/runner.mjs` defines the `describe`/`it` global
 registers tests with, runs them (awaiting async ones) and prints TeamCity service messages, which `KnTestLauncher
 --node` turns into `test.xml` exactly as it does a native test binary's; `--test_filter` works the same way.
 
-A wasmJs link fails on any symbol it can't link, as native's does. The js link only warns, as KGP's does (the call
-throws if it runs): ktor 3.6.0's js klibs, built with Kotlin 2.3, call `EventTarget.addEventListener(String, (Event) ->
-Unit)`, which Kotlin 2.4's `kotlin-dom-api-compat` no longer has. A ktor built with 2.4 should let it go back to
-failing.
+Both links fail on any symbol they can't link, as native's does. A link passes every klib before the klibs it depends
+on (a topological depset), because the linker takes a class from the first library that declares it: on js,
+kotlinx-browser redeclares `kotlin-dom-api-compat`'s DOM classes with the overloads libraries are compiled against
+(`EventTarget.addEventListener(String, (Event) -> Unit)`, which Compose and ktor call and 2.4's dom-api-compat lacks).
+
+**The app** (`app/main/web`) is `kmp_main_platform web`: its `src/main` compiles for the browser targets alone, and
+`kt_web_executable` links it once per target. `kt_web_dist` lays out the site (`:dist`): `index.html` and `loader.mjs`
+(`site/`) at the root, each program in `wasmJs/` or `js/` with Compose's `skiko-js-wasm-runtime` jar unpacked beside it
+(`skiko.mjs`, `skiko.wasm`; the jar is a `jvm`-only library in `@maven_kmp`, and Skiko's klibs are forced to the same
+`SKIKO` version), and the programs' npm packages under `node_modules/`. Browsers don't resolve bare imports and a worker
+can't use an import map, so `web/dist.mjs` rewrites each bare import to a relative path, resolved as a bundler would
+for the browser (`exports` with the `browser` condition, else `module`, else `main`). The loader picks wasmJs when the
+browser validates a tiny WasmGC module, js otherwise (`?target=js` forces it). `bazel run //app/main/web:serve -- 8080`
+serves the site on 127.0.0.1 with Node (`web/serve.mjs`).
 
 ## Desktop
 

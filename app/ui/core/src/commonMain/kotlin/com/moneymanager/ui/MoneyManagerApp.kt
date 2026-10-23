@@ -244,7 +244,7 @@ fun MoneyManagerApp(
                                     Column {
                                         Text(currentScreen.title)
                                         Text(
-                                            text = "v$appVersion",
+                                            text = listOfNotNull("v${appVersion.value}", LocalBuildLabel.current).joinToString(" · "),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                                         )
@@ -670,6 +670,13 @@ fun MoneyManagerApp(
                                                         ),
                                                     )
                                                 },
+                                                // Folders need an import file source, which the browser doesn't have yet.
+                                                tabs =
+                                                    if (importFileSourceFactory != null) {
+                                                        ImportTab.entries
+                                                    } else {
+                                                        ImportTab.entries - ImportTab.DIRECTORIES
+                                                    },
                                                 onTimelineFileClick = { file ->
                                                     when (file.kind) {
                                                         TimelineSourceKind.CSV -> {

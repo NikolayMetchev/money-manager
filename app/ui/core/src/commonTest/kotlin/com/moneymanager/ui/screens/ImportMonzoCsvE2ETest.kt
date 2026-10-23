@@ -86,7 +86,7 @@ class ImportMonzoCsvE2ETest {
             waitForIdle()
             waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
 
-            // Navigate to Imports screen using nav bar (lands on the Directories tab), then open CSV.
+            // Navigate to Imports screen using nav bar (lands on its first tab), then open CSV.
             waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()

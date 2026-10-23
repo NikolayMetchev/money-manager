@@ -1,4 +1,4 @@
-package com.moneymanager.remotestorage.di
+package com.moneymanager.remotestorage.googledrive.loopback
 
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.remotestorage.RemoteStorageProvider
@@ -7,13 +7,12 @@ import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.googledrive.BrowserLauncher
 import com.moneymanager.remotestorage.googledrive.GOOGLE_DRIVE_PROVIDER_ID
 import com.moneymanager.remotestorage.googledrive.GoogleOAuthDefaults
-import com.moneymanager.remotestorage.googledrive.loopback.googleDriveProvider
 
 /**
  * Google Drive signed in through the installed-app loopback flow, consent opened by [browser]. The desktop JVM
  * app and the native CLI share it; Android signs in through its own token source instead.
  */
-internal fun loopbackRemoteStorageProviderFactory(
+fun loopbackRemoteStorageProviderFactory(
     vault: CredentialVault,
     browser: BrowserLauncher,
 ): RemoteStorageProviderFactory =

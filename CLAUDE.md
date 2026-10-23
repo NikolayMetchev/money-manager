@@ -58,6 +58,7 @@ timeout; use at least 20 minutes.
 | `bazel build //...` | Build everything: every platform's compile, the commonMain metadata checks, the host's `mm`, the module and dependency checks |
 | `bazel test //...` | Every test the host can run: JVM, Android host, the host's native tests, ktlint, detekt, Android lint, the lockfile tests |
 | `bazel run //app/main/jvm:app` | Run the desktop app |
+| `bazel run //app/main/web:serve -- 8080` | Serve the browser app (`//app/main/web:dist`) on http://127.0.0.1:8080 |
 | `bazel build //app/main/android:debug` | Debug APK (`bazel-bin/app/main/android/debug.apk`; `adb install` it) |
 | `bazel build //app/main/cli:mm` / `:mm-jvm` | The host's native `mm` / the JVM `mm-jvm` (`bazel-bin/app/main/cli/mm-jvm/bin/mm-jvm`) |
 | `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')` | Android device tests, on the device adb picks (an API 36 emulator) |
@@ -169,6 +170,7 @@ workflow because label events start it: any other label's run skips, without can
 | `tools/{strategy-catalog,crypto-dataset}/` | Build-time tools: catalog site renderer; crypto dataset builder |
 | `test/{app/db,app/ui,app/remotestorage,utils/credentialvault}/` | Test fixtures only (see **Testing**); `app/remotestorage` is the in-memory cloud store (`InMemoryStorageProvider`, `SingleProviderFactory`) |
 | `app/main/jvm/` | JVM Desktop entry point |
+| `app/main/web/` | Browser entry point (wasmJs and js) and `:dist`, the site: a loader that picks wasmJs where the browser has WasmGC, else js, with the database worker and npm packages beside it (see `bazel/README.md`, "Browser"). No import folders or API imports yet |
 | `app/main/android/` | Android entry point |
 | `app/main/cli/` | `mm`, the command-line client (Clikt): native executables for every native target, plus a JVM build the desktop installer starts as `mm-jvm` on its bundled runtime — see **CLI** |
 | `app/main/android-smoketest/` | Self-instrumenting UiAutomator smoke test of the R8-minified release APK (`bazel test //app/main/android-smoketest:smoketest_test`, on a device) |
@@ -554,7 +556,9 @@ stdout carries only the result: prompts, warnings and errors go to stderr, and I
 
 ## UI
 
-**Compose Multiplatform** with Material 3. JVM, Android and the browser (wasmJs, js; the browser app itself is still in progress, #84).
+**Compose Multiplatform** with Material 3. JVM, Android and the browser (wasmJs, js: `app/main/web`, #84). A screen a
+front end can't back is left out by what it's given, not by platform checks: without an `ImportFileSourceFactory` (the
+browser) the Imports screen has no Directories tab and the setup wizard no import-folders step.
 
 ## Presenters
 

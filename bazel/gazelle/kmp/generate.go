@@ -160,8 +160,11 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		// Without the Android target Gradle compiles no androidMain.
 		sets = withoutAndroid(sets)
 	}
-	if kc.androidMain {
-		sets = androidApp(sets)
+	switch kc.mainPlatform {
+	case "android":
+		sets = mainFor(sets, "android_srcs", "android")
+	case "web":
+		sets = mainFor(sets, "web_srcs", "web")
 	}
 	main, mainSetsPresent := scan(args.Dir, sets)
 	sqldelightRoot := filepath.Join(args.Dir, "src", "commonMain", "sqldelight")
@@ -186,7 +189,7 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 	if kc.android {
 		lib.SetAttr("android", true)
 	}
-	if kc.androidMain {
+	if kc.mainPlatform != "" {
 		lib.SetAttr("jvm", false)
 	}
 	if len(kc.targets) > 0 {
@@ -475,12 +478,12 @@ func resourceGlob(dir, kind string) (rule.GlobValue, bool) {
 	return rule.GlobValue{Patterns: patterns}, patterns != nil
 }
 
-// androidApp makes `src/main` the Android leaf, as an Android app's only compilation is.
-func androidApp(sets []sourceSet) []sourceSet {
+// mainFor compiles src/main for the platform kmp_main_platform names instead of the JVM.
+func mainFor(sets []sourceSet, srcsAttr, platform string) []sourceSet {
 	var out []sourceSet
 	for _, set := range sets {
 		if set.dir == "main" {
-			set = sourceSet{"main", "android_srcs", "android"}
+			set = sourceSet{"main", srcsAttr, platform}
 		}
 		out = append(out, set)
 	}

@@ -1,5 +1,5 @@
 # gazelle:kmp_generate true
-# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_plugins metro
 # gazelle:kmp_export //app/db/core
 # gazelle:kmp_export //app/di/params
@@ -14,9 +14,12 @@ load("//bazel/kmp:defs.bzl", "kmp_library")
 kmp_library(
     name = "di",
     android = True,
+    android_deps = ["//app/remotestorage/googledrive"],
     android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_deps = ["//app/remotestorage/googledrive/loopback"],
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    native_deps = ["//app/remotestorage/googledrive/loopback"],
     native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
     native_targets = [
         "linuxArm64",
@@ -26,6 +29,11 @@ kmp_library(
     ],
     plugins = ["metro"],
     visibility = ["//visibility:public"],
+    web_srcs = glob(["src/webMain/kotlin/**/*.kt"]),
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
     exports = [
         "//app/db/core",
         "//app/di/params",
@@ -35,9 +43,5 @@ kmp_library(
         "//utils/credentialvault",
         "//utils/localsettings",
     ],
-    deps = [
-        "//app/remotestorage/googledrive",
-        "//app/remotestorage/googledrive/loopback",
-        "@maven_kmp//:metro_runtime",
-    ],
+    deps = ["@maven_kmp//:metro_runtime"],
 )
