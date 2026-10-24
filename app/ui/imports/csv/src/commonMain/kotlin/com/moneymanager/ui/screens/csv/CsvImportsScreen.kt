@@ -26,6 +26,7 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -39,9 +40,12 @@ import com.moneymanager.importengineapi.createXlsxImport
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.ui.components.imports.ImportStatusMessage
 import com.moneymanager.ui.components.imports.ImportsEmptyMessage
 import com.moneymanager.ui.components.imports.ImportsScreenHeader
+import com.moneymanager.ui.components.imports.ReimportAllDialog
+import com.moneymanager.ui.components.imports.ReimportPickerRepositories
 import com.moneymanager.ui.components.imports.StagedImportCard
 import com.moneymanager.ui.components.imports.StagedImportsTabs
 import com.moneymanager.ui.components.imports.importPickedFiles
@@ -61,6 +65,7 @@ fun CsvImportsScreen(
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
+    currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
     transactionRepository: TransactionReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
@@ -218,9 +223,10 @@ fun CsvImportsScreen(
             }
 
             reimportAllScope?.let { scopedImported ->
-                CsvReimportAllDialog(
-                    imported = scopedImported,
-                    importDirectoryService = importDirectoryService,
+                ReimportAllDialog(
+                    files = scopedImported.map(StagedFile::Csv),
+                    reimports = importDirectoryService.reimports,
+                    pickers = ReimportPickerRepositories(accountRepository, categoryRepository, currencyRepository, personRepository),
                     onDismiss = { reimportAllScope = null },
                     onComplete = { reimportAllScope = null },
                 )

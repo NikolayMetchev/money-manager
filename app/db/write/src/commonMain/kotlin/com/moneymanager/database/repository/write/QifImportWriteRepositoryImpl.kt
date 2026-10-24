@@ -112,6 +112,17 @@ class QifImportWriteRepositoryImpl(
             }
         }
 
+    override suspend fun resetRecordStatuses(
+        id: QifImportId,
+        recordIndexes: Collection<Long>?,
+    ): Unit =
+        withContext(coroutineContext) {
+            when {
+                recordIndexes == null -> writeQueries.resetAllRecordStatuses(id.id.toString())
+                else -> recordIndexes.chunked(RESET_CHUNK).forEach { writeQueries.resetRecordStatuses(id.id.toString(), it) }
+            }
+        }
+
     override suspend fun saveError(
         id: QifImportId,
         recordIndex: Long,
@@ -156,3 +167,5 @@ class QifImportWriteRepositoryImpl(
             )
         }
 }
+
+private const val RESET_CHUNK = 500

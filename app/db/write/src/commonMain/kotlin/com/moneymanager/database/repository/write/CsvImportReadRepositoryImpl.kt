@@ -122,7 +122,7 @@ class CsvImportReadRepositoryImpl(
         }
 
     override suspend fun findRowsReferencingTransactions(
-        excluding: CsvImportId,
+        excluding: CsvImportId?,
         transferIds: Set<TransferId>,
         tradeIds: Set<TradeId>,
     ): Map<CsvImportId, List<Long>> =
@@ -132,21 +132,13 @@ class CsvImportReadRepositoryImpl(
             csvImportSelectQueries
                 .selectAllImports(::toCsvImportRecord)
                 .awaitAsList()
-                .filter { it.importId != excluding.id.toString() }
+                .filter { it.importId != excluding?.id?.toString() }
                 .mapNotNull { other ->
                     tableManager
                         .findRowsWithTransactionIds(other.tableName, transactionIds)
                         .takeIf { it.isNotEmpty() }
                         ?.let { rows -> CsvImportId(Uuid.parse(other.importId)) to rows }
                 }.toMap()
-        }
-
-    override suspend fun historicalSourceAccounts(): Map<CsvImportId, AccountId> =
-        withContext(coroutineContext) {
-            entitySourceSelectQueries
-                .selectHistoricalSourceAccounts()
-                .awaitAsList()
-                .associate { CsvImportId(Uuid.parse(it.csv_import_id)) to AccountId(requireNotNull(it.account_id)) }
         }
 
     override suspend fun findImportsByChecksum(checksum: String): List<CsvImport> =

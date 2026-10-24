@@ -1,8 +1,6 @@
 package com.moneymanager.ui.screens
 
 import com.moneymanager.csvimporter.CsvTransferMapper
-import com.moneymanager.csvimporter.executeCsvReimport
-import com.moneymanager.csvimporter.planCsvReimport
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.di.openDatabaseComponent
@@ -32,14 +30,17 @@ import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importer.ImportEngineImpl
+import com.moneymanager.qifimporter.StagedFile
+import com.moneymanager.qifimporter.StagedRunResult
 import com.moneymanager.regex.compileRegex
-import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
@@ -54,8 +55,8 @@ import kotlin.uuid.Uuid
 /**
  * End-to-end test of CSV re-import against a real database: a CSV import creates a duplicate payee
  * account; the user then adds a global account mapping pointing its value at a pre-existing account;
- * re-importing merges the duplicate into the true account (reversibly), moves its transactions, and
- * does not re-create transfers. A duplicate with transactions to the target is skipped, not merged.
+ * re-importing deletes what the file created and imports it again, so its rows land on the true
+ * account and the emptied duplicate is deleted. A duplicate that still holds other transactions stays.
  */
 class CsvReimportE2ETest {
     private var testDbLocation: DbLocation? = null
@@ -154,8 +155,15 @@ class CsvReimportE2ETest {
             .firstOrNull { it.name == DUPLICATE_NAME }
             ?.id
 
+    private suspend fun Fixture.reimport(strategy: CsvImportStrategy = this.strategy): SourceRerunResult<StagedRunResult?> {
+        val reimports = dc.reimports()
+        val current = dc.csvImportRepository.getImport(csvImport.id).first()!!
+        val plan = reimports.plan(StagedFile.Csv(current)).copy(strategy = strategy)
+        return reimports.reimport(plan, accountId = sourceAccountId, currencyId = null)
+    }
+
     @Test
-    fun `re-import merges duplicate into mapped account reversibly and deletes it`() =
+    fun `re-import moves the rows onto the mapped account and deletes the emptied duplicate`() =
         runBlocking {
             val fixture = setUpImportedCsv()
             val dc = fixture.dc
@@ -169,66 +177,22 @@ class CsvReimportE2ETest {
                 accountId = fixture.trueAccountId,
             )
 
-            val currencies = dc.currencyRepository.getAllCurrencies().first()
-            val plan =
-                planCsvReimport(
-                    csvImport = fixture.csvImport,
-                    strategy = fixture.strategy,
-                    sourceAccountOverride = fixture.sourceAccountId,
-                    currencies = currencies,
-                    accountMappingRepository = dc.accountMappingRepository,
-                    accountRepository = dc.accountRepository,
-                    csvImportRepository = dc.csvImportRepository,
-                    transactionRepository = dc.transactionRepository,
-                    relationshipRepository = dc.transferRelationshipRepository,
-                    transferSourceRepository = dc.transferSourceRepository,
-                    tradeRepository = dc.tradeRepository,
-                )
-            assertEquals(1, plan.merges.size)
-            assertEquals(duplicateId, plan.merges.single().duplicateId)
-            assertEquals(fixture.trueAccountId, plan.merges.single().targetId)
-            assertEquals(2L, plan.merges.single().transferCount)
-            assertTrue(plan.skipped.isEmpty())
+            val result = fixture.reimport()
 
-            val result =
-                executeCsvReimport(
-                    plan = plan,
-                    csvImport = fixture.csvImport,
-                    strategy = fixture.strategy,
-                    sourceAccountOverride = fixture.sourceAccountId,
-                    currencies = currencies,
-                    accountMappingRepository = dc.accountMappingRepository,
-                    accountRepository = dc.accountRepository,
-                    csvImportRepository = dc.csvImportRepository,
-                    maintenance = dc.maintenanceService,
-                    importEngine = fixture.importEngine,
-                )
-
-            assertEquals(1, result.mergedAccounts.size)
-            assertTrue(result.skipped.isEmpty())
-            // The merge itself removed the duplicate; nothing was separately empty.
-            assertTrue(result.deletedEmptyAccounts.isEmpty())
-            // All rows were already imported, so the re-run had nothing to do (no double import).
-            assertNull(result.importResult)
-
-            // Transfers moved to the true account and the duplicate is gone.
+            assertEquals(2, result.deletedTransfers)
+            assertEquals(2, result.rerun?.successCount)
+            assertEquals(listOf(DUPLICATE_NAME), result.deletedEmptyAccounts)
             assertEquals(2L, dc.accountRepository.countTransfersByAccount(fixture.trueAccountId))
             assertNull(fixture.duplicateAccountId())
-
-            // The merge is recorded and reversible.
-            val reversibleMerges = dc.accountRepository.getReversibleMerges().first()
-            assertEquals(1, reversibleMerges.size)
         }
 
     @Test
-    fun `duplicate with transactions to the target account is skipped not merged`() =
+    fun `a duplicate still holding other transactions is kept`() =
         runBlocking {
             val fixture = setUpImportedCsv()
             val dc = fixture.dc
             val duplicateId = fixture.duplicateAccountId() ?: error("duplicate account not created")
 
-            // A transfer BETWEEN the duplicate and the true account makes a merge unrepresentable
-            // (it would become a self-transfer), so re-import must skip it.
             val currencies = dc.currencyRepository.getAllCurrencies().first()
             val gbp = currencies.first { it.code == "GBP" }
             dc.transactionRepository.createTransfers(
@@ -251,59 +215,23 @@ class CsvReimportE2ETest {
                 accountId = fixture.trueAccountId,
             )
 
-            val plan =
-                planCsvReimport(
-                    csvImport = fixture.csvImport,
-                    strategy = fixture.strategy,
-                    sourceAccountOverride = fixture.sourceAccountId,
-                    currencies = currencies,
-                    accountMappingRepository = dc.accountMappingRepository,
-                    accountRepository = dc.accountRepository,
-                    csvImportRepository = dc.csvImportRepository,
-                    transactionRepository = dc.transactionRepository,
-                    relationshipRepository = dc.transferRelationshipRepository,
-                    transferSourceRepository = dc.transferSourceRepository,
-                    tradeRepository = dc.tradeRepository,
-                )
-            assertTrue(plan.merges.isEmpty())
-            assertEquals(1, plan.skipped.size)
-            assertTrue(
-                plan.skipped
-                    .single()
-                    .detail
-                    .contains("transaction(s) between"),
-            )
+            val result = fixture.reimport()
 
-            val result =
-                executeCsvReimport(
-                    plan = plan,
-                    csvImport = fixture.csvImport,
-                    strategy = fixture.strategy,
-                    sourceAccountOverride = fixture.sourceAccountId,
-                    currencies = currencies,
-                    accountMappingRepository = dc.accountMappingRepository,
-                    accountRepository = dc.accountRepository,
-                    csvImportRepository = dc.csvImportRepository,
-                    maintenance = dc.maintenanceService,
-                    importEngine = fixture.importEngine,
-                )
-
-            assertTrue(result.mergedAccounts.isEmpty())
-            assertEquals(1, result.skipped.size)
-            // The duplicate keeps its transactions and must not be deleted.
+            assertTrue(result.deletedEmptyAccounts.isEmpty())
+            // The imported rows moved to the true account; the hand-made transfer keeps the duplicate.
             assertEquals(duplicateId, fixture.duplicateAccountId())
-            assertEquals(3L, dc.accountRepository.countTransfersByAccount(duplicateId))
+            assertEquals(1L, dc.accountRepository.countTransfersByAccount(duplicateId))
+            assertEquals(3L, dc.accountRepository.countTransfersByAccount(fixture.trueAccountId))
         }
 
     @Test
-    fun `re-import updates transfers in place when amount and currency mappings changed`() =
+    fun `re-import re-creates transfers with the changed amount and currency mappings`() =
         runBlocking {
             val fixture = setUpImportedCsv()
             val dc = fixture.dc
 
             val rowsBefore = dc.csvImportRepository.getImportRows(fixture.csvImport.id, limit = 1000, offset = 0)
-            val transferIdsBefore = rowsBefore.mapNotNull { it.transferId }
-            assertEquals(2, transferIdsBefore.size)
+            assertEquals(2, rowsBefore.mapNotNull { it.transferId }.size)
 
             // The user edits the strategy to read the amount from a different column in a different currency.
             val currencies = dc.currencyRepository.getAllCurrencies().first()
@@ -330,91 +258,28 @@ class CsvReimportE2ETest {
                         ),
                 )
 
-            val planProgress = mutableListOf<Progress>()
-            val plan =
-                planCsvReimport(
-                    csvImport = fixture.csvImport,
-                    strategy = changedStrategy,
-                    sourceAccountOverride = fixture.sourceAccountId,
-                    currencies = currencies,
-                    accountMappingRepository = dc.accountMappingRepository,
-                    accountRepository = dc.accountRepository,
-                    csvImportRepository = dc.csvImportRepository,
-                    transactionRepository = dc.transactionRepository,
-                    relationshipRepository = dc.transferRelationshipRepository,
-                    transferSourceRepository = dc.transferSourceRepository,
-                    tradeRepository = dc.tradeRepository,
-                    onProgress = { planProgress += it },
-                )
-            assertTrue(plan.merges.isEmpty())
-            assertTrue(plan.skipped.isEmpty())
-            assertEquals(2, plan.valueUpdates.size)
-            assertTrue(plan.valueUpdates.all { it.changes.isNotEmpty() })
-            // The plan reports its phases, ending the value-change scan at 2 of 2.
-            assertTrue(planProgress.any { it.detail == "Analyzing rows (pass 1 of 2)" })
-            val valueScan = planProgress.filter { it.detail == "Checking rows for value changes" }
-            assertEquals(2, valueScan.last().processed)
-            assertEquals(2, valueScan.last().total)
+            val result = fixture.reimport(changedStrategy)
+            assertEquals(2, result.deletedTransfers)
+            assertEquals(2, result.rerun?.successCount)
 
-            val executeProgress = mutableListOf<Progress>()
-            val result =
-                executeCsvReimport(
-                    plan = plan,
-                    csvImport = fixture.csvImport,
-                    strategy = changedStrategy,
-                    sourceAccountOverride = fixture.sourceAccountId,
-                    currencies = currencies,
-                    accountMappingRepository = dc.accountMappingRepository,
-                    accountRepository = dc.accountRepository,
-                    csvImportRepository = dc.csvImportRepository,
-                    maintenance = dc.maintenanceService,
-                    importEngine = fixture.importEngine,
-                    onProgress = { executeProgress += it },
-                    // Force one chunk per update so per-chunk progress is exercised with 2 rows.
-                    valueUpdateChunkSize = 1,
-                )
-            assertEquals(2, result.updatedRows.size)
-            assertTrue(result.skipped.isEmpty())
-            // Chunked updates report 0 → 1 → 2 of 2, and the run ends with the view refresh phase.
-            val updating = executeProgress.filter { it.detail == "Updating transactions" }
-            assertEquals(listOf(0, 1, 2), updating.mapNotNull { it.processed })
-            assertTrue(updating.all { it.total == 2 })
-            assertEquals("Refreshing views", executeProgress.last().detail)
-            // All rows were already imported, so nothing was re-imported (no duplicates created).
-            assertNull(result.importResult)
-
-            // The same transfers now carry the new column's values in the new currency.
             val rowsAfter = dc.csvImportRepository.getImportRows(fixture.csvImport.id, limit = 1000, offset = 0)
-            assertEquals(transferIdsBefore, rowsAfter.mapNotNull { it.transferId })
-            assertTrue(rowsAfter.all { it.importStatus == ImportStatus.UPDATED })
-            val amountsById =
-                transferIdsBefore.associateWith { id ->
-                    dc.transactionRepository
-                        .getTransactionById(id.id)
-                        .first()
-                        ?.amount
+            assertTrue(rowsAfter.all { it.importStatus == ImportStatus.IMPORTED })
+            val amounts =
+                rowsAfter.mapNotNull { row ->
+                    row.transferId?.let {
+                        dc.transactionRepository
+                            .getTransactionById(it.id)
+                            .first()
+                            ?.amount
+                    }
                 }
             assertEquals(
                 setOf(Money.fromDisplayValue("40.00", usd), Money.fromDisplayValue("20.00", usd)),
-                amountsById.values.filterNotNull().toSet(),
+                amounts.toSet(),
             )
 
-            // Re-planning right after finds nothing left to update.
-            val secondPlan =
-                planCsvReimport(
-                    csvImport = fixture.csvImport,
-                    strategy = changedStrategy,
-                    sourceAccountOverride = fixture.sourceAccountId,
-                    currencies = currencies,
-                    accountMappingRepository = dc.accountMappingRepository,
-                    accountRepository = dc.accountRepository,
-                    csvImportRepository = dc.csvImportRepository,
-                    transactionRepository = dc.transactionRepository,
-                    relationshipRepository = dc.transferRelationshipRepository,
-                    transferSourceRepository = dc.transferSourceRepository,
-                    tradeRepository = dc.tradeRepository,
-                )
-            assertTrue(secondPlan.valueUpdates.isEmpty())
+            // Re-importing again with the same strategy re-creates the same values.
+            assertEquals(2, fixture.reimport(changedStrategy).rerun?.successCount)
         }
 
     private fun createImportEngine(dc: DatabaseComponent): ImportEngine =

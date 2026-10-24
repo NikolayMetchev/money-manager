@@ -279,16 +279,20 @@ class CsvImportWriteRepositoryImpl(
 
     override suspend fun resetRowStatuses(
         id: CsvImportId,
-        rowIndexes: Collection<Long>,
+        rowIndexes: Collection<Long>?,
     ): Unit =
         withContext(coroutineContext) {
-            if (rowIndexes.isEmpty()) return@withContext
+            if (rowIndexes?.isEmpty() == true) return@withContext
 
             val import =
                 csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                     ?: return@withContext
 
-            tableManager.resetRowStatuses(import.table_name, rowIndexes)
+            if (rowIndexes == null) {
+                tableManager.resetAllRowStatuses(import.table_name)
+            } else {
+                tableManager.resetRowStatuses(import.table_name, rowIndexes)
+            }
         }
 
     override suspend fun saveError(

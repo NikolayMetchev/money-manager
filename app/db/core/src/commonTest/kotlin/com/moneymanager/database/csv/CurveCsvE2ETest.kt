@@ -5,10 +5,7 @@ import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.addAttributeToken
 import com.moneymanager.csvimporter.bulkApplyCsv
-import com.moneymanager.csvimporter.executeCsvReimport
 import com.moneymanager.csvimporter.findUnmatchedFundingReferences
-import com.moneymanager.csvimporter.planCsvReimport
-import com.moneymanager.csvimporter.rerunFundingReconciles
 import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AttributeTypeId
@@ -20,8 +17,10 @@ import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.setAccountAttributeValue
 import com.moneymanager.importengineapi.updateCsvStrategy
+import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -167,40 +166,8 @@ class CurveCsvE2ETest : DbTest() {
                 .getAllStrategies()
                 .first()
                 .first { it.name == strategyName }
-        val currencies = repositories.currencyRepository.getAllCurrencies().first()
-        val passThroughAccounts = repositories.passThroughAccountRepository.getAll().first()
-        val attributeMatchers =
-            AttributeAccountMatcher.registry(repositories.accountAttributeRepository.getAll().first())
-        val plan =
-            planCsvReimport(
-                csvImport = current,
-                strategy = strategy,
-                sourceAccountOverride = null,
-                currencies = currencies,
-                accountMappingRepository = repositories.accountMappingRepository,
-                accountRepository = repositories.accountRepository,
-                csvImportRepository = repositories.csvImportRepository,
-                transactionRepository = repositories.transactionRepository,
-                relationshipRepository = repositories.transferRelationshipRepository,
-                transferSourceRepository = repositories.transferSourceRepository,
-                tradeRepository = repositories.tradeRepository,
-                passThroughAccounts = passThroughAccounts,
-                attributeAccountMatchers = attributeMatchers,
-            )
-        executeCsvReimport(
-            plan = plan,
-            csvImport = current,
-            strategy = strategy,
-            sourceAccountOverride = null,
-            currencies = currencies,
-            accountMappingRepository = repositories.accountMappingRepository,
-            accountRepository = repositories.accountRepository,
-            csvImportRepository = repositories.csvImportRepository,
-            maintenance = maintenance,
-            importEngine = repositories.importEngine,
-            passThroughAccounts = passThroughAccounts,
-            attributeAccountMatchers = attributeMatchers,
-        )
+        val reimports = repositories.reimports(maintenance)
+        reimports.reimport(reimports.plan(StagedFile.Csv(current)).copy(strategy = strategy), accountId = null, currencyId = null)
     }
 
     private suspend fun transfersBetween(
@@ -562,27 +529,12 @@ class CurveCsvE2ETest : DbTest() {
                 value = addAttributeToken(existing.value, reference.value),
                 existingAttributeId = existing.id,
             )
-            val reconciled =
-                rerunFundingReconciles(
-                    imports = reference.imports,
-                    strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
-                    currencies = repositories.currencyRepository.getAllCurrencies().first(),
-                    cryptoAssets = repositories.cryptoRepository.getAllCryptoAssets().first(),
-                    passThroughAccounts = repositories.passThroughAccountRepository.getAll().first(),
-                    attributeAccountMatchers =
-                        AttributeAccountMatcher.registry(repositories.accountAttributeRepository.getAll().first()),
-                    accountMappingRepository = repositories.accountMappingRepository,
-                    accountRepository = repositories.accountRepository,
-                    csvImportRepository = repositories.csvImportRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    relationshipRepository = repositories.transferRelationshipRepository,
-                    transferSourceRepository = repositories.transferSourceRepository,
-                    tradeRepository = repositories.tradeRepository,
-                    maintenance = maintenance,
-                    importEngine = repositories.importEngine,
-                )
-            // The 7721 row already reconciled against the card's movement into Curve when it was imported.
-            assertEquals(0, reconciled)
+            // Assigning the card re-imports the files that reference it (Card Last-4's reimportFiles).
+            val reimports = repositories.reimports(maintenance)
+            val files = reference.imports.map { StagedFile.Csv(repositories.csvImportRepository.getImport(it).first()!!) }
+            val rerun = reimports.reimportAll(reimports.planAll(files), accountId = null, currencyId = null, onProgress = {})
+            assertEquals(1, rerun.filesImported)
+            assertEquals(0, rerun.filesFailed)
 
             val cardAttributes =
                 repositories.accountAttributeRepository

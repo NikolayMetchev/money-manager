@@ -4,7 +4,6 @@ import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.CsvUnimportResult
 import com.moneymanager.csvimporter.bulkApplyCsv
-import com.moneymanager.csvimporter.bulkReimportCsv
 import com.moneymanager.csvimporter.executeCsvBulkUnimport
 import com.moneymanager.csvimporter.executeCsvUnimport
 import com.moneymanager.csvimporter.planCsvBulkUnimport
@@ -19,7 +18,9 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportHistoryEvent
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.setCsvImportIgnored
+import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.reimports
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -225,23 +226,12 @@ class CsvUnimportE2ETest : DbTest() {
             assertTrue(secondRows.all { it.importStatus == null && it.transferId == null }, "the dependent row is reset")
 
             // Re-importing the surviving file restores its movement.
-            bulkReimportCsv(
-                imports = listOf(reload(second.id)),
-                sourceAccountOverride = monzo,
-                strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
-                currencies = repositories.currencyRepository.getAllCurrencies().first(),
-                accountMappingRepository = repositories.accountMappingRepository,
-                accountRepository = repositories.accountRepository,
-                csvImportRepository = repositories.csvImportRepository,
-                transactionRepository = repositories.transactionRepository,
-                relationshipRepository = repositories.transferRelationshipRepository,
-                transferSourceRepository = repositories.transferSourceRepository,
-                maintenance = maintenance,
-                importEngine = repositories.importEngine,
+            val reimports = repositories.reimports(maintenance)
+            reimports.reimportAll(
+                reimports.planAll(listOf(StagedFile.Csv(reload(second.id)))),
+                accountId = monzo,
+                currencyId = null,
                 onProgress = { },
-                cryptoRepository = repositories.cryptoRepository,
-                tradeRepository = repositories.tradeRepository,
-                attributeAccountMatchers = attributeMatchers(),
             )
             assertEquals(1, transfersOn(monzo).size)
         }

@@ -44,6 +44,16 @@ interface QifImportWriteRepository : QifImportReadRepository {
         recordTransferMap: Map<Long, TransferId?>,
     )
 
+    /**
+     * Clears the import status + transfer link of the given records, returning them to the never-imported
+     * state so a strategy re-run picks them up again (used after their transfers were deleted). Null
+     * resets every record.
+     */
+    suspend fun resetRecordStatuses(
+        id: QifImportId,
+        recordIndexes: Collection<Long>?,
+    )
+
     /** Saves an error message for a specific record, replacing any existing one. */
     suspend fun saveError(
         id: QifImportId,

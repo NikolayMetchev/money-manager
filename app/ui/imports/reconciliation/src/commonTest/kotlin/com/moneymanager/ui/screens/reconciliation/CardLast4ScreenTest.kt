@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
+import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.domain.model.AccountAttribute
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
@@ -115,7 +116,7 @@ class CardLast4ScreenTest {
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
-                        rerunFundingReconciles = { 0 },
+                        reimportFiles = { BulkReimportResult(0, 0, 0, 0, 0) },
                     )
                 }
             }

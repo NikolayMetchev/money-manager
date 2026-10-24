@@ -13,10 +13,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.moneymanager.apiimport.ApiImportService
-import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.executeCsvUnimport
 import com.moneymanager.csvimporter.planCsvUnimport
-import com.moneymanager.csvimporter.rerunFundingReconciles
 import com.moneymanager.database.service.AccountMappingExportService
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiSession
@@ -47,11 +45,11 @@ import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
-import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.importfilesource.DriveFolderBrowser
+import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.screens.accountmapping.AccountMappingsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiSessionsScreen
@@ -90,7 +88,6 @@ fun ImportsScreen(
     cryptoRepository: CryptoReadRepository,
     transactionRepository: TransactionReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
-    transferSourceRepository: TransferSourceReadRepository,
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     personRepository: PersonReadRepository,
@@ -162,6 +159,7 @@ fun ImportsScreen(
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
+                    currencyRepository = currencyRepository,
                     personRepository = personRepository,
                     transactionRepository = transactionRepository,
                     transferRelationshipRepository = transferRelationshipRepository,
@@ -199,12 +197,10 @@ fun ImportsScreen(
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     cryptoRepository = cryptoRepository,
-                    transactionRepository = transactionRepository,
-                    transferRelationshipRepository = transferRelationshipRepository,
-                    tradeRepository = tradeRepository,
                     maintenance = maintenance,
                     deviceId = deviceId,
                     apiImportService = apiImportService,
+                    reimports = importDirectoryService.reimports,
                     onAddCredentialClick = onAddCredentialClick,
                     onApiStrategiesClick = onApiStrategiesClick,
                     onSessionClick = onSessionClick,
@@ -263,27 +259,14 @@ fun ImportsScreen(
                             accountRepository = accountRepository,
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
-                            rerunFundingReconciles = { imports ->
-                                rerunFundingReconciles(
-                                    imports = imports,
-                                    strategies = csvImportStrategyRepository.getAllStrategies().first(),
-                                    currencies = currencyRepository.getAllCurrencies().first(),
-                                    cryptoAssets = cryptoRepository.getAllCryptoAssets().first(),
-                                    passThroughAccounts = passThroughAccountRepository.getAll().first(),
-                                    attributeAccountMatchers =
-                                        AttributeAccountMatcher.registry(
-                                            accountAttributeRepository.getAll().first(),
-                                        ),
-                                    accountMappingRepository = accountMappingRepository,
-                                    accountRepository = accountRepository,
-                                    csvImportRepository = csvImportRepository,
-                                    transactionRepository = transactionRepository,
-                                    relationshipRepository = transferRelationshipRepository,
-                                    transferSourceRepository = transferSourceRepository,
-                                    tradeRepository = tradeRepository,
-                                    maintenance = maintenance,
-                                    importEngine = importEngine,
-                                ).also { if (it > 0) onTransactionsImported() }
+                            reimportFiles = { ids ->
+                                val reimports = importDirectoryService.reimports
+                                val files =
+                                    ids.mapNotNull { id -> csvImportRepository.getImport(id).first()?.let(StagedFile::Csv) }
+                                // The files keep the account and currency they were imported with.
+                                reimports
+                                    .reimportAll(reimports.planAll(files), accountId = null, currencyId = null, onProgress = {})
+                                    .also { if (it.transfersCreated > 0) onTransactionsImported() }
                             },
                         )
                     },

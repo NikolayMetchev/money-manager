@@ -7,12 +7,13 @@ import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.deleteAccountMapping
+import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.qifimporter.bulkApplyQif
-import com.moneymanager.qifimporter.bulkReimportQif
 import com.moneymanager.regex.compileRegex
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.installBuiltInCsvStrategies
+import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,7 +25,7 @@ import kotlin.time.Duration
 
 /**
  * End-to-end guard for QIF re-import. Drives a real import through [bulkApplyQif], then re-imports via
- * [bulkReimportQif] and asserts (a) a re-import with no config change is a no-op (no double-import), and
+ * [Reimports.reimportAll][com.moneymanager.qifimporter.Reimports.reimportAll] and asserts (a) a re-import with no config change is a no-op (no double-import), and
  * (b) a global account mapping added AFTER the import is applied retroactively — the import-created
  * duplicate account is merged into the mapped target and deleted.
  */
@@ -114,20 +115,17 @@ class QifReimportE2ETest : DbTest() {
     }
 
     private suspend fun reimport() {
-        bulkReimportQif(
-            imports = repositories.qifImportRepository.getAllImports().first(),
-            sourceAccountOverride = sourceAccountId(),
-            // null => strategy's own currency, matching the import path exactly (no spurious value updates).
+        val reimports = repositories.reimports(maintenance)
+        reimports.reimportAll(
+            reimports.planAll(
+                repositories.qifImportRepository
+                    .getAllImports()
+                    .first()
+                    .map(StagedFile::Qif),
+            ),
+            accountId = sourceAccountId(),
+            // null => the currency the file imported with, matching the import path exactly.
             currencyId = null,
-            strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
-            currencies = repositories.currencyRepository.getAllCurrencies().first(),
-            accountMappingRepository = repositories.accountMappingRepository,
-            accountRepository = repositories.accountRepository,
-            qifImportRepository = repositories.qifImportRepository,
-            transactionRepository = repositories.transactionRepository,
-            transferSourceRepository = repositories.transferSourceRepository,
-            maintenance = maintenance,
-            importEngine = repositories.importEngine,
             onProgress = { },
         )
     }

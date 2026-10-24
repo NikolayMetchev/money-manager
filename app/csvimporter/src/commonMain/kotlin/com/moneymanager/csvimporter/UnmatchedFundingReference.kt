@@ -1,20 +1,9 @@
 package com.moneymanager.csvimporter
 
-import com.moneymanager.domain.Maintenance
-import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.CsvImportId
-import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.model.passthrough.PassThroughAccount
-import com.moneymanager.domain.repository.AccountMappingReadRepository
-import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
-import com.moneymanager.domain.repository.TradeReadRepository
-import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
-import com.moneymanager.domain.repository.TransferSourceReadRepository
-import com.moneymanager.importengineapi.ImportEngine
 import kotlinx.coroutines.flow.first
 
 /**
@@ -122,74 +111,3 @@ fun addAttributeToken(
         .filter { it.isNotEmpty() }
         .distinct()
         .joinToString(" ")
-
-/**
- * Re-runs the funding reconcile for [imports] after a funding reference gained an account: each file's
- * already-imported rows that now resolve a funding leg are reset and re-imported reconciled. Only the
- * re-import plan's funding reconciles are executed, so unrelated merges, rewrites and value updates the
- * full re-import would also apply are left for the user to review there.
- */
-@Suppress("LongParameterList")
-suspend fun rerunFundingReconciles(
-    imports: List<CsvImportId>,
-    strategies: List<CsvImportStrategy>,
-    currencies: List<Currency>,
-    cryptoAssets: List<CryptoAsset>,
-    passThroughAccounts: List<PassThroughAccount>,
-    attributeAccountMatchers: Map<String, AttributeAccountMatcher>,
-    accountMappingRepository: AccountMappingReadRepository,
-    accountRepository: AccountReadRepository,
-    csvImportRepository: CsvImportReadRepository,
-    transactionRepository: TransactionReadRepository,
-    relationshipRepository: TransferRelationshipReadRepository,
-    transferSourceRepository: TransferSourceReadRepository,
-    tradeRepository: TradeReadRepository,
-    maintenance: Maintenance,
-    importEngine: ImportEngine,
-): Int {
-    val historicalSourceAccounts = csvImportRepository.historicalSourceAccounts()
-    var reconciled = 0
-    for (importId in imports) {
-        val csvImport = csvImportRepository.getImport(importId).first()
-        val strategy = csvImport?.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } } ?: continue
-        val sourceAccountOverride = historicalSourceAccounts[importId]
-        val plan =
-            planCsvReimport(
-                csvImport = csvImport,
-                strategy = strategy,
-                sourceAccountOverride = sourceAccountOverride,
-                currencies = currencies,
-                accountMappingRepository = accountMappingRepository,
-                accountRepository = accountRepository,
-                csvImportRepository = csvImportRepository,
-                transactionRepository = transactionRepository,
-                relationshipRepository = relationshipRepository,
-                transferSourceRepository = transferSourceRepository,
-                tradeRepository = tradeRepository,
-                passThroughAccounts = passThroughAccounts,
-                cryptoAssets = cryptoAssets,
-                attributeAccountMatchers = attributeAccountMatchers,
-            )
-        if (plan.fundingReconciles.isNotEmpty()) {
-            executeCsvReimport(
-                plan = ReimportPlan(merges = emptyList(), skipped = emptyList(), fundingReconciles = plan.fundingReconciles),
-                csvImport = csvImport,
-                strategy = strategy,
-                sourceAccountOverride = sourceAccountOverride,
-                currencies = currencies,
-                accountMappingRepository = accountMappingRepository,
-                accountRepository = accountRepository,
-                csvImportRepository = csvImportRepository,
-                maintenance = maintenance,
-                importEngine = importEngine,
-                passThroughAccounts = passThroughAccounts,
-                refreshViews = false,
-                tradeRepository = tradeRepository,
-                attributeAccountMatchers = attributeAccountMatchers,
-            )
-            reconciled += plan.fundingReconciles.size
-        }
-    }
-    if (reconciled > 0) maintenance.refreshMaterializedViews()
-    return reconciled
-}

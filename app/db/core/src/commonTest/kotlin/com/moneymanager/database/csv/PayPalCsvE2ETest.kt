@@ -4,8 +4,6 @@ import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.bulkApplyCsv
-import com.moneymanager.csvimporter.executeCsvReimport
-import com.moneymanager.csvimporter.planCsvReimport
 import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
@@ -18,8 +16,10 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.importengineapi.createAccount
+import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -619,40 +619,10 @@ class PayPalCsvE2ETest : DbTest() {
                 .first()
                 .first { it.name == "Crypto.com Card" }
         val strategy = installed.copy(config = changeConfig(installed.config))
-        val currencies = repositories.currencyRepository.getAllCurrencies().first()
-        val passThroughAccounts = repositories.passThroughAccountRepository.getAll().first()
-        val attributeMatchers = AttributeAccountMatcher.registry(repositories.accountAttributeRepository.getAll().first())
-        val plan =
-            planCsvReimport(
-                csvImport = current,
-                strategy = strategy,
-                sourceAccountOverride = null,
-                currencies = currencies,
-                accountMappingRepository = repositories.accountMappingRepository,
-                accountRepository = repositories.accountRepository,
-                csvImportRepository = repositories.csvImportRepository,
-                transactionRepository = repositories.transactionRepository,
-                relationshipRepository = repositories.transferRelationshipRepository,
-                transferSourceRepository = repositories.transferSourceRepository,
-                tradeRepository = repositories.tradeRepository,
-                passThroughAccounts = passThroughAccounts,
-                attributeAccountMatchers = attributeMatchers,
-            )
-        assertTrue(plan.rewrites.isNotEmpty(), "the changed strategy rewrites the card chains")
-        executeCsvReimport(
-            plan = plan,
-            csvImport = current,
-            strategy = strategy,
-            sourceAccountOverride = null,
-            currencies = currencies,
-            accountMappingRepository = repositories.accountMappingRepository,
-            accountRepository = repositories.accountRepository,
-            csvImportRepository = repositories.csvImportRepository,
-            maintenance = maintenance,
-            importEngine = repositories.importEngine,
-            passThroughAccounts = passThroughAccounts,
-            attributeAccountMatchers = attributeMatchers,
-        )
+        val reimports = repositories.reimports(maintenance)
+        val plan = reimports.plan(StagedFile.Csv(current)).copy(strategy = strategy)
+        assertTrue(plan.rerun.createdTransfers.isNotEmpty(), "the re-import deletes the card chains it re-creates")
+        reimports.reimport(plan, accountId = null, currencyId = null)
     }
 
     @Test

@@ -64,6 +64,7 @@ kmp_test(
         "@maven_kmp//:androidx_compose_ui_test",
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:mokkery_runtime",
+        "//app/csvimporter",
     ],
     device_manifest = "src/androidDeviceTest/AndroidManifest.xml",
     device_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
@@ -79,6 +80,7 @@ kmp_test(
         "mokkery",
     ],
     deps = [
+        "//app/csvimporter",
         "//app/importengineapi",
         "//app/model/core",
         "//app/model/csv",

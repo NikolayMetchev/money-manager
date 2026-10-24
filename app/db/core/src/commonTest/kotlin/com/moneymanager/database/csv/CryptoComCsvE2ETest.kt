@@ -2,10 +2,7 @@ package com.moneymanager.database.csv
 
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.BulkApplyResult
-import com.moneymanager.csvimporter.CsvReimportResult
 import com.moneymanager.csvimporter.bulkApplyCsv
-import com.moneymanager.csvimporter.executeCsvReimport
-import com.moneymanager.csvimporter.planCsvReimport
 import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
@@ -16,9 +13,13 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.createAccount
+import com.moneymanager.qifimporter.StagedFile
+import com.moneymanager.qifimporter.StagedRunResult
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.reimports
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -250,43 +251,16 @@ class CryptoComCsvE2ETest : DbTest() {
             assertEquals(cardRecord.id, reconciledLink.id2)
         }
 
-    /** Re-imports an already-imported Crypto.com Fiat file (plan + execute) with its built-in strategy. */
-    private suspend fun reimportFiat(importId: CsvImportId): CsvReimportResult {
+    /** Re-imports an already-imported Crypto.com Fiat file with its built-in strategy. */
+    private suspend fun reimportFiat(importId: CsvImportId): SourceRerunResult<StagedRunResult?> {
         val current = repositories.csvImportRepository.getImport(importId).first()!!
         val strategy =
             repositories.csvImportStrategyRepository
                 .getAllStrategies()
                 .first()
                 .first { it.name == "Crypto.com Fiat" }
-        val currencies = repositories.currencyRepository.getAllCurrencies().first()
-        val plan =
-            planCsvReimport(
-                csvImport = current,
-                strategy = strategy,
-                sourceAccountOverride = null,
-                currencies = currencies,
-                accountMappingRepository = repositories.accountMappingRepository,
-                accountRepository = repositories.accountRepository,
-                csvImportRepository = repositories.csvImportRepository,
-                transactionRepository = repositories.transactionRepository,
-                relationshipRepository = repositories.transferRelationshipRepository,
-                transferSourceRepository = repositories.transferSourceRepository,
-                tradeRepository = repositories.tradeRepository,
-            )
-        return executeCsvReimport(
-            plan = plan,
-            csvImport = current,
-            strategy = strategy,
-            sourceAccountOverride = null,
-            currencies = currencies,
-            accountMappingRepository = repositories.accountMappingRepository,
-            accountRepository = repositories.accountRepository,
-            csvImportRepository = repositories.csvImportRepository,
-            maintenance = maintenance,
-            importEngine = repositories.importEngine,
-            cryptoRepository = repositories.cryptoRepository,
-            tradeRepository = repositories.tradeRepository,
-        )
+        val reimports = repositories.reimports(maintenance)
+        return reimports.reimport(reimports.plan(StagedFile.Csv(current)).copy(strategy = strategy), accountId = null, currencyId = null)
     }
 
     @Test
@@ -345,7 +319,7 @@ class CryptoComCsvE2ETest : DbTest() {
             )
 
             val result = reimportFiat(fiat.id)
-            assertEquals(1, result.counterpartyReconciledRows.size, "the deposit row is re-run")
+            assertEquals(0, result.rerun?.failedRows?.size, "the file is re-run")
             repositories.maintenanceService.refreshMaterializedViews()
 
             val deposits =

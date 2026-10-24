@@ -1,7 +1,11 @@
 package com.moneymanager.database.repository
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
+import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.TransferSourceReadRepository
@@ -17,6 +21,7 @@ class TransferSourceReadRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : TransferSourceReadRepository {
     private val sources = EntitySourceReader(database)
+    private val queries = database.entitySourceSelectQueries
 
     override suspend fun getSourcesForTransaction(transactionId: TransferId): List<SourceRecord> =
         withContext(Dispatchers.Default) {
@@ -32,4 +37,49 @@ class TransferSourceReadRepositoryImpl(
                 .sourcesFor(EntityType.TRANSFER, transactionId.id)
                 .firstOrNull { it.revisionId == revisionId }
         }
+
+    override suspend fun getTransfersCreatedBy(importSource: Source): Map<TransferId, Source> =
+        withContext(Dispatchers.Default) {
+            when (importSource) {
+                is Source.Csv -> {
+                    queries
+                        .selectCreatedTransferRowsByCsvImport(importSource.importId.id.toString())
+                        .awaitAsList()
+                        .associate { TransferId(it.entity_id) to Source.Csv(importSource.importId, it.csv_row_index) }
+                }
+
+                is Source.Qif -> {
+                    queries
+                        .selectCreatedTransferRecordsByQifImport(importSource.importId.id.toString())
+                        .awaitAsList()
+                        .associate { TransferId(it.entity_id) to Source.Qif(importSource.importId, it.qif_record_index) }
+                }
+
+                is Source.Api -> {
+                    queries
+                        .selectCreatedTransferNodesByApiSession(importSource.sessionId.id)
+                        .awaitAsList()
+                        .associate {
+                            TransferId(it.entity_id) to
+                                Source.Api(importSource.sessionId, ApiRequestId(it.api_request_id), JsonPath(it.json_path))
+                        }
+                }
+
+                else -> {
+                    emptyMap()
+                }
+            }
+        }
+
+    override suspend fun getHandEditedTransferIds(ids: Collection<TransferId>): Set<TransferId> =
+        withContext(Dispatchers.Default) {
+            val edited = mutableSetOf<TransferId>()
+            // Chunked so a large import stays under SQLite's bound-parameter limit.
+            for (chunk in ids.mapTo(mutableSetOf()) { it.id }.chunked(HAND_EDITED_CHUNK)) {
+                queries.selectHandEditedTransferIds(chunk).awaitAsList().mapTo(edited) { TransferId(it) }
+            }
+            edited
+        }
 }
+
+private const val HAND_EDITED_CHUNK = 500

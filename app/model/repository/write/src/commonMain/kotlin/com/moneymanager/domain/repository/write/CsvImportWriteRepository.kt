@@ -145,11 +145,11 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
      * them up again (used after their previously-imported transfers were deleted).
      *
      * @param id The import ID
-     * @param rowIndexes The row indexes to reset
+     * @param rowIndexes The row indexes to reset, or null for every row
      */
     suspend fun resetRowStatuses(
         id: CsvImportId,
-        rowIndexes: Collection<Long>,
+        rowIndexes: Collection<Long>?,
     )
 
     /**

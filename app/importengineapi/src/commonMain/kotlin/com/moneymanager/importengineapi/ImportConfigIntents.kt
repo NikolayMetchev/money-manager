@@ -248,11 +248,11 @@ sealed interface CsvImportMutation {
 
     /**
      * Clears the rows' import status + transfer link so a re-import re-runs them from scratch (used
-     * after their previously-imported transfers were deleted, e.g. a pass-through rewrite).
+     * after their previously-imported transfers were deleted). Null [rowIndexes] resets every row.
      */
     data class ResetRowStatuses(
         val id: CsvImportId,
-        val rowIndexes: Collection<Long>,
+        val rowIndexes: Collection<Long>?,
     ) : CsvImportMutation
 
     data class SaveError(
@@ -304,6 +304,15 @@ sealed interface QifImportMutation {
         val id: QifImportId,
         val status: String,
         val recordTransferMap: Map<Long, TransferId?>,
+    ) : QifImportMutation
+
+    /**
+     * Returns records to the never-imported state, after their transfers were deleted, so a re-run
+     * re-imports them. Null [recordIndexes] resets every record.
+     */
+    data class ResetRecordStatuses(
+        val id: QifImportId,
+        val recordIndexes: Collection<Long>?,
     ) : QifImportMutation
 
     data class SaveError(

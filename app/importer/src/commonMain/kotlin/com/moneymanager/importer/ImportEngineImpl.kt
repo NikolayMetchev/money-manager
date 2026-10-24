@@ -2368,6 +2368,10 @@ class ImportEngineImpl(
                     )
                 }
 
+                is QifImportMutation.ResetRecordStatuses -> {
+                    qifImportRepository.resetRecordStatuses(m.id, m.recordIndexes)
+                }
+
                 is QifImportMutation.SaveError -> {
                     qifImportRepository.saveError(m.id, m.recordIndex, m.errorMessage)
                 }

@@ -31,9 +31,12 @@ import com.moneymanager.importengineapi.setQifImportIgnored
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.qif.QifParser
+import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.ui.components.imports.ImportStatusMessage
 import com.moneymanager.ui.components.imports.ImportsEmptyMessage
 import com.moneymanager.ui.components.imports.ImportsScreenHeader
+import com.moneymanager.ui.components.imports.ReimportAllDialog
+import com.moneymanager.ui.components.imports.ReimportPickerRepositories
 import com.moneymanager.ui.components.imports.StagedImportCard
 import com.moneymanager.ui.components.imports.StagedImportsTabs
 import com.moneymanager.ui.components.imports.importPickedFiles
@@ -153,13 +156,10 @@ fun QifImportsScreen(
             }
 
             reimportAllScope?.let { scoped ->
-                QifReimportAllDialog(
-                    imported = scoped,
-                    importDirectoryService = importDirectoryService,
-                    accountRepository = accountRepository,
-                    categoryRepository = categoryRepository,
-                    currencyRepository = currencyRepository,
-                    personRepository = personRepository,
+                ReimportAllDialog(
+                    files = scoped.map(StagedFile::Qif),
+                    reimports = importDirectoryService.reimports,
+                    pickers = ReimportPickerRepositories(accountRepository, categoryRepository, currencyRepository, personRepository),
                     onDismiss = { reimportAllScope = null },
                     onComplete = { reimportAllScope = null },
                 )

@@ -72,6 +72,7 @@ import com.moneymanager.apiimport.sessionImportedAtCurrentRevision
 import com.moneymanager.apiimport.splitSessionsByImportState
 import com.moneymanager.apiimport.storeNewSigningKey
 import com.moneymanager.apiimporter.ApiCounterpartySuggestion
+import com.moneymanager.apiimporter.ApiImportReads
 import com.moneymanager.apiimporter.ApiSessionDownloadResult
 import com.moneymanager.apiimporter.ApiSessionImportResult
 import com.moneymanager.apiimporter.displaySummary
@@ -101,11 +102,9 @@ import com.moneymanager.domain.repository.ApiSessionImportRevision
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
-import com.moneymanager.domain.repository.TradeReadRepository
-import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.qifimporter.Reimports
 import com.moneymanager.tasks.Progress
 import com.moneymanager.tasks.TaskState
 import com.moneymanager.tasks.formatElapsedTime
@@ -140,12 +139,10 @@ fun ApiSessionsScreen(
     accountRepository: AccountReadRepository,
     currencyRepository: CurrencyReadRepository,
     cryptoRepository: com.moneymanager.domain.repository.CryptoReadRepository,
-    transactionRepository: TransactionReadRepository,
-    transferRelationshipRepository: TransferRelationshipReadRepository,
-    tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     deviceId: DeviceId,
     apiImportService: ApiImportService,
+    reimports: Reimports,
     onAddCredentialClick: () -> Unit = {},
     onApiStrategiesClick: () -> Unit = {},
     onSessionClick: (ApiSession) -> Unit = {},
@@ -605,14 +602,15 @@ fun ApiSessionsScreen(
         ApiReimportDialog(
             session = reimport.session,
             strategy = reimport.strategy,
-            apiSessionRepository = apiSessionRepository,
-            accountRepository = accountRepository,
-            currencyRepository = currencyRepository,
-            cryptoRepository = cryptoRepository,
-            accountAttributeRepository = accountAttributeRepository,
-            transactionRepository = transactionRepository,
-            transferRelationshipRepository = transferRelationshipRepository,
-            tradeRepository = tradeRepository,
+            apiReads =
+                ApiImportReads(
+                    apiSessionRepository = apiSessionRepository,
+                    accountRepository = accountRepository,
+                    accountAttributeRepository = accountAttributeRepository,
+                    currencyRepository = currencyRepository,
+                    cryptoRepository = cryptoRepository,
+                ),
+            reimports = reimports,
             maintenance = maintenance,
             importEngine = importEngine,
             onDismiss = { pendingReimport = null },
@@ -624,7 +622,7 @@ fun ApiSessionsScreen(
                         reimport.session.id to
                             ApiSessionImportResult(
                                 accountCount = 0,
-                                transactionCount = result.transactionsImported + result.tradesImported,
+                                transactionCount = result.rerun.transactionsImported + result.rerun.tradesImported,
                             )
                     )
                 refresh()
@@ -638,14 +636,15 @@ fun ApiSessionsScreen(
             credentialId = reimportAll.credentialId,
             importedSessionCount = reimportAll.importedSessionCount,
             strategy = reimportAll.strategy,
-            apiSessionRepository = apiSessionRepository,
-            accountRepository = accountRepository,
-            currencyRepository = currencyRepository,
-            cryptoRepository = cryptoRepository,
-            accountAttributeRepository = accountAttributeRepository,
-            transactionRepository = transactionRepository,
-            transferRelationshipRepository = transferRelationshipRepository,
-            tradeRepository = tradeRepository,
+            apiReads =
+                ApiImportReads(
+                    apiSessionRepository = apiSessionRepository,
+                    accountRepository = accountRepository,
+                    accountAttributeRepository = accountAttributeRepository,
+                    currencyRepository = currencyRepository,
+                    cryptoRepository = cryptoRepository,
+                ),
+            reimports = reimports,
             maintenance = maintenance,
             importEngine = importEngine,
             onDismiss = { pendingReimportAll = null },

@@ -1,5 +1,6 @@
 package com.moneymanager.database.api
 
+import com.moneymanager.apiimporter.ApiImportReads
 import com.moneymanager.apiimporter.executeApiReimport
 import com.moneymanager.apiimporter.importApiSessionExchange
 import com.moneymanager.apiimporter.planApiReimport
@@ -16,6 +17,7 @@ import com.moneymanager.domain.model.apistrategy.ApiAccountBridge
 import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
 import com.moneymanager.importengineapi.updateApiStrategy
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -168,24 +170,28 @@ class KrakenReimportE2ETest : DbTest() {
             assertTrue(strategyWithBridge.revisionId > strategyBeforeBridge.revisionId, "updating the strategy should bump its revision")
 
             val session = repositories.apiSessionRepository.getSessionById(sessionId)!!
-            val plan = planApiReimport(sessionId, repositories.apiSessionRepository)
-            assertTrue(plan.transferIds.contains(withdrawalBefore.id), "the plan should target the withdrawal this session created")
-            assertEquals(1, plan.transferIds.size, "the withdrawal created by this session should be deleted before re-run")
+            val reimports = repositories.reimports(testMaintenance)
+            val apiReads =
+                ApiImportReads(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    cryptoRepository = repositories.cryptoRepository,
+                )
+            val plan = planApiReimport(sessionId, repositories.apiSessionRepository, reimports.reads)
+            assertTrue(plan.createdTransfers.contains(withdrawalBefore.id), "the plan should target the withdrawal this session created")
+            assertEquals(1, plan.createdTransfers.size, "the withdrawal created by this session should be deleted before re-run")
 
             executeApiReimport(
                 plan = plan,
                 session = session,
                 strategy = strategyWithBridge,
-                apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
-                currencyRepository = repositories.currencyRepository,
-                cryptoRepository = repositories.cryptoRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                transactionRepository = repositories.transactionRepository,
-                transferRelationshipRepository = repositories.transferRelationshipRepository,
-                tradeRepository = repositories.tradeRepository,
+                apiReads = apiReads,
+                reads = reimports.reads,
                 maintenance = testMaintenance,
                 importEngine = repositories.importEngine,
+                rerunAffected = reimports,
             )
 
             val withdrawalsAfter =
@@ -231,22 +237,17 @@ class KrakenReimportE2ETest : DbTest() {
             )
 
             // Re-importing again is idempotent: same shape, no crash on the second pass.
-            val plan2 = planApiReimport(sessionId, repositories.apiSessionRepository)
-            assertEquals(1, plan2.transferIds.size, "the second re-import should delete exactly the one leg it re-creates")
+            val plan2 = planApiReimport(sessionId, repositories.apiSessionRepository, reimports.reads)
+            assertEquals(1, plan2.createdTransfers.size, "the second re-import should delete exactly the one leg it re-creates")
             executeApiReimport(
                 plan = plan2,
                 session = session,
                 strategy = strategyWithBridge,
-                apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
-                currencyRepository = repositories.currencyRepository,
-                cryptoRepository = repositories.cryptoRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                transactionRepository = repositories.transactionRepository,
-                transferRelationshipRepository = repositories.transferRelationshipRepository,
-                tradeRepository = repositories.tradeRepository,
+                apiReads = apiReads,
+                reads = reimports.reads,
                 maintenance = testMaintenance,
                 importEngine = repositories.importEngine,
+                rerunAffected = reimports,
             )
             val withdrawalsFinal =
                 repositories.transactionRepository

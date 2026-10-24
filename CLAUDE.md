@@ -467,7 +467,15 @@ resolve, as sub-tabs: External Account Reconciliation (the sources above), Manua
 transaction rules), and Card Last-4. Card Last-4 lists funding references that no account owns: values in
 any CSV strategy's `fundingAttributeMatch` column that its attribute type doesn't resolve. Assigning one
 adds the value to the account's token set (`addAttributeToken`, so an account can own several cards) and
-re-runs only the re-import plan's funding reconciles (`rerunFundingReconciles`).
+re-imports the files that reference it.
+
+**Re-import is delete + re-run.** Re-importing a CSV/QIF file (`Reimports`, `app/qifimporter`, one path and one
+pair of dialogs for both formats) or an API session (`executeApiReimport`) goes through `executeSourceRerun`
+(`app/importengineapi`): it un-hides the other sources' records the source had reconciled away, deletes every
+transfer and trade the source created, resets its records, runs the normal import again, re-runs other files'
+records that had matched against the deleted ones, re-applies hand edits (from the audit log) to the
+re-created transfers (reporting those it can't match), and deletes accounts the source created that are now
+empty. There is no separate re-import logic: no merges, no in-place updates, no detectors.
 
 ## Dependency Injection
 
