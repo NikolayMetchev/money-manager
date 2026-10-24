@@ -441,7 +441,6 @@ class Reimports(
                     maintenance = maintenance,
                     importEngine = importEngine,
                     onProgress = onProgress,
-                    engineBatchSize = BULK_ENGINE_BATCH_SIZE,
                 )?.let { StagedRunResult(it.successCount, it.duplicateCount) }
             }
         }

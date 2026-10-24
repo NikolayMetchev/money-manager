@@ -453,7 +453,7 @@ class ImportDirectoryService(
     private suspend fun matchCsvStrategies(
         files: List<CsvImport>,
         strategies: List<CsvImportStrategy>,
-    ): Map<CsvImportId, CsvImportStrategy?> = files.associate { it.id to matchCsvStrategy(it, strategies, preferLastApplied = false) }
+    ): Map<CsvImportId, CsvImportStrategy?> = files.associate { it.id to matchCsvStrategy(it, strategies) }
 
     /**
      * Applies [plan]. A file from a folder without an account gets one named after the folder; a file from
@@ -605,12 +605,8 @@ class ImportDirectoryService(
     private suspend fun matchCsvStrategy(
         listed: CsvImport,
         strategies: List<CsvImportStrategy>,
-        preferLastApplied: Boolean,
     ): CsvImportStrategy? {
         val full = csvImportRepository.getImport(listed.id).first() ?: return null
-        if (preferLastApplied) {
-            full.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }?.let { return it }
-        }
         val sampleRows = csvImportRepository.getImportRows(listed.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
         return strategies.selectForCsv(full.originalFileName, full.columns, sampleRows)
     }

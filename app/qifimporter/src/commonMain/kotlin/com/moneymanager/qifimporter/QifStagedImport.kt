@@ -1,5 +1,6 @@
 package com.moneymanager.qifimporter
 
+import com.moneymanager.csvimporter.BULK_ENGINE_BATCH_SIZE
 import com.moneymanager.csvimporter.effectiveSourceFor
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
@@ -31,7 +32,6 @@ internal suspend fun applyStagedQif(
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onProgress: (suspend (Progress) -> Unit)? = null,
-    engineBatchSize: Int = Int.MAX_VALUE,
 ): QifImportResult? {
     val recordCount = qifImportRepository.countRecords(qifImport.id)
     val records = qifImportRepository.getImportRecords(qifImport.id, recordCount.coerceAtLeast(1), 0)
@@ -63,6 +63,6 @@ internal suspend fun applyStagedQif(
         importEngine = importEngine,
         refreshViews = false,
         onProgress = onProgress,
-        engineBatchSize = engineBatchSize,
+        engineBatchSize = BULK_ENGINE_BATCH_SIZE,
     )
 }
