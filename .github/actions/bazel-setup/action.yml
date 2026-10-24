@@ -27,7 +27,11 @@ runs:
       uses: bazel-contrib/setup-bazel@0.19.1
       with:
         bazelisk-cache: true
-        disk-cache: ${{ github.workflow }}-${{ inputs.cache-name }}
+        # Not on RBE: every action runs remotely and BuildBuddy's cache already holds its results, so restoring the
+        # disk cache (several GB) only costs time. A fork's PR (no key) and the `cache` configs still need it.
+        disk-cache: >-
+          ${{ (inputs.buildbuddy-api-key != '' && inputs.config == 'rbe') && 'false'
+          || format('{0}-{1}', github.workflow, inputs.cache-name) }}
         repository-cache: true
         # Only main writes the caches, so PR runs don't evict the entries everyone restores.
         cache-save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}

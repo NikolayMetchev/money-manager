@@ -94,7 +94,8 @@ Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer
 (`//app/main/android:release_debug_signed`) on a device and drives first run; CI runs it only via the manual "Android
 Release Smoke Test" workflow (dispatch it on main or a PR branch). Cut a release by pushing a `v*` tag.
 
-**CI**: every workflow sets Bazel up through `.github/actions/bazel-setup`. `build.yml`'s Build and Test, on Linux
+**CI**: every workflow sets Bazel up through `.github/actions/bazel-setup` (on RBE without the disk cache, which
+BuildBuddy's cache already holds). `build.yml`'s Build and Test, on Linux
 (RBE), is `bazel build //...` (plus the cross-linked linuxArm64 and mingwX64 test binaries and the Linux desktop
 installer) and `bazel test //...` (plus the desktop ProGuard check), all with `--config=coverage`, then merges the
 Kotlin JVM and Android tests' coverage (`coverage.sh`), installs the deb and starts the app, `mm-jvm` and `mm`. Native Tests run

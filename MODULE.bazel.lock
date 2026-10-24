@@ -279,7 +279,7 @@
   "moduleExtensions": {
     "//bazel/kmp/android:extensions.bzl%android_sdk": {
       "general": {
-        "bzlTransitiveDigest": "jJb9zwE8h5JlGqV1IMuYibYuyZGFqFwtmAs+rvYm/y0=",
+        "bzlTransitiveDigest": "A0YxyJxboOAB1U6c2eYxc4dBdFOuBTmsouPa7bYldPg=",
         "usagesDigest": "1E3EYzX3gngg9oxhEs/gCjYiKH0ZhK4WPGx84tQ8KcI=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
@@ -289,8 +289,7 @@
               "agp": "9.4.1",
               "compile_sdk": "37",
               "min_sdk": "30",
-              "target_sdk": "36",
-              "local_properties": "/home/nikolaym/IdeaProjects/money-manager/local.properties"
+              "target_sdk": "36"
             }
           },
           "aapt2": {
