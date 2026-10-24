@@ -106,8 +106,8 @@ class SourceRerunE2ETest : DbTest() {
             "",
         )
 
-    private suspend fun createAccount(name: String): AccountId =
-        repositories.importEngine.createAccount(Account(id = AccountId(0), name = name, openingDate = now), Source.Manual)
+    private suspend fun createMonzoAccount(): AccountId =
+        repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Monzo", openingDate = now), Source.Manual)
 
     private suspend fun stage(
         fileName: String,
@@ -193,7 +193,7 @@ class SourceRerunE2ETest : DbTest() {
     fun reimport_reappliesHandEdits_andRerunsOtherFilesMatchedAgainstIt() =
         runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
-            val monzo = createAccount("Monzo")
+            val monzo = createMonzoAccount()
             val first =
                 stage(
                     "MonzoDataExport.csv",
@@ -255,7 +255,7 @@ class SourceRerunE2ETest : DbTest() {
     fun reimport_reportsHandEditsWhoseRowNoLongerCreatesATransaction() =
         runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
-            val monzo = createAccount("Monzo")
+            val monzo = createMonzoAccount()
             val file =
                 stage(
                     "MonzoDataExport.csv",
