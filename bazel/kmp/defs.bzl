@@ -23,7 +23,7 @@ load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load(":metadata.bzl", "kt_metadata_library")
-load(":module_info.bzl", "kmp_module_info", "module_configurations")
+load(":module_info.bzl", "module_info")
 load("@bazel_skylib//lib:structs.bzl", "structs")
 load("//bazel/kmp/dokka:dokka.bzl", "dokka_module")
 load("//bazel/kmp/checks:checks.bzl", "kmp_forbidden_deps", "kmp_reference_check", "kmp_unused_deps")
@@ -260,25 +260,24 @@ def kmp_library(
     hand_written = (common_srcs + jvm_android_srcs + jvm_srcs + android_srcs + native_srcs + linux_srcs + apple_srcs +
                     mingw_srcs + non_jvm_srcs + web_srcs + wasm_js_srcs + js_srcs)
     kmp_lint(name, hand_written)
-    kmp_module_info(
-        name = name + "_module",
-        module = "//" + native.package_name(),
-        configurations = module_configurations("Main", [
-            ("common", deps, exports),
-            ("jvmAndroid", jvm_android_deps, jvm_android_exports),
-            ("jvm", jvm_deps, jvm_exports),
-            ("android", android_deps, android_exports),
-            ("nonJvm", non_jvm_deps, []),
-            ("native", native_deps, []),
-            ("linux", linux_deps, []),
-            ("apple", apple_deps, []),
-            ("mingw", mingw_deps, []),
-            ("web", web_deps, []),
-            ("wasmJs", wasm_js_deps, []),
-            ("js", js_deps, []),
-        ]),
-        visibility = ["//visibility:public"],
-    )
+    module_info(name, None, {
+        "deps": deps,
+        "exports": exports,
+        "jvm_android_deps": jvm_android_deps,
+        "jvm_android_exports": jvm_android_exports,
+        "jvm_deps": jvm_deps,
+        "jvm_exports": jvm_exports,
+        "android_deps": android_deps,
+        "android_exports": android_exports,
+        "non_jvm_deps": non_jvm_deps,
+        "native_deps": native_deps,
+        "linux_deps": linux_deps,
+        "apple_deps": apple_deps,
+        "mingw_deps": mingw_deps,
+        "web_deps": web_deps,
+        "wasm_js_deps": wasm_js_deps,
+        "js_deps": js_deps,
+    })
     if forbidden_reference:
         kmp_reference_check(
             name = name + "_references",
@@ -551,27 +550,21 @@ def kmp_test(
     """
     srcs = common_srcs + jvm_android_srcs + jvm_srcs + android_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs
     kmp_lint(name, srcs + [s for s in device_srcs if s not in srcs])
-    kmp_module_info(
-        name = name + "_module",
-        # The associate is always the package's own kmp_library.
-        module = "//" + native.package_name(),
-        configurations = module_configurations("Test", [
-            ("common", deps, []),
-            ("jvmAndroid", jvm_android_deps, []),
-            ("jvm", jvm_deps, []),
-            ("androidHost", android_deps, []),
-            ("androidDevice", device_deps, []),
-            ("nonJvm", non_jvm_deps, []),
-            ("native", native_deps, []),
-            ("linux", linux_deps, []),
-            ("apple", apple_deps, []),
-            ("mingw", mingw_deps, []),
-            ("web", web_deps, []),
-            ("wasmJs", wasm_js_deps, []),
-            ("js", js_deps, []),
-        ]),
-        visibility = ["//visibility:public"],
-    )
+    module_info(name, name, {
+        "deps": deps,
+        "jvm_android_deps": jvm_android_deps,
+        "jvm_deps": jvm_deps,
+        "android_deps": android_deps,
+        "device_deps": device_deps,
+        "non_jvm_deps": non_jvm_deps,
+        "native_deps": native_deps,
+        "linux_deps": linux_deps,
+        "apple_deps": apple_deps,
+        "mingw_deps": mingw_deps,
+        "web_deps": web_deps,
+        "wasm_js_deps": wasm_js_deps,
+        "js_deps": js_deps,
+    })
     fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, jvm_srcs)
     brought = plugin_deps(plugins)
     declared = deps + jvm_android_deps + jvm_deps

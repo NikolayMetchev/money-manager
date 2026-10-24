@@ -11,7 +11,7 @@ pages_site(
         "//app/db/schemaspy:docs": "database",
         ":kdoc": "kdoc",
         "//tools/strategy-catalog:catalog_site": ".",
-        ":modules-graph": "modules-graph.md",
+        ":modules-graph": "modules-graph.json",
     },
     strip_prefix = "webpage",
     tags = ["manual"],

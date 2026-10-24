@@ -59,9 +59,6 @@ webpage/strategy-library/
 # Generated Dokka KDoc API docs (regenerated and published by CI)
 webpage/kdoc/
 
-# Generated module dependency graph (regenerated and published by CI)
-webpage/modules-graph.md
-
 # Guard against a literal "~" directory accidentally created by un-expanded tilde paths
 /~/
 /profile.jfr

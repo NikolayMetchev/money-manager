@@ -115,39 +115,29 @@ def _module_package(dep, module):
         return module
     return dep.partition(":")[0]
 
-def _gradle_path(module):
-    return ":" + module[2:].replace("/", ":")
-
 def _module_graph_impl(ctx):
     infos = ctx.attr.modules[KmpModulesInfo].modules
     modules = {info.module: True for info in infos}
     edges = {}
     for info in infos:
-        for configuration, deps in info.configurations.items():
+        for attribute, deps in info.attributes.items():
             for dep in deps:
                 package = _module_package(dep, info.module)
                 if package in modules and package != info.module:
-                    edges["  %s -- %s --> %s" % (_gradle_path(info.module), configuration, _gradle_path(package))] = True
-    out = ctx.actions.declare_file(ctx.label.name + ".md")
-    ctx.actions.write(out, "\n".join([
-        "## Module dependency graph",
-        "",
-        "```mermaid",
-        "%%{",
-        "  init: {",
-        "    'theme': 'neutral'",
-        "  }",
-        "}%%",
-        "",
-        "graph LR",
-    ] + sorted(edges) + ["```", ""]))
+                    edges[(info.target, attribute, package)] = True
+    out = ctx.actions.declare_file(ctx.label.name + ".json")
+    ctx.actions.write(out, json.encode_indent(struct(
+        modules = sorted(modules),
+        tests = {info.target: info.module for info in sorted(infos, key = lambda i: i.target) if info.target != info.module},
+        edges = [struct(**{"from": e[0], "attribute": e[1], "to": e[2]}) for e in sorted(edges)],
+    )) + "\n")
     return [DefaultInfo(files = depset([out]))]
 
 module_graph = rule(
     implementation = _module_graph_impl,
-    doc = "`<name>.md`: the Mermaid graph webpage/modules.html renders, `:from -- <configuration> --> :to`, one edge " +
-          "per module dependency each module and its tests declare, labelled with the Gradle configuration that " +
-          "would have declared it (`commonMainImplementation`, `jvmTestImplementation`, …).",
+    doc = "`<name>.json`, what webpage/modules.html renders: `modules` (each one's package), `tests` (each " +
+          "`kmp_test` → its module) and `edges`, one per module dependency a module or its tests declare: " +
+          "`{from: \"//app/main/cli:test\", attribute: \"deps\", to: \"//test/app/db\"}`.",
     attrs = {
         "modules": attr.label(default = "//:modules", providers = [KmpModulesInfo]),
     },

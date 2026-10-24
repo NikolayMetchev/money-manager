@@ -1,28 +1,30 @@
-"""What each module declares, per source set, for reports over the whole build (the Pages site's module graph).
+"""What each module declares, for reports over the whole build (the Pages site's module graph).
 
 `kmp_library` and `kmp_test` each emit `:<name>_module`, a `kmp_module_info` holding their dependencies as written,
-keyed by the Gradle configuration that would have declared them (`commonMainImplementation`, `jvmMainApi`,
-`commonTestImplementation`, …). They're strings, not labels: a report needs no compile, and a restricted module
-(`kmp_visibility`) would otherwise refuse them. `//:modules`, which Gazelle keeps listing every one, gathers them.
+keyed by the attribute that declares them (`deps`, `exports`, `jvm_deps`, `device_deps`, …). They're strings, not
+labels: a report needs no compile, and a restricted module (`kmp_visibility`) would otherwise refuse them.
+`//:modules`, which Gazelle keeps listing every one, gathers them.
 """
 
 KmpModuleInfo = provider(
     doc = "One module's (or its tests') declared dependencies.",
     fields = {
         "module": "the module's package, `//app/db/core`",
-        "configurations": "Gradle configuration name → the dependency labels it declares, as written",
+        "target": "the declaring target: the module (`//app/db/core`) or its tests (`//app/db/core:test`)",
+        "attributes": "attribute name → the dependency labels it declares, as written",
     },
 )
 
 def _module_info_impl(ctx):
-    return [KmpModuleInfo(module = ctx.attr.module, configurations = ctx.attr.configurations)]
+    return [KmpModuleInfo(module = ctx.attr.module, target = ctx.attr.target, attributes = ctx.attr.attributes)]
 
 kmp_module_info = rule(
     implementation = _module_info_impl,
     doc = "A module's declared dependencies (KmpModuleInfo).",
     attrs = {
-        "configurations": attr.string_list_dict(),
+        "attributes": attr.string_list_dict(),
         "module": attr.string(mandatory = True),
+        "target": attr.string(mandatory = True),
     },
 )
 
@@ -42,17 +44,13 @@ kmp_modules = rule(
     },
 )
 
-def module_configurations(kind, sets):
-    """`{"<sourceSet><Kind>Implementation": deps, "<sourceSet><Kind>Api": exports}` for the non-empty ones.
-
-    Args:
-        kind: `Main` or `Test`.
-        sets: `[(source set, deps, exports), …]`, e.g. `("common", deps, exports)`.
-    """
-    out = {}
-    for source_set, deps, exports in sets:
-        if deps:
-            out["%s%sImplementation" % (source_set, kind)] = deps
-        if exports:
-            out["%s%sApi" % (source_set, kind)] = exports
-    return out
+def module_info(name, target, attributes):
+    """`:<name>_module` for the target `target` (in this package), from `{attribute: deps}`, empty ones dropped."""
+    package = "//" + native.package_name()
+    kmp_module_info(
+        name = name + "_module",
+        module = package,
+        target = package if target == None else "%s:%s" % (package, target),
+        attributes = {attribute: deps for attribute, deps in attributes.items() if deps},
+        visibility = ["//visibility:public"],
+    )
