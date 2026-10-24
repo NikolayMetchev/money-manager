@@ -242,10 +242,7 @@ class Reimports(
         }
 
     /** Re-runs the reset records of the files in [affected], each as it was imported. */
-    override suspend fun rerun(
-        affected: AffectedRecords,
-        onProgress: (suspend (Progress) -> Unit)?,
-    ) {
+    override suspend fun prepare(affected: AffectedRecords): suspend (onProgress: (suspend (Progress) -> Unit)?) -> Unit {
         val files =
             affected.csvRows.keys.mapNotNull { id ->
                 reads.csvImportRepository
@@ -259,19 +256,27 @@ class Reimports(
                         .first()
                         ?.let(StagedFile::Qif)
                 }
-        if (files.isEmpty()) return
-        val strategies = csvImportStrategyRepository.getAllStrategies().first()
-        val currencies = currencies()
-        files.forEach { file ->
-            // One file failing leaves its reset records to its next import rather than failing the
-            // re-import that reset them, whose own work is already done.
-            try {
-                val strategy = strategyFor(file, strategies) ?: return@forEach
-                runStaged(file, strategy, importedSettings(file.source), currencies, onProgress)
-            } catch (expected: CancellationException) {
-                throw expected
-            } catch (expected: Exception) {
-                logger.e(expected) { "Re-running the records of ${file.name} matched against a re-imported transaction failed" }
+        // Read now: once the re-import resets these records, a file that only matched others' transactions
+        // has nothing left to read its account from.
+        val settings = files.associate { it.source to importedSettings(it.source) }
+        return { onProgress ->
+            val strategies = csvImportStrategyRepository.getAllStrategies().first()
+            val currencies = currencies()
+            files.forEach { file ->
+                // One file failing leaves its reset records to its next import rather than failing the
+                // re-import that reset them, whose own work is already done.
+                try {
+                    val strategy = strategyFor(file, strategies) ?: return@forEach
+                    val fileSettings = settings.getValue(file.source)
+                    // Without the account or currency nobody is asked here, so the records wait for the file's next import.
+                    if (strategy.needsSourceAccountOverride() && fileSettings.accountId == null) return@forEach
+                    if (strategy.needsCurrencyOverride() && fileSettings.currencyId == null) return@forEach
+                    runStaged(file, strategy, fileSettings, currencies, onProgress)
+                } catch (expected: CancellationException) {
+                    throw expected
+                } catch (expected: Exception) {
+                    logger.e(expected) { "Re-running the records of ${file.name} matched against a re-imported transaction failed" }
+                }
             }
         }
     }

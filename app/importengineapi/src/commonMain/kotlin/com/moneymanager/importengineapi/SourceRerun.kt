@@ -53,10 +53,11 @@ data class AffectedRecords(
 
 /** Re-runs [AffectedRecords] with each file's own strategy; supplied by a caller that can run both kinds. */
 fun interface AffectedRecordsRerunner {
-    suspend fun rerun(
-        affected: AffectedRecords,
-        onProgress: (suspend (Progress) -> Unit)?,
-    )
+    /**
+     * Called before the re-import deletes anything, while the records still point at what they matched
+     * (which is how a file's account is read); the returned function re-runs them after the re-import.
+     */
+    suspend fun prepare(affected: AffectedRecords): suspend (onProgress: (suspend (Progress) -> Unit)?) -> Unit
 }
 
 /** The values of a transfer that a person can edit by hand. */
@@ -190,6 +191,8 @@ suspend fun <R> ImportEngine.executeSourceRerun(
     val unhideUpdates =
         reconciledPartnerUnhideUpdates(plan.createdTransfers.keys, reads.transferRelationshipRepository, reads.transactionRepository)
 
+    val rerunAffectedRecords = if (plan.affected.isEmpty) null else rerunAffected?.prepare(plan.affected)
+
     // The un-hide updates ride in the delete batch (the engine applies updates before deletes), and so
     // do the record resets: other files' links can't be found again once the transactions are gone.
     onProgress?.invoke(Progress("Removing what the import created"))
@@ -223,9 +226,9 @@ suspend fun <R> ImportEngine.executeSourceRerun(
     onProgress?.invoke(Progress("Re-importing"))
     val result = rerun()
 
-    if (!plan.affected.isEmpty && rerunAffected != null) {
+    if (rerunAffectedRecords != null) {
         onProgress?.invoke(Progress("Re-linking other files"))
-        rerunAffected.rerun(plan.affected, onProgress)
+        rerunAffectedRecords(onProgress)
     }
 
     onProgress?.invoke(Progress("Re-applying manual edits"))
