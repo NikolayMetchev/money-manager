@@ -550,6 +550,24 @@ fun effectiveSourceFor(
         else -> null
     }
 
+/**
+ * The fuzzy dedupe policy for this strategy's rows, which CSV and QIF imports share. Cross-source
+ * reconciliation is opt-in per strategy (`CsvStrategyConfig.crossSourceReconcileWindowSeconds`):
+ * a row recording a movement another export already imported (same accounts + amount within that window,
+ * or, when one side's counterparty is only a placeholder marked by [unidentifiedCounterpartyTypeId], the
+ * same owned account + direction + amount within the fuzzy date tolerance) is kept but excluded and
+ * linked instead of double-counting. Mirrors the API importer.
+ */
+fun CsvImportStrategy.fuzzyDedupePolicy(unidentifiedCounterpartyTypeId: AttributeTypeId?): DedupePolicy.FuzzyAllFields {
+    val reconcileWindow = config.crossSourceReconcileWindowSeconds?.seconds
+    return DedupePolicy.FuzzyAllFields(
+        reconcileWindow = reconcileWindow,
+        reconciledExclusionAttributeTypeId = reconcileWindow?.let { AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID) },
+        reconciledRelationshipTypeId = reconcileWindow?.let { RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID) },
+        unidentifiedCounterpartyAttributeTypeId = reconcileWindow?.let { unidentifiedCounterpartyTypeId },
+    )
+}
+
 /** True when `strategy` needs a user-chosen source account (no SOURCE_ACCOUNT mapping of its own). */
 fun CsvImportStrategy.needsSourceAccountOverride(): Boolean = config.fieldMappings[TransferField.SOURCE_ACCOUNT] == null
 
@@ -1145,19 +1163,7 @@ suspend fun runCsvImport(
                     ?: TradeDedupePolicy.ExactTupleOnly,
             dedupePolicy =
                 if (uniqueIdTypeNames.isEmpty()) {
-                    // Cross-source reconciliation is opt-in per strategy: rows recording a movement
-                    // another export already imported (same accounts+amount within the window) are
-                    // kept but excluded+linked instead of double-counting. Mirrors the API importer.
-                    val reconcileWindow = strategy.config.crossSourceReconcileWindowSeconds?.seconds
-                    DedupePolicy.FuzzyAllFields(
-                        reconcileWindow = reconcileWindow,
-                        reconciledExclusionAttributeTypeId =
-                            reconcileWindow?.let { AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID) },
-                        reconciledRelationshipTypeId =
-                            reconcileWindow?.let { RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID) },
-                        unidentifiedCounterpartyAttributeTypeId =
-                            reconcileWindow?.let { unidentifiedCounterpartyTypeId },
-                    )
+                    strategy.fuzzyDedupePolicy(unidentifiedCounterpartyTypeId)
                 } else {
                     // Cross-source reconciliation for unique-id strategies whose sources issue a
                     // different id per side of the same movement (e.g. Monzo's own- and joint-account
