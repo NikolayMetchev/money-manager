@@ -330,6 +330,21 @@ object BuiltInCsvStrategies {
      */
     private const val BINANCE_TRADE_RECONCILE_WINDOW_SECONDS = 5L
 
+    /**
+     * Cross-source window for the bank and card QIF strategies (Santander, American Express). QIF dates are
+     * date-only and a card statement books a payment up to a few days from the paying bank, so the
+     * placeholder rule that pairs a card's "PAYMENT RECEIVED" with the bank's direct debit matches within
+     * the engine's fuzzy date tolerance (3 days). This window, for an exact same-accounts match, allows two
+     * days, like the other statement exports (Curve, PayPal).
+     */
+    private const val QIF_STATEMENT_RECONCILE_WINDOW_SECONDS = 172_800L
+
+    /**
+     * An American Express payee recording a payment INTO the card ("PAYMENT RECEIVED - THANK YOU"). It never
+     * says who paid, so the payer is a placeholder that reconciles against the paying bank's own record.
+     */
+    private const val AMEX_PAYMENT_RECEIVED = "^(?:PAYMENT|DIRECT DEBIT) RECEIVED\\b"
+
     /** The memo every American Express QIF record ends with; group 1 is the date. */
     private const val AMEX_PROCESS_DATE = "\\bProcess Date (\\d{2}/\\d{2}/\\d{4})\\s*$"
 
@@ -1669,6 +1684,9 @@ object BuiltInCsvStrategies {
                                     "INTEREST|MAINTAINING THE ACCOUNT|CREDIT FROM|TRANSFER)",
                             ),
                         ),
+                    // Opts in to cross-source reconciliation, so a payment the bank names both ends of (a direct
+                    // debit to a card) supersedes the card statement's placeholder record of it.
+                    crossSourceReconcileWindowSeconds = QIF_STATEMENT_RECONCILE_WINDOW_SECONDS,
                 ),
             createdAt = now,
             updatedAt = now,
@@ -1725,7 +1743,14 @@ object BuiltInCsvStrategies {
                 ),
                 // Negative = a purchase on the card; positive = a refund, payment or cashback.
                 incomingWhenPositive(QifColumns.COL_AMOUNT),
-                accounts(AccountSide.TARGET, AccountNaming(value = ValueExpr.of(QifColumns.COL_PAYEE))),
+                accounts(
+                    AccountSide.TARGET,
+                    // A payment to the card names no payer: a placeholder, which reconciles against the
+                    // paying bank's own record of the payment (its direct debit to the card) in either import
+                    // order, so the payment is counted once.
+                    naming(QifColumns.COL_PAYEE, pattern = AMEX_PAYMENT_RECEIVED, unidentified = true),
+                    AccountNaming(value = ValueExpr.of(QifColumns.COL_PAYEE)),
+                ),
             )
         return CsvImportStrategy(
             id = CsvImportStrategyId(amexQifStrategyId),
@@ -1736,6 +1761,7 @@ object BuiltInCsvStrategies {
                     fieldMappings = fieldMappings,
                     rules = rules,
                     contentMatchRules = listOf(Condition(QifColumns.COL_MEMO, ConditionOp.MATCHES, AMEX_PROCESS_DATE)),
+                    crossSourceReconcileWindowSeconds = QIF_STATEMENT_RECONCILE_WINDOW_SECONDS,
                 ),
             createdAt = now,
             updatedAt = now,

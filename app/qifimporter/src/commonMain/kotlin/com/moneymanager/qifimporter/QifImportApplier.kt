@@ -13,6 +13,7 @@ import com.moneymanager.csvimporter.buildFirstRowByAccountName
 import com.moneymanager.csvimporter.buildPendingAccountMappings
 import com.moneymanager.csvimporter.byContentScoreThenNameThenId
 import com.moneymanager.csvimporter.contentScore
+import com.moneymanager.csvimporter.fuzzyDedupePolicy
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
@@ -23,6 +24,7 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
@@ -37,7 +39,6 @@ import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.importengineapi.AccountRef
-import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOwnershipIntent
@@ -336,15 +337,18 @@ suspend fun runImport(
         return QifImportResult(successCount = 0)
     }
 
-    // Pre-resolve attribute types.
+    // Pre-resolve attribute types, plus the engine-facing unidentified-counterparty marker (resolved for
+    // every import, like the CSV path: a file naming both ends needs it to supersede placeholder legs).
     val attributeTypeIdByName =
         importEngine.getOrCreateAttributeTypes(
-            finalPrep.validTransfers
-                .flatMap { it.attributes }
-                .map { it.first }
-                .toSet()
-                .toList(),
+            (
+                finalPrep.validTransfers
+                    .flatMap { it.attributes }
+                    .map { it.first }
+                    .toSet() + WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME
+            ).toList(),
         )
+    val unidentifiedCounterpartyTypeId = attributeTypeIdByName[WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME]
 
     fun attributesFor(attributes: List<Pair<String, String>>): List<NewAttribute> =
         attributes.mapNotNull { (typeName, value) ->
@@ -353,7 +357,8 @@ suspend fun runImport(
 
     // Build the unified import batch. Accounts are already resolved/created above, so transfers carry
     // Existing refs. QIF splits expand to multiple transfers per record sharing one recordIndex, so a
-    // per-record split index keeps the row keys unique. QIF has no transaction id -> fuzzy dedupe.
+    // per-record split index keeps the row keys unique. QIF has no transaction id -> fuzzy dedupe, with the
+    // strategy's opt-in cross-source reconciliation (see fuzzyDedupePolicy).
     val splitCounters = mutableMapOf<Long, Int>()
     val importTransfers =
         finalPrep.validTransfers.map { row ->
@@ -367,7 +372,16 @@ suspend fun runImport(
                 timestamp = row.transfer.timestamp,
                 description = row.transfer.description,
                 amount = row.transfer.amount,
-                attributes = attributesFor(row.attributes),
+                attributes =
+                    attributesFor(row.attributes) +
+                        listOfNotNull(
+                            // Marks the persisted leg as the placeholder record, so a later import that does
+                            // name both ends knows which of the two to exclude.
+                            unidentifiedCounterpartyTypeId
+                                ?.takeIf { row.unidentifiedCounterpartyAccountId != null }
+                                ?.let { NewAttribute(it, "true") },
+                        ),
+                unidentifiedCounterpartyAccountId = row.unidentifiedCounterpartyAccountId,
             )
         }
     // Personal counterparties (resolved via person-flagged strategy rules) become People with an
@@ -417,7 +431,7 @@ suspend fun runImport(
     val batch =
         ImportBatch(
             transfers = importTransfers,
-            dedupePolicy = DedupePolicy.FuzzyAllFields(),
+            dedupePolicy = strategy.fuzzyDedupePolicy(unidentifiedCounterpartyTypeId),
             peopleToCreate = peopleToCreate,
             ownerships = ownerships,
         )

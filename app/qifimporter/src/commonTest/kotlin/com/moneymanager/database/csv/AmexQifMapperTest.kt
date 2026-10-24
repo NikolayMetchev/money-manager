@@ -62,11 +62,21 @@ class AmexQifMapperTest {
     }
 
     @Test
-    fun `a payment to the card comes in from the payer`() {
+    fun `a payment to the card comes in from an unidentified payer`() {
         val r = map(row("PAYMENT RECEIVED - THANK YOU", "1574.62", "  Process Date 02/04/2020"))
         assertEquals(amex.id, r.transfer.targetAccountId)
         assertEquals("PAYMENT RECEIVED - THANK YOU", r.newAccounts.single().name)
+        // Amex never says who paid: the payer is a placeholder, which reconciles against the paying bank's record.
+        assertEquals(r.transfer.sourceAccountId, r.unidentifiedCounterpartyAccountId)
         assertEquals(null, r.attributes.toMap()["amex-merchant-type"])
+    }
+
+    @Test
+    fun `a refund names its merchant and is not a placeholder`() {
+        val r = map(row("ZIPCAR WIMBLEDON", "45.00", "  Process Date 23/03/2020"))
+        assertEquals(amex.id, r.transfer.targetAccountId)
+        assertEquals("ZIPCAR WIMBLEDON", r.newAccounts.single().name)
+        assertNull(r.unidentifiedCounterpartyAccountId)
     }
 
     @Test
