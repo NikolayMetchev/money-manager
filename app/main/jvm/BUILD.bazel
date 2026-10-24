@@ -33,15 +33,18 @@ kmp_library(
     visibility = ["//visibility:public"],
 )
 
-# The app's runtime classpath: Gradle's runtimeOnly deps besides the module's own (the CLI rides along for the
-# installer's mm-jvm launcher).
+# The app's runtime classpath: Gradle's runtimeOnly deps besides the module's own.
 _RUNTIME = [
     ":jvm_jvm",
-    "//app/main/cli:cli_jvm",
-    "//app/main/cli:mm_jvm_logging",
     "//bazel/kmp/deps:compose_desktop_current_os_jvm",
     "@maven_kmp//:log4j_core_jvm",
     "@maven_kmp//:log4j_slf4j2_impl_jvm",
+]
+
+# The release jars also carry the CLI: the installer's mm-jvm launcher starts from them.
+_RELEASE_RUNTIME = _RUNTIME + [
+    "//app/main/cli:cli_jvm",
+    "//app/main/cli:mm_jvm_logging",
 ]
 
 _MAIN_CLASS = "com.moneymanager.MainKt"
@@ -78,7 +81,7 @@ proguard_jars(
     }),
     rules = ["proguard-rules.pro"],
     tags = ["manual"],
-    deps = _RUNTIME,
+    deps = _RELEASE_RUNTIME,
 )
 
 # Gradle's `runRelease`: the shrunk app.
