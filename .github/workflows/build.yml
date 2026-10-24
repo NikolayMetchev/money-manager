@@ -551,14 +551,15 @@ jobs:
           bazel build --define=proguard_optimize=false --define=bundle_native_cli=true
           //app/main/jvm:installer 2>&1 | tee build.log
 
+      # This job builds here, not on a BuildBuddy runner, so the installer is in bazel-bin (not ci-out).
       - name: Install and start it
-        run: bazel/kmp/jpackage/install_smoke_test.sh ci-out/installer "$(cat VERSION)"
+        run: bazel/kmp/jpackage/install_smoke_test.sh bazel-bin/app/main/jvm/installer "$(cat VERSION)"
 
       - name: Upload the installer
         uses: actions/upload-artifact@v7
         with:
           name: installer-${{ matrix.name }}
-          path: ci-out/installer/*
+          path: bazel-bin/app/main/jvm/installer/*
           retention-days: 7
 
   android-release:
