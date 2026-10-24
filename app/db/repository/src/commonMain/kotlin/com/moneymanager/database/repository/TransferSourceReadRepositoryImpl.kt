@@ -73,13 +73,12 @@ class TransferSourceReadRepositoryImpl(
 
     override suspend fun getHandEditedTransferIds(ids: Collection<TransferId>): Set<TransferId> =
         withContext(Dispatchers.Default) {
+            val edited = mutableSetOf<TransferId>()
             // Chunked so a large import stays under SQLite's bound-parameter limit.
-            ids
-                .map { it.id }
-                .distinct()
-                .chunked(HAND_EDITED_CHUNK)
-                .flatMap { chunk -> queries.selectHandEditedTransferIds(chunk).awaitAsList() }
-                .mapTo(mutableSetOf()) { TransferId(it) }
+            for (chunk in ids.mapTo(mutableSetOf()) { it.id }.chunked(HAND_EDITED_CHUNK)) {
+                queries.selectHandEditedTransferIds(chunk).awaitAsList().mapTo(edited) { TransferId(it) }
+            }
+            edited
         }
 }
 
