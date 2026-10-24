@@ -78,7 +78,9 @@ def _sdk_dir(rctx):
         value = rctx.getenv(var)
         if value:
             return value
-    local = rctx.path(rctx.attr.local_properties)
+    # The workspace's own, found from the invocation rather than passed in: the lockfile records the extension's
+    # repo attributes, and an absolute path there would send every other checkout to this one's file.
+    local = rctx.workspace_root.get_child("local.properties")
     rctx.watch(local)
     if local.exists:
         return _properties(rctx.read(local)).get("sdk.dir")
@@ -172,7 +174,6 @@ _platform = repository_rule(
     attrs = {
         "agp": attr.string(mandatory = True),
         "compile_sdk": attr.string(mandatory = True),
-        "local_properties": attr.string(mandatory = True),
         "min_sdk": attr.string(mandatory = True),
         "target_sdk": attr.string(mandatory = True),
     },
@@ -211,14 +212,12 @@ def _android_sdk_impl(module_ctx):
     levels = [tag for mod in module_ctx.modules if mod.is_root for tag in mod.tags.levels]
     if len(levels) != 1:
         fail("android_sdk: the root module sets the API levels with exactly one android_sdk.levels(…)")
-    root = module_ctx.path(Label("//:MODULE.bazel")).dirname
     _platform(
         name = "android_sdk",
         agp = agps[0],
         compile_sdk = str(levels[0].compile_sdk),
         min_sdk = str(levels[0].min_sdk),
         target_sdk = str(levels[0].target_sdk),
-        local_properties = str(root) + "/local.properties",
     )
     _aapt2(name = "aapt2", agp = agps[0])
     return module_ctx.extension_metadata(reproducible = False)
