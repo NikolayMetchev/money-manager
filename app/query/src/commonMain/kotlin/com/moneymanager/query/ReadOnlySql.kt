@@ -44,14 +44,37 @@ suspend fun MoneyManagerDatabaseWrapper.runReadOnlySql(
             rollback(result)
         }
     } catch (expectedFailure: Exception) {
-        throw when (expectedFailure) {
-            is InvalidSqlException, is CancellationException -> expectedFailure
-
-            // The drivers' own SQLite exceptions (JDBC's, SQLiter's) have no common type.
-            else -> InvalidSqlException(expectedFailure.message ?: expectedFailure.toString(), expectedFailure)
-        }
+        if (expectedFailure is CancellationException) throw expectedFailure
+        // The drivers' own SQLite exceptions (JDBC's, SQLiter's) have no common type.
+        val message = expectedFailure.message ?: expectedFailure.toString()
+        throw InvalidSqlException(message + tableHint(message), expectedFailure)
     }
 }
+
+/**
+ * A guessed table name is the commonest mistake (`transfers` for `transfer`), so name the real ones: the close
+ * matches when there are any, else every table but the per-file CSV staging tables, which run to hundreds.
+ */
+private suspend fun MoneyManagerDatabaseWrapper.tableHint(message: String): String {
+    val wanted =
+        NO_SUCH_TABLE
+            .find(message)
+            ?.groupValues
+            ?.get(1)
+            ?.substringAfterLast('.')
+            ?.lowercase() ?: return ""
+    val tables =
+        rawQuery(
+            "SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY name",
+        ) { checkNotNull(it.getString(0)) }
+            .awaitAsList()
+            .filterNot { CSV_STAGING_TABLE.matches(it) }
+    val close = tables.filter { it.lowercase() in wanted || wanted in it.lowercase() }
+    return if (close.isNotEmpty()) "\nDid you mean: ${close.joinToString()}?" else "\nTables: ${tables.joinToString()}"
+}
+
+private val NO_SUCH_TABLE = Regex("no such table: (\\S+)", RegexOption.IGNORE_CASE)
+private val CSV_STAGING_TABLE = Regex("csv_import_[0-9a-f]{8}")
 
 private suspend fun MoneyManagerDatabaseWrapper.queryThroughView(
     statement: String,

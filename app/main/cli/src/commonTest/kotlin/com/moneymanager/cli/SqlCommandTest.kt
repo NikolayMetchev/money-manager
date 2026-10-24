@@ -134,6 +134,8 @@ class SqlCommandTest {
             }
             assertContains(db.mm("sql", "SELECT 1; DELETE FROM person").stderr, "Only one statement")
             assertContains(db.mm("sql", "DELETE FROM person").stderr, "only a single SELECT is allowed")
+            assertContains(db.mm("sql", "SELECT * FROM persons").stderr, Regex("Did you mean: .*\\bperson\\b"))
+            assertContains(db.mm("sql", "SELECT * FROM nothing_like_it").stderr, Regex("Tables: .*\\bperson\\b"))
 
             assertEquals(before, db.personCount())
         }
