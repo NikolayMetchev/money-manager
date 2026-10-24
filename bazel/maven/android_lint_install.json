@@ -3,7 +3,7 @@
   "__INPUT_ARTIFACTS_HASH": {
     "com.android.tools.lint:lint-gradle": -1775251462,
     "com.google.code.findbugs:jsr305": 86638414,
-    "com.google.code.gson:gson": 579810017,
+    "com.google.code.gson:gson": -1217141342,
     "com.google.errorprone:error_prone_annotations": -846490651,
     "com.google.guava:failureaccess": 892280507,
     "com.google.guava:guava": 1922279566,
@@ -19,31 +19,31 @@
   },
   "__RESOLVED_ARTIFACTS_HASH": {
     "com.android.tools.analytics-library:protos": -811090399,
-    "com.android.tools.analytics-library:shared": 1646354366,
-    "com.android.tools.analytics-library:tracker": -269875659,
+    "com.android.tools.analytics-library:shared": -870743852,
+    "com.android.tools.analytics-library:tracker": -374195568,
     "com.android.tools.build:aapt2-proto": -334134589,
     "com.android.tools.build:builder-model": 706058705,
-    "com.android.tools.build:manifest-merger": 1874524136,
+    "com.android.tools.build:manifest-merger": 940634764,
     "com.android.tools.ddms:ddmlib": -842199779,
     "com.android.tools.external.com-intellij:intellij-core": -2102754356,
     "com.android.tools.external.com-intellij:kotlin-compiler": 710702353,
     "com.android.tools.external.org-jetbrains:uast": -253172226,
     "com.android.tools.layoutlib:layoutlib-api": -122627752,
-    "com.android.tools.lint:lint": -1535081066,
-    "com.android.tools.lint:lint-api": -2087673013,
-    "com.android.tools.lint:lint-checks": 602754419,
-    "com.android.tools.lint:lint-gradle": -1284353358,
-    "com.android.tools.lint:lint-model": -2131572792,
+    "com.android.tools.lint:lint": -2067508683,
+    "com.android.tools.lint:lint-api": 384688868,
+    "com.android.tools.lint:lint-checks": -2094674142,
+    "com.android.tools.lint:lint-gradle": 304521176,
+    "com.android.tools.lint:lint-model": -460496526,
     "com.android.tools.lint:lint-typedef-remover": 864093721,
     "com.android.tools:annotations": 2036980914,
     "com.android.tools:common": -1279647048,
     "com.android.tools:dvlib": -1770481794,
     "com.android.tools:play-sdk-proto": 811769283,
-    "com.android.tools:repository": -1439739228,
-    "com.android.tools:sdk-common": 1334392167,
-    "com.android.tools:sdklib": 2082408137,
+    "com.android.tools:repository": -458186967,
+    "com.android.tools:sdk-common": 103889086,
+    "com.android.tools:sdklib": -790019769,
     "com.google.code.findbugs:jsr305": 870839855,
-    "com.google.code.gson:gson": 1948049175,
+    "com.google.code.gson:gson": 2019875040,
     "com.google.errorprone:error_prone_annotations": 295418660,
     "com.google.guava:failureaccess": 1715931538,
     "com.google.guava:guava": -221578555,
@@ -240,9 +240,9 @@
     },
     "com.google.code.gson:gson": {
       "shasums": {
-        "jar": "2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f"
+        "jar": "96d3dd843dc2911de01cdabcd50064cb9e860353102a0a78c96fd833d396fc7d"
       },
-      "version": "2.14.0"
+      "version": "2.15.0"
     },
     "com.google.errorprone:error_prone_annotations": {
       "shasums": {
