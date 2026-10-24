@@ -1,2 +1,19 @@
+load("//bazel/kmp:module_info.bzl", "kmp_modules")
+
 # gazelle:kmp_generate true
 # gazelle:kmp_targets linuxX64 web
+
+kmp_modules(
+    name = "modules",
+    modules = [
+        "//lib/app:app_module",
+        "//lib/app:test_module",
+        "//lib/files:files_module",
+        "//lib/files:test_module",
+        "//lib/server:server_module",
+        "//lib/server:test_module",
+        "//lib/ui:ui_module",
+        "//main:main_module",
+    ],
+    visibility = ["//visibility:public"],
+)

@@ -72,6 +72,9 @@ func (*kmpLang) Kinds() map[string]rule.KindInfo {
 			MergeableAttrs: mergeable("associate", "data", "size", "forbidden_deps", "keep_deps", "jvm_flags", "flaky", "device_manifest"),
 			ResolveAttrs:   resolvedAttrs,
 		},
+		"kmp_modules": {
+			MergeableAttrs: map[string]bool{"modules": true, "visibility": true},
+		},
 		"sqldelight_library": {
 			NonEmptyAttrs:  map[string]bool{"srcs": true},
 			MergeableAttrs: map[string]bool{"package": true, "module_name": true, "deps": true},
@@ -82,6 +85,7 @@ func (*kmpLang) Kinds() map[string]rule.KindInfo {
 func (*kmpLang) Loads() []rule.LoadInfo {
 	return []rule.LoadInfo{
 		{Name: "//bazel/kmp:defs.bzl", Symbols: []string{"kmp_library", "kmp_test"}},
+		{Name: "//bazel/kmp:module_info.bzl", Symbols: []string{"kmp_modules"}},
 		{Name: "//bazel/kmp/sqldelight:sqldelight.bzl", Symbols: []string{"sqldelight_library"}},
 	}
 }

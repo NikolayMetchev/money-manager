@@ -62,18 +62,12 @@ jobs:
           GOOGLE_OAUTH_WEB_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_WEB_CLIENT_ID }}
         # //webpage:site is webpage/'s pages with the schema docs (database/), the strategy catalog
         # (strategy-library/, which the app fetches from <pages-url>/strategy-library/index.json), the
-        # KDoc (kdoc/) and the browser app (app/, #84) at their paths (#1027).
+        # KDoc (kdoc/), the browser app (app/, #84) and the module graph (modules-graph.json) at their paths (#1027).
         run: |
           bazel build --remote_download_outputs=toplevel //webpage:site
           mkdir -p site
           cp -R bazel-bin/webpage/site/. site/
           chmod -R u+w site
-      - name: Generate module dependency graph
-        # webpage/modules.html reads modules-graph.md: each module's dependencies per compilation, from the
-        # build graph.
-        run: |
-          bazel query '//app/... + //utils/... + //tools/... + //test/...' --output=streamed_jsonproto \
-            | python3 bazel/pages/module_graph.py > site/modules-graph.md
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:

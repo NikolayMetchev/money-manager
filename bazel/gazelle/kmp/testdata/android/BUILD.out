@@ -1,1 +1,15 @@
+load("//bazel/kmp:module_info.bzl", "kmp_modules")
+
 # gazelle:kmp_generate true
+
+kmp_modules(
+    name = "modules",
+    modules = [
+        "//desk:desk_module",
+        "//dev:dev_module",
+        "//dev:test_module",
+        "//lib:lib_module",
+        "//lib:test_module",
+    ],
+    visibility = ["//visibility:public"],
+)

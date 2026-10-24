@@ -2,8 +2,11 @@
 
 `tool_output_dir` runs a tool that writes a directory (the strategy catalog), `schemaspy_docs` is
 app/db/schemaspy's `publishSchemaSpyDocs` and `pages_site` lays the site out as the Pages artifact expects:
-`webpage/`'s checked-in pages with each generated directory at its path.
+`webpage/`'s checked-in pages with each generated directory at its path. `module_graph` is the module dependency
+graph webpage/modules.html reads.
 """
+
+load("//bazel/kmp:module_info.bzl", "KmpModulesInfo")
 
 def _tool_output_dir_impl(ctx):
     out = ctx.actions.declare_directory(ctx.label.name)
@@ -101,5 +104,41 @@ pages_site = rule(
         "generated": attr.label_keyed_string_dict(allow_files = True),
         "srcs": attr.label_list(allow_files = True),
         "strip_prefix": attr.string(mandatory = True),
+    },
+)
+
+def _module_package(dep, module):
+    """The package a dependency label names (`:x` is `module`'s own), or None for an external repository's."""
+    if dep.startswith("@"):
+        return None
+    if dep.startswith(":"):
+        return module
+    return dep.partition(":")[0]
+
+def _module_graph_impl(ctx):
+    infos = ctx.attr.modules[KmpModulesInfo].modules
+    modules = {info.module: True for info in infos}
+    edges = {}
+    for info in infos:
+        for attribute, deps in info.attributes.items():
+            for dep in deps:
+                package = _module_package(dep, info.module)
+                if package in modules and package != info.module:
+                    edges[(info.target, attribute, package)] = True
+    out = ctx.actions.declare_file(ctx.label.name + ".json")
+    ctx.actions.write(out, json.encode_indent(struct(
+        modules = sorted(modules),
+        tests = {info.target: info.module for info in sorted(infos, key = lambda i: i.target) if info.target != info.module},
+        edges = [struct(**{"from": e[0], "attribute": e[1], "to": e[2]}) for e in sorted(edges)],
+    )) + "\n")
+    return [DefaultInfo(files = depset([out]))]
+
+module_graph = rule(
+    implementation = _module_graph_impl,
+    doc = "`<name>.json`, what webpage/modules.html renders: `modules` (each one's package), `tests` (each " +
+          "`kmp_test` → its module) and `edges`, one per module dependency a module or its tests declare: " +
+          "`{from: \"//app/main/cli:test\", attribute: \"deps\", to: \"//test/app/db\"}`.",
+    attrs = {
+        "modules": attr.label(default = "//:modules", providers = [KmpModulesInfo]),
     },
 )

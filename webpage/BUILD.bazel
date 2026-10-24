@@ -1,10 +1,8 @@
 load("//bazel/kmp/dokka:dokka.bzl", "dokka_site")
-load("//bazel/pages:pages.bzl", "pages_site")
+load("//bazel/pages:pages.bzl", "module_graph", "pages_site")
 load(":kdoc_modules.bzl", "KDOC_MODULES")
 
 # The GitHub Pages site (#1027), as static.yml deploys it: the checked-in pages plus what the build generates.
-# The module graph (modules-graph.md) is static.yml's own step: it comes from `bazel query`
-# (bazel/pages/module_graph.py), which no action can run.
 pages_site(
     name = "site",
     srcs = glob(["*.html"]),
@@ -13,8 +11,15 @@ pages_site(
         "//app/db/schemaspy:docs": "database",
         ":kdoc": "kdoc",
         "//tools/strategy-catalog:catalog_site": ".",
+        ":modules-graph": "modules-graph.json",
     },
     strip_prefix = "webpage",
+    tags = ["manual"],
+)
+
+# What modules.html renders: every module's dependencies, from what each one declares (//:modules).
+module_graph(
+    name = "modules-graph",
     tags = ["manual"],
 )
 

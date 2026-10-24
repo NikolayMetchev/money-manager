@@ -1,2 +1,17 @@
+load("//bazel/kmp:module_info.bzl", "kmp_modules")
+
 # gazelle:kmp_generate true
 # gazelle:kmp_targets linuxX64 mingwX64
+
+kmp_modules(
+    name = "modules",
+    modules = [
+        "//fixture:fixture_module",
+        "//lib/cbind:cbind_module",
+        "//lib/cbind:test_module",
+        "//lib/core:core_module",
+        "//lib/net:net_module",
+        "//lib/net:test_module",
+    ],
+    visibility = ["//visibility:public"],
+)

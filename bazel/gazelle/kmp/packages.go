@@ -39,6 +39,25 @@ func forTests(dep string) string {
 	return dep
 }
 
+// Every module's and every module's tests' `:<name>_module` (bazel/kmp/module_info.bzl). Gazelle visits the root
+// last, so it lists them all in `//:modules`, which whole-build reports (the Pages site's module graph) read.
+var (
+	moduleInfosMu sync.Mutex
+	moduleInfos   = map[string]bool{}
+)
+
+func recordModuleInfo(rel, name string) {
+	moduleInfosMu.Lock()
+	defer moduleInfosMu.Unlock()
+	moduleInfos["//"+rel+":"+name+"_module"] = true
+}
+
+func allModuleInfos() []string {
+	moduleInfosMu.Lock()
+	defer moduleInfosMu.Unlock()
+	return sortedKeys(moduleInfos)
+}
+
 func recordPackages(rel string, packages []string) {
 	ownersMu.Lock()
 	defer ownersMu.Unlock()
