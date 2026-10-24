@@ -95,10 +95,12 @@ Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer
 Release Smoke Test" workflow (dispatch it on main or a PR branch). Cut a release by pushing a `v*` tag.
 
 **CI**: every workflow sets Bazel up through `.github/actions/bazel-setup` (on RBE without the disk cache, which
-BuildBuddy's cache already holds). `build.yml`'s Build and Test, on Linux
-(RBE), is `bazel build //...` (plus the cross-linked linuxArm64 and mingwX64 test binaries and the Linux desktop
-installer) and `bazel test //...` (plus the desktop ProGuard check), all with `--config=coverage`, then merges the
-Kotlin JVM and Android tests' coverage (`coverage.sh`), installs the deb and starts the app, `mm-jvm` and `mm`. Native Tests run
+BuildBuddy's cache already holds). `build.yml`'s Build and Test, on Linux (RBE), is `bazel/ci/build_and_test.sh`:
+`bazel test //...` (plus the desktop ProGuard check, the cross-linked linuxArm64 and mingwX64 test binaries and the
+Linux desktop installer) with `--config=coverage`, then the Kotlin JVM and Android tests' merged coverage
+(`coverage.sh`). It runs on a BuildBuddy runner (`bb remote`, Remote Bazel) resumed from a snapshot of an earlier run,
+warm Bazel server and all, and the job fetches its outputs (`bazel/ci/fetch_artifacts.sh`); a fork's PR runs it on the
+GitHub runner. The job then installs the deb and starts the app, `mm-jvm` and `mm`. Native Tests run
 the cross-linked binaries on an arm64 and a Windows runner, and build and test macOS on its own runner (with the
 cache); Android Instrumented Tests (an API 36 emulator) and Desktop Installer (macOS and Windows, smoke-tested the same
 way) are their own jobs. Auto-format PR runs `//:format` on every PR and pushes the fixes, so a stale BUILD file is

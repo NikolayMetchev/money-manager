@@ -83,6 +83,13 @@
       "depNameTemplate": "com.android.tools.build:gradle",
       "datasourceTemplate": "maven",
       "registryUrlTemplate": "https://maven.google.com"
+    },
+    {
+      "customType": "regex",
+      "description": "The BuildBuddy CLI Build and Test runs its Bazel commands through (build.yml's BB_VERSION); the job checks the download against the release's own SHA-256",
+      "managerFilePatterns": ["/^\\.github/workflows/build\\.yml$/"],
+      "matchStrings": ["BB_VERSION: (?<currentValue>\\S+)  # renovate: (?<depName>\\S+)"],
+      "datasourceTemplate": "github-releases"
     }
   ]
 }
