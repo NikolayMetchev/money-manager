@@ -7,3 +7,7 @@ directories:
   -.bazelbsp
 
 derive_targets_from_directories: true
+
+# Each native module's `:<name>_ide_native` (bazel/kmp/defs.bzl) is the only module that owns its nativeMain and
+# linuxMain sources. It is manual, so `bazel build //...` never compiles it.
+allow_manual_targets_sync: true

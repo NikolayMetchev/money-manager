@@ -23,7 +23,8 @@ Read from the plugin's sync aspect (`intellij.libraries.bazel.aspect.sdk`), whic
 |---|---|
 | `:<name>_jvm` (`kt_jvm_library`) | A Kotlin JVM module: every `commonMain`, `jvmAndroidMain` and `jvmMain` file in **one** module, its jar classpath (Maven jars included), its compiler plugins. |
 | `:test_jvm_lib` (`kt_jvm_library`, testonly) | A test module with `associates`, so `internal` resolves. |
-| `:<name>_<target>` (`kt_native_klib`), `:test_<target>_bin` | Nothing: our own rules, which the aspect doesn't know. `nativeMain`/`linuxMain`/`appleMain`/`mingwMain` files belong to no module. |
+| `:<name>_<target>` (`kt_native_klib`), `:test_<target>_bin` | Nothing: our own rules, which the aspect doesn't know. |
+| `:<name>_ide_native` (`kt_jvm_library`, manual) | A Kotlin JVM module for `commonMain` + `nonJvmMain` + `nativeMain` + `linuxMain`, depending on its modules' own `_ide_native` (workaround 1 below), synced because `.bazelproject` sets `allow_manual_targets_sync`. `appleMain`/`mingwMain` files still belong to no module. |
 | `:sqldelight` | Its srcjar is a generated source of `:<name>_sqldelight_jvm`, so SQLDelight's generated API resolves (on the JVM). |
 
 ## What that predicts
@@ -32,7 +33,7 @@ Read from the plugin's sync aspect (`intellij.libraries.bazel.aspect.sdk`), whic
 |---|---|---|
 | Import and sync time | Fine | Plain rules_kotlin targets; measure it. |
 | Navigation/highlighting in `commonMain`, `jvmMain` | Works, as JVM code | Both are in the `_jvm` module. |
-| … in `nativeMain`, `linuxMain` | **Doesn't work** | No module owns those files: no highlighting, red references, no navigation. |
+| … in `nativeMain`, `linuxMain` | Partly | `:<name>_ide_native` owns them, analysed against the JVM: our own code and common libraries resolve, `kotlinx.cinterop`, `platform.*` and native-only libraries (ionspin's BigInteger, SQLiter) stay red. |
 | expect ↔ actual navigation | **Likely broken**, maybe with false errors | The IDE sees `expect` and `actual` in one JVM module. Unless it picks up the fragment flags (`-Xmulti-platform -Xfragments…`, which our rules add to the compile action, not to a provider the aspect reads), it may flag every `expect` as having no actual, or as redeclared. Check this first. |
 | What `commonMain` is analysed against | **JVM only** | One JVM module. JVM-only APIs in `commonMain` (`java.util.regex`, `DOT_MATCHES_ALL`) won't show as errors, the same blind spot the Gradle project has had without a native target. The build still catches them (native compiles, #1010). |
 | Run/debug a JVM test from the gutter | Likely works | `java_test` over a `kt_jvm_library`. Our runner is `KmpJUnitRunner`, not Bazel's, so check that gutter runs filter to the one test (`--test_filter`). |
