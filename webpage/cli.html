@@ -306,6 +306,27 @@ mm transactions --account 7 --limit 500 --cursor "$cursor"</code></pre>
       <pre><code>mm strategies --kind api
 mm --format table import-dirs</code></pre>
 
+      <h3><code>sql</code></h3>
+      <p class="synopsis"><code>mm sql [SQL] [--limit N]</code></p>
+      <p>
+        Runs one read-only SQL statement (<code>SELECT</code>, <code>WITH … SELECT</code> or <code>VALUES</code>)
+        straight against the database, for debugging and for agents that need a query the other commands don't
+        offer. Without <code>SQL</code>, or with <code>-</code>, the statement is read from stdin. SQLite itself
+        refuses anything that would change the database, and a second statement is refused too (exit 2).
+        <code>--limit</code> caps the rows (default 1000, <code>0</code> for all); JSON says <code>truncated</code>
+        when it cut the result. Amounts are the stored scaled integers (10<sup>18</sup> per unit).
+      </p>
+      <p>
+        A cloud database with a kept local copy is queried in place. One without a local copy is downloaded and
+        decrypted for the query (it needs <code>MM_REMOTE_PASSWORD</code> or a prompt), and the copy is deleted again
+        afterwards, leaving only the encrypted archive; pass <code>--keep-local</code> to keep it.
+      </p>
+      <pre><code>mm sql "SELECT id, name FROM account ORDER BY name"
+mm --format table sql "SELECT COUNT(*) FROM transfer"
+mm sql &lt;&lt;'EOF'
+SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name
+EOF</code></pre>
+
       <h3><code>import dirs</code>, <code>import apis</code>, <code>import all</code></h3>
       <p class="synopsis">
         <code>mm import dirs [--dir NAME]… [--download-only] [--redownload]</code><br>

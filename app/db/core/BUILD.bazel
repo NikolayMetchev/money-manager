@@ -60,6 +60,7 @@ kmp_library(
         "@maven_kmp//:co_touchlab_sqliter_driver",
         "@maven_kmp//:sqldelight_native_driver",
         "//utils/sqlite3",
+        "@maven_kmp//:kermit",
     ],
     native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
     native_targets = [
