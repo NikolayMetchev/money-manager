@@ -150,8 +150,8 @@ Anything else, a second statement, or SQL that SQLite rejects exits 2 with SQLit
 | `rows` | one array per row, values in column order: integers as exact JSON numbers, reals as numbers, text as strings, blobs as upper-case hex strings, `NULL` as `null` |
 | `truncated` | `true` when there were more than `--limit` rows (default 1000; `--limit 0` returns them all) |
 
-The values are the database's own, so amounts are scaled integers (every asset uses a scale factor of 10^18) and
-times are what the schema stores. The schema isn't part of this contract: it can change with any release.
+The values are the database's own, so amounts are scaled integers (divide by the asset's `scale_factor`: 10^18 for
+every asset the app creates) and times are what the schema stores. The schema isn't part of this contract: it can change with any release.
 
 ### `import dirs [--dir NAME]… [--download-only] [--redownload]`, `import apis [--strategy NAME]… [--force-full] [--download-only]`, `import all [--force-full] [--download-only]`
 

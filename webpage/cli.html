@@ -314,7 +314,7 @@ mm --format table import-dirs</code></pre>
         offer. Without <code>SQL</code>, or with <code>-</code>, the statement is read from stdin. SQLite itself
         refuses anything that would change the database, and a second statement is refused too (exit 2).
         <code>--limit</code> caps the rows (default 1000, <code>0</code> for all); JSON says <code>truncated</code>
-        when it cut the result. Amounts are the stored scaled integers (10<sup>18</sup> per unit).
+        when it cut the result. Amounts are the stored scaled integers: divide by the asset's <code>scale_factor</code> (10<sup>18</sup> for every asset the app creates).
       </p>
       <p>
         A cloud database with a kept local copy is queried in place. One without a local copy is downloaded and
