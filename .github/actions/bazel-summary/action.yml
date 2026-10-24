@@ -5,6 +5,10 @@ inputs:
   title:
     description: 'Heading for this job''s lines'
     required: true
+  logs:
+    description: 'The directory the logs are in'
+    required: false
+    default: '.'
 
 runs:
   using: 'composite'
@@ -13,9 +17,10 @@ runs:
       shell: bash
       run: |
         for step in build test coverage; do
-          [ -f "$step.log" ] || continue
+          log="${{ inputs.logs }}/$step.log"
+          [ -f "$log" ] || continue
           {
             echo "### ${{ inputs.title }} $step"
-            grep -E "Streaming build results to|INFO: [0-9,]+ processes|Executed [0-9]+ out of" "$step.log" | sed 's/^/    /'
+            grep -E "Streaming build results to|INFO: [0-9,]+ processes|Executed [0-9]+ out of" "$log" | sed 's/^/    /'
           } >> "$GITHUB_STEP_SUMMARY"
         done

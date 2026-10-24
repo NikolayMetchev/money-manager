@@ -92,41 +92,81 @@ jobs:
         with:
           persist-credentials: false  # read-only job, no git push
 
+      # Every Bazel command is bazel/ci/build_and_test.sh: the build and tests, coverage, and collecting what the
+      # steps below read into ci-out/. With BuildBuddy it runs on a BuildBuddy runner (Remote Bazel), resumed from a
+      # snapshot of an earlier run's machine, Bazel server and all: a fresh runner would spend most of a cached build
+      # restoring caches and analysing. A PR's first run resumes main's snapshot, later ones its own. A fork's PR
+      # (no key) runs it here, on the restored disk cache.
+      - name: Where Bazel runs
+        id: where
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: echo "remote=$([ -n "$BUILDBUDDY_API_KEY" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       - name: Set up Bazel
+        if: steps.where.outputs.remote == 'false'
         uses: ./.github/actions/bazel-setup
         with:
-          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
           cache-name: linux
 
-      # jpackage's deb needs fakeroot; the installer smoke test's display is Xvfb.
+      # The installer smoke test's display is Xvfb. jpackage's deb needs fakeroot where the build runs (a
+      # BuildBuddy runner installs its own).
       - name: Install packaging tools
-        run: sudo apt-get update && sudo apt-get install -y fakeroot xvfb
-
-      # `bazel test` builds every target it's given, tests or not, so one invocation builds `//...` and runs its
-      # tests. The rest are manual, so `//...` skips them:
-      # - the desktop ProGuard check: `//...` never runs ProGuard, so a new dependency that needs keep/dontwarn rules
-      #   would otherwise surface only when release.yml ran. It shrinks the desktop app and checks every
-      #   ServiceLoader provider survived.
-      # - the Linux desktop installer.
-      # - the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`) and the launcher that turns their
-      #   output into JUnit XML, for Native Tests to run on their own runners.
-      - name: Build and Test
         run: >-
-          bazel test $BAZEL_FLAGS -- //... //app/main/jvm:release_service_providers_test
-          //app/main/jvm:installer //bazel/kmp/testing:native_launcher_deploy.jar
-          $(bazel query 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') 2>&1 | tee test.log
+          sudo apt-get update && sudo apt-get install -y xvfb
+          ${{ steps.where.outputs.remote == 'false' && 'fakeroot' || '' }}
 
-      # The JVM and Android host tests' coverage reports, merged into one XML report (bazel/kmp/testing/coverage.sh).
-      # It credits code to every test that runs it, not only its own module's.
-      - name: Coverage
-        if: ${{ !cancelled() }}
-        run: bazel/kmp/testing/coverage.sh coverage.xml $BAZEL_FLAGS 2>&1 | tee coverage.log
+      - name: Install the BuildBuddy CLI
+        if: steps.where.outputs.remote == 'true'
+        env:
+          BB_VERSION: 5.0.497  # renovate: buildbuddy-io/bazel
+        run: |
+          release="https://github.com/buildbuddy-io/bazel/releases/download/$BB_VERSION/bazel-$BB_VERSION-linux-x86_64"
+          mkdir -p "$RUNNER_TEMP/bb"
+          curl -fsSL -o "$RUNNER_TEMP/bb/bazel-$BB_VERSION-linux-x86_64" "$release"
+          curl -fsSL "$release.sha256" | (cd "$RUNNER_TEMP/bb" && sha256sum -c --quiet)
+          mv "$RUNNER_TEMP/bb/bazel-$BB_VERSION-linux-x86_64" "$RUNNER_TEMP/bb/bb" && chmod +x "$RUNNER_TEMP/bb/bb"
+          echo "$RUNNER_TEMP/bb" >> "$GITHUB_PATH"
+
+      # The runner runs our RBE image (the one bazel/platforms names), so the build sees the executors' system.
+      # Its properties are part of the snapshot key: change one and every branch starts cold. Every run saves a
+      # snapshot (by default a branch other than main saves only its first), so a PR's next push resumes this
+      # one's Bazel server. The OAuth client goes in as secret env overrides, which BuildBuddy keeps out of its
+      # logs and cache.
+      - name: Build and Test (BuildBuddy runner)
+        if: steps.where.outputs.remote == 'true'
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+          GIT_REPO_DEFAULT_BRANCH: main
+        run: |
+          image=$(sed -n 's/^ *"container-image": "\(.*\)",$/\1/p' bazel/platforms/BUILD.bazel | head -1)
+          bb remote --os=linux --arch=amd64 --timeout=60m --container_image="$image" \
+            --runner_exec_properties=EstimatedCPU=8 --runner_exec_properties=EstimatedMemory=16GB \
+            --runner_exec_properties=EstimatedFreeDiskBytes=40GB \
+            --runner_exec_properties=remote-snapshot-save-policy=always \
+            --run_from_branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}" --run_from_commit="$GITHUB_SHA" \
+            --env=REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --remote_run_header="x-buildbuddy-platform.secret-env-overrides=GOOGLE_OAUTH_CLIENT_ID=$GOOGLE_OAUTH_CLIENT_ID,GOOGLE_OAUTH_CLIENT_SECRET=$GOOGLE_OAUTH_CLIENT_SECRET" \
+            --invocation_id_file=remote-run.id \
+            --script="bazel/ci/build_and_test.sh $BAZEL_FLAGS"
+
+      - name: Fetch the BuildBuddy runner's outputs
+        if: ${{ !cancelled() && steps.where.outputs.remote == 'true' && hashFiles('remote-run.id') != '' }}
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: bazel/ci/fetch_artifacts.sh "$(cat remote-run.id)" ci-out
+
+      - name: Build and Test
+        if: steps.where.outputs.remote == 'false'
+        env:
+          BUILDBUDDY_ARTIFACTS_DIRECTORY: ci-out
+        run: bazel/ci/build_and_test.sh $BAZEL_FLAGS
 
       - name: Coverage summary
         run: |
           # The report's own totals are its last LINE counter.
-          files=$(grep -c '<sourcefile ' coverage.xml)
-          grep -o '<counter type="LINE" missed="[0-9]*" covered="[0-9]*"' coverage.xml | tail -1 | tr -c '0-9' ' ' |
+          files=$(grep -c '<sourcefile ' ci-out/coverage.xml)
+          grep -o '<counter type="LINE" missed="[0-9]*" covered="[0-9]*"' ci-out/coverage.xml | tail -1 | tr -c '0-9' ' ' |
             awk -v f="$files" '{printf "### Coverage\n%d files, %d of %d lines (%.1f%%)\n", f, $2, $1+$2, 100*$2/($1+$2)}' \
             >> "$GITHUB_STEP_SUMMARY"
 
@@ -136,30 +176,22 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit
           name: unit
-          files: coverage.xml
+          files: ci-out/coverage.xml
           disable_search: true
           fail_ci_if_error: false
 
       - name: Install and start the desktop installer
-        run: bazel/kmp/jpackage/install_smoke_test.sh bazel-bin/app/main/jvm/installer "$(cat VERSION)"
+        run: bazel/kmp/jpackage/install_smoke_test.sh ci-out/installer "$(cat VERSION)"
 
       - name: Upload the installer
         uses: actions/upload-artifact@v7
         with:
           name: installer-Linux
-          path: bazel-bin/app/main/jvm/installer/*
+          path: ci-out/installer/*
           retention-days: 7
 
-      - name: Collect native test binaries
-        run: |
-          for target in linuxArm64 mingwX64; do
-            for binary in $(bazel cquery $BAZEL_FLAGS --output=files "attr(name, \"_${target}_cross\$\", //...)"); do
-              dir="native-tests/$target/$(dirname "${binary#bazel-out/*/bin/}")"
-              mkdir -p "$dir" && cp "$binary" "$dir/"
-            done
-            cp bazel-bin/bazel/kmp/testing/native_launcher_deploy.jar "native-tests/$target/"
-          done
-          find native-tests -type f | sort
+      - name: Unpack native test binaries
+        run: tar --zstd -xf ci-out/native-tests.tar.zst && find native-tests -type f | sort
 
       - name: Upload linuxArm64 test binaries
         uses: actions/upload-artifact@v7
@@ -182,12 +214,15 @@ jobs:
         uses: ./.github/actions/bazel-summary
         with:
           title: Linux
+          logs: ci-out
 
-      # Codecov's `files` takes paths, not globs, so list the reports (bazel-testlogs is a symlink).
+      # Codecov's `files` takes paths, not globs, so list the reports.
       - name: List test reports
         id: test-reports
-        if: ${{ !cancelled() }}
-        run: echo "files=$(find -L bazel-testlogs/ -name test.xml | paste -sd, -)" >> "$GITHUB_OUTPUT"
+        if: ${{ !cancelled() && hashFiles('ci-out/testlogs.tar') != '' }}
+        run: |
+          mkdir -p ci-out/testlogs && tar -xf ci-out/testlogs.tar -C ci-out/testlogs
+          echo "files=$(find ci-out/testlogs -name test.xml | paste -sd, -)" >> "$GITHUB_OUTPUT"
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && steps.test-reports.outputs.files != '' }}
@@ -322,11 +357,13 @@ jobs:
         with:
           title: macOS
 
-      # Codecov's `files` takes paths, not globs, so list the reports (bazel-testlogs is a symlink).
+      # Codecov's `files` takes paths, not globs, so list the reports.
       - name: List test reports
         id: test-reports
-        if: ${{ !cancelled() }}
-        run: echo "files=$(find -L bazel-testlogs/ -name test.xml | paste -sd, -)" >> "$GITHUB_OUTPUT"
+        if: ${{ !cancelled() && hashFiles('ci-out/testlogs.tar') != '' }}
+        run: |
+          mkdir -p ci-out/testlogs && tar -xf ci-out/testlogs.tar -C ci-out/testlogs
+          echo "files=$(find ci-out/testlogs -name test.xml | paste -sd, -)" >> "$GITHUB_OUTPUT"
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && steps.test-reports.outputs.files != '' }}
@@ -438,11 +475,13 @@ jobs:
           disable-animations: true
           script: bazel test $(bazel query 'attr(tags, android_device, tests(//...))') --test_output=errors
 
-      # Codecov's `files` takes paths, not globs, so list the reports (bazel-testlogs is a symlink).
+      # Codecov's `files` takes paths, not globs, so list the reports.
       - name: List test reports
         id: test-reports
-        if: ${{ !cancelled() }}
-        run: echo "files=$(find -L bazel-testlogs/ -name test.xml | paste -sd, -)" >> "$GITHUB_OUTPUT"
+        if: ${{ !cancelled() && hashFiles('ci-out/testlogs.tar') != '' }}
+        run: |
+          mkdir -p ci-out/testlogs && tar -xf ci-out/testlogs.tar -C ci-out/testlogs
+          echo "files=$(find ci-out/testlogs -name test.xml | paste -sd, -)" >> "$GITHUB_OUTPUT"
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && steps.test-reports.outputs.files != '' }}
@@ -513,13 +552,13 @@ jobs:
           //app/main/jvm:installer 2>&1 | tee build.log
 
       - name: Install and start it
-        run: bazel/kmp/jpackage/install_smoke_test.sh bazel-bin/app/main/jvm/installer "$(cat VERSION)"
+        run: bazel/kmp/jpackage/install_smoke_test.sh ci-out/installer "$(cat VERSION)"
 
       - name: Upload the installer
         uses: actions/upload-artifact@v7
         with:
           name: installer-${{ matrix.name }}
-          path: bazel-bin/app/main/jvm/installer/*
+          path: ci-out/installer/*
           retention-days: 7
 
   android-release:
