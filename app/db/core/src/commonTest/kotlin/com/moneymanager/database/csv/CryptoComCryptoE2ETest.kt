@@ -1,7 +1,6 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.bulkApplyCsv
-import com.moneymanager.csvimporter.bulkReimportCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -12,7 +11,9 @@ import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.updateCsvStrategy
+import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -102,23 +103,9 @@ class CryptoComCryptoE2ETest : DbTest() {
         )
 
     private suspend fun reimportAll(imports: List<CsvImport>) =
-        bulkReimportCsv(
-            imports = imports,
-            sourceAccountOverride = null,
-            strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
-            currencies = repositories.currencyRepository.getAllCurrencies().first(),
-            accountMappingRepository = repositories.accountMappingRepository,
-            accountRepository = repositories.accountRepository,
-            csvImportRepository = repositories.csvImportRepository,
-            transactionRepository = repositories.transactionRepository,
-            relationshipRepository = repositories.transferRelationshipRepository,
-            transferSourceRepository = repositories.transferSourceRepository,
-            maintenance = maintenance,
-            importEngine = repositories.importEngine,
-            onProgress = { },
-            cryptoRepository = repositories.cryptoRepository,
-            tradeRepository = repositories.tradeRepository,
-        )
+        repositories.reimports(maintenance).let { reimports ->
+            reimports.reimportAll(reimports.planAll(imports.map(StagedFile::Csv)), accountId = null, currencyId = null, onProgress = {})
+        }
 
     @Test
     fun cryptoExport_reimportAll_resolvesCryptoAndKeepsBalance() =
@@ -384,7 +371,7 @@ class CryptoComCryptoE2ETest : DbTest() {
             // The strategy definition is updated (the catalog-update path) and the file re-imported.
             repositories.importEngine.updateCsvStrategy(current)
             val result = reimportAll(repositories.csvImportRepository.getAllImports().first())
-            assertEquals(1, result.tradeConversions, "the junk transfer row must convert to a trade")
+            assertEquals(1, result.filesImported, "the file re-imports, so its junk transfer row comes back as a trade")
 
             val trades = repositories.tradeRepository.getTradesByAccount(wallet.id).first()
             assertEquals(1, trades.size)
@@ -409,10 +396,9 @@ class CryptoComCryptoE2ETest : DbTest() {
                     .importStatus,
             )
 
-            // A second re-import is a no-op: the row now has no transfer id, so the conversion pass
-            // must not fire again, and createTrade's idempotency keeps the single trade.
+            // A second re-import deletes and re-creates the one trade.
             val again = reimportAll(repositories.csvImportRepository.getAllImports().first())
-            assertEquals(0, again.tradeConversions)
+            assertEquals(1, again.filesImported)
             assertEquals(
                 1,
                 repositories.tradeRepository

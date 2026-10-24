@@ -25,6 +25,12 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 updateRecordStatus:
 UPDATE qif_record SET import_status = ?, transaction_id = ? WHERE import_id = ? AND record_index = ?;
 
+resetAllRecordStatuses:
+UPDATE qif_record SET import_status = NULL, transaction_id = NULL WHERE import_id = ?;
+
+resetRecordStatuses:
+UPDATE qif_record SET import_status = NULL, transaction_id = NULL WHERE import_id = ? AND record_index IN ?;
+
 -- qif_import_application queries
 insertApplication:
 INSERT INTO qif_import_application (id, qif_import_id, strategy_id, strategy_name, applied_at)

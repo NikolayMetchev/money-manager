@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.AttributeAccountMatcher
+import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.UnmatchedFundingReference
 import com.moneymanager.csvimporter.addAttributeToken
 import com.moneymanager.csvimporter.findUnmatchedFundingReferences
@@ -48,7 +49,7 @@ import kotlinx.coroutines.launch
 /**
  * Funding references (card last-4 digits and the like) that imported rows carry but no account owns yet.
  * Assigning one adds it to the picked account's attribute set — an account may own several cards — and
- * then [rerunFundingReconciles] re-runs the funding reconcile for the files that reference it.
+ * then [reimportFiles] re-imports the files that reference it, so their rows reconcile against the card's account.
  * Which column and attribute type count is whatever a CSV strategy's funding match says, so this
  * screen knows nothing about any particular source.
  */
@@ -60,7 +61,7 @@ fun CardLast4Screen(
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
-    rerunFundingReconciles: suspend (List<CsvImportId>) -> Int,
+    reimportFiles: suspend (List<CsvImportId>) -> BulkReimportResult,
 ) {
     val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
@@ -105,10 +106,10 @@ fun CardLast4Screen(
                     value = addAttributeToken(existing?.value, reference.value),
                     existingAttributeId = existing?.id,
                 )
-                rerunFundingReconciles(reference.imports)
-            }.onSuccess { reconciled ->
+                reimportFiles(reference.imports)
+            }.onSuccess { result ->
                 error = null
-                message = "Assigned ${reference.value}; reconciled $reconciled transaction${if (reconciled == 1) "" else "s"}."
+                message = "Assigned ${reference.value}. ${result.toSummary()}."
             }.onFailure { error = "Assigning ${reference.value} failed: ${it.message}" }
             busyValue = null
         }

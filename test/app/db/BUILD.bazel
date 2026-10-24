@@ -50,6 +50,7 @@ kmp_library(
     deps = [
         "//app/db/schema",
         "//app/importengineapi",
+        "//app/qifimporter",
         "//utils/bigdecimal",
         "//utils/currency",
         "@maven_kmp//:kotlinx_coroutines_core",

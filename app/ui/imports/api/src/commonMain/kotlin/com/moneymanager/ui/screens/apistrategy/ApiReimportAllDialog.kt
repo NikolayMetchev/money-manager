@@ -13,22 +13,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
 import com.moneymanager.apiimporter.ApiBulkReimportResult
+import com.moneymanager.apiimporter.ApiImportReads
 import com.moneymanager.apiimporter.bulkReimportApiSessions
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.repository.AccountAttributeReadRepository
-import com.moneymanager.domain.repository.AccountReadRepository
-import com.moneymanager.domain.repository.ApiSessionReadRepository
-import com.moneymanager.domain.repository.CryptoReadRepository
-import com.moneymanager.domain.repository.CurrencyReadRepository
-import com.moneymanager.domain.repository.TradeReadRepository
-import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.qifimporter.Reimports
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
+import com.moneymanager.ui.components.imports.UnmatchedEditsReport
+import com.moneymanager.ui.components.imports.rememberAccountNamer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -44,20 +40,15 @@ fun ApiReimportAllDialog(
     credentialId: ApiCredentialId,
     importedSessionCount: Int,
     strategy: ApiImportStrategy,
-    apiSessionRepository: ApiSessionReadRepository,
-    accountRepository: AccountReadRepository,
-    currencyRepository: CurrencyReadRepository,
-    cryptoRepository: CryptoReadRepository,
-    accountAttributeRepository: AccountAttributeReadRepository,
-    transactionRepository: TransactionReadRepository,
-    transferRelationshipRepository: TransferRelationshipReadRepository,
-    tradeRepository: TradeReadRepository,
+    apiReads: ApiImportReads,
+    reimports: Reimports,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
     onComplete: () -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
+    val accountName = rememberAccountNamer(apiReads.accountRepository)
     var isRunning by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<Progress?>(null) }
     var result by remember { mutableStateOf<ApiBulkReimportResult?>(null) }
@@ -79,16 +70,11 @@ fun ApiReimportAllDialog(
                         bulkReimportApiSessions(
                             credentialId = credentialId,
                             strategy = strategy,
-                            apiSessionRepository = apiSessionRepository,
-                            accountRepository = accountRepository,
-                            currencyRepository = currencyRepository,
-                            cryptoRepository = cryptoRepository,
-                            accountAttributeRepository = accountAttributeRepository,
-                            transactionRepository = transactionRepository,
-                            transferRelationshipRepository = transferRelationshipRepository,
-                            tradeRepository = tradeRepository,
+                            apiReads = apiReads,
+                            reads = reimports.reads,
                             maintenance = maintenance,
                             importEngine = importEngine,
+                            rerunAffected = reimports,
                             onProgress = { progress = it },
                         )
                 } catch (expected: CancellationException) {
@@ -109,6 +95,13 @@ fun ApiReimportAllDialog(
                 text = "Re-imported ${finished.sessionsReimported} session(s) under \"${strategy.name}\".",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            if (finished.reappliedEdits > 0) {
+                Text(
+                    text = "${finished.reappliedEdits} manual edit(s) re-applied.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            UnmatchedEditsReport(finished.unmatchedEdits, accountName)
             if (finished.failures.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(

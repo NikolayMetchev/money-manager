@@ -646,7 +646,6 @@ fun MoneyManagerApp(
                                                 cryptoRepository = services.accounts.cryptoRepository,
                                                 transactionRepository = services.transactions.transactionRepository,
                                                 transferRelationshipRepository = services.transactions.transferRelationshipRepository,
-                                                transferSourceRepository = services.transactions.transferSourceRepository,
                                                 tradeRepository = services.transactions.tradeRepository,
                                                 maintenance = services.imports.maintenance,
                                                 personRepository = services.people.personRepository,
@@ -803,6 +802,7 @@ fun MoneyManagerApp(
                                                 tradeRepository = services.transactions.tradeRepository,
                                                 auditRepository = services.audit.auditRepository,
                                                 importEngine = services.transactions.importEngine,
+                                                reimports = importDirectoryService.reimports,
                                                 onBack = { navigationHistory.navigateBack() },
                                                 onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.CSV)) },
                                                 onCreateStrategy = { importId ->
@@ -826,10 +826,9 @@ fun MoneyManagerApp(
                                                 currencyRepository = services.accounts.currencyRepository,
                                                 personRepository = services.people.personRepository,
                                                 settingsRepository = services.settings.settingsRepository,
-                                                transactionRepository = services.transactions.transactionRepository,
-                                                transferSourceRepository = services.transactions.transferSourceRepository,
                                                 maintenance = services.imports.maintenance,
                                                 importEngine = services.transactions.importEngine,
+                                                reimports = importDirectoryService.reimports,
                                                 onBack = { navigationHistory.navigateBack() },
                                                 onCreateStrategy = { qifImportId ->
                                                     navigationHistory.navigateTo(Screen.QifStrategyEditor(qifImportId))

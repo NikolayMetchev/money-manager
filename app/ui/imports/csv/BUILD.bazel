@@ -54,6 +54,7 @@ kmp_library(
         "//app/model/repository/read",
         "//app/model/rules",
         "//app/presenter/core",
+        "//app/qifimporter",
         "//app/tasks",
         "//app/ui/audit",
         "//app/ui/components",

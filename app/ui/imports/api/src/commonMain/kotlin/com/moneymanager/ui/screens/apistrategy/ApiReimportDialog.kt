@@ -21,25 +21,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
-import com.moneymanager.apiimporter.ApiReimportPlan
-import com.moneymanager.apiimporter.ApiReimportResult
+import com.moneymanager.apiimporter.ApiImportReads
+import com.moneymanager.apiimporter.ApiRerunCounts
 import com.moneymanager.apiimporter.executeApiReimport
 import com.moneymanager.apiimporter.planApiReimport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.repository.AccountAttributeReadRepository
-import com.moneymanager.domain.repository.AccountReadRepository
-import com.moneymanager.domain.repository.ApiSessionReadRepository
-import com.moneymanager.domain.repository.CryptoReadRepository
-import com.moneymanager.domain.repository.CurrencyReadRepository
-import com.moneymanager.domain.repository.TradeReadRepository
-import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.SourceRerunPlan
+import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.qifimporter.Reimports
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.LoadingTextButton
+import com.moneymanager.ui.components.imports.SourceRerunPreview
+import com.moneymanager.ui.components.imports.rememberAccountNamer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -47,36 +44,31 @@ private val logger = Logger.withTag("ApiReimportDialog")
 
 /**
  * Re-imports an already-imported API session so a strategy config change (e.g. an internal-transfer
- * reconcile bridge added after the fact) applies retroactively: deletes the transfers/trades this
- * session itself created, then re-runs the import under the current strategy — which re-parses the
- * session's stored responses from scratch under the new config.
+ * reconcile bridge added after the fact) applies retroactively: deletes what the session created, then
+ * re-parses its stored responses under the current strategy, re-running the other files' records
+ * matched against it and putting hand edits back, as CSV and QIF re-import do.
  */
 @Suppress("LongParameterList")
 @Composable
 fun ApiReimportDialog(
     session: ApiSession,
     strategy: ApiImportStrategy,
-    apiSessionRepository: ApiSessionReadRepository,
-    accountRepository: AccountReadRepository,
-    currencyRepository: CurrencyReadRepository,
-    cryptoRepository: CryptoReadRepository,
-    accountAttributeRepository: AccountAttributeReadRepository,
-    transactionRepository: TransactionReadRepository,
-    transferRelationshipRepository: TransferRelationshipReadRepository,
-    tradeRepository: TradeReadRepository,
+    apiReads: ApiImportReads,
+    reimports: Reimports,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
-    onComplete: (ApiReimportResult) -> Unit,
+    onComplete: (SourceRerunResult<ApiRerunCounts>) -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    var plan by remember { mutableStateOf<ApiReimportPlan?>(null) }
+    val accountName = rememberAccountNamer(apiReads.accountRepository)
+    var plan by remember { mutableStateOf<SourceRerunPlan?>(null) }
     var isRunning by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var executeProgress by remember { mutableStateOf<Progress?>(null) }
 
     LaunchedEffect(session.id) {
-        plan = planApiReimport(session.id, apiSessionRepository)
+        plan = planApiReimport(session.id, apiReads.apiSessionRepository, reimports.reads)
     }
 
     AlertDialog(
@@ -96,20 +88,11 @@ fun ApiReimportDialog(
 
                     else -> {
                         Text(
-                            text =
-                                "This will delete ${currentPlan.transferIds.size} transaction(s) and " +
-                                    "${currentPlan.tradeIds.size} trade(s) created by this session, then re-import " +
-                                    "them under the current strategy configuration (\"${strategy.name}\").",
+                            text = "Re-imports this session under the current strategy configuration (\"${strategy.name}\").",
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                        if (currentPlan.isEmpty) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "This session created no transactions or trades — nothing to re-import.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        SourceRerunPreview(currentPlan, recordNoun = "item", accountName = accountName)
                         if (isRunning) {
                             Spacer(modifier = Modifier.height(12.dp))
                             ApiReimportProgress(executeProgress ?: Progress("Starting re-import"))
@@ -136,16 +119,11 @@ fun ApiReimportDialog(
                                     plan = currentPlan,
                                     session = session,
                                     strategy = strategy,
-                                    apiSessionRepository = apiSessionRepository,
-                                    accountRepository = accountRepository,
-                                    currencyRepository = currencyRepository,
-                                    cryptoRepository = cryptoRepository,
-                                    accountAttributeRepository = accountAttributeRepository,
-                                    transactionRepository = transactionRepository,
-                                    transferRelationshipRepository = transferRelationshipRepository,
-                                    tradeRepository = tradeRepository,
+                                    apiReads = apiReads,
+                                    reads = reimports.reads,
                                     maintenance = maintenance,
                                     importEngine = importEngine,
+                                    rerunAffected = reimports,
                                     onProgress = { executeProgress = it },
                                 )
                             onComplete(result)
@@ -160,7 +138,7 @@ fun ApiReimportDialog(
                         }
                     }
                 },
-                enabled = !isRunning && currentPlan != null && !currentPlan.isEmpty,
+                enabled = !isRunning && currentPlan != null,
                 loading = isRunning,
                 label = "Re-import",
                 loadingIndicatorModifier = Modifier.padding(end = 8.dp),

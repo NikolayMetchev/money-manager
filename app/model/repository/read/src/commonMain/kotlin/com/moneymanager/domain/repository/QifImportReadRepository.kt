@@ -2,6 +2,7 @@ package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.QifImportId
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportRecord
 import kotlinx.coroutines.flow.Flow
@@ -36,4 +37,13 @@ interface QifImportReadRepository {
      * duplicate-account merges and empty-account cleanup to accounts the import itself introduced.
      */
     suspend fun getAccountsCreatedByImport(id: QifImportId): Set<AccountId>
+
+    /**
+     * Records of every other QIF import linked to any of [transferIds] (marked DUPLICATE or UPDATED
+     * against them), keyed by import. Re-import resets them after deleting those transfers.
+     */
+    suspend fun findRecordsReferencingTransfers(
+        excluding: QifImportId?,
+        transferIds: Set<TransferId>,
+    ): Map<QifImportId, List<Long>>
 }

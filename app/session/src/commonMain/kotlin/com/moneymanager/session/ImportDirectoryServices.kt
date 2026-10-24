@@ -30,6 +30,7 @@ fun AppServices.importDirectoryService(
         transactionRepository = transactions.transactionRepository,
         transferRelationshipRepository = transactions.transferRelationshipRepository,
         transferSourceRepository = transactions.transferSourceRepository,
+        auditRepository = audit.auditRepository,
         maintenance = imports.maintenance,
         importEngine = transactions.importEngine,
         fileSourceFactory = fileSourceFactory,

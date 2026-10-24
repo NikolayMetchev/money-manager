@@ -4,12 +4,10 @@ import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.BulkFileStatus
-import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.DirectoryRedownloadResult
 import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
 import com.moneymanager.csvimporter.ScanResult
 import com.moneymanager.csvimporter.bulkApplyCsv
-import com.moneymanager.csvimporter.bulkReimportCsv
 import com.moneymanager.csvimporter.discoverImportableFolders
 import com.moneymanager.csvimporter.findUnmatchedFundingReferences
 import com.moneymanager.csvimporter.needsSourceAccountOverride
@@ -20,7 +18,6 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
-import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.QifImportId
@@ -33,6 +30,7 @@ import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
@@ -46,14 +44,15 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.RerunReads
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createImportDirectory
 import com.moneymanager.importengineapi.setLastQifAccount
 import com.moneymanager.importengineapi.updateImportDirectory
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.qifimporter.QifCsvAdapter
+import com.moneymanager.qifimporter.Reimports
 import com.moneymanager.qifimporter.bulkApplyQif
-import com.moneymanager.qifimporter.bulkReimportQif
 import com.moneymanager.qifimporter.qifCompatible
 import com.moneymanager.qifimporter.selectForQifContent
 import com.moneymanager.tasks.Progress
@@ -104,12 +103,37 @@ class ImportDirectoryService(
     private val transactionRepository: TransactionReadRepository,
     private val transferRelationshipRepository: TransferRelationshipReadRepository,
     private val transferSourceRepository: TransferSourceReadRepository,
+    auditRepository: AuditReadRepository,
     private val maintenance: Maintenance,
     private val importEngine: ImportEngine,
     private val fileSourceFactory: ImportFileSourceFactory?,
     private val deviceId: DeviceId,
     private val writeLock: Mutex = Mutex(),
 ) {
+    /** Re-imports this session's CSV and QIF files; see [Reimports]. */
+    val reimports =
+        Reimports(
+            reads =
+                RerunReads(
+                    transactionRepository = transactionRepository,
+                    transferSourceRepository = transferSourceRepository,
+                    transferRelationshipRepository = transferRelationshipRepository,
+                    auditRepository = auditRepository,
+                    accountRepository = accountRepository,
+                    csvImportRepository = csvImportRepository,
+                    qifImportRepository = qifImportRepository,
+                    tradeRepository = tradeRepository,
+                ),
+            csvImportStrategyRepository = csvImportStrategyRepository,
+            accountMappingRepository = accountMappingRepository,
+            accountAttributeRepository = accountAttributeRepository,
+            currencyRepository = currencyRepository,
+            cryptoRepository = cryptoRepository,
+            passThroughAccountRepository = passThroughAccountRepository,
+            maintenance = maintenance,
+            importEngine = importEngine,
+        )
+
     /** Whether [directory] can be downloaded here: there is file access, and a LOCAL folder belongs to this device. */
     fun isScannable(directory: ImportDirectory): Boolean = fileSourceFactory != null && directory.isOn(deviceId)
 
@@ -561,80 +585,6 @@ class ImportDirectoryService(
                 }.toMap()
         return folders.mapNotNull { (file, folder) -> accounts[folder]?.let { file to it } }.toMap()
     }
-
-    /** Plans a CSV "re-import all" over [imports]: each file keeps the strategy it was last imported with. */
-    suspend fun planCsvReimportAll(imports: List<CsvImport>): CsvReimportAllPlan {
-        val strategies = csvImportStrategyRepository.getAllStrategies().first()
-        return CsvReimportAllPlan(
-            files = imports,
-            matches = imports.associate { it.id to matchCsvStrategy(it, strategies, preferLastApplied = true) },
-            strategies = strategies,
-            currencies = currencyRepository.getAllCurrencies().first(),
-            passThroughAccounts = passThroughAccountRepository.getAll().first(),
-            attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first()),
-        )
-    }
-
-    /** Applies [plan]; each file's source account comes from its own import history. */
-    suspend fun applyCsvReimportAll(
-        plan: CsvReimportAllPlan,
-        onProgress: suspend (Progress) -> Unit,
-    ): BulkReimportResult =
-        bulkReimportCsv(
-            imports = plan.files,
-            sourceAccountOverride = null,
-            strategies = plan.strategies,
-            currencies = plan.currencies,
-            accountMappingRepository = accountMappingRepository,
-            accountRepository = accountRepository,
-            csvImportRepository = csvImportRepository,
-            transactionRepository = transactionRepository,
-            relationshipRepository = transferRelationshipRepository,
-            transferSourceRepository = transferSourceRepository,
-            tradeRepository = tradeRepository,
-            maintenance = maintenance,
-            importEngine = importEngine,
-            onProgress = onProgress,
-            passThroughAccounts = plan.passThroughAccounts,
-            cryptoRepository = cryptoRepository,
-            attributeAccountMatchers = plan.attributeAccountMatchers,
-        )
-
-    /** Plans a QIF "re-import all" over [imports], preselecting the last QIF account and the default currency. */
-    suspend fun planQifReimportAll(imports: List<QifImport>): QifReimportAllPlan {
-        val currencies = currencyRepository.getAllCurrencies().first()
-        val defaultCurrencyId = settingsRepository.getDefaultCurrencyId().first()
-        return QifReimportAllPlan(
-            files = imports,
-            defaultSourceAccountId = lastQifAccountId(),
-            defaultCurrencyId = defaultCurrencyId?.takeIf { id -> currencies.any { it.id == id } } ?: currencies.firstOrNull()?.id,
-            strategies = csvImportStrategyRepository.getAllStrategies().first(),
-            currencies = currencies,
-        )
-    }
-
-    /** Applies [plan] in [currencyId] (QIF carries none); [sourceAccountId] is for not-yet-imported records. */
-    suspend fun applyQifReimportAll(
-        plan: QifReimportAllPlan,
-        sourceAccountId: AccountId?,
-        currencyId: CurrencyId,
-        onProgress: suspend (Progress) -> Unit,
-    ): BulkReimportResult =
-        bulkReimportQif(
-            imports = plan.files,
-            sourceAccountOverride = sourceAccountId,
-            currencyId = currencyId,
-            strategies = plan.strategies,
-            currencies = plan.currencies,
-            accountMappingRepository = accountMappingRepository,
-            accountRepository = accountRepository,
-            qifImportRepository = qifImportRepository,
-            transactionRepository = transactionRepository,
-            transferSourceRepository = transferSourceRepository,
-            maintenance = maintenance,
-            importEngine = importEngine,
-            onProgress = onProgress,
-        )
 
     private suspend fun unimportedCsvFiles(): List<CsvImport> =
         csvImportRepository.getAllImports().first().filter { !it.ignored && it.lastAppliedAt == null }

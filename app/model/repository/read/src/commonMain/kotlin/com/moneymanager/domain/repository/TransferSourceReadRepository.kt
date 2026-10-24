@@ -1,5 +1,6 @@
 package com.moneymanager.domain.repository
 
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TransferId
 
@@ -27,4 +28,14 @@ interface TransferSourceReadRepository {
         transactionId: TransferId,
         revisionId: Long,
     ): SourceRecord?
+
+    /**
+     * The still-existing transfers [importSource] created (not merely updated), each with the record it
+     * came from: [Source.Csv] with its row, [Source.Qif] with its record, [Source.Api] with its request
+     * and JSON path. [importSource] names a whole import or session; any other source created none.
+     */
+    suspend fun getTransfersCreatedBy(importSource: Source): Map<TransferId, Source>
+
+    /** Those of [ids] a person has edited by hand since they were created. */
+    suspend fun getHandEditedTransferIds(ids: Collection<TransferId>): Set<TransferId>
 }

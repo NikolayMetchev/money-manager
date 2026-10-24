@@ -15,7 +15,6 @@ import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.StringSimilarity
-import com.moneymanager.importengineapi.selectNearestUnconsumedLeg
 import kotlin.time.Duration
 import kotlin.time.Instant
 
@@ -333,8 +332,7 @@ class ImportDeduper(
     // Scope is a single import() call: this does NOT know which legs a previous, separate batch already
     // consumed, so a later batch's row could re-link to an already-reconciled leg if the amount+window
     // coincide. In practice a conduit/exchange export is imported in one batch, so the collision needs two
-    // overlapping imports; CsvReimport.computeFundingReconcileReruns mirrors this same single-batch
-    // limitation for the funding-card path.
+    // overlapping imports.
     private val consumedReconcileIds = mutableSetOf<TransferId>()
 
     /**

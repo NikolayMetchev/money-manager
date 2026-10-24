@@ -6,7 +6,6 @@ import com.moneymanager.csvimporter.DirectoryRedownloadResult
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.csv.CsvImport
@@ -96,27 +95,6 @@ data class QifImportAllPlan(
             blockedIds = emptySet(),
         )
 }
-
-/** What a CSV "re-import all" over [files] will do: each file's strategy (last applied, else matched). */
-data class CsvReimportAllPlan(
-    val files: List<CsvImport>,
-    val matches: Map<CsvImportId, CsvImportStrategy?>,
-    val strategies: List<CsvImportStrategy>,
-    val currencies: List<Currency>,
-    val passThroughAccounts: List<PassThroughAccount>,
-    val attributeAccountMatchers: Map<String, AttributeAccountMatcher>,
-) {
-    val skippedNoStrategy: Int get() = matches.count { it.value == null }
-}
-
-/** What a QIF "re-import all" over [files] will do, with the dialog's preselected account and currency. */
-data class QifReimportAllPlan(
-    val files: List<QifImport>,
-    val defaultSourceAccountId: AccountId?,
-    val defaultCurrencyId: CurrencyId?,
-    val strategies: List<CsvImportStrategy>,
-    val currencies: List<Currency>,
-)
 
 /**
  * What an unattended [ImportDirectoryService.importAll] did: an optional re-download, the download, then

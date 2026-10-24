@@ -35,8 +35,8 @@ interface CsvImportReadRepository {
     ): List<CsvRow>
 
     /**
-     * Ids of the accounts this import auto-created (from CSV provenance). Used by re-import to
-     * scope account merges/deletions to import-created accounts only.
+     * Ids of the accounts this import auto-created (from CSV provenance). Re-import deletes those it
+     * leaves empty, and never any other account.
      */
     suspend fun getAccountsCreatedByImport(id: CsvImportId): Set<AccountId>
 
@@ -50,12 +50,12 @@ interface CsvImportReadRepository {
     suspend fun getTradeIdsCreatedByImport(id: CsvImportId): Set<TradeId>
 
     /**
-     * For every import other than [excluding], the rows whose linked transaction is one of
+     * For every import other than [excluding] (every import when null), the rows whose linked transaction is one of
      * [transferIds]/[tradeIds] — rows another file marked DUPLICATE or UPDATED against them. Imports
      * with no such rows are omitted.
      */
     suspend fun findRowsReferencingTransactions(
-        excluding: CsvImportId,
+        excluding: CsvImportId?,
         transferIds: Set<TransferId>,
         tradeIds: Set<TradeId>,
     ): Map<CsvImportId, List<Long>>
@@ -70,13 +70,4 @@ interface CsvImportReadRepository {
 
     /** The raw workbook bytes for an Excel-backed import, or null for a CSV/QIF import. */
     suspend fun getXlsxBlob(id: CsvImportId): XlsxImportBlob?
-
-    /**
-     * For every CSV import that has one, the single account appearing on either side of every one of
-     * its currently-existing created transfers — i.e. the account the file was actually imported
-     * against last time. Lets re-import auto-resolve a source-account override for strategies with no
-     * SOURCE_ACCOUNT mapping (e.g. Monzo CSV) without asking the user again for a file already
-     * successfully imported once.
-     */
-    suspend fun historicalSourceAccounts(): Map<CsvImportId, AccountId>
 }

@@ -34,12 +34,18 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
-import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ManualEdit
 import com.moneymanager.importengineapi.deleteQifImport
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.qifimporter.Reimports
+import com.moneymanager.qifimporter.StagedFile
+import com.moneymanager.ui.components.imports.ReimportDialog
+import com.moneymanager.ui.components.imports.ReimportPickerRepositories
+import com.moneymanager.ui.components.imports.UnmatchedEditsReport
+import com.moneymanager.ui.components.imports.rememberAccountNamer
+import com.moneymanager.ui.components.imports.toSummary
 import com.moneymanager.ui.components.qif.QifRecordList
 import com.moneymanager.ui.util.displayDateTime
 import kotlinx.coroutines.launch
@@ -56,10 +62,9 @@ fun QifImportDetailScreen(
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
     settingsRepository: SettingsReadRepository,
-    transactionRepository: TransactionReadRepository,
-    transferSourceRepository: TransferSourceReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
+    reimports: Reimports,
     onBack: () -> Unit,
     onCreateStrategy: (QifImportId) -> Unit,
     onDeleted: () -> Unit,
@@ -75,6 +80,8 @@ fun QifImportDetailScreen(
     var showApplyDialog by remember { mutableStateOf(false) }
     var showReimportDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var reimportSummary by remember { mutableStateOf<String?>(null) }
+    var unmatchedEdits by remember { mutableStateOf<List<ManualEdit>>(emptyList()) }
 
     androidx.compose.runtime.LaunchedEffect(importId, refreshTrigger) {
         val count = qifImportRepository.countRecords(importId)
@@ -116,8 +123,7 @@ fun QifImportDetailScreen(
                 OutlinedButton(onClick = { onCreateStrategy(importId) }) {
                     Text("Create Strategy")
                 }
-                // Re-applies the last-used strategy/mappings retroactively (merges duplicate accounts,
-                // updates changed values, imports remaining records). Only meaningful once imported.
+                // Deletes what the file created and imports it again. Only meaningful once imported.
                 OutlinedButton(
                     onClick = { showReimportDialog = true },
                     enabled = current?.lastAppliedStrategyId != null && records.isNotEmpty(),
@@ -135,6 +141,12 @@ fun QifImportDetailScreen(
                     Text("Apply Strategy")
                 }
             }
+        }
+
+        reimportSummary?.let {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = it, style = MaterialTheme.typography.bodyMedium)
+            UnmatchedEditsReport(unmatchedEdits, rememberAccountNamer(accountRepository))
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -169,23 +181,15 @@ fun QifImportDetailScreen(
     }
 
     if (showReimportDialog && current != null) {
-        QifReimportDialog(
-            qifImport = current,
-            records = records,
-            csvImportStrategyRepository = csvImportStrategyRepository,
-            accountMappingRepository = accountMappingRepository,
-            accountRepository = accountRepository,
-            categoryRepository = categoryRepository,
-            currencyRepository = currencyRepository,
-            personRepository = personRepository,
-            qifImportRepository = qifImportRepository,
-            transactionRepository = transactionRepository,
-            transferSourceRepository = transferSourceRepository,
-            maintenance = maintenance,
-            importEngine = importEngine,
+        ReimportDialog(
+            file = StagedFile.Qif(current),
+            reimports = reimports,
+            pickers = ReimportPickerRepositories(accountRepository, categoryRepository, currencyRepository, personRepository),
             onDismiss = { showReimportDialog = false },
-            onComplete = {
+            onComplete = { result ->
                 showReimportDialog = false
+                reimportSummary = result.toSummary(result.rerun?.successCount ?: 0)
+                unmatchedEdits = result.unmatchedEdits
                 refreshTrigger++
             },
         )

@@ -53,7 +53,12 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.deleteCsvImport
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.qifimporter.Reimports
+import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.ui.components.csv.CsvPreviewTable
+import com.moneymanager.ui.components.imports.ReimportDialog
+import com.moneymanager.ui.components.imports.ReimportPickerRepositories
+import com.moneymanager.ui.components.imports.toSummary
 import com.moneymanager.ui.util.displayDateTime
 import kotlinx.coroutines.launch
 
@@ -78,6 +83,7 @@ fun CsvImportDetailScreen(
     tradeRepository: TradeReadRepository,
     auditRepository: AuditReadRepository,
     importEngine: ImportEngine,
+    reimports: Reimports,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
     onCreateStrategy: (CsvImportId) -> Unit = {},
@@ -495,64 +501,25 @@ fun CsvImportDetailScreen(
         )
     }
 
-    // Re-import dialog: applies newly added account mappings retroactively (merge duplicates,
-    // import remaining rows, delete emptied import-created accounts).
+    // Re-import dialog: deletes what the file created and imports it again, so strategy and mapping
+    // changes apply retroactively.
     if (showReimportDialog && import != null) {
         ReimportDialog(
-            csvImport = import!!,
-            rows = rows,
-            csvImportRepository = csvImportRepository,
-            csvImportStrategyRepository = csvImportStrategyRepository,
-            accountMappingRepository = accountMappingRepository,
-            accountRepository = accountRepository,
-            accountAttributeRepository = accountAttributeRepository,
-            categoryRepository = categoryRepository,
-            currencyRepository = currencyRepository,
-            personRepository = personRepository,
-            passThroughAccountRepository = passThroughAccountRepository,
-            transactionRepository = transactionRepository,
-            transferRelationshipRepository = transferRelationshipRepository,
-            transferSourceRepository = transferSourceRepository,
-            cryptoRepository = cryptoRepository,
-            tradeRepository = tradeRepository,
-            maintenance = maintenance,
-            importEngine = importEngine,
+            file = StagedFile.Csv(import!!),
+            reimports = reimports,
+            pickers = ReimportPickerRepositories(accountRepository, categoryRepository, currencyRepository, personRepository),
             onDismiss = { showReimportDialog = false },
             onComplete = { result ->
                 showReimportDialog = false
-                importSuccessMessage =
-                    buildString {
-                        append("Re-import complete: ")
-                        append("${result.mergedAccounts.size} account(s) merged")
-                        val moved = result.mergedAccounts.sumOf { it.transferCount }
-                        if (moved > 0) append(" ($moved transaction(s) moved)")
-                        if (result.rewrittenRows.isNotEmpty()) {
-                            append(", ${result.rewrittenRows.size} row(s) rerouted through pass-through accounts")
-                        }
-                        if (result.updatedRows.isNotEmpty()) {
-                            append(", ${result.updatedRows.size} transaction(s) updated to new values")
-                        }
-                        if (result.convertedRows.isNotEmpty()) {
-                            append(", ${result.convertedRows.size} transfer(s) converted to trades")
-                        }
-                        if (result.duplicateTradeRows.isNotEmpty()) {
-                            append(", ${result.duplicateTradeRows.size} duplicate conversion(s) removed")
-                        }
-                        if (result.counterpartyReconciledRows.isNotEmpty()) {
-                            append(", ${result.counterpartyReconciledRows.size} row(s) rebooked onto their real counterparty")
-                        }
-                        result.importResult?.let { append(", ${it.successCount} row(s) imported") }
-                        if (result.deletedEmptyAccounts.isNotEmpty()) {
-                            append(", ${result.deletedEmptyAccounts.size} empty account(s) deleted")
-                        }
-                    }
+                val imported = result.rerun
+                importSuccessMessage = result.toSummary(imported?.successCount ?: 0)
                 importFailedRows =
-                    result.skipped.map { skip -> "${skip.accountName}: ${skip.detail}" } +
-                    result.importResult?.failedRows.orEmpty().map { failed ->
+                    result.unmatchedEdits.map { edit -> "Manual edit not re-applied: ${edit.imported.description}" } +
+                    imported?.failedRows.orEmpty().map { failed ->
                         "Row ${failed.rowIndex}: ${failed.errorMessage}"
                     }
                 failedRowIndexes =
-                    result.importResult
+                    imported
                         ?.failedRows
                         .orEmpty()
                         .map { it.rowIndex }
