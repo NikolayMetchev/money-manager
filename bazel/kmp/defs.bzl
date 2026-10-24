@@ -82,6 +82,14 @@ def _on(platform, labels):
             out.append(target)
     return out
 
+def _is_library(dep):
+    """A Maven library (`@maven_kmp//:…`, or `//bazel/kmp/deps`'s), not a module."""
+    return dep.startswith("@") or dep.startswith("//bazel/kmp/deps")
+
+def _on_ide_native(labels):
+    """`_on` for `:<name>_ide_native`: a module's IDE target, but a library's JVM jar."""
+    return _on("jvm", [d for d in labels if _is_library(d)]) + _on("ide_native", [d for d in labels if not _is_library(d)])
+
 def _resource_jars(name, kind, resources):
     """`resources` as a jar, the JVM compilation's source sets' `resources` dirs merged, the leaf winning."""
     if not resources:
@@ -139,6 +147,43 @@ def _module_name(native_targets, jvm):
     if not jvm:
         return base
     return "%s_%s" % (package.replace("/", "."), package.replace("/", "-") if native_targets else base)
+
+def _ide_native(name, common_srcs, non_jvm_srcs, native_srcs, linux_srcs, deps, native_deps, exports, cinterops,
+                sqldelight, module_name, plugins, visibility):
+    """`:<name>_ide_native`: a JVM compile of `commonMain ← nonJvmMain ← nativeMain ← linuxMain`, only so the
+    JetBrains Bazel plugin has a module that owns the native sources (it reads `KtJvmInfo`, not our klibs; see
+    docs/bazel/ide-evaluation.md). It is analysed against the JVM stdlib, so `kotlinx.cinterop` and `platform.*`
+    stay red, and appleMain/mingwMain still belong to no module. It depends on its modules' own IDE targets, so a
+    nativeMain declaration another module's nativeMain uses resolves; a module without native sources aliases
+    its `_jvm`. A Maven library only the native source sets use has no JVM jar, so it is left out. Manual: nothing
+    builds it, and much of it wouldn't compile."""
+    if not (non_jvm_srcs or native_srcs or linux_srcs):
+        native.alias(
+            name = name + "_ide_native",
+            actual = ":" + name + "_jvm",
+            tags = ["manual"],
+            visibility = visibility,
+        )
+        return
+    fragments = _fragments([
+        ("commonMain", common_srcs, True),
+        ("nonJvmMain", non_jvm_srcs, False),
+        ("nativeMain", native_srcs, False),
+        ("linuxMain", linux_srcs, True),
+    ])
+    own = [":%s_sqldelight_jvm" % name] if sqldelight else []
+    kt_jvm_library(
+        name = name + "_ide_native",
+        srcs = fragments.srcs,
+        fragment_srcs = fragments.fragment_srcs,
+        fragment_refines = fragments.fragment_refines,
+        deps = _on_ide_native(deps + exports + [d for d in native_deps if not _is_library(d) and d not in cinterops]) + own,
+        exports = _on_ide_native(exports) + own,
+        module_name = module_name,
+        plugins = plugin_labels(plugins, "jvm"),
+        tags = ["manual"],
+        visibility = visibility,
+    )
 
 def kmp_library(
         name,
@@ -347,6 +392,9 @@ def kmp_library(
         )
         if fragments.srcs:
             _unused_deps(name, name + "_jvm", declared, keep_deps)
+    if jvm and native_targets:
+        _ide_native(name, common_srcs, non_jvm_srcs, native_srcs, linux_srcs, deps, non_jvm_deps + native_deps + linux_deps,
+                    exports, cinterops, sqldelight, module_name, plugins, visibility)
     if android:
         android_fragments = _jvm_fragments("Main", common_srcs, jvm_android_srcs, android_srcs, "android")
         kt_jvm_library(
