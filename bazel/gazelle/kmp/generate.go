@@ -147,13 +147,21 @@ func scanFile(file, platform string, s *scanned) {
 func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResult {
 	kc := getConfig(args.Config)
 	var res language.GenerateResult
+	// The root is visited last, whatever its kmp_generate, so every module is recorded by then.
+	if args.Rel == "" {
+		if modules := allModuleInfos(); len(modules) > 0 {
+			r := rule.NewRule("kmp_modules", "modules")
+			r.SetAttr("modules", modules)
+			r.SetAttr("visibility", []string{"//visibility:public"})
+			res.Gen = append(res.Gen, r)
+			res.Imports = append(res.Imports, imports{})
+		}
+		return res
+	}
 	if !kc.generate {
 		return res
 	}
 	name := path.Base(args.Rel)
-	if args.Rel == "" {
-		return res
-	}
 
 	sets := mainSets
 	if !kc.android {
@@ -246,6 +254,7 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 		res.Imports = append(res.Imports, imports{})
 	}
 	lib.SetPrivateAttr(packagesKey, ownPackages)
+	recordModuleInfo(args.Rel, name)
 	res.Gen = append(res.Gen, lib)
 	res.Imports = append(res.Imports, imports{byPlatform: keys(main.imports), keep: kc.kept(false), packages: ownPackages, leaves: leaves{android: kc.android, native: kc.targets, web: kc.web}})
 
@@ -325,6 +334,7 @@ func (*kmpLang) GenerateRules(args language.GenerateArgs) language.GenerateResul
 			t.SetAttr("keep_deps", kept)
 		}
 		res.Gen = append(res.Gen, t)
+		recordModuleInfo(args.Rel, "test")
 		testLeaves := leaves{android: hostTests}
 		if runsOn(testSetsPresent, nativeSets) {
 			testLeaves.native = kc.targets

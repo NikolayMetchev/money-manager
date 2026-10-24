@@ -369,7 +369,9 @@ it is relative, so it runs under any prefix.
   write into the workspace (`BUILD_WORKSPACE_DIRECTORY`).
 - **Pages** (`pages/`): `//webpage:site` is the artifact `static.yml` uploads: `webpage/*.html` with SchemaSpy's
   schema docs (`database/`; its action runs locally, since it needs the host's Graphviz), the strategy catalog,
-  `kdoc/` and the browser app (`app/`, `//app/main/web:dist`). `modules-graph.md` is written from `bazel query` (`pages/module_graph.py`).
+  `kdoc/` and the browser app (`app/`, `//app/main/web:dist`). `modules-graph.md` (`//webpage:modules-graph`, `module_graph`) is every module's
+  dependencies, labelled by the Gradle configuration declaring them: each `kmp_library` and `kmp_test` emits
+  `:<name>_module` (`kmp/module_info.bzl`) with its deps as written, and Gazelle lists them all in `//:modules`.
 - **KDoc** (`kmp/dokka`): every `kmp_library` has a manual `:<name>_dokka`, and `//webpage:kdoc` aggregates the
   modules `webpage/kdoc_modules.bzl` lists (no schemaspy, `app/main/*`, `test/*` or `tools/*`), so a new module joins
   there. The Kotlin analysis goes on Dokka's plugins classpath beside dokka-base (it reads enum members' docs from
