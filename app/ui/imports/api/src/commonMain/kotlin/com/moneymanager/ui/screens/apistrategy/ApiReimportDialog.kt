@@ -115,17 +115,19 @@ fun ApiReimportDialog(
                     scope.launch {
                         try {
                             val result =
-                                executeApiReimport(
-                                    plan = currentPlan,
-                                    session = session,
-                                    strategy = strategy,
-                                    apiReads = apiReads,
-                                    reads = reimports.reads,
-                                    maintenance = maintenance,
-                                    importEngine = importEngine,
-                                    rerunAffected = reimports,
-                                    onProgress = { executeProgress = it },
-                                )
+                                reimports.exclusively {
+                                    executeApiReimport(
+                                        plan = currentPlan,
+                                        session = session,
+                                        strategy = strategy,
+                                        apiReads = apiReads,
+                                        reads = reimports.reads,
+                                        maintenance = maintenance,
+                                        importEngine = importEngine,
+                                        rerunAffected = reimports,
+                                        onProgress = { executeProgress = it },
+                                    )
+                                }
                             onComplete(result)
                         } catch (expected: CancellationException) {
                             throw expected

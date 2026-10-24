@@ -43,6 +43,8 @@ import com.moneymanager.importengineapi.planSourceRerun
 import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 private val logger = Logger.withTag("Reimports")
 
@@ -124,6 +126,8 @@ data class StagedRunResult(
  * deleted and its records run through the normal import again, with the strategy, account and currency
  * it was imported with ([executeSourceRerun]). Also the [AffectedRecordsRerunner] every re-import (API
  * sessions included) hands the other files' records to that were matched against a deleted transaction.
+ * Each re-import holds [writeLock], the session's write lock, throughout: its delete, import, re-runs
+ * and edits are separate writes, and an import between them would dedupe against a half-done state.
  */
 @Suppress("LongParameterList", "TooManyFunctions")
 class Reimports(
@@ -136,7 +140,11 @@ class Reimports(
     private val passThroughAccountRepository: PassThroughAccountReadRepository,
     private val maintenance: Maintenance,
     private val importEngine: ImportEngine,
+    private val writeLock: Mutex = Mutex(),
 ) : AffectedRecordsRerunner {
+    /** Runs [block] holding the session's write lock, for the re-imports that run outside this class (API sessions). */
+    suspend fun <T> exclusively(block: suspend () -> T): T = writeLock.withLock { block() }
+
     /** Plans re-importing [file]: what it created, the other files matched against that, and its hand edits. */
     suspend fun plan(file: StagedFile): FileReimportPlan {
         val loaded = file.reloaded()
@@ -158,6 +166,14 @@ class Reimports(
         currencyId: CurrencyId?,
         onProgress: (suspend (Progress) -> Unit)? = null,
         refreshViews: Boolean = true,
+    ): SourceRerunResult<StagedRunResult?> = writeLock.withLock { rerunFile(plan, accountId, currencyId, onProgress, refreshViews) }
+
+    private suspend fun rerunFile(
+        plan: FileReimportPlan,
+        accountId: AccountId?,
+        currencyId: CurrencyId?,
+        onProgress: (suspend (Progress) -> Unit)?,
+        refreshViews: Boolean,
     ): SourceRerunResult<StagedRunResult?> {
         val strategy = requireNotNull(plan.strategy) { "No strategy matches ${plan.file.name}" }
         val settings =
@@ -192,6 +208,13 @@ class Reimports(
      * [accountId] and [currencyId] are for the files whose own transactions don't say.
      */
     suspend fun reimportAll(
+        plan: ReimportAllPlan,
+        accountId: AccountId?,
+        currencyId: CurrencyId?,
+        onProgress: suspend (Progress) -> Unit,
+    ): BulkReimportResult = writeLock.withLock { reimportAllLocked(plan, accountId, currencyId, onProgress) }
+
+    private suspend fun reimportAllLocked(
         plan: ReimportAllPlan,
         accountId: AccountId?,
         currencyId: CurrencyId?,
@@ -231,7 +254,7 @@ class Reimports(
                 else -> {
                     val filePlan =
                         FileReimportPlan(file, strategy, plan.imported.getValue(file.source), rerunPlan(file))
-                    val result = reimport(filePlan, accountId, currencyId, onFileProgress, refreshViews = false)
+                    val result = rerunFile(filePlan, accountId, currencyId, onFileProgress, refreshViews = false)
                     BulkReimportFileOutcome.Reimported(
                         result = result,
                         successCount = result.rerun?.successCount ?: 0,
@@ -242,7 +265,7 @@ class Reimports(
         }
 
     /** Re-runs the reset records of the files in [affected], each as it was imported. */
-    override suspend fun prepare(affected: AffectedRecords): suspend (onProgress: (suspend (Progress) -> Unit)?) -> Unit {
+    override suspend fun prepare(affected: AffectedRecords): suspend (onProgress: (suspend (Progress) -> Unit)?) -> AffectedRecords {
         val files =
             affected.csvRows.keys.mapNotNull { id ->
                 reads.csvImportRepository
@@ -262,22 +285,33 @@ class Reimports(
         return { onProgress ->
             val strategies = csvImportStrategyRepository.getAllStrategies().first()
             val currencies = currencies()
+            val notRerun = mutableSetOf<Source>()
             files.forEach { file ->
                 // One file failing leaves its reset records to its next import rather than failing the
                 // re-import that reset them, whose own work is already done.
                 try {
-                    val strategy = strategyFor(file, strategies) ?: return@forEach
+                    val strategy = strategyFor(file, strategies)
                     val fileSettings = settings.getValue(file.source)
                     // Without the account or currency nobody is asked here, so the records wait for the file's next import.
-                    if (strategy.needsSourceAccountOverride() && fileSettings.accountId == null) return@forEach
-                    if (strategy.needsCurrencyOverride() && fileSettings.currencyId == null) return@forEach
-                    runStaged(file, strategy, fileSettings, currencies, onProgress)
+                    if (strategy == null ||
+                        (strategy.needsSourceAccountOverride() && fileSettings.accountId == null) ||
+                        (strategy.needsCurrencyOverride() && fileSettings.currencyId == null)
+                    ) {
+                        notRerun += file.source
+                    } else {
+                        runStaged(file, strategy, fileSettings, currencies, onProgress)
+                    }
                 } catch (expected: CancellationException) {
                     throw expected
                 } catch (expected: Exception) {
                     logger.e(expected) { "Re-running the records of ${file.name} matched against a re-imported transaction failed" }
+                    notRerun += file.source
                 }
             }
+            AffectedRecords(
+                csvRows = affected.csvRows.filterKeys { Source.Csv(it) in notRerun },
+                qifRecords = affected.qifRecords.filterKeys { Source.Qif(it) in notRerun },
+            )
         }
     }
 

@@ -132,6 +132,7 @@ class ImportDirectoryService(
             passThroughAccountRepository = passThroughAccountRepository,
             maintenance = maintenance,
             importEngine = importEngine,
+            writeLock = writeLock,
         )
 
     /** Whether [directory] can be downloaded here: there is file access, and a LOCAL folder belongs to this device. */

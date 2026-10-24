@@ -198,7 +198,7 @@ class ReimportDialogsTest {
             }
 
             waitUntilAtLeastOneExists(hasText("Manual edits to re-apply (1):"), timeoutMillis = 15_000)
-            onNodeWithText("Re-import 1 files").performClick()
+            onNodeWithText("Re-import 1 file").performClick()
 
             waitUntilAtLeastOneExists(hasText("Manual edits not re-applied (1):"), timeoutMillis = 15_000)
             onNodeWithText("Flat white", substring = true).assertExists()

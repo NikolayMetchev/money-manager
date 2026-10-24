@@ -108,8 +108,14 @@ fun CardLast4Screen(
                 )
                 reimportFiles(reference.imports)
             }.onSuccess { result ->
-                error = null
-                message = "Assigned ${reference.value}. ${result.toSummary()}."
+                // The assigned card leaves this list, so a file that failed can only be retried from its import screen.
+                if (result.filesFailed > 0) {
+                    message = null
+                    error = "Assigned ${reference.value}, but ${result.filesFailed} file(s) failed to re-import. ${result.toSummary()}."
+                } else {
+                    error = null
+                    message = "Assigned ${reference.value}. ${result.toSummary()}."
+                }
             }.onFailure { error = "Assigning ${reference.value} failed: ${it.message}" }
             busyValue = null
         }

@@ -207,12 +207,20 @@ fun ReimportAllDialog(
     var isRunning by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<Progress?>(null) }
     var result by remember { mutableStateOf<BulkReimportResult?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     var plan by remember { mutableStateOf<ReimportAllPlan?>(null) }
     // A run changes the file list it was planned from; re-planning then would only replace the plan it ran.
     LaunchedEffect(files) {
         if (isRunning || result != null) return@LaunchedEffect
-        plan = reimports.planAll(files)
+        try {
+            plan = reimports.planAll(files)
+        } catch (expected: CancellationException) {
+            throw expected
+        } catch (expected: Exception) {
+            logger.e(expected) { "Re-import all preview failed: ${expected.message}" }
+            errorMessage = "Failed to prepare re-import: ${expected.message}"
+        }
     }
     val ready = plan?.let { (!it.needsAccount || accountId != null) && (!it.needsCurrency || currencyId != null) } == true
 
@@ -221,14 +229,20 @@ fun ReimportAllDialog(
         completeTitle = "Re-import complete",
         result = result,
         isRunning = isRunning,
-        confirmLabel = "Re-import ${files.size} files",
+        confirmLabel = "Re-import ${files.size} file${if (files.size == 1) "" else "s"}",
         confirmEnabled = ready,
         onRun = {
             val planned = plan ?: return@BulkImportDialogScaffold
             isRunning = true
+            errorMessage = null
             scope.launch {
                 try {
                     result = reimports.reimportAll(planned, accountId, currencyId, onProgress = { progress = it })
+                } catch (expected: CancellationException) {
+                    throw expected
+                } catch (expected: Exception) {
+                    logger.e(expected) { "Re-import all failed: ${expected.message}" }
+                    errorMessage = "Re-import failed: ${expected.message}"
                 } finally {
                     isRunning = false
                 }
@@ -249,6 +263,7 @@ fun ReimportAllDialog(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(12.dp))
+        errorMessage?.let { Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         plan?.let { planned ->
             if (planned.skippedNoStrategy > 0) {
                 Text(

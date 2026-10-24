@@ -55,9 +55,10 @@ data class AffectedRecords(
 fun interface AffectedRecordsRerunner {
     /**
      * Called before the re-import deletes anything, while the records still point at what they matched
-     * (which is how a file's account is read); the returned function re-runs them after the re-import.
+     * (which is how a file's account is read); the returned function re-runs them after the re-import and
+     * returns the records it couldn't.
      */
-    suspend fun prepare(affected: AffectedRecords): suspend (onProgress: (suspend (Progress) -> Unit)?) -> Unit
+    suspend fun prepare(affected: AffectedRecords): suspend (onProgress: (suspend (Progress) -> Unit)?) -> AffectedRecords
 }
 
 /** The values of a transfer that a person can edit by hand. */
@@ -134,7 +135,13 @@ data class SourceRerunResult<R>(
     val deletedTrades: Int,
     /** Transfers from other sources the deleted ones had hidden as reconciled copies, shown again. */
     val unhiddenTransfers: Int,
+    /** Records of other files matched against a deleted transfer, reset and re-run. */
     val affected: AffectedRecords,
+    /**
+     * Records of other files the re-import reset but couldn't re-run (their file's account or currency is
+     * unknown, or its run failed). Import-all skips an applied file, so they wait for that file's re-import.
+     */
+    val notRerun: AffectedRecords,
     val reappliedEdits: List<ManualEdit>,
     /** Hand edits whose transfer the re-run didn't create again (its record is now a duplicate, or skipped). */
     val unmatchedEdits: List<ManualEdit>,
@@ -226,10 +233,21 @@ suspend fun <R> ImportEngine.executeSourceRerun(
     onProgress?.invoke(Progress("Re-importing"))
     val result = rerun()
 
-    if (rerunAffectedRecords != null) {
-        onProgress?.invoke(Progress("Re-linking other files"))
-        rerunAffectedRecords(onProgress)
-    }
+    val notRerun =
+        when {
+            !plan.affected.isEmpty && rerunAffectedRecords == null -> {
+                plan.affected
+            }
+
+            rerunAffectedRecords == null -> {
+                AffectedRecords()
+            }
+
+            else -> {
+                onProgress?.invoke(Progress("Re-linking other files"))
+                rerunAffectedRecords(onProgress)
+            }
+        }
 
     onProgress?.invoke(Progress("Re-applying manual edits"))
     val (reapplied, unmatched) = reapplyManualEdits(plan, reads)
@@ -253,7 +271,12 @@ suspend fun <R> ImportEngine.executeSourceRerun(
         deletedTransfers = plan.createdTransfers.size,
         deletedTrades = plan.tradeIds.size,
         unhiddenTransfers = unhideUpdates.size,
-        affected = plan.affected,
+        affected =
+            AffectedRecords(
+                csvRows = plan.affected.csvRows - notRerun.csvRows.keys,
+                qifRecords = plan.affected.qifRecords - notRerun.qifRecords.keys,
+            ),
+        notRerun = notRerun,
         reappliedEdits = reapplied,
         unmatchedEdits = unmatched,
         deletedEmptyAccounts = deletedEmptyAccounts,

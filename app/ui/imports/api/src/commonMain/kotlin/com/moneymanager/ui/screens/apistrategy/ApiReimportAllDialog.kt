@@ -67,16 +67,18 @@ fun ApiReimportAllDialog(
             scope.launch {
                 try {
                     result =
-                        bulkReimportApiSessions(
-                            credentialId = credentialId,
-                            strategy = strategy,
-                            apiReads = apiReads,
-                            reads = reimports.reads,
-                            maintenance = maintenance,
-                            importEngine = importEngine,
-                            rerunAffected = reimports,
-                            onProgress = { progress = it },
-                        )
+                        reimports.exclusively {
+                            bulkReimportApiSessions(
+                                credentialId = credentialId,
+                                strategy = strategy,
+                                apiReads = apiReads,
+                                reads = reimports.reads,
+                                maintenance = maintenance,
+                                importEngine = importEngine,
+                                rerunAffected = reimports,
+                                onProgress = { progress = it },
+                            )
+                        }
                 } catch (expected: CancellationException) {
                     throw expected
                 } catch (expected: Exception) {

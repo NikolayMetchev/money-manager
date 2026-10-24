@@ -203,6 +203,9 @@ fun SourceRerunResult<*>.toSummary(imported: Int): String =
         if (deletedTrades > 0) append(" and $deletedTrades trade${plural(deletedTrades)}")
         append(", $imported imported")
         if (!affected.isEmpty) append(", ${affected.count} row${plural(affected.count)} of other files re-run")
+        if (!notRerun.isEmpty) {
+            append(", ${notRerun.count} row${plural(notRerun.count)} of other files left for those files' own re-import")
+        }
         if (reappliedEdits.isNotEmpty()) append(", ${reappliedEdits.size} manual edit${plural(reappliedEdits.size)} re-applied")
         if (unmatchedEdits.isNotEmpty()) {
             append(", ${unmatchedEdits.size} manual edit${plural(unmatchedEdits.size)} not re-applied")

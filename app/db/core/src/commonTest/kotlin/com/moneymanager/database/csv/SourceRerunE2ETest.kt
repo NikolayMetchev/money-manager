@@ -233,6 +233,8 @@ class SourceRerunE2ETest : DbTest() {
             assertEquals(2, result.rerun?.successCount)
             assertEquals(listOf(edit), result.reappliedEdits)
             assertTrue(result.unmatchedEdits.isEmpty())
+            assertEquals(1, result.affected.count)
+            assertTrue(result.notRerun.isEmpty)
             val after = transfersOn(monzo)
             assertEquals(3, after.size, "the duplicate row matched the re-created transaction again: $after")
             val recreated = after.single { it.description == "Flat white" }
@@ -249,6 +251,31 @@ class SourceRerunE2ETest : DbTest() {
                     .single()
                     .description,
             )
+        }
+
+    @Test
+    fun reimport_reportsOtherFilesRowsItCannotRerun() =
+        runDbTest {
+            repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
+            val monzo = createMonzoAccount()
+            val first =
+                stage(
+                    "MonzoDataExport.csv",
+                    listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee"), row("tx_2", "Book Store", "-12.00", "Books")),
+                )
+            assertEquals(2, apply(first, monzo).transfersCreated)
+            // One duplicate row: its one transaction has two accounts, so the file's own account can't be read back.
+            val second = stage("MonzoDataExport-later.csv", listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee")))
+            assertEquals(1, apply(second, monzo).duplicatesSkipped)
+
+            val reimports = repositories.reimports(maintenance)
+            val result = reimports.reimport(reimports.plan(StagedFile.Csv(reload(first.id))), accountId = null, currencyId = null)
+
+            assertTrue(result.affected.isEmpty, "nothing is reported as re-run")
+            assertEquals(setOf(second.id), result.notRerun.csvRows.keys)
+            assertEquals(1, result.notRerun.count)
+            val secondRow = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0).first()
+            assertEquals(null, secondRow.transferId, "the row waits for its own file's re-import")
         }
 
     @Test
