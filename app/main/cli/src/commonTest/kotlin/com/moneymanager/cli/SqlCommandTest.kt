@@ -30,7 +30,7 @@ class SqlCommandTest {
 
     private fun withFixture(block: suspend (DbLocation) -> Unit): TestResult =
         runTest(timeout = 2.minutes) {
-            val db = cli.seedQueryFixture(installStrategies = false)
+            val db = cli.seedQueryFixture()
             try {
                 block(db)
             } finally {

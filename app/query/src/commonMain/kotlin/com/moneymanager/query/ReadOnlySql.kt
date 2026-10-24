@@ -18,7 +18,7 @@ data class SqlResultJson(
     val truncated: Boolean,
 )
 
-/** [sql] isn't one read-only statement, or SQLite rejected it; the message says why. */
+/** The SQL given isn't one read-only statement, or SQLite rejected it; the message says why. */
 class InvalidSqlException(
     message: String,
     cause: Throwable? = null,
