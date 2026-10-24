@@ -13,6 +13,7 @@ import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.importfilesource.di.createImportFileSourceFactory
 import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.googledrive.BrowserLauncher
+import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.tui.NotATerminalException
 import io.ktor.client.engine.HttpClientEngine
@@ -31,7 +32,7 @@ internal fun recorder(
 }
 
 /**
- * Test services: a test database manager, in-memory settings and vault, no cloud. Import directories read
+ * Test services: a test database manager, in-memory settings and vault, no cloud unless [remoteController]. Import directories read
  * real local folders; [httpEngine] answers API downloads.
  */
 internal class TestCli(
@@ -39,6 +40,7 @@ internal class TestCli(
     val localSettings: LocalSettings = InMemoryLocalSettings(),
     val vault: CredentialVault = inMemoryCredentialVault(),
     private val httpEngine: HttpClientEngine? = null,
+    private val remoteController: RemoteDatabaseController? = null,
 ) {
     private val platform =
         CliPlatform(
@@ -47,7 +49,7 @@ internal class TestCli(
                     databaseManager = databaseManager,
                     localSettings = localSettings,
                     credentialVault = vault,
-                    remoteController = null,
+                    remoteController = remoteController,
                     appVersion = AppVersion("9.9.9"),
                     importFileSources = fileSources(vault),
                     httpEngine = httpEngine,

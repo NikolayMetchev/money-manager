@@ -38,6 +38,7 @@ kmp_library(
 _RUNTIME = [
     ":jvm_jvm",
     "//app/main/cli:cli_jvm",
+    "//app/main/cli:mm_jvm_logging",
     "//bazel/kmp/deps:compose_desktop_current_os_jvm",
     "@maven_kmp//:log4j_core_jvm",
     "@maven_kmp//:log4j_slf4j2_impl_jvm",

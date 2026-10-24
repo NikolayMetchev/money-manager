@@ -137,6 +137,22 @@ Dates:
 | `trackedFiles`, `importedFiles` | files downloaded so far, and how many of those were imported |
 | `lastImportedAt` | instant of the latest import, or `null` |
 
+### `sql [SQL] [--limit N]`
+
+Runs one read-only statement (`SELECT`, `WITH … SELECT` or `VALUES`); with no `SQL`, or `-`, it is read from stdin.
+Anything else, a second statement, or SQL that SQLite rejects exits 2 with SQLite's message.
+
+`data`: `{ columns, rows, truncated }`.
+
+| Field | |
+|---|---|
+| `columns` | the result's column names, in order; a repeated name gets a suffix (`a`, `a:1`) |
+| `rows` | one array per row, values in column order: integers as exact JSON numbers, reals as numbers, text as strings, blobs as upper-case hex strings, `NULL` as `null` |
+| `truncated` | `true` when there were more than `--limit` rows (default 1000; `--limit 0` returns them all) |
+
+The values are the database's own, so amounts are scaled integers (divide by the asset's `scale_factor`: 10^18 for
+every asset the app creates) and times are what the schema stores. The schema isn't part of this contract: it can change with any release.
+
 ### `import dirs [--dir NAME]… [--download-only] [--redownload]`, `import apis [--strategy NAME]… [--force-full] [--download-only]`, `import all [--force-full] [--download-only]`
 
 These commands download and import. `import dirs` downloads every included import directory (local and Google

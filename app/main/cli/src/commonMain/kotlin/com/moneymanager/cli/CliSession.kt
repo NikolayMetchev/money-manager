@@ -46,22 +46,34 @@ internal class CliSession(
     private val sessions =
         DatabaseSessions(services.databaseManager, services.localSettings, services.credentialVault, controller)
 
-    suspend fun <T> run(block: suspend (DatabaseSession) -> T): T =
+    /** True when [openStartup] had no local copy and restored one from the encrypted cloud archive. */
+    private var restoredAtStartup = false
+
+    /**
+     * Opens the startup database, runs [block] on it and closes it. With [dropRestoredCopy], a copy restored from
+     * the cloud just for this run is deleted again on close (unless `--keep-local`), so a read leaves only the
+     * encrypted archive behind, as it found it.
+     */
+    suspend fun <T> run(
+        dropRestoredCopy: Boolean = false,
+        block: suspend (DatabaseSession) -> T,
+    ): T =
         coroutineScope {
             val unlocker = launch { answerVaultRequests() }
             try {
                 val session =
                     openStartup()
                         ?: usage("No database to open: pass --db <path>, or open one in the desktop app first")
+                val keepLocalDefault = if (dropRestoredCopy && restoredAtStartup) false else null
                 var succeeded = false
                 try {
                     val result = block(session)
                     succeeded = true
-                    close(session)
+                    close(session, keepLocalDefault)
                     result
                 } finally {
                     // The command's own failure wins, but still close as the person asks, so local changes stay safe.
-                    if (!succeeded) runCatching { close(session) }
+                    if (!succeeded) runCatching { close(session, keepLocalDefault) }
                 }
             } finally {
                 unlocker.cancel()
@@ -96,6 +108,7 @@ internal class CliSession(
                                 "(set ${Console.REMOTE_PASSWORD_ENV} or run in a terminal)",
                         )
                 prepare(sessions.restoreRemote(target.binding, password), restored = true)
+                    .also { restoredAtStartup = true }
             }
 
             StartupTarget.ChooseDatabase -> {
@@ -166,8 +179,14 @@ internal class CliSession(
 
     private fun cloudBinding(session: DatabaseSession): RemoteDatabaseBinding? = controller?.bindingFor(session.location)
 
-    /** Closes [session], asking (or following `--push`/`--keep-local`) whether to upload a changed cloud-backed copy. */
-    suspend fun close(session: DatabaseSession) {
+    /**
+     * Closes [session], asking (or following `--push`/`--keep-local`) whether to upload a changed cloud-backed copy.
+     * [keepLocalDefault] answers "keep the local copy" instead of asking, when `--keep-local`/`--drop-local` don't.
+     */
+    suspend fun close(
+        session: DatabaseSession,
+        keepLocalDefault: Boolean? = null,
+    ) {
         val controller = controller
         val decision = if (controller != null && cloudBinding(session) != null) controller.closeDecision(session.database) else null
         if (controller == null || decision == null) {
@@ -178,7 +197,10 @@ internal class CliSession(
         // leaves an unchanged copy, and asking every time would make `mm` unusable in a loop.
         val ask = prompter.interactive && decision.localChanged
         val upload = options.push ?: (ask && prompter.confirm("Upload the changes to ${decision.remoteName}", default = true))
-        val keepLocal = options.keepLocal ?: (!ask || prompter.confirm("Keep the local copy on this device", default = true))
+        val keepLocal =
+            options.keepLocal
+                ?: keepLocalDefault
+                ?: (!ask || prompter.confirm("Keep the local copy on this device", default = true))
         val password = if (upload && decision.needsPassword) remotePassword(decision.remoteName) else null
         val outcome =
             controller.performClose(session.database, upload, keepLocal, password, decision.localChanged)

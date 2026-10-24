@@ -528,6 +528,10 @@ stdout carries only the result: prompts, warnings and errors go to stderr, and I
   print. Filtering and resolution live in `app/query`. Every command's JSON is `{"schemaVersion":1,"data":…}` (plus
   `nextCursor` on a paged result), documented in `docs/cli-json.md`. Renaming or removing a field bumps `Envelope.SCHEMA_VERSION`.
   The golden tests (`QueryGoldens.kt`) guard the contract. Unknown or ambiguous names exit 2 with a message listing the candidates.
+- **`sql`** runs one read-only statement through `runReadOnlySql` (`app/query`): the statement becomes a `TEMP VIEW`
+  (SQLite's grammar only takes a select there, and the view gives the column names SQLDelight's cursor lacks) inside a
+  transaction that is always rolled back; `singleStatement` refuses a second statement. It opens with
+  `withSession(dropRestoredCopy = true)`, so a cloud database restored only for the query is deleted again on close.
 - **Import commands** (`import dirs|apis|all`, `ImportRun`) resolve the names they're given, then run
   `SessionImports.run` (`app/session`), which the TUI's Imports tab runs too: `ImportDirectoryService.importAll` and
   `ApiImportService.downloadAndImportAll`, the same services the desktop screens use, built with one shared session

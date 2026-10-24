@@ -45,8 +45,14 @@ internal class CliRuntime(
 ) {
     val services: CliServices by lazy(servicesFactory)
 
-    /** Runs [block] on the open database, then closes it (asking about a cloud upload when it changed). */
-    suspend fun <T> withSession(block: suspend (DatabaseSession) -> T): T = session().run(block)
+    /**
+     * Runs [block] on the open database, then closes it (asking about a cloud upload when it changed). A read-only
+     * command passes [dropRestoredCopy], so a cloud database it had to restore goes back to being only the archive.
+     */
+    suspend fun <T> withSession(
+        dropRestoredCopy: Boolean = false,
+        block: suspend (DatabaseSession) -> T,
+    ): T = session().run(dropRestoredCopy, block)
 
     /** How this run opens and closes databases, asking its questions through [prompter]. */
     fun session(prompter: Prompter = console): CliSession = CliSession(services, console, sessionOptions, prompter)
@@ -93,6 +99,7 @@ internal class MmCommand(
             PeopleCommand(),
             StrategiesCommand(),
             ImportDirsCommand(),
+            SqlCommand(),
             ImportCommand(),
             TuiCommand(),
         )

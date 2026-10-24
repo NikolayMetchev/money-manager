@@ -20,7 +20,7 @@ while [ -h "$app_path" ]; do
     esac
 done
 APP_HOME=$(cd -P "${{app_path%/*}}/.." > /dev/null && pwd -P) || exit
-DEFAULT_JVM_OPTS={jvm_flags}
+DEFAULT_JVM_OPTS='{jvm_flags}'
 CLASSPATH={unix_classpath}
 if [ -n "$JAVA_HOME" ]; then
     JAVACMD=$JAVA_HOME/bin/java
@@ -57,6 +57,13 @@ def jar_name(jar):
     stem = jar.basename.removesuffix(".jar").removeprefix(leaf + "_").removeprefix(leaf)
     return package.replace("/", "-") + ("-" + stem.lstrip("_").replace("_", "-") if stem.lstrip("_") else "") + ".jar"
 
+def _checked_flag(ctx, flag):
+    # Both scripts word-split DEFAULT_JVM_OPTS, as Gradle's do, so a flag can't carry a space or a quote.
+    for c in [" ", "'", '"', "%"]:
+        if c in flag:
+            fail("%s: jvm_flags %r can't contain %r" % (ctx.label, flag, c))
+    return flag
+
 def _impl(ctx):
     jars = depset(transitive = [d[JavaInfo].transitive_runtime_jars for d in ctx.attr.deps]).to_list()
     outputs = []
@@ -75,7 +82,7 @@ def _impl(ctx):
         ctx.actions.symlink(output = out, target_file = jar)
         outputs.append(out)
     values = {
-        "jvm_flags": " ".join(ctx.attr.jvm_flags),
+        "jvm_flags": " ".join([_checked_flag(ctx, f) for f in ctx.attr.jvm_flags]),
         "main_class": ctx.attr.main_class,
         "name": ctx.label.name,
         "opts_var": ctx.label.name.upper().replace("-", "_") + "_OPTS",

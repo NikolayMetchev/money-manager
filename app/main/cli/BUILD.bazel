@@ -3,6 +3,7 @@
 # gazelle:kmp_plugins serialization
 # gazelle:kmp_keep_dep @maven_kmp//:mosaic_terminal jvmMain
 
+load("@rules_java//java:java_library.bzl", "java_library")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_native_executable", "kmp_test")
 load("//bazel/kmp:distribution.bzl", "jvm_distribution")
@@ -81,12 +82,14 @@ kmp_test(
         "//app/model/importdirectory",
         "//app/query",
         "//app/remotestorage/googledrive",
+        "//app/remotestorage/sync",
         "//app/session",
         "//app/tasks",
         "//app/terminal",
         "//app/tui",
         "//bazel/kmp/deps:kotlin_test",
         "//test/app/db",
+        "//test/app/remotestorage",
         "//test/utils/credentialvault",
         "//utils/credentialvault",
         "//utils/files",
@@ -127,12 +130,34 @@ kmp_native_executable(
     visibility = ["//app/main/jvm:__pkg__"],
 )
 
+# SLF4J's provider for mm on the JVM: libraries that log through SLF4J reach log4j, which
+# keeps them to errors on stderr (log4j2-mm.xml); without a provider SLF4J warns on every start. mm's own logs
+# go through Kermit. The desktop installer's mm-jvm launcher carries it too.
+java_library(
+    name = "mm_jvm_logging",
+    resource_strip_prefix = "app/main/cli",
+    resources = ["log4j2-mm.xml"],
+    visibility = ["//app/main/jvm:__pkg__"],
+    runtime_deps = [
+        "@maven_kmp//:log4j_core_jvm",
+        "@maven_kmp//:log4j_slf4j2_impl_jvm",
+    ],
+)
+
 # `mm-jvm`: the CLI on the JVM, laid out as Gradle's `installDist` (bin/ scripts, lib/ jars); the desktop
-# installer bundles it.
+# installer bundles it, with the same options (app/main/jvm/mm-jvm.properties).
 jvm_distribution(
     name = "mm-jvm",
+    jvm_flags = [
+        # Mordant reads the terminal through JNA, which the JDK otherwise warns about on every start.
+        "--enable-native-access=ALL-UNNAMED",
+        "-Dlog4j2.configurationFile=classpath:log4j2-mm.xml",
+    ],
     main_class = "com.moneymanager.cli.MainKt",
-    deps = [":cli_jvm"],
+    deps = [
+        ":cli_jvm",
+        ":mm_jvm_logging",
+    ],
 )
 
 pkg_tar(
