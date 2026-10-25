@@ -39,6 +39,11 @@ poll loop and a completion notification rather than blocking; CI takes 10–25 m
     tests used to render. Don't lower the target or add a threshold.
   - `//app/ui/core:test_jvm` ComposeTimeoutException under load is flaky — re-run before investigating.
 - Repeat until every required check is green.
+- Then fix the failing non-required checks too (Qodana and anything else not in `CI Passed`) where the fix is
+  in reach: fix real findings in code, and add a verified false positive to the exclusions its tool keeps
+  (Qodana's `qodana.yaml`, under the defect number that explains it) rather than leaving the check red. Leave
+  one red only when fixing it is out of the PR's reach (an outage, a check broken on `main` too), and say so
+  in the final report.
 
 ## Phase 3 — Ready for review
 
@@ -72,6 +77,6 @@ phase (cap at 3 rounds; after that summarise what's still open instead of loopin
 
 ## Phase 6 — Final green
 
-Poll checks as in Phase 2 until the final push is fully green (same flake handling). Then report:
+Poll checks as in Phase 2 until the final push is fully green, non-required checks included (same flake and fix handling). Then report:
 PR URL, checks status, how many CodeRabbit comments were fixed vs replied-to, and anything left
 open for the user.
