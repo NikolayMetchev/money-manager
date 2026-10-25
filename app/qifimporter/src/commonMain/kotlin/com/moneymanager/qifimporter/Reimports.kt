@@ -17,6 +17,8 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.TransferField
@@ -43,9 +45,13 @@ import com.moneymanager.importengineapi.planSourceRerun
 import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 private val logger = Logger.withTag("Reimports")
 
@@ -213,33 +219,57 @@ class Reimports(
     ): ReimportAllPlan {
         val progress = PhasedProgress(onProgress)
         val strategies = csvImportStrategyRepository.getAllStrategies().first()
-        val loaded = mutableListOf<StagedFile>()
-        val imported = mutableMapOf<Source, ImportedSettings>()
-        val manualEdits = mutableListOf<ManualEdit>()
-        files.forEachIndexed { index, file ->
-            val base = index.toFloat() / files.size
-            val span = 1f / files.size
-            val prefix = "File ${index + 1} of ${files.size}: ${file.name}"
-            progress.emit(base = base, detail = "$prefix — $READING_IMPORT_SETTINGS")
-            val reloaded = file.reloaded().also(loaded::add)
-            imported[reloaded.source] = importedSettings(reloaded.source)
-            manualEdits +=
-                manualEditsOf(reloaded.source, reads) { inner ->
-                    progress.emit(
-                        base = base,
-                        span = span,
-                        detail = "$prefix — ${inner.detail}",
-                        innerFraction = inner.fraction,
-                        processed = inner.processed,
-                        total = inner.total,
-                    )
-                }
-        }
+        val prefixes = files.mapIndexed { index, file -> "File ${index + 1} of ${files.size}: ${file.name}" }
+        // Each file is read once, all of them at once (reads don't block one another), off the caller's
+        // dispatcher (a dialog's is the UI thread); what spans them all (their transfers, the hand edits) is
+        // then loaded in one go.
+        val progressLock = Mutex()
+        var filesRead = 0
+        val fileReads =
+            withContext(Dispatchers.Default) {
+                files
+                    .map { file ->
+                        async {
+                            val reloaded = file.reloaded()
+                            val read =
+                                FileReads(
+                                    file = reloaded,
+                                    created = reads.transferSourceRepository.getTransfersCreatedBy(reloaded.source),
+                                    referenced = referencedTransferIds(reloaded.source),
+                                )
+                            // Files finish in any order, so the bar counts files read rather than following the list.
+                            progressLock.withLock {
+                                filesRead++
+                                progress.emit(
+                                    base = PLAN_ALL_READ_SPAN * filesRead / files.size,
+                                    detail = "File $filesRead of ${files.size}: ${file.name} — $READING_IMPORT_SETTINGS",
+                                )
+                            }
+                            read
+                        }
+                    }.awaitAll()
+            }
+        val loaded = fileReads.map { it.file }
+        val created = fileReads.associate { it.file.source to it.created }
+        val imported = importedSettingsOf(created, fileReads.associate { it.file.source to it.referenced })
+        val indexOf = loaded.withIndex().associate { (index, file) -> file.source to index }
+        val manualEdits =
+            manualEditsOf(created, reads) { source, inner ->
+                val index = indexOf.getValue(source)
+                progress.emit(
+                    base = PLAN_ALL_READ_SPAN + (1f - PLAN_ALL_READ_SPAN) * index / files.size,
+                    span = (1f - PLAN_ALL_READ_SPAN) / files.size,
+                    detail = "${prefixes[index]} — ${inner.detail}",
+                    innerFraction = inner.fraction,
+                    processed = inner.processed,
+                    total = inner.total,
+                )
+            }
         return ReimportAllPlan(
             files = loaded,
             strategies = loaded.associate { it.source to strategyFor(it, strategies) },
             imported = imported,
-            manualEdits = manualEdits,
+            manualEdits = manualEdits.values.flatten(),
         )
     }
 
@@ -321,7 +351,7 @@ class Reimports(
                 }
         // Read now: once the re-import resets these records, a file that only matched others' transactions
         // has nothing left to read its account from.
-        val settings = files.associate { it.source to importedSettings(it.source) }
+        val settings = importedSettingsOf(files.map { it.source })
         return { onProgress ->
             val strategies = csvImportStrategyRepository.getAllStrategies().first()
             val currencies = currencies()
@@ -359,30 +389,49 @@ class Reimports(
      * Reads the account and currency [source] was imported with; see [ImportedSettings]. Rows that matched
      * another file's transaction as duplicates count too, so a file that created nothing still knows them.
      */
-    suspend fun importedSettings(source: Source): ImportedSettings {
-        val referenced =
-            when (source) {
-                is Source.Csv -> {
-                    reads.csvImportRepository.getImportRows(source.importId, limit = Int.MAX_VALUE, offset = 0).mapNotNull { it.transferId }
-                }
+    suspend fun importedSettings(source: Source): ImportedSettings = importedSettingsOf(listOf(source)).getValue(source)
 
-                is Source.Qif -> {
-                    reads.qifImportRepository
-                        .getImportRecords(
-                            source.importId,
-                            limit = Int.MAX_VALUE,
-                            offset = 0,
-                        ).mapNotNull { it.transferId }
-                }
+    private suspend fun importedSettingsOf(sources: List<Source>): Map<Source, ImportedSettings> =
+        importedSettingsOf(
+            created = sources.associateWith { reads.transferSourceRepository.getTransfersCreatedBy(it) },
+            referenced = sources.associateWith { referencedTransferIds(it) },
+        )
 
-                else -> {
-                    emptyList()
-                }
+    /**
+     * [importedSettings] for each source of [created] (the transfers it created; [referenced], those its
+     * records point at). Their transfers are loaded together: one batched load, not one per file.
+     */
+    private suspend fun importedSettingsOf(
+        created: Map<Source, Map<TransferId, Source>>,
+        referenced: Map<Source, List<TransferId>>,
+    ): Map<Source, ImportedSettings> {
+        val ids = created.mapValues { (source, transfers) -> transfers.keys + referenced[source].orEmpty() }
+        val transfers = reads.transactionRepository.getTransactionsByIds(ids.values.flatten().toSet())
+        return ids.mapValues { (_, fileIds) -> settingsOf(fileIds.mapNotNull(transfers::get)) }
+    }
+
+    // The transfers a file's records point at, its duplicates of other files' transfers included.
+    private suspend fun referencedTransferIds(source: Source): List<TransferId> =
+        when (source) {
+            is Source.Csv -> {
+                reads.csvImportRepository.getImportRows(source.importId, limit = Int.MAX_VALUE, offset = 0).mapNotNull { it.transferId }
             }
-        val transfers =
-            reads.transactionRepository
-                .getTransactionsByIds(reads.transferSourceRepository.getTransfersCreatedBy(source).keys + referenced)
-                .values
+
+            is Source.Qif -> {
+                reads.qifImportRepository
+                    .getImportRecords(
+                        source.importId,
+                        limit = Int.MAX_VALUE,
+                        offset = 0,
+                    ).mapNotNull { it.transferId }
+            }
+
+            else -> {
+                emptyList()
+            }
+        }
+
+    private fun settingsOf(transfers: List<Transfer>): ImportedSettings {
         if (transfers.isEmpty()) return ImportedSettings(null, null)
         val sharedAccount =
             transfers
@@ -527,3 +576,13 @@ class Reimports(
 private const val READING_IMPORT_SETTINGS = "Reading import settings"
 private const val PLAN_LOAD_SPAN = 0.02f
 private const val PLAN_SETTINGS_END = 0.1f
+
+// Reading each file is nearly all of "re-import all" planning; its hand edits are the rest.
+private const val PLAN_ALL_READ_SPAN = 0.9f
+
+/** What "re-import all" planning reads from one [file]: the transfers it created and those its records point at. */
+private class FileReads(
+    val file: StagedFile,
+    val created: Map<TransferId, Source>,
+    val referenced: List<TransferId>,
+)
