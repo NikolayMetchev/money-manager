@@ -10,8 +10,7 @@ import java.lang.foreign.SymbolLookup
 internal object PdfiumLibrary {
     private const val RESOURCE_DIRECTORY = "pdfium"
 
-    fun load(): SymbolLookup {
-        val name = libraryName()
+    fun load(name: String = libraryName()): SymbolLookup {
         val bytes =
             resource(name)
                 ?: throw PdfUnsupportedPlatformException(

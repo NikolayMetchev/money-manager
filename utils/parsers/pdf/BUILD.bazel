@@ -252,6 +252,7 @@ kmp_test(
         "@maven_kmp//:kotlinx_coroutines_test",
     ],
     device_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
     keep_deps = ["@maven_kmp//:androidx_test_runner"],
     native_targets = [
         "linuxArm64",
