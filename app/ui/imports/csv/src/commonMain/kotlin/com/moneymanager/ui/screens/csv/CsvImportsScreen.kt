@@ -14,11 +14,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.compose.filepicker.BinaryFilePickerResult
 import com.moneymanager.compose.filepicker.rememberBinaryFilePicker
 import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
 import com.moneymanager.csv.CsvParseOptions
 import com.moneymanager.csv.CsvParser
 import com.moneymanager.csvimporter.sha256Hex
+import com.moneymanager.csvimporter.stagePdfImport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.csv.CsvImport
@@ -54,6 +56,7 @@ import com.moneymanager.xlsx.createXlsxParser
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 @Suppress("LongParameterList", "LongMethod")
 @Composable
@@ -134,40 +137,60 @@ fun CsvImportsScreen(
             }
         }
 
+    // Excel and PDF files are staged from their bytes; one picked file at a time, skipped if already imported.
+    fun stageBinaryFile(
+        result: BinaryFilePickerResult,
+        stage: suspend (checksum: String, lastModified: Instant) -> Unit,
+    ) {
+        isImporting = true
+        importMessage = null
+        scope.launch {
+            importMessageIsError = false
+            importMessage =
+                try {
+                    val checksum = sha256Hex(result.bytes)
+                    if (csvImportRepository.findImportsByChecksum(checksum).isNotEmpty()) {
+                        "Skipped ${result.fileName}: already imported"
+                    } else {
+                        stage(checksum, result.lastModified ?: Clock.System.now())
+                        "Imported ${result.fileName}"
+                    }
+                } catch (expected: Exception) {
+                    // Includes a platform with no PDF or Excel parsing, whose message says so.
+                    importMessageIsError = true
+                    "${result.fileName}: ${expected.message}"
+                }
+            isImporting = false
+        }
+    }
+
     val xlsxFilePicker =
         rememberBinaryFilePicker(
             mimeTypes = listOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
         ) { result ->
             if (result != null) {
-                isImporting = true
-                importMessage = null
-                scope.launch {
-                    importMessageIsError = false
-                    importMessage =
-                        try {
-                            val checksum = sha256Hex(result.bytes)
-                            if (csvImportRepository.findImportsByChecksum(checksum).isNotEmpty()) {
-                                "Skipped ${result.fileName}: already imported"
-                            } else {
-                                val parser = createXlsxParser()
-                                val sheetName = parser.sheetNames(result.bytes).firstOrNull() ?: ""
-                                val parsed = parser.parse(result.bytes, sheetName)
-                                importEngine.createXlsxImport(
-                                    fileName = result.fileName,
-                                    headers = parsed.headers,
-                                    rows = parsed.rows,
-                                    fileChecksum = checksum,
-                                    fileLastModified = result.lastModified ?: Clock.System.now(),
-                                    xlsxBytes = result.bytes,
-                                    xlsxWorksheetName = sheetName,
-                                )
-                                "Imported ${result.fileName}"
-                            }
-                        } catch (expected: Exception) {
-                            importMessageIsError = true
-                            "${result.fileName}: ${expected.message}"
-                        }
-                    isImporting = false
+                stageBinaryFile(result) { checksum, lastModified ->
+                    val parser = createXlsxParser()
+                    val sheetName = parser.sheetNames(result.bytes).firstOrNull() ?: ""
+                    val parsed = parser.parse(result.bytes, sheetName)
+                    importEngine.createXlsxImport(
+                        fileName = result.fileName,
+                        headers = parsed.headers,
+                        rows = parsed.rows,
+                        fileChecksum = checksum,
+                        fileLastModified = lastModified,
+                        xlsxBytes = result.bytes,
+                        xlsxWorksheetName = sheetName,
+                    )
+                }
+            }
+        }
+
+    val pdfFilePicker =
+        rememberBinaryFilePicker(mimeTypes = listOf("application/pdf")) { result ->
+            if (result != null) {
+                stageBinaryFile(result) { checksum, lastModified ->
+                    importEngine.stagePdfImport(result.fileName, result.bytes, checksum, lastModified)
                 }
             }
         }
@@ -190,6 +213,12 @@ fun CsvImportsScreen(
                 enabled = !isImporting,
             ) {
                 Text("+ Import Excel")
+            }
+            TextButton(
+                onClick = { pdfFilePicker.launch() },
+                enabled = !isImporting,
+            ) {
+                Text("+ Import PDF")
             }
         }
 
