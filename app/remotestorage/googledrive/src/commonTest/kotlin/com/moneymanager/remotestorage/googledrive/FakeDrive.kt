@@ -24,7 +24,7 @@ import kotlinx.serialization.json.put
 /**
  * An in-memory Google Drive behind a Ktor [MockEngine]: just enough of `files.list` (the `q` terms the app sends,
  * paged by [pageSize]), folder create, multipart upload/update, `alt=media` download, metadata get and delete for
- * [GoogleDriveProvider] and [DriveImportFileSource]. [failures] answers a path with a status before anything else.
+ * [GoogleDriveProvider] and [DriveImportFileSource]. [failures] answers a path with a status (and [failureBodies] its body) before anything else.
  */
 class FakeDrive(
     private val pageSize: Int = Int.MAX_VALUE,
@@ -48,6 +48,7 @@ class FakeDrive(
     val items = mutableListOf<Item>()
     val requests = mutableListOf<HttpRequestData>()
     val failures = mutableMapOf<String, HttpStatusCode>()
+    val failureBodies = mutableMapOf<String, String>()
     private var nextId = 1
 
     val tokenSource: GoogleAccessTokenSource =
@@ -106,7 +107,7 @@ class FakeDrive(
     private fun MockRequestHandleScope.handle(request: HttpRequestData): HttpResponseData {
         requests += request
         val path = request.url.encodedPath
-        failures[path]?.let { return respond("""{"error":"$it"}""", it) }
+        failures[path]?.let { return respond(failureBodies[path].orEmpty(), it) }
         val fileId = path.substringAfter("/files", "").removePrefix("/").ifEmpty { null }
         val upload = path.startsWith("/upload/")
         return when (request.method) {

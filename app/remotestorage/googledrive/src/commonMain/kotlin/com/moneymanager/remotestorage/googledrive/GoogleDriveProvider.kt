@@ -65,26 +65,18 @@ class GoogleDriveProvider(
     override suspend fun list(): List<RemoteFile> =
         withContext(ioDispatcher) {
             val driveQuery = "'${folderId()}' in parents and trashed = false"
-            val body =
-                httpClient
-                    .get(FILES_ENDPOINT) {
-                        url {
-                            parameters.append("q", driveQuery)
-                            parameters.append("spaces", "drive")
-                            parameters.append("fields", "files($FILE_FIELDS)")
-                        }
-                    }.requireBody("list Google Drive files")
-            json
-                .decodeFromString<DriveFileList>(body)
-                .files
-                .preferOwnFiles()
+            // Every page before preferOwnFiles(), or our copy could sit on a later page than the file it shadows.
+            fetchAllDrivePages(httpClient, driveQuery, "nextPageToken,files($FILE_FIELDS)", "list Google Drive files") { body ->
+                val page = json.decodeFromString<DriveFileList>(body)
+                page.files to page.nextPageToken
+            }.preferOwnFiles()
                 .map { it.toRemoteFile() }
         }
 
     override suspend fun stat(fileId: String): RemoteFile? =
         withContext(ioDispatcher) {
             val response =
-                httpClient.get("$FILES_ENDPOINT/$fileId") {
+                httpClient.get("$DRIVE_FILES_ENDPOINT/$fileId") {
                     url { parameters.append("fields", FILE_FIELDS) }
                 }
             if (!response.status.isSuccess()) return@withContext null
@@ -94,7 +86,7 @@ class GoogleDriveProvider(
     override suspend fun download(fileId: String): ByteArray =
         withContext(ioDispatcher) {
             val response =
-                httpClient.get("$FILES_ENDPOINT/$fileId") {
+                httpClient.get("$DRIVE_FILES_ENDPOINT/$fileId") {
                     url { parameters.append("alt", "media") }
                 }
             if (!response.status.isSuccess()) {
@@ -133,12 +125,12 @@ class GoogleDriveProvider(
             if (fileId != null && response.driveErrorReason() == APP_NOT_AUTHORIZED_TO_FILE) {
                 return@withContext upload(fileId = null, name = name, bytes = bytes)
             }
-            json.decodeFromString<DriveFile>(response.requireBody("upload to Google Drive")).toRemoteFile()
+            json.decodeFromString<DriveFile>(response.requireDriveBody("upload to Google Drive")).toRemoteFile()
         }
 
     override suspend fun delete(fileId: String) {
         withContext(ioDispatcher) {
-            val response = httpClient.delete("$FILES_ENDPOINT/$fileId")
+            val response = httpClient.delete("$DRIVE_FILES_ENDPOINT/$fileId")
             if (!response.status.isSuccess() && response.status.value != HTTP_NOT_FOUND) {
                 throw RemoteStorageException("Failed to delete $fileId from Google Drive (${response.status.value})")
             }
@@ -167,13 +159,13 @@ class GoogleDriveProvider(
         val driveQuery = "mimeType = '$FOLDER_MIME_TYPE' and name = '$name' and trashed = false$parentClause"
         val body =
             httpClient
-                .get(FILES_ENDPOINT) {
+                .get(DRIVE_FILES_ENDPOINT) {
                     url {
                         parameters.append("q", driveQuery)
                         parameters.append("spaces", "drive")
                         parameters.append("fields", "files(id)")
                     }
-                }.requireBody("find Drive folder")
+                }.requireDriveBody("find Drive folder")
         return json
             .decodeFromString<DriveFileList>(body)
             .files
@@ -193,30 +185,12 @@ class GoogleDriveProvider(
                 appProperties = APP_PROPERTIES,
             )
         val response =
-            httpClient.post(FILES_ENDPOINT) {
+            httpClient.post(DRIVE_FILES_ENDPOINT) {
                 url { parameters.append("fields", "id") }
                 contentType(Json)
                 setBody(json.encodeToString(metadata))
             }
-        return json.decodeFromString<DriveFile>(response.requireBody("create Drive folder")).id
-    }
-
-    private suspend fun HttpResponse.requireBody(action: String): String {
-        if (!status.isSuccess()) throw RemoteStorageException("Failed to $action (${status.value}${driveErrorSuffix()})")
-        return bodyAsText()
-    }
-
-    private suspend fun HttpResponse.driveError(): DriveError? =
-        if (status.isSuccess()) null else runCatching { json.decodeFromString<DriveErrorResponse>(bodyAsText()).error }.getOrNull()
-
-    private suspend fun HttpResponse.driveErrorReason(): String? = driveError()?.errors?.firstOrNull()?.reason
-
-    // Drive's status alone can't tell a permission refusal from a rate limit (both 403), so carry its reason.
-    private suspend fun HttpResponse.driveErrorSuffix(): String {
-        val error = driveError() ?: return ""
-        val reason = error.errors.firstOrNull()?.reason
-        val detail = listOfNotNull(reason, error.message).joinToString(": ")
-        return if (detail.isEmpty()) "" else ", $detail"
+        return json.decodeFromString<DriveFile>(response.requireDriveBody("create Drive folder")).id
     }
 
     /**
@@ -250,22 +224,7 @@ class GoogleDriveProvider(
     @Serializable
     private data class DriveFileList(
         val files: List<DriveFile> = emptyList(),
-    )
-
-    @Serializable
-    private data class DriveErrorResponse(
-        val error: DriveError,
-    )
-
-    @Serializable
-    private data class DriveError(
-        val message: String? = null,
-        val errors: List<DriveErrorDetail> = emptyList(),
-    )
-
-    @Serializable
-    private data class DriveErrorDetail(
-        val reason: String? = null,
+        val nextPageToken: String? = null,
     )
 
     /** Drive file metadata sent on create/update; null fields are omitted (encodeDefaults stays off). */
@@ -278,12 +237,10 @@ class GoogleDriveProvider(
     )
 
     private companion object {
-        const val FILES_ENDPOINT = "https://www.googleapis.com/drive/v3/files"
         const val UPLOAD_ENDPOINT = "https://www.googleapis.com/upload/drive/v3/files"
         const val APP_PROPERTY_KEY = "moneymanagerDb"
         const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
         const val FILE_FIELDS = "id,name,size,headRevisionId,appProperties"
-        const val APP_NOT_AUTHORIZED_TO_FILE = "appNotAuthorizedToFile"
         const val HTTP_NOT_FOUND = 404
         val APP_PROPERTIES = mapOf(APP_PROPERTY_KEY to "true")
         val json: JsonFormat = JsonFormat { ignoreUnknownKeys = true }

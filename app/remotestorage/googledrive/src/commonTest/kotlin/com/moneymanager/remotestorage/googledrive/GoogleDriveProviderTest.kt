@@ -65,8 +65,34 @@ class GoogleDriveProviderTest {
     fun anUpdateRefusedForAnotherReasonStillFailsWithDrivesReason() =
         runTest {
             drive.failures["/upload/drive/v3/files/id9"] = HttpStatusCode.Forbidden
+            drive.failureBodies["/upload/drive/v3/files/id9"] =
+                """{"error":{"code":403,"message":"Rate limited","errors":[{"reason":"rateLimitExceeded"}]}}"""
             val error = assertFailsWith<RemoteStorageException> { provider.upload("id9", "a.json", ByteArray(0)) }
-            assertTrue(error.message!!.startsWith("Failed to upload to Google Drive (403"), error.message)
+            assertEquals("Failed to upload to Google Drive (403, rateLimitExceeded: Rate limited)", error.message)
+        }
+
+    @Test
+    fun aFailureBodyThatIsntDrivesErrorIsKeptAsText() =
+        runTest {
+            drive.failures["/drive/v3/files"] = HttpStatusCode.BadGateway
+            drive.failureBodies["/drive/v3/files"] = "upstream unavailable"
+            val error = assertFailsWith<RemoteStorageException> { provider.list() }
+            assertEquals("Failed to find Drive folder (502, upstream unavailable)", error.message)
+        }
+
+    @Test
+    fun listPrefersOurOwnCopyEvenWhenItIsOnALaterPage() =
+        runTest {
+            val paged = FakeDrive(pageSize = 1)
+            val folder = paged.folder(GOOGLE_DRIVE_FOLDER_NAME)
+            paged.add("mappings.json", folder.id, readOnly = true)
+            val own = paged.add("mappings.json", folder.id, appProperties = mapOf("moneymanagerDb" to "true"))
+            paged.add("other.json", folder.id)
+
+            assertEquals(
+                listOf(own.id, "other.json"),
+                GoogleDriveProvider(paged.tokenSource).list().map { if (it.name == "other.json") it.name else it.id },
+            )
         }
 
     @Test
