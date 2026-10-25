@@ -34,12 +34,14 @@ suspend fun planApiReimport(
     sessionId: ApiSessionId,
     apiSessionRepository: ApiSessionReadRepository,
     reads: RerunReads,
+    onProgress: (suspend (Progress) -> Unit)? = null,
 ): SourceRerunPlan =
     planSourceRerun(
         source = Source.Api(sessionId),
         tradeIds = apiSessionRepository.getTradeIdsCreatedBySession(sessionId),
         createdAccountIds = apiSessionRepository.getAccountIdsCreatedBySession(sessionId),
         reads = reads,
+        onProgress = onProgress,
     )
 
 /** What re-running a session's stored responses imported. */

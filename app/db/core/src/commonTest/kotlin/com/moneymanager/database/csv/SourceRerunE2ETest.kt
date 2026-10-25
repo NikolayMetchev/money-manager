@@ -23,6 +23,7 @@ import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.qifimporter.StagedFile
+import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.reimports
 import com.moneymanager.test.database.upsertCurrencyByCode
@@ -211,7 +212,12 @@ class SourceRerunE2ETest : DbTest() {
             editByHand(coffee, description = "Flat white", note = "work trip")
 
             val reimports = repositories.reimports(maintenance)
-            val plan = reimports.plan(StagedFile.Csv(reload(first.id)))
+            val planProgress = mutableListOf<Progress>()
+            val plan = reimports.plan(StagedFile.Csv(reload(first.id)), onProgress = { planProgress += it })
+            assertProgressesTo(planProgress, "Checking other files for records matched against it", "Reading manual edits")
+            val planAllProgress = mutableListOf<Progress>()
+            reimports.planAll(listOf(StagedFile.Csv(reload(first.id))), onProgress = { planAllProgress += it })
+            assertProgressesTo(planAllProgress, "File 1 of 1: MonzoDataExport.csv — Reading manual edits")
             assertEquals(monzo, plan.imported.accountId, "the account is read from what the file created")
             assertEquals(1, plan.rerun.affected.count, "the second file's duplicate row is re-run too")
             val edit = plan.rerun.manualEdits.single()
@@ -317,4 +323,14 @@ class SourceRerunE2ETest : DbTest() {
             assertEquals("Novels", result.unmatchedEdits.single().description)
             assertEquals(1, transfersOn(monzo).size, "only the unskipped row is imported")
         }
+
+    // Planning reports each named step on a bar that never moves backwards.
+    private fun assertProgressesTo(
+        progress: List<Progress>,
+        vararg details: String,
+    ) {
+        details.forEach { detail -> assertTrue(progress.any { it.detail == detail }, "no \"$detail\" in $progress") }
+        val fractions = progress.mapNotNull { it.fraction }
+        assertEquals(fractions.sorted(), fractions, "the bar never moves backwards: $progress")
+    }
 }

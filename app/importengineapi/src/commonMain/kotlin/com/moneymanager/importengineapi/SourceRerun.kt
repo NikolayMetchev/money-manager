@@ -22,6 +22,7 @@ import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
+import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
 import kotlin.time.Instant
 
@@ -150,30 +151,49 @@ data class SourceRerunResult<R>(
 
 /**
  * Plans re-importing [source]: what it created (per `entity_source`, first revision), what other files
- * matched against that, and which of its transfers a person edited by hand.
+ * matched against that, and which of its transfers a person edited by hand. Checking the other CSV files
+ * reads every one of them, which is most of the time on a large database, so [onProgress] counts them.
  */
 suspend fun planSourceRerun(
     source: Source,
     tradeIds: Set<TradeId>,
     createdAccountIds: Set<AccountId>,
     reads: RerunReads,
+    onProgress: (suspend (Progress) -> Unit)? = null,
 ): SourceRerunPlan {
+    val progress = PhasedProgress(onProgress)
+    progress.emit(base = 0f, detail = "Finding what the import created")
     val created = reads.transferSourceRepository.getTransfersCreatedBy(source)
     val csvExcluding = (source as? Source.Csv)?.importId
     val qifExcluding = (source as? Source.Qif)?.importId
+    progress.emit(base = PLAN_CREATED_SPAN, detail = CHECKING_OTHER_FILES)
+    val csvRows =
+        reads.csvImportRepository.findRowsReferencingTransactions(csvExcluding, created.keys, tradeIds) { checked, total ->
+            progress.emit(
+                base = PLAN_CREATED_SPAN,
+                span = PLAN_OTHER_FILES_SPAN,
+                detail = CHECKING_OTHER_FILES,
+                innerFraction = checked.toFloat() / total,
+                processed = checked,
+                total = total,
+            )
+        }
+    val qifRecords = reads.qifImportRepository.findRecordsReferencingTransfers(qifExcluding, created.keys)
+    val manualEditsBase = PLAN_CREATED_SPAN + PLAN_OTHER_FILES_SPAN
     return SourceRerunPlan(
         source = source,
         createdTransfers = created,
         tradeIds = tradeIds,
         createdAccountIds = createdAccountIds,
-        affected =
-            AffectedRecords(
-                csvRows = reads.csvImportRepository.findRowsReferencingTransactions(csvExcluding, created.keys, tradeIds),
-                qifRecords = reads.qifImportRepository.findRecordsReferencingTransfers(qifExcluding, created.keys),
-            ),
-        manualEdits = captureManualEdits(created, reads),
+        affected = AffectedRecords(csvRows = csvRows, qifRecords = qifRecords),
+        manualEdits =
+            captureManualEdits(created, reads, progress.sink(base = manualEditsBase, span = 1f - manualEditsBase)),
     )
 }
+
+private const val CHECKING_OTHER_FILES = "Checking other files for records matched against it"
+private const val PLAN_CREATED_SPAN = 0.05f
+private const val PLAN_OTHER_FILES_SPAN = 0.85f
 
 /**
  * Re-imports per [plan]. One batch un-hides the partners the source's transfers had reconciled away,
@@ -287,16 +307,20 @@ suspend fun <R> ImportEngine.executeSourceRerun(
 suspend fun manualEditsOf(
     source: Source,
     reads: RerunReads,
-): List<ManualEdit> = captureManualEdits(reads.transferSourceRepository.getTransfersCreatedBy(source), reads)
+    onProgress: (suspend (Progress) -> Unit)? = null,
+): List<ManualEdit> = captureManualEdits(reads.transferSourceRepository.getTransfersCreatedBy(source), reads, onProgress)
 
 private suspend fun captureManualEdits(
     created: Map<TransferId, Source>,
     reads: RerunReads,
+    onProgress: (suspend (Progress) -> Unit)?,
 ): List<ManualEdit> {
+    onProgress?.invoke(Progress(READING_MANUAL_EDITS))
     val edited = reads.transferSourceRepository.getHandEditedTransferIds(created.keys)
     if (edited.isEmpty()) return emptyList()
     val current = reads.transactionRepository.getTransactionsByIds(edited)
-    return edited.sortedBy { it.id }.mapNotNull { id ->
+    return edited.sortedBy { it.id }.withIndex().mapNotNull { (index, id) ->
+        onProgress?.invoke(Progress.counted(READING_MANUAL_EDITS, index, edited.size))
         val transfer = current[id] ?: return@mapNotNull null
         manualEditOf(
             transfer = transfer,
@@ -306,6 +330,8 @@ private suspend fun captureManualEdits(
         )
     }
 }
+
+private const val READING_MANUAL_EDITS = "Reading manual edits"
 
 /**
  * Reads a transfer's hand edits from its audit trail. An UPDATE audit row holds the values from before

@@ -40,6 +40,7 @@ import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.executeSourceRerun
 import com.moneymanager.importengineapi.manualEditsOf
 import com.moneymanager.importengineapi.planSourceRerun
+import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
@@ -145,14 +146,25 @@ class Reimports(
     /** Runs [block] holding the session's write lock, for the re-imports that run outside this class (API sessions). */
     suspend fun <T> exclusively(block: suspend () -> T): T = writeLock.withLock { block() }
 
-    /** Plans re-importing [file]: what it created, the other files matched against that, and its hand edits. */
-    suspend fun plan(file: StagedFile): FileReimportPlan {
+    /**
+     * Plans re-importing [file]: what it created, the other files matched against that, and its hand edits.
+     * On a large database this takes a while, so [onProgress] hears each step.
+     */
+    suspend fun plan(
+        file: StagedFile,
+        onProgress: (suspend (Progress) -> Unit)? = null,
+    ): FileReimportPlan {
+        val progress = PhasedProgress(onProgress)
+        progress.emit(base = 0f, detail = "Loading ${file.name}")
         val loaded = file.reloaded()
+        val strategy = strategyFor(loaded, csvImportStrategyRepository.getAllStrategies().first())
+        progress.emit(base = PLAN_LOAD_SPAN, detail = READING_IMPORT_SETTINGS)
+        val imported = importedSettings(loaded.source)
         return FileReimportPlan(
             file = loaded,
-            strategy = strategyFor(loaded, csvImportStrategyRepository.getAllStrategies().first()),
-            imported = importedSettings(loaded.source),
-            rerun = rerunPlan(loaded),
+            strategy = strategy,
+            imported = imported,
+            rerun = rerunPlan(loaded, progress.sink(base = PLAN_SETTINGS_END, span = 1f - PLAN_SETTINGS_END)),
         )
     }
 
@@ -191,15 +203,43 @@ class Reimports(
         }
     }
 
-    /** Plans a "re-import all" over [files], reading each file's settings before any of them is deleted. */
-    suspend fun planAll(files: List<StagedFile>): ReimportAllPlan {
+    /**
+     * Plans a "re-import all" over [files], reading each file's settings before any of them is deleted.
+     * [onProgress] gives each file an equal slice of the bar.
+     */
+    suspend fun planAll(
+        files: List<StagedFile>,
+        onProgress: (suspend (Progress) -> Unit)? = null,
+    ): ReimportAllPlan {
+        val progress = PhasedProgress(onProgress)
         val strategies = csvImportStrategyRepository.getAllStrategies().first()
-        val loaded = files.map { it.reloaded() }
+        val loaded = mutableListOf<StagedFile>()
+        val imported = mutableMapOf<Source, ImportedSettings>()
+        val manualEdits = mutableListOf<ManualEdit>()
+        files.forEachIndexed { index, file ->
+            val base = index.toFloat() / files.size
+            val span = 1f / files.size
+            val prefix = "File ${index + 1} of ${files.size}: ${file.name}"
+            progress.emit(base = base, detail = "$prefix — $READING_IMPORT_SETTINGS")
+            val reloaded = file.reloaded().also(loaded::add)
+            imported[reloaded.source] = importedSettings(reloaded.source)
+            manualEdits +=
+                manualEditsOf(reloaded.source, reads) { inner ->
+                    progress.emit(
+                        base = base,
+                        span = span,
+                        detail = "$prefix — ${inner.detail}",
+                        innerFraction = inner.fraction,
+                        processed = inner.processed,
+                        total = inner.total,
+                    )
+                }
+        }
         return ReimportAllPlan(
             files = loaded,
             strategies = loaded.associate { it.source to strategyFor(it, strategies) },
-            imported = loaded.associate { it.source to importedSettings(it.source) },
-            manualEdits = loaded.flatMap { manualEditsOf(it.source, reads) },
+            imported = imported,
+            manualEdits = manualEdits,
         )
     }
 
@@ -359,7 +399,10 @@ class Reimports(
         return ImportedSettings(sharedAccount, currency)
     }
 
-    private suspend fun rerunPlan(file: StagedFile): SourceRerunPlan =
+    private suspend fun rerunPlan(
+        file: StagedFile,
+        onProgress: (suspend (Progress) -> Unit)? = null,
+    ): SourceRerunPlan =
         when (file) {
             is StagedFile.Csv -> {
                 planSourceRerun(
@@ -367,6 +410,7 @@ class Reimports(
                     tradeIds = reads.csvImportRepository.getTradeIdsCreatedByImport(file.import.id),
                     createdAccountIds = reads.csvImportRepository.getAccountsCreatedByImport(file.import.id),
                     reads = reads,
+                    onProgress = onProgress,
                 )
             }
 
@@ -377,6 +421,7 @@ class Reimports(
                     tradeIds = emptySet(),
                     createdAccountIds = reads.qifImportRepository.getAccountsCreatedByImport(file.import.id),
                     reads = reads,
+                    onProgress = onProgress,
                 )
             }
         }
@@ -478,3 +523,7 @@ class Reimports(
 
     private suspend fun currencies(): List<Currency> = currencyRepository.getAllCurrencies().first()
 }
+
+private const val READING_IMPORT_SETTINGS = "Reading import settings"
+private const val PLAN_LOAD_SPAN = 0.02f
+private const val PLAN_SETTINGS_END = 0.1f

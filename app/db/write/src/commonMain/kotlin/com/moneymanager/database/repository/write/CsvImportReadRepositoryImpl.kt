@@ -127,17 +127,21 @@ class CsvImportReadRepositoryImpl(
         excluding: CsvImportId?,
         transferIds: Set<TransferId>,
         tradeIds: Set<TradeId>,
+        onImportChecked: (suspend (checked: Int, total: Int) -> Unit)?,
     ): Map<CsvImportId, List<Long>> =
         withContext(coroutineContext) {
             val transactionIds = transferIds.map { it.id } + tradeIds.map { it.id }
             if (transactionIds.isEmpty()) return@withContext emptyMap()
-            csvImportSelectQueries
-                .selectAllImports(::toCsvImportRecord)
-                .awaitAsList()
-                .filter { it.importId != excluding?.id?.toString() }
-                .mapNotNull { other ->
+            val others =
+                csvImportSelectQueries
+                    .selectAllImports(::toCsvImportRecord)
+                    .awaitAsList()
+                    .filter { it.importId != excluding?.id?.toString() }
+            others
+                .mapIndexedNotNull { index, other ->
                     tableManager
                         .findRowsWithTransactionIds(other.tableName, transactionIds)
+                        .also { onImportChecked?.invoke(index + 1, others.size) }
                         .takeIf { it.isNotEmpty() }
                         ?.let { rows -> CsvImportId(Uuid.parse(other.importId)) to rows }
                 }.toMap()

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -66,9 +65,11 @@ fun ApiReimportDialog(
     var isRunning by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var executeProgress by remember { mutableStateOf<Progress?>(null) }
+    var planProgress by remember { mutableStateOf<Progress?>(null) }
 
     LaunchedEffect(session.id) {
-        plan = planApiReimport(session.id, apiReads.apiSessionRepository, reimports.reads)
+        plan =
+            planApiReimport(session.id, apiReads.apiSessionRepository, reimports.reads, onProgress = { planProgress = it })
     }
 
     AlertDialog(
@@ -83,7 +84,7 @@ fun ApiReimportDialog(
             ) {
                 when (val currentPlan = plan) {
                     null -> {
-                        CircularProgressIndicator()
+                        ApiReimportProgress(planProgress ?: Progress("Preparing re-import"))
                     }
 
                     else -> {
