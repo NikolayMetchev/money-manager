@@ -14,7 +14,7 @@ internal class AndroidPdfium private constructor(
     private val api: Api,
 ) : Pdfium<Pointer>() {
     // pdfium's own names, which JNA looks the symbols up by.
-    @Suppress("FunctionNaming", "ktlint:standard:function-naming")
+    @Suppress("FunctionName", "FunctionNaming", "ktlint:standard:function-naming")
     internal interface Api : Library {
         fun FPDF_InitLibrary()
 
@@ -83,8 +83,8 @@ internal class AndroidPdfium private constructor(
         block: (Pointer) -> R,
     ): R {
         // pdfium reads the buffer for as long as the document is open, so it stays referenced until then.
-        val data = Memory(bytes.size.toLong().coerceAtLeast(1)).apply { write(0, bytes, 0, bytes.size) }
-        try {
+        Memory(bytes.size.toLong().coerceAtLeast(1)).use { data ->
+            data.write(0, bytes, 0, bytes.size)
             val document =
                 api.FPDF_LoadMemDocument64(data, bytes.size.toLong(), null)
                     ?: throw pdfiumOpenError(api.FPDF_GetLastError().toLong())
@@ -93,8 +93,6 @@ internal class AndroidPdfium private constructor(
             } finally {
                 api.FPDF_CloseDocument(document)
             }
-        } finally {
-            data.close()
         }
     }
 
