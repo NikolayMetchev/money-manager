@@ -52,12 +52,14 @@ interface CsvImportReadRepository {
     /**
      * For every import other than [excluding] (every import when null), the rows whose linked transaction is one of
      * [transferIds]/[tradeIds] — rows another file marked DUPLICATE or UPDATED against them. Imports
-     * with no such rows are omitted.
+     * with no such rows are omitted. Every import is its own table, so [onImportChecked] hears after each one
+     * how many of the total have been checked.
      */
     suspend fun findRowsReferencingTransactions(
         excluding: CsvImportId?,
         transferIds: Set<TransferId>,
         tradeIds: Set<TradeId>,
+        onImportChecked: (suspend (checked: Int, total: Int) -> Unit)? = null,
     ): Map<CsvImportId, List<Long>>
 
     /**

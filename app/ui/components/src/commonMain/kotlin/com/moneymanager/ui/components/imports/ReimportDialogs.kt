@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -76,10 +75,11 @@ fun ReimportDialog(
     var isRunning by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var executeProgress by remember { mutableStateOf<Progress?>(null) }
+    var planProgress by remember { mutableStateOf<Progress?>(null) }
 
     LaunchedEffect(file.source) {
         try {
-            plan = reimports.plan(file)
+            plan = reimports.plan(file, onProgress = { planProgress = it })
         } catch (expected: CancellationException) {
             throw expected
         } catch (expected: Exception) {
@@ -103,7 +103,7 @@ fun ReimportDialog(
                 val currentPlan = plan
                 when {
                     currentPlan == null -> {
-                        if (errorMessage == null) CircularProgressIndicator()
+                        if (errorMessage == null) ReimportProgressIndicator(planProgress ?: Progress(PREPARING_REIMPORT))
                     }
 
                     currentPlan.strategy == null -> {
@@ -210,11 +210,12 @@ fun ReimportAllDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     var plan by remember { mutableStateOf<ReimportAllPlan?>(null) }
+    var planProgress by remember { mutableStateOf<Progress?>(null) }
     // A run changes the file list it was planned from; re-planning then would only replace the plan it ran.
     LaunchedEffect(files) {
         if (isRunning || result != null) return@LaunchedEffect
         try {
-            plan = reimports.planAll(files)
+            plan = reimports.planAll(files, onProgress = { planProgress = it })
         } catch (expected: CancellationException) {
             throw expected
         } catch (expected: Exception) {
@@ -264,6 +265,9 @@ fun ReimportAllDialog(
         )
         Spacer(modifier = Modifier.height(12.dp))
         errorMessage?.let { Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        if (plan == null && errorMessage == null) {
+            ReimportProgressIndicator(planProgress ?: Progress(PREPARING_REIMPORT))
+        }
         plan?.let { planned ->
             if (planned.skippedNoStrategy > 0) {
                 Text(
@@ -337,3 +341,5 @@ private fun ReimportSettingsPickers(
         Spacer(modifier = Modifier.height(12.dp))
     }
 }
+
+private const val PREPARING_REIMPORT = "Preparing re-import"
