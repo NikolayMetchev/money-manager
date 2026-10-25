@@ -3,6 +3,7 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOne
+import com.moneymanager.coroutines.throttleLatest
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
@@ -25,6 +26,7 @@ class ImportTimelineReadRepositoryImpl(
         queries
             .selectCsvImportDateRanges()
             .asFlow()
+            .throttleLatest(LISTING_REFRESH_PERIOD)
             .mapToList(coroutineContext)
             .map { rows ->
                 rows.map { row ->
@@ -45,6 +47,7 @@ class ImportTimelineReadRepositoryImpl(
         queries
             .selectQifImportDateRanges()
             .asFlow()
+            .throttleLatest(LISTING_REFRESH_PERIOD)
             .mapToList(coroutineContext)
             .map { rows ->
                 rows.map { row ->
@@ -65,6 +68,7 @@ class ImportTimelineReadRepositoryImpl(
         queries
             .selectApiSessionDateRanges()
             .asFlow()
+            .throttleLatest(LISTING_REFRESH_PERIOD)
             .mapToList(coroutineContext)
             .map { rows ->
                 rows.map { row ->
@@ -84,6 +88,7 @@ class ImportTimelineReadRepositoryImpl(
         queries
             .selectManualDateRange()
             .asFlow()
+            .throttleLatest(LISTING_REFRESH_PERIOD)
             .mapToOne(coroutineContext)
             .map { row ->
                 val earliestMs = row.earliest_ms ?: return@map null
@@ -113,6 +118,7 @@ class ImportTimelineReadRepositoryImpl(
         queries
             .selectCsvImportAccountRanges()
             .asFlow()
+            .throttleLatest(LISTING_REFRESH_PERIOD)
             .mapToList(coroutineContext)
             .map { rows ->
                 rows.map { row ->
@@ -134,6 +140,7 @@ class ImportTimelineReadRepositoryImpl(
         queries
             .selectQifImportAccountRanges()
             .asFlow()
+            .throttleLatest(LISTING_REFRESH_PERIOD)
             .mapToList(coroutineContext)
             .map { rows ->
                 rows.map { row ->
@@ -155,6 +162,7 @@ class ImportTimelineReadRepositoryImpl(
         queries
             .selectApiSessionAccountRanges()
             .asFlow()
+            .throttleLatest(LISTING_REFRESH_PERIOD)
             .mapToList(coroutineContext)
             .map { rows ->
                 rows.map { row ->
@@ -175,6 +183,7 @@ class ImportTimelineReadRepositoryImpl(
         queries
             .selectManualAccountRanges()
             .asFlow()
+            .throttleLatest(LISTING_REFRESH_PERIOD)
             .mapToList(coroutineContext)
             .map { rows ->
                 rows.map { row ->

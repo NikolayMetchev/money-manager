@@ -414,6 +414,7 @@ class ImportMonzoCsvE2ETest {
             waitUntilExactlyOneExists(hasText("Not imported yet"), timeoutMillis = 10000)
 
             // The already-imported file lives on the Imported tab, with its strategy name shown.
+            waitUntilExactlyOneExists(hasText("Imported (1)"), timeoutMillis = 15000)
             onNodeWithText("Imported (1)").performClick()
             waitForIdle()
             waitUntilExactlyOneExists(hasText("already_imported.csv"), timeoutMillis = 15000)
@@ -501,6 +502,9 @@ class ImportMonzoCsvE2ETest {
             onNodeWithText("Done").performClick()
             waitForIdle()
 
+            // The tab counts come from an import listing that refreshes at most every 250 ms while writes burst,
+            // so waitForIdle alone may race it.
+            waitUntilExactlyOneExists(hasText("Imported (2)"), timeoutMillis = 15000)
             onNodeWithText("Imported (2)").performClick()
             waitForIdle()
             // The list composes only the cards that fit, and the two files can land in either order.

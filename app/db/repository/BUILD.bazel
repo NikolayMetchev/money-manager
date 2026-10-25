@@ -50,6 +50,7 @@ kmp_library(
     ],
     deps = [
         "//utils/bigdecimal",
+        "//utils/coroutines",
         "//utils/regex",
         "@maven_kmp//:kotlinx_serialization_core",
         "@maven_kmp//:kotlinx_serialization_json",

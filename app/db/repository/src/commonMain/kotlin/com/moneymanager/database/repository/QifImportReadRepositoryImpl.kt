@@ -5,6 +5,7 @@ import app.cash.sqldelight.async.coroutines.awaitAsOne
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
+import com.moneymanager.coroutines.throttleLatest
 import com.moneymanager.database.sql.qifImport.Qif_record
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountId
@@ -36,6 +37,7 @@ class QifImportReadRepositoryImpl(
         selectQueries
             .selectAllImports(::toQifImport)
             .asFlow()
+            .throttleLatest(LISTING_REFRESH_PERIOD)
             .mapToList(coroutineContext)
 
     override fun getImport(id: QifImportId): Flow<QifImport?> =

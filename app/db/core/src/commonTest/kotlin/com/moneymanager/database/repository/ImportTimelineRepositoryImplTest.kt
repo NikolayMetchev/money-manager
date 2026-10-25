@@ -325,4 +325,27 @@ class ImportTimelineRepositoryImplTest : DbTest() {
 
             assertEquals(setOf(TimelineSourceKind.CSV, TimelineSourceKind.MANUAL), all.map { it.kind }.toSet())
         }
+
+    @Test
+    fun `getAllAccountRanges splits every source by account`() =
+        runDbTest {
+            setupAccountsAndCurrency()
+            val importId = createCsvImport("statement.csv")
+            attachCsvProvenance(createTransferAt(earliestTimestamp), importId, rowIndex = 0)
+            createTransferAt(latestTimestamp, source = Source.Manual)
+            val accounts =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .map { it.id }
+                    .toSet()
+
+            val all = repositories.importTimelineRepository.getAllAccountRanges().first()
+
+            // Each transfer touches both accounts, so each source has a range per account.
+            assertEquals(
+                setOf(TimelineSourceKind.CSV, TimelineSourceKind.MANUAL).flatMap { kind -> accounts.map { kind to it } }.toSet(),
+                all.map { it.kind to it.accountId }.toSet(),
+            )
+        }
 }
