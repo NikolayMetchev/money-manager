@@ -74,7 +74,11 @@ class GoogleDriveProvider(
                             parameters.append("fields", "files($FILE_FIELDS)")
                         }
                     }.requireBody("list Google Drive files")
-            json.decodeFromString<DriveFileList>(body).files.map { it.toRemoteFile() }
+            json
+                .decodeFromString<DriveFileList>(body)
+                .files
+                .preferOwnFiles()
+                .map { it.toRemoteFile() }
         }
 
     override suspend fun stat(fileId: String): RemoteFile? =
@@ -124,6 +128,11 @@ class GoogleDriveProvider(
             }
             val response =
                 if (fileId == null) httpClient.post(endpoint, configure) else httpClient.patch(endpoint, configure)
+            // drive.file only lets the app write files it created, so a same-named file another app (or a person)
+            // put in our folder is readable but not updatable. Write our own copy instead; list() prefers it.
+            if (fileId != null && response.driveErrorReason() == APP_NOT_AUTHORIZED_TO_FILE) {
+                return@withContext upload(fileId = null, name = name, bytes = bytes)
+            }
             json.decodeFromString<DriveFile>(response.requireBody("upload to Google Drive")).toRemoteFile()
         }
 
@@ -193,9 +202,33 @@ class GoogleDriveProvider(
     }
 
     private suspend fun HttpResponse.requireBody(action: String): String {
-        if (!status.isSuccess()) throw RemoteStorageException("Failed to $action (${status.value})")
+        if (!status.isSuccess()) throw RemoteStorageException("Failed to $action (${status.value}${driveErrorSuffix()})")
         return bodyAsText()
     }
+
+    private suspend fun HttpResponse.driveError(): DriveError? =
+        if (status.isSuccess()) null else runCatching { json.decodeFromString<DriveErrorResponse>(bodyAsText()).error }.getOrNull()
+
+    private suspend fun HttpResponse.driveErrorReason(): String? = driveError()?.errors?.firstOrNull()?.reason
+
+    // Drive's status alone can't tell a permission refusal from a rate limit (both 403), so carry its reason.
+    private suspend fun HttpResponse.driveErrorSuffix(): String {
+        val error = driveError() ?: return ""
+        val reason = error.errors.firstOrNull()?.reason
+        val detail = listOfNotNull(reason, error.message).joinToString(": ")
+        return if (detail.isEmpty()) "" else ", $detail"
+    }
+
+    /**
+     * Of several same-named files, keeps only the ones this app created (tagged with [APP_PROPERTIES]) when there
+     * are any: the others are another app's copies, which drive.file lets us read but never update.
+     */
+    private fun List<DriveFile>.preferOwnFiles(): List<DriveFile> {
+        val ownNames = filter { it.isOwn() }.mapTo(mutableSetOf()) { it.name }
+        return filter { it.isOwn() || it.name !in ownNames }
+    }
+
+    private fun DriveFile.isOwn() = appProperties?.get(APP_PROPERTY_KEY) == APP_PROPERTIES.getValue(APP_PROPERTY_KEY)
 
     private fun DriveFile.toRemoteFile() =
         RemoteFile(
@@ -211,11 +244,28 @@ class GoogleDriveProvider(
         val name: String = "",
         val size: String? = null,
         val headRevisionId: String? = null,
+        val appProperties: Map<String, String>? = null,
     )
 
     @Serializable
     private data class DriveFileList(
         val files: List<DriveFile> = emptyList(),
+    )
+
+    @Serializable
+    private data class DriveErrorResponse(
+        val error: DriveError,
+    )
+
+    @Serializable
+    private data class DriveError(
+        val message: String? = null,
+        val errors: List<DriveErrorDetail> = emptyList(),
+    )
+
+    @Serializable
+    private data class DriveErrorDetail(
+        val reason: String? = null,
     )
 
     /** Drive file metadata sent on create/update; null fields are omitted (encodeDefaults stays off). */
@@ -232,7 +282,8 @@ class GoogleDriveProvider(
         const val UPLOAD_ENDPOINT = "https://www.googleapis.com/upload/drive/v3/files"
         const val APP_PROPERTY_KEY = "moneymanagerDb"
         const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
-        const val FILE_FIELDS = "id,name,size,headRevisionId"
+        const val FILE_FIELDS = "id,name,size,headRevisionId,appProperties"
+        const val APP_NOT_AUTHORIZED_TO_FILE = "appNotAuthorizedToFile"
         const val HTTP_NOT_FOUND = 404
         val APP_PROPERTIES = mapOf(APP_PROPERTY_KEY to "true")
         val json: JsonFormat = JsonFormat { ignoreUnknownKeys = true }

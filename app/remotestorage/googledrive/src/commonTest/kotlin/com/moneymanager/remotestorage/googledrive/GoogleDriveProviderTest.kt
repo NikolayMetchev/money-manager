@@ -47,6 +47,29 @@ class GoogleDriveProviderTest {
         }
 
     @Test
+    fun anUpdateRefusedForAnotherAppsFileWritesOurOwnCopyWhichListPrefers() =
+        runTest {
+            val folder = drive.folder(GOOGLE_DRIVE_FOLDER_NAME)
+            val foreign = drive.add("mappings.json", folder.id, bytes = "old".encodeToByteArray(), readOnly = true)
+            assertEquals(listOf(foreign.id), provider.list().map { it.id })
+
+            val saved = provider.upload(foreign.id, "mappings.json", "new".encodeToByteArray())
+
+            assertTrue(saved.id != foreign.id)
+            assertContentEquals("old".encodeToByteArray(), foreign.bytes)
+            assertEquals(listOf(saved.id), provider.list().map { it.id })
+            assertContentEquals("new".encodeToByteArray(), provider.download(saved.id))
+        }
+
+    @Test
+    fun anUpdateRefusedForAnotherReasonStillFailsWithDrivesReason() =
+        runTest {
+            drive.failures["/upload/drive/v3/files/id9"] = HttpStatusCode.Forbidden
+            val error = assertFailsWith<RemoteStorageException> { provider.upload("id9", "a.json", ByteArray(0)) }
+            assertTrue(error.message!!.startsWith("Failed to upload to Google Drive (403"), error.message)
+        }
+
+    @Test
     fun listReturnsOnlyTheAppFolderContentsAndCachesTheFolder() =
         runTest {
             val folder = drive.folder(GOOGLE_DRIVE_FOLDER_NAME)

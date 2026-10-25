@@ -41,6 +41,8 @@ class FakeDrive(
         var revision: Int = 1,
         val sharedWithMe: Boolean = false,
         val appProperties: Map<String, String> = emptyMap(),
+        // Another app's file: drive.file lets this app read it, but an update is refused.
+        val readOnly: Boolean = false,
     )
 
     val items = mutableListOf<Item>()
@@ -76,8 +78,21 @@ class FakeDrive(
         modifiedTime: String? = null,
         md5Checksum: String? = null,
         sharedWithMe: Boolean = false,
+        appProperties: Map<String, String> = emptyMap(),
+        readOnly: Boolean = false,
     ): Item =
-        Item("id${nextId++}", name, parent, mimeType, bytes, modifiedTime, md5Checksum, sharedWithMe = sharedWithMe).also {
+        Item(
+            "id${nextId++}",
+            name,
+            parent,
+            mimeType,
+            bytes,
+            modifiedTime,
+            md5Checksum,
+            sharedWithMe = sharedWithMe,
+            appProperties = appProperties,
+            readOnly = readOnly,
+        ).also {
             items +=
                 it
         }
@@ -201,6 +216,12 @@ class FakeDrive(
                 ).also { items += it }
             } else {
                 val existing = items.firstOrNull { it.id == fileId } ?: return respond("", HttpStatusCode.NotFound)
+                if (existing.readOnly) {
+                    return respond(
+                        """{"error":{"code":403,"message":"No write access","errors":[{"reason":"appNotAuthorizedToFile"}]}}""",
+                        HttpStatusCode.Forbidden,
+                    )
+                }
                 existing.also {
                     it.name = name
                     it.bytes = media
@@ -222,6 +243,9 @@ class FakeDrive(
             put("headRevisionId", "rev$revision")
             modifiedTime?.let { put("modifiedTime", it) }
             md5Checksum?.let { put("md5Checksum", it) }
+            if (appProperties.isNotEmpty()) {
+                put("appProperties", buildJsonObject { appProperties.forEach { (key, value) -> put(key, value) } })
+            }
         }
 
     private fun MockRequestHandleScope.json(body: JsonObject) =
