@@ -156,7 +156,7 @@ every asset the app creates) and times are what the schema stores. The schema is
 ### `pdf-lines FILE`
 
 Reads a PDF (no database needed) and prints its text lines, as a CSV strategy's PDF line rules see them: glyphs
-sharing a baseline form a line, and columns stay two or more spaces apart. Platforms that can't read PDFs exit 1.
+sharing a baseline form a line, and columns stay two or more spaces apart. A file that isn't a readable PDF exits 1.
 
 `data`: one object per line, in reading order.
 

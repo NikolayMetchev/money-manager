@@ -13,8 +13,9 @@ import kotlin.js.ExperimentalWasmJsInterop
 actual fun createPdfTextExtractor(): PdfTextExtractor = WebPdfiumTextExtractor
 
 /**
- * [PdfTextExtractor] over pdfium's WebAssembly build (`@embedpdf/pdfium`): the same text API the JVM calls, so a PDF
- * reads as the same lines in the browser. The module loads on first use. One call runs at a time, as pdfium isn't
+ * [PdfTextExtractor] over pdfium's WebAssembly build (`@embedpdf/pdfium`): the same text calls [Pdfium] makes on
+ * the other platforms, so a PDF reads as the same lines in the browser. They run in one JavaScript loop per document
+ * rather than one interop call per glyph. The module loads on first use. One call runs at a time, as pdfium isn't
  * reentrant.
  */
 internal object WebPdfiumTextExtractor : PdfTextExtractor {
@@ -40,7 +41,7 @@ private const val GLYPH_FIELDS = 5
 private fun glyphs(numbers: JsAny): List<PdfGlyph> =
     (0 until length(numbers) / GLYPH_FIELDS).mapNotNull { glyph ->
         val at = glyph * GLYPH_FIELDS
-        glyphText(numberAt(numbers, at).toInt())?.let { text ->
+        pdfiumGlyphText(numberAt(numbers, at).toInt())?.let { text ->
             PdfGlyph(
                 text = text,
                 left = numberAt(numbers, at + 1),
@@ -50,21 +51,6 @@ private fun glyphs(numbers: JsAny): List<PdfGlyph> =
             )
         }
     }
-
-private const val MAX_CODE_POINT = 0x10FFFF
-
-// As on the JVM: whitespace and code points that aren't characters are left to the line builder's spacing.
-private fun glyphText(codePoint: Int): String? {
-    if (codePoint <= 0 || codePoint > MAX_CODE_POINT) return null
-    val text =
-        if (codePoint < 0x10000) {
-            codePoint.toChar().toString()
-        } else {
-            val offset = codePoint - 0x10000
-            charArrayOf((0xD800 + (offset shr 10)).toChar(), (0xDC00 + (offset and 0x3FF)).toChar()).concatToString()
-        }
-    return text.takeUnless { it.isBlank() }
-}
 
 private fun newObject(): JsAny = js("new Object()")
 

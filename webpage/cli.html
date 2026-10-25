@@ -334,7 +334,8 @@ EOF</code></pre>
         Prints a PDF's text lines (page, line number and text) as a CSV strategy's PDF line rules read them: the
         glyphs sharing a baseline form a line, and columns stay two or more spaces apart, so a Capture pattern can
         split them on <code>\s{2,}</code>. It opens no database. Use it to write a statement's line rules, or to see
-        why a row was missed.
+        why a row was missed. <code>mm</code> carries the PDF reader (pdfium) inside it, and the first PDF it reads
+        writes the library, with its license notices, to <code>~/.moneymanager/native/</code>.
       </p>
       <pre><code>mm --format table pdf-lines ~/Downloads/statement.pdf</code></pre>
 

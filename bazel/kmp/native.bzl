@@ -365,7 +365,7 @@ def _static_library_impl(ctx):
             tool = "clang",
             target = target,
             arguments = [args],
-            inputs = [src] + ctx.files.hdrs,
+            inputs = [src] + ctx.files.hdrs + ctx.files.embeds,
             outputs = [obj],
             mnemonic = "KonanClang",
             progress_message = "Compiling %s for %s" % (src.short_path, ctx.attr.target),
@@ -394,6 +394,10 @@ konan_static_library = rule(
 sysroot (`run_konan clang`), so it links into that target's binaries like the klibs beside it.""",
     attrs = {
         "defines": attr.string_list(doc = "`NAME=VALUE` preprocessor definitions."),
+        "embeds": attr.label_list(
+            allow_files = True,
+            doc = "Files the sources `.incbin` by their exec paths: inputs of every compile, in no include path.",
+        ),
         "hdrs": attr.label_list(allow_files = [".h"], doc = "Headers; their directories are on the include path."),
         "library_name": attr.string(doc = "The archive is `lib<library_name>.a` (default: the target name)."),
         "srcs": attr.label_list(allow_files = [".c"], mandatory = True),

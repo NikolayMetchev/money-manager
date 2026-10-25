@@ -94,15 +94,16 @@ http_archive(
     url = "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip",
 )
 
-# pdfium (bblanchon/pdfium-binaries), the PDF text extractor //utils/parsers/pdf calls through Java's FFM (#1176):
-# one shared library per desktop OS/arch, each build's jar carrying only its target platform's. Renovate bumps
-# PDFIUM (the release's chromium build); bazel/renovate/repin.sh then rewrites the SHA-256s.
+# pdfium (bblanchon/pdfium-binaries), the PDF text extractor //utils/parsers/pdf calls through Java's FFM (#1176)
+# and, from native binaries, through a loader that embeds it (#1191): one shared library per desktop OS/arch, each
+# build carrying only its target platform's. Renovate bumps PDFIUM (the release's chromium build);
+# bazel/renovate/repin.sh then rewrites the SHA-256s.
 PDFIUM = "8111"
 
-# The library, its VERSION, and the license notices a binary distribution must carry: bblanchon's LICENSE, and
-# licenses/ for pdfium and each library it compiles in.
+# The library, its VERSION, its C headers (the native loader includes them), and the license notices a binary
+# distribution must carry: bblanchon's LICENSE, and licenses/ for pdfium and each library it compiles in.
 PDFIUM_BUILD = """
-exports_files(glob(["lib/*", "bin/*"], allow_empty = True) + ["VERSION", "LICENSE"])
+exports_files(glob(["lib/*", "bin/*", "include/*.h"], allow_empty = True) + ["VERSION", "LICENSE"])
 
 filegroup(
     name = "licenses",
