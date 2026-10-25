@@ -52,7 +52,7 @@ class StagedFileMessageTest {
     @Test
     fun anExcelFileIsStagedFromItsFirstWorksheet() =
         runTest {
-            val workbook = BinaryFilePickerResult("budget.xlsx", byteArrayOf(4, 5), null)
+            val workbook = BinaryFilePickerResult("budget.xlsx", byteArrayOf(4, 5))
             val parser =
                 object : XlsxParser {
                     override fun sheetNames(bytes: ByteArray) = listOf("Spending", "Notes")
