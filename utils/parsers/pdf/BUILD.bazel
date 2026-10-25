@@ -6,33 +6,26 @@ load("@rules_java//java:java_import.bzl", "java_import")
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 load("//bazel/kmp:resources.bzl", "file_resource_jar")
 
-# The target platform's pdfium library (and its VERSION, which names the unpacked copy), as `pdfium/<file>`
-# classpath resources PdfiumLibrary loads. Other platforms build no library; their extractor says so per file.
+# The target platform's pdfium library, its VERSION (which names the unpacked copy) and the license notices a binary
+# distribution of it must carry (`pdfium/LICENSE`, `pdfium/licenses/`), as `pdfium/<file>` classpath resources
+# PdfiumLibrary loads. Other platforms build no library; their extractor says so per file.
 file_resource_jar(
     name = "pdfium_native_jar",
     entries = select({
-        ":linux_arm64": {
-            "@pdfium_linux_arm64//:lib/libpdfium.so": "pdfium/libpdfium.so",
-            "@pdfium_linux_arm64//:VERSION": "pdfium/VERSION",
-        },
-        ":linux_x64": {
-            "@pdfium_linux_x64//:lib/libpdfium.so": "pdfium/libpdfium.so",
-            "@pdfium_linux_x64//:VERSION": "pdfium/VERSION",
-        },
-        ":macos_arm64": {
-            "@pdfium_mac_arm64//:lib/libpdfium.dylib": "pdfium/libpdfium.dylib",
-            "@pdfium_mac_arm64//:VERSION": "pdfium/VERSION",
-        },
-        ":macos_x64": {
-            "@pdfium_mac_x64//:lib/libpdfium.dylib": "pdfium/libpdfium.dylib",
-            "@pdfium_mac_x64//:VERSION": "pdfium/VERSION",
-        },
-        ":windows_x64": {
-            "@pdfium_win_x64//:bin/pdfium.dll": "pdfium/pdfium.dll",
-            "@pdfium_win_x64//:VERSION": "pdfium/VERSION",
-        },
-        "//conditions:default": {},
-    }),
+        ":" + platform: {
+            "@pdfium_%s//:%s" % (archive, library): "pdfium/" + library.rpartition("/")[2],
+            "@pdfium_%s//:VERSION" % archive: "pdfium/VERSION",
+            "@pdfium_%s//:LICENSE" % archive: "pdfium/LICENSE",
+            "@pdfium_%s//:licenses" % archive: "pdfium/licenses/",
+        }
+        for platform, archive, library in [
+            ("linux_arm64", "linux_arm64", "lib/libpdfium.so"),
+            ("linux_x64", "linux_x64", "lib/libpdfium.so"),
+            ("macos_arm64", "mac_arm64", "lib/libpdfium.dylib"),
+            ("macos_x64", "mac_x64", "lib/libpdfium.dylib"),
+            ("windows_x64", "win_x64", "bin/pdfium.dll"),
+        ]
+    } | {"//conditions:default": {}}),
 )
 
 # `_jvm`, as kmp_library resolves `jvm_deps` to each label's JVM target.
@@ -93,6 +86,7 @@ kmp_test(
     android = True,
     associate = ":pdf",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    jvm_deps = ["//test/utils/parsers/pdf"],
     jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
     native_targets = [
         "linuxArm64",

@@ -100,6 +100,7 @@ internal class MmCommand(
             StrategiesCommand(),
             ImportDirsCommand(),
             SqlCommand(),
+            PdfLinesCommand(),
             ImportCommand(),
             TuiCommand(),
         )

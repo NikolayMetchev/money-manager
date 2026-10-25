@@ -83,6 +83,7 @@ mm accounts --owner "Alice Smith"                    # accounts with owners and 
 mm balances --asset GBP --non-zero                   # one row per account and asset
 mm transactions --account Current --from 2024-03-01  # newest first, with running balances
 mm sql "SELECT COUNT(*) FROM transfer"               # one read-only SQL query, for debugging
+mm pdf-lines statement.pdf                           # a PDF's text lines, as PDF line rules read them
 mm --push import all                                 # download + import every folder and API, then upload
 mm tui                                               # full-screen terminal UI: status & cloud sync, accounts, transactions, imports (? for keys, q to quit)
 ```

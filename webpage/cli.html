@@ -328,6 +328,16 @@ mm sql &lt;&lt;'EOF'
 SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name
 EOF</code></pre>
 
+      <h3><code>pdf-lines</code></h3>
+      <p class="synopsis"><code>mm pdf-lines FILE</code></p>
+      <p>
+        Prints a PDF's text lines (page, line number and text) as a CSV strategy's PDF line rules read them: the
+        glyphs sharing a baseline form a line, and columns stay two or more spaces apart, so a Capture pattern can
+        split them on <code>\s{2,}</code>. It opens no database. Use it to write a statement's line rules, or to see
+        why a row was missed.
+      </p>
+      <pre><code>mm --format table pdf-lines ~/Downloads/statement.pdf</code></pre>
+
       <h3><code>import dirs</code>, <code>import apis</code>, <code>import all</code></h3>
       <p class="synopsis">
         <code>mm import dirs [--dir NAME]… [--download-only] [--redownload]</code><br>

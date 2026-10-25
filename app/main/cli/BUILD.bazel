@@ -65,6 +65,8 @@ kmp_test(
     name = "test",
     associate = ":cli",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    jvm_deps = ["//test/utils/parsers/pdf"],
+    jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
     native_targets = [
         "linuxArm64",
         "linuxX64",
