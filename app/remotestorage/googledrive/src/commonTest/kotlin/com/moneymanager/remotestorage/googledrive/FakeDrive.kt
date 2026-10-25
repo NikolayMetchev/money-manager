@@ -24,7 +24,7 @@ import kotlinx.serialization.json.put
 /**
  * An in-memory Google Drive behind a Ktor [MockEngine]: just enough of `files.list` (the `q` terms the app sends,
  * paged by [pageSize]), folder create, multipart upload/update, `alt=media` download, metadata get and delete for
- * [GoogleDriveProvider] and [DriveImportFileSource]. [failures] answers a path with a status before anything else.
+ * [GoogleDriveProvider] and [DriveImportFileSource]. [failures] answers a path with a status (and [failureBodies] its body) before anything else.
  */
 class FakeDrive(
     private val pageSize: Int = Int.MAX_VALUE,
@@ -41,11 +41,14 @@ class FakeDrive(
         var revision: Int = 1,
         val sharedWithMe: Boolean = false,
         val appProperties: Map<String, String> = emptyMap(),
+        // Another app's file: drive.file lets this app read it, but an update is refused.
+        val readOnly: Boolean = false,
     )
 
     val items = mutableListOf<Item>()
     val requests = mutableListOf<HttpRequestData>()
     val failures = mutableMapOf<String, HttpStatusCode>()
+    val failureBodies = mutableMapOf<String, String>()
     private var nextId = 1
 
     val tokenSource: GoogleAccessTokenSource =
@@ -76,8 +79,21 @@ class FakeDrive(
         modifiedTime: String? = null,
         md5Checksum: String? = null,
         sharedWithMe: Boolean = false,
+        appProperties: Map<String, String> = emptyMap(),
+        readOnly: Boolean = false,
     ): Item =
-        Item("id${nextId++}", name, parent, mimeType, bytes, modifiedTime, md5Checksum, sharedWithMe = sharedWithMe).also {
+        Item(
+            "id${nextId++}",
+            name,
+            parent,
+            mimeType,
+            bytes,
+            modifiedTime,
+            md5Checksum,
+            sharedWithMe = sharedWithMe,
+            appProperties = appProperties,
+            readOnly = readOnly,
+        ).also {
             items +=
                 it
         }
@@ -91,7 +107,7 @@ class FakeDrive(
     private fun MockRequestHandleScope.handle(request: HttpRequestData): HttpResponseData {
         requests += request
         val path = request.url.encodedPath
-        failures[path]?.let { return respond("""{"error":"$it"}""", it) }
+        failures[path]?.let { return respond(failureBodies[path].orEmpty(), it) }
         val fileId = path.substringAfter("/files", "").removePrefix("/").ifEmpty { null }
         val upload = path.startsWith("/upload/")
         return when (request.method) {
@@ -201,6 +217,12 @@ class FakeDrive(
                 ).also { items += it }
             } else {
                 val existing = items.firstOrNull { it.id == fileId } ?: return respond("", HttpStatusCode.NotFound)
+                if (existing.readOnly) {
+                    return respond(
+                        """{"error":{"code":403,"message":"No write access","errors":[{"reason":"appNotAuthorizedToFile"}]}}""",
+                        HttpStatusCode.Forbidden,
+                    )
+                }
                 existing.also {
                     it.name = name
                     it.bytes = media
@@ -222,6 +244,9 @@ class FakeDrive(
             put("headRevisionId", "rev$revision")
             modifiedTime?.let { put("modifiedTime", it) }
             md5Checksum?.let { put("md5Checksum", it) }
+            if (appProperties.isNotEmpty()) {
+                put("appProperties", buildJsonObject { appProperties.forEach { (key, value) -> put(key, value) } })
+            }
         }
 
     private fun MockRequestHandleScope.json(body: JsonObject) =
