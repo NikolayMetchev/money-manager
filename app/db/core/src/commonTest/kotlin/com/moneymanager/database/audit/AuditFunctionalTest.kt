@@ -476,7 +476,7 @@ class AuditFunctionalTest : DbTest() {
                     ),
                 )
 
-            repositories.transactionRepository.deleteTransaction(transfer.id.id)
+            repositories.transactionRepository.deleteTransactions(listOf(transfer.id))
 
             val auditHistory = database.auditSelectQueries.selectAuditHistoryForTransfer(transfer.id.id).awaitAsList()
 

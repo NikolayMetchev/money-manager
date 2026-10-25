@@ -131,7 +131,7 @@ class TransferRelationshipReconciliationTest : DbTest() {
 
             // Deleting one side of the pair must remove the relationship (FK transfer(id) ON DELETE CASCADE),
             // leaving no stale reconciliation link on the surviving transfer.
-            repositories.transactionRepository.deleteTransaction(duplicateId.id)
+            repositories.transactionRepository.deleteTransactions(listOf(duplicateId))
 
             assertEquals(emptyList(), repositories.transferRelationshipRepository.getByTransfer(originalId).first())
             assertEquals(emptyList(), repositories.transferRelationshipRepository.getByTransfer(duplicateId).first())

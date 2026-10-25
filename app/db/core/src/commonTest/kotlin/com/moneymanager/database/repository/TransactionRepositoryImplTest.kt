@@ -370,7 +370,7 @@ class TransactionRepositoryImplTest : DbTest() {
     // OTHER TRANSACTION TESTS
 
     @Test
-    fun `deleteTransaction should remove transaction`() =
+    fun `deleteTransactions should remove the transactions`() =
         runDbTest {
             val now = Clock.System.now()
 
@@ -402,7 +402,7 @@ class TransactionRepositoryImplTest : DbTest() {
             val createdTransfer = createTransfer(transfer)
 
             // Delete transaction
-            repositories.transactionRepository.deleteTransaction(createdTransfer.id.id)
+            repositories.transactionRepository.deleteTransactions(listOf(createdTransfer.id))
 
             val deleted = repositories.transactionRepository.getTransactionById(createdTransfer.id.id).first()
             assertEquals(null, deleted)

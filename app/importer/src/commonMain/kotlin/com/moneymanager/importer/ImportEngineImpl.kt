@@ -97,8 +97,12 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-/** Emit a delete-phase progress update every N rows rather than per row — one delete is cheap. */
-private const val DELETE_PROGRESS_EVERY_ROWS = 50
+/**
+ * Transfers and trades are deleted this many per database transaction, with a progress update after each:
+ * a commit per row waits on the disk every time (synchronous=FULL), which made a re-import's delete phase
+ * ~8x slower than its deletes.
+ */
+private const val DELETE_CHUNK_ROWS = 500
 
 /** Upper bound on the legs walked along one pass-through chain; real chains are a few hops (card → Curve → PayPal → merchant). */
 private const val MAX_PASS_THROUGH_CHAIN_LEGS = 16
@@ -384,27 +388,25 @@ class ImportEngineImpl(
         val deleteTotal = transferDeletes.size + tradeDeletes.size
         var deleted = 0
 
-        suspend fun reportDeleted() {
-            deleted++
-            if (onProgress != null && (deleted % DELETE_PROGRESS_EVERY_ROWS == 0 || deleted == deleteTotal)) {
-                onProgress(
-                    Progress(
-                        detail = "Deleting transactions",
-                        fraction = deleted.toFloat() / deleteTotal,
-                        processed = deleted,
-                        total = deleteTotal,
-                    ),
-                )
-            }
+        suspend fun reportDeleted(count: Int) {
+            deleted += count
+            onProgress?.invoke(
+                Progress(
+                    detail = "Deleting transactions",
+                    fraction = deleted.toFloat() / deleteTotal,
+                    processed = deleted,
+                    total = deleteTotal,
+                ),
+            )
         }
 
-        transferDeletes.forEach {
-            transactionRepository.deleteTransaction(requireNotNull(it.existingId).id)
-            reportDeleted()
+        transferDeletes.map { requireNotNull(it.existingId) }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
+            transactionRepository.deleteTransactions(chunk)
+            reportDeleted(chunk.size)
         }
-        tradeDeletes.forEach {
-            tradeRepository.deleteTrade(requireNotNull(it.existingId))
-            reportDeleted()
+        tradeDeletes.map { requireNotNull(it.existingId) }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
+            tradeRepository.deleteTrades(chunk)
+            reportDeleted(chunk.size)
         }
         batch.accountsToCreate.deletes().forEach { accountRepository.deleteAccount(requireNotNull(it.existingId)) }
         batch.categories.deletes().forEach { categoryRepository.deleteCategory(requireNotNull(it.existingId)) }

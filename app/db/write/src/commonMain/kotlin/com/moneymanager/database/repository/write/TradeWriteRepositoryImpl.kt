@@ -85,9 +85,11 @@ class TradeWriteRepositoryImpl(
         }
     }
 
-    override suspend fun deleteTrade(id: TradeId): Unit =
+    override suspend fun deleteTrades(ids: Collection<TradeId>): Unit =
         withContext(Dispatchers.Default) {
-            writeQueries.delete(id.id)
+            writeQueries.transaction {
+                ids.forEach { writeQueries.delete(it.id) }
+            }
         }
 
     override suspend fun upsertAttributes(
