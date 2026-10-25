@@ -38,7 +38,6 @@ import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createCsvImport
-import com.moneymanager.importengineapi.createXlsxImport
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
@@ -158,18 +157,7 @@ fun CsvImportsScreen(
         ) { result ->
             if (result != null) {
                 stageBinaryFile(result) { checksum, lastModified ->
-                    val parser = createXlsxParser()
-                    val sheetName = parser.sheetNames(result.bytes).firstOrNull() ?: ""
-                    val parsed = parser.parse(result.bytes, sheetName)
-                    importEngine.createXlsxImport(
-                        fileName = result.fileName,
-                        headers = parsed.headers,
-                        rows = parsed.rows,
-                        fileChecksum = checksum,
-                        fileLastModified = lastModified,
-                        xlsxBytes = result.bytes,
-                        xlsxWorksheetName = sheetName,
-                    )
+                    importEngine.stageXlsxFile(result, createXlsxParser(), checksum, lastModified)
                 }
             }
         }

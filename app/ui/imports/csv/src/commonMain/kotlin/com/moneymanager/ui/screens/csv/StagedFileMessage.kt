@@ -2,6 +2,9 @@ package com.moneymanager.ui.screens.csv
 
 import com.moneymanager.compose.filepicker.BinaryFilePickerResult
 import com.moneymanager.csvimporter.sha256Hex
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.createXlsxImport
+import com.moneymanager.xlsx.XlsxParser
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -32,3 +35,23 @@ internal suspend fun stagePickedFile(
     } catch (expected: Exception) {
         StagedFileMessage("${result.fileName}: ${expected.message}", isError = true)
     }
+
+/** Stages a picked Excel workbook's first worksheet, keeping the workbook so another sheet can be chosen later. */
+internal suspend fun ImportEngine.stageXlsxFile(
+    result: BinaryFilePickerResult,
+    parser: XlsxParser,
+    checksum: String,
+    lastModified: Instant,
+) {
+    val sheetName = parser.sheetNames(result.bytes).firstOrNull() ?: ""
+    val parsed = parser.parse(result.bytes, sheetName)
+    createXlsxImport(
+        fileName = result.fileName,
+        headers = parsed.headers,
+        rows = parsed.rows,
+        fileChecksum = checksum,
+        fileLastModified = lastModified,
+        xlsxBytes = result.bytes,
+        xlsxWorksheetName = sheetName,
+    )
+}
