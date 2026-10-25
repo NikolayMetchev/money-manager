@@ -303,12 +303,26 @@ suspend fun <R> ImportEngine.executeSourceRerun(
     )
 }
 
-/** The hand edits a re-import of [source] would put back, without the rest of [planSourceRerun]. */
+/**
+ * The hand edits re-importing each source would put back, without the rest of [planSourceRerun]. [created]
+ * holds what each source created ([TransferSourceReadRepository.getTransfersCreatedBy]); the hand edits
+ * among them all are looked up at once, so a "re-import all" costs one lookup rather than one per file.
+ * [onProgress] hears each source's step in [created]'s order.
+ */
 suspend fun manualEditsOf(
-    source: Source,
+    created: Map<Source, Map<TransferId, Source>>,
     reads: RerunReads,
-    onProgress: (suspend (Progress) -> Unit)? = null,
-): List<ManualEdit> = captureManualEdits(reads.transferSourceRepository.getTransfersCreatedBy(source), reads, onProgress)
+    onProgress: (suspend (Source, Progress) -> Unit)? = null,
+): Map<Source, List<ManualEdit>> {
+    val edited = reads.transferSourceRepository.getHandEditedTransferIds(created.values.flatMap { it.keys })
+    val current = if (edited.isEmpty()) emptyMap() else reads.transactionRepository.getTransactionsByIds(edited)
+    return created.mapValues { (source, transfers) ->
+        onProgress?.invoke(source, Progress(READING_MANUAL_EDITS))
+        readManualEdits(transfers, edited.filterTo(mutableSetOf()) { it in transfers }, current, reads) { progress ->
+            onProgress?.invoke(source, progress)
+        }
+    }
+}
 
 private suspend fun captureManualEdits(
     created: Map<TransferId, Source>,
@@ -318,8 +332,18 @@ private suspend fun captureManualEdits(
     onProgress?.invoke(Progress(READING_MANUAL_EDITS))
     val edited = reads.transferSourceRepository.getHandEditedTransferIds(created.keys)
     if (edited.isEmpty()) return emptyList()
-    val current = reads.transactionRepository.getTransactionsByIds(edited)
-    return edited.sortedBy { it.id }.withIndex().mapNotNull { (index, id) ->
+    return readManualEdits(created, edited, reads.transactionRepository.getTransactionsByIds(edited), reads, onProgress)
+}
+
+// [edited] are those of [created] edited by hand, [current] (at least) their transfers as they are now.
+private suspend fun readManualEdits(
+    created: Map<TransferId, Source>,
+    edited: Set<TransferId>,
+    current: Map<TransferId, Transfer>,
+    reads: RerunReads,
+    onProgress: (suspend (Progress) -> Unit)?,
+): List<ManualEdit> =
+    edited.sortedBy { it.id }.withIndex().mapNotNull { (index, id) ->
         onProgress?.invoke(Progress.counted(READING_MANUAL_EDITS, index, edited.size))
         val transfer = current[id] ?: return@mapNotNull null
         manualEditOf(
@@ -329,7 +353,6 @@ private suspend fun captureManualEdits(
             sources = reads.transferSourceRepository.getSourcesForTransaction(id),
         )
     }
-}
 
 private const val READING_MANUAL_EDITS = "Reading manual edits"
 

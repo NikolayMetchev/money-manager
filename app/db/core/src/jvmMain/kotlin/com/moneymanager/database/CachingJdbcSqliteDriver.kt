@@ -13,7 +13,6 @@ import java.sql.DriverManager
 import java.sql.PreparedStatement
 import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.concurrent.getOrSet
 
 /**
  * A file-backed SQLite driver that keeps compiled statements around instead of re-preparing them.
@@ -28,16 +27,31 @@ import kotlin.concurrent.getOrSet
  * — pragmas, schema DDL — are prepared and closed as before, since they run once). Closing a connection
  * closes its cached statements, so the cache cannot outlive the connection it belongs to.
  *
- * Connection handling mirrors SQLDelight's own `JdbcSqliteDriver` for file databases: one connection per
- * thread, opened on demand and closed when no transaction is in flight. That class is final, so this is a
- * sibling rather than a subclass.
+ * Connections are pooled rather than opened per call. A connection's first statement parses the whole
+ * schema, and every staged CSV file adds a table to it: on a database with ~475 of them, opening a
+ * connection and running one query took ~7.6 ms against ~0.007 ms on an open one, and SQLDelight's own
+ * `JdbcSqliteDriver` (which this mirrors otherwise) closes the connection after every query outside a
+ * transaction. A transaction keeps its connection until it ends, then hands it back. Every connection
+ * opened is kept until [close], so the pool settles at the most queries that ran at once, which the
+ * dispatchers bound (each costs ~1 MB, half of it the parsed schema). An idle connection holds no statement
+ * open, so it holds no read snapshot or lock. That class is final, so this is a sibling rather than a subclass.
  */
 class CachingJdbcSqliteDriver(
     private val url: String,
-    private val properties: Properties = Properties(),
+    properties: Properties = Properties(),
 ) : JdbcDriver() {
+    // After every INSERT sqlite-jdbc runs its own `SELECT last_insert_rowid()` for getGeneratedKeys, which
+    // SQLDelight never calls, and keeps that query open until the statement runs again. A cached INSERT
+    // would leave its pooled connection holding an open query, which blocks VACUUM ("SQL statements in
+    // progress") and pins a read snapshot.
+    private val properties =
+        Properties().apply {
+            putAll(properties)
+            put("jdbc.get_generated_keys", "false")
+        }
     private val transactions = ThreadLocal<Transaction>()
-    private val connections = ThreadLocal<Connection>()
+    private val idleConnections = ArrayDeque<Connection>()
+    private var closed = false
     private val statementCaches = ConcurrentHashMap<Connection, MutableMap<Int, CachedStatement>>()
     private val listeners = linkedMapOf<String, MutableSet<Query.Listener>>()
 
@@ -51,18 +65,30 @@ class CachingJdbcSqliteDriver(
             }
         }
 
-    override fun getConnection(): Connection = connections.getOrSet { DriverManager.getConnection(url, properties) }
+    override fun getConnection(): Connection =
+        synchronized(idleConnections) { idleConnections.removeLastOrNull() } ?: DriverManager.getConnection(url, properties)
 
     override fun closeConnection(connection: Connection) {
-        check(connections.get() == connection) { "Connections must be closed on the thread that opened them" }
-        if (transaction == null) {
-            statementCaches.remove(connection)?.values?.forEach { it.statement.close() }
-            connection.close()
-            connections.remove()
-        }
+        // A transaction's connection goes back only when the transaction ends (the setter above).
+        if (transaction != null) return
+        val pooled = synchronized(idleConnections) { (!closed).also { if (it) idleConnections.addLast(connection) } }
+        if (!pooled) discard(connection)
     }
 
-    override fun close() = Unit
+    /** Closes the idle connections; a connection still in use is closed when it is handed back. */
+    override fun close() {
+        val idle =
+            synchronized(idleConnections) {
+                closed = true
+                idleConnections.toList().also { idleConnections.clear() }
+            }
+        idle.forEach(::discard)
+    }
+
+    private fun discard(connection: Connection) {
+        statementCaches.remove(connection)?.values?.forEach { it.statement.close() }
+        connection.close()
+    }
 
     // SQLite transactions are explicit statements rather than autoCommit toggling, matching JdbcSqliteDriver.
     override fun Connection.beginTransaction() {
