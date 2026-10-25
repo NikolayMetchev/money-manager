@@ -8,7 +8,7 @@ import kotlin.test.assertFailsWith
 class DateFormatsTest {
     private val formats = DateFormats()
 
-    private fun reference(date: LocalDate) = { date }
+    private fun reference(date: LocalDate): () -> LocalDate = { date }
 
     @Test
     fun `month names read in either case and length`() {

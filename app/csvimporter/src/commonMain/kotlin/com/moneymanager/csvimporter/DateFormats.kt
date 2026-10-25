@@ -44,7 +44,7 @@ internal class DateFormats {
     ): LocalDate {
         val (text, numeric) = withMonthNumbers(value, pattern)
         if (YEAR_FIELD.containsMatchIn(numeric)) return format(numeric).parse(text)
-        val referenceDate = requireNotNull(reference) { "Date format '$pattern' has no year and nothing to take one from" }()
+        val referenceDate = requireNotNull(reference?.invoke()) { "Date format '$pattern' has no year and nothing to take one from" }
         val withYear = format("$numeric yyyy")
         val yearBefore = { withYear.parse("$text ${referenceDate.year - 1}") }
         // 29 February in a year that has none: only the year before can be meant.

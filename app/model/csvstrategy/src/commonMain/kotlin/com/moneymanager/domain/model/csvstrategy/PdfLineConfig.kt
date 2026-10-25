@@ -49,6 +49,3 @@ data class PdfLineConfig(
         val BASE_COLUMNS: List<String> = listOf(PAGE, LINE, TEXT)
     }
 }
-
-/** Whether this strategy reads PDFs: its [CsvStrategyConfig.pdfLines] turn a document's lines into rows. */
-fun CsvImportStrategy.isPdfStrategy(): Boolean = config.pdfLines != null

@@ -1873,7 +1873,7 @@ object BuiltInCsvStrategies {
                     naming("description", pattern = AMEX_PAYMENT_RECEIVED, unidentified = true),
                     naming("description", pattern = "^CREDIT BALANCE REFUNDED\\b", unidentified = true),
                     // The statement's column gaps collapse to single spaces, as the merchant reads in Amex's other exports.
-                    naming("description", pattern = "(?<merchant>.+)", name = "\${merchant}"),
+                    naming("description", pattern = "(?<merchant>.+)", name = $$"${merchant}"),
                 ),
             )
         return CsvImportStrategy(
