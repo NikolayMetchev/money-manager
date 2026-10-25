@@ -16,14 +16,6 @@ import com.moneymanager.domain.model.WellKnownIds
  * These settings are applied per-connection (not persisted to the database file).
  */
 object DatabaseConfig {
-    // Canonical values live in WellKnownIds (db-free, so the import modules can reference them); these
-    // aliases keep existing db-layer call sites and the seeding below working. The database seeds
-    // exactly these ids.
-    const val EXCLUDED_ATTR_TYPE_ID: Long = WellKnownIds.EXCLUDED_ATTR_TYPE_ID
-    const val RECONCILED_RELATIONSHIP_TYPE_ID: Long = WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID
-    const val FEE_RELATIONSHIP_TYPE_ID: Long = WellKnownIds.FEE_RELATIONSHIP_TYPE_ID
-    const val PASS_THROUGH_RELATIONSHIP_TYPE_ID: Long = WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID
-
     /**
      * SQL statements to execute when opening a database connection.
      * Applied to all database connections (JVM, Android, etc.)

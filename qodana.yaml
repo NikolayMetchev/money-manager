@@ -89,6 +89,16 @@ exclude:
   # breaks the build. EAP false positive.
   - name: UnnecessaryOptInAnnotation
     paths:
+      # [5] — native code is analysed against the JVM (each module's `:<name>_ide_native`), where kotlinx.cinterop,
+      # platform.* and the native-only libraries don't resolve, so their ExperimentalForeignApi opt-ins look unneeded.
+      - app/apiimport/src/nativeMain/kotlin/com/moneymanager/apiimport/LocaleEnvironment.kt
+      - app/model/core/src/linuxMain/kotlin/com/moneymanager/domain/MachineName.linux.kt
+      - app/model/core/src/nativeMain/kotlin/com/moneymanager/domain/DeviceInfoProvider.native.kt
+      - app/remotestorage/googledrive/src/linuxMain/kotlin/com/moneymanager/remotestorage/googledrive/SystemBrowserLauncher.linux.kt
+      - app/terminal/src/nativeMain/kotlin/com/moneymanager/terminal/Interrupts.native.kt
+      - utils/archive/src/nativeMain/kotlin/com/moneymanager/archive/Compression.native.kt
+      - utils/files/src/linuxMain/kotlin/com/moneymanager/files/LastModified.linux.kt
+      - utils/files/src/nativeMain/kotlin/com/moneymanager/files/Files.native.kt
       - app/ui
 
   # [2] — the project compiles (so every expect has its actuals); the linter's KMP model doesn't
@@ -112,6 +122,12 @@ exclude:
   # linter fails to resolve this experimental serialization API and calls the import unused.
   - name: KotlinUnusedImport
     paths:
+      # [5] — native code is analysed against the JVM (each module's `:<name>_ide_native`), where kotlinx.cinterop,
+      # platform.* and the native-only libraries don't resolve: `kotlinx.coroutines.IO` (native's Dispatchers.IO
+      # extension) and cinterop's `get` operator look unused.
+      - app/db/core/src/nativeMain/kotlin/com/moneymanager/database/NativeDatabaseManager.kt
+      - app/remotestorage/googledrive/src/linuxMain/kotlin/com/moneymanager/remotestorage/googledrive/SystemBrowserLauncher.linux.kt
+      - utils/coroutines/src/nativeMain/kotlin/com/moneymanager/coroutines/IoDispatcher.native.kt
       - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/navigation/ScreenSerialization.kt
       # [5] — `import kotlinx.coroutines.IO` (common Dispatchers.IO), used by withContext(Dispatchers.IO).
       - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/ImportDirectoryDiscovery.kt
@@ -160,6 +176,9 @@ exclude:
   # receiver's type lives in another module, so its members resolve to nothing here.
   - name: UnusedReceiverParameter
     paths:
+      # [5] — native code is analysed against the JVM (each module's `:<name>_ide_native`), where kotlinx.cinterop,
+      # platform.* and the native-only libraries don't resolve: zStream's MemScope receiver serves alloc<z_stream>().
+      - utils/archive/src/nativeMain/kotlin/com/moneymanager/archive/Compression.native.kt
       - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/ImportDirectoryScanner.kt
       - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/QifStagingConversion.kt
       - app/importfilesource/localfolder/src/androidMain/kotlin/com/moneymanager/importfilesource/localfolder/SafFolderImportFileSource.kt
@@ -195,6 +214,9 @@ exclude:
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/write/MoneyManagerDatabaseWrapper.kt
   - name: KDocUnresolvedReference
     paths:
+      # [5] — native code is analysed against the JVM (each module's `:<name>_ide_native`), where kotlinx.cinterop,
+      # platform.* and the native-only libraries don't resolve: SQLiter's NO_VERSION_CHECK.
+      - app/db/core/src/nativeMain/kotlin/com/moneymanager/database/NativeDatabaseManager.kt
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/write/MoneyManagerDatabaseWrapper.kt
 
   # The Starlark plugin reports rules and module extensions other files load (`aar_import = rule(...)`)
@@ -232,6 +254,10 @@ exclude:
   # fakes stubbing constants.
   - name: SameReturnValue
     paths:
+      # [5] — actuals whose answer is fixed on their platform: Linux terminals always take VT sequences, and native
+      # and the browser have no locale to give a default currency.
+      - app/terminal/src/linuxMain/kotlin/com/moneymanager/terminal/VirtualTerminal.linux.kt
+      - utils/currency/src/nonJvmMain/kotlin/com/moneymanager/currency/Currency.kt
       - app/importfilesource/di/src/androidMain/kotlin/com/moneymanager/importfilesource/di/CreateImportFileSourceFactory.android.kt
       - app/importfilesource/di/src/jvmMain/kotlin/com/moneymanager/importfilesource/di/CreateImportFileSourceFactory.jvm.kt
       - app/remotestorage/core/src/commonMain/kotlin/com/moneymanager/remotestorage/RemoteStorageProvider.kt
@@ -290,6 +316,10 @@ exclude:
   # "unused parameter".
   - name: unused
     paths:
+      # [5] — native actuals that ignore the AppComponentParams their expect takes (Android's need its Context).
+      - app/db/di/src/nativeMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.native.kt
+      - utils/credentialvault/di/src/nativeMain/kotlin/com/moneymanager/credentialvault/di/CreateVaultPathResolver.native.kt
+      - utils/localsettings/di/src/nativeMain/kotlin/com/moneymanager/localsettings/di/CreateLocalSettings.native.kt
       # revisionId in toDomain is unused by design (positional match for the generated mapper —
       # see the comment there); the in-code @Suppress can't carry the IDE's "unused" id because
       # RedundantSuppression then flags the detekt-only ids sharing the annotation.
@@ -354,6 +384,30 @@ exclude:
       - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/navigation/Screen.kt
   - name: UnusedSymbol
     paths:
+      # [5] — native and nonJvm actuals, which no JVM module links to their expects, and what only the CLI or
+      # another platform's source set calls (connectionPragmas: Android and the browser; the loopback factories:
+      # jvmMain and nativeMain actuals; runReadOnlySql: the CLI; PortableRegex and escapeRegex: every importer).
+      # The flips are random, so whole files are listed.
+      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/DatabaseConfig.kt
+      - app/importfilesource/di/src/commonMain/kotlin/com/moneymanager/importfilesource/di/LoopbackImportFileSources.kt
+      - app/importfilesource/di/src/nativeMain/kotlin/com/moneymanager/importfilesource/di/CreateDriveFolderBrowser.native.kt
+      - app/model/core/src/nativeMain/kotlin/com/moneymanager/domain/DeviceInfoProvider.native.kt
+      - app/model/core/src/nativeMain/kotlin/com/moneymanager/domain/model/RemoteCacheLocation.kt
+      - app/query/src/commonMain/kotlin/com/moneymanager/query/ReadOnlySql.kt
+      - app/remotestorage/di/src/nativeMain/kotlin/com/moneymanager/remotestorage/di/CreateRemoteStorageProviderFactory.native.kt
+      - app/terminal/src/linuxMain/kotlin/com/moneymanager/terminal/VirtualTerminal.linux.kt
+      - app/terminal/src/nativeMain/kotlin/com/moneymanager/terminal/Interrupts.native.kt
+      - app/terminal/src/nativeMain/kotlin/com/moneymanager/terminal/TerminalFacts.native.kt
+      - bazel/kmp/web/tests/greeting/native/greeting/Platform.kt
+      - utils/archive/src/nativeMain/kotlin/com/moneymanager/archive/Compression.native.kt
+      - utils/bigdecimal/src/nonJvmMain/kotlin/com/moneymanager/bigdecimal/BigDecimal.kt
+      - utils/bigdecimal/src/nonJvmMain/kotlin/com/moneymanager/bigdecimal/BigInteger.kt
+      - utils/coroutines/src/nativeMain/kotlin/com/moneymanager/coroutines/IoDispatcher.native.kt
+      - utils/currency/src/nonJvmMain/kotlin/com/moneymanager/currency/Currency.kt
+      - utils/files/src/linuxMain/kotlin/com/moneymanager/files/LastModified.linux.kt
+      - utils/regex/src/commonMain/kotlin/com/moneymanager/regex/CompileRegex.kt
+      - utils/regex/src/commonMain/kotlin/com/moneymanager/regex/PortableRegex.kt
+      - utils/regex/src/nativeMain/kotlin/com/moneymanager/regex/PortableRegex.kt
       # [1] — Metro binding containers (and the Metro plugin test's fixtures).
       - app/db/di/src/commonMain/kotlin/com/moneymanager/database/di/DatabaseManagerModule.kt
       - app/remotestorage/di/src/commonMain/kotlin/com/moneymanager/remotestorage/di/RemoteStorageModule.kt
