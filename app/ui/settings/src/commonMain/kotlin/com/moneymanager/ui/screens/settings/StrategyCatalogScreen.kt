@@ -373,6 +373,7 @@ private val kindFilterChips =
         StrategyKind.CSV to "CSV",
         StrategyKind.QIF to "QIF",
         StrategyKind.XLSX to "Excel",
+        StrategyKind.PDF to "PDF",
         StrategyKind.API to "API",
         StrategyKind.PASS_THROUGH to "Pass-through",
         StrategyKind.CURRENCIES to "Currencies",
@@ -383,6 +384,7 @@ private fun StrategyKind.displayName(): String =
         StrategyKind.CSV -> "CSV import strategy"
         StrategyKind.QIF -> "QIF import strategy"
         StrategyKind.XLSX -> "Excel import strategy"
+        StrategyKind.PDF -> "PDF import strategy"
         StrategyKind.API -> "API import strategy"
         StrategyKind.PASS_THROUGH -> "Pass-through definition"
         StrategyKind.GLOBAL_MAPPINGS -> "Global account mappings"

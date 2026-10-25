@@ -1,11 +1,15 @@
 package com.moneymanager.domain.strategy
 
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.isPdfStrategy
+import com.moneymanager.domain.model.csvstrategy.isQifStrategy
+import com.moneymanager.domain.model.csvstrategy.isXlsxStrategy
 
 /**
  * The kinds of strategy artifact stored in the shared library, one file per artifact on the remote.
- * CSV, QIF and XLSX are all `csv_import_strategy` rows (QIF and XLSX both ride the CSV engine); they
- * are separated here only so the filename suffix records which kind a file is. [GLOBAL_MAPPINGS] is
+ * CSV, QIF, XLSX and PDF are all `csv_import_strategy` rows (the others ride the CSV engine); they
+ * are separated here only so the filename suffix records which kind a file is ([libraryKind]). [GLOBAL_MAPPINGS] is
  * the single combined file holding all global account mappings. [PASS_THROUGH] is one pass-through
  * (conduit) account definition per file. [CURRENCIES] is the reference list of currencies a database is
  * seeded with (one file, [StrategyFileNaming.CURRENCIES_NAME]); applying it only adds missing codes.
@@ -14,11 +18,21 @@ enum class StrategyKind {
     CSV,
     QIF,
     XLSX,
+    PDF,
     API,
     GLOBAL_MAPPINGS,
     PASS_THROUGH,
     CURRENCIES,
 }
+
+/** Which of the CSV engine's kinds this strategy's library file is. */
+fun CsvImportStrategy.libraryKind(): StrategyKind =
+    when {
+        isPdfStrategy() -> StrategyKind.PDF
+        isQifStrategy() -> StrategyKind.QIF
+        isXlsxStrategy() -> StrategyKind.XLSX
+        else -> StrategyKind.CSV
+    }
 
 /**
  * Identity of a library artifact. For [StrategyKind.GLOBAL_MAPPINGS] the [name] is the fixed
@@ -58,6 +72,7 @@ object StrategyFileNaming {
     private const val CSV_INFIX = ".csv"
     private const val QIF_INFIX = ".qif"
     private const val XLSX_INFIX = ".xlsx"
+    private const val PDF_INFIX = ".pdf"
     private const val API_INFIX = ".api"
     private const val PASS_THROUGH_INFIX = ".passthrough"
     private const val CURRENCIES_INFIX = ".currencies"
@@ -67,6 +82,7 @@ object StrategyFileNaming {
             StrategyKind.CSV -> "${key.name}$CSV_INFIX$SUFFIX"
             StrategyKind.QIF -> "${key.name}$QIF_INFIX$SUFFIX"
             StrategyKind.XLSX -> "${key.name}$XLSX_INFIX$SUFFIX"
+            StrategyKind.PDF -> "${key.name}$PDF_INFIX$SUFFIX"
             StrategyKind.API -> "${key.name}$API_INFIX$SUFFIX"
             StrategyKind.GLOBAL_MAPPINGS -> "$GLOBAL_MAPPINGS_NAME$SUFFIX"
             StrategyKind.PASS_THROUGH -> "${key.name}$PASS_THROUGH_INFIX$SUFFIX"
@@ -82,6 +98,7 @@ object StrategyFileNaming {
         }
         return when {
             stem.endsWith(XLSX_INFIX) -> StrategyKey(StrategyKind.XLSX, stem.removeSuffix(XLSX_INFIX))
+            stem.endsWith(PDF_INFIX) -> StrategyKey(StrategyKind.PDF, stem.removeSuffix(PDF_INFIX))
             stem.endsWith(CSV_INFIX) -> StrategyKey(StrategyKind.CSV, stem.removeSuffix(CSV_INFIX))
             stem.endsWith(QIF_INFIX) -> StrategyKey(StrategyKind.QIF, stem.removeSuffix(QIF_INFIX))
             stem.endsWith(API_INFIX) -> StrategyKey(StrategyKind.API, stem.removeSuffix(API_INFIX))
