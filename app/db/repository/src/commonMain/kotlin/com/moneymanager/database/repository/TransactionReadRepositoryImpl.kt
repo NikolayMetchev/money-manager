@@ -134,6 +134,22 @@ class TransactionReadRepositoryImpl(
             )
         }
 
+    override suspend fun getTransactionsByAccountsWithAttributeValues(
+        accountIds: Collection<AccountId>,
+        values: Collection<String>,
+    ): List<Transfer> =
+        withContext(Dispatchers.Default) {
+            val ids = accountIds.map { it.id }.distinct()
+            if (ids.isEmpty() || values.isEmpty()) return@withContext emptyList()
+            // The account ids are bound twice per query; the values fill the rest of the variable limit.
+            val valuesPerQuery = (MAX_IDS_PER_QUERY - 2 * ids.size).coerceAtLeast(1)
+            val rows =
+                values.distinct().chunked(valuesPerQuery).flatMap { chunk ->
+                    transferSelectQueries.selectByAccountsWithAttributeValues(ids, chunk, TransferMapper::mapRaw).awaitAsList()
+                }
+            loadAttributesForTransfers(rows.distinctBy { it.id })
+        }
+
     override suspend fun getUnreversedTransfersTouchingAccounts(
         accountIds: Set<AccountId>,
         amounts: Set<Money>,
