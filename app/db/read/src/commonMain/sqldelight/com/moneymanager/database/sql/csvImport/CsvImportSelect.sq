@@ -152,5 +152,8 @@ SELECT file_bytes, worksheet_name FROM xlsx_import_blob WHERE csv_import_id = ?;
 selectPdfBlob:
 SELECT file_bytes, staged_rules_hash FROM pdf_import_blob WHERE csv_import_id = ?;
 
+selectPdfImportIds:
+SELECT csv_import_id FROM pdf_import_blob;
+
 selectPdfLines:
 SELECT page, line, text FROM pdf_import_line WHERE csv_import_id = ? ORDER BY page, line;

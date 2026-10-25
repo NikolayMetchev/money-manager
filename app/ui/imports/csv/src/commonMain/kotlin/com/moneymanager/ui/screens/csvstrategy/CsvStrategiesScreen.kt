@@ -44,6 +44,7 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.isPdfStrategy
 import com.moneymanager.domain.model.csvstrategy.isQifStrategy
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
@@ -293,6 +294,7 @@ fun CsvStrategiesScreen(
         } else {
             SelectCsvImportDialog(
                 csvImportRepository = csvImportRepository,
+                pdf = editingStrategy.isPdfStrategy(),
                 onCsvSelected = { csvImport ->
                     dismiss()
                     onEditStrategy(editingStrategy.id, csvImport.id)

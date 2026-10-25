@@ -31,6 +31,7 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csv.PdfTextLine
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
@@ -67,6 +68,9 @@ import kotlin.uuid.Uuid
  * Loads the CSV [csvImportId]'s columns and sample rows (and, when [strategyId] is non-null, the
  * existing strategy) from the repositories, then presents a tabbed form. Saving builds the strategy
  * via [buildStrategyFromEditorState] and navigates back.
+ *
+ * Over a PDF import the editor edits a PDF strategy: its line rules run over the import's stored lines as they
+ * change, and the rows they assemble are the columns and sample rows every tab reads.
  */
 @Composable
 fun CsvStrategyEditorScreen(
@@ -121,23 +125,35 @@ fun CsvStrategyEditorScreen(
     var editingAccountMapping by remember { mutableStateOf<AccountMapping?>(null) }
     var showAddAccountMappingDialog by remember { mutableStateOf(false) }
 
-    var rows by remember { mutableStateOf<List<CsvRow>>(emptyList()) }
+    var importRows by remember { mutableStateOf<List<CsvRow>>(emptyList()) }
     var rowsLoaded by remember { mutableStateOf(false) }
+
+    // Null until loaded, then the import's PDF lines (empty when it isn't a PDF import).
+    var pdfLines by remember { mutableStateOf<List<PdfTextLine>?>(null) }
+    LaunchedEffect(csvImportId, columnsOverride) {
+        pdfLines =
+            if (columnsOverride == null && csvImportId != null) {
+                csvImportRepository.getPdfSource(csvImportId)?.lines.orEmpty()
+            } else {
+                emptyList()
+            }
+    }
 
     LaunchedEffect(csvImportId, csvImport?.rowCount, columnsOverride) {
         if (columnsOverride != null) {
-            rows = sampleRowsOverride.orEmpty()
+            importRows = sampleRowsOverride.orEmpty()
             rowsLoaded = true
             return@LaunchedEffect
         }
         val import = csvImport ?: return@LaunchedEffect
         val id = csvImportId ?: return@LaunchedEffect
-        rows = csvImportRepository.getImportRows(id, limit = import.rowCount, offset = 0)
+        importRows = csvImportRepository.getImportRows(id, limit = import.rowCount, offset = 0)
         rowsLoaded = true
     }
 
     val currentImport = csvImport
-    val ready = (columnsOverride != null || currentImport != null) && rowsLoaded && strategyLoaded
+    val loadedPdfLines = pdfLines
+    val ready = (columnsOverride != null || currentImport != null) && rowsLoaded && strategyLoaded && loadedPdfLines != null
     if (!ready) {
         EditorPlaceholder(isEditMode = isEditMode, onBack = onBack) {
             CircularProgressIndicator()
@@ -152,10 +168,25 @@ fun CsvStrategyEditorScreen(
         return
     }
 
-    val csvColumns = columnsOverride ?: requireNotNull(currentImport).columns
-    val availableColumnNames = remember(csvColumns) { csvColumns.map { it.originalName }.toSet() }
+    val previewer = remember(loadedPdfLines) { loadedPdfLines.takeIf { it.isNotEmpty() }?.let(::PdfLinesPreviewer) }
+    val importColumns = columnsOverride ?: requireNotNull(currentImport).columns
+    val initialColumns =
+        remember(previewer, existingStrategy) {
+            previewer
+                ?.preview(
+                    existingStrategy
+                        ?.config
+                        ?.pdfLines
+                        ?.rules
+                        .orEmpty(),
+                )?.columns ?: importColumns
+        }
+    val availableColumnNames = remember(initialColumns) { initialColumns.map { it.originalName }.toSet() }
     val editKey = strategyId?.toString() ?: "create:${csvImportId?.toString() ?: "external"}"
-    val state = rememberCsvStrategyEditorState(editKey, existingStrategy, availableColumnNames)
+    val state = rememberCsvStrategyEditorState(editKey, existingStrategy, availableColumnNames, pdf = previewer != null)
+    val pdfPreview = previewer?.let { remember(it, state.pdfLineRules) { it.preview(state.pdfLineRules.orEmpty()) } }
+    val csvColumns = pdfPreview?.columns ?: importColumns
+    val rows = pdfPreview?.rows ?: importRows
 
     val firstRow = rows.firstOrNull()
 
@@ -304,6 +335,7 @@ fun CsvStrategyEditorScreen(
                         csvColumns = csvColumns,
                         firstRow = firstRow,
                         enabled = !state.isSaving,
+                        pdfPreview = pdfPreview,
                     )
                 }
 

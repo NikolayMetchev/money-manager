@@ -24,6 +24,9 @@ internal fun RulesTab(
     csvColumns: List<CsvColumn>,
     firstRow: CsvRow?,
     enabled: Boolean,
+    // The rows the line rules assemble from the PDF being edited against; null for a strategy over a CSV, QIF or
+    // Excel file.
+    pdfPreview: PdfLinesPreview? = null,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         state.pdfLineRules?.let { lineRules ->
@@ -43,6 +46,10 @@ internal fun RulesTab(
                 pathField = columnPathField(csvColumns, firstRow, enabled),
                 enabled = enabled,
             )
+            pdfPreview?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                PdfLinesPreviewTable(it)
+            }
             Spacer(modifier = Modifier.height(16.dp))
             Text("Rows", style = MaterialTheme.typography.titleSmall)
         }

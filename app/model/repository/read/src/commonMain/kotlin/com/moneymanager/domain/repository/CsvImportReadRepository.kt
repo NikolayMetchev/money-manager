@@ -76,4 +76,7 @@ interface CsvImportReadRepository {
 
     /** The file and its text lines for a PDF-backed import, or null for any other. */
     suspend fun getPdfSource(id: CsvImportId): PdfImportSource?
+
+    /** The imports staged from a PDF, which only a PDF strategy reads. */
+    suspend fun getPdfImportIds(): Set<CsvImportId>
 }
