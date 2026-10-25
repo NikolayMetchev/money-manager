@@ -119,4 +119,44 @@ class RuleEngineTest {
         val json = Json.encodeToString(rules)
         assertEquals(rules, Json.decodeFromString<List<StrategyRule>>(json))
     }
+
+    @Test
+    fun `a capture sets each named group and claims its target`() {
+        val rules =
+            listOf(
+                rule(
+                    RuleAction.Capture("From", """^(?<day>\d+) (?<mon>[A-Z][a-z]+)(?: (?<note>x))?$""", CaptureTarget.NEW_ROW),
+                    RuleAction.SetValue("date", RuleValue.Template("{day}-{mon}")),
+                ),
+                rule(RuleAction.Capture("From", """(?<other>.+)""", CaptureTarget.ROW)),
+            )
+        val outcome = engine.evaluate(rules, row("Card", "1", "2 Jan", "B", ""))
+        assertEquals(CaptureTarget.NEW_ROW, outcome.capture)
+        assertEquals(mapOf("day" to "2", "mon" to "Jan", "date" to "2-Jan", "other" to "2 Jan"), outcome.rewrites)
+    }
+
+    @Test
+    fun `a capture that doesn't match stops its rule`() {
+        val rules =
+            listOf(
+                rule(
+                    RuleAction.Capture("From", """^(?<day>\d+)$""", CaptureTarget.ROW),
+                    RuleAction.SetValue("date", RuleValue.constant("x")),
+                ),
+            )
+        val outcome = engine.evaluate(rules, row("Card", "1", "Jan", "B", ""))
+        assertNull(outcome.capture)
+        assertTrue(outcome.rewrites.isEmpty())
+    }
+
+    @Test
+    fun `capture group names come in order and once each`() {
+        assertEquals(listOf("a", "b"), captureGroupNames("""(?<a>x)(?:y)(?<b>z)|(?<a>w)"""))
+    }
+
+    @Test
+    fun `a capture round-trips through JSON`() {
+        val rule = rule(RuleAction.Capture("text", "(?<a>.)", CaptureTarget.DOCUMENT))
+        assertEquals(rule, Json.decodeFromString(StrategyRule.serializer(), Json.encodeToString(StrategyRule.serializer(), rule)))
+    }
 }

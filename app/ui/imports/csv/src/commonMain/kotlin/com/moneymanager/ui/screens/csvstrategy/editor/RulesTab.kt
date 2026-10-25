@@ -26,6 +26,26 @@ internal fun RulesTab(
     enabled: Boolean,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
+        state.pdfLineRules?.let { lineRules ->
+            Text("PDF lines", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "These rules run over each line of the statement's text first. A Capture rule's named groups " +
+                    "become columns: a line that starts a new row, one that continues it, or one holding a value " +
+                    "every row gets. The rows they build are what the field mappings and the rules below read.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            StrategyRulesEditor(
+                rules = lineRules,
+                onRulesChanged = { state.pdfLineRules = it },
+                context = RuleContext.PDF_LINE,
+                pathField = columnPathField(csvColumns, firstRow, enabled),
+                enabled = enabled,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Rows", style = MaterialTheme.typography.titleSmall)
+        }
         Text(
             "Each rule whose conditions all hold applies its actions to the row. Some rule must name the target " +
                 "account; a row no rule gives a direction is money out of the account.",

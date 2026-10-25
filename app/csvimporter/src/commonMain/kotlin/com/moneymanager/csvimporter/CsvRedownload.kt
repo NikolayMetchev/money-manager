@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.CsvRowLink
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryFile
 import com.moneymanager.domain.repository.CsvImportReadRepository
@@ -71,6 +72,8 @@ class CsvRedownload internal constructor(
     val lastModified: Instant,
     val xlsxBytes: ByteArray?,
     val plan: CsvRedownloadPlan,
+    // A PDF's new copy and lines, staged as raw lines: a strategy assembles them again on the next import.
+    val pdf: PdfImportSource? = null,
     internal val source: TrackedSource,
 )
 
@@ -172,12 +175,22 @@ private suspend fun prepareFromSource(
     val bytes = source.download(tracked.fileRef)
 
     val blob = csvImportRepository.getXlsxBlob(importId)
+    val stagedPdf = csvImportRepository.getPdfSource(importId)
+    val pdf = stagedPdf?.let { readPdf(bytes) }
     val (parsed, checksum) =
-        if (blob != null) {
-            createXlsxParser().parse(bytes, blob.worksheetName) to sha256Hex(bytes)
-        } else {
-            val content = bytes.decodeToString()
-            parseStagedCsv(content) to sha256Hex(content)
+        when {
+            blob != null -> {
+                createXlsxParser().parse(bytes, blob.worksheetName) to sha256Hex(bytes)
+            }
+
+            pdf != null -> {
+                PdfRowAssembler.rawLines(pdf.lines).let { CsvParseResult(it.headers, it.rows) } to sha256Hex(bytes)
+            }
+
+            else -> {
+                val content = bytes.decodeToString()
+                parseStagedCsv(content) to sha256Hex(content)
+            }
         }
 
     val other = csvImportRepository.findImportsByChecksum(checksum).firstOrNull { it.id != importId }
@@ -186,6 +199,18 @@ private suspend fun prepareFromSource(
     }
 
     val oldRows = csvImportRepository.getImportRows(importId, limit = maxOf(staged.rowCount, 1), offset = 0)
+    val plan =
+        if (stagedPdf?.stagedRulesHash != null) {
+            // Rows a strategy assembled have no counterpart among the new copy's raw lines, so imported ones block.
+            val imported = oldRows.filter { it.carriedStatus() != null }
+            when {
+                checksum == staged.fileChecksum -> CsvRedownloadPlan.Unchanged
+                imported.isNotEmpty() -> CsvRedownloadPlan.Blocked(imported)
+                else -> planCsvRedownload(staged, emptyList(), parsed.headers, parsed.rows, checksum)
+            }
+        } else {
+            planCsvRedownload(staged, oldRows, parsed.headers, parsed.rows, checksum)
+        }
     return CsvRedownload(
         importId = importId,
         headers = parsed.headers,
@@ -193,7 +218,8 @@ private suspend fun prepareFromSource(
         checksum = checksum,
         lastModified = entry.lastModifiedEpochMs?.let(Instant::fromEpochMilliseconds) ?: Clock.System.now(),
         xlsxBytes = bytes.takeIf { blob != null },
-        plan = planCsvRedownload(staged, oldRows, parsed.headers, parsed.rows, checksum),
+        plan = plan,
+        pdf = pdf,
         source = TrackedSource(tracked.directoryId, tracked.fileRef, tracked.fileName, entry.remoteContentHash),
     )
 }
@@ -326,6 +352,7 @@ suspend fun executeCsvRedownload(
                             carriedRows = plan.carriedRows,
                             rowIndexRemap = plan.rowIndexRemap,
                             xlsxBytes = redownload.xlsxBytes,
+                            pdf = redownload.pdf,
                         ),
                     ),
             ),

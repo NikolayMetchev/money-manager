@@ -133,6 +133,7 @@ workflow because label events start it: any other label's run skips, without can
 | `utils/localsettings/` (+ `di/`) | App-level settings kept outside any database (`lastDatabase`, remote bindings, vault path). Desktop JVM and native share one JSON file, `~/.moneymanager/settings.json` (`JsonLocalSettings` over a `SettingsText`), so the desktop app and the CLI see the same state; the browser keeps the same JSON in a `localStorage` item, and Android keeps SharedPreferences. The desktop app moves any old `java.util.prefs` values into the file on first use |
 | `utils/credentialvault/` | The encrypted, password-protected credential file (API tokens, Google refresh tokens) that outlives the DB — see **Credentials** |
 | `utils/parsers/{csv,qif,xlsx}/` | File-format parsers |
+| `utils/parsers/pdf/` | PDF text extraction: pdfium (bblanchon's prebuilt libraries, pinned in `MODULE.bazel`) called through FFM on the JVM, and `PdfLineBuilder`, which rebuilds layout lines from glyph positions (columns stay two or more spaces apart). Android, native and the browser report the platform unsupported, as xlsx does; stored lines still restage there |
 | `utils/rest/` | Shared Ktor `ApiClient`, request signing, SCA challenge signing (`ScaCrypto`: RSA keys + SHA256withRSA on cryptography-kotlin, so native too; suspending, as WebCrypto has no blocking calls) and API traffic recording |
 | `utils/httpclient/` | The one place the Ktor engine is chosen: `platformHttpClient()` runs on Ktor's `ktor-client-engine-defaults` (OkHttp on JVM/Android, Curl on Linux, Darwin on macOS, WinHttp on Windows; native TLS comes from the OS or the statically linked libcurl), found by engine discovery. Build every production `HttpClient` with it, never with a named engine. ProGuard keeps `OkHttpEngineContainer` for the ServiceLoader lookup |
 | `utils/compose/{filePicker,scrollbar}/` | Platform file/folder pickers and scrollbar widgets. In the browser a picker is an `<input type=file>`, a save is a download, and folders are unsupported |
@@ -384,6 +385,7 @@ exchange pipelines read the same `RuleOutcome`, so an action means the same thin
 | `TradeSide` | a trade or order buys or sells its base asset | `sideField`/`buyValues`/`fixedSideBuy` |
 | `Leg(group, role)` | the row is a debit/credit/by-sign leg of the named `LegGroupRule` | `legWhen`, `LegSide` |
 | `LedgerTradeLeg` | a ledger row feeds `ApiLedgerTrades` instead of booking a transfer | Kraken/Coinbase `excludeWhen` |
+| `Capture(path, pattern, target)` | a PDF line's named regex groups become columns; the line starts a row (`NEW_ROW`), continues it (`ROW`) or holds a value for every row (`DOCUMENT`) | — |
 
 `ConditionOp` has `POSITIVE`/`NEGATIVE` for amount signs, plus `EXISTS`/`MISSING` for paths. Built-ins write
 rules through small shorthands (`RuleShorthand.kt` in `app/strategies`: `onlyWhen`, `directionFromSign`,
@@ -400,6 +402,15 @@ What isn't a per-record decision stays structural config:
 | API fetching | One pipeline: `ApiAccountsSource` (`Downloaded`/`Single`) × `ApiDateWindowing` × `ApiPaging` (single/offset/before-cursor/forward-id/token), walked by one `PageWalker` | separate bank vs exchange paths and three hand-written pagination loops |
 | API ledger trades | `ApiLedgerTrades` (which rows join one is `LedgerTradeLeg`) | `reconcileTradeAmounts*`, `unpairedTradeLeg*` |
 | Transfer reconciliation | `ImportDeduper.reconcile()` over an ordered `ReconcileRule` table. Each rule only says how to find the existing record; one ranking decides which record stays counted (precise > approximate, named > placeholder, itemised > gross, ties keep the existing one) | nine cross-source classifiers |
+
+**PDF statements** are CSV strategies with `CsvStrategyConfig.pdfLines` (`PdfLineConfig`): one more rule list, run over
+the statement's text lines (`text`, `page`, `line`) by the same `RuleEngine`, whose `Capture` rules `PdfRowAssembler`
+(`app/csvimporter`) turns into the rows everything else reads. A PDF import is a CSV import whose original bytes and
+extracted lines are kept (`pdf_import_blob`, `pdf_import_line`), restaged whenever the line rules change. Statements
+without a year on each row use `DateTimeParsingMapping.yearFrom` (`ReferenceDate`): the latest date on or before a
+reference column (the statement date). A unique-id export's placeholder (a card statement's "PAYMENT RECEIVED")
+reconciles against the paying bank's record, in either order, as on `FuzzyAllFields`. The built-in American Express
+(PDF) strategy is all configuration.
 
 **One editor:** `StrategyRulesEditor` (`app/ui/components`) edits every rule list: an ordered list of rule cards,
 each with `ConditionsEditor` as "If" and its actions as "Then". A complete rule shows collapsed as its one-line `summary()` (`RuleSummary.kt`) until opened; one

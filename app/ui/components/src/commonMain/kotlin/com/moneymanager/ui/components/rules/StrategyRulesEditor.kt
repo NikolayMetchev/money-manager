@@ -43,9 +43,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.csvstrategy.PdfLineConfig
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
+import com.moneymanager.domain.model.rules.CaptureTarget
 import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ForeignAmount
 import com.moneymanager.domain.model.rules.LegRole
@@ -61,7 +64,13 @@ enum class RuleContext {
     API_TRANSACTION,
     API_TRADE,
     API_ACCOUNT,
+
+    /** A PDF statement's text lines, before they're assembled into rows. */
+    PDF_LINE,
 }
+
+/** The contexts that run over a record that becomes a transfer, trade or account. */
+private val RECORD_CONTEXTS = RuleContext.entries.toSet() - RuleContext.PDF_LINE
 
 /** One kind of [RuleAction] the editor can add: its label, where it makes sense, and a fresh instance. */
 enum class RuleActionKind(
@@ -69,19 +78,19 @@ enum class RuleActionKind(
     val contexts: Set<RuleContext>,
     val create: () -> RuleAction,
 ) {
-    ACCOUNT("Name an account", RuleContext.entries.toSet(), {
+    ACCOUNT("Name an account", RECORD_CONTEXTS, {
         RuleAction.Account(AccountSide.COUNTERPARTY, AccountNaming(value = ValueExpr(listOf(""))))
     }),
     DIRECTION("Set the direction", setOf(RuleContext.CSV_ROW, RuleContext.API_TRANSACTION), { RuleAction.SetDirection(incoming = true) }),
     FLIP("Flip source and target", setOf(RuleContext.CSV_ROW), { RuleAction.Flip }),
-    SWAP("Swap two values", RuleContext.entries.toSet(), { RuleAction.SwapValues("", "") }),
+    SWAP("Swap two values", RECORD_CONTEXTS, { RuleAction.SwapValues("", "") }),
     SET("Set a value", RuleContext.entries.toSet(), { RuleAction.SetValue("", RuleValue.constant("")) }),
     SKIP("Skip the record", RuleContext.entries.toSet(), { RuleAction.Skip }),
     EXCLUDE("Exclude from balances", setOf(RuleContext.CSV_ROW, RuleContext.API_TRANSACTION), { RuleAction.Exclude() }),
     ATTRIBUTE("Add an attribute", setOf(RuleContext.CSV_ROW, RuleContext.API_TRANSACTION, RuleContext.API_ACCOUNT), {
         RuleAction.Attribute("", RuleValue.read(""))
     }),
-    EXTERNAL_ID("Set the external id", RuleContext.entries.toSet(), { RuleAction.ExternalId(RuleValue.read("")) }),
+    EXTERNAL_ID("Set the external id", RECORD_CONTEXTS, { RuleAction.ExternalId(RuleValue.read("")) }),
     PERSON("Counterparty is a person", setOf(RuleContext.API_TRANSACTION), { RuleAction.CounterpartyIsPerson }),
     IGNORE_ID("Ignore the counterparty id", setOf(RuleContext.API_TRANSACTION), { RuleAction.IgnoreCounterpartyId }),
     FEE("Book a fee", setOf(RuleContext.CSV_ROW, RuleContext.API_TRANSACTION, RuleContext.API_TRADE), {
@@ -94,6 +103,7 @@ enum class RuleActionKind(
     TRADE_SIDE("Set the trade side", setOf(RuleContext.API_TRADE), { RuleAction.TradeSide(buy = true) }),
     LEG("Leg of a group", setOf(RuleContext.CSV_ROW), { RuleAction.Leg("", LegRole.Debit) }),
     LEDGER_LEG("Ledger trade leg", setOf(RuleContext.API_TRANSACTION), { RuleAction.LedgerTradeLeg }),
+    CAPTURE("Capture values", setOf(RuleContext.PDF_LINE), { RuleAction.Capture(PdfLineConfig.TEXT, "", CaptureTarget.NEW_ROW) }),
     ;
 
     companion object {
@@ -116,6 +126,7 @@ enum class RuleActionKind(
                 is RuleAction.TradeSide -> TRADE_SIDE
                 is RuleAction.Leg -> LEG
                 RuleAction.LedgerTradeLeg -> LEDGER_LEG
+                is RuleAction.Capture -> CAPTURE
             }
 
         fun availableIn(context: RuleContext): List<RuleActionKind> = entries.filter { context in it.contexts }
@@ -128,6 +139,7 @@ fun RuleContext.accountSides(): List<AccountSide> =
         RuleContext.CSV_ROW -> listOf(AccountSide.SOURCE, AccountSide.TARGET, AccountSide.INTERMEDIATE)
         RuleContext.API_TRANSACTION, RuleContext.API_TRADE -> listOf(AccountSide.COUNTERPARTY)
         RuleContext.API_ACCOUNT -> listOf(AccountSide.OWN)
+        RuleContext.PDF_LINE -> emptyList()
     }
 
 /** Whether every rule has the inputs its conditions and actions need. */
@@ -163,6 +175,8 @@ private fun RuleAction.isComplete(): Boolean =
         is RuleAction.ThroughConduit -> accountName.isNotBlank()
 
         is RuleAction.Leg -> group.isNotBlank() && (role as? LegRole.BySign)?.path?.isNotBlank() ?: true
+
+        is RuleAction.Capture -> path.isNotBlank() && pattern.isNotBlank() && Extraction(pattern).isValid
 
         RuleAction.Flip, is RuleAction.SetDirection, RuleAction.Skip, RuleAction.CounterpartyIsPerson,
         RuleAction.IgnoreCounterpartyId, is RuleAction.TradeSide, RuleAction.LedgerTradeLeg,
@@ -493,11 +507,31 @@ private fun ActionFields(
             LegRoleEditor(action.role, { onActionChanged(action.copy(role = it)) }, pathField, enabled)
         }
 
+        is RuleAction.Capture -> {
+            pathField.Field("Read", action.path, { onActionChanged(action.copy(path = it)) }, action.path.isBlank())
+            TextField(
+                "Pattern (each (?<name>…) group becomes a column)",
+                action.pattern,
+                enabled,
+                isError = action.pattern.isBlank() || !Extraction(action.pattern).isValid,
+            ) { onActionChanged(action.copy(pattern = it)) }
+            ChoiceDropdown("The line", action.target, CaptureTarget.entries, { it.label() }, enabled) {
+                onActionChanged(action.copy(target = it))
+            }
+        }
+
         RuleAction.Flip, RuleAction.Skip, RuleAction.CounterpartyIsPerson, RuleAction.IgnoreCounterpartyId,
         RuleAction.LedgerTradeLeg,
         -> {}
     }
 }
+
+private fun CaptureTarget.label(): String =
+    when (this) {
+        CaptureTarget.NEW_ROW -> "Starts a new row"
+        CaptureTarget.ROW -> "Continues the row"
+        CaptureTarget.DOCUMENT -> "Holds a value for every row"
+    }
 
 private fun AccountSide.label(): String =
     when (this) {

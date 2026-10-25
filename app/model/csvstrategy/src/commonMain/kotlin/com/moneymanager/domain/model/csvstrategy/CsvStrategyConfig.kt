@@ -61,6 +61,8 @@ import kotlinx.serialization.encoding.Encoder
  *                      mints a duplicate asset nor fails to match.
  * @property reconciliation When set, this strategy imports a reconciliation source into shadow
  *                          accounts only (see [ReconciliationConfig]). Null for ordinary strategies.
+ * @property pdfLines When set, this strategy reads PDFs: these rules assemble a document's lines into the
+ *                    rows everything else here then reads (see [PdfLineConfig]). Null for CSV, QIF and Excel.
  */
 @Serializable
 data class CsvStrategyConfig<out M>(
@@ -94,6 +96,9 @@ data class CsvStrategyConfig<out M>(
     // NEVER-encoded when empty, same rationale.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val assetCodes: AssetCodeRules = AssetCodeRules(),
+    // NEVER-encoded when null, same rationale.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val pdfLines: PdfLineConfig? = null,
 ) {
     /** This config with each field mapping replaced by [transform]'s result, everything else unchanged. */
     fun <N> mapFieldMappings(transform: (M) -> N): CsvStrategyConfig<N> =
@@ -109,6 +114,7 @@ data class CsvStrategyConfig<out M>(
             legGroups = legGroups,
             reconciliation = reconciliation,
             assetCodes = assetCodes,
+            pdfLines = pdfLines,
         )
 }
 

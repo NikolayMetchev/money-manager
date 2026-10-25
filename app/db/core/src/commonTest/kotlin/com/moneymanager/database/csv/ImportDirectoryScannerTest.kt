@@ -204,23 +204,23 @@ class ImportDirectoryScannerTest : DbTest() {
         }
 
     @Test
-    fun `scan skips unsupported files like pdf and stages only supported ones`() =
+    fun `scan skips unsupported files like docx and stages only supported ones`() =
         runDbTest {
             val engine = engine()
             val directory = newDirectory(engine)
             val source =
                 FakeFileSource(
                     listOf(
-                        FileSpec("statement.pdf", "%PDF-1.4 not a real pdf", 1_000),
+                        FileSpec("statement.docx", "not a spreadsheet", 1_000),
                         FileSpec("jan.csv", csvV1, 1_000),
                     ),
                 )
 
             val result = scan(engine, directory, source)
             assertEquals(1, result.filesDownloaded, "only the csv is staged")
-            assertEquals(1, result.filesSkipped, "the pdf is skipped")
-            // The PDF must never have been staged (no tracking row, no import).
-            assertEquals(null, repositories.importDirectoryRepository.getTrackedFile(directory.id, "statement.pdf"))
+            assertEquals(1, result.filesSkipped, "the docx is skipped")
+            // The docx must never have been staged (no tracking row, no import).
+            assertEquals(null, repositories.importDirectoryRepository.getTrackedFile(directory.id, "statement.docx"))
             assertEquals(
                 1,
                 repositories.csvImportRepository

@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExport
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
+import com.moneymanager.domain.model.csvstrategy.PdfLineConfig
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.passthrough.export.PassThroughExport
 import com.moneymanager.domain.model.rules.StrategyRule
@@ -62,6 +63,7 @@ class StrategyExportUnsortedCollectionGuardTest {
             ApiValueSet.Union::class to "sets",
             // Rules run in order (first claim wins, rewrites are seen by later rules), and so do a rule's actions.
             CsvStrategyConfig::class to "rules",
+            PdfLineConfig::class to "rules",
             ApiAccountMappings::class to "rules",
             ApiTransactionMappings::class to "rules",
             ApiTradeMappings::class to "rules",

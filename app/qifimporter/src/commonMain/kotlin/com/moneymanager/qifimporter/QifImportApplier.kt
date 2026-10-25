@@ -13,6 +13,7 @@ import com.moneymanager.csvimporter.buildFirstRowByAccountName
 import com.moneymanager.csvimporter.buildPendingAccountMappings
 import com.moneymanager.csvimporter.byContentScoreThenNameThenId
 import com.moneymanager.csvimporter.contentScore
+import com.moneymanager.csvimporter.effectiveSourceFor
 import com.moneymanager.csvimporter.fuzzyDedupePolicy
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
@@ -163,7 +164,8 @@ suspend fun bulkApplyQif(
 
             // The strategy's own (configured) currency is used — no per-import override.
             val strategy = matched
-            val effectiveSourceAccountId = directoryAccounts[qifImport.id] ?: sourceAccountId
+            // A strategy that names its own source account keeps it; the folder's or shared pick is for the others.
+            val effectiveSourceAccountId = effectiveSourceFor(strategy, directoryAccounts[qifImport.id] ?: sourceAccountId)
             if (effectiveSourceAccountId == null && strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT] == null) {
                 outcome(BulkFileStatus.SKIPPED_NO_STRATEGY)
                 return@forEachIndexed

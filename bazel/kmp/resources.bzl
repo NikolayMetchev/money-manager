@@ -33,3 +33,34 @@ kmp_resource_jar = rule(
         "_tool": attr.label(default = "//bazel/kmp/resources", executable = True, cfg = "exec"),
     },
 )
+
+def _file_resource_jar_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + ".jar")
+    args = ctx.actions.args()
+    args.add("--out", out)
+    files = []
+    for target, entry in ctx.attr.entries.items():
+        target_files = target.files.to_list()
+        if len(target_files) != 1:
+            fail("%s must be one file, got %d" % (target.label, len(target_files)))
+        args.add("%s=%s" % (entry, target_files[0].path))
+        files.append(target_files[0])
+    ctx.actions.run(
+        executable = ctx.executable._tool,
+        arguments = [args],
+        inputs = files,
+        outputs = [out],
+        mnemonic = "KmpResources",
+        progress_message = "Packing %{label}",
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+file_resource_jar = rule(
+    implementation = _file_resource_jar_impl,
+    doc = "Packs single files from anywhere (another repository's, say) into a resource jar, each at its named " +
+          "entry. Wrap it in a `java_import` for a JVM library to take as a runtime dep.",
+    attrs = {
+        "entries": attr.label_keyed_string_dict(allow_files = True, doc = "File → its path in the jar."),
+        "_tool": attr.label(default = "//bazel/kmp/resources", executable = True, cfg = "exec"),
+    },
+)

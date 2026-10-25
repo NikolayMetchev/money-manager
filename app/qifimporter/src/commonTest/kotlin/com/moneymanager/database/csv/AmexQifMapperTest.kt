@@ -3,6 +3,7 @@ package com.moneymanager.database.csv
 import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.MappingResult
+import com.moneymanager.csvimporter.needsSourceAccountOverride
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
@@ -14,6 +15,7 @@ import com.moneymanager.qifimporter.qifCompatible
 import com.moneymanager.qifimporter.selectForQifContent
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.time.Clock
@@ -35,7 +37,10 @@ class AmexQifMapperTest {
         reference: String = "10550530",
     ): CsvRow = CsvRow(rowIndex = 1, values = listOf("19/03/2020", amount, payee, memo, "", "", reference, "", ""))
 
-    private fun map(row: CsvRow): MappingResult.Success {
+    private fun map(
+        row: CsvRow,
+        sourceAccountOverride: AccountId? = amex.id,
+    ): MappingResult.Success {
         val mapper =
             CsvTransferMapper(
                 strategy = strategy,
@@ -43,7 +48,7 @@ class AmexQifMapperTest {
                 existingAccounts = mapOf(amex.name to amex),
                 existingCurrencies = mapOf(gbp.id to gbp),
                 existingCurrenciesByCode = mapOf(gbp.code to gbp),
-                sourceAccountOverride = amex.id,
+                sourceAccountOverride = sourceAccountOverride,
             )
         val result = mapper.mapRow(row)
         return assertIs<MappingResult.Success>(result, "mapping failed: $result")
@@ -59,6 +64,13 @@ class AmexQifMapperTest {
         assertEquals("10698290", attributes["amex-reference"])
         assertEquals("19/03/2020", attributes["amex-process-date"])
         assertEquals("GOODS", attributes["amex-merchant-type"])
+    }
+
+    @Test
+    fun `the strategy names the card account itself whatever folder the file came from`() {
+        val r = map(row("AMAZON.CO.UK", "-9.99", " GOODS Process Date 19/03/2020"), sourceAccountOverride = null)
+        assertEquals(amex.id, r.transfer.sourceAccountId)
+        assertFalse(strategy.needsSourceAccountOverride())
     }
 
     @Test

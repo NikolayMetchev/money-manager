@@ -455,6 +455,10 @@ exclude:
       - utils/localsettings/di/src/androidMain/kotlin/com/moneymanager/localsettings/di/CreateLocalSettings.android.kt
       - utils/localsettings/di/src/commonMain/kotlin/com/moneymanager/localsettings/di/CreateLocalSettings.kt
       - utils/localsettings/di/src/jvmMain/kotlin/com/moneymanager/localsettings/di/CreateLocalSettings.jvm.kt
+      - utils/parsers/pdf/src/androidMain/kotlin/com/moneymanager/pdf/PdfTextExtractor.android.kt
+      - utils/parsers/pdf/src/commonMain/kotlin/com/moneymanager/pdf/PdfTextExtractor.kt
+      - utils/parsers/pdf/src/jvmMain/kotlin/com/moneymanager/pdf/PdfTextExtractor.jvm.kt
+      - utils/parsers/pdf/src/nonJvmMain/kotlin/com/moneymanager/pdf/PdfTextExtractor.nonJvm.kt
       - utils/parsers/xlsx/src/androidMain/kotlin/com/moneymanager/xlsx/XlsxParser.android.kt
       - utils/parsers/xlsx/src/commonMain/kotlin/com/moneymanager/xlsx/XlsxParser.kt
       - utils/parsers/xlsx/src/jvmMain/kotlin/com/moneymanager/xlsx/XlsxParser.jvm.kt

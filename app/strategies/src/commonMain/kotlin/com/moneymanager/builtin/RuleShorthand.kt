@@ -18,11 +18,12 @@ import com.moneymanager.domain.model.rules.ValueExpr
 // Shorthand for the rules the built-in strategies declare. It only builds config: everything here is
 // plain StrategyRule data, editable like any user-written rule.
 
-/** A rule doing [actions] when every one of [conditions] holds. */
+/** A rule doing [actions] when every one of [conditions] holds, [name] saying what it's for. */
 internal fun rule(
     vararg actions: RuleAction,
     conditions: List<Condition> = emptyList(),
-): StrategyRule = StrategyRule(conditions = conditions, actions = actions.toList())
+    name: String? = null,
+): StrategyRule = StrategyRule(name = name, conditions = conditions, actions = actions.toList())
 
 /** [field]'s account is named by the strategy's rules; new accounts go under [defaultCategoryId]. */
 internal fun accountFromRules(

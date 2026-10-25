@@ -1,12 +1,16 @@
 package com.moneymanager.csvimporter
 
 import com.moneymanager.domain.model.csv.CsvColumn
+import com.moneymanager.domain.model.csv.CsvColumnId
+import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.rules.ColumnRecord
 import com.moneymanager.domain.model.rules.RuleEvaluator
+import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.regex.compileRegex
+import kotlin.uuid.Uuid
 
 /** Number of leading rows sampled when content-scoring a file against a strategy. */
 const val STRATEGY_CONTENT_SAMPLE_SIZE = 50
@@ -50,6 +54,8 @@ fun CsvImportStrategy.contentScore(
  *    [STRATEGY_CONTENT_SAMPLE_SIZE] of [rows]; only scores covering at least half the sample count.
  *    The threshold keeps a file that merely *contains* a few matching rows (e.g. crypto.com's
  *    crypto_ file carrying the odd viban_purchase) from being misrouted — such files are skipped.
+ *    With [wholeDocument] (a PDF's lines, where a statement names its issuer on one line of hundreds)
+ *    every row is scored and one matching row is enough.
  * 3. **Fallback**: a candidate carrying no signals at all (no content rules, no filename pattern)
  *    matches on columns alone — the pre-existing behavior for single-strategy column sets.
  *
@@ -60,6 +66,7 @@ fun List<CsvImportStrategy>.selectForCsv(
     fileName: String,
     columns: List<CsvColumn>,
     rows: List<CsvRow>,
+    wholeDocument: Boolean = false,
 ): CsvImportStrategy? {
     val headings = columns.map { it.originalName }.toSet()
     // Exact column match first (the strict, unchanged behaviour). Only when nothing matches exactly,
@@ -74,7 +81,7 @@ fun List<CsvImportStrategy>.selectForCsv(
     if (candidates.isEmpty()) return null
 
     val indexByName = columns.associate { it.originalName to it.columnIndex }
-    val sample = rows.take(STRATEGY_CONTENT_SAMPLE_SIZE)
+    val sample = if (wholeDocument) rows else rows.take(STRATEGY_CONTENT_SAMPLE_SIZE)
 
     val fileNameMatches = candidates.filter { it.matchesFileName(fileName) }
     if (fileNameMatches.isNotEmpty()) {
@@ -84,7 +91,7 @@ fun List<CsvImportStrategy>.selectForCsv(
             ?.first
     }
 
-    val minScore = maxOf(1, (sample.size + 1) / 2)
+    val minScore = if (wholeDocument) 1 else maxOf(1, (sample.size + 1) / 2)
     val contentMatch =
         candidates
             .map { it to it.contentScore(sample, indexByName) }
@@ -102,4 +109,24 @@ private fun CsvImportStrategy.matchesFileName(fileName: String): Boolean {
     // A malformed user-entered pattern must not break selection for every other strategy.
     return runCatching { compileRegex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(fileName) }
         .getOrDefault(false)
+}
+
+/**
+ * Picks the strategy for the staged [csvImport] (see [selectForCsv]), reading what it needs from
+ * [csvImportRepository]. A PDF import is matched on its text lines, whatever rows a strategy has staged from
+ * them since, so it can match again (and differently) once its strategies change.
+ */
+suspend fun List<CsvImportStrategy>.selectForImport(
+    csvImport: CsvImport,
+    csvImportRepository: CsvImportReadRepository,
+): CsvImportStrategy? {
+    val pdf = csvImportRepository.getPdfSource(csvImport.id)
+    if (pdf != null) {
+        val staged = PdfRowAssembler.rawLines(pdf.lines)
+        val columns = staged.headers.mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }
+        val rows = staged.rows.mapIndexed { index, values -> CsvRow(index + 1L, values) }
+        return selectForCsv(csvImport.originalFileName, columns, rows, wholeDocument = true)
+    }
+    val sampleRows = csvImportRepository.getImportRows(csvImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
+    return selectForCsv(csvImport.originalFileName, csvImport.columns, sampleRows)
 }

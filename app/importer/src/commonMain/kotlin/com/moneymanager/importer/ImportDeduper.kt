@@ -139,6 +139,11 @@ class ImportDeduper(
      */
     private val claimedReconcileTargets: Set<TransferId> = emptySet(),
     /**
+     * Existing legs excluded because another record keeps their movement (the `id1` of a `reconciled`
+     * relationship), each mapped to that record (its `id2`).
+     */
+    private val reconciledInto: Map<TransferId, TransferId> = emptyMap(),
+    /**
      * Accounts this import books legs against itself. A leg whose counterparty is one of them is a
      * movement this export lists in its own right (a crypto.com wallet statement records both a bank
      * withdrawal and a card top-up), never a second source's record of the row being classified — so the
@@ -799,7 +804,8 @@ class ImportDeduper(
         val matched = rule.find(transfer, window) ?: return null
         // An incoming leg the source itself excluded records nothing, so it supersedes nothing either.
         val found = if (transfer.isExcluded(exclusionTypeId)) matched.copy(supersedes = emptyList()) else matched
-        consumedReconcileIds += found.claims
+        // Nor does it claim the leg: a later counted record of the same movement must still find it.
+        if (!transfer.isExcluded(exclusionTypeId)) consumedReconcileIds += found.claims
         pairedInBatch += found.id
         supersede(found.supersedes)
         // Superseded legs are linked too, so the exclusion they take on stays explained — and is lifted by
@@ -851,9 +857,19 @@ class ImportDeduper(
         ReconcileRule(Keeps.EXISTING) { transfer, window ->
             val key = DirectedAmountKey(transfer.fromAccount.requireId(), transfer.toAccount.requireId(), transfer.amount)
             reconcileCandidatesByDirectedAmount[key]
-                ?.firstOrNull { (id, existing) -> id !in existingExcludedLegs && reconcileMatches(transfer, existing, window) }
+                ?.firstOrNull { (id, existing) -> standsForCountedMovement(id) && reconcileMatches(transfer, existing, window) }
                 ?.let { (id, existing) -> Found(id, existing, claims = emptyList()) }
         }
+
+    /**
+     * Whether pairing with existing leg [id] still leaves its movement counted once: it is counted, or it was
+     * excluded only because a record that is still counted keeps the same movement (a card statement's
+     * payment reconciled against the paying bank's record, met again on a second statement of the card).
+     * A keeper this import didn't load is unknown, so it isn't taken for counted.
+     */
+    private fun standsForCountedMovement(id: TransferId): Boolean =
+        id !in existingExcludedLegs ||
+            reconciledInto[id]?.let { keeper -> keeper in existingById && keeper !in existingExcludedLegs } == true
 
     /**
      * A conduit's own record of a payment (e.g. a Curve export row) against the funding leg that put the
@@ -1325,6 +1341,18 @@ class ImportDeduper(
             policy.reconciledExclusionAttributeTypeId,
             policy.reconciledRelationshipTypeId,
         )?.let { return it }
+
+        // A card's own statement says only "PAYMENT RECEIVED" where the paying bank's names both ends: the
+        // record naming the far end is kept, in either import order (as for ApiMultiKey).
+        for (rule in listOf(placeholderTwin, identifiedTwin)) {
+            reconcile(
+                transfer,
+                rule,
+                policy.unidentifiedCounterpartyWindow,
+                policy.reconciledExclusionAttributeTypeId,
+                policy.reconciledRelationshipTypeId,
+            )?.let { return it }
+        }
 
         return Classified(transfer, ImportStatus.IMPORTED, null)
     }

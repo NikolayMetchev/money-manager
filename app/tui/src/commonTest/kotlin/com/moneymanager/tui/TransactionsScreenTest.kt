@@ -91,9 +91,12 @@ class TransactionsScreenTest {
                 assertContains(screen { it.contains("Groceries 1 ") }, "Groceries 2 ")
 
                 // A range keeps only its days, both ends included.
+                // Each prompt opens after the last one's Enter: a key typed before it shows is lost.
                 press("f")
+                screen { it.contains("From (blank for the earliest)") }
                 type("2024-01-10")
                 press("Enter")
+                screen { it.contains("To, inclusive") }
                 type("2024-01-12")
                 press("Enter")
                 val ranged = screen { it.contains("3 rows loaded") }
@@ -105,6 +108,7 @@ class TransactionsScreenTest {
 
                 // A jump lands on the day, with the newer rows still a key away.
                 press("g")
+                screen { it.contains("Go to (YYYY-MM-DD") }
                 type("2024-01-20")
                 press("Enter")
                 val jumped = screen { it.contains("newer above") }

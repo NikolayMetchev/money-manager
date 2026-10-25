@@ -64,3 +64,23 @@ CREATE TABLE xlsx_import_blob (
     worksheet_name TEXT NOT NULL,
     FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id) ON DELETE CASCADE
 );
+
+-- A PDF staged as a CSV import: the file's bytes, and the text lines the parser read from them. The staged
+-- rows (the dynamic csv_import_<uuid> table) are these lines until a PDF strategy assembles them into its own
+-- rows, which it can redo from the lines alone whenever its line rules change. staged_rules_hash names the line
+-- rules the staged rows were assembled with (null: the raw lines are staged).
+CREATE TABLE pdf_import_blob (
+    csv_import_id TEXT PRIMARY KEY NOT NULL,
+    file_bytes BLOB NOT NULL,
+    staged_rules_hash TEXT,
+    FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id) ON DELETE CASCADE
+);
+
+CREATE TABLE pdf_import_line (
+    csv_import_id TEXT NOT NULL,
+    page INTEGER NOT NULL,
+    line INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    PRIMARY KEY (csv_import_id, page, line),
+    FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id) ON DELETE CASCADE
+);

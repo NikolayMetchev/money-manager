@@ -17,6 +17,8 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csv.PdfImportSource
+import com.moneymanager.domain.model.csv.PdfTextLine
 import com.moneymanager.domain.model.csv.XlsxImportBlob
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import kotlinx.coroutines.Dispatchers
@@ -152,6 +154,21 @@ class CsvImportReadRepositoryImpl(
         withContext(coroutineContext) {
             csvImportSelectQueries.selectXlsxBlob(id.id.toString()).awaitAsOneOrNull()?.let { blob ->
                 XlsxImportBlob(fileBytes = blob.file_bytes, worksheetName = blob.worksheet_name)
+            }
+        }
+
+    override suspend fun getPdfSource(id: CsvImportId): PdfImportSource? =
+        withContext(coroutineContext) {
+            val importId = id.id.toString()
+            csvImportSelectQueries.selectPdfBlob(importId).awaitAsOneOrNull()?.let { blob ->
+                PdfImportSource(
+                    fileBytes = blob.file_bytes,
+                    lines =
+                        csvImportSelectQueries
+                            .selectPdfLines(importId) { page, line, text -> PdfTextLine(page.toInt(), line.toInt(), text) }
+                            .awaitAsList(),
+                    stagedRulesHash = blob.staged_rules_hash,
+                )
             }
         }
 

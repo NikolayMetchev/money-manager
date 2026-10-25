@@ -442,6 +442,7 @@ class CsvStrategyExportService(
                     timeFormat = timeFormat,
                     defaultTime = defaultTime,
                     dateTimeFormat = dateTimeFormat,
+                    yearFrom = yearFrom,
                 )
             }
 
