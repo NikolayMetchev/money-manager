@@ -1,4 +1,4 @@
-load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
@@ -22,4 +22,26 @@ kmp_library(
         "js",
     ],
     deps = ["@maven_kmp//:kotlinx_coroutines_core"],
+)
+
+kmp_test(
+    name = "test",
+    android = True,
+    associate = ":coroutines",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+    deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_coroutines_test",
+    ],
 )

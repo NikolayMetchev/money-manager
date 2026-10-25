@@ -5,7 +5,9 @@ import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
+import com.moneymanager.coroutines.throttleLatest
 import com.moneymanager.database.csv.CsvTableManager
+import com.moneymanager.database.repository.LISTING_REFRESH_PERIOD
 import com.moneymanager.database.repository.createDeviceInfo
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AccountId
@@ -42,6 +44,7 @@ class CsvImportReadRepositoryImpl(
         csvImportSelectQueries
             .selectAllImports(::toCsvImportRecord)
             .asFlow()
+            .throttleLatest(LISTING_REFRESH_PERIOD)
             .mapToList(coroutineContext)
             .map { imports ->
                 imports.map { import -> toCsvImport(import) }
