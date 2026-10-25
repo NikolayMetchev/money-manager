@@ -20,7 +20,11 @@ import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
+import com.moneymanager.domain.model.csvstrategy.PdfLineConfig
 import com.moneymanager.domain.model.qif.QifColumns
+import com.moneymanager.domain.model.rules.CaptureTarget
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.strategy.StrategyFileNaming
 import com.moneymanager.domain.strategy.StrategyKey
 import com.moneymanager.domain.strategy.StrategyKind
@@ -111,6 +115,49 @@ class StrategyLibraryServiceTest : DbTest() {
             )
             val kinds = repositories.strategyLibrary.listLocal(version).associate { it.key.name to it.key.kind }
             assertEquals(StrategyKind.QIF, kinds["MyQif"])
+        }
+
+    @Test
+    fun `a PDF strategy is classified as PDF and round-trips its line rules in order`() =
+        runDbTest {
+            val engine = repositories.importEngine
+            val library = repositories.strategyLibrary
+            val now = Clock.System.now()
+            // Out of alphabetical order on purpose: line rules are first-claim-wins, so export must never sort them.
+            val lineRules =
+                listOf(
+                    StrategyRule(
+                        name = "Transaction",
+                        actions = listOf(RuleAction.Capture(PdfLineConfig.TEXT, "^(?<date>\\w{3} \\d+) ", CaptureTarget.NEW_ROW)),
+                    ),
+                    StrategyRule(
+                        name = "Statement date",
+                        actions = listOf(RuleAction.Capture(PdfLineConfig.TEXT, "Date (?<statementDate>\\S+)", CaptureTarget.DOCUMENT)),
+                    ),
+                )
+            engine.createCsvStrategy(
+                CsvImportStrategy(
+                    id = CsvImportStrategyId(Uuid.random()),
+                    name = "MyPdf",
+                    config =
+                        CsvStrategyConfig(
+                            identificationColumns = PdfLineConfig.BASE_COLUMNS.toSet(),
+                            fieldMappings = emptyMap(),
+                            pdfLines = PdfLineConfig(lineRules),
+                        ),
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+            val key = StrategyKey(StrategyKind.PDF, "MyPdf")
+            val entry = library.listLocal(version).single { it.key.name == "MyPdf" }
+            assertEquals(key, entry.key)
+            assertEquals("MyPdf.pdf.json", StrategyFileNaming.fileName(key))
+            assertEquals(key, StrategyFileNaming.parse("MyPdf.pdf.json"))
+
+            library.applyIncoming(key, entry.json, emptyMap())
+            val reapplied = repositories.csvImportStrategyRepository.getStrategyByName("MyPdf").first()!!
+            assertEquals(lineRules, reapplied.config.pdfLines?.rules)
         }
 
     @Test

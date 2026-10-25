@@ -11,8 +11,6 @@ import com.moneymanager.domain.model.CurrencyExportEntry
 import com.moneymanager.domain.model.CurrencyListExport
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
-import com.moneymanager.domain.model.csvstrategy.isQifStrategy
-import com.moneymanager.domain.model.csvstrategy.isXlsxStrategy
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.passthrough.export.PassThroughExport
@@ -30,6 +28,7 @@ import com.moneymanager.domain.strategy.StrategyKey
 import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.domain.strategy.StrategyParseResult
+import com.moneymanager.domain.strategy.libraryKind
 import com.moneymanager.importengineapi.AccountMappingMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.ImportBatch
@@ -63,13 +62,7 @@ class StrategyLibraryService(
 
         for (strategy in csvStrategyRepository.getAllStrategies().first()) {
             val json = CsvStrategyExportCodec.encode(csvStrategyExportService.toExport(strategy, appVersion))
-            val kind =
-                when {
-                    strategy.isQifStrategy() -> StrategyKind.QIF
-                    strategy.isXlsxStrategy() -> StrategyKind.XLSX
-                    else -> StrategyKind.CSV
-                }
-            entries += entry(StrategyKey(kind, strategy.name), json)
+            entries += entry(StrategyKey(strategy.libraryKind(), strategy.name), json)
         }
 
         for (strategy in apiStrategyRepository.getAllStrategies().first()) {
@@ -108,7 +101,7 @@ class StrategyLibraryService(
         json: String,
     ): StrategyParseResult =
         when (key.kind) {
-            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.XLSX -> {
+            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.XLSX, StrategyKind.PDF -> {
                 val export = CsvStrategyExportCodec.decode(json)
                 val refs = csvStrategyExportService.parseExport(export).unresolvedReferences
                 StrategyParseResult(key, refs)
@@ -135,7 +128,7 @@ class StrategyLibraryService(
         resolutions: Map<CsvUnresolvedReference, CsvResolution>,
     ) {
         when (key.kind) {
-            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.XLSX -> applyCsv(key.name, json, resolutions)
+            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.XLSX, StrategyKind.PDF -> applyCsv(key.name, json, resolutions)
             StrategyKind.API -> applyApi(key.name, json)
             StrategyKind.PASS_THROUGH -> applyPassThrough(key.name, json)
             StrategyKind.GLOBAL_MAPPINGS -> applyGlobalMappings(json, resolutions)
