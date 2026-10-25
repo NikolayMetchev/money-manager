@@ -17,7 +17,7 @@ class ThrottleLatestTest {
                 flow {
                     for (value in 1..5) {
                         emit(value)
-                        delay(30)
+                        delay(30.milliseconds)
                     }
                 }.throttleLatest(100.milliseconds).toList()
 
@@ -31,7 +31,7 @@ class ThrottleLatestTest {
                 flow {
                     for (value in 1..3) {
                         emit(value)
-                        delay(200)
+                        delay(200.milliseconds)
                     }
                 }.throttleLatest(100.milliseconds).toList()
 
