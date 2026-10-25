@@ -145,21 +145,9 @@ fun CsvImportsScreen(
         isImporting = true
         importMessage = null
         scope.launch {
-            importMessageIsError = false
-            importMessage =
-                try {
-                    val checksum = sha256Hex(result.bytes)
-                    if (csvImportRepository.findImportsByChecksum(checksum).isNotEmpty()) {
-                        "Skipped ${result.fileName}: already imported"
-                    } else {
-                        stage(checksum, result.lastModified ?: Clock.System.now())
-                        "Imported ${result.fileName}"
-                    }
-                } catch (expected: Exception) {
-                    // Includes a platform with no PDF or Excel parsing, whose message says so.
-                    importMessageIsError = true
-                    "${result.fileName}: ${expected.message}"
-                }
+            val staged = stagePickedFile(result, { csvImportRepository.findImportsByChecksum(it).isNotEmpty() }, stage)
+            importMessage = staged.message
+            importMessageIsError = staged.isError
             isImporting = false
         }
     }
