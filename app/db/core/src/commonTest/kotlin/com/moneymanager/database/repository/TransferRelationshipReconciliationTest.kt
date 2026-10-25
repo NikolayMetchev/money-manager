@@ -1,5 +1,4 @@
 package com.moneymanager.database.repository
-import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
@@ -11,6 +10,7 @@ import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
@@ -71,8 +71,8 @@ class TransferRelationshipReconciliationTest : DbTest() {
                     updateSources = emptyList(),
                 ).single()
 
-        val excludedTypeId = AttributeTypeId(DatabaseConfig.EXCLUDED_ATTR_TYPE_ID)
-        val reconciledTypeId = RelationshipTypeId(DatabaseConfig.RECONCILED_RELATIONSHIP_TYPE_ID)
+        val excludedTypeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
+        val reconciledTypeId = RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID)
         val duplicateId =
             repositories.transactionRepository
                 .importTransfers(
@@ -144,7 +144,7 @@ class TransferRelationshipReconciliationTest : DbTest() {
             val cardId = createAccount("Crypto.com")
             val conduitId = createAccount("Curve")
             val merchantId = createAccount("National Lottery")
-            val passThroughTypeId = RelationshipTypeId(DatabaseConfig.PASS_THROUGH_RELATIONSHIP_TYPE_ID)
+            val passThroughTypeId = RelationshipTypeId(WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID)
             // Funding leg (card -> conduit) is id1; spend leg (conduit -> merchant) is id2, linked via the
             // pass-through relationship. Both created in one batch with temp ids resolved by the engine.
             val funding =
@@ -206,7 +206,7 @@ class TransferRelationshipReconciliationTest : DbTest() {
             val conduitId = createAccount("Curve")
             val merchantId = createAccount("Sainsburys London")
             val curveMerchantId = createAccount("SAINSBURYS")
-            val passThroughTypeId = RelationshipTypeId(DatabaseConfig.PASS_THROUGH_RELATIONSHIP_TYPE_ID)
+            val passThroughTypeId = RelationshipTypeId(WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID)
 
             fun funding() =
                 Transfer(
@@ -244,8 +244,8 @@ class TransferRelationshipReconciliationTest : DbTest() {
             val spendId = chainIds[1]
 
             // The Curve export's own record of the spend, reconciled (excluded + linked) against the funding leg.
-            val excludedTypeId = AttributeTypeId(DatabaseConfig.EXCLUDED_ATTR_TYPE_ID)
-            val reconciledTypeId = RelationshipTypeId(DatabaseConfig.RECONCILED_RELATIONSHIP_TYPE_ID)
+            val excludedTypeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
+            val reconciledTypeId = RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID)
             val curveSpendId =
                 repositories.transactionRepository
                     .importTransfers(
@@ -287,7 +287,7 @@ class TransferRelationshipReconciliationTest : DbTest() {
             val checkingId = createAccount("Checking")
             val shopId = createAccount("Coffee Shop")
             val feeAccountId = createAccount("Monzo Fees")
-            val feeTypeId = RelationshipTypeId(DatabaseConfig.FEE_RELATIONSHIP_TYPE_ID)
+            val feeTypeId = RelationshipTypeId(WellKnownIds.FEE_RELATIONSHIP_TYPE_ID)
             // Both the main transfer and its fee are created in the same batch with temp ids; the fee
             // relationship on the main (id1) references the fee's temp id (-2), which the two-pass insert
             // must resolve to the fee's real generated id (id2).
