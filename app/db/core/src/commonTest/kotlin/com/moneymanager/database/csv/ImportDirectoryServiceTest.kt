@@ -99,14 +99,13 @@ class ImportDirectoryServiceTest : DbTest() {
         """.trimIndent()
 
     // An American Express statement, so the built-in Amex QIF strategy recognises it.
+    // A bank's card payment (Santander's shape): its strategy takes the source account from the folder.
     private fun qif(payee: String): String =
         """
-        !Type:CCard
+        !Type:Bank
         D01/02/2024
-        N$payee
         T-12.50
-        P$payee
-        M Process Date 01/02/2024
+        PCARD PAYMENT TO $payee,12.50 GBP, RATE 1.00/GBP ON 01-02-2024, 12.50
         ^
         """.trimIndent()
 

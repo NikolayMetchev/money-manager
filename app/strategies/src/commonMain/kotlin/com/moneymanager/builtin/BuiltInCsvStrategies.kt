@@ -1708,8 +1708,8 @@ object BuiltInCsvStrategies {
      * "Process Date dd/mm/yyyy" memo (after an optional merchant type such as "RETAIL GOODS"), which
      * content-matches these files (QIF's fixed columns can't tell banks apart). The payee is
      * the merchant (the target account); the check-number field holds Amex's own reference, the same in
-     * every statement that covers the transaction, so overlapping exports dedupe on it. Like the other
-     * QIF strategies, the source account and currency are chosen at import time.
+     * every statement that covers the transaction, so overlapping exports dedupe on it. The source is the
+     * card's own account, "American Express", wherever the file was found.
      */
     fun buildAmexQifStrategy(
         now: Instant,
@@ -1717,6 +1717,7 @@ object BuiltInCsvStrategies {
     ): CsvImportStrategy {
         val fieldMappings =
             mapOf(
+                accountFromRules(TransferField.SOURCE_ACCOUNT),
                 accountFromRules(TransferField.TARGET_ACCOUNT),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
@@ -1753,6 +1754,7 @@ object BuiltInCsvStrategies {
                 ),
                 // Negative = a purchase on the card; positive = a refund, payment or cashback.
                 incomingWhenPositive(QifColumns.COL_AMOUNT),
+                accounts(AccountSide.SOURCE, fixedNaming(QifColumns.COL_DATE, AMEX_ACCOUNT)),
                 accounts(
                     AccountSide.TARGET,
                     // A payment to the card names no payer: a placeholder, which reconciles against the
