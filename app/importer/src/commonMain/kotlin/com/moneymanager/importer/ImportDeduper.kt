@@ -804,7 +804,8 @@ class ImportDeduper(
         val matched = rule.find(transfer, window) ?: return null
         // An incoming leg the source itself excluded records nothing, so it supersedes nothing either.
         val found = if (transfer.isExcluded(exclusionTypeId)) matched.copy(supersedes = emptyList()) else matched
-        consumedReconcileIds += found.claims
+        // Nor does it claim the leg: a later counted record of the same movement must still find it.
+        if (!transfer.isExcluded(exclusionTypeId)) consumedReconcileIds += found.claims
         pairedInBatch += found.id
         supersede(found.supersedes)
         // Superseded legs are linked too, so the exclusion they take on stays explained — and is lifted by
@@ -864,9 +865,11 @@ class ImportDeduper(
      * Whether pairing with existing leg [id] still leaves its movement counted once: it is counted, or it was
      * excluded only because a record that is still counted keeps the same movement (a card statement's
      * payment reconciled against the paying bank's record, met again on a second statement of the card).
+     * A keeper this import didn't load is unknown, so it isn't taken for counted.
      */
     private fun standsForCountedMovement(id: TransferId): Boolean =
-        id !in existingExcludedLegs || reconciledInto[id]?.let { it !in existingExcludedLegs } == true
+        id !in existingExcludedLegs ||
+            reconciledInto[id]?.let { keeper -> keeper in existingById && keeper !in existingExcludedLegs } == true
 
     /**
      * A conduit's own record of a payment (e.g. a Curve export row) against the funding leg that put the

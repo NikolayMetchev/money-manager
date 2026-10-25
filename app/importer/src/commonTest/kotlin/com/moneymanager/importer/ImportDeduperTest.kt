@@ -1326,6 +1326,22 @@ class ImportDeduperTest {
         // The bank's record names the far end, so it is the one kept: the placeholder is superseded.
         assertEquals(ImportStatus.IMPORTED, result.status)
         assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+        assertEquals(TransferId(50), result.excludeExisting?.transfer?.id)
+        assertEquals(
+            NewRelationship(relatedTransferId = TransferId(50), typeId = RelationshipTypeId(1)),
+            result.transfer.relationships.single(),
+        )
+    }
+
+    @Test
+    fun uniqueId_anExcludedPlaceholderDoesNotClaimTheBanksRecord() {
+        val deduper = ImportDeduper(uniqueIdPlaceholderPolicy, existing = listOf(bankCredit(40, timestamp = baseTime + 2.days)))
+        val excluded = placeholderDeposit(0).copy(uniqueKey = mapOf("line" to "1"), excludedFromBalances = true)
+        val counted = placeholderDeposit(1).copy(uniqueKey = mapOf("line" to "2"))
+        val results = deduper.classify(listOf(excluded, counted))
+        // The excluded row counts nowhere, so the counted one must still find the bank's record.
+        assertTrue(results[1].transfer.attributes.any { it.typeId == AttributeTypeId(-1) })
+        assertTrue(results[1].transfer.relationships.any { it.relatedTransferId == TransferId(40) })
     }
 
     @Test
@@ -1354,6 +1370,21 @@ class ImportDeduperTest {
                 uniqueIdPlaceholderPolicy,
                 existing = listOf(first, keeper),
                 claimedReconcileTargets = setOf(TransferId(40)),
+                reconciledInto = mapOf(TransferId(50) to TransferId(40)),
+            )
+        val result = deduper.classify(listOf(placeholderDeposit(0).copy(uniqueKey = mapOf("line" to "2")))).single()
+        assertTrue(result.transfer.relationships.none { it.relatedTransferId == TransferId(50) })
+    }
+
+    @Test
+    fun sameAccounts_skipsARecordWhoseKeeperWasNotLoaded() {
+        // Nothing says the unloaded keeper is still counted, so pairing with its record could count the
+        // movement zero times.
+        val first = existing(50, src = placeholder, tgt = wallet, attributes = mapOf(reconciled))
+        val deduper =
+            ImportDeduper(
+                uniqueIdPlaceholderPolicy,
+                existing = listOf(first),
                 reconciledInto = mapOf(TransferId(50) to TransferId(40)),
             )
         val result = deduper.classify(listOf(placeholderDeposit(0).copy(uniqueKey = mapOf("line" to "2")))).single()
