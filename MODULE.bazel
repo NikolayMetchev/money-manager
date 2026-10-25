@@ -524,8 +524,8 @@ maven.install(
     artifacts = [
         "com.pinterest.ktlint:ktlint-cli:1.8.0",
         # Transitive versions held at the newest (see version_conflict_policy).
-        "ch.qos.logback:logback-classic:1.6.5",
-        "ch.qos.logback:logback-core:1.6.5",
+        "ch.qos.logback:logback-classic:1.6.6",
+        "ch.qos.logback:logback-core:1.6.6",
         "dev.drewhamilton.poko:poko-annotations-jvm:0.23.2",
         "org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21",
         "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.4.21",
@@ -574,8 +574,8 @@ maven.install(
         "org.schemaspy:schemaspy:7.0.2",
         "org.xerial:sqlite-jdbc:3.53.4.0",
         # Transitive versions held at the newest (see version_conflict_policy).
-        "ch.qos.logback:logback-classic:1.6.5",
-        "ch.qos.logback:logback-core:1.6.5",
+        "ch.qos.logback:logback-classic:1.6.6",
+        "ch.qos.logback:logback-core:1.6.6",
         "commons-io:commons-io:2.22.0",
         "org.ow2.asm:asm-analysis:9.11.1",
         "org.ow2.asm:asm-commons:9.11.1",
