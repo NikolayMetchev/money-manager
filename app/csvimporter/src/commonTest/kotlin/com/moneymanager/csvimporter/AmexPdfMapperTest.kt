@@ -17,6 +17,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
@@ -34,7 +35,10 @@ class AmexPdfMapperTest {
 
     private fun lines(vararg texts: String) = texts.mapIndexed { index, text -> PdfTextLine(1, index + 1, text) }
 
-    private fun map(vararg texts: String): List<MappingResult.Success> {
+    private fun map(
+        vararg texts: String,
+        sourceAccountOverride: AccountId? = amex.id,
+    ): List<MappingResult.Success> {
         val staged = PdfRowAssembler(checkNotNull(strategy.config.pdfLines)).assemble(lines(*texts))
         val columns = staged.headers.mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }
         val mapper =
@@ -44,7 +48,7 @@ class AmexPdfMapperTest {
                 existingAccounts = mapOf(amex.name to amex),
                 existingCurrencies = mapOf(gbp.id to gbp),
                 existingCurrenciesByCode = mapOf(gbp.code to gbp),
-                sourceAccountOverride = amex.id,
+                sourceAccountOverride = sourceAccountOverride,
             )
         return staged.rows
             .mapIndexed { index, values -> mapper.mapRow(CsvRow(index + 1L, values)) }
@@ -70,6 +74,18 @@ class AmexPdfMapperTest {
         assertEquals("SAINSBURY'S SUPERMARKET LONDON", purchase.transfer.description)
         assertEquals("SAINSBURY'S SUPERMARKET LONDON", purchase.newAccounts.single().name)
         assertEquals(Money.fromDisplayValue(BigDecimal("1005.89"), gbp), rows[1].transfer.amount)
+    }
+
+    @Test
+    fun `the strategy names the card account itself whatever folder the file came from`() {
+        val row =
+            map(
+                header2013,
+                "Jan 2  Jan 3  AMAZON.CO.UK                                                 9.99",
+                sourceAccountOverride = null,
+            ).single()
+        assertEquals(amex.id, row.transfer.sourceAccountId)
+        assertFalse(strategy.needsSourceAccountOverride())
     }
 
     @Test

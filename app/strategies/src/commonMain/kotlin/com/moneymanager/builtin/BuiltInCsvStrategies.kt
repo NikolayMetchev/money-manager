@@ -348,6 +348,7 @@ object BuiltInCsvStrategies {
      * An American Express payee recording a payment INTO the card ("PAYMENT RECEIVED - THANK YOU"). It never
      * says who paid, so the payer is a placeholder that reconciles against the paying bank's own record.
      */
+    private const val AMEX_ACCOUNT = "American Express"
     private const val AMEX_PAYMENT_RECEIVED = "^(?:PAYMENT|DIRECT DEBIT) RECEIVED\\b"
 
     /** The column the American Express PDF strategy assembles a row's date in ("2 Jan"). */
@@ -1850,6 +1851,7 @@ object BuiltInCsvStrategies {
                     AmountParsingMapping(fieldType = TransferField.AMOUNT, mode = AmountMode.SINGLE_COLUMN, amountColumnName = "amount"),
                 TransferField.CURRENCY to HardCodedCurrencyMapping(fieldType = TransferField.CURRENCY, currencyId = currencyId),
                 TransferField.TIMEZONE to HardCodedTimezoneMapping(fieldType = TransferField.TIMEZONE, timezoneId = "UTC"),
+                accountFromRules(TransferField.SOURCE_ACCOUNT),
             )
         val rules =
             listOf(
@@ -1866,6 +1868,8 @@ object BuiltInCsvStrategies {
                 attribute("exchangeRate", "amex-exchange-rate"),
                 attribute("foreignFee", "amex-foreign-fee"),
                 incomingWhen(Condition("credit", ConditionOp.NOT_BLANK)),
+                // The statement is the card's own, wherever the file was found: the folder's account doesn't apply.
+                accounts(AccountSide.SOURCE, fixedNaming("description", AMEX_ACCOUNT)),
                 accounts(
                     AccountSide.TARGET,
                     // Payments in, and a credit balance paid back out, name no bank: placeholders that reconcile
