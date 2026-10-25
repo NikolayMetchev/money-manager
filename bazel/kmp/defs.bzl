@@ -821,7 +821,7 @@ def _jvm_test(name, lib, size, flaky, jvm_flags, data, runtime_deps):
         ] + runtime_deps,
     )
 
-def kmp_static_library(name, srcs, native_targets, hdrs = [], defines = [], library_name = None, visibility = None):
+def kmp_static_library(name, srcs, native_targets, hdrs = [], embeds = [], defines = [], library_name = None, visibility = None):
     """A C static library per Kotlin/Native target (`:<name>_<target>`), built with that target's konan clang.
 
     Args:
@@ -829,6 +829,7 @@ def kmp_static_library(name, srcs, native_targets, hdrs = [], defines = [], libr
         srcs: the C sources.
         native_targets: the Kotlin/Native targets, by KGP's names.
         hdrs: headers, whose directories go on the include path.
+        embeds: files the sources `.incbin` (by exec path, which a generated header can supply).
         defines: `NAME=VALUE` preprocessor definitions.
         library_name: the archives are `lib<library_name>.a` (default: the name).
         visibility: the targets' visibility.
@@ -838,6 +839,7 @@ def kmp_static_library(name, srcs, native_targets, hdrs = [], defines = [], libr
             name = name + "_" + target,
             srcs = srcs,
             hdrs = hdrs,
+            embeds = embeds,
             defines = defines,
             library_name = library_name or name,
             target = target,

@@ -2,9 +2,10 @@
 # gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_keep_dep :pdfium_native jvmMain
 # gazelle:kmp_keep_dep @maven_kmp//:embedpdf_pdfium webMain
+# gazelle:kmp_cinterops :pdfium_interop
 
 load("@rules_java//java:java_import.bzl", "java_import")
-load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+load("//bazel/kmp:defs.bzl", "kmp_cinterop", "kmp_library", "kmp_static_library", "kmp_test")
 load("//bazel/kmp:resources.bzl", "file_resource_jar")
 
 # The target platform's pdfium library, its VERSION (which names the unpacked copy) and the license notices a binary
@@ -55,17 +56,84 @@ java_import(
     ]
 ]
 
+# Native binaries (#1191): pdfium.def's loader, which embeds its target's library, VERSION and license notices
+# (`.incbin`, by the exec paths pdfium_embed.h names) and loads the library from the file Kotlin writes it to.
+NATIVE_PDFIUM = [
+    # (Kotlin/Native target, pdfium archive, library, the C condition that is that target)
+    ("linuxArm64", "linux_arm64", "lib/libpdfium.so", "defined(__linux__) && defined(__aarch64__)"),
+    ("linuxX64", "linux_x64", "lib/libpdfium.so", "defined(__linux__) && defined(__x86_64__)"),
+    ("macosArm64", "mac_arm64", "lib/libpdfium.dylib", "defined(__APPLE__) && defined(__aarch64__)"),
+    ("mingwX64", "win_x64", "bin/pdfium.dll", "defined(_WIN32)"),
+]
+
+[
+    genrule(
+        name = "pdfium_licenses_" + archive,
+        srcs = [
+            "@pdfium_%s//:LICENSE" % archive,
+            "@pdfium_%s//:licenses" % archive,
+        ],
+        outs = ["pdfium_licenses_%s.txt" % archive],
+        cmd = "for f in $(SRCS); do echo \"==> $$(basename $$f) <==\"; cat $$f; echo; done > $@",
+    )
+    for _, archive, _, _ in NATIVE_PDFIUM
+]
+
+PDFIUM_EMBEDS = [
+    file
+    for _, archive, library, _ in NATIVE_PDFIUM
+    for file in [
+        "@pdfium_%s//:%s" % (archive, library),
+        "@pdfium_%s//:VERSION" % archive,
+        ":pdfium_licenses_" + archive,
+    ]
+]
+
+genrule(
+    name = "pdfium_embed",
+    srcs = PDFIUM_EMBEDS,
+    outs = ["pdfium_embed/pdfium_embed.h"],
+    cmd = "(" + " && ".join([
+        line
+        for _, archive, library, condition in NATIVE_PDFIUM
+        for line in [
+            "echo '#if %s'" % condition,
+            "echo '#define MM_PDFIUM_LIBRARY \"$(execpath @pdfium_%s//:%s)\"'" % (archive, library),
+            "echo '#define MM_PDFIUM_FILE_NAME \"%s\"'" % library.rpartition("/")[2],
+            "echo '#define MM_PDFIUM_VERSION \"$(execpath @pdfium_%s//:VERSION)\"'" % archive,
+            "echo '#define MM_PDFIUM_LICENSES \"$(execpath :pdfium_licenses_%s)\"'" % archive,
+            "echo '#endif'",
+        ]
+    ]) + ") > $@",
+)
+
+kmp_static_library(
+    name = "libpdfium_loader",
+    srcs = ["src/nativeInterop/c/pdfium_loader.c"],
+    hdrs = [
+        ":pdfium_embed",
+        "@pdfium_linux_x64//:include/fpdf_text.h",
+        "@pdfium_linux_x64//:include/fpdfview.h",
+    ],
+    embeds = PDFIUM_EMBEDS,
+    library_name = "pdfium_loader",
+    native_targets = [target for target, _, _, _ in NATIVE_PDFIUM],
+)
+
+kmp_cinterop(
+    name = "pdfium_interop",
+    def_file = "src/nativeInterop/cinterop/pdfium.def",
+    native_targets = [target for target, _, _, _ in NATIVE_PDFIUM],
+    static_libraries = [":libpdfium_loader"],
+)
+
 kmp_library(
     name = "pdf",
     android = True,
     android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
+    cinterops = [":pdfium_interop"],
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
-    jvm_deps = [
-        ":pdfium_native",
-        "//utils/files",
-        "@maven_kmp//:kermit",
-        "@maven_kmp//:kotlinx_io_core",
-    ],
+    jvm_deps = [":pdfium_native"],
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
     keep_deps = [
         ":pdfium_native",
@@ -82,12 +150,17 @@ kmp_library(
     web_deps = [
         "@maven_kmp//:embedpdf_pdfium",
         "@maven_kmp//:kotlinx_browser",
-        "@maven_kmp//:kotlinx_coroutines_core",
     ],
     web_srcs = glob(["src/webMain/kotlin/**/*.kt"]),
     web_targets = [
         "wasmJs",
         "js",
+    ],
+    deps = [
+        "//utils/files",
+        "@maven_kmp//:kermit",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_io_core",
     ],
 )
 

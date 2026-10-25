@@ -1,0 +1,26 @@
+# pdfium for native binaries (#1191): the loader (src/nativeInterop/c/pdfium_loader.c, built by
+# :libpdfium_loader), which embeds the target's pdfium library, loads it, and forwards the calls below.
+# kmp_cinterop links the loader into this klib (-staticLibrary). Linux's sysroot keeps dlopen in libdl.
+package = com.moneymanager.pdf.pdfium
+linkerOpts.linux = -ldl
+---
+#include <stddef.h>
+
+const unsigned char* mm_pdfium_library(size_t* size);
+const unsigned char* mm_pdfium_version(size_t* size);
+const unsigned char* mm_pdfium_licenses(size_t* size);
+const char* mm_pdfium_file_name(void);
+const char* mm_pdfium_load(const char* path);
+void* mm_pdfium_load_document(const void* data, size_t size);
+unsigned int mm_pdfium_last_error(void);
+void mm_pdfium_close_document(void* document);
+int mm_pdfium_page_count(void* document);
+void* mm_pdfium_load_page(void* document, int index);
+void mm_pdfium_close_page(void* page);
+void* mm_pdfium_load_text_page(void* page);
+void mm_pdfium_close_text_page(void* text_page);
+int mm_pdfium_char_count(void* text_page);
+unsigned int mm_pdfium_unicode(void* text_page, int index);
+int mm_pdfium_is_generated(void* text_page, int index);
+double mm_pdfium_font_size(void* text_page, int index);
+int mm_pdfium_position(void* text_page, int index, double* position);

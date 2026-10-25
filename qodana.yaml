@@ -100,6 +100,8 @@ exclude:
       - utils/files/src/linuxMain/kotlin/com/moneymanager/files/LastModified.linux.kt
       - utils/files/src/nativeMain/kotlin/com/moneymanager/files/Files.native.kt
       - app/ui
+      # [5] — native-only sources belong to no module, so cinterop's opt-ins look unneeded.
+      - utils/parsers/pdf/src/nativeMain
 
   # [2] — the project compiles (so every expect has its actuals); the linter's KMP model doesn't
   # see the platform source sets that hold them.
@@ -161,6 +163,8 @@ exclude:
       - app/ui/people/src/commonMain/kotlin/com/moneymanager/ui/screens/people/PeopleScreen.kt
       - app/ui/settings/src/commonMain/kotlin/com/moneymanager/ui/screens/settings/StrategyCatalogScreen.kt
       - app/ui/transactions/src/commonMain/kotlin/com/moneymanager/ui/screens/transactions/ManualEntriesScreen.kt
+      # [5] — native-only sources belong to no module, so the kotlinx.cinterop imports don't resolve.
+      - utils/parsers/pdf/src/nativeMain
 
   # Mokkery `calls { (code) -> ... it.code == code }` — the lambda parameter comes from the mock
   # invocation at runtime; the condition is not constant.
@@ -213,6 +217,8 @@ exclude:
   - name: HasPlatformType
     paths:
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/write/MoneyManagerDatabaseWrapper.kt
+      # [5] — native-only sources belong to no module, so the cinterop calls' types don't resolve.
+      - utils/parsers/pdf/src/nativeMain
   - name: KDocUnresolvedReference
     paths:
       # [5] — native code is analysed against the JVM (each module's `:<name>_ide_native`), where kotlinx.cinterop,
