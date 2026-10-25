@@ -1,9 +1,14 @@
+-- The "created by" queries below start from the per-source table (`csv_entity_source` etc.), whose import index
+-- narrows to one file's rows, and CROSS JOIN fixes that order: without statistics (nothing runs ANALYZE) SQLite
+-- otherwise drives them from entity_source's entity-type index and walks every row of the type, ~4x slower on a
+-- real database whatever the file's size.
+
 -- Accounts (entity_type_id = 1) whose creation was recorded against the given CSV import — the
 -- accounts the import auto-created, used by re-import to scope merges/deletes to them.
 selectAccountIdsCreatedByCsvImport:
 SELECT DISTINCT entity_source.entity_id
-FROM entity_source
-JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+FROM csv_entity_source
+CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
 WHERE csv_entity_source.csv_import_id = ? AND entity_source.entity_type_id = 1;
 
 -- Transfers (entity_type_id = 7) created (not merely updated) by the given CSV import, still-existing
@@ -13,8 +18,8 @@ WHERE csv_entity_source.csv_import_id = ? AND entity_source.entity_type_id = 1;
 -- unimport to find everything the file produced.
 selectTransferIdsCreatedByCsvImport:
 SELECT DISTINCT entity_source.entity_id
-FROM entity_source
-JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+FROM csv_entity_source
+CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
 JOIN transfer ON transfer.id = entity_source.entity_id
 WHERE csv_entity_source.csv_import_id = ?
   AND entity_source.entity_type_id = 7
@@ -24,8 +29,8 @@ WHERE csv_entity_source.csv_import_id = ?
 -- selectTransferIdsCreatedByCsvImport.
 selectTradeIdsCreatedByCsvImport:
 SELECT DISTINCT entity_source.entity_id
-FROM entity_source
-JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+FROM csv_entity_source
+CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
 JOIN trade ON trade.id = entity_source.entity_id
 WHERE csv_entity_source.csv_import_id = ?
   AND entity_source.entity_type_id = 11
@@ -35,8 +40,8 @@ WHERE csv_entity_source.csv_import_id = ?
 -- analogue of selectAccountIdsCreatedByCsvImport, used by QIF re-import to scope merges/deletes.
 selectAccountIdsCreatedByQifImport:
 SELECT DISTINCT entity_source.entity_id
-FROM entity_source
-JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
+FROM qif_entity_source
+CROSS JOIN entity_source ON entity_source.id = qif_entity_source.id
 WHERE qif_entity_source.qif_import_id = ? AND entity_source.entity_type_id = 1;
 
 -- Accounts (entity_type_id = 1) created (not merely touched) by the given API session — revision_id = 1
@@ -45,8 +50,8 @@ WHERE qif_entity_source.qif_import_id = ? AND entity_source.entity_type_id = 1;
 -- resurface. Used by API re-import to scope deletes/cleanup to what the session itself produced.
 selectAccountIdsCreatedByApiSession:
 SELECT DISTINCT entity_source.entity_id
-FROM entity_source
-JOIN api_entity_source ON entity_source.id = api_entity_source.id
+FROM api_entity_source
+CROSS JOIN entity_source ON entity_source.id = api_entity_source.id
 JOIN account ON account.id = entity_source.entity_id
 WHERE api_entity_source.api_session_id = ?
   AND entity_source.entity_type_id = 1
@@ -57,8 +62,8 @@ WHERE api_entity_source.api_session_id = ?
 -- same session more than once must not keep re-discovering ids a prior pass already deleted.
 selectTransferIdsCreatedByApiSession:
 SELECT DISTINCT entity_source.entity_id
-FROM entity_source
-JOIN api_entity_source ON entity_source.id = api_entity_source.id
+FROM api_entity_source
+CROSS JOIN entity_source ON entity_source.id = api_entity_source.id
 JOIN transfer ON transfer.id = entity_source.entity_id
 WHERE api_entity_source.api_session_id = ?
   AND entity_source.entity_type_id = 7
@@ -68,8 +73,8 @@ WHERE api_entity_source.api_session_id = ?
 -- selectAccountIdsCreatedByApiSession for why the join against `trade` matters.
 selectTradeIdsCreatedByApiSession:
 SELECT DISTINCT entity_source.entity_id
-FROM entity_source
-JOIN api_entity_source ON entity_source.id = api_entity_source.id
+FROM api_entity_source
+CROSS JOIN entity_source ON entity_source.id = api_entity_source.id
 JOIN trade ON trade.id = entity_source.entity_id
 WHERE api_entity_source.api_session_id = ?
   AND entity_source.entity_type_id = 11
@@ -134,8 +139,8 @@ ORDER BY entity_source.revision_id DESC;
 -- re-run created from the same row as a hand-edited one it deleted, to re-apply the edit there.
 selectCreatedTransferRowsByCsvImport:
 SELECT entity_source.entity_id, csv_entity_source.csv_row_index
-FROM entity_source
-JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+FROM csv_entity_source
+CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
 JOIN transfer ON transfer.id = entity_source.entity_id
 WHERE csv_entity_source.csv_import_id = ?
   AND entity_source.entity_type_id = 7
@@ -144,8 +149,8 @@ WHERE csv_entity_source.csv_import_id = ?
 -- The QIF analogue of selectCreatedTransferRowsByCsvImport.
 selectCreatedTransferRecordsByQifImport:
 SELECT entity_source.entity_id, qif_entity_source.qif_record_index
-FROM entity_source
-JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
+FROM qif_entity_source
+CROSS JOIN entity_source ON entity_source.id = qif_entity_source.id
 JOIN transfer ON transfer.id = entity_source.entity_id
 WHERE qif_entity_source.qif_import_id = ?
   AND entity_source.entity_type_id = 7
@@ -154,8 +159,8 @@ WHERE qif_entity_source.qif_import_id = ?
 -- The API analogue of selectCreatedTransferRowsByCsvImport: a record is a response node.
 selectCreatedTransferNodesByApiSession:
 SELECT entity_source.entity_id, api_entity_source.api_request_id, api_entity_source.json_path
-FROM entity_source
-JOIN api_entity_source ON entity_source.id = api_entity_source.id
+FROM api_entity_source
+CROSS JOIN entity_source ON entity_source.id = api_entity_source.id
 JOIN transfer ON transfer.id = entity_source.entity_id
 WHERE api_entity_source.api_session_id = ?
   AND entity_source.entity_type_id = 7
