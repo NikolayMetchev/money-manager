@@ -1,12 +1,19 @@
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
+# gazelle:kmp_android_host_tests false
 # gazelle:kmp_keep_dep :pdfium_native jvmMain
+# gazelle:kmp_keep_dep :pdfium_library androidMain
 # gazelle:kmp_keep_dep @maven_kmp//:embedpdf_pdfium webMain
 # gazelle:kmp_cinterops :pdfium_interop
+# The host has none of the APK's native libraries, so the tests run on a device (#1190) instead.
+# gazelle:kmp_device_test_srcs src/commonTest/kotlin
+# gazelle:kmp_keep_dep @maven_kmp//:androidx_test_runner androidDeviceTest
 
 load("@rules_java//java:java_import.bzl", "java_import")
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_import")
 load("//bazel/kmp:defs.bzl", "kmp_cinterop", "kmp_library", "kmp_static_library", "kmp_test")
 load("//bazel/kmp:resources.bzl", "file_resource_jar")
+load("//bazel/kmp/android:aar.bzl", "aar_import")
 
 # The target platform's pdfium library, its VERSION (which names the unpacked copy) and the license notices a binary
 # distribution of it must carry (`pdfium/LICENSE`, `pdfium/licenses/`), as `pdfium/<file>` classpath resources
@@ -56,6 +63,71 @@ java_import(
     ]
 ]
 
+# Android (#1190): pdfium's Android builds as an AAR's parts, which the APK packages: `jni/<abi>/libpdfium.so` (arm64
+# devices, x64 emulators), the license notices as an asset, and the keep rules JNA needs under R8. JNA itself is the
+# AAR maven_kmp resolves (`android_aars`), which carries libjnidispatch.so.
+ANDROID_PDFIUM = [
+    # (ABI, pdfium archive)
+    ("arm64-v8a", "android_arm64"),
+    ("x86_64", "android_x64"),
+]
+
+[
+    genrule(
+        name = "pdfium_android_" + abi.replace("-", "_"),
+        srcs = ["@pdfium_%s//:lib/libpdfium.so" % archive],
+        outs = ["pdfium_android/jni/%s/libpdfium.so" % abi],
+        cmd = "cp $< $@",
+    )
+    for abi, archive in ANDROID_PDFIUM
+]
+
+genrule(
+    name = "pdfium_android_licenses",
+    srcs = [":pdfium_licenses_android_arm64"],
+    outs = ["pdfium_android/assets/pdfium/LICENSES.txt"],
+    cmd = "cp $< $@",
+)
+
+genrule(
+    name = "pdfium_android_manifest",
+    outs = ["pdfium_android/AndroidManifest.xml"],
+    cmd = "echo '<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"com.moneymanager.pdf.pdfium\" />' > $@",
+)
+
+genrule(
+    name = "pdfium_android_keep",
+    outs = ["pdfium_android/proguard.txt"],
+    # JNA finds a library's functions by the interface's method names, and reads its own classes reflectively.
+    cmd = "printf '%s\\n' " + " ".join([
+        "'-dontwarn java.awt.**'",
+        "'-keep class com.sun.jna.** { *; }'",
+        "'-keep interface * extends com.sun.jna.Library { *; }'",
+    ]) + " > $@",
+)
+
+genrule(
+    name = "pdfium_android_classes",
+    outs = ["pdfium_android/classes.jar"],
+    cmd = "$(execpath @bazel_tools//tools/jdk:singlejar) --exclude_build_data --output $@",
+    tools = ["@bazel_tools//tools/jdk:singlejar"],
+)
+
+aar_import(
+    name = "pdfium_android",
+    assets = [":pdfium_android_licenses"],
+    jar = ":pdfium_android_classes",
+    jni = [":pdfium_android_" + abi.replace("-", "_") for abi, _ in ANDROID_PDFIUM],
+    manifest = ":pdfium_android_manifest",
+    proguard = [":pdfium_android_keep"],
+)
+
+# `_android`, as kmp_library resolves `android_deps` to each label's Android target.
+kt_jvm_import(
+    name = "pdfium_library_android",
+    jars = [":pdfium_android"],
+)
+
 # Native binaries (#1191): pdfium.def's loader, which embeds its target's library, VERSION and license notices
 # (`.incbin`, by the exec paths pdfium_embed.h names) and loads the library from the file Kotlin writes it to.
 NATIVE_PDFIUM = [
@@ -76,7 +148,7 @@ NATIVE_PDFIUM = [
         outs = ["pdfium_licenses_%s.txt" % archive],
         cmd = "for f in $(SRCS); do echo \"==> $$(basename $$f) <==\"; cat $$f; echo; done > $@",
     )
-    for _, archive, _, _ in NATIVE_PDFIUM
+    for archive in [archive for _, archive, _, _ in NATIVE_PDFIUM] + [archive for _, archive in ANDROID_PDFIUM]
 ]
 
 PDFIUM_EMBEDS = [
@@ -130,6 +202,10 @@ kmp_cinterop(
 kmp_library(
     name = "pdf",
     android = True,
+    android_deps = [
+        ":pdfium_library",
+        "@maven_kmp//:jna",
+    ],
     android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
     cinterops = [":pdfium_interop"],
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
@@ -138,6 +214,7 @@ kmp_library(
     keep_deps = [
         ":pdfium_native",
         "@maven_kmp//:embedpdf_pdfium",
+        ":pdfium_library",
     ],
     native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
     native_targets = [
@@ -166,9 +243,16 @@ kmp_library(
 
 kmp_test(
     name = "test",
-    android = True,
     associate = ":pdf",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    device_deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/utils/parsers/pdf",
+        "@maven_kmp//:androidx_test_runner",
+        "@maven_kmp//:kotlinx_coroutines_test",
+    ],
+    device_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    keep_deps = ["@maven_kmp//:androidx_test_runner"],
     native_targets = [
         "linuxArm64",
         "linuxX64",

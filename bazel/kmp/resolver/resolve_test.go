@@ -182,6 +182,24 @@ func TestRuntimeOnlyLibraryResolvesOnTheJvm(t *testing.T) {
 	}
 }
 
+func TestAndroidTakesAnAarTheJarPomAlsoPublishes(t *testing.T) {
+	// JNA: a jar POM, and an AAR beside the jar carrying Android's native libraries.
+	path, body := pom("g", "jna", "1", "")
+	files := map[string][]byte{path: body, "/g/jna/1/jna-1.jar": []byte("jar"), "/g/jna/1/jna-1.aar": []byte("aar")}
+	r := NewResolver(repository(t, files), nil, nil)
+	r.androidAars = map[string]bool{"g:jna": true}
+
+	for platform, want := range map[string]string{"android": "jna-1.aar", "jvm": "jna-1.jar"} {
+		got, _, err := r.Resolve(platforms[platform], []Coordinate{{"g", "jna", "1"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if files := got["g:jna"].Files; len(files) != 1 || files[0].Name != want {
+			t.Errorf("%s resolved %+v, want %s", platform, files, want)
+		}
+	}
+}
+
 func TestApiOnlyDependencyIsCompileOnly(t *testing.T) {
 	// log4j-core's api variant names OSGi annotations its runtime variant leaves out.
 	files := map[string][]byte{

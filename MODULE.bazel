@@ -94,9 +94,9 @@ http_archive(
     url = "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip",
 )
 
-# pdfium (bblanchon/pdfium-binaries), the PDF text extractor //utils/parsers/pdf calls through Java's FFM (#1176)
-# and, from native binaries, through a loader that embeds it (#1191): one shared library per desktop OS/arch, each
-# build carrying only its target platform's. Renovate bumps PDFIUM (the release's chromium build);
+# pdfium (bblanchon/pdfium-binaries), the PDF text extractor //utils/parsers/pdf calls through Java's FFM (#1176),
+# from native binaries through a loader that embeds it (#1191), and on Android through JNA (#1190): one shared library
+# per OS/arch, each build carrying only its target platform's (Android: arm64 devices and x64 emulators). Renovate bumps PDFIUM (the release's chromium build);
 # bazel/renovate/repin.sh then rewrites the SHA-256s.
 PDFIUM = "8111"
 
@@ -111,6 +111,20 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 """
+
+http_archive(
+    name = "pdfium_android_arm64",
+    build_file_content = PDFIUM_BUILD,
+    sha256 = "727cb2645ece75d28d0b72f2ec05b82858ca3bfb6712cd333ffc248807016e2c",
+    url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F" + PDFIUM + "/pdfium-android-arm64.tgz",
+)
+
+http_archive(
+    name = "pdfium_android_x64",
+    build_file_content = PDFIUM_BUILD,
+    sha256 = "e2c31cffe42ee3a34e2b9d6c6c254ddf5da1541ce2d82216171e9354c86f0a7c",
+    url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F" + PDFIUM + "/pdfium-android-x64.tgz",
+)
 
 http_archive(
     name = "pdfium_linux_arm64",
@@ -181,6 +195,7 @@ ERRORPRONE = "2.51.0"  # renovate: com.google.errorprone:error_prone_annotations
 JAVAWRITER = "2.5.1"  # renovate: com.squareup:javawriter
 JETBRAINS_ANNOTATIONS = "26.1.0"  # renovate: org.jetbrains:annotations
 JETBRAINS_NAVIGATION3 = "1.2.0"  # renovate: org.jetbrains.androidx.navigation3:navigation3-ui-desktop
+JNA = "5.19.1"  # renovate: net.java.dev.jna:jna
 JSR305 = "3.0.2"  # renovate: com.google.code.findbugs:jsr305
 JUNIT = "4.13.2"  # renovate: junit:junit
 KERMIT = "2.2.0"  # renovate: co.touchlab:kermit
@@ -221,6 +236,9 @@ maven_kmp.install(
     # Android Studio renders Compose previews with the hub's `androidx_compose_ui_ui_tooling`, rules_jvm_external's
     # name for it, and builds it after every sync of a Compose project: a missing target fails that build.
     aliases = {"androidx_compose_ui_ui_tooling": "androidx_compose_ui_tooling_android"},
+    # JNA's POM says jar, but Android takes the AAR beside it: its jni/ carries libjnidispatch, which JNA can't unpack
+    # from a jar there.
+    android_aars = ["net.java.dev.jna:jna"],
     # alias → group:artifact:version. Modules name a library by its alias: @maven_kmp//:kotlinx_io_core.
     artifacts = {
         "androidx-activity": "androidx.activity:activity:" + ANDROIDX_ACTIVITY_COMPOSE,
@@ -287,6 +305,8 @@ maven_kmp.install(
         "cryptography-random": "dev.whyoleg.cryptography:cryptography-random:" + CRYPTOGRAPHY,
         "jetbrains-navigation3-ui": "org.jetbrains.androidx.navigation3:navigation3-ui:" + JETBRAINS_NAVIGATION3,
         "jetbrains-navigation3-ui-desktop": "org.jetbrains.androidx.navigation3:navigation3-ui-desktop:" + JETBRAINS_NAVIGATION3,
+        # JNA calls pdfium on Android (#1190), which has no FFM.
+        "jna": "net.java.dev.jna:jna:" + JNA,
         "junit": "junit:junit:" + JUNIT,
         "kermit": "co.touchlab:kermit:" + KERMIT,
         "kermit-core": "co.touchlab:kermit-core:" + KERMIT,
@@ -455,6 +475,7 @@ maven_kmp.install(
         "compose-ui-util-desktop": ["jvm"],
         "jetbrains-navigation3-ui": ["js", "metadataWeb", "wasmJs"],
         "jetbrains-navigation3-ui-desktop": ["jvm"],
+        "jna": ["android"],
         "kotlin-compose-compiler-plugin-embeddable": ["jvm"],
         "kotlin-serialization-compiler-plugin-embeddable": ["jvm"],
         "kotlinx-coroutines-android": ["android"],

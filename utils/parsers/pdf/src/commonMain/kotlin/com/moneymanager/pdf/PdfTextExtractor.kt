@@ -21,14 +21,14 @@ data class PdfPage(
 /**
  * Reads the characters a PDF draws, with their positions. A PDF stores no reading order (its text operators can
  * draw a page in any order), so lines are rebuilt from the positions by [PdfLineBuilder]. Implemented with pdfium on
- * the JVM and in the browser (its WebAssembly build, which loads asynchronously, hence `suspend`); the Android and
- * native `actual`s return a parser that throws [PdfUnsupportedPlatformException] (see [createPdfTextExtractor]).
+ * every platform (in the browser its WebAssembly build, which loads asynchronously, hence `suspend`).
  */
 interface PdfTextExtractor {
     /**
      * Every page's glyphs.
      *
      * @throws PdfParseException if [bytes] isn't a PDF pdfium can open (corrupt, or password protected).
+     * @throws PdfUnsupportedPlatformException if this build has no pdfium for the OS, CPU or ABI it runs on.
      */
     suspend fun extract(bytes: ByteArray): List<PdfPage>
 }
@@ -38,21 +38,13 @@ class PdfParseException(
     message: String,
 ) : IllegalArgumentException(message)
 
-/** Thrown by the [PdfTextExtractor] of a platform without pdfium. */
+/**
+ * pdfium can't load here: this build carries none for the OS, CPU or ABI it runs on. Each PDF fails on its own, so
+ * one never aborts a whole import.
+ */
 class PdfUnsupportedPlatformException(
     message: String,
 ) : UnsupportedOperationException(message)
-
-/**
- * The [PdfTextExtractor] of every platform without pdfium. Each call fails with [PdfUnsupportedPlatformException],
- * so a PDF fails on its own instead of aborting a whole import.
- */
-internal object UnsupportedPdfTextExtractor : PdfTextExtractor {
-    override suspend fun extract(bytes: ByteArray): List<PdfPage> =
-        throw PdfUnsupportedPlatformException(
-            "PDF parsing is not supported on this platform: import PDFs with the desktop app or mm-jvm",
-        )
-}
 
 /** This platform's [PdfTextExtractor]. */
 @Suppress("ktlint:standard:function-naming")

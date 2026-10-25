@@ -34,6 +34,8 @@ def _expected_inputs(install):
         "libraries": install.artifacts,
         "platforms": install.platforms,
     }
+    if install.android_aars:
+        inputs["android_aars"] = install.android_aars
     if install.classpath_forces:
         inputs["classpath_forces"] = install.classpath_forces
     if install.library_platforms:
@@ -284,6 +286,7 @@ def _install(module_ctx, install, files, archives, npm):
     pin_args += ["--classpath-force=%s=%s" % (m, v) for m, v in sorted(install.classpath_forces.items())]
     pin_args += ["--repository=" + r for r in install.repositories]
     pin_args += ["--exclude=" + e for e in install.excludes]
+    pin_args += ["--android-aar=" + m for m in install.android_aars]
     pin_args += ["--npm=%s=%s" % (a, p) for a, p in sorted(install.npm.items())]
     pin_args += ["--npm-force=%s=%s" % (n, v) for n, v in sorted(install.npm_forces.items())]
     for alias, key in sorted(lock.get("npm_libraries", {}).items()):
@@ -331,6 +334,9 @@ maven_kmp = module_extension(
         "install": tag_class(attrs = {
             "aliases": attr.string_dict(
                 doc = "name → one of the hub's targets, for a tool that expects another name for it (rules_jvm_external's).",
+            ),
+            "android_aars": attr.string_list(
+                doc = "group:artifact whose POM says jar but whose release also has an AAR, which Android takes.",
             ),
             "artifacts": attr.string_dict(
                 doc = "alias → group:artifact:version: the libraries to resolve, named by alias in the hub.",

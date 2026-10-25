@@ -10,16 +10,9 @@ import kotlin.test.assertTrue
 class PdfiumTextExtractorTest {
     private val extractor = createPdfTextExtractor()
 
-    // A platform without pdfium yet only has to say so.
-    private val unsupported = extractor == UnsupportedPdfTextExtractor
-
     @Test
     fun `reads each line of text where the page draws it`() =
         runTest {
-            if (unsupported) {
-                assertFailsWith<PdfUnsupportedPlatformException> { extractor.extract(STATEMENT_EXCERPT_PDF) }
-                return@runTest
-            }
             val lines = extractor.extractLines(STATEMENT_EXCERPT_PDF)
             assertEquals(
                 listOf("Statement Date 19/01/13", "CR"),
@@ -32,9 +25,8 @@ class PdfiumTextExtractorTest {
         }
 
     @Test
-    fun `bytes that aren't a PDF fail as a parse error`() =
+    fun `bytes that are not a PDF fail as a parse error`() =
         runTest {
-            if (unsupported) return@runTest
             assertFailsWith<PdfParseException> {
                 extractor.extract("not a pdf".encodeToByteArray())
             }

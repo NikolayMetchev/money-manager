@@ -161,7 +161,9 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
   and a library with only a runtime variant (the Compose Gradle plugin jar) compiles against that one.
 - The `android` platform takes a library's `androidJvm` variant (an AAR: `classes.jar` merged with its `libs/` jars),
   else a JVM one, never androidx's `*Stubs`; `library_platforms` limits a library to the platforms that use it (the
-  `-desktop` jars to `jvm`, the androidx roots to `android`).
+  `-desktop` jars to `jvm`, the androidx roots to `android`). A module whose POM says `jar` but which also publishes an
+  AAR with native libraries (JNA: `libjnidispatch.so` per ABI) is listed in `android_aars`, and the `android`
+  platform takes the AAR.
 - The browser platforms (#84) take a library's `kotlin-api` klib like native does: `wasmJs` is Kotlin/Wasm's `js`
   target (never WASI), `js` Kotlin/JS's IR compiler. Their hub targets are `kt_web_import`/`kt_web_group`
   (`kmp/web.bzl`, `WebKlibInfo`). Unlike native they also follow the `kotlin-runtime` variant, as a program links

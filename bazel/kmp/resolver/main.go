@@ -41,6 +41,7 @@ type Lock struct {
 		// library for the source sets that declare it: the desktop Compose jars are no Android library.
 		LibraryPlatforms map[string][]string `json:"library_platforms,omitempty"`
 		Excludes         []string            `json:"excludes"`
+		AndroidAars      []string            `json:"android_aars,omitempty"`
 		// Npm are npm packages our own code imports (`@JsModule`), alias → name@version, and NpmForces pin an npm
 		// package's version whoever asks for it, as a Yarn `resolutions` entry does.
 		Npm       map[string]string `json:"npm,omitempty"`
@@ -63,7 +64,7 @@ type Lock struct {
 var nonIdent = regexp.MustCompile(`[^A-Za-z0-9_]`)
 
 func main() {
-	var libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes, npmLibraries, npmForces multi
+	var libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes, androidAars, npmLibraries, npmForces multi
 	kotlin := flag.String("kotlin", "", "the Kotlin release the toolchain's stdlib and kotlin-test are")
 	out := flag.String("lock", "bazel/kmp/deps/maven_kmp.lock.json", "the lockfile to write")
 	flag.Var(&libraries, "library", "alias=group:artifact:version: a library to resolve (repeatable)")
@@ -73,20 +74,25 @@ func main() {
 	flag.Var(&classpathForces, "classpath-force", "module=version: pin a module on the JVM and in common metadata only (repeatable)")
 	flag.Var(&repos, "repository", "url[=group-regex,…]: a repository, in order, optionally limited to groups (repeatable)")
 	flag.Var(&excludes, "exclude", "group:artifact never to resolve, whoever depends on it (repeatable)")
+	flag.Var(&androidAars, "android-aar", "group:artifact whose AAR Android takes, though its POM says jar (repeatable)")
 	flag.Var(&npmLibraries, "npm", "alias=name@version: an npm package our code imports (repeatable)")
 	flag.Var(&npmForces, "npm-force", "name=version: pin an npm package, whoever asks for it (repeatable)")
 	flag.Parse()
 	npm := npmInputs{libraries: npmLibraries, forces: npmForces}
-	if err := run(*kotlin, *out, libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes, npm); err != nil {
+	android := androidInputs{aars: androidAars}
+	if err := run(*kotlin, *out, libraries, libraryPlatforms, platformNames, forces, classpathForces, repos, excludes, android, npm); err != nil {
 		fmt.Fprintln(os.Stderr, "resolver:", err)
 		os.Exit(1)
 	}
 }
 
+// androidInputs are the --android-aar specs.
+type androidInputs struct{ aars []string }
+
 // npmInputs are the --npm and --npm-force specs.
 type npmInputs struct{ libraries, forces []string }
 
-func run(kotlin, out string, libraries, libraryPlatformSpecs, platformNames, forceSpecs, classpathForceSpecs, repoSpecs, excludes []string, npmSpecs npmInputs) error {
+func run(kotlin, out string, libraries, libraryPlatformSpecs, platformNames, forceSpecs, classpathForceSpecs, repoSpecs, excludes []string, android androidInputs, npmSpecs npmInputs) error {
 	if kotlin == "" {
 		return fmt.Errorf("--kotlin is required")
 	}
@@ -167,6 +173,16 @@ func run(kotlin, out string, libraries, libraryPlatformSpecs, platformNames, for
 
 	resolver := NewResolver(NewFetcher(repos), forced, excludes)
 	resolver.classpathForces = classpathForced
+	resolver.androidAars = map[string]bool{}
+	for _, module := range android.aars {
+		if strings.Count(module, ":") != 1 {
+			return fmt.Errorf("--android-aar %s: want group:artifact", module)
+		}
+		resolver.androidAars[module] = true
+	}
+	if len(android.aars) > 0 {
+		lock.Inputs.AndroidAars = append([]string{}, android.aars...)
+	}
 	for _, name := range platformNames {
 		if p, ok := platforms[name]; ok && !p.Common {
 			resolver.consumers = append(resolver.consumers, p)
