@@ -422,6 +422,8 @@ exclude:
       # [5] — throttleLatest's callers chain it on SQLDelight queries' asFlow(), whose generated types the linter
       # reads as compiled classes, so the calls don't resolve.
       - utils/coroutines/src/commonMain/kotlin/com/moneymanager/coroutines/ThrottleLatest.kt
+      # [5] — native-only sources belong to no module, so the native actual of createPdfTextExtractor looks unused.
+      - utils/parsers/pdf/src/nativeMain
       # [5] — FileSettingsText is used by jvmMain's DesktopLocalSettings and the CLI's CreateLocalSettings.native.
       - utils/localsettings/src/commonMain/kotlin/com/moneymanager/localsettings/JsonLocalSettings.kt
       # [5] — actuals of common expects (BigDecimal/BigInteger, Currency, the file pickers, the vault path

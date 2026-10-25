@@ -1,6 +1,7 @@
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_keep_dep :pdfium_native jvmMain
+# gazelle:kmp_keep_dep @maven_kmp//:embedpdf_pdfium webMain
 
 load("@rules_java//java:java_import.bzl", "java_import")
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
@@ -66,15 +67,24 @@ kmp_library(
         "@maven_kmp//:kotlinx_io_core",
     ],
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
-    keep_deps = [":pdfium_native"],
+    keep_deps = [
+        ":pdfium_native",
+        "@maven_kmp//:embedpdf_pdfium",
+    ],
+    native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
     native_targets = [
         "linuxArm64",
         "linuxX64",
         "macosArm64",
         "mingwX64",
     ],
-    non_jvm_srcs = glob(["src/nonJvmMain/kotlin/**/*.kt"]),
     visibility = ["//visibility:public"],
+    web_deps = [
+        "@maven_kmp//:embedpdf_pdfium",
+        "@maven_kmp//:kotlinx_browser",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+    web_srcs = glob(["src/webMain/kotlin/**/*.kt"]),
     web_targets = [
         "wasmJs",
         "js",
@@ -86,8 +96,6 @@ kmp_test(
     android = True,
     associate = ":pdf",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
-    jvm_deps = ["//test/utils/parsers/pdf"],
-    jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
     native_targets = [
         "linuxArm64",
         "linuxX64",
@@ -98,5 +106,9 @@ kmp_test(
         "wasmJs",
         "js",
     ],
-    deps = ["//bazel/kmp/deps:kotlin_test"],
+    deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/utils/parsers/pdf",
+        "@maven_kmp//:kotlinx_coroutines_test",
+    ],
 )

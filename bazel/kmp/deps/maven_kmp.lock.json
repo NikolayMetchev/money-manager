@@ -392,6 +392,7 @@
       "org.jetbrains.kotlin:kotlin-gradle-plugin"
     ],
     "npm": {
+      "embedpdf-pdfium": "@embedpdf/pdfium@2.15.1",
       "js-joda-timezone": "@js-joda/timezone@3.1.0",
       "sqlite-wasm": "@sqlite.org/sqlite-wasm@3.54.1-build1"
     },
@@ -22134,6 +22135,12 @@
     }
   },
   "npm": {
+    "@embedpdf/pdfium@2.15.1": {
+      "name": "@embedpdf/pdfium",
+      "version": "2.15.1",
+      "url": "https://registry.npmjs.org/@embedpdf/pdfium/-/pdfium-2.15.1.tgz",
+      "integrity": "sha512-qDH4gEkGSQT0iM+07Hpm3LyvoB7PEFbW3Qyk6+LPkEYLJYfHagkHM1OzYlDq2EDOhJRguykTkzdMOT3/w27x5Q=="
+    },
     "@js-joda/core@6.3.0": {
       "name": "@js-joda/core",
       "version": "6.3.0",
@@ -22163,6 +22170,7 @@
     }
   },
   "npm_libraries": {
+    "embedpdf-pdfium": "@embedpdf/pdfium@2.15.1",
     "js-joda-timezone": "@js-joda/timezone@3.1.0",
     "sqlite-wasm": "@sqlite.org/sqlite-wasm@3.54.1-build1"
   }
