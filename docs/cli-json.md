@@ -153,6 +153,19 @@ Anything else, a second statement, or SQL that SQLite rejects exits 2 with SQLit
 The values are the database's own, so amounts are scaled integers (divide by the asset's `scale_factor`: 10^18 for
 every asset the app creates) and times are what the schema stores. The schema isn't part of this contract: it can change with any release.
 
+### `pdf-lines FILE`
+
+Reads a PDF (no database needed) and prints its text lines, as a CSV strategy's PDF line rules see them: glyphs
+sharing a baseline form a line, and columns stay two or more spaces apart. Platforms that can't read PDFs exit 1.
+
+`data`: one object per line, in reading order.
+
+| Field | |
+|---|---|
+| `page` | 1-based page number |
+| `line` | 1-based line number within the page |
+| `text` | the line's text |
+
 ### `import dirs [--dir NAME]… [--download-only] [--redownload]`, `import apis [--strategy NAME]… [--force-full] [--download-only]`, `import all [--force-full] [--download-only]`
 
 These commands download and import. `import dirs` downloads every included import directory (local and Google

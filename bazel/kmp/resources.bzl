@@ -41,10 +41,14 @@ def _file_resource_jar_impl(ctx):
     files = []
     for target, entry in ctx.attr.entries.items():
         target_files = target.files.to_list()
-        if len(target_files) != 1:
-            fail("%s must be one file, got %d" % (target.label, len(target_files)))
-        args.add("%s=%s" % (entry, target_files[0].path))
-        files.append(target_files[0])
+        if entry.endswith("/"):
+            for f in target_files:
+                args.add("%s%s=%s" % (entry, f.basename, f.path))
+        elif len(target_files) == 1:
+            args.add("%s=%s" % (entry, target_files[0].path))
+        else:
+            fail("%s must be one file, got %d (or name a directory entry, ending in /)" % (target.label, len(target_files)))
+        files.extend(target_files)
     ctx.actions.run(
         executable = ctx.executable._tool,
         arguments = [args],
@@ -57,10 +61,11 @@ def _file_resource_jar_impl(ctx):
 
 file_resource_jar = rule(
     implementation = _file_resource_jar_impl,
-    doc = "Packs single files from anywhere (another repository's, say) into a resource jar, each at its named " +
-          "entry. Wrap it in a `java_import` for a JVM library to take as a runtime dep.",
+    doc = "Packs files from anywhere (another repository's, say) into a resource jar, each at its named entry, or " +
+          "every file of a target under an entry ending in `/`. Wrap it in a `java_import` for a JVM library to take " +
+          "as a runtime dep.",
     attrs = {
-        "entries": attr.label_keyed_string_dict(allow_files = True, doc = "File → its path in the jar."),
+        "entries": attr.label_keyed_string_dict(allow_files = True, doc = "File → its path in the jar, or files → their directory."),
         "_tool": attr.label(default = "//bazel/kmp/resources", executable = True, cfg = "exec"),
     },
 )

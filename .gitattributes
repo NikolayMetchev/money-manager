@@ -2,3 +2,5 @@
 bazel/kmp/sqldelight/tests/golden/** text eol=lf
 # cmd scripts keep the CRLF they were written with.
 bazel/stamp/*.bat -text
+# A PDF's cross-reference table holds byte offsets, so no checkout may rewrite its line endings.
+*.pdf binary

@@ -52,6 +52,9 @@ _MAIN_CLASS = "com.moneymanager.MainKt"
 _JVM_FLAGS = [
     "--add-modules",
     "java.sql",
+    # PDF imports call pdfium through the foreign function API (//utils/parsers/pdf), which the JDK otherwise warns
+    # about on first use and a later JDK will refuse.
+    "--enable-native-access=ALL-UNNAMED",
 ]
 
 # `bazel run //app/main/jvm:app` is Gradle's `:app:main:jvm:run`; `:app_deploy.jar` is the app in one jar.

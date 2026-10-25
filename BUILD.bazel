@@ -207,6 +207,7 @@ kmp_modules(
         "//utils/parsers/pdf:pdf_module",
         "//utils/parsers/pdf:test_module",
         "//utils/coroutines:test_module",
+        "//test/utils/parsers/pdf:pdf_module",
     ],
     visibility = ["//visibility:public"],
 )

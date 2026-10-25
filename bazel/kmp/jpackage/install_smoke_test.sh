@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installs the desktop installer `//app/main/jvm:installer` built (deb, dmg or msi, by host) and checks the
-# installed app: `mm-jvm version` and the bundled native `mm version` print the version, and the desktop app starts
-# and stays up (#1020). CI runs it on fresh runners; it needs root on Linux (apt) and a display (Linux: Xvfb).
+# installed app: `mm-jvm version` and the bundled native `mm version` print the version, `mm-jvm pdf-lines` reads a
+# PDF through the bundled pdfium, and the desktop app starts and stays up (#1020). CI runs it on fresh runners; it needs root on Linux (apt) and a display (Linux: Xvfb).
 #
 # Usage: install_smoke_test.sh <installer directory> <expected version>
 set -euo pipefail
@@ -62,6 +62,14 @@ for cli in "$mm_jvm" "$mm"; do
   echo "$cli version: $out"
   grep -q "\"version\": \"$version\"" <<<"$out"
 done
+
+# PDF imports: the shrunk jars still carry pdfium, the runtime unpacks and loads it, and lines come out in order.
+pdf=$(dirname "$0")/smoke-test.pdf
+case "$(uname -s)" in MINGW* | MSYS*) pdf=$(cygpath -w "$pdf") ;; esac
+out=$("$mm_jvm" pdf-lines "$pdf" </dev/null)
+echo "mm-jvm pdf-lines: $out"
+grep -q '"text": "Statement Date 19/01/13"' <<<"$out"
+grep -Eq '"text": "Jan 2 +PAYMENT RECEIVED - THANK YOU {2,}[^"]*2,609.36"' <<<"$out"
 
 # A fresh runner, so this is the app's first run: the database setup screen.
 if [ "$(uname -s)" = Linux ]; then
