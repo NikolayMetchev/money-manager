@@ -58,6 +58,7 @@ timeout; use at least 20 minutes.
 | `bazel build //...` | Build everything: every platform's compile, the commonMain metadata checks, the host's `mm`, the module and dependency checks |
 | `bazel test //...` | Every test the host can run: JVM, Android host, the host's native tests, ktlint, detekt, Android lint, the lockfile tests |
 | `bazel run //app/main/jvm:app` | Run the desktop app |
+| `bazel run //app/main/jvm:app_jfr` | Run the desktop app under Java Flight Recorder (method sampling); writes `profile.jfr` in the repo root on exit |
 | `bazel run //app/main/web:serve -- 8080` | Serve the browser app (`//app/main/web:dist`) on http://127.0.0.1:8080 |
 | `bazel build //app/main/android:debug` | Debug APK (`bazel-bin/app/main/android/debug.apk`; `adb install` it) |
 | `bazel build //app/main/cli:mm` / `:mm-jvm` | The host's native `mm` / the JVM `mm-jvm` (`bazel-bin/app/main/cli/mm-jvm/bin/mm-jvm`) |
