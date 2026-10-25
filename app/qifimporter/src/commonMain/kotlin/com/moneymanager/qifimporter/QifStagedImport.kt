@@ -56,6 +56,7 @@ internal suspend fun applyStagedQif(
         selectedExistingAccounts = emptyMap(),
         selectedNewAccountNames = emptyMap(),
         selectedSourceAccountId = effectiveSource,
+        accounts = accounts,
         currencies = currencies,
         accountMappingRepository = accountMappingRepository,
         accountRepository = accountRepository,

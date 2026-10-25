@@ -201,6 +201,7 @@ suspend fun bulkApplyQif(
                     refreshViews = false,
                     onProgress = { tracker.item(index, qifImport.originalFileName, it) },
                     engineBatchSize = BULK_ENGINE_BATCH_SIZE,
+                    accounts = accounts,
                 )
             outcome(BulkFileStatus.IMPORTED, result.successCount, result.duplicateCount)
         } catch (expected: Exception) {
@@ -275,13 +276,16 @@ suspend fun runImport(
     refreshViews: Boolean = true,
     onProgress: (suspend (Progress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
+    // Every account, when the caller has just read them to build [basePrep].
+    accounts: List<Account>? = null,
 ): QifImportResult {
+    val knownAccounts = accounts ?: accountRepository.getAllAccounts().first()
     // Persist any "map to existing account" selections so future imports reuse them.
     val selectedMappingsToPersist =
         buildPendingAccountMappings(
             basePrep,
             selectedExistingAccounts,
-            accountRepository.getAllAccounts().first().associateBy { it.id },
+            knownAccounts.associateBy { it.id },
         )
     if (selectedMappingsToPersist.isNotEmpty()) {
         runCatching { importEngine.createAccountMappings(selectedMappingsToPersist) }
@@ -309,7 +313,7 @@ suspend fun runImport(
 
     // Rebuild the mapper against the now-current accounts/mappings. Duplicate detection happens inside
     // the central engine, so no existing transfers are loaded here.
-    val latestAccounts = accountRepository.getAllAccounts().first()
+    val latestAccounts = if (accountsToCreate.isEmpty()) knownAccounts else accountRepository.getAllAccounts().first()
     val latestMappings = accountMappingRepository.getAllMappings().first()
     val historicalAccountNames = accountRepository.getPreviousAccountNames()
     val mapper =
