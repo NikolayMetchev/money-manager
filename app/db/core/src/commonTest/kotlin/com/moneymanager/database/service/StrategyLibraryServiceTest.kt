@@ -153,7 +153,7 @@ class StrategyLibraryServiceTest : DbTest() {
             val entry = library.listLocal(version).single { it.key.name == "MyPdf" }
             assertEquals(key, entry.key)
             assertEquals("MyPdf.pdf.json", StrategyFileNaming.fileName(key))
-            assertEquals(key, StrategyFileNaming.parse("MyPdf.pdf.json"))
+            assertEquals(key, StrategyFileNaming.parse(StrategyFileNaming.fileName(key)))
 
             library.applyIncoming(key, entry.json, emptyMap())
             val reapplied = repositories.csvImportStrategyRepository.getStrategyByName("MyPdf").first()!!
