@@ -213,6 +213,7 @@ TURBINE = "1.2.1"  # renovate: app.cash.turbine:turbine
 JS_JODA_CORE = "6.3.0"  # renovate-npm: @js-joda/core
 JS_JODA_TIMEZONE = "3.1.0"  # renovate-npm: @js-joda/timezone
 SQLITE_WASM = "3.54.1-build1"  # renovate-npm: @sqlite.org/sqlite-wasm
+EMBEDPDF_PDFIUM = "2.15.1"  # renovate-npm: @embedpdf/pdfium
 
 maven_kmp = use_extension("//bazel/kmp/deps:extensions.bzl", "maven_kmp")
 maven_kmp.install(
@@ -477,6 +478,8 @@ maven_kmp.install(
     # alias → name@version: npm packages our own browser code imports (`@JsModule`), named like the libraries, with a
     # target per browser platform: @maven_kmp//:js_joda_timezone. The ones the libraries need come from their klibs.
     npm = {
+        # pdfium compiled to WebAssembly, the browser's PDF text extractor (//utils/parsers/pdf).
+        "embedpdf-pdfium": "@embedpdf/pdfium@" + EMBEDPDF_PDFIUM,
         "js-joda-timezone": "@js-joda/timezone@" + JS_JODA_TIMEZONE,
         # SQLite compiled to WebAssembly, which the browser's database worker (app/db/worker) runs.
         "sqlite-wasm": "@sqlite.org/sqlite-wasm@" + SQLITE_WASM,

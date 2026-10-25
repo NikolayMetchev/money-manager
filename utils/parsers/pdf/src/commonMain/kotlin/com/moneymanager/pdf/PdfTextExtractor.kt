@@ -21,8 +21,8 @@ data class PdfPage(
 /**
  * Reads the characters a PDF draws, with their positions. A PDF stores no reading order (its text operators can
  * draw a page in any order), so lines are rebuilt from the positions by [PdfLineBuilder]. Implemented with pdfium on
- * the JVM; the Android, native and browser `actual`s return a parser that throws [PdfUnsupportedPlatformException]
- * (see [createPdfTextExtractor]).
+ * the JVM and in the browser (its WebAssembly build, which loads asynchronously, hence `suspend`); the Android and
+ * native `actual`s return a parser that throws [PdfUnsupportedPlatformException] (see [createPdfTextExtractor]).
  */
 interface PdfTextExtractor {
     /**
@@ -30,7 +30,7 @@ interface PdfTextExtractor {
      *
      * @throws PdfParseException if [bytes] isn't a PDF pdfium can open (corrupt, or password protected).
      */
-    fun extract(bytes: ByteArray): List<PdfPage>
+    suspend fun extract(bytes: ByteArray): List<PdfPage>
 }
 
 /** [bytes][PdfTextExtractor.extract] couldn't be read as a PDF. */
@@ -48,7 +48,7 @@ class PdfUnsupportedPlatformException(
  * so a PDF fails on its own instead of aborting a whole import.
  */
 internal object UnsupportedPdfTextExtractor : PdfTextExtractor {
-    override fun extract(bytes: ByteArray): List<PdfPage> =
+    override suspend fun extract(bytes: ByteArray): List<PdfPage> =
         throw PdfUnsupportedPlatformException(
             "PDF parsing is not supported on this platform: import PDFs with the desktop app or mm-jvm",
         )
@@ -59,4 +59,19 @@ internal object UnsupportedPdfTextExtractor : PdfTextExtractor {
 expect fun createPdfTextExtractor(): PdfTextExtractor
 
 /** The PDF's text as lines (see [PdfLineBuilder]). */
-fun PdfTextExtractor.extractLines(bytes: ByteArray): List<PdfLine> = PdfLineBuilder.build(extract(bytes))
+suspend fun PdfTextExtractor.extractLines(bytes: ByteArray): List<PdfLine> = PdfLineBuilder.build(extract(bytes))
+
+/** Why pdfium couldn't open a document, from `FPDF_GetLastError`'s code (fpdfview.h's `FPDF_ERR_*`). */
+internal fun pdfiumOpenError(code: Long): PdfParseException {
+    val reason =
+        when (code) {
+            1L -> "unknown error"
+            2L -> "file not found or could not be opened"
+            3L -> "not a PDF or corrupted"
+            4L -> "password protected"
+            5L -> "unsupported security scheme"
+            6L -> "page not found or content error"
+            else -> "pdfium error $code"
+        }
+    return PdfParseException("Not a readable PDF ($reason)")
+}

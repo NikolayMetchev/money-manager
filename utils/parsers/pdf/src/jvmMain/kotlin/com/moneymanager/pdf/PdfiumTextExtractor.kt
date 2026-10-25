@@ -16,7 +16,7 @@ internal object PdfiumTextExtractor : PdfTextExtractor {
     private val lock = Any()
     private val functions by lazy { PdfiumFunctions(PdfiumLibrary.load()) }
 
-    override fun extract(bytes: ByteArray): List<PdfPage> =
+    override suspend fun extract(bytes: ByteArray): List<PdfPage> =
         synchronized(lock) {
             Arena.ofConfined().use { arena ->
                 functions.extract(arena, bytes)
@@ -71,8 +71,7 @@ private class PdfiumFunctions(
         MemorySegment.copy(bytes, 0, data, ValueLayout.JAVA_BYTE, 0, bytes.size)
         val document = loadMemDocument.invokeWithArguments(data, bytes.size.toLong(), MemorySegment.NULL) as MemorySegment
         if (document == MemorySegment.NULL) {
-            val error = getLastError.invokeWithArguments() as Long
-            throw PdfParseException("Not a readable PDF (${ERRORS[error] ?: "pdfium error $error"})")
+            throw pdfiumOpenError(getLastError.invokeWithArguments() as Long)
         }
         try {
             val pageCount = getPageCount.invokeWithArguments(document) as Int
@@ -128,18 +127,5 @@ private class PdfiumFunctions(
             baseline = y.get(ValueLayout.JAVA_DOUBLE, 0),
             size = getFontSize.invokeWithArguments(textPage, index) as Double,
         )
-    }
-
-    private companion object {
-        // fpdfview.h's FPDF_ERR_* codes.
-        val ERRORS =
-            mapOf(
-                1L to "unknown error",
-                2L to "file not found or could not be opened",
-                3L to "not a PDF or corrupted",
-                4L to "password protected",
-                5L to "unsupported security scheme",
-                6L to "page not found or content error",
-            )
     }
 }
