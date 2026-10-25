@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.csv.CsvRowLink
+import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
@@ -146,6 +147,8 @@ sealed interface CsvImportMutation {
         // different worksheet is later selected.
         val xlsxBytes: ByteArray? = null,
         val xlsxWorksheetName: String? = null,
+        // Non-null only for a PDF import: the file and the text lines [rows] were staged from.
+        val pdf: PdfImportSource? = null,
     ) : CsvImportMutation {
         // ByteArray uses reference equality by default; override with structural (contentEquals)
         // comparison so this mutation compares correctly in tests/state diffing.
@@ -160,7 +163,8 @@ sealed interface CsvImportMutation {
                         fileChecksum == other.fileChecksum &&
                         fileLastModified == other.fileLastModified &&
                         xlsxBytes.contentEquals(other.xlsxBytes) &&
-                        xlsxWorksheetName == other.xlsxWorksheetName
+                        xlsxWorksheetName == other.xlsxWorksheetName &&
+                        pdf == other.pdf
                 )
 
         override fun hashCode(): Int {
@@ -172,6 +176,7 @@ sealed interface CsvImportMutation {
             result = 31 * result + fileLastModified.hashCode()
             result = 31 * result + (xlsxBytes?.contentHashCode() ?: 0)
             result = 31 * result + xlsxWorksheetName.hashCode()
+            result = 31 * result + pdf.hashCode()
             return result
         }
     }
@@ -181,15 +186,17 @@ sealed interface CsvImportMutation {
     ) : CsvImportMutation
 
     /**
-     * Replaces an already-staged Excel import's rows/columns in place (keeping its id) with a different
-     * worksheet re-parsed from the stored workbook bytes. Used when the matched strategy names a sheet
-     * other than the one initially staged (the first sheet).
+     * Replaces an already-staged import's rows/columns in place (keeping its id): an Excel import's with a
+     * different worksheet re-parsed from the stored workbook bytes, when the matched strategy names a sheet
+     * other than the one initially staged (the first sheet); a PDF import's with the rows its strategy's line
+     * rules assembled from the stored lines ([pdfRulesHash] names those rules, null for the raw lines).
      */
     data class Restage(
         val id: CsvImportId,
         val headers: List<String>,
         val rows: List<List<String>>,
-        val worksheetName: String,
+        val worksheetName: String? = null,
+        val pdfRulesHash: String? = null,
     ) : CsvImportMutation
 
     /**
@@ -206,6 +213,7 @@ sealed interface CsvImportMutation {
         val carriedRows: List<CsvRowLink> = emptyList(),
         val rowIndexRemap: Map<Long, Long> = emptyMap(),
         val xlsxBytes: ByteArray? = null,
+        val pdf: PdfImportSource? = null,
     ) : CsvImportMutation
 
     /** Toggles the "ignored" flag; ignored files are hidden from the actionable lists. */

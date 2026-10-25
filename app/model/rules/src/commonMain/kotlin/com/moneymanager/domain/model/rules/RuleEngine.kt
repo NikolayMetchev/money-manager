@@ -1,5 +1,7 @@
 package com.moneymanager.domain.model.rules
 
+import com.moneymanager.regex.firstMatch
+
 /** A [RuleAction.Attribute] claim, its value already computed. */
 data class RuleAttribute(
     val typeName: String,
@@ -23,6 +25,8 @@ data class RuleLeg(
  * @property excludeReason The [RuleAction.Exclude] reason, blank when the rule gave none.
  * @property accounts Every account candidate per side, in rule order; the importer takes the first that
  *   applies (see [AccountNaming]).
+ * @property rewrites Every value the rules set or rewrote, by path, in the order first written.
+ * @property capture The claimed [RuleAction.Capture] target.
  */
 data class RuleOutcome(
     val record: Record,
@@ -42,6 +46,8 @@ data class RuleOutcome(
     val tradeBuy: Boolean? = null,
     val legs: List<RuleLeg> = emptyList(),
     val ledgerTradeLeg: Boolean = false,
+    val rewrites: Map<String, String?> = emptyMap(),
+    val capture: CaptureTarget? = null,
 ) {
     /** The account candidates claimed for [side], in rule order. */
     fun accountsFor(side: AccountSide): List<AccountNaming> = accounts[side].orEmpty()
@@ -80,7 +86,7 @@ class RuleEngine(
         for (rule in rules) {
             if (!evaluator.all(rule.conditions, state.current)) continue
             for (action in rule.actions) {
-                apply(action, state)
+                if (!apply(action, state)) break
                 if (state.skipped) return state.toOutcome()
             }
         }
@@ -100,11 +106,12 @@ class RuleEngine(
             is RuleValue.Template -> renderTemplate(value.template, record)
         }
 
-    @Suppress("CyclomaticComplexMethod") // One branch per action; splitting it would only scatter the table.
+    /** Applies [action]; false when the rule's remaining actions shouldn't run (a capture that didn't match). */
+    @Suppress("CyclomaticComplexMethod", "LongMethod") // One branch per action; splitting it would only scatter the table.
     private fun apply(
         action: RuleAction,
         state: State,
-    ) {
+    ): Boolean {
         when (action) {
             is RuleAction.SwapValues -> {
                 val first = state.current.text(action.first)
@@ -180,7 +187,27 @@ class RuleEngine(
             RuleAction.LedgerTradeLeg -> {
                 state.ledgerTradeLeg = true
             }
+
+            is RuleAction.Capture -> {
+                return capture(action, state)
+            }
         }
+        return true
+    }
+
+    private fun capture(
+        action: RuleAction.Capture,
+        state: State,
+    ): Boolean {
+        val value = state.current.text(action.path) ?: return false
+        val match = evaluator.regex(action.pattern).firstMatch(value) ?: return false
+        val groups = match.groups as? MatchNamedGroupCollection
+        for (name in captureGroupNames(action.pattern)) {
+            // A group the pattern names but this match skipped (an optional part) sets nothing.
+            groups?.get(name)?.value?.let { state.rewrite(name, it.trim()) }
+        }
+        state.capture = state.capture ?: action.target
+        return true
     }
 
     private class State(
@@ -205,6 +232,7 @@ class RuleEngine(
         var tradeBuy: Boolean? = null
         val legs = mutableListOf<RuleLeg>()
         var ledgerTradeLeg = false
+        var capture: CaptureTarget? = null
 
         fun rewrite(
             path: String,
@@ -233,6 +261,8 @@ class RuleEngine(
                 tradeBuy = tradeBuy,
                 legs = legs.toList(),
                 ledgerTradeLeg = ledgerTradeLeg,
+                rewrites = overrides.toMap(),
+                capture = capture,
             )
     }
 }

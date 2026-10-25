@@ -13,7 +13,7 @@ import com.moneymanager.csvimporter.findUnmatchedFundingReferences
 import com.moneymanager.csvimporter.needsSourceAccountOverride
 import com.moneymanager.csvimporter.redownloadImportDirectory
 import com.moneymanager.csvimporter.scanImportDirectory
-import com.moneymanager.csvimporter.selectForCsv
+import com.moneymanager.csvimporter.selectForImport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -608,8 +608,7 @@ class ImportDirectoryService(
         strategies: List<CsvImportStrategy>,
     ): CsvImportStrategy? {
         val full = csvImportRepository.getImport(listed.id).first() ?: return null
-        val sampleRows = csvImportRepository.getImportRows(listed.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
-        return strategies.selectForCsv(full.originalFileName, full.columns, sampleRows)
+        return strategies.selectForImport(full, csvImportRepository)
     }
 
     // The last account a QIF import used, if it still exists.

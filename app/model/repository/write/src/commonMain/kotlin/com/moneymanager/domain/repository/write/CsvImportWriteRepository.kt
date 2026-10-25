@@ -4,6 +4,7 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvRowLink
+import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import kotlin.time.Instant
 
@@ -12,7 +13,8 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
      * Creates a new CSV (or Excel) import from parsed data. Creates the metadata, column definitions,
      * and dynamic table with data. When [xlsxBytes] is non-null, also stores the raw workbook bytes
      * (and the worksheet they were parsed from) so the sheet can be re-extracted later if a different
-     * worksheet is chosen.
+     * worksheet is chosen. When [pdf] is non-null, stores the PDF's bytes and text lines likewise, so a strategy can
+     * assemble rows from the lines later.
      *
      * @param fileName The original file name
      * @param headers The column headers
@@ -27,6 +29,7 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
         fileLastModified: Instant,
         xlsxBytes: ByteArray? = null,
         xlsxWorksheetName: String? = null,
+        pdf: PdfImportSource? = null,
     ): CsvImportId
 
     /**
@@ -36,13 +39,15 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
      * workbook bytes and re-staged. Recreates the dynamic table, replaces the column metadata, updates
      * the row/column counts, and records the new [worksheetName] on the workbook blob. Any previously
      * written per-row statuses/errors are discarded along with the old rows (the old sheet's rows were
-     * never validly imported under this strategy).
+     * never validly imported under this strategy). A PDF import is restaged the same way with the rows its
+     * strategy's line rules assembled, and records [pdfRulesHash], the rules that assembled them.
      */
     suspend fun restageImport(
         id: CsvImportId,
         headers: List<String>,
         rows: List<List<String>>,
-        worksheetName: String,
+        worksheetName: String? = null,
+        pdfRulesHash: String? = null,
     )
 
     /**
@@ -52,7 +57,8 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
      * and transaction link, the file checksum/last-modified are updated, per-row errors are dropped, and
      * the import's provenance rows are renumbered through [rowIndexRemap] (old index -> new index; a
      * provenance row whose old index is absent loses its row reference). [xlsxBytes], when set, replaces
-     * the stored workbook.
+     * the stored workbook, and [pdf], when set, the stored PDF (its [PdfImportSource.stagedRulesHash] naming the
+     * rules [rows] were assembled with).
      */
     suspend fun repopulateImport(
         id: CsvImportId,
@@ -63,6 +69,7 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
         carriedRows: List<CsvRowLink>,
         rowIndexRemap: Map<Long, Long>,
         xlsxBytes: ByteArray?,
+        pdf: PdfImportSource? = null,
     )
 
     /**

@@ -2,6 +2,7 @@ package com.moneymanager.ui.components.rules
 
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
+import com.moneymanager.domain.model.rules.CaptureTarget
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.LegRole
@@ -9,6 +10,7 @@ import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
+import com.moneymanager.domain.model.rules.captureGroupNames
 
 private const val MISSING_INPUT = "?"
 
@@ -66,23 +68,85 @@ private fun AccountNaming.summary(): String =
 @Suppress("CyclomaticComplexMethod") // One phrase per action kind.
 fun RuleAction.summary(): String =
     when (this) {
-        is RuleAction.Account -> "${side.summary()} ${naming.summary()}"
-        is RuleAction.SetDirection -> if (incoming) "money in" else "money out"
-        RuleAction.Flip -> "flip source and target"
-        is RuleAction.SwapValues -> "swap ${first.orMissing()} ↔ ${second.orMissing()}"
-        is RuleAction.SetValue -> "set ${path.orMissing()} = ${value.summary()}"
-        RuleAction.Skip -> "skip"
-        is RuleAction.Exclude -> reason?.let { "exclude (reason: ${it.summary()})" } ?: "exclude"
-        is RuleAction.Attribute -> "attribute ${typeName.orMissing()} = ${value.summary()}" + if (uniqueIdentifier) " (identifies)" else ""
-        is RuleAction.ExternalId -> "id = ${value.summary()}"
-        RuleAction.CounterpartyIsPerson -> "counterparty is a person"
-        RuleAction.IgnoreCounterpartyId -> "ignore the counterparty id"
-        is RuleAction.Fee -> "fee ${fee.amount.summary()}"
-        is RuleAction.Foreign -> "foreign amount ${foreignAmount.amount.summary()} ${foreignAmount.currency.summary()}"
-        is RuleAction.ThroughConduit -> "through “${accountName.orMissing()}”"
-        is RuleAction.TradeSide -> if (buy) "buy" else "sell"
-        is RuleAction.Leg -> "${role.summary()} leg of ${group.orMissing()}"
-        RuleAction.LedgerTradeLeg -> "ledger trade leg"
+        is RuleAction.Account -> {
+            "${side.summary()} ${naming.summary()}"
+        }
+
+        is RuleAction.SetDirection -> {
+            if (incoming) "money in" else "money out"
+        }
+
+        RuleAction.Flip -> {
+            "flip source and target"
+        }
+
+        is RuleAction.SwapValues -> {
+            "swap ${first.orMissing()} ↔ ${second.orMissing()}"
+        }
+
+        is RuleAction.SetValue -> {
+            "set ${path.orMissing()} = ${value.summary()}"
+        }
+
+        RuleAction.Skip -> {
+            "skip"
+        }
+
+        is RuleAction.Exclude -> {
+            reason?.let { "exclude (reason: ${it.summary()})" } ?: "exclude"
+        }
+
+        is RuleAction.Attribute -> {
+            "attribute ${typeName.orMissing()} = ${value.summary()}" + if (uniqueIdentifier) " (identifies)" else ""
+        }
+
+        is RuleAction.ExternalId -> {
+            "id = ${value.summary()}"
+        }
+
+        RuleAction.CounterpartyIsPerson -> {
+            "counterparty is a person"
+        }
+
+        RuleAction.IgnoreCounterpartyId -> {
+            "ignore the counterparty id"
+        }
+
+        is RuleAction.Fee -> {
+            "fee ${fee.amount.summary()}"
+        }
+
+        is RuleAction.Foreign -> {
+            "foreign amount ${foreignAmount.amount.summary()} ${foreignAmount.currency.summary()}"
+        }
+
+        is RuleAction.ThroughConduit -> {
+            "through “${accountName.orMissing()}”"
+        }
+
+        is RuleAction.TradeSide -> {
+            if (buy) "buy" else "sell"
+        }
+
+        is RuleAction.Leg -> {
+            "${role.summary()} leg of ${group.orMissing()}"
+        }
+
+        RuleAction.LedgerTradeLeg -> {
+            "ledger trade leg"
+        }
+
+        is RuleAction.Capture -> {
+            "capture ${captureGroupNames(pattern).joinToString().orMissing()} from ${path.orMissing()}" +
+                target.summary()
+        }
+    }
+
+private fun CaptureTarget.summary(): String =
+    when (this) {
+        CaptureTarget.NEW_ROW -> " (new row)"
+        CaptureTarget.ROW -> " (same row)"
+        CaptureTarget.DOCUMENT -> " (every row)"
     }
 
 private fun LegRole.summary(): String =

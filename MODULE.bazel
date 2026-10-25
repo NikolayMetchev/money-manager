@@ -94,6 +94,46 @@ http_archive(
     url = "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip",
 )
 
+# pdfium (bblanchon/pdfium-binaries), the PDF text extractor //utils/parsers/pdf calls through Java's FFM (#1176):
+# one shared library per desktop OS/arch, each build's jar carrying only its target platform's. Renovate bumps
+# PDFIUM (the release's chromium build); bazel/renovate/repin.sh then rewrites the SHA-256s.
+PDFIUM = "8111"
+
+http_archive(
+    name = "pdfium_linux_arm64",
+    build_file_content = 'exports_files(glob(["lib/*", "bin/*"], allow_empty = True) + ["VERSION", "LICENSE"])',
+    sha256 = "042de247138f96341534cccf24ed21c2550a7245b936bb4a60d2340120000f05",
+    url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F" + PDFIUM + "/pdfium-linux-arm64.tgz",
+)
+
+http_archive(
+    name = "pdfium_linux_x64",
+    build_file_content = 'exports_files(glob(["lib/*", "bin/*"], allow_empty = True) + ["VERSION", "LICENSE"])',
+    sha256 = "bdc60126399f39fe768566a18d4be055a7b3681bc9e248e8a6656b4f6cae0aa2",
+    url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F" + PDFIUM + "/pdfium-linux-x64.tgz",
+)
+
+http_archive(
+    name = "pdfium_mac_arm64",
+    build_file_content = 'exports_files(glob(["lib/*", "bin/*"], allow_empty = True) + ["VERSION", "LICENSE"])',
+    sha256 = "46c674298c60123f1195c2a03c65ee08c4783c84874ce4f5b3a054abb3ecaf30",
+    url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F" + PDFIUM + "/pdfium-mac-arm64.tgz",
+)
+
+http_archive(
+    name = "pdfium_mac_x64",
+    build_file_content = 'exports_files(glob(["lib/*", "bin/*"], allow_empty = True) + ["VERSION", "LICENSE"])',
+    sha256 = "e7fece4693f65a7e47f84fa38099068d573d4dcbd46b1a3c8d2c26581c308466",
+    url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F" + PDFIUM + "/pdfium-mac-x64.tgz",
+)
+
+http_archive(
+    name = "pdfium_win_x64",
+    build_file_content = 'exports_files(glob(["lib/*", "bin/*"], allow_empty = True) + ["VERSION", "LICENSE"])',
+    sha256 = "3452d11031050ec65e57f180215b57b9e6d465e3fbedafa8a77ad90885c7d23e",
+    url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F" + PDFIUM + "/pdfium-win-x64.tgz",
+)
+
 # The app's Maven libraries: Kotlin Multiplatform ones, resolved per platform (jar, klib) from Gradle Module Metadata
 # into bazel/kmp/deps/maven_kmp.lock.json (#1000), which rules_jvm_external's POM resolution can't do. A version shared
 # by several coordinates moves them together; its `# renovate:` comment names the artifact Renovate looks up for it.

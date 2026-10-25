@@ -69,3 +69,18 @@ UPDATE xlsx_import_blob SET worksheet_name = ? WHERE csv_import_id = ?;
 
 updateXlsxBlobBytes:
 UPDATE xlsx_import_blob SET file_bytes = ? WHERE csv_import_id = ?;
+
+-- pdf_import_blob / pdf_import_line queries
+insertOrReplacePdfBlob:
+INSERT OR REPLACE INTO pdf_import_blob (csv_import_id, file_bytes, staged_rules_hash)
+VALUES (?, ?, NULL);
+
+updatePdfStagedRulesHash:
+UPDATE pdf_import_blob SET staged_rules_hash = ? WHERE csv_import_id = ?;
+
+insertPdfLine:
+INSERT INTO pdf_import_line (csv_import_id, page, line, text)
+VALUES (?, ?, ?, ?);
+
+deletePdfLines:
+DELETE FROM pdf_import_line WHERE csv_import_id = ?;

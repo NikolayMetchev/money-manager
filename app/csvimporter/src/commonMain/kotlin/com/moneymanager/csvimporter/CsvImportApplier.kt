@@ -64,6 +64,7 @@ import com.moneymanager.importengineapi.createAccounts
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.getOrCreateAttributeTypes
 import com.moneymanager.importengineapi.normalizeNameKey
+import com.moneymanager.importengineapi.restagePdfImport
 import com.moneymanager.importengineapi.restageXlsxImport
 import com.moneymanager.tasks.Progress
 import com.moneymanager.tasks.WeightedProgress
@@ -200,7 +201,7 @@ suspend fun ensureCryptoAssetsForImports(
 
     val codes = mutableSetOf<String>()
     for (listedImport in imports) {
-        codes += cryptoCodesForImport(listedImport, strategies, csvImportRepository, fiatCodes, existingCrypto)
+        codes += cryptoCodesForImport(listedImport, strategies, csvImportRepository, importEngine, fiatCodes, existingCrypto)
     }
     createCryptoAssets(codes, importEngine)
     return cryptoRepository.getAllCryptoAssets().first()
@@ -211,15 +212,17 @@ private suspend fun cryptoCodesForImport(
     listedImport: CsvImport,
     strategies: List<CsvImportStrategy>,
     csvImportRepository: CsvImportReadRepository,
+    importEngine: ImportEngine,
     fiatCodes: Set<String>,
     existingCrypto: Set<String>,
 ): Set<String> {
-    val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: return emptySet()
-    val sampleRows = csvImportRepository.getImportRows(csvImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
+    val listed = csvImportRepository.getImport(listedImport.id).first() ?: return emptySet()
     val strategy =
-        csvImport.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
-            ?: strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, sampleRows)
+        listed.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
+            ?: strategies.selectForImport(listed, csvImportRepository)
             ?: return emptySet()
+    // A PDF's rows are the ones its strategy assembles, so they're staged before they're scanned.
+    val csvImport = restageForStrategy(listed, strategy, csvImportRepository, importEngine)
     // Scan ALL rows, not just importable ones: a re-import remaps already-IMPORTED rows too (value
     // updates, transfer→trade conversions), and their tickers must resolve at plan time. For a fresh
     // import every row is unimported, so this is the same set.
@@ -322,8 +325,7 @@ suspend fun bulkApplyCsv(
         // getAllImports() doesn't populate columns, so re-fetch the full import (which loads them)
         // for the strategy match below.
         val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: listedImport
-        val sampleRows = csvImportRepository.getImportRows(csvImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
-        val matched = strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, sampleRows)
+        val matched = strategies.selectForImport(csvImport, csvImportRepository)
 
         fun outcome(
             status: BulkFileStatus,
@@ -403,10 +405,10 @@ suspend fun applyStagedCsv(
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
     tradeRepository: TradeReadRepository? = null,
 ): CsvImportResult? {
-    // An Excel import is initially staged from the workbook's FIRST worksheet, but the matched strategy
-    // may target a different sheet. Re-extract + re-stage the correct sheet before reading rows so the
-    // staged data (and everything downstream) reflects the sheet the strategy actually imports.
-    val stagedImport = restageXlsxForStrategy(csvImport, strategy, csvImportRepository, importEngine)
+    // The staged rows must be the ones the strategy reads: an Excel import is initially staged from the workbook's
+    // FIRST worksheet, but the strategy may target a different sheet, and a PDF import's rows are whatever its
+    // strategy's line rules assemble. Re-stage before reading rows so everything downstream sees those.
+    val stagedImport = restageForStrategy(csvImport, strategy, csvImportRepository, importEngine)
 
     val allRows = csvImportRepository.getImportRows(stagedImport.id, limit = stagedImport.rowCount.coerceAtLeast(1), offset = 0)
     val unprocessedRows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
@@ -481,6 +483,50 @@ suspend fun applyStagedCsv(
         unprocessedRowIndexes = unprocessedRowIndexes,
         tradeRepository = tradeRepository,
     )
+}
+
+/**
+ * [csvImport] staged as [strategy] reads it (see [restageXlsxForStrategy] and [restagePdfForStrategy]): reloaded
+ * when its rows had to be staged again, else as it was.
+ */
+suspend fun restageForStrategy(
+    csvImport: CsvImport,
+    strategy: CsvImportStrategy,
+    csvImportRepository: CsvImportReadRepository,
+    importEngine: ImportEngine,
+): CsvImport =
+    restagePdfForStrategy(
+        restageXlsxForStrategy(csvImport, strategy, csvImportRepository, importEngine),
+        strategy,
+        csvImportRepository,
+        importEngine,
+    )
+
+/**
+ * If [csvImport] is a PDF whose staged rows weren't assembled by [strategy]'s line rules, assembles them from the
+ * stored lines and re-stages them in place, returning the reloaded import; any other import comes back unchanged.
+ * A strategy that doesn't read PDFs stages the raw lines back. Needs no PDF parser, so it works on every platform.
+ */
+suspend fun restagePdfForStrategy(
+    csvImport: CsvImport,
+    strategy: CsvImportStrategy,
+    csvImportRepository: CsvImportReadRepository,
+    importEngine: ImportEngine,
+): CsvImport {
+    val pdf = csvImportRepository.getPdfSource(csvImport.id) ?: return csvImport
+    val lineConfig = strategy.config.pdfLines
+    val rulesHash = lineConfig?.let { PdfRowAssembler.rulesHash(it) }
+    if (pdf.stagedRulesHash == rulesHash) return csvImport
+    if (csvImport.lastAppliedAt != null) {
+        // Its transactions point at the staged rows by index; a re-import unimports it first, and then it's restaged.
+        logger.w { "PDF import ${csvImport.id.id} was imported with other line rules; keeping its rows until it's re-imported" }
+        return csvImport
+    }
+
+    val staged = lineConfig?.let { PdfRowAssembler(it).assemble(pdf.lines) } ?: PdfRowAssembler.rawLines(pdf.lines)
+    importEngine.restagePdfImport(csvImport.id, staged.headers, staged.rows, rulesHash)
+    logger.i { "Re-staged PDF import ${csvImport.id.id}: ${staged.rows.size} rows from ${pdf.lines.size} lines" }
+    return csvImportRepository.getImport(csvImport.id).first() ?: csvImport
 }
 
 /**

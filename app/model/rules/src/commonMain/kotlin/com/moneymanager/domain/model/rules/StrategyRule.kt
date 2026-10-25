@@ -150,6 +150,19 @@ sealed interface LegRole {
     ) : LegRole
 }
 
+/** Where a [RuleAction.Capture]'s values go when records are assembled into rows (PDF lines). */
+@Serializable
+enum class CaptureTarget {
+    /** The record starts a new row; the row in progress ends. */
+    NEW_ROW,
+
+    /** The values join the row in progress (a continuation line). Before any row, they're dropped. */
+    ROW,
+
+    /** The values belong to the whole document (a statement date) and fill every row that lacks them. */
+    DOCUMENT,
+}
+
 /**
  * What a [StrategyRule] does. Each action either rewrites the record, so later rules and actions see the
  * new value, or claims a slot of the [RuleOutcome]. A single-valued slot keeps the first claim; a list
@@ -279,4 +292,28 @@ sealed interface RuleAction {
     @Serializable
     @SerialName("ledgerTradeLeg")
     data object LedgerTradeLeg : RuleAction
+
+    /**
+     * Matches [pattern] (case-insensitive) against the value at [path] and sets each named group
+     * (`(?<date>…)`) as a value of its own, as [SetValue] would, then claims [target]: where the record's
+     * values go when records are assembled into rows (see [CaptureTarget]). When the pattern doesn't match,
+     * nothing is set and the rule's remaining actions don't run.
+     */
+    @Serializable
+    @SerialName("capture")
+    data class Capture(
+        val path: String,
+        val pattern: String,
+        val target: CaptureTarget,
+    ) : RuleAction
 }
+
+private val NAMED_GROUP = Regex("""\(\?<([a-zA-Z][a-zA-Z0-9]*)>""")
+
+/** The named groups of [pattern], in the order they open: the values a [RuleAction.Capture] sets. */
+fun captureGroupNames(pattern: String): List<String> =
+    NAMED_GROUP
+        .findAll(pattern)
+        .map { it.groupValues[1] }
+        .distinct()
+        .toList()

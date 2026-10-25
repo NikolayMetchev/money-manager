@@ -173,6 +173,9 @@ internal class CsvStrategyEditorState(
     // Edited via LegGroupsEditor (Advanced tab).
     var legGroups by mutableStateOf(config?.legGroups.orEmpty())
 
+    // Null for a strategy over a CSV, QIF or Excel file; a PDF strategy's rules over its text lines.
+    var pdfLineRules by mutableStateOf(config?.pdfLines?.rules)
+
     // Blank = an ordinary strategy; non-blank = a reconciliation source importing into shadow accounts.
     var reconciliationSourceName by mutableStateOf(config?.reconciliation?.sourceName.orEmpty())
     var reconciliationLinkablePrefix by mutableStateOf(config?.reconciliation?.linkableAccountPrefix.orEmpty())
@@ -206,7 +209,7 @@ internal class CsvStrategyEditorState(
         get() = sourceAccountMode != SourceAccountMode.RULES || rulesName(AccountSide.SOURCE)
 
     private val rulesValid: Boolean
-        get() = rules.isComplete()
+        get() = rules.isComplete() && pdfLineRules?.isComplete() != false
 
     /** Whether the columns the chosen [amountMode] requires have all been picked. */
     private val amountValid: Boolean

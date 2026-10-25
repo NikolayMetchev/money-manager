@@ -1294,4 +1294,69 @@ class ImportDeduperTest {
         val result = deduper.classify(listOf(incoming)).single()
         assertEquals(ImportStatus.UPDATED, result.status)
     }
+
+    // A card's own statement (a unique-id export) says only "PAYMENT RECEIVED"; the paying bank names both ends.
+    private val uniqueIdPlaceholderPolicy =
+        DedupePolicy.UniqueIdentifier(
+            reconcileWindow = 60.minutes,
+            reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
+            reconciledRelationshipTypeId = RelationshipTypeId(1),
+            unidentifiedCounterpartyAttributeTypeId = AttributeTypeId(-9),
+            unidentifiedCounterpartyWindow = 3.days,
+        )
+
+    private val reconciled = AttributeTypeId(-1) to "reconciled"
+
+    @Test
+    fun uniqueId_placeholderReconcilesAgainstTheBanksRecord() {
+        val deduper = ImportDeduper(uniqueIdPlaceholderPolicy, existing = listOf(bankCredit(40, timestamp = baseTime + 2.days)))
+        val result = deduper.classify(listOf(placeholderDeposit(0).copy(uniqueKey = mapOf("line" to "1")))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.any { it.typeId == AttributeTypeId(-1) })
+        assertEquals(listOf(TransferId(40)), result.transfer.relationships.map { it.relatedTransferId })
+    }
+
+    @Test
+    fun uniqueId_banksRecordReconcilesAgainstAPlaceholder() {
+        val existingPlaceholder =
+            existing(50, src = placeholder, tgt = wallet, attributes = mapOf(AttributeTypeId(-9) to "true"))
+        val deduper = ImportDeduper(uniqueIdPlaceholderPolicy, existing = listOf(existingPlaceholder))
+        val bankRow = importTransfer(0, src = bank, tgt = wallet, timestamp = baseTime + 2.days, uniqueKey = mapOf("ref" to "b"))
+        val result = deduper.classify(listOf(bankRow)).single()
+        // The bank's record names the far end, so it is the one kept: the placeholder is superseded.
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun sameAccounts_pairsWithARecordReconciledIntoACountedLeg() {
+        // A second statement of the card meets the first's placeholder, which the bank's record (40, still
+        // counted) keeps: pairing with it still counts the movement once.
+        val first = existing(50, src = placeholder, tgt = wallet, attributes = mapOf(reconciled))
+        val deduper =
+            ImportDeduper(
+                uniqueIdPlaceholderPolicy,
+                existing = listOf(first, bankCredit(40, timestamp = baseTime + 2.days)),
+                claimedReconcileTargets = setOf(TransferId(40)),
+                reconciledInto = mapOf(TransferId(50) to TransferId(40)),
+            )
+        val result = deduper.classify(listOf(placeholderDeposit(0).copy(uniqueKey = mapOf("line" to "2")))).single()
+        assertTrue(result.transfer.attributes.any { it.typeId == AttributeTypeId(-1) })
+        assertEquals(listOf(TransferId(50)), result.transfer.relationships.map { it.relatedTransferId })
+    }
+
+    @Test
+    fun sameAccounts_skipsARecordWhoseKeeperIsExcludedToo() {
+        val first = existing(50, src = placeholder, tgt = wallet, attributes = mapOf(reconciled))
+        val keeper = bankCredit(40, timestamp = baseTime + 2.days).copy(attributes = mapOf(reconciled))
+        val deduper =
+            ImportDeduper(
+                uniqueIdPlaceholderPolicy,
+                existing = listOf(first, keeper),
+                claimedReconcileTargets = setOf(TransferId(40)),
+                reconciledInto = mapOf(TransferId(50) to TransferId(40)),
+            )
+        val result = deduper.classify(listOf(placeholderDeposit(0).copy(uniqueKey = mapOf("line" to "2")))).single()
+        assertTrue(result.transfer.relationships.none { it.relatedTransferId == TransferId(50) })
+    }
 }

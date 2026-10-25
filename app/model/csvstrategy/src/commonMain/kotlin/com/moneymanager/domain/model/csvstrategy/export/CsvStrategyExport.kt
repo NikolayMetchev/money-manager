@@ -4,6 +4,7 @@ import com.moneymanager.domain.model.accountmapping.export.AccountMappingExport
 import com.moneymanager.domain.model.accountmapping.export.SortedAccountMappingListSerializer
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
+import com.moneymanager.domain.model.csvstrategy.ReferenceDate
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
@@ -78,6 +79,8 @@ data class DateTimeParsingExport(
     val timeFormat: String? = null,
     val defaultTime: String = "12:00:00",
     val dateTimeFormat: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val yearFrom: ReferenceDate? = null,
 ) : FieldMappingExport
 
 /**

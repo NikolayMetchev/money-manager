@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.model.csv.XlsxImportBlob
 import kotlinx.coroutines.flow.Flow
 
@@ -70,4 +71,7 @@ interface CsvImportReadRepository {
 
     /** The raw workbook bytes for an Excel-backed import, or null for a CSV/QIF import. */
     suspend fun getXlsxBlob(id: CsvImportId): XlsxImportBlob?
+
+    /** The file and its text lines for a PDF-backed import, or null for any other. */
+    suspend fun getPdfSource(id: CsvImportId): PdfImportSource?
 }

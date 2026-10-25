@@ -18,6 +18,7 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
@@ -222,6 +223,41 @@ suspend fun ImportEngine.restageXlsxImport(
     worksheetName: String,
 ) {
     import(ImportBatch(csvImportMutations = listOf(CsvImportMutation.Restage(id, headers, rows, worksheetName))))
+}
+
+/**
+ * Stages a PDF exactly like [createCsvImport], additionally storing the file and the text [PdfImportSource.lines]
+ * read from it. [headers]/[rows] are those lines (see `PdfRowAssembler`) until a strategy restages them through
+ * [restagePdfImport].
+ */
+suspend fun ImportEngine.createPdfImport(
+    fileName: String,
+    headers: List<String>,
+    rows: List<List<String>>,
+    fileChecksum: String,
+    fileLastModified: Instant,
+    pdf: PdfImportSource,
+): CsvImportId =
+    requireNotNull(
+        import(
+            ImportBatch(
+                csvImportMutations =
+                    listOf(CsvImportMutation.Create(fileName, fileName, headers, rows, fileChecksum, fileLastModified, pdf = pdf)),
+            ),
+        ).createdCsvImportIds[fileName],
+    )
+
+/**
+ * Re-stages PDF import [id] in place with the [headers]/[rows] a strategy's line rules assembled from its stored
+ * lines, recording [rulesHash], the rules that did (null when the raw lines go back).
+ */
+suspend fun ImportEngine.restagePdfImport(
+    id: CsvImportId,
+    headers: List<String>,
+    rows: List<List<String>>,
+    rulesHash: String?,
+) {
+    import(ImportBatch(csvImportMutations = listOf(CsvImportMutation.Restage(id, headers, rows, pdfRulesHash = rulesHash))))
 }
 
 suspend fun ImportEngine.deleteCsvImport(id: CsvImportId) {

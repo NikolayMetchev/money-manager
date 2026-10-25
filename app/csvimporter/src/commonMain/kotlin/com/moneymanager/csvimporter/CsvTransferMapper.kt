@@ -1,7 +1,3 @@
-@file:OptIn(
-    kotlinx.datetime.format.FormatStringsInDatetimeFormats::class,
-)
-
 package com.moneymanager.csvimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
@@ -51,12 +47,9 @@ import com.moneymanager.importengineapi.DESCRIPTION_SIMILARITY_THRESHOLD
 import com.moneymanager.importengineapi.ImportConversion
 import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.StringSimilarity
-import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.format.DateTimeFormat
-import kotlinx.datetime.format.byUnicodePattern
 import kotlinx.datetime.toInstant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -345,24 +338,7 @@ class CsvTransferMapper(
 
     // Likewise for date/time formats: building a kotlinx-datetime Format compiles a parser, which is
     // far more expensive than the parse itself.
-    private val dateTimeFormatCache = HashMap<String, DateTimeFormat<LocalDateTime>>()
-    private val dateFormatCache = HashMap<String, DateTimeFormat<LocalDate>>()
-    private val timeFormatCache = HashMap<String, DateTimeFormat<LocalTime>>()
-
-    private fun cachedDateTimeFormat(pattern: String): DateTimeFormat<LocalDateTime> =
-        dateTimeFormatCache.getOrPut(pattern) {
-            LocalDateTime.Format { byUnicodePattern(pattern) }
-        }
-
-    private fun cachedDateFormat(pattern: String): DateTimeFormat<LocalDate> =
-        dateFormatCache.getOrPut(pattern) {
-            LocalDate.Format { byUnicodePattern(pattern) }
-        }
-
-    private fun cachedTimeFormat(pattern: String): DateTimeFormat<LocalTime> =
-        timeFormatCache.getOrPut(pattern) {
-            LocalTime.Format { byUnicodePattern(pattern) }
-        }
+    private val dateFormats = DateFormats()
 
     // The attribute types the strategy's rules mark as identifying a row across imports.
     private val uniqueIdentifierTypes: List<String> = strategy.config.uniqueIdentifierAttributeTypes()
@@ -1230,35 +1206,19 @@ class CsvTransferMapper(
         return try {
             if (dateTimeFormat != null) {
                 // Single column holding a combined date+time value
-                cachedDateTimeFormat(dateTimeFormat)
-                    .parse(dateValue.trim())
-                    .toInstant(timezone)
+                dateFormats.dateTime(dateValue, dateTimeFormat).toInstant(timezone)
             } else {
-                // Parse date and time using the specified formats
-                parseDateTimeString(dateValue, mapping.dateFormat, timeValue, mapping.timeFormat, timezone)
+                val reference =
+                    mapping.yearFrom?.let { yearFrom ->
+                        { dateFormats.date(getColumnValue(yearFrom.column, values), yearFrom.format) }
+                    }
+                val date = dateFormats.date(dateValue, mapping.dateFormat, reference)
+                val time = if (timeValue.isBlank()) LocalTime(12, 0, 0) else dateFormats.time(timeValue, mapping.timeFormat ?: "HH:mm[:ss]")
+                LocalDateTime(date, time).toInstant(timezone)
             }
         } catch (_: Exception) {
             null
         }
-    }
-
-    private fun parseDateTimeString(
-        dateValue: String,
-        dateFormat: String,
-        timeValue: String,
-        timeFormat: String?,
-        timezone: TimeZone,
-    ): Instant {
-        val date = cachedDateFormat(dateFormat).parse(dateValue.trim())
-
-        val time =
-            if (timeValue.isBlank()) {
-                LocalTime(12, 0, 0)
-            } else {
-                cachedTimeFormat(timeFormat ?: "HH:mm[:ss]").parse(timeValue.trim())
-            }
-
-        return LocalDateTime(date, time).toInstant(timezone)
     }
 
     private fun parseTimezone(

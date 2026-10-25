@@ -11,7 +11,7 @@ import com.moneymanager.csvimporter.applyStagedCsv
 import com.moneymanager.csvimporter.ensureCryptoAssetsForImports
 import com.moneymanager.csvimporter.needsSourceAccountOverride
 import com.moneymanager.csvimporter.runBulkReimport
-import com.moneymanager.csvimporter.selectForCsv
+import com.moneymanager.csvimporter.selectForImport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
@@ -413,11 +413,7 @@ class Reimports(
         when (file) {
             is StagedFile.Csv -> {
                 file.import.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
-                    ?: strategies.selectForCsv(
-                        file.import.originalFileName,
-                        file.import.columns,
-                        reads.csvImportRepository.getImportRows(file.import.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0),
-                    )
+                    ?: strategies.selectForImport(file.import, reads.csvImportRepository)
             }
 
             is StagedFile.Qif -> {

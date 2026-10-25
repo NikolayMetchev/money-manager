@@ -10,6 +10,7 @@ import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createCsvImport
+import com.moneymanager.importengineapi.createPdfImport
 import com.moneymanager.importengineapi.createQifImport
 import com.moneymanager.importengineapi.createXlsxImport
 import com.moneymanager.importengineapi.recordDirectoryFileImported
@@ -28,26 +29,27 @@ import kotlin.time.Instant
 
 private val scanLogger = Logger.withTag("ImportDirectoryScanner")
 
-/** File types the scanner can stage. Others (e.g. .pdf) are skipped. */
-private enum class SupportedKind { CSV, QIF, XLSX }
+/** File types the scanner can stage. Others are skipped. */
+private enum class SupportedKind { CSV, QIF, XLSX, PDF }
 
 private fun supportedKind(fileName: String): SupportedKind? =
     when (fileName.substringAfterLast('.', "").lowercase()) {
         "csv" -> SupportedKind.CSV
         "qif" -> SupportedKind.QIF
         "xlsx" -> SupportedKind.XLSX
+        "pdf" -> SupportedKind.PDF
         else -> null
     }
 
-/** True if [fileName] is an importable file (.csv/.qif/.xlsx). Used by directory discovery. */
+/** True if [fileName] is an importable file (.csv/.qif/.xlsx/.pdf). Used by directory discovery. */
 internal fun isSupportedImportFile(fileName: String): Boolean = supportedKind(fileName) != null
 
 /**
  * Scans one configured [directory]: lists its files and DOWNLOADS new/changed **supported** files
- * (.csv → CSV staging, .qif → QIF staging, .xlsx → CSV staging of its first worksheet) into the
- * Imports section. Unsupported files (e.g. .pdf) are skipped without downloading. Excel parsing (Apache
- * POI) is JVM-only; on Android an .xlsx file is recorded as a per-file scan failure rather than crashing
- * the scan. It does NOT apply a strategy — the user runs the existing "Import All".
+ * (.csv → CSV staging, .qif → QIF staging, .xlsx → CSV staging of its first worksheet, .pdf → CSV staging
+ * of its text lines) into the Imports section. Unsupported files are skipped without downloading. Excel
+ * (Apache POI) and PDF (pdfium) parsing are JVM-only; elsewhere such a file is recorded as a per-file scan
+ * failure rather than crashing the scan. It does NOT apply a strategy — the user runs the existing "Import All".
  * Change detection: a matching server-provided content hash (e.g. Drive md5Checksum) skips the download
  * entirely; otherwise the file is downloaded and sha256-confirmed. A changed file produces a fresh
  * staging row; a bad file is recorded as a failure and does not abort the scan.
@@ -153,7 +155,7 @@ private suspend fun ScanContext.scanFile(entry: ImportFileEntry): FileOutcome {
         // Excel is binary and must be hashed/staged from raw bytes; decoding it as UTF-8 text (like
         // CSV/QIF) would both corrupt the checksum and lose data, so it branches before decoding.
         val rawBytes = fileSource.download(entry.ref)
-        val content = if (kind == SupportedKind.XLSX) null else rawBytes.decodeToString()
+        val content = if (kind == SupportedKind.XLSX || kind == SupportedKind.PDF) null else rawBytes.decodeToString()
         val checksum = if (content != null) sha256Hex(content) else sha256Hex(rawBytes)
 
         dbLock.withLock {
@@ -192,6 +194,12 @@ private suspend fun ScanContext.scanFile(entry: ImportFileEntry): FileOutcome {
                     csvImportId =
                         csvImportRepository.findImportsByChecksum(checksum).firstOrNull()?.id
                             ?: stageXlsx(importEngine, entry, rawBytes, checksum, lastModified)
+                }
+
+                SupportedKind.PDF -> {
+                    csvImportId =
+                        csvImportRepository.findImportsByChecksum(checksum).firstOrNull()?.id
+                            ?: stagePdf(importEngine, entry, rawBytes, checksum, lastModified)
                 }
             }
 
@@ -257,6 +265,30 @@ private suspend fun stageXlsx(
         fileLastModified = lastModified,
         xlsxBytes = bytes,
         xlsxWorksheetName = sheetName,
+    )
+}
+
+/**
+ * Stages a PDF as its text lines, one row each (see [PdfRowAssembler.rawLines]), plus the file and the lines,
+ * from which a strategy assembles its rows later. Throws `PdfUnsupportedPlatformException` where there's no
+ * pdfium; the caller's generic exception handler records that as a per-file scan failure.
+ */
+private suspend fun stagePdf(
+    importEngine: ImportEngine,
+    entry: ImportFileEntry,
+    bytes: ByteArray,
+    checksum: String,
+    lastModified: Instant,
+): CsvImportId {
+    val pdf = readPdf(bytes)
+    val staged = PdfRowAssembler.rawLines(pdf.lines)
+    return importEngine.createPdfImport(
+        fileName = entry.name,
+        headers = staged.headers,
+        rows = staged.rows,
+        fileChecksum = checksum,
+        fileLastModified = lastModified,
+        pdf = pdf,
     )
 }
 

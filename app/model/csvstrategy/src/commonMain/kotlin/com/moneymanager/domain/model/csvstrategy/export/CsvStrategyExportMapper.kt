@@ -67,6 +67,7 @@ object CsvStrategyExportMapper {
                     timeFormat = timeFormat,
                     defaultTime = defaultTime,
                     dateTimeFormat = dateTimeFormat,
+                    yearFrom = yearFrom,
                 )
             }
 

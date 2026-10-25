@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvRowLink
+import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.write.CsvImportWriteRepository
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,7 @@ class CsvImportWriteRepositoryImpl(
         fileLastModified: Instant,
         xlsxBytes: ByteArray?,
         xlsxWorksheetName: String?,
+        pdf: PdfImportSource?,
     ): CsvImportId =
         withContext(coroutineContext) {
             database.transactionWithResult {
@@ -76,6 +78,7 @@ class CsvImportWriteRepositoryImpl(
                         worksheet_name = xlsxWorksheetName,
                     )
                 }
+                pdf?.let { storePdf(importId.id.toString(), it) }
 
                 importId
             }
@@ -85,7 +88,8 @@ class CsvImportWriteRepositoryImpl(
         id: CsvImportId,
         headers: List<String>,
         rows: List<List<String>>,
-        worksheetName: String,
+        worksheetName: String?,
+        pdfRulesHash: String?,
     ): Unit =
         withContext(coroutineContext) {
             database.transaction {
@@ -116,10 +120,10 @@ class CsvImportWriteRepositoryImpl(
                     column_count = columnCount.toLong(),
                     id = id.id.toString(),
                 )
-                csvImportWriteQueries.updateXlsxBlobWorksheet(
-                    worksheet_name = worksheetName,
-                    csv_import_id = id.id.toString(),
-                )
+                worksheetName?.let {
+                    csvImportWriteQueries.updateXlsxBlobWorksheet(worksheet_name = it, csv_import_id = id.id.toString())
+                }
+                csvImportWriteQueries.updatePdfStagedRulesHash(pdfRulesHash, id.id.toString())
             }
         }
 
@@ -132,6 +136,7 @@ class CsvImportWriteRepositoryImpl(
         carriedRows: List<CsvRowLink>,
         rowIndexRemap: Map<Long, Long>,
         xlsxBytes: ByteArray?,
+        pdf: PdfImportSource?,
     ): Unit =
         withContext(coroutineContext) {
             database.transaction {
@@ -173,8 +178,21 @@ class CsvImportWriteRepositoryImpl(
                 csvImportWriteQueries.clearParkedEntitySourceRows(importId)
 
                 xlsxBytes?.let { csvImportWriteQueries.updateXlsxBlobBytes(it, importId) }
+                pdf?.let { storePdf(importId, it) }
             }
         }
+
+    private suspend fun storePdf(
+        importId: String,
+        pdf: PdfImportSource,
+    ) {
+        csvImportWriteQueries.insertOrReplacePdfBlob(importId, pdf.fileBytes)
+        csvImportWriteQueries.updatePdfStagedRulesHash(pdf.stagedRulesHash, importId)
+        csvImportWriteQueries.deletePdfLines(importId)
+        pdf.lines.forEach { line ->
+            csvImportWriteQueries.insertPdfLine(importId, line.page.toLong(), line.line.toLong(), line.text)
+        }
+    }
 
     override suspend fun deleteImport(id: CsvImportId): Unit =
         withContext(coroutineContext) {

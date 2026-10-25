@@ -612,6 +612,10 @@ class ImportEngineImpl(
                 existingRelationships
                     .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
                     .mapTo(mutableSetOf()) { it.id2 },
+                reconciledInto =
+                    existingRelationships
+                        .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
+                        .associate { it.id1 to it.id2 },
                 ownBatchAccounts = resolvedTransfers.flatMapTo(mutableSetOf()) { listOf(it.fromAccount, it.toAccount).map(::requireId) },
                 passThroughOnward = passThroughOnward(existing, existingRelationships),
                 ownSourceLegs = ownSourceLegs(resolvedTransfers),
@@ -2264,13 +2268,14 @@ class ImportEngineImpl(
                             m.fileLastModified,
                             m.xlsxBytes,
                             m.xlsxWorksheetName,
+                            m.pdf,
                         ),
                         "CsvImport",
                     )
                 }
 
                 is CsvImportMutation.Restage -> {
-                    csvImportRepository.restageImport(m.id, m.headers, m.rows, m.worksheetName)
+                    csvImportRepository.restageImport(m.id, m.headers, m.rows, m.worksheetName, m.pdfRulesHash)
                 }
 
                 is CsvImportMutation.Repopulate -> {
@@ -2283,6 +2288,7 @@ class ImportEngineImpl(
                         m.carriedRows,
                         m.rowIndexRemap,
                         m.xlsxBytes,
+                        m.pdf,
                     )
                 }
 

@@ -47,6 +47,9 @@ data class AccountFromRulesMapping(
  *
  * When [dateTimeFormat] is set, the [dateColumnName] column holds a combined
  * date+time value parsed with that format, and the other time settings are ignored.
+ *
+ * Formats are Unicode patterns; `MMM`/`MMMM` read English month names ("Jan", "January"). A date format
+ * without a year (`d MMM`, as statements print their rows) takes its year from [yearFrom].
  */
 @Serializable
 data class DateTimeParsingMapping(
@@ -57,12 +60,25 @@ data class DateTimeParsingMapping(
     val timeFormat: String? = null,
     val defaultTime: String = DEFAULT_TIME,
     val dateTimeFormat: String? = null,
+    // NEVER-encoded when null, so adding it rehashed no existing strategy.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val yearFrom: ReferenceDate? = null,
 ) : FieldMapping {
     companion object {
         /** The time stamped onto rows whose source carries only a date. */
         const val DEFAULT_TIME: String = "12:00:00"
     }
 }
+
+/**
+ * The date a year-less date is read against: the date in [column], parsed with [format]. The year chosen is
+ * the one that puts the date on or before it, so a statement dated 19 January reads "Dec 20" as last year's.
+ */
+@Serializable
+data class ReferenceDate(
+    val column: String,
+    val format: String,
+)
 
 /**
  * Copies a string value from the row (the description), read via [value]: the first of its columns

@@ -204,6 +204,8 @@ kmp_modules(
         "//utils/rest:test_module",
         "//utils/sqlite3:sqlite3_module",
         "//utils/sqlite3:test_module",
+        "//utils/parsers/pdf:pdf_module",
+        "//utils/parsers/pdf:test_module",
     ],
     visibility = ["//visibility:public"],
 )

@@ -68,12 +68,14 @@ kmp_library(
         "//utils/bigdecimal",
         "//utils/coroutines",
         "//utils/parsers/csv",
+        "//utils/parsers/pdf",
         "//utils/parsers/qif",
         "//utils/parsers/xlsx",
         "//utils/regex",
         "@maven_kmp//:cryptography_core",
         "@maven_kmp//:kermit",
         "@maven_kmp//:kotlinx_datetime",
+        "@maven_kmp//:kotlinx_serialization_json",
     ],
 )
 

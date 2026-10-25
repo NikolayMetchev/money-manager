@@ -77,6 +77,16 @@
     },
     {
       "customType": "regex",
+      "description": "The pdfium build the PDF parser bundles (MODULE.bazel's PDFIUM, a bblanchon/pdfium-binaries chromium/<build> release); repin.sh rewrites its archives' SHA-256s",
+      "managerFilePatterns": ["/^MODULE\\.bazel$/"],
+      "matchStrings": ["\\nPDFIUM = \"(?<currentValue>[^\"]+)\"\\n"],
+      "depNameTemplate": "bblanchon/pdfium-binaries",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^chromium/(?<version>\\d+)$",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
       "description": "The AGP release aapt2 is downloaded from (MODULE.bazel's android_sdk.agp)",
       "managerFilePatterns": ["/^MODULE\\.bazel$/"],
       "matchStrings": ["android_sdk\\.agp\\(version = \"(?<currentValue>[^\"]+)\"\\)"],
