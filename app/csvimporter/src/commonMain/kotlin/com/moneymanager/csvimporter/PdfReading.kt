@@ -11,7 +11,7 @@ import kotlin.time.Instant
 
 /**
  * The PDF in [bytes] as it is staged: the file and its text lines. Throws `PdfUnsupportedPlatformException` where
- * there's no pdfium, and `PdfParseException` for a file pdfium can't open.
+ * pdfium can't load, and `PdfParseException` for a file pdfium can't open.
  */
 suspend fun readPdf(bytes: ByteArray): PdfImportSource =
     PdfImportSource(
@@ -22,7 +22,7 @@ suspend fun readPdf(bytes: ByteArray): PdfImportSource =
 /**
  * Stages the PDF in [bytes] as a CSV import: its text lines, one raw row each, until a strategy's line rules
  * assemble them ([PdfRowAssembler]). The one way a PDF is staged, from an import folder or a picked file. Throws
- * as [readPdf] does: `PdfUnsupportedPlatformException` where there's no pdfium, which the scanner records as a
+ * as [readPdf] does: `PdfUnsupportedPlatformException` where pdfium can't load, which the scanner records as a
  * per-file failure and the Import PDF button shows.
  */
 suspend fun ImportEngine.stagePdfImport(

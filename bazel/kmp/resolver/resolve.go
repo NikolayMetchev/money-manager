@@ -240,6 +240,9 @@ type Resolver struct {
 	// substitutions).
 	classpathForces map[string]string
 	excludes        map[string]bool
+	// androidAars are modules whose POM says jar but whose release also publishes an AAR, which Android takes
+	// (JNA's carries the native dispatch library Android can't unpack from a jar).
+	androidAars map[string]bool
 	// consumers are the platforms common code is compiled for, whose variants decide what it sees.
 	consumers []Platform
 	mu        sync.Mutex
@@ -464,6 +467,9 @@ func (r *Resolver) loadPom(p Platform, c Coordinate, dir string) (*node, error) 
 	switch pom.pom.Packaging {
 	case "", "jar", "bundle":
 		ext = "jar"
+		if p.Android && r.androidAars[c.Module()] {
+			ext = "aar"
+		}
 	case "aar":
 		// A POM-only Android library (Play services): Android only.
 		if !p.Android {
