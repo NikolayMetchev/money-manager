@@ -407,7 +407,9 @@ What isn't a per-record decision stays structural config:
 **PDF statements** are CSV strategies with `CsvStrategyConfig.pdfLines` (`PdfLineConfig`): one more rule list, run over
 the statement's text lines (`text`, `page`, `line`) by the same `RuleEngine`, whose `Capture` rules `PdfRowAssembler`
 (`app/csvimporter`) turns into the rows everything else reads. A PDF import is a CSV import whose original bytes and
-extracted lines are kept (`pdf_import_blob`, `pdf_import_line`), restaged whenever the line rules change. Statements
+extracted lines are kept (`pdf_import_blob`, `pdf_import_line`), restaged whenever the line rules change. The strategy
+editor, opened on a PDF import, runs the line rules over its stored lines as they're edited (`PdfLinesPreviewer`),
+and the rows they assemble are the columns and sample rows its other tabs read. Statements
 without a year on each row use `DateTimeParsingMapping.yearFrom` (`ReferenceDate`): the latest date on or before a
 reference column (the statement date). A unique-id export's placeholder (a card statement's "PAYMENT RECEIVED")
 reconciles against the paying bank's record, in either order, as on `FuzzyAllFields`. The built-in American Express

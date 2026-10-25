@@ -37,6 +37,7 @@ class StagePdfImportTest : DbTest() {
             val import = repositories.csvImportRepository.getImport(id).first()!!
             assertEquals("statement.pdf", import.originalFileName)
             assertEquals(lines.size, import.rowCount)
+            assertEquals(setOf(id), repositories.csvImportRepository.getPdfImportIds())
         }
 
     @Test

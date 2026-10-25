@@ -22,6 +22,7 @@ import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.isComplete
 import com.moneymanager.ui.components.rules.isComplete
 import kotlinx.datetime.TimeZone
@@ -51,6 +52,8 @@ internal enum class EditorTab(
 internal class CsvStrategyEditorState(
     strategy: CsvImportStrategy?,
     availableColumnNames: Set<String>,
+    // A new strategy over a PDF import starts as a PDF strategy, with no line rules yet.
+    pdf: Boolean = false,
 ) {
     var selectedTab by mutableStateOf(EditorTab.GENERAL)
     var isSaving by mutableStateOf(false)
@@ -174,7 +177,7 @@ internal class CsvStrategyEditorState(
     var legGroups by mutableStateOf(config?.legGroups.orEmpty())
 
     // Null for a strategy over a CSV, QIF or Excel file; a PDF strategy's rules over its text lines.
-    var pdfLineRules by mutableStateOf(config?.pdfLines?.rules)
+    var pdfLineRules by mutableStateOf(config?.pdfLines?.rules ?: emptyList<StrategyRule>().takeIf { pdf })
 
     // Blank = an ordinary strategy; non-blank = a reconciliation source importing into shadow accounts.
     var reconciliationSourceName by mutableStateOf(config?.reconciliation?.sourceName.orEmpty())
@@ -322,4 +325,5 @@ internal fun rememberCsvStrategyEditorState(
     editKey: String,
     strategy: CsvImportStrategy?,
     availableColumnNames: Set<String>,
-): CsvStrategyEditorState = remember(editKey) { CsvStrategyEditorState(strategy, availableColumnNames) }
+    pdf: Boolean = false,
+): CsvStrategyEditorState = remember(editKey) { CsvStrategyEditorState(strategy, availableColumnNames, pdf) }

@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.qif.QifImport
@@ -117,21 +119,27 @@ fun DeleteCsvStrategyDialog(
 }
 
 /**
- * Dialog for selecting a CSV import to use as sample data when editing a strategy.
+ * Dialog for selecting a CSV import to use as sample data when editing a strategy. A PDF strategy ([pdf]) reads
+ * PDF imports only, and any other strategy every other import.
  */
 @Composable
 fun SelectCsvImportDialog(
     csvImportRepository: CsvImportReadRepository,
     onCsvSelected: (CsvImport) -> Unit,
     onDismiss: () -> Unit,
+    pdf: Boolean = false,
 ) {
-    val imports by csvImportRepository
+    val allImports by csvImportRepository
         .getAllImports()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    var pdfImportIds by remember { mutableStateOf<Set<CsvImportId>>(emptySet()) }
+    LaunchedEffect(allImports) { pdfImportIds = csvImportRepository.getPdfImportIds() }
+    val imports = allImports.filter { (it.id in pdfImportIds) == pdf }
+    val kind = if (pdf) "PDF" else "CSV"
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select CSV File") },
+        title = { Text("Select $kind File") },
         text = {
             if (imports.isEmpty()) {
                 Box(
@@ -143,13 +151,13 @@ fun SelectCsvImportDialog(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "No CSV files available",
+                            text = "No $kind files available",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Import a CSV file first to use as sample data",
+                            text = "Import a $kind file first to use as sample data",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

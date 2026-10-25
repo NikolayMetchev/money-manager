@@ -179,6 +179,11 @@ class CsvImportReadRepositoryImpl(
             }
         }
 
+    override suspend fun getPdfImportIds(): Set<CsvImportId> =
+        withContext(coroutineContext) {
+            csvImportSelectQueries.selectPdfImportIds().awaitAsList().mapTo(mutableSetOf()) { CsvImportId(Uuid.parse(it)) }
+        }
+
     private data class CsvImportRecord(
         val importId: String,
         val tableName: String,
