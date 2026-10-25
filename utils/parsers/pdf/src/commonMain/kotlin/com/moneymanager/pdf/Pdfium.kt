@@ -124,7 +124,7 @@ private val NO_BREAK_SPACES = setOf(' ', ' ', ' ')
  * which the line builder leaves to the glyphs' positions.
  */
 internal fun pdfiumGlyphText(codePoint: Int): String? {
-    if (codePoint <= 0 || codePoint > MAX_CODE_POINT) return null
+    if (codePoint !in 1..MAX_CODE_POINT) return null
     if (codePoint < SUPPLEMENTARY_START) {
         val char = codePoint.toChar()
         return char.takeUnless { it.isWhitespace() && it !in NO_BREAK_SPACES }?.toString()
@@ -138,13 +138,16 @@ internal fun pdfiumGlyphText(codePoint: Int): String? {
 
 /**
  * Writes a pdfium shared library this build carries to a file, as a library has to be one to be loaded: once under
- * `~/.moneymanager/native/pdfium-<build>/`, beside the license [notices] a binary distribution of it carries, and
- * returns its absolute path. [version] is the library's VERSION file, which names the build.
+ * `~/.moneymanager/native/pdfium-<build>/`, beside the license notices a binary distribution of it carries.
  */
 internal object PdfiumLibraryFile {
     private const val RADIX = 36
     private val logger = Logger.withTag("PdfiumLibraryFile")
 
+    /**
+     * Writes [bytes] as [name] and returns its absolute path. [version] is the library's VERSION file, which names
+     * the build, and [notices] its license notices.
+     */
     fun unpack(
         name: String,
         bytes: ByteArray,
