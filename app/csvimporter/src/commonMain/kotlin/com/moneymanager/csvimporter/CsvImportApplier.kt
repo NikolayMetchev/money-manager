@@ -482,6 +482,7 @@ suspend fun applyStagedCsv(
         attributeAccountMatchers = attributeAccountMatchers,
         unprocessedRowIndexes = unprocessedRowIndexes,
         tradeRepository = tradeRepository,
+        visibleAccounts = accounts,
     )
 }
 
@@ -821,12 +822,15 @@ suspend fun runCsvImport(
     // some of its legs missing; transfers are then still emitted only for the rows named here.
     unprocessedRowIndexes: Set<Long> = rows.mapTo(mutableSetOf()) { it.rowIndex },
     tradeRepository: TradeReadRepository? = null,
+    // The accounts the strategy sees, when the caller has just read them to build [basePrep].
+    visibleAccounts: List<Account>? = null,
 ): CsvImportResult {
     logger.i { "Starting CSV import with ${basePrep.validTransfers.size} valid transfers" }
 
     // A reconciliation source may only be pointed at its own shadow accounts; drop any "map to existing
     // account" choice that names a real one (the row then creates its shadow account as usual).
-    val visibleAccountsById = accountRepository.accountsVisibleTo(strategy).associateBy { it.id }
+    val knownAccounts = visibleAccounts ?: accountRepository.accountsVisibleTo(strategy)
+    val visibleAccountsById = knownAccounts.associateBy { it.id }
     val existingSelections = selectedExistingAccounts.filterValues { it in visibleAccountsById }
     val accountsToCreate =
         buildAccountsToCreate(
@@ -860,7 +864,7 @@ suspend fun runCsvImport(
 
     // Re-map with new account IDs
     logger.i { "Re-mapping transfers with updated account IDs" }
-    val updatedAccounts = accountRepository.accountsVisibleTo(strategy)
+    val updatedAccounts = if (accountsToCreate.isEmpty()) knownAccounts else accountRepository.accountsVisibleTo(strategy)
     val accountsByName = updatedAccounts.associateBy { it.name }
     val currenciesById = currencies.associateBy { it.id }
     val currenciesByCode = currencies.associateBy { it.code.uppercase() }

@@ -26,13 +26,15 @@ suspend fun ImportEngine.deleteEmptyImportCreatedAccounts(
     keyPrefix: String = "reimport-delete",
 ): List<String> {
     if (createdAccountIds.isEmpty()) return emptyList()
-    val remainingById = accountRepository.getAllAccounts().first().associateBy { it.id }
-    val candidates = createdAccountIds.mapNotNull { remainingById[it] }
-    if (candidates.isEmpty()) return emptyList()
-    // Batched membership checks instead of a COUNT query per candidate account.
-    val withTransfers = accountRepository.accountsWithTransfers(candidates.map { it.id })
-    val withTrades = tradeRepository?.accountsWithTrades(candidates.map { it.id }).orEmpty()
-    val emptyAccounts = candidates.filter { it.id !in withTransfers && it.id !in withTrades }
+    // Batched membership checks instead of a COUNT query per candidate account. Only the few accounts left
+    // empty are read, rather than the whole account list (an id already deleted reads as null).
+    val withTransfers = accountRepository.accountsWithTransfers(createdAccountIds)
+    val withTrades = tradeRepository?.accountsWithTrades(createdAccountIds).orEmpty()
+    val emptyAccounts =
+        createdAccountIds
+            .distinct()
+            .filter { it !in withTransfers && it !in withTrades }
+            .mapNotNull { accountRepository.getAccountById(it).first() }
     if (emptyAccounts.isEmpty()) return emptyList()
 
     import(
