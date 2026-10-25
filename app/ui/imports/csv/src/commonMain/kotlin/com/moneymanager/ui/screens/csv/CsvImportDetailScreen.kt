@@ -16,6 +16,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,6 +36,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportHistoryEvent
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csv.PdfTextLine
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -56,6 +59,7 @@ import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.qifimporter.Reimports
 import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.ui.components.csv.CsvPreviewTable
+import com.moneymanager.ui.components.csv.PdfLinesTable
 import com.moneymanager.ui.components.imports.ReimportDialog
 import com.moneymanager.ui.components.imports.ReimportPickerRepositories
 import com.moneymanager.ui.components.imports.toSummary
@@ -107,6 +111,8 @@ fun CsvImportDetailScreen(
     var failedRowIndexes by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var rowsRefreshTrigger by remember { mutableStateOf(0) }
     var hasMatchingStrategy by remember { mutableStateOf(false) }
+    var pdfLines by remember { mutableStateOf<List<PdfTextLine>?>(null) }
+    var showPdfText by remember { mutableStateOf(false) }
 
     // Observe strategies to re-check when new ones are added
     val strategies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
@@ -125,6 +131,11 @@ fun CsvImportDetailScreen(
     // The import flow re-emits whenever its applications change (import, re-import, unimport).
     LaunchedEffect(import) {
         history = if (import == null) emptyList() else auditRepository.getCsvImportHistory(importId)
+    }
+
+    // Restaging (after the strategy's line rules change) re-emits the import too.
+    LaunchedEffect(import) {
+        pdfLines = if (import == null) null else csvImportRepository.getPdfSource(importId)?.lines
     }
 
     // Determine amount column index by looking for common amount column names
@@ -367,8 +378,20 @@ fun CsvImportDetailScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // A PDF import keeps its text lines beside the rows its strategy assembled from them.
+                val lines = pdfLines
+                if (lines != null) {
+                    SecondaryTabRow(selectedTabIndex = if (showPdfText) 1 else 0) {
+                        Tab(selected = !showPdfText, onClick = { showPdfText = false }, text = { Text("Rows") })
+                        Tab(selected = showPdfText, onClick = { showPdfText = true }, text = { Text("Text") })
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
                 // Data table
-                if (isLoading) {
+                if (lines != null && showPdfText) {
+                    PdfLinesTable(lines = lines, modifier = Modifier.fillMaxSize())
+                } else if (isLoading) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
