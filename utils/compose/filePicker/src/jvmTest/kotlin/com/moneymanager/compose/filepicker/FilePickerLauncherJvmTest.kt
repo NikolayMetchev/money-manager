@@ -31,6 +31,11 @@ class FilePickerLauncherJvmTest {
     // MIME type to extensions tests
 
     @Test
+    fun `mimeTypesToExtensions returns pdf extension for application pdf`() {
+        assertEquals(listOf(".pdf"), mimeTypesToExtensions(listOf("application/pdf")))
+    }
+
+    @Test
     fun `mimeTypesToExtensions returns csv extension for text csv`() {
         val extensions = mimeTypesToExtensions(listOf("text/csv"))
 

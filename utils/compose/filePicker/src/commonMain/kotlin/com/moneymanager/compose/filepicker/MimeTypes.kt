@@ -14,6 +14,7 @@ internal fun mimeTypesToExtensions(mimeTypes: List<String>): List<String> =
                 "text/tab-separated-values" -> listOf(".tsv")
                 "application/vnd.ms-excel" -> listOf(".csv", ".xls")
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> listOf(".xlsx")
+                "application/pdf" -> listOf(".pdf")
                 else -> emptyList()
             }
         }.distinct()

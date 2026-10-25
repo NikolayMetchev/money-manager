@@ -10,7 +10,6 @@ import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createCsvImport
-import com.moneymanager.importengineapi.createPdfImport
 import com.moneymanager.importengineapi.createQifImport
 import com.moneymanager.importengineapi.createXlsxImport
 import com.moneymanager.importengineapi.recordDirectoryFileImported
@@ -199,7 +198,7 @@ private suspend fun ScanContext.scanFile(entry: ImportFileEntry): FileOutcome {
                 SupportedKind.PDF -> {
                     csvImportId =
                         csvImportRepository.findImportsByChecksum(checksum).firstOrNull()?.id
-                            ?: stagePdf(importEngine, entry, rawBytes, checksum, lastModified)
+                            ?: importEngine.stagePdfImport(entry.name, rawBytes, checksum, lastModified)
                 }
             }
 
@@ -265,30 +264,6 @@ private suspend fun stageXlsx(
         fileLastModified = lastModified,
         xlsxBytes = bytes,
         xlsxWorksheetName = sheetName,
-    )
-}
-
-/**
- * Stages a PDF as its text lines, one row each (see [PdfRowAssembler.rawLines]), plus the file and the lines,
- * from which a strategy assembles its rows later. Throws `PdfUnsupportedPlatformException` where there's no
- * pdfium; the caller's generic exception handler records that as a per-file scan failure.
- */
-private suspend fun stagePdf(
-    importEngine: ImportEngine,
-    entry: ImportFileEntry,
-    bytes: ByteArray,
-    checksum: String,
-    lastModified: Instant,
-): CsvImportId {
-    val pdf = readPdf(bytes)
-    val staged = PdfRowAssembler.rawLines(pdf.lines)
-    return importEngine.createPdfImport(
-        fileName = entry.name,
-        headers = staged.headers,
-        rows = staged.rows,
-        fileChecksum = checksum,
-        fileLastModified = lastModified,
-        pdf = pdf,
     )
 }
 
