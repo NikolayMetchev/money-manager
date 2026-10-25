@@ -148,6 +148,7 @@ exclude:
       - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/ApiSessionsScreen.kt
       - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/ApiStrategiesScreen.kt
       - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/editor/ApiEditorComponents.kt
+      - app/ui/imports/csv/src/commonMain/kotlin/com/moneymanager/ui/components/csv/PdfLinesTable.kt
       - app/ui/imports/csv/src/commonMain/kotlin/com/moneymanager/ui/screens/accountmapping/AccountMappingsScreen.kt
       - app/ui/imports/csv/src/commonMain/kotlin/com/moneymanager/ui/screens/csv/CsvImportsScreen.kt
       - app/ui/imports/csv/src/commonMain/kotlin/com/moneymanager/ui/screens/csvstrategy/CsvStrategiesScreen.kt
