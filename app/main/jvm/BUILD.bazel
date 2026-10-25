@@ -62,6 +62,19 @@ java_binary(
     runtime_deps = _RUNTIME,
 )
 
+# `bazel run //app/main/jvm:app_jfr` is Gradle's `run -Pjfr`: the app recorded by Java Flight Recorder with method
+# sampling on, dumped to profile.jfr in the workspace root on exit (open it in JDK Mission Control or IntelliJ). The
+# launcher expands BUILD_WORKSPACE_DIRECTORY, which `bazel run` sets.
+java_binary(
+    name = "app_jfr",
+    jvm_flags = _JVM_FLAGS + [
+        "-XX:StartFlightRecording=settings=profile,filename=$${BUILD_WORKSPACE_DIRECTORY:-.}/profile.jfr,dumponexit=true",
+    ],
+    main_class = _MAIN_CLASS,
+    tags = ["manual"],
+    runtime_deps = _RUNTIME,
+)
+
 # Compose's proguardReleaseJars: not part of `bazel build //...`, as it isn't of Gradle's `build`.
 # `--define=proguard_optimize=false` skips the optimizer, as CI's Build and Test does.
 proguard_jars(
