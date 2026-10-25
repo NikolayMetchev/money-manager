@@ -45,6 +45,12 @@ interface TransactionReadRepository {
         attributeTypeName: String,
     ): List<Transfer>
 
+    /** Transfers on any of [accountIds] carrying an attribute (of any type) whose value is one of [values], at any date. */
+    suspend fun getTransactionsByAccountsWithAttributeValues(
+        accountIds: Collection<AccountId>,
+        values: Collection<String>,
+    ): List<Transfer>
+
     fun getAccountBalances(): Flow<List<AccountBalance>>
 
     /**

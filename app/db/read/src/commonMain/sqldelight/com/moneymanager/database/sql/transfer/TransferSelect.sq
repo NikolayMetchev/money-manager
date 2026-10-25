@@ -38,6 +38,18 @@ AND id IN (
 )
 ORDER BY timestamp DESC;
 
+-- Transfers on the given accounts carrying an attribute with one of the given values, whatever its type
+-- or date. The importer finds the existing records a batch's unique ids name this way: an id match holds
+-- at any distance in time, so the date range it otherwise loads can miss them.
+selectByAccountsWithAttributeValues:
+SELECT * FROM transfer_with_asset
+WHERE (source_account_id IN :accountIds OR target_account_id IN :accountIds)
+AND id IN (
+    SELECT transfer_attribute.transaction_id FROM transfer_attribute
+    WHERE transfer_attribute.attribute_value IN :attributeValues
+)
+ORDER BY timestamp DESC;
+
 selectAllBalances:
 SELECT
     account_balance_materialized_view.account_id,

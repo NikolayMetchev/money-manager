@@ -17,6 +17,7 @@ import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountMergeRequest
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
+import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportCategoryIntent
@@ -51,6 +52,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -198,6 +200,61 @@ class ImportEngineDbTest : DbTest() {
 
             assertEquals(1, result.accountsCreated)
             assertEquals(1, accountsNamed("Curve"))
+        }
+
+    @Test
+    fun uniqueIdMatch_holdsFarOutsideTheBatchDates() =
+        runDbTest {
+            // A unique-id policy loads only the existing transfers near the batch, plus those its ids name:
+            // an export that re-dates a row by a year must still update the row, not import it a second time.
+            val checking = createSourceAccount()
+            repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Savings", openingDate = baseTime))
+            val savings =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .first { it.name == "Savings" }
+                    .id
+            val currency = gbp()
+            val txId = engine().getOrCreateAttributeType("Transaction ID")
+
+            fun batch(
+                timestamp: Instant,
+                description: String,
+            ) = ImportBatch(
+                transfers =
+                    listOf(
+                        ImportTransfer(
+                            rowKey = ImportRowKey.CsvRow(0),
+                            fromAccount = AccountRef.Existing(checking),
+                            toAccount = AccountRef.Existing(savings),
+                            source = Source.SampleGenerator,
+                            timestamp = timestamp,
+                            description = description,
+                            amount = Money(500, currency),
+                            attributes = listOf(NewAttribute(txId, "T1")),
+                            uniqueKey = mapOf("Transaction ID" to "T1"),
+                        ),
+                    ),
+                dedupePolicy = DedupePolicy.UniqueIdentifier(),
+                uniqueKeyExtractor =
+                    ExistingUniqueKeyExtractor { transfer ->
+                        transfer.attributes.filter { it.attributeType.id == txId }.associate { it.attributeType.name to it.value }
+                    },
+            )
+
+            assertEquals(1, engine().import(batch(baseTime, "Rent")).transfersImported)
+            val result = engine().import(batch(baseTime + 365.days, "Rent (corrected)"))
+
+            assertEquals(0, result.transfersImported)
+            assertEquals(1, result.updated)
+            assertEquals(
+                1,
+                repositories.transactionRepository
+                    .getTransactionsByAccount(checking)
+                    .first()
+                    .size,
+            )
         }
 
     @Test

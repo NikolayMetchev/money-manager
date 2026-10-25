@@ -1543,19 +1543,18 @@ class ImportEngineImpl(
                 }
 
                 is DedupePolicy.UniqueIdentifier -> {
-                    accountIds
-                        .flatMap { transactionRepository.getTransactionsByAccount(it).first() }
-                        .distinctBy { it.id }
+                    loadAroundBatch(transfers, accountIds.toList(), batch.dedupePolicy.windows())
                 }
 
                 is DedupePolicy.ApiMultiKey -> {
-                    // Load full history for every account the batch touches (the own account may be the
-                    // source or the target depending on transaction direction), plus the app accounts
-                    // bridged for internal-transfer reconciliation (whose legs the batch does not touch).
+                    // The own account may be the source or the target depending on direction; the app
+                    // accounts bridged for internal-transfer reconciliation hold legs the batch never touches.
                     val policy = batch.dedupePolicy as DedupePolicy.ApiMultiKey
-                    (accountIds + policy.internalTransferBridges.map { it.appAccountId })
-                        .flatMap { transactionRepository.getTransactionsByAccount(it).first() }
-                        .distinctBy { it.id }
+                    loadAroundBatch(
+                        transfers,
+                        (accountIds + policy.internalTransferBridges.map { it.appAccountId }).toList(),
+                        policy.windows(),
+                    )
                 }
 
                 is DedupePolicy.None -> {
@@ -1592,6 +1591,59 @@ class ImportEngineImpl(
             )
         }
     }
+
+    /**
+     * The existing transfers on [accountIds] a unique-id policy can match the batch against, instead of each
+     * account's whole history: everything near the batch in time, plus the few records that may match from
+     * any distance — those carrying one of the batch's own ids, and those dated only approximately.
+     *
+     * Every other rule pairs an existing leg with a batch row inside one of the policy's [windows], or (the
+     * split-conduit pass) with an existing placeholder that is itself inside the window of a batch row, so
+     * twice the widest window covers each one. A leg outside that cannot match anything; loading it changed
+     * nothing but the cost, which on a large database was most of a re-import.
+     *
+     * The result keeps the order the full-history load gave (account by account, newest first), since the
+     * deduper's indexes keep the first or last of several candidates.
+     */
+    private suspend fun loadAroundBatch(
+        transfers: List<ImportTransfer>,
+        accountIds: List<AccountId>,
+        windows: List<Duration?>,
+    ): List<Transfer> {
+        val timestamps = transfers.map { it.timestamp ?: return loadFullHistory(accountIds) }
+        val slack = (windows.filterNotNull().maxOrNull() ?: Duration.ZERO) * 2
+        val from = timestamps.min() - slack
+        // An approximately-dated row may have happened as late as its approximateUntil.
+        val until = transfers.maxOf { maxOf(requireNotNull(it.timestamp), it.approximateUntil ?: Instant.DISTANT_PAST) } + slack
+        val ids = transfers.flatMap { it.uniqueKey?.values.orEmpty() + listOfNotNull(it.apiId) }
+        val loaded =
+            accountIds.flatMap { transactionRepository.getTransactionsByAccountAndDateRange(it, from, until).first() } +
+                transactionRepository.getTransactionsByAccountsWithAttributeValues(accountIds, ids) +
+                transactionRepository.getTransactionsByAccountsWithAttributeType(
+                    accountIds,
+                    WellKnownIds.TIMESTAMP_APPROXIMATE_ATTR_TYPE_NAME,
+                )
+        val byAccount = mutableMapOf<AccountId, MutableList<Transfer>>()
+        for (transfer in loaded.distinctBy { it.id }.sortedByDescending { it.timestamp }) {
+            byAccount.getOrPut(transfer.sourceAccountId) { mutableListOf() } += transfer
+            if (transfer.targetAccountId != transfer.sourceAccountId) {
+                byAccount.getOrPut(transfer.targetAccountId) { mutableListOf() } += transfer
+            }
+        }
+        return accountIds.flatMap { byAccount[it].orEmpty() }.distinctBy { it.id }
+    }
+
+    private suspend fun loadFullHistory(accountIds: List<AccountId>): List<Transfer> =
+        accountIds.flatMap { transactionRepository.getTransactionsByAccount(it).first() }.distinctBy { it.id }
+
+    /** Every window within which a rule of this policy pairs an incoming row with an existing leg. */
+    private fun DedupePolicy.windows(): List<Duration?> =
+        when (this) {
+            is DedupePolicy.UniqueIdentifier -> listOf(reconcileWindow, unidentifiedCounterpartyWindow)
+            is DedupePolicy.ApiMultiKey -> listOf(reconcileWindow, unidentifiedCounterpartyWindow, internalTransferWindow)
+            is DedupePolicy.FuzzyAllFields -> listOf(dateTolerance, reconcileWindow)
+            DedupePolicy.None -> emptyList()
+        }
 
     /**
      * Creates the IMPORTED transfers and applies the UPDATED ones. [batchSize] transfers are written per
