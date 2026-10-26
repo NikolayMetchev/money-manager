@@ -78,16 +78,16 @@ fun main() {
         MainWindow(onExit = ::exitApplication)
     }
     logger.i { "Window closed; waiting for AWT to shut down" }
-    exitIfStillRunningAfter(EXIT_GRACE_MILLIS)
+    exitIfStillRunningAfterGracePeriod()
 }
 
 private const val EXIT_GRACE_MILLIS = 10_000L
 
 /** A non-daemon thread (an HTTP client's pool, say) would keep the JVM up; by now AWT is quiet, so exit is safe. */
-private fun exitIfStillRunningAfter(millis: Long) {
+private fun exitIfStillRunningAfterGracePeriod() {
     Thread {
-        Thread.sleep(millis)
-        logger.w { "Still running ${millis}ms after the window closed; exiting" }
+        Thread.sleep(EXIT_GRACE_MILLIS)
+        logger.w { "Still running ${EXIT_GRACE_MILLIS}ms after the window closed; exiting" }
         exitProcess(0)
     }.apply {
         isDaemon = true
