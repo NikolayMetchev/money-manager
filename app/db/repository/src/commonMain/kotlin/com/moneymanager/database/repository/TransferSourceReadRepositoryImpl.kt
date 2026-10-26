@@ -72,12 +72,13 @@ class TransferSourceReadRepositoryImpl(
         tradeIds: Set<TradeId>,
     ): List<Source.Csv> =
         withContext(Dispatchers.Default) {
-            (transferIds.map { it.id } + tradeIds.map { it.id })
-                .distinct()
-                .chunked(ID_CHUNK)
-                .flatMap { queries.selectImportRecordsMatchedTo(it).awaitAsList() }
-                .map { Source.Csv(CsvImportId(Uuid.parse(it.import_id)), it.record_index) }
-                .distinct()
+            val records = linkedSetOf<Source.Csv>()
+            for (chunk in (transferIds.map { it.id } + tradeIds.map { it.id }).distinct().chunked(ID_CHUNK)) {
+                queries.selectImportRecordsMatchedTo(chunk).awaitAsList().mapTo(records) {
+                    Source.Csv(CsvImportId(Uuid.parse(it.import_id)), it.record_index)
+                }
+            }
+            records.toList()
         }
 
     override suspend fun getHandEditedTransferIds(ids: Collection<TransferId>): Set<TransferId> =

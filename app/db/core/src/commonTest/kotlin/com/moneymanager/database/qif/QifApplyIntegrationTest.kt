@@ -266,9 +266,9 @@ class QifApplyIntegrationTest : DbTest() {
             T-90.00
             PSupermarket
             SGroceries
-            ${'$'}-60.00
+            $-60.00
             SHousehold
-            ${'$'}-30.00
+            $-30.00
             ^
             """.trimIndent()
     }

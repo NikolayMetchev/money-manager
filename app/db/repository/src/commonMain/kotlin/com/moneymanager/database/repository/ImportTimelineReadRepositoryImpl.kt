@@ -30,8 +30,7 @@ class ImportTimelineReadRepositoryImpl(
             .mapToList(coroutineContext)
             .map { rows ->
                 rows.map { row ->
-                    fileRange(
-                        kind = TimelineSourceKind.CSV,
+                    csvFileRange(
                         fileId = row.import_id,
                         fileName = row.file_name,
                         ignored = row.ignored,
@@ -100,8 +99,7 @@ class ImportTimelineReadRepositoryImpl(
             .mapToList(coroutineContext)
             .map { rows ->
                 rows.map { row ->
-                    fileRange(
-                        kind = TimelineSourceKind.CSV,
+                    csvFileRange(
                         fileId = row.import_id,
                         fileName = row.file_name,
                         ignored = row.ignored,
@@ -166,8 +164,7 @@ class ImportTimelineReadRepositoryImpl(
         }
 
     @Suppress("LongParameterList")
-    private fun fileRange(
-        kind: TimelineSourceKind,
+    private fun csvFileRange(
         fileId: String,
         fileName: String,
         ignored: Long,
@@ -178,7 +175,7 @@ class ImportTimelineReadRepositoryImpl(
         accountId: AccountId? = null,
     ): ImportFileDateRange =
         ImportFileDateRange(
-            kind = kind,
+            kind = TimelineSourceKind.CSV,
             fileId = fileId,
             fileName = fileName,
             strategyName = strategyName,

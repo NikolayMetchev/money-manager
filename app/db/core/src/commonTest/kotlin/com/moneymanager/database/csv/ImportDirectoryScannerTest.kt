@@ -1,7 +1,6 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.scanImportDirectory
-import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
@@ -10,7 +9,6 @@ import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createImportDirectory
 import com.moneymanager.importengineapi.deleteCsvImport
-import com.moneymanager.importengineapi.recordDirectoryFileImported
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
