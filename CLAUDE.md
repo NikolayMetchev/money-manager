@@ -487,7 +487,9 @@ re-imports the files that reference it.
 pair of dialogs for both formats) or an API session (`executeApiReimport`) goes through `executeSourceRerun`
 (`app/importengineapi`): it un-hides the other sources' records the source had reconciled away, deletes every
 transfer and trade the source created, resets its records, runs the normal import again, re-runs other files'
-records that had matched against the deleted ones, re-applies hand edits (from the audit log) to the
+records that had matched against the deleted ones (found from provenance: a CSV row or QIF record linked to a
+transaction it didn't create is a `matched = 1` `entity_source` entry, kept in step with the row's link; readers
+asking who wrote a revision filter on `matched = 0`), re-applies hand edits (from the audit log) to the
 re-created transfers (reporting those it can't match), and deletes accounts the source created that are now
 empty. There is no separate re-import logic: no merges, no in-place updates, no detectors.
 

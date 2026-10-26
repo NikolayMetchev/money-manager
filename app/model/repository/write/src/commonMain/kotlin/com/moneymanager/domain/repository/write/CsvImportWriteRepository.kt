@@ -94,32 +94,9 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
     )
 
     /**
-     * Updates the transfer ID for a specific row after importing.
-     * This links the CSV row to the created transfer for navigation.
-     *
-     * @param id The import ID
-     * @param rowIndex The row index to update
-     * @param transferId The transfer ID to link
-     */
-    suspend fun updateRowTransferId(
-        id: CsvImportId,
-        rowIndex: Long,
-        transferId: TransferId,
-    )
-
-    /**
-     * Updates transfer IDs for multiple rows in batch.
-     *
-     * @param id The import ID
-     * @param rowTransferMap Map of row index to transfer ID
-     */
-    suspend fun updateRowTransferIdsBatch(
-        id: CsvImportId,
-        rowTransferMap: Map<Long, TransferId>,
-    )
-
-    /**
-     * Updates the import status for multiple rows in a single database transaction.
+     * Updates the import status for multiple rows in a single database transaction. A row linked to a
+     * transaction it didn't create (any status but IMPORTED) is also recorded as a matched source of it, so
+     * re-importing the transaction's own file finds the row from its provenance.
      *
      * @param id The import ID
      * @param status The import status to set for all rows (IMPORTED, DUPLICATE, UPDATED)

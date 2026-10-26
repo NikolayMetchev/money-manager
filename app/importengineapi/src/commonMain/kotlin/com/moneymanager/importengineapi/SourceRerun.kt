@@ -41,15 +41,53 @@ class RerunReads(
 
 /**
  * Rows of other CSV files and records of other QIF files that were matched (DUPLICATE or UPDATED)
- * against a transaction a re-import deletes. They are reset with it and re-run after it, so they match
+ * against a transaction a re-import deletes, found from their provenance. They are reset with it and re-run after it, so they match
  * the re-created transaction instead of pointing at a deleted one.
  */
 data class AffectedRecords(
-    val csvRows: Map<CsvImportId, List<Long>> = emptyMap(),
-    val qifRecords: Map<QifImportId, List<Long>> = emptyMap(),
+    /** Each file's records, keyed by the whole file: a [Source.Csv] or [Source.Qif] with no row. */
+    val byFile: Map<Source, List<Long>> = emptyMap(),
 ) {
-    val isEmpty: Boolean get() = csvRows.isEmpty() && qifRecords.isEmpty()
-    val count: Int get() = csvRows.values.sumOf { it.size } + qifRecords.values.sumOf { it.size }
+    val isEmpty: Boolean get() = byFile.isEmpty()
+    val count: Int get() = byFile.values.sumOf { it.size }
+
+    /** The mutations that return these records to never-imported. */
+    fun resetMutations(): ImportBatch =
+        ImportBatch(
+            csvImportMutations =
+                byFile.mapNotNull { (file, rows) -> (file as? Source.Csv)?.let { CsvImportMutation.ResetRowStatuses(it.importId, rows) } },
+            qifImportMutations =
+                byFile.mapNotNull { (file, records) ->
+                    (file as? Source.Qif)?.let { QifImportMutation.ResetRecordStatuses(it.importId, records) }
+                },
+        )
+
+    companion object {
+        /** Groups [records] (each a CSV row or QIF record) by file, leaving out [excluding]'s own. */
+        fun of(
+            records: List<Source>,
+            excluding: Source? = null,
+        ): AffectedRecords =
+            AffectedRecords(
+                records
+                    .mapNotNull { record ->
+                        when (record) {
+                            is Source.Csv -> record.rowIndex?.let { Source.Csv(record.importId) to it }
+                            is Source.Qif -> record.recordIndex?.let { Source.Qif(record.importId) to it }
+                            else -> null
+                        }
+                    }.filter { (file, _) -> file != excluding?.wholeFile() }
+                    .groupBy({ it.first }, { it.second })
+                    .mapValues { (_, indexes) -> indexes.distinct().sorted() },
+            )
+
+        private fun Source.wholeFile(): Source =
+            when (this) {
+                is Source.Csv -> Source.Csv(importId)
+                is Source.Qif -> Source.Qif(importId)
+                else -> this
+            }
+    }
 }
 
 /** Re-runs [AffectedRecords] with each file's own strategy; supplied by a caller that can run both kinds. */
@@ -151,8 +189,7 @@ data class SourceRerunResult<R>(
 
 /**
  * Plans re-importing [source]: what it created (per `entity_source`, first revision), what other files
- * matched against that, and which of its transfers a person edited by hand. Checking the other CSV files
- * reads every one of them, which is most of the time on a large database, so [onProgress] counts them.
+ * matched against that, and which of its transfers a person edited by hand.
  */
 suspend fun planSourceRerun(
     source: Source,
@@ -164,36 +201,23 @@ suspend fun planSourceRerun(
     val progress = PhasedProgress(onProgress)
     progress.emit(base = 0f, detail = "Finding what the import created")
     val created = reads.transferSourceRepository.getTransfersCreatedBy(source)
-    val csvExcluding = (source as? Source.Csv)?.importId
-    val qifExcluding = (source as? Source.Qif)?.importId
-    progress.emit(base = PLAN_CREATED_SPAN, detail = CHECKING_OTHER_FILES)
-    val csvRows =
-        reads.csvImportRepository.findRowsReferencingTransactions(csvExcluding, created.keys, tradeIds) { checked, total ->
-            progress.emit(
-                base = PLAN_CREATED_SPAN,
-                span = PLAN_OTHER_FILES_SPAN,
-                detail = CHECKING_OTHER_FILES,
-                innerFraction = checked.toFloat() / total,
-                processed = checked,
-                total = total,
-            )
-        }
-    val qifRecords = reads.qifImportRepository.findRecordsReferencingTransfers(qifExcluding, created.keys)
+    progress.emit(base = PLAN_CREATED_SPAN, detail = "Checking other files for records matched against it")
+    val affected =
+        AffectedRecords.of(reads.transferSourceRepository.getImportRecordsMatchedTo(created.keys, tradeIds), excluding = source)
     val manualEditsBase = PLAN_CREATED_SPAN + PLAN_OTHER_FILES_SPAN
     return SourceRerunPlan(
         source = source,
         createdTransfers = created,
         tradeIds = tradeIds,
         createdAccountIds = createdAccountIds,
-        affected = AffectedRecords(csvRows = csvRows, qifRecords = qifRecords),
+        affected = affected,
         manualEdits =
             captureManualEdits(created, reads, progress.sink(base = manualEditsBase, span = 1f - manualEditsBase)),
     )
 }
 
-private const val CHECKING_OTHER_FILES = "Checking other files for records matched against it"
 private const val PLAN_CREATED_SPAN = 0.05f
-private const val PLAN_OTHER_FILES_SPAN = 0.85f
+private const val PLAN_OTHER_FILES_SPAN = 0.05f
 
 /**
  * Re-imports per [plan]. One batch un-hides the partners the source's transfers had reconciled away,
@@ -220,6 +244,7 @@ suspend fun <R> ImportEngine.executeSourceRerun(
 
     val rerunAffectedRecords = if (plan.affected.isEmpty) null else rerunAffected?.prepare(plan.affected)
 
+    val affectedResets = plan.affected.resetMutations()
     // The un-hide updates ride in the delete batch (the engine applies updates before deletes), and so
     // do the record resets: other files' links can't be found again once the transactions are gone.
     onProgress?.invoke(Progress("Removing what the import created"))
@@ -240,12 +265,8 @@ suspend fun <R> ImportEngine.executeSourceRerun(
                     )
                 },
             dedupePolicy = DedupePolicy.None,
-            csvImportMutations =
-                resetRecords.csvImportMutations +
-                    plan.affected.csvRows.map { (id, rows) -> CsvImportMutation.ResetRowStatuses(id, rows) },
-            qifImportMutations =
-                resetRecords.qifImportMutations +
-                    plan.affected.qifRecords.map { (id, records) -> QifImportMutation.ResetRecordStatuses(id, records) },
+            csvImportMutations = resetRecords.csvImportMutations + affectedResets.csvImportMutations,
+            qifImportMutations = resetRecords.qifImportMutations + affectedResets.qifImportMutations,
         ),
         onProgress = onProgress?.let { sink -> { sink(it.copy(detail = "Removing what the import created")) } },
     )
@@ -291,11 +312,7 @@ suspend fun <R> ImportEngine.executeSourceRerun(
         deletedTransfers = plan.createdTransfers.size,
         deletedTrades = plan.tradeIds.size,
         unhiddenTransfers = unhideUpdates.size,
-        affected =
-            AffectedRecords(
-                csvRows = plan.affected.csvRows - notRerun.csvRows.keys,
-                qifRecords = plan.affected.qifRecords - notRerun.qifRecords.keys,
-            ),
+        affected = AffectedRecords(plan.affected.byFile - notRerun.byFile.keys),
         notRerun = notRerun,
         reappliedEdits = reapplied,
         unmatchedEdits = unmatched,

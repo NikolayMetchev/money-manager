@@ -2370,14 +2370,6 @@ class ImportEngineImpl(
                     csvImportRepository.resetToUnimported(m.id)
                 }
 
-                is CsvImportMutation.UpdateRowTransferId -> {
-                    csvImportRepository.updateRowTransferId(m.id, m.rowIndex, m.transferId)
-                }
-
-                is CsvImportMutation.UpdateRowTransferIds -> {
-                    csvImportRepository.updateRowTransferIdsBatch(m.id, m.rowTransferMap)
-                }
-
                 is CsvImportMutation.UpdateRowStatuses -> {
                     csvImportRepository.updateRowStatusesBatch(m.id, m.status, m.rowTransferMap)
                 }

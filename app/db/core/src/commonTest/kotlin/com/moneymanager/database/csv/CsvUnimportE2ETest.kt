@@ -147,7 +147,7 @@ class CsvUnimportE2ETest : DbTest() {
 
     private suspend fun unimport(import: CsvImport): CsvUnimportResult =
         executeCsvUnimport(
-            plan = planCsvUnimport(import.id, repositories.csvImportRepository),
+            plan = planCsvUnimport(import.id, repositories.csvImportRepository, repositories.transferSourceRepository),
             accountRepository = repositories.accountRepository,
             transactionRepository = repositories.transactionRepository,
             transferRelationshipRepository = repositories.transferRelationshipRepository,
@@ -216,7 +216,7 @@ class CsvUnimportE2ETest : DbTest() {
             val second = stage("MonzoDataExport-again.csv", listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee")))
             assertEquals(1, apply(second, monzo).duplicatesSkipped, "the second file's row is a duplicate of the first's")
 
-            val plan = planCsvUnimport(first.id, repositories.csvImportRepository)
+            val plan = planCsvUnimport(first.id, repositories.csvImportRepository, repositories.transferSourceRepository)
             assertEquals(listOf(second.id), plan.affectedFiles.map { it.importId })
 
             unimport(reload(first.id))
@@ -270,7 +270,8 @@ class CsvUnimportE2ETest : DbTest() {
                 )
             assertEquals(1, apply(second, monzo).transfersCreated, "tx_1 is a duplicate of the first file's row")
 
-            val plan = planCsvBulkUnimport(listOf(first.id, second.id), repositories.csvImportRepository)
+            val plan =
+                planCsvBulkUnimport(listOf(first.id, second.id), repositories.csvImportRepository, repositories.transferSourceRepository)
             assertTrue(plan.affectedFiles.isEmpty(), "the dependent file is being unimported too: ${plan.affectedFiles}")
             assertEquals(2, plan.transferCount)
 
@@ -278,6 +279,7 @@ class CsvUnimportE2ETest : DbTest() {
                 executeCsvBulkUnimport(
                     plan = plan,
                     csvImportRepository = repositories.csvImportRepository,
+                    transferSourceRepository = repositories.transferSourceRepository,
                     accountRepository = repositories.accountRepository,
                     transactionRepository = repositories.transactionRepository,
                     transferRelationshipRepository = repositories.transferRelationshipRepository,

@@ -42,7 +42,7 @@ selectLegsForAccounts:
         ) THEN 1 ELSE 0 END AS is_excluded,
         COALESCE(
             (SELECT 'c' || ces.csv_import_id || ':' || ces.csv_row_index
-             FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id
+             FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id AND es.matched = 0
              WHERE es.entity_type_id = 7 AND es.entity_id = tr.id AND ces.csv_row_index IS NOT NULL
              ORDER BY es.revision_id LIMIT 1),
             (SELECT 't' || rel.id1 FROM transfer_relationship rel
@@ -75,7 +75,7 @@ selectLegsForAccounts:
         ) THEN 1 ELSE 0 END,
         COALESCE(
             (SELECT 'c' || ces.csv_import_id || ':' || ces.csv_row_index
-             FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id
+             FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id AND es.matched = 0
              WHERE es.entity_type_id = 7 AND es.entity_id = tr.id AND ces.csv_row_index IS NOT NULL
              ORDER BY es.revision_id LIMIT 1),
             (SELECT 't' || rel.id1 FROM transfer_relationship rel
@@ -108,7 +108,7 @@ selectLegsForAccounts:
         ) THEN 1 ELSE 0 END,
         COALESCE(
             (SELECT 'c' || ces.csv_import_id || ':' || ces.csv_row_index
-             FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id
+             FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id AND es.matched = 0
              WHERE es.entity_type_id = 11 AND es.entity_id = td.id AND ces.csv_row_index IS NOT NULL
              ORDER BY es.revision_id LIMIT 1),
             'd' || td.id
@@ -139,7 +139,7 @@ selectLegsForAccounts:
         ) THEN 1 ELSE 0 END,
         COALESCE(
             (SELECT 'c' || ces.csv_import_id || ':' || ces.csv_row_index
-             FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id
+             FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id AND es.matched = 0
              WHERE es.entity_type_id = 11 AND es.entity_id = td.id AND ces.csv_row_index IS NOT NULL
              ORDER BY es.revision_id LIMIT 1),
             'd' || td.id

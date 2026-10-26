@@ -337,18 +337,27 @@ class Reimports(
     /** Re-runs the reset records of the files in [affected], each as it was imported. */
     override suspend fun prepare(affected: AffectedRecords): suspend (onProgress: (suspend (Progress) -> Unit)?) -> AffectedRecords {
         val files =
-            affected.csvRows.keys.mapNotNull { id ->
-                reads.csvImportRepository
-                    .getImport(id)
-                    .first()
-                    ?.let(StagedFile::Csv)
-            } +
-                affected.qifRecords.keys.mapNotNull { id ->
-                    reads.qifImportRepository
-                        .getImport(id)
-                        .first()
-                        ?.let(StagedFile::Qif)
+            affected.byFile.keys.mapNotNull { file ->
+                when (file) {
+                    is Source.Csv -> {
+                        reads.csvImportRepository
+                            .getImport(file.importId)
+                            .first()
+                            ?.let(StagedFile::Csv)
+                    }
+
+                    is Source.Qif -> {
+                        reads.qifImportRepository
+                            .getImport(file.importId)
+                            .first()
+                            ?.let(StagedFile::Qif)
+                    }
+
+                    else -> {
+                        null
+                    }
                 }
+            }
         // Read now: once the re-import resets these records, a file that only matched others' transactions
         // has nothing left to read its account from.
         val settings = importedSettingsOf(files.map { it.source })
@@ -378,10 +387,7 @@ class Reimports(
                     notRerun += file.source
                 }
             }
-            AffectedRecords(
-                csvRows = affected.csvRows.filterKeys { Source.Csv(it) in notRerun },
-                qifRecords = affected.qifRecords.filterKeys { Source.Qif(it) in notRerun },
-            )
+            AffectedRecords(affected.byFile.filterKeys { it in notRerun })
         }
     }
 

@@ -1,10 +1,14 @@
 package com.moneymanager.database.repository.write
 
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.write.forgetMatchedSources
+import com.moneymanager.database.write.recordMatchedSource
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.QifImportId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.write.QifImportWriteRepository
@@ -80,6 +84,8 @@ class QifImportWriteRepositoryImpl(
             database.transaction {
                 // As for CSV: forget the import-folder file staged into it, so the folder re-stages it.
                 writeQueries.deleteDirectoryFilesForImport(id.id.toString())
+                // Its records' links go with it; their matched entries would otherwise block the delete.
+                database.forgetMatchedSources(Source.Qif(id), records = null)
                 writeQueries.deleteImport(id.id.toString())
             }
         }
@@ -101,6 +107,7 @@ class QifImportWriteRepositoryImpl(
             if (recordTransferMap.isEmpty()) return@withContext
             val importIdString = id.id.toString()
             database.transaction {
+                database.forgetMatchedSources(Source.Qif(id), recordTransferMap.keys)
                 recordTransferMap.forEach { (recordIndex, transferId) ->
                     writeQueries.updateRecordStatus(
                         import_status = status,
@@ -108,6 +115,9 @@ class QifImportWriteRepositoryImpl(
                         import_id = importIdString,
                         record_index = recordIndex,
                     )
+                    if (transferId != null && status != ImportStatus.IMPORTED.name) {
+                        database.recordMatchedSource(deviceId, Source.Qif(id, recordIndex), transferId.id)
+                    }
                 }
             }
         }
@@ -117,9 +127,12 @@ class QifImportWriteRepositoryImpl(
         recordIndexes: Collection<Long>?,
     ): Unit =
         withContext(coroutineContext) {
-            when {
-                recordIndexes == null -> writeQueries.resetAllRecordStatuses(id.id.toString())
-                else -> recordIndexes.chunked(RESET_CHUNK).forEach { writeQueries.resetRecordStatuses(id.id.toString(), it) }
+            database.transaction {
+                database.forgetMatchedSources(Source.Qif(id), recordIndexes)
+                when {
+                    recordIndexes == null -> writeQueries.resetAllRecordStatuses(id.id.toString())
+                    else -> recordIndexes.chunked(RESET_CHUNK).forEach { writeQueries.resetRecordStatuses(id.id.toString(), it) }
+                }
             }
         }
 

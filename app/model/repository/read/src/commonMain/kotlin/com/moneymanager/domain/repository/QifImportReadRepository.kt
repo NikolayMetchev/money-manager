@@ -37,13 +37,4 @@ interface QifImportReadRepository {
      * duplicate-account merges and empty-account cleanup to accounts the import itself introduced.
      */
     suspend fun getAccountsCreatedByImport(id: QifImportId): Set<AccountId>
-
-    /**
-     * Records of every other QIF import linked to any of [transferIds] (marked DUPLICATE or UPDATED
-     * against them), keyed by import. Re-import resets them after deleting those transfers.
-     */
-    suspend fun findRecordsReferencingTransfers(
-        excluding: QifImportId?,
-        transferIds: Set<TransferId>,
-    ): Map<QifImportId, List<Long>>
 }

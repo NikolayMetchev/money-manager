@@ -3,11 +3,15 @@ package com.moneymanager.database.repository.write
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.csv.CsvTableManager
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.write.forgetMatchedSources
+import com.moneymanager.database.write.recordMatchedSource
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvRowLink
+import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.write.CsvImportWriteRepository
@@ -100,6 +104,8 @@ class CsvImportWriteRepositoryImpl(
 
                 // Recreate the dynamic table with the new column shape and rows. The row_index sequence
                 // restarts, so any previously written per-row errors are stale — clear them.
+                // The new rows carry no links, so neither may their matched entries.
+                database.forgetMatchedSources(Source.Csv(id), records = null)
                 tableManager.dropCsvTable(import.table_name)
                 tableManager.createCsvTable(import.table_name, columnCount)
                 tableManager.insertRowsBatch(import.table_name, rows, columnCount)
@@ -204,6 +210,8 @@ class CsvImportWriteRepositoryImpl(
                 // A file staged from an import folder references this import; forget the file too, so the
                 // delete isn't blocked and the next scan of that folder stages the file again.
                 csvImportWriteQueries.deleteDirectoryFilesForImport(id.id.toString())
+                // Its rows' links go with it; their matched entries would otherwise block the delete.
+                database.forgetMatchedSources(Source.Csv(id), records = null)
 
                 tableManager.dropCsvTable(import.table_name)
 
@@ -221,6 +229,7 @@ class CsvImportWriteRepositoryImpl(
                     ?: return@withContext
 
             database.transaction {
+                database.forgetMatchedSources(Source.Csv(id), records = null)
                 tableManager.resetAllRowStatuses(import.table_name)
                 csvImportWriteQueries.deleteErrorsByImportId(id.id.toString())
                 csvImportWriteQueries.deleteApplicationsByImportId(id.id.toString())
@@ -233,33 +242,6 @@ class CsvImportWriteRepositoryImpl(
     ): Unit =
         withContext(coroutineContext) {
             csvImportWriteQueries.setImportIgnored(if (ignored) 1L else 0L, id.id.toString())
-        }
-
-    override suspend fun updateRowTransferId(
-        id: CsvImportId,
-        rowIndex: Long,
-        transferId: TransferId,
-    ): Unit =
-        withContext(coroutineContext) {
-            val import =
-                csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
-                    ?: return@withContext
-
-            tableManager.updateTransferId(import.table_name, rowIndex, transferId)
-        }
-
-    override suspend fun updateRowTransferIdsBatch(
-        id: CsvImportId,
-        rowTransferMap: Map<Long, TransferId>,
-    ): Unit =
-        withContext(coroutineContext) {
-            if (rowTransferMap.isEmpty()) return@withContext
-
-            val import =
-                csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
-                    ?: return@withContext
-
-            tableManager.updateTransferIdsBatch(import.table_name, rowTransferMap)
         }
 
     override suspend fun updateRowStatusesBatch(
@@ -275,8 +257,12 @@ class CsvImportWriteRepositoryImpl(
                     ?: return@withContext
 
             database.transaction {
+                database.forgetMatchedSources(Source.Csv(id), rowTransferMap.keys)
                 rowTransferMap.forEach { (rowIndex, transferId) ->
                     tableManager.updateRowStatus(import.table_name, rowIndex, status, transferId)
+                    if (transferId != null && status != ImportStatus.IMPORTED.name) {
+                        database.recordMatchedSource(deviceId, Source.Csv(id, rowIndex), transferId.id)
+                    }
                 }
             }
         }
@@ -292,10 +278,13 @@ class CsvImportWriteRepositoryImpl(
                 csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                     ?: return@withContext
 
-            if (rowIndexes == null) {
-                tableManager.resetAllRowStatuses(import.table_name)
-            } else {
-                tableManager.resetRowStatuses(import.table_name, rowIndexes)
+            database.transaction {
+                database.forgetMatchedSources(Source.Csv(id), rowIndexes)
+                if (rowIndexes == null) {
+                    tableManager.resetAllRowStatuses(import.table_name)
+                } else {
+                    tableManager.resetRowStatuses(import.table_name, rowIndexes)
+                }
             }
         }
 

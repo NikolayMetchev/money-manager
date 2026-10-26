@@ -257,6 +257,7 @@ class SourceRerunE2ETest : DbTest() {
                     .single()
                     .description,
             )
+            assertEquals(1, again.rerun.affected.count, "the re-run duplicate is recorded against the replacement")
         }
 
     @Test
@@ -278,7 +279,7 @@ class SourceRerunE2ETest : DbTest() {
             val result = reimports.reimport(reimports.plan(StagedFile.Csv(reload(first.id))), accountId = null, currencyId = null)
 
             assertTrue(result.affected.isEmpty, "nothing is reported as re-run")
-            assertEquals(setOf(second.id), result.notRerun.csvRows.keys)
+            assertEquals(setOf<Source>(Source.Csv(second.id)), result.notRerun.byFile.keys)
             assertEquals(1, result.notRerun.count)
             val secondRow = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0).first()
             assertEquals(null, secondRow.transferId, "the row waits for its own file's re-import")

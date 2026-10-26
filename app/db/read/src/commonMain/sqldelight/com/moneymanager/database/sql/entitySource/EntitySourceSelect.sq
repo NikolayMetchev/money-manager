@@ -23,7 +23,8 @@ CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
 JOIN transfer ON transfer.id = entity_source.entity_id
 WHERE csv_entity_source.csv_import_id = ?
   AND entity_source.entity_type_id = 7
-  AND entity_source.revision_id = 1;
+  AND entity_source.revision_id = 1
+  AND entity_source.matched = 0;
 
 -- Trades (entity_type_id = 11) created by the given CSV import, still-existing only — see
 -- selectTransferIdsCreatedByCsvImport.
@@ -34,7 +35,8 @@ CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
 JOIN trade ON trade.id = entity_source.entity_id
 WHERE csv_entity_source.csv_import_id = ?
   AND entity_source.entity_type_id = 11
-  AND entity_source.revision_id = 1;
+  AND entity_source.revision_id = 1
+  AND entity_source.matched = 0;
 
 -- Accounts (entity_type_id = 1) whose creation was recorded against the given QIF import — the QIF
 -- analogue of selectAccountIdsCreatedByCsvImport, used by QIF re-import to scope merges/deletes.
@@ -85,7 +87,8 @@ SELECT id, source_type_id
 FROM entity_source
 WHERE entity_type_id = ?
   AND entity_id = ?
-  AND revision_id = ?;
+  AND revision_id = ?
+  AND matched = 0;
 
 selectApiEntitySourceId:
 SELECT id
@@ -96,8 +99,8 @@ WHERE id = ?;
 --
 -- The single shared source read: audit history and the transfer source screens both use it instead
 -- of repeating this join (and its flat column list) once per entity type. Callers key the result by
--- (entity_id, revision_id) -- UNIQUE (entity_type_id, entity_id, revision_id) on entity_source makes
--- that pairing exact, so attaching in memory matches what a LEFT JOIN on those columns produced.
+-- (entity_id, revision_id) -- idx_entity_source_writer (one writer per revision) makes that pairing
+-- exact, so attaching in memory matches what a LEFT JOIN on those columns produced.
 --
 -- Deliberately one entity per call rather than `entity_id IN :ids`: a dynamic IN list is not a
 -- statically cacheable statement, and re-import calls this once per transfer in a loop.
@@ -132,6 +135,7 @@ LEFT JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
 LEFT JOIN qif_import_metadata ON qif_entity_source.qif_import_id = qif_import_metadata.id
 LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
 WHERE entity_source.entity_type_id = :entityTypeId AND entity_source.entity_id = :entityId
+  AND entity_source.matched = 0
 ORDER BY entity_source.revision_id DESC;
 
 -- Still-existing transfers (entity_type_id = 7) a CSV import created, with the row each came from.
@@ -144,7 +148,8 @@ CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
 JOIN transfer ON transfer.id = entity_source.entity_id
 WHERE csv_entity_source.csv_import_id = ?
   AND entity_source.entity_type_id = 7
-  AND entity_source.revision_id = 1;
+  AND entity_source.revision_id = 1
+  AND entity_source.matched = 0;
 
 -- The QIF analogue of selectCreatedTransferRowsByCsvImport.
 selectCreatedTransferRecordsByQifImport:
@@ -154,7 +159,8 @@ CROSS JOIN entity_source ON entity_source.id = qif_entity_source.id
 JOIN transfer ON transfer.id = entity_source.entity_id
 WHERE qif_entity_source.qif_import_id = ?
   AND entity_source.entity_type_id = 7
-  AND entity_source.revision_id = 1;
+  AND entity_source.revision_id = 1
+  AND entity_source.matched = 0;
 
 -- The API analogue of selectCreatedTransferRowsByCsvImport: a record is a response node.
 selectCreatedTransferNodesByApiSession:
@@ -175,3 +181,55 @@ WHERE entity_type_id = 7
   AND source_type_id = 1
   AND revision_id > 1
   AND entity_id IN ?;
+
+-- The CSV rows and QIF records whose current link is one of the given transfers or trades (they share one
+-- id space) without having written it: their matched entries, which mirror those links exactly (see
+-- recordMatchedSource). source_type_id tells the two apart.
+selectImportRecordsMatchedTo:
+SELECT entity_source.source_type_id, csv_entity_source.csv_import_id AS import_id, csv_entity_source.csv_row_index AS record_index
+FROM entity_source
+CROSS JOIN csv_entity_source ON csv_entity_source.id = entity_source.id
+WHERE entity_source.entity_type_id IN (7, 11)
+  AND entity_source.entity_id IN :transactionIds
+  AND entity_source.matched = 1
+  AND csv_entity_source.csv_row_index IS NOT NULL
+UNION
+SELECT entity_source.source_type_id, qif_entity_source.qif_import_id, qif_entity_source.qif_record_index
+FROM entity_source
+CROSS JOIN qif_entity_source ON qif_entity_source.id = entity_source.id
+WHERE entity_source.entity_type_id IN (7, 11)
+  AND entity_source.entity_id IN :transactionIds
+  AND entity_source.matched = 1
+  AND qif_entity_source.qif_record_index IS NOT NULL;
+
+-- The matched entries of the given rows of one CSV import, or of all its rows; see forgetMatchedSources.
+selectMatchedCsvSourceIds:
+SELECT csv_entity_source.id
+FROM csv_entity_source
+CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
+WHERE csv_entity_source.csv_import_id = ?
+  AND csv_entity_source.csv_row_index IN ?
+  AND entity_source.matched = 1;
+
+selectAllMatchedCsvSourceIds:
+SELECT csv_entity_source.id
+FROM csv_entity_source
+CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
+WHERE csv_entity_source.csv_import_id = ?
+  AND entity_source.matched = 1;
+
+-- The QIF analogues of selectMatchedCsvSourceIds and selectAllMatchedCsvSourceIds.
+selectMatchedQifSourceIds:
+SELECT qif_entity_source.id
+FROM qif_entity_source
+CROSS JOIN entity_source ON entity_source.id = qif_entity_source.id
+WHERE qif_entity_source.qif_import_id = ?
+  AND qif_entity_source.qif_record_index IN ?
+  AND entity_source.matched = 1;
+
+selectAllMatchedQifSourceIds:
+SELECT qif_entity_source.id
+FROM qif_entity_source
+CROSS JOIN entity_source ON entity_source.id = qif_entity_source.id
+WHERE qif_entity_source.qif_import_id = ?
+  AND entity_source.matched = 1;

@@ -29,6 +29,9 @@ INSERT OR IGNORE INTO entity_type (id, name) VALUES (10, 'CRYPTO');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (11, 'TRADE');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (12, 'EXCHANGE_ORDER');
 
+-- matched: 0 = the source wrote this revision (one per revision, enforced by idx_entity_source_writer);
+-- 1 = an import record reported the transfer or trade without changing it (a duplicate row), so a
+-- revision can have any number of these. Readers asking who wrote a revision filter on matched = 0.
 CREATE TABLE entity_source (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entity_type_id INTEGER NOT NULL,
@@ -37,15 +40,15 @@ CREATE TABLE entity_source (
     source_type_id INTEGER NOT NULL,
     device_id INTEGER NOT NULL,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
+    matched INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (entity_type_id) REFERENCES entity_type(id),
     FOREIGN KEY (source_type_id) REFERENCES source_type(id),
-    FOREIGN KEY (device_id) REFERENCES device(id),
-    UNIQUE (entity_type_id, entity_id, revision_id)
+    FOREIGN KEY (device_id) REFERENCES device(id)
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_entity_source_writer ON entity_source(entity_type_id, entity_id, revision_id) WHERE matched = 0;
 CREATE INDEX IF NOT EXISTS idx_entity_source_entity ON entity_source(entity_type_id, entity_id);
 CREATE INDEX IF NOT EXISTS idx_entity_source_type ON entity_source(source_type_id);
-CREATE INDEX IF NOT EXISTS idx_entity_source_entity_revision ON entity_source(entity_type_id, entity_id, revision_id);
 CREATE INDEX IF NOT EXISTS idx_entity_source_device ON entity_source(device_id);
 
 -- api_entity_source: API-specific data for API sources (source_type_id = 5)

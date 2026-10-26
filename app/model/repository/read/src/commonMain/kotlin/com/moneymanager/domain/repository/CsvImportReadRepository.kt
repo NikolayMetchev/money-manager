@@ -51,19 +51,6 @@ interface CsvImportReadRepository {
     suspend fun getTradeIdsCreatedByImport(id: CsvImportId): Set<TradeId>
 
     /**
-     * For every import other than [excluding] (every import when null), the rows whose linked transaction is one of
-     * [transferIds]/[tradeIds] — rows another file marked DUPLICATE or UPDATED against them. Imports
-     * with no such rows are omitted. Every import is its own table, so [onImportChecked] hears after each one
-     * how many of the total have been checked.
-     */
-    suspend fun findRowsReferencingTransactions(
-        excluding: CsvImportId?,
-        transferIds: Set<TransferId>,
-        tradeIds: Set<TradeId>,
-        onImportChecked: (suspend (checked: Int, total: Int) -> Unit)? = null,
-    ): Map<CsvImportId, List<Long>>
-
-    /**
      * Finds imports that match the given file checksum.
      *
      * @param checksum The SHA-256 checksum to search for

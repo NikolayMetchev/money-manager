@@ -631,6 +631,7 @@ fun MoneyManagerApp(
                                                 apiImportService = apiImportService,
                                                 driveFolderBrowser = driveFolderBrowser,
                                                 csvImportRepository = services.imports.csvImportRepository,
+                                                transferSourceRepository = services.transactions.transferSourceRepository,
                                                 csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
                                                 accountMappingRepository = services.imports.accountMappingRepository,
                                                 accountMappingExportService = services.imports.accountMappingExportService,
