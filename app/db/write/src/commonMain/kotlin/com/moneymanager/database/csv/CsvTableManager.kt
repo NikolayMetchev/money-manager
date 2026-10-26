@@ -198,8 +198,4 @@ class CsvTableManager(
     suspend fun resetAllRowStatuses(tableName: String) {
         database.execute(null, "UPDATE $tableName SET import_status = NULL, transaction_id = NULL", 0)
     }
-
-    private companion object {
-        const val ID_CHUNK_SIZE = 500
-    }
 }
