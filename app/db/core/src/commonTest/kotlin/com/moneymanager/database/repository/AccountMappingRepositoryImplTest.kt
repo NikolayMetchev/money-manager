@@ -203,7 +203,7 @@ class AccountMappingRepositoryImplTest : DbTest() {
             var mappings = repositories.accountMappingRepository.getAllMappings().first()
             assertEquals(1, mappings.size)
 
-            repositories.accountRepository.deleteAccount(account.id)
+            repositories.accountRepository.deleteAccounts(listOf(account.id))
 
             mappings = repositories.accountMappingRepository.getAllMappings().first()
             assertTrue(mappings.isEmpty())

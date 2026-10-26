@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
+import com.moneymanager.domain.repository.write.TransferEdit
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -93,13 +94,17 @@ class UpdateProvenanceTest : DbTest() {
                     ),
                 )
 
-            repositories.transactionRepository.updateTransfer(
-                transfer = transfer.copy(description = "Edited"),
-                deletedAttributeIds = emptySet(),
-                updatedAttributes = emptyMap(),
-                newAttributes = emptyList(),
-                transactionId = transfer.id,
-                source = Source.Manual,
+            repositories.transactionRepository.updateTransfers(
+                listOf(
+                    TransferEdit(
+                        transfer = transfer.copy(description = "Edited"),
+                        deletedAttributeIds = emptySet(),
+                        updatedAttributes = emptyMap(),
+                        newAttributes = emptyList(),
+                        transactionId = transfer.id,
+                        source = Source.Manual,
+                    ),
+                ),
             )
 
             val history = repositories.auditRepository.getAuditHistoryForTransfer(transfer.id)

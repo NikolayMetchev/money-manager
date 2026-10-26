@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.repository.write.TransferEdit
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
@@ -311,21 +312,25 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // UPDATE first transfer to have timestamp AFTER second
-            repositories.transactionRepository.updateTransfer(
-                transfer =
-                    Transfer(
-                        id = transfer1.id,
-                        timestamp = now.plus(kotlin.time.Duration.parse("2h")),
-                        description = "Transfer 1 (updated)",
-                        sourceAccountId = account1Id,
-                        targetAccountId = account2Id,
-                        amount = Money.fromDisplayValue("100", currency),
+            repositories.transactionRepository.updateTransfers(
+                listOf(
+                    TransferEdit(
+                        transfer =
+                            Transfer(
+                                id = transfer1.id,
+                                timestamp = now.plus(kotlin.time.Duration.parse("2h")),
+                                description = "Transfer 1 (updated)",
+                                sourceAccountId = account1Id,
+                                targetAccountId = account2Id,
+                                amount = Money.fromDisplayValue("100", currency),
+                            ),
+                        deletedAttributeIds = emptySet(),
+                        updatedAttributes = emptyMap(),
+                        newAttributes = emptyList(),
+                        transactionId = transfer1.id,
+                        source = Source.Manual,
                     ),
-                deletedAttributeIds = emptySet(),
-                updatedAttributes = emptyMap(),
-                newAttributes = emptyList(),
-                transactionId = transfer1.id,
-                source = Source.Manual,
+                ),
             )
 
             // Verify incremental refresh produces correct results
@@ -375,21 +380,25 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // UPDATE to change BOTH source and target accounts (account1→account2 becomes account3→account4)
-            repositories.transactionRepository.updateTransfer(
-                transfer =
-                    Transfer(
-                        id = transfer.id,
-                        timestamp = now,
-                        description = "Updated transfer",
-                        sourceAccountId = account3Id,
-                        targetAccountId = account4Id,
-                        amount = Money.fromDisplayValue("100", currency),
+            repositories.transactionRepository.updateTransfers(
+                listOf(
+                    TransferEdit(
+                        transfer =
+                            Transfer(
+                                id = transfer.id,
+                                timestamp = now,
+                                description = "Updated transfer",
+                                sourceAccountId = account3Id,
+                                targetAccountId = account4Id,
+                                amount = Money.fromDisplayValue("100", currency),
+                            ),
+                        deletedAttributeIds = emptySet(),
+                        updatedAttributes = emptyMap(),
+                        newAttributes = emptyList(),
+                        transactionId = transfer.id,
+                        source = Source.Manual,
                     ),
-                deletedAttributeIds = emptySet(),
-                updatedAttributes = emptyMap(),
-                newAttributes = emptyList(),
-                transactionId = transfer.id,
-                source = Source.Manual,
+                ),
             )
 
             // Should track 4 account-currency pairs:

@@ -316,11 +316,10 @@ class CsvImportRepositoryImplTest : DbTest() {
                 csv_import_id = importId.id.toString(),
                 csv_row_index = 1,
             )
-            repositories.csvImportRepository.updateRowStatus(
+            repositories.csvImportRepository.updateRowStatusesBatch(
                 id = importId,
-                rowIndex = 1,
                 status = "IMPORTED",
-                transferId = TransferId(0),
+                rowTransferMap = mapOf(1L to TransferId(0)),
             )
 
             val importRows = repositories.csvImportRepository.getImportRows(importId, limit = 10, offset = 0)

@@ -241,13 +241,6 @@ sealed interface CsvImportMutation {
         val rowTransferMap: Map<Long, TransferId>,
     ) : CsvImportMutation
 
-    data class UpdateRowStatus(
-        val id: CsvImportId,
-        val rowIndex: Long,
-        val status: String,
-        val transferId: TransferId? = null,
-    ) : CsvImportMutation
-
     data class UpdateRowStatuses(
         val id: CsvImportId,
         val status: String,
@@ -263,10 +256,10 @@ sealed interface CsvImportMutation {
         val rowIndexes: Collection<Long>?,
     ) : CsvImportMutation
 
-    data class SaveError(
+    /** Saves each row's error message ([errors]: row index to message), replacing any it had. */
+    data class SaveErrors(
         val id: CsvImportId,
-        val rowIndex: Long,
-        val errorMessage: String,
+        val errors: Map<Long, String>,
     ) : CsvImportMutation
 
     data class ClearError(

@@ -119,23 +119,7 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
     )
 
     /**
-     * Updates the import status for a specific row.
-     *
-     * @param id The import ID
-     * @param rowIndex The row index to update
-     * @param status The import status (IMPORTED, DUPLICATE, UPDATED)
-     * @param transferId Optional transfer ID to link
-     */
-    suspend fun updateRowStatus(
-        id: CsvImportId,
-        rowIndex: Long,
-        status: String,
-        transferId: TransferId? = null,
-    )
-
-    /**
      * Updates the import status for multiple rows in a single database transaction.
-     * Much faster than per-row [updateRowStatus] calls for large imports.
      *
      * @param id The import ID
      * @param status The import status to set for all rows (IMPORTED, DUPLICATE, UPDATED)
@@ -160,17 +144,12 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
     )
 
     /**
-     * Saves an error message for a specific row.
-     * Replaces any existing error for the same row.
-     *
-     * @param id The import ID
-     * @param rowIndex The row index that failed
-     * @param errorMessage The error message to save
+     * Saves an error message per row of [errors] (row index to message) in a single database transaction,
+     * replacing any existing error for the same row.
      */
-    suspend fun saveError(
+    suspend fun saveErrors(
         id: CsvImportId,
-        rowIndex: Long,
-        errorMessage: String,
+        errors: Map<Long, String>,
     )
 
     /**
