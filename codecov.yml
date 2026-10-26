@@ -26,5 +26,8 @@ comment:
 # Code only a device or emulator runs (SharedPreferences, the Storage Access Framework): the coverage run is the JVM
 # and Android host tests, which never reach it, so it would only count against the patch and project targets.
 # Native source sets need no entry: no coverage run instruments them, so they never reach the report.
+# The desktop and Android entry points are the same: no test starts the app through main() or its Activity.
 ignore:
   - "**/src/androidMain/**"
+  - "app/main/jvm/src/main/**"
+  - "app/main/android/src/main/**"
