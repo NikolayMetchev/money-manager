@@ -1,15 +1,14 @@
 package com.moneymanager.database.qif
 
+import com.moneymanager.csvimporter.bulkApplyCsv
+import com.moneymanager.csvimporter.stageQifImport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.qif.QifImport
-import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.deleteAccountMapping
-import com.moneymanager.qifimporter.StagedFile
-import com.moneymanager.qifimporter.bulkApplyQif
 import com.moneymanager.regex.compileRegex
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
@@ -25,8 +24,8 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 
 /**
- * End-to-end guard for QIF re-import. Drives a real import through [bulkApplyQif], then re-imports via
- * [Reimports.reimportAll][com.moneymanager.qifimporter.Reimports.reimportAll] and asserts (a) a re-import with no config change is a no-op (no double-import), and
+ * End-to-end guard for QIF re-import. Stages QIF files as CSV imports, drives a real import through [bulkApplyCsv],
+ * then re-imports via [Reimports.reimportAll][com.moneymanager.csvimporter.Reimports.reimportAll] and asserts (a) a re-import with no config change is a no-op (no double-import), and
  * (b) a global account mapping added AFTER the import is applied retroactively — the import-created
  * duplicate account is merged into the mapped target and deleted.
  */
@@ -47,31 +46,20 @@ class QifReimportE2ETest : DbTest() {
         }
 
     private fun rec(
-        index: Long,
         date: String,
         amount: String,
         payee: String,
-    ) = QifImportRecord(
-        recordIndex = index,
-        sectionType = "BANK",
-        accountName = "Santander",
-        supported = true,
-        rawText = "",
-        date = date,
-        amount = amount,
-        payee = payee,
-    )
+    ) = "D$date\nT$amount\nP$payee\n^\n"
 
-    private suspend fun createImport(): QifImport =
+    private suspend fun createImport(): CsvImport =
         createImport(
             fileName = "santander.qif",
             checksum = "santander-reimport-checksum",
             records =
                 listOf(
-                    rec(0, "27/03/2021", "-7.32", "CARD PAYMENT TO VANGUARD,7.32 GBP, RATE 1.00/GBP ON 27-03-2021, 7.32"),
-                    rec(1, "28/03/2021", "-10.00", "CARD PAYMENT TO VANGUARD,10.00 GBP, RATE 1.00/GBP ON 28-03-2021, 10.00"),
+                    rec("27/03/2021", "-7.32", "CARD PAYMENT TO VANGUARD,7.32 GBP, RATE 1.00/GBP ON 27-03-2021, 7.32"),
+                    rec("28/03/2021", "-10.00", "CARD PAYMENT TO VANGUARD,10.00 GBP, RATE 1.00/GBP ON 28-03-2021, 10.00"),
                     rec(
-                        2,
                         "01/03/2021",
                         "-1352.23",
                         "DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 374693512504002, MANDATE NO 0013, 1352.23",
@@ -82,17 +70,16 @@ class QifReimportE2ETest : DbTest() {
     private suspend fun createImport(
         fileName: String,
         checksum: String,
-        records: List<QifImportRecord>,
-    ): QifImport {
+        records: List<String>,
+    ): CsvImport {
         val id =
-            repositories.qifImportRepository.createImport(
+            repositories.importEngine.stageQifImport(
                 fileName = fileName,
-                records = records,
-                accountType = "BANK",
+                content = "!Type:Bank\n" + records.joinToString(""),
                 fileChecksum = checksum,
                 fileLastModified = now,
             )
-        return repositories.qifImportRepository.getImport(id).first()!!
+        return repositories.csvImportRepository.getImport(id).first()!!
     }
 
     private suspend fun sourceAccountId(): AccountId =
@@ -103,7 +90,7 @@ class QifReimportE2ETest : DbTest() {
             ?.id
             ?: repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Santander", openingDate = now))
 
-    private suspend fun apply(qifImport: QifImport) {
+    private suspend fun apply(qifImport: CsvImport) {
         if (repositories.csvImportStrategyRepository
                 .getAllStrategies()
                 .first()
@@ -111,14 +98,14 @@ class QifReimportE2ETest : DbTest() {
         ) {
             repositories.installBuiltInCsvStrategies()
         }
-        bulkApplyQif(
+        bulkApplyCsv(
             imports = listOf(qifImport),
-            sourceAccountId = sourceAccountId(),
+            sourceAccountOverride = sourceAccountId(),
             strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
             currencies = repositories.currencyRepository.getAllCurrencies().first(),
             accountMappingRepository = repositories.accountMappingRepository,
             accountRepository = repositories.accountRepository,
-            qifImportRepository = repositories.qifImportRepository,
+            csvImportRepository = repositories.csvImportRepository,
             maintenance = maintenance,
             importEngine = repositories.importEngine,
             onProgress = { },
@@ -129,10 +116,9 @@ class QifReimportE2ETest : DbTest() {
         val reimports = repositories.reimports(maintenance)
         reimports.reimportAll(
             reimports.planAll(
-                repositories.qifImportRepository
+                repositories.csvImportRepository
                     .getAllImports()
-                    .first()
-                    .map(StagedFile::Qif),
+                    .first(),
             ),
             accountId = sourceAccountId(),
             // null => the currency the file imported with, matching the import path exactly.
@@ -152,9 +138,8 @@ class QifReimportE2ETest : DbTest() {
                     "santander-later-checksum",
                     // Two payees, so the account the file was imported against is the one they share.
                     listOf(
-                        rec(0, "27/03/2021", "-7.32", "CARD PAYMENT TO VANGUARD,7.32 GBP, RATE 1.00/GBP ON 27-03-2021, 7.32"),
+                        rec("27/03/2021", "-7.32", "CARD PAYMENT TO VANGUARD,7.32 GBP, RATE 1.00/GBP ON 27-03-2021, 7.32"),
                         rec(
-                            1,
                             "01/03/2021",
                             "-1352.23",
                             "DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 374693512504002, MANDATE NO 0013, 1352.23",
@@ -162,16 +147,16 @@ class QifReimportE2ETest : DbTest() {
                     ),
                 )
             apply(overlap)
-            val duplicates = repositories.qifImportRepository.getImportRecords(overlap.id, limit = 10, offset = 0)
+            val duplicates = repositories.csvImportRepository.getImportRows(overlap.id, limit = 10, offset = 0)
             assertEquals(listOf(ImportStatus.DUPLICATE, ImportStatus.DUPLICATE), duplicates.map { it.importStatus })
 
             val reimports = repositories.reimports(maintenance)
-            val plan = reimports.plan(StagedFile.Qif(repositories.qifImportRepository.getImport(first.id).first()!!))
+            val plan = reimports.plan(repositories.csvImportRepository.getImport(first.id).first()!!)
             assertEquals(2, plan.rerun.affected.count, "the later file's duplicate records are re-run too")
 
             reimports.reimport(plan, accountId = sourceAccountId(), currencyId = null)
 
-            val relinked = repositories.qifImportRepository.getImportRecords(overlap.id, limit = 10, offset = 0)
+            val relinked = repositories.csvImportRepository.getImportRows(overlap.id, limit = 10, offset = 0)
             assertTrue(
                 relinked.all {
                     it.importStatus == ImportStatus.DUPLICATE && it.transferId != null

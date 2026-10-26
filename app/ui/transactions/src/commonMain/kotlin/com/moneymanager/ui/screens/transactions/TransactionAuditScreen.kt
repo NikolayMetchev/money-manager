@@ -28,7 +28,6 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.TradeAuditEntry
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
@@ -63,7 +62,6 @@ fun TransactionAuditScreen(
     transactionRepository: TransactionReadRepository,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
     onBack: () -> Unit,
@@ -155,7 +153,6 @@ fun TransactionAuditScreen(
                         auditedAccountNames = auditedAccountNames,
                         currentDeviceId = currentDeviceId,
                         onCsvSourceClick = onCsvSourceClick,
-                        onQifSourceClick = onQifSourceClick,
                         onApiSourceClick = onApiSourceClick,
                         onAccountClick = onAccountClick,
                     )
@@ -169,7 +166,6 @@ fun TransactionAuditScreen(
                         auditedAccountNames = auditedAccountNames,
                         currentDeviceId = currentDeviceId,
                         onCsvSourceClick = onCsvSourceClick,
-                        onQifSourceClick = onQifSourceClick,
                         onApiSourceClick = onApiSourceClick,
                         onAccountClick = onAccountClick,
                     )
@@ -200,7 +196,6 @@ private fun TradeAuditDiffCard(
     auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
@@ -235,7 +230,6 @@ private fun TradeAuditDiffCard(
                 labelWidth = LABEL_WIDTH,
                 currentDeviceId = currentDeviceId,
                 onCsvSourceClick = onCsvSourceClick,
-                onQifSourceClick = onQifSourceClick,
                 onApiSourceClick = onApiSourceClick,
             )
         }
@@ -348,7 +342,6 @@ private fun TransactionAuditDiffCard(
     auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
@@ -365,7 +358,6 @@ private fun TransactionAuditDiffCard(
                     auditedAccountNames,
                     currentDeviceId,
                     onCsvSourceClick,
-                    onQifSourceClick,
                     onApiSourceClick,
                     onAccountClick,
                 )
@@ -378,7 +370,6 @@ private fun TransactionAuditDiffCard(
                     auditedAccountNames,
                     currentDeviceId,
                     onCsvSourceClick,
-                    onQifSourceClick,
                     onApiSourceClick,
                     onAccountClick,
                 )
@@ -391,7 +382,6 @@ private fun TransactionAuditDiffCard(
                     auditedAccountNames,
                     currentDeviceId,
                     onCsvSourceClick,
-                    onQifSourceClick,
                     onApiSourceClick,
                     onAccountClick,
                 )
@@ -407,7 +397,6 @@ private fun InsertDiffContent(
     auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
@@ -429,7 +418,6 @@ private fun InsertDiffContent(
             labelWidth = LABEL_WIDTH,
             currentDeviceId = currentDeviceId,
             onCsvSourceClick = onCsvSourceClick,
-            onQifSourceClick = onQifSourceClick,
             onApiSourceClick = onApiSourceClick,
         )
     }
@@ -442,7 +430,6 @@ private fun UpdateDiffContent(
     auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
@@ -512,7 +499,6 @@ private fun UpdateDiffContent(
             labelWidth = LABEL_WIDTH,
             currentDeviceId = currentDeviceId,
             onCsvSourceClick = onCsvSourceClick,
-            onQifSourceClick = onQifSourceClick,
             onApiSourceClick = onApiSourceClick,
         )
     }
@@ -525,7 +511,6 @@ private fun DeleteDiffContent(
     auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
@@ -549,7 +534,6 @@ private fun DeleteDiffContent(
             currentDeviceId = currentDeviceId,
             labelColor = errorColor.copy(alpha = 0.8f),
             onCsvSourceClick = onCsvSourceClick,
-            onQifSourceClick = onQifSourceClick,
             onApiSourceClick = onApiSourceClick,
         )
     }

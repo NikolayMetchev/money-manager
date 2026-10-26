@@ -4,21 +4,23 @@ import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.MappingResult
 import com.moneymanager.csvimporter.needsSourceAccountOverride
+import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.CurrencyScaleFactors
+import com.moneymanager.domain.model.csv.CsvColumn
+import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.qifimporter.QifCsvAdapter
-import com.moneymanager.qifimporter.qifCompatible
-import com.moneymanager.qifimporter.selectForQifContent
+import com.moneymanager.domain.model.qif.QifColumns
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 /** The built-in American Express QIF strategy ([BuiltInCsvStrategies.buildAmexQifStrategy]) over Amex's record shapes. */
 class AmexQifMapperTest {
@@ -29,7 +31,7 @@ class AmexQifMapperTest {
         Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
     private val amex = Account(id = AccountId(1), name = "American Express", openingDate = now)
 
-    /** A QIF-shaped row (columns in [QifCsvAdapter] order), as Amex writes it: `M` and `N` always set. */
+    /** A QIF-shaped row (columns in [QifColumns.headers] order), as Amex writes it: `M` and `N` always set. */
     private fun row(
         payee: String,
         amount: String,
@@ -44,7 +46,7 @@ class AmexQifMapperTest {
         val mapper =
             CsvTransferMapper(
                 strategy = strategy,
-                columns = QifCsvAdapter.columns,
+                columns = qifColumns,
                 existingAccounts = mapOf(amex.name to amex),
                 existingCurrencies = mapOf(gbp.id to gbp),
                 existingCurrenciesByCode = mapOf(gbp.code to gbp),
@@ -93,11 +95,13 @@ class AmexQifMapperTest {
 
     @Test
     fun `content auto-detect picks American Express for amex rows and nothing for another bank`() {
-        val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now).qifCompatible()
+        val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now)
         val amexRows = listOf(row("ZIPCAR WIMBLEDON", "-45.00", "  Process Date 21/03/2020"))
         val genericRows = listOf(CsvRow(rowIndex = 1, values = listOf("19/03/2020", "-5.00", "Tesco", "", "", "", "", "", "")))
 
-        assertEquals("American Express (QIF)", strategies.selectForQifContent(amexRows, QifCsvAdapter.columns)?.name)
-        assertNull(strategies.selectForQifContent(genericRows, QifCsvAdapter.columns))
+        assertEquals("American Express (QIF)", strategies.selectForCsv("statement.qif", qifColumns, amexRows, wholeDocument = true)?.name)
+        assertNull(strategies.selectForCsv("statement.qif", qifColumns, genericRows, wholeDocument = true))
     }
 }
+
+private val qifColumns = QifColumns.headers.mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }

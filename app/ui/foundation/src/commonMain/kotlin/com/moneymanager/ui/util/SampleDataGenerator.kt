@@ -448,14 +448,10 @@ private class TransferBuilder(
             addAll(conversionTransfers())
         }
 
-    /** Row keys deliberately alternate across the three producer kinds so provenance covers each. */
+    /** Row keys deliberately alternate across the producer kinds so provenance covers each. */
     private fun nextRowKey(): ImportRowKey {
         val index = rowIndex++
-        return when (index % 3) {
-            0L -> ImportRowKey.CsvRow(index)
-            1L -> ImportRowKey.QifRecord(index)
-            else -> ImportRowKey.Manual(index)
-        }
+        return if (index % 2 == 0L) ImportRowKey.CsvRow(index) else ImportRowKey.Manual(index)
     }
 
     private fun randomTimestamp(): Instant =

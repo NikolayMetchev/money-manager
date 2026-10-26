@@ -120,7 +120,7 @@ The main modules (see [`CLAUDE.md`](CLAUDE.md) for the full table and the
 | `app/model/repository/read/`, `app/model/repository/write/` | `*ReadRepository` / `*WriteRepository` interfaces |
 | `app/db/*` | SQLDelight schema, read/write SQL, repository implementations, `DatabaseManager` |
 | `app/importengineapi/` | DB-free import/write API: `ImportBatch`/`ImportResult` and `ImportEngine.*` helpers |
-| `app/csvimporter/`, `app/qifimporter/`, `app/apiimporter/` | Per-format importers that build an `ImportBatch` (DB-free) |
+| `app/csvimporter/`, `app/apiimporter/` | Importers that build an `ImportBatch` (DB-free); QIF files are staged as CSV imports |
 | `app/importer/` | Central import engine: applies an `ImportBatch` and deduplicates. The sole DB writer |
 | `app/importdirectory/`, `app/apiimport/` | Import-folder and API-connection orchestration shared by the desktop app and the CLI |
 | `app/session/` | Headless database bootstrap shared by every front end |

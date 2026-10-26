@@ -72,7 +72,6 @@ class StagePdfImportTest : DbTest() {
                 fileSource = folder,
                 importDirectoryRepository = repositories.importDirectoryRepository,
                 csvImportRepository = repositories.csvImportRepository,
-                qifImportRepository = repositories.qifImportRepository,
                 importEngine = engine,
             )
 

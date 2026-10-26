@@ -13,7 +13,6 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -50,7 +49,7 @@ data class ImportResult(
     val createdTransferIds: Map<ImportRowKey, TransferId> = emptyMap(),
     val rowOutcomes: Map<ImportRowKey, RowOutcome> = emptyMap(),
     // Per-transfer outcomes aligned to the input ImportBatch.transfers order. Use this (instead of the
-    // keyed rowOutcomes) when row keys are not unique per transfer (e.g. API pages, QIF splits).
+    // keyed rowOutcomes) when row keys are not unique per transfer (e.g. API pages).
     val orderedRowOutcomes: List<RowOutcome> = emptyList(),
     val createdAccountIds: Map<LocalAccountKey, AccountId> = emptyMap(),
     val createdCategoryIds: Map<LocalCategoryKey, Long> = emptyMap(),
@@ -70,7 +69,6 @@ data class ImportResult(
     val createdApiStrategyIds: Map<String, ApiImportStrategyId> = emptyMap(),
     val createdAccountMappingIds: Map<String, Long> = emptyMap(),
     val createdCsvImportIds: Map<String, CsvImportId> = emptyMap(),
-    val createdQifImportIds: Map<String, QifImportId> = emptyMap(),
     val createdImportDirectoryIds: Map<String, ImportDirectoryId> = emptyMap(),
     val apiCredentialIds: Map<String, ApiCredentialId> = emptyMap(),
     val apiSessionIds: Map<String, ApiSessionId> = emptyMap(),

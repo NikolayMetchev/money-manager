@@ -21,7 +21,6 @@ import com.moneymanager.database.repository.PassThroughAccountReadRepositoryImpl
 import com.moneymanager.database.repository.PersonAccountOwnershipReadRepositoryImpl
 import com.moneymanager.database.repository.PersonAttributeReadRepositoryImpl
 import com.moneymanager.database.repository.PersonReadRepositoryImpl
-import com.moneymanager.database.repository.QifImportReadRepositoryImpl
 import com.moneymanager.database.repository.ReconciliationReadRepositoryImpl
 import com.moneymanager.database.repository.RelationshipTypeReadRepositoryImpl
 import com.moneymanager.database.repository.SettingsReadRepositoryImpl
@@ -49,7 +48,6 @@ import com.moneymanager.database.repository.write.PassThroughAccountWriteReposit
 import com.moneymanager.database.repository.write.PersonAccountOwnershipWriteRepositoryImpl
 import com.moneymanager.database.repository.write.PersonAttributeWriteRepositoryImpl
 import com.moneymanager.database.repository.write.PersonWriteRepositoryImpl
-import com.moneymanager.database.repository.write.QifImportWriteRepositoryImpl
 import com.moneymanager.database.repository.write.ReconciliationLinkWriteRepositoryImpl
 import com.moneymanager.database.repository.write.RelationshipTypeWriteRepositoryImpl
 import com.moneymanager.database.repository.write.SettingsWriteRepositoryImpl
@@ -85,7 +83,6 @@ import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.RelationshipTypeReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
@@ -112,7 +109,6 @@ import com.moneymanager.domain.repository.write.PassThroughAccountWriteRepositor
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
-import com.moneymanager.domain.repository.write.QifImportWriteRepository
 import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
@@ -394,19 +390,6 @@ object RepositoryModule {
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideQifImportReadRepository(database: MoneyManagerDatabaseWrapper): QifImportReadRepository =
-        QifImportReadRepositoryImpl(database)
-
-    @Provides
-    @SingleIn(DatabaseScope::class)
-    fun provideQifImportWriteRepository(
-        database: MoneyManagerDatabaseWrapper,
-        deviceId: DeviceId,
-        reader: QifImportReadRepository,
-    ): QifImportWriteRepository = QifImportWriteRepositoryImpl(database, deviceId, reader)
-
-    @Provides
-    @SingleIn(DatabaseScope::class)
     fun provideRelationshipTypeReadRepository(database: MoneyManagerDatabaseWrapper): RelationshipTypeReadRepository =
         RelationshipTypeReadRepositoryImpl(database)
 
@@ -550,7 +533,6 @@ object RepositoryModule {
         apiImportStrategyRepository: ApiImportStrategyWriteRepository,
         accountMappingRepository: AccountMappingWriteRepository,
         csvImportRepository: CsvImportWriteRepository,
-        qifImportRepository: QifImportWriteRepository,
         apiSessionRepository: ApiSessionWriteRepository,
         settingsRepository: SettingsWriteRepository,
         importDirectoryRepository: ImportDirectoryWriteRepository,
@@ -576,7 +558,6 @@ object RepositoryModule {
             apiImportStrategyRepository = apiImportStrategyRepository,
             accountMappingRepository = accountMappingRepository,
             csvImportRepository = csvImportRepository,
-            qifImportRepository = qifImportRepository,
             apiSessionRepository = apiSessionRepository,
             settingsRepository = settingsRepository,
             importDirectoryRepository = importDirectoryRepository,

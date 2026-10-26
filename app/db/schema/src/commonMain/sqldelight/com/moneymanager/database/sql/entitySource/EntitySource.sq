@@ -82,17 +82,3 @@ CREATE TABLE csv_entity_source (
 );
 
 CREATE INDEX IF NOT EXISTS idx_csv_entity_source_import ON csv_entity_source(csv_import_id);
-
--- qif_entity_source: QIF-specific data for QIF sources (source_type_id = 6), 1:1 with entity_source.
--- Records which QIF import and record created the entity, mirroring csv_entity_source.
--- qif_record_index is nullable: an entity created from the import as a whole (e.g. an account
--- derived from many records) has a known import id but no single originating record.
-CREATE TABLE qif_entity_source (
-    id INTEGER PRIMARY KEY,  -- Same as entity_source.id
-    qif_import_id TEXT NOT NULL,
-    qif_record_index INTEGER,
-    FOREIGN KEY (id) REFERENCES entity_source(id),
-    FOREIGN KEY (qif_import_id) REFERENCES qif_import_metadata(id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_qif_entity_source_import ON qif_entity_source(qif_import_id);

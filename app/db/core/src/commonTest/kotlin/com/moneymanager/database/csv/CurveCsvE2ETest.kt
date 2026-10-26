@@ -17,7 +17,6 @@ import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.setAccountAttributeValue
 import com.moneymanager.importengineapi.updateCsvStrategy
-import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.reimports
@@ -167,7 +166,7 @@ class CurveCsvE2ETest : DbTest() {
                 .first()
                 .first { it.name == strategyName }
         val reimports = repositories.reimports(maintenance)
-        reimports.reimport(reimports.plan(StagedFile.Csv(current)).copy(strategy = strategy), accountId = null, currencyId = null)
+        reimports.reimport(reimports.plan(current).copy(strategy = strategy), accountId = null, currencyId = null)
     }
 
     private suspend fun transfersBetween(
@@ -531,7 +530,7 @@ class CurveCsvE2ETest : DbTest() {
             )
             // Assigning the card re-imports the files that reference it (Card Last-4's reimportFiles).
             val reimports = repositories.reimports(maintenance)
-            val files = reference.imports.map { StagedFile.Csv(repositories.csvImportRepository.getImport(it).first()!!) }
+            val files = reference.imports.map { repositories.csvImportRepository.getImport(it).first()!! }
             val rerun = reimports.reimportAll(reimports.planAll(files), accountId = null, currencyId = null, onProgress = {})
             assertEquals(1, rerun.filesImported)
             assertEquals(0, rerun.filesFailed)

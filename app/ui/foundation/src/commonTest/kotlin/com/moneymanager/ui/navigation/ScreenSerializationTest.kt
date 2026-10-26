@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.strategy.StrategyKind
 import kotlinx.serialization.PolymorphicSerializer
@@ -36,7 +35,7 @@ class ScreenSerializationTest {
             Screen.Categories,
             Screen.People,
             Screen.PeopleScroll(PersonId(2)),
-            Screen.Imports(ImportTab.QIF),
+            Screen.Imports(ImportTab.API),
             Screen.CsvStrategies,
             Screen.CsvStrategyEditor(CsvImportId(uuid), CsvImportStrategyId(uuid)),
             Screen.ApiStrategies,
@@ -46,8 +45,6 @@ class ScreenSerializationTest {
             Screen.DatabaseSizeBreakdown,
             Screen.AccountTransactions(AccountId(3), "Checking", TransferId(4), CurrencyId(5)),
             Screen.CsvImportDetail(CsvImportId(uuid), scrollToRowIndex = 7),
-            Screen.QifImportDetail(QifImportId(uuid), scrollToRecordIndex = 8),
-            Screen.QifStrategyEditor(QifImportId(uuid), CsvImportStrategyId(uuid)),
             Screen.AuditHistory(TransferId(9)),
             Screen.AccountAuditHistory(AccountId(10), "Savings"),
             Screen.PersonAuditHistory(PersonId(11), "Ada"),

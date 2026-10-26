@@ -9,7 +9,6 @@ import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CsvImportId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.SourceRecord
 import kotlin.time.Instant
 
@@ -129,7 +128,6 @@ fun <E> FlatEntityAuditDiffCard(
     labelWidth: Dp = 100.dp,
     onApiSourceClick: ((ApiSessionId, ApiRequestId, String) -> Unit)? = null,
     onCsvSourceClick: ((CsvImportId, Long) -> Unit)? = null,
-    onQifSourceClick: ((QifImportId, Long?) -> Unit)? = null,
     extraSection: @Composable (E, Color) -> Unit = { _, _ -> },
 ) {
     @Composable
@@ -140,7 +138,6 @@ fun <E> FlatEntityAuditDiffCard(
             labelWidth = labelWidth,
             onApiSourceClick = onApiSourceClick,
             onCsvSourceClick = onCsvSourceClick,
-            onQifSourceClick = onQifSourceClick,
         )
     }
 

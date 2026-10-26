@@ -15,7 +15,6 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
-import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
@@ -32,18 +31,17 @@ class RerunReads(
     val auditRepository: AuditReadRepository,
     val accountRepository: AccountReadRepository,
     val csvImportRepository: CsvImportReadRepository,
-    val qifImportRepository: QifImportReadRepository,
     /** Null for a source that never creates trades (QIF). */
     val tradeRepository: TradeReadRepository?,
 )
 
 /**
- * Rows of other CSV files and records of other QIF files that were matched (DUPLICATE or UPDATED)
+ * Rows of other staged files that were matched (DUPLICATE or UPDATED)
  * against a transaction a re-import deletes, found from their provenance. They are reset with it and re-run after it, so they match
  * the re-created transaction instead of pointing at a deleted one.
  */
 data class AffectedRecords(
-    /** Each file's records, keyed by the whole file: a [Source.Csv] or [Source.Qif] with no row. */
+    /** Each file's records, keyed by the whole file: a [Source.Csv] with no row. */
     val byFile: Map<Source, List<Long>> = emptyMap(),
 ) {
     val isEmpty: Boolean get() = byFile.isEmpty()
@@ -54,14 +52,10 @@ data class AffectedRecords(
         ImportBatch(
             csvImportMutations =
                 byFile.mapNotNull { (file, rows) -> (file as? Source.Csv)?.let { CsvImportMutation.ResetRowStatuses(it.importId, rows) } },
-            qifImportMutations =
-                byFile.mapNotNull { (file, records) ->
-                    (file as? Source.Qif)?.let { QifImportMutation.ResetRecordStatuses(it.importId, records) }
-                },
         )
 
     companion object {
-        /** Groups [records] (each a CSV row or QIF record) by file, leaving out [excluding]'s own. */
+        /** Groups [records] (each a staged row) by file, leaving out [excluding]'s own. */
         fun of(
             records: List<Source>,
             excluding: Source? = null,
@@ -71,7 +65,6 @@ data class AffectedRecords(
                     .mapNotNull { record ->
                         when (record) {
                             is Source.Csv -> record.rowIndex?.let { Source.Csv(record.importId) to it }
-                            is Source.Qif -> record.recordIndex?.let { Source.Qif(record.importId) to it }
                             else -> null
                         }
                     }.filter { (file, _) -> file != excluding?.wholeFile() }
@@ -82,7 +75,6 @@ data class AffectedRecords(
         private fun Source.wholeFile(): Source =
             when (this) {
                 is Source.Csv -> Source.Csv(importId)
-                is Source.Qif -> Source.Qif(importId)
                 else -> this
             }
     }
@@ -154,7 +146,7 @@ data class ManualEdit(
  * executed by [executeSourceRerun].
  */
 data class SourceRerunPlan(
-    /** The whole import or session: `Source.Csv(importId)`, `Source.Qif(importId)` or `Source.Api(sessionId)`. */
+    /** The whole import or session: `Source.Csv(importId)` or `Source.Api(sessionId)`. */
     val source: Source,
     /** Every transfer the source created, with the record it came from. */
     val createdTransfers: Map<TransferId, Source>,
@@ -264,7 +256,6 @@ suspend fun <R> ImportEngine.executeSourceRerun(
                 },
             dedupePolicy = DedupePolicy.None,
             csvImportMutations = resetRecords.csvImportMutations + affectedResets.csvImportMutations,
-            qifImportMutations = resetRecords.qifImportMutations + affectedResets.qifImportMutations,
         ),
         onProgress = onProgress?.let { sink -> { sink(it.copy(detail = "Removing what the import created")) } },
     )

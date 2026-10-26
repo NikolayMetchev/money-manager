@@ -11,7 +11,6 @@ import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.updateCsvStrategy
-import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
@@ -104,7 +103,7 @@ class CryptoComCryptoE2ETest : DbTest() {
 
     private suspend fun reimportAll(imports: List<CsvImport>) =
         repositories.reimports(maintenance).let { reimports ->
-            reimports.reimportAll(reimports.planAll(imports.map(StagedFile::Csv)), accountId = null, currencyId = null, onProgress = {})
+            reimports.reimportAll(reimports.planAll(imports), accountId = null, currencyId = null, onProgress = {})
         }
 
     @Test

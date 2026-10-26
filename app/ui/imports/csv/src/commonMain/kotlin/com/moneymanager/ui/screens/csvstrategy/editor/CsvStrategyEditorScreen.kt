@@ -78,7 +78,7 @@ fun CsvStrategyEditorScreen(
     strategyId: CsvImportStrategyId?,
     csvImportRepository: CsvImportReadRepository,
     // When set, the editor uses these fixed columns and sample rows instead of loading them from a
-    // CSV import. QIF reuses this editor by supplying its fixed columns (see QifCsvAdapter).
+    // CSV import.
     columnsOverride: List<CsvColumn>? = null,
     sampleRowsOverride: List<CsvRow>? = null,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,

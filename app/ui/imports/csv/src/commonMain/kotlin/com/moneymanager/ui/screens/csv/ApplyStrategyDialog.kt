@@ -28,6 +28,7 @@ import com.moneymanager.csvimporter.buildCreatedAccountNameOverrides
 import com.moneymanager.csvimporter.buildPendingAccountMappings
 import com.moneymanager.csvimporter.ensureCryptoAssets
 import com.moneymanager.csvimporter.hasBlankNewAccountNames
+import com.moneymanager.csvimporter.isQifFileName
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
@@ -151,7 +152,13 @@ fun ApplyStrategyDialog(
     // Auto-select matching strategy when strategies load (filename/content-aware selection)
     LaunchedEffect(strategies, csvImport.columns, rows) {
         if (selectedStrategy == null && strategies.isNotEmpty()) {
-            val matching = strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, rows)
+            val matching =
+                strategies.selectForCsv(
+                    csvImport.originalFileName,
+                    csvImport.columns,
+                    rows,
+                    wholeDocument = isQifFileName(csvImport.originalFileName),
+                )
             selectedStrategy = matching ?: strategies.firstOrNull()
         }
     }

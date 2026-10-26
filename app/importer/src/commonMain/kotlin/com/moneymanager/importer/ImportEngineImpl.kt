@@ -20,7 +20,6 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
@@ -48,7 +47,6 @@ import com.moneymanager.domain.repository.write.PassThroughAccountWriteRepositor
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
-import com.moneymanager.domain.repository.write.QifImportWriteRepository
 import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
@@ -84,7 +82,6 @@ import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.PersonMatchKey
-import com.moneymanager.importengineapi.QifImportMutation
 import com.moneymanager.importengineapi.ReconciliationLinkMutation
 import com.moneymanager.importengineapi.RowOutcome
 import com.moneymanager.importengineapi.TradeAttributeMutation
@@ -149,7 +146,6 @@ class ImportEngineImpl(
     private val apiImportStrategyRepository: ApiImportStrategyWriteRepository,
     private val accountMappingRepository: AccountMappingWriteRepository,
     private val csvImportRepository: CsvImportWriteRepository,
-    private val qifImportRepository: QifImportWriteRepository,
     private val apiSessionRepository: ApiSessionWriteRepository,
     private val settingsRepository: SettingsWriteRepository,
     private val importDirectoryRepository: ImportDirectoryWriteRepository,
@@ -447,7 +443,6 @@ class ImportEngineImpl(
             createdApiStrategyIds = config.apiStrategyIds,
             createdAccountMappingIds = config.accountMappingIds,
             createdCsvImportIds = config.csvImportIds,
-            createdQifImportIds = config.qifImportIds,
             createdImportDirectoryIds = config.importDirectoryIds,
             apiCredentialIds = config.apiCredentialIds,
             apiSessionIds = config.apiSessionIds,
@@ -2130,7 +2125,6 @@ class ImportEngineImpl(
         val apiStrategyIds: Map<String, ApiImportStrategyId>,
         val accountMappingIds: Map<String, Long>,
         val csvImportIds: Map<String, CsvImportId>,
-        val qifImportIds: Map<String, QifImportId>,
         val importDirectoryIds: Map<String, ImportDirectoryId>,
         val apiCredentialIds: Map<String, ApiCredentialId>,
         val apiSessionIds: Map<String, ApiSessionId>,
@@ -2401,56 +2395,6 @@ class ImportEngineImpl(
             }
         }
 
-        val qifImportIds = mutableMapOf<String, QifImportId>()
-        for (m in batch.qifImportMutations) {
-            when (m) {
-                is QifImportMutation.Create -> {
-                    qifImportIds.putUnique(
-                        m.key,
-                        qifImportRepository.createImport(m.fileName, m.records, m.accountType, m.fileChecksum, m.fileLastModified),
-                        "QifImport",
-                    )
-                }
-
-                is QifImportMutation.Delete -> {
-                    qifImportRepository.deleteImport(m.id)
-                }
-
-                is QifImportMutation.SetIgnored -> {
-                    qifImportRepository.setImportIgnored(m.id, m.ignored)
-                }
-
-                is QifImportMutation.UpdateRecordStatuses -> {
-                    qifImportRepository.updateRecordStatusesBatch(
-                        m.id,
-                        m.status,
-                        m.recordTransferMap,
-                    )
-                }
-
-                is QifImportMutation.ResetRecordStatuses -> {
-                    qifImportRepository.resetRecordStatuses(m.id, m.recordIndexes)
-                }
-
-                is QifImportMutation.SaveError -> {
-                    qifImportRepository.saveError(m.id, m.recordIndex, m.errorMessage)
-                }
-
-                is QifImportMutation.ClearErrors -> {
-                    qifImportRepository.clearErrors(m.id, m.recordIndexes)
-                }
-
-                is QifImportMutation.RecordApplication -> {
-                    qifImportRepository.recordImportApplication(
-                        m.id,
-                        m.strategyId,
-                        m.strategyName,
-                        m.appliedAt,
-                    )
-                }
-            }
-        }
-
         val importDirectoryIds = mutableMapOf<String, ImportDirectoryId>()
         for (m in batch.importDirectoryMutations) {
             when (m) {
@@ -2479,7 +2423,6 @@ class ImportEngineImpl(
                         m.checksum,
                         m.remoteContentHash,
                         m.csvImportId,
-                        m.qifImportId,
                         m.importedAt,
                     )
                 }
@@ -2559,7 +2502,6 @@ class ImportEngineImpl(
 
         batch.settings?.let { s ->
             s.defaultCurrencyId?.let { settingsRepository.setDefaultCurrencyId(it) }
-            s.lastQifAccountId?.let { settingsRepository.setLastQifAccountId(it) }
             s.setupWizardCompleted?.let { settingsRepository.setSetupWizardCompleted(it) }
         }
 
@@ -2568,7 +2510,6 @@ class ImportEngineImpl(
             apiStrategyIds = apiStrategyIds,
             accountMappingIds = accountMappingIds,
             csvImportIds = csvImportIds,
-            qifImportIds = qifImportIds,
             importDirectoryIds = importDirectoryIds,
             apiCredentialIds = apiCredentialIds,
             apiSessionIds = apiSessionIds,

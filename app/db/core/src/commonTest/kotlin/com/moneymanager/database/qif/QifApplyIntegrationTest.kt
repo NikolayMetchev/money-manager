@@ -1,11 +1,15 @@
 package com.moneymanager.database.qif
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ExistingTransferInfo
+import com.moneymanager.csvimporter.parseQifAsCsv
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.csv.CsvColumn
+import com.moneymanager.domain.model.csv.CsvColumnId
+import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
@@ -18,10 +22,7 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifColumns
-import com.moneymanager.domain.model.qif.QifImportRecord
-import com.moneymanager.domain.model.qif.QifRecordSplit
 import com.moneymanager.domain.model.rules.ValueExpr
-import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
@@ -33,11 +34,16 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Verifies that QIF imports reuse the CSV strategy engine end-to-end: QIF records are adapted to
- * fixed-column rows and mapped by [CsvTransferMapper], with split records expanding to one transfer
- * per split.
+ * Verifies that QIF imports reuse the CSV strategy engine end-to-end: QIF text is staged as fixed-column
+ * rows ([parseQifAsCsv]) and mapped by [CsvTransferMapper], with split records expanding to one row, and so
+ * one transfer, per split.
  */
 class QifApplyIntegrationTest : DbTest() {
+    private val columns = QifColumns.headers.mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }
+
+    private fun rows(qif: String): List<CsvRow> =
+        parseQifAsCsv(qif).rows.mapIndexed { index, values -> CsvRow(rowIndex = index + 1L, values = values) }
+
     private suspend fun seed(): Triple<Currency, Account, Account> {
         val currencyId = repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
         val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
@@ -57,7 +63,7 @@ class QifApplyIntegrationTest : DbTest() {
             name = "QIF Bank",
             config =
                 CsvStrategyConfig(
-                    identificationColumns = QifCsvAdapter.headers.toSet(),
+                    identificationColumns = QifColumns.headers.toSet(),
                     fieldMappings =
                         mapOf(
                             TransferField.SOURCE_ACCOUNT to
@@ -92,13 +98,13 @@ class QifApplyIntegrationTest : DbTest() {
     fun qifRecordsMapThroughCsvEngine_splitsExpandToMultipleTransfers() =
         runDbTest {
             val (currency, source, target) = seed()
-            val rows = QifCsvAdapter.toRows(sampleRecords())
+            val rows = rows(SAMPLE_QIF)
             assertEquals(3, rows.size)
 
             val mapper =
                 CsvTransferMapper(
                     strategy = strategy(currency, source, target),
-                    columns = QifCsvAdapter.columns,
+                    columns = columns,
                     existingAccounts = mapOf(source.name to source, target.name to target),
                     existingCurrencies = mapOf(currency.id to currency),
                     existingCurrenciesByCode = mapOf(currency.code.uppercase() to currency),
@@ -110,15 +116,16 @@ class QifApplyIntegrationTest : DbTest() {
             assertEquals(3, preparation.validTransfers.size)
             assertTrue(preparation.validTransfers.all { it.importStatus == ImportStatus.IMPORTED })
             assertTrue(preparation.validTransfers.all { it.transfer.sourceAccountId == source.id })
-            // The two split rows both originate from record index 1.
-            assertEquals(listOf(0L, 1L, 1L), preparation.validTransfers.map { it.rowIndex })
+            // Each split of the supermarket record is its own row.
+            assertEquals(listOf(1L, 2L, 3L), preparation.validTransfers.map { it.rowIndex })
+            assertEquals(listOf("-12.00", "-60.00", "-30.00"), rows(SAMPLE_QIF).map { it.values[1] })
         }
 
     @Test
     fun reimportingSameRecords_isDetectedAsDuplicate() =
         runDbTest {
             val (currency, source, target) = seed()
-            val rows = QifCsvAdapter.toRows(sampleRecords())
+            val rows = rows(SAMPLE_QIF)
             val accountsByName = mapOf(source.name to source, target.name to target)
             val byId = mapOf(currency.id to currency)
             val byCode = mapOf(currency.code.uppercase() to currency)
@@ -126,7 +133,7 @@ class QifApplyIntegrationTest : DbTest() {
 
             // First import produces three new transfers.
             val first =
-                CsvTransferMapper(strat, QifCsvAdapter.columns, accountsByName, byId, byCode).prepareImport(rows)
+                CsvTransferMapper(strat, columns, accountsByName, byId, byCode).prepareImport(rows)
             val existing =
                 first.validTransfers.mapIndexed { index, v ->
                     ExistingTransferInfo(
@@ -140,7 +147,7 @@ class QifApplyIntegrationTest : DbTest() {
             // Re-importing the same records with those transfers present marks them all as duplicates
             // (matched on date + accounts + amount + description; QIF has no transaction id).
             val second =
-                CsvTransferMapper(strat, QifCsvAdapter.columns, accountsByName, byId, byCode, existingTransfers = existing)
+                CsvTransferMapper(strat, columns, accountsByName, byId, byCode, existingTransfers = existing)
                     .prepareImport(rows)
 
             assertEquals(3, second.validTransfers.size)
@@ -154,35 +161,24 @@ class QifApplyIntegrationTest : DbTest() {
         date: String,
         amount: String,
         payee: String,
-    ) = listOf(
-        QifImportRecord(
-            recordIndex = 0,
-            sectionType = "BANK",
-            accountName = "Checking",
-            supported = true,
-            rawText = "",
-            date = date,
-            amount = amount,
-            payee = payee,
-        ),
-    )
+    ) = "!Type:Bank\nD$date\nT$amount\nP$payee\n^\n"
 
     /** Runs an import of [records] against [existing] transfers and returns the resulting statuses. */
     private fun statuses(
         currency: Currency,
         source: Account,
         target: Account,
-        records: List<QifImportRecord>,
+        records: String,
         existing: List<ExistingTransferInfo> = emptyList(),
     ): List<ImportStatus> =
         CsvTransferMapper(
             strategy = strategy(currency, source, target),
-            columns = QifCsvAdapter.columns,
+            columns = columns,
             existingAccounts = mapOf(source.name to source, target.name to target),
             existingCurrencies = mapOf(currency.id to currency),
             existingCurrenciesByCode = mapOf(currency.code.uppercase() to currency),
             existingTransfers = existing,
-        ).prepareImport(QifCsvAdapter.toRows(records)).validTransfers.map { it.importStatus }
+        ).prepareImport(rows(records)).validTransfers.map { it.importStatus }
 
     /** Builds existing transfers from [records], forcing a different target account so fuzzy matching
      *  must rely on the shared source account (the bank side), mirroring the real re-import case. */
@@ -190,15 +186,15 @@ class QifApplyIntegrationTest : DbTest() {
         currency: Currency,
         source: Account,
         target: Account,
-        records: List<QifImportRecord>,
+        records: String,
     ): List<ExistingTransferInfo> =
         CsvTransferMapper(
             strategy = strategy(currency, source, target),
-            columns = QifCsvAdapter.columns,
+            columns = columns,
             existingAccounts = mapOf(source.name to source, target.name to target),
             existingCurrencies = mapOf(currency.id to currency),
             existingCurrenciesByCode = mapOf(currency.code.uppercase() to currency),
-        ).prepareImport(QifCsvAdapter.toRows(records)).validTransfers.mapIndexed { i, v ->
+        ).prepareImport(rows(records)).validTransfers.mapIndexed { i, v ->
             ExistingTransferInfo(
                 transferId = TransferId(i + 1L),
                 transfer = v.transfer.copy(id = TransferId(i + 1L), targetAccountId = AccountId(99_000L + i)),
@@ -258,32 +254,22 @@ class QifApplyIntegrationTest : DbTest() {
             assertEquals(listOf(ImportStatus.IMPORTED), result)
         }
 
-    private fun sampleRecords(): List<QifImportRecord> =
-        listOf(
-            QifImportRecord(
-                recordIndex = 0,
-                sectionType = "BANK",
-                accountName = "Checking",
-                supported = true,
-                rawText = "",
-                date = "03/15/2022",
-                amount = "-12.00",
-                payee = "Coffee Shop",
-            ),
-            QifImportRecord(
-                recordIndex = 1,
-                sectionType = "BANK",
-                accountName = "Checking",
-                supported = true,
-                rawText = "",
-                date = "03/16/2022",
-                amount = "-90.00",
-                payee = "Supermarket",
-                splits =
-                    listOf(
-                        QifRecordSplit(category = "Groceries", amount = "-60.00"),
-                        QifRecordSplit(category = "Household", amount = "-30.00"),
-                    ),
-            ),
-        )
+    private companion object {
+        val SAMPLE_QIF =
+            """
+            !Type:Bank
+            D03/15/2022
+            T-12.00
+            PCoffee Shop
+            ^
+            D03/16/2022
+            T-90.00
+            PSupermarket
+            SGroceries
+            ${'$'}-60.00
+            SHousehold
+            ${'$'}-30.00
+            ^
+            """.trimIndent()
+    }
 }

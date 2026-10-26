@@ -5,7 +5,6 @@ import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.toSourceType
@@ -102,16 +101,9 @@ class ImportDirectoryWriteRepositoryImpl(
         checksum: String?,
         remoteContentHash: String?,
         csvImportId: CsvImportId?,
-        qifImportId: QifImportId?,
         importedAt: Instant,
     ): Unit =
         withContext(coroutineContext) {
-            // A tracked file stages into at most one import type (CSV xor QIF); reject mixed state
-            // before any write. The schema also enforces this via the file's sibling-table triggers.
-            require(csvImportId == null || qifImportId == null) {
-                "A directory file resolves to at most one import type, but both csvImportId=$csvImportId " +
-                    "and qifImportId=$qifImportId were supplied for $fileRef"
-            }
             database.transaction {
                 writeQueries.upsertFile(
                     directory_id = directoryId.id.toString(),
@@ -122,13 +114,11 @@ class ImportDirectoryWriteRepositoryImpl(
                     remote_content_hash = remoteContentHash,
                     imported_at = importedAt.toEpochMilliseconds(),
                 )
-                // The csv/qif import lives in a 1:1 child table; replace it so a re-import (or a
+                // The import lives in a 1:1 child table; replace it so a re-import (or a
                 // file that no longer stages anything) leaves exactly the right child row.
                 val fileId = selectQueries.selectFileByRef(directoryId.id.toString(), fileRef).awaitAsOne().id
                 writeQueries.deleteCsvImportForFile(fileId)
-                writeQueries.deleteQifImportForFile(fileId)
                 csvImportId?.let { writeQueries.insertCsvImportForFile(fileId, it.id.toString()) }
-                qifImportId?.let { writeQueries.insertQifImportForFile(fileId, it.id.toString()) }
             }
         }
 }

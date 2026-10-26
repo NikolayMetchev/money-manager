@@ -1,12 +1,12 @@
 package com.moneymanager.database.qif
 
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.csvimporter.bulkApplyCsv
+import com.moneymanager.csvimporter.stageQifImport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.qif.QifImport
-import com.moneymanager.domain.model.qif.QifImportRecord
-import com.moneymanager.qifimporter.bulkApplyQif
+import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.installBuiltInCsvStrategies
@@ -50,49 +50,38 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
 
     private suspend fun stage(
         fileName: String,
-        accountName: String,
-        records: List<QifImportRecord>,
-    ): QifImport {
+        records: List<String>,
+    ): CsvImport {
         val id =
-            repositories.qifImportRepository.createImport(
+            repositories.importEngine.stageQifImport(
                 fileName = fileName,
-                records = records.map { it.copy(accountName = accountName) },
-                accountType = "BANK",
+                content = "!Type:Bank\n" + records.joinToString(""),
                 fileChecksum = "$fileName-checksum",
                 fileLastModified = now,
             )
-        return repositories.qifImportRepository.getImport(id).first()!!
+        return repositories.csvImportRepository.getImport(id).first()!!
     }
 
     private fun record(
-        index: Int,
         date: String,
         amount: String,
         payee: String,
         memo: String? = null,
         checkNumber: String? = null,
-    ) = QifImportRecord(
-        recordIndex = index.toLong(),
-        sectionType = "BANK",
-        accountName = null,
-        supported = true,
-        rawText = "",
-        date = date,
-        amount = amount,
-        payee = payee,
-        memo = memo,
-        checkNumber = checkNumber,
-    )
+    ) = buildString {
+        append("D$date\nT$amount\nP$payee\n")
+        memo?.let { append("M$it\n") }
+        checkNumber?.let { append("N$it\n") }
+        append("^\n")
+    }
 
-    private suspend fun amexStatement(): QifImport =
+    private suspend fun amexStatement(): CsvImport =
         stage(
             "amex.qif",
-            AMEX,
             payments.mapIndexed { i, (date, _, amount) ->
-                record(i, date, amount, "PAYMENT RECEIVED - THANK YOU", memo = "  Process Date $date", checkNumber = "9936181$i")
+                record(date, amount, "PAYMENT RECEIVED - THANK YOU", memo = "  Process Date $date", checkNumber = "9936181$i")
             } +
                 record(
-                    payments.size,
                     "19/03/2020",
                     "-16.10",
                     "SAINSBURY'S",
@@ -101,13 +90,11 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
                 ),
         )
 
-    private suspend fun santanderStatement(): QifImport =
+    private suspend fun santanderStatement(): CsvImport =
         stage(
             "santander.qif",
-            SANTANDER,
-            payments.mapIndexed { i, (_, date, amount) ->
+            payments.map { (_, date, amount) ->
                 record(
-                    i,
                     date,
                     "-$amount",
                     "DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013, $amount",
@@ -124,18 +111,18 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
             ?: repositories.accountRepository.createAccount(Account(id = AccountId(0), name = name, openingDate = now))
 
     private suspend fun apply(
-        qifImport: QifImport,
+        qifImport: CsvImport,
         accountName: String,
     ) {
         val result =
-            bulkApplyQif(
+            bulkApplyCsv(
                 imports = listOf(qifImport),
-                sourceAccountId = accountId(accountName),
+                sourceAccountOverride = accountId(accountName),
                 strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
                 currencies = repositories.currencyRepository.getAllCurrencies().first(),
                 accountMappingRepository = repositories.accountMappingRepository,
                 accountRepository = repositories.accountRepository,
-                qifImportRepository = repositories.qifImportRepository,
+                csvImportRepository = repositories.csvImportRepository,
                 maintenance = maintenance,
                 importEngine = repositories.importEngine,
                 onProgress = { },

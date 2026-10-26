@@ -2,10 +2,11 @@ package com.moneymanager.ui.components.imports
 
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.QifImportId
+import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
@@ -14,7 +15,6 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
-import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,13 +24,14 @@ import kotlin.uuid.Uuid
 class StagedImportsDataTest {
     private val epoch = Instant.fromEpochMilliseconds(0)
     private val file =
-        QifImport(
-            id = QifImportId(Uuid.random()),
+        CsvImport(
+            id = CsvImportId(Uuid.random()),
+            tableName = "csv_import",
             originalFileName = "amex.qif",
             importTimestamp = epoch,
-            recordCount = 185,
-            unsupportedCount = 2,
-            accountType = "CCARD",
+            rowCount = 1,
+            columnCount = 0,
+            columns = emptyList(),
             deviceInfo = DeviceInfo.Jvm("os", "machine"),
             fileChecksum = "amex.qif",
             fileLastModified = epoch,
@@ -97,8 +98,8 @@ class StagedImportsDataTest {
     private fun data(
         strategy: CsvImportStrategy? = null,
         accounts: List<Account> = listOf(conduit),
-        directoryAccounts: Map<QifImportId, AccountId> = emptyMap(),
-        importDirectories: Map<QifImportId, List<ImportDirectory>> = mapOf(file.id to listOf(amexFolder)),
+        directoryAccounts: Map<CsvImportId, AccountId> = emptyMap(),
+        importDirectories: Map<CsvImportId, List<ImportDirectory>> = mapOf(file.id to listOf(amexFolder)),
     ) = StagedImportsData(
         directories = listOf(amexFolder),
         importDirectories = importDirectories,

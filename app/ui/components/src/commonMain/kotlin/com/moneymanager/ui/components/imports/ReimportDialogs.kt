@@ -21,19 +21,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
 import com.moneymanager.csvimporter.BulkReimportResult
+import com.moneymanager.csvimporter.CsvImportResult
+import com.moneymanager.csvimporter.FileReimportPlan
+import com.moneymanager.csvimporter.ReimportAllPlan
+import com.moneymanager.csvimporter.Reimports
+import com.moneymanager.csvimporter.source
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.qifimporter.FileReimportPlan
-import com.moneymanager.qifimporter.ReimportAllPlan
-import com.moneymanager.qifimporter.Reimports
-import com.moneymanager.qifimporter.StagedFile
-import com.moneymanager.qifimporter.StagedRunResult
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
@@ -52,7 +53,7 @@ data class ReimportPickerRepositories(
 )
 
 /**
- * Re-imports one CSV or QIF [file] so strategy and mapping changes take effect retroactively: shows
+ * Re-imports one staged [file] (CSV, QIF, Excel or PDF) so strategy and mapping changes take effect retroactively: shows
  * what it created, the other files' records matched against that and the hand edits it will put back,
  * then (on confirm) deletes it all and imports the file again ([Reimports.reimport]). The account and
  * currency come from what the file created; the person picks them only when it created nothing.
@@ -60,11 +61,11 @@ data class ReimportPickerRepositories(
 @Suppress("LongMethod", "CyclomaticComplexMethod")
 @Composable
 fun ReimportDialog(
-    file: StagedFile,
+    file: CsvImport,
     reimports: Reimports,
     pickers: ReimportPickerRepositories,
     onDismiss: () -> Unit,
-    onComplete: (SourceRerunResult<StagedRunResult?>) -> Unit,
+    onComplete: (SourceRerunResult<CsvImportResult?>) -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val accountName = rememberAccountNamer(pickers.accountRepository)
@@ -92,7 +93,7 @@ fun ReimportDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isRunning) onDismiss() },
-        title = { Text("Re-import ${file.name}") },
+        title = { Text("Re-import ${file.originalFileName}") },
         text = {
             Column(
                 modifier =
@@ -186,14 +187,14 @@ fun ReimportDialog(
 }
 
 /**
- * Re-imports every CSV or QIF file in [files] in one go, each as [ReimportDialog] would, with one
+ * Re-imports every staged file in [files] in one go, each as [ReimportDialog] would, with one
  * confirm and an aggregated summary. Each file keeps the strategy, account and currency it was
  * imported with; the shared pickers only appear for files that created nothing to read them from.
  */
 @Suppress("LongMethod")
 @Composable
 fun ReimportAllDialog(
-    files: List<StagedFile>,
+    files: List<CsvImport>,
     reimports: Reimports,
     pickers: ReimportPickerRepositories,
     onDismiss: () -> Unit,

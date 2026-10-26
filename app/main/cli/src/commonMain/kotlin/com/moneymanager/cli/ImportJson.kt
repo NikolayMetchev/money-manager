@@ -8,6 +8,7 @@ import com.moneymanager.apiimport.ApiSessionImportStatus
 import com.moneymanager.csvimporter.BulkFileOutcome
 import com.moneymanager.csvimporter.BulkFileStatus
 import com.moneymanager.csvimporter.DirectoryRedownloadResult
+import com.moneymanager.csvimporter.isQifFileName
 import com.moneymanager.importdirectory.ImportAllResult
 import kotlinx.serialization.Serializable
 
@@ -152,17 +153,18 @@ internal fun ImportAllResult.toJson(): DirectoriesImportJson =
                 }.sortedWith(compareBy({ it.name }, { it.id })),
         foldersCreated = download.created,
         redownload = redownload?.toJson(),
-        files = csv.files.map { it.toJson("csv") } + qif.files.map { it.toJson("qif") },
+        files = csv.files.map { it.toJson() },
         failures = download.folderFailures,
     )
 
 private fun DirectoryRedownloadResult.toJson() = RedownloadJson(replaced, unchanged, blocked, reimportSuggested, failures)
 
-private fun BulkFileOutcome.toJson(format: String) =
+// Every staged file is a CSV import; a QIF file still reports as one.
+private fun BulkFileOutcome.toJson() =
     FileImportJson(
         id = fileId,
         file = fileName,
-        format = format,
+        format = if (isQifFileName(fileName)) "qif" else "csv",
         status =
             when (status) {
                 BulkFileStatus.IMPORTED -> "imported"

@@ -31,7 +31,6 @@ import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AuditReadRepository
@@ -61,7 +60,6 @@ fun AccountAuditScreen(
     maintenance: Maintenance,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onOwnerClick: (PersonId) -> Unit = {},
     onBack: () -> Unit,
 ) {
@@ -96,7 +94,7 @@ fun AccountAuditScreen(
         },
         diffKey = { it.id },
         onBack = onBack,
-        diffCard = { diff -> AccountAuditDiffCard(diff, onApiSourceClick, onCsvSourceClick, onQifSourceClick, onOwnerClick) },
+        diffCard = { diff -> AccountAuditDiffCard(diff, onApiSourceClick, onCsvSourceClick, onOwnerClick) },
         header = {
             MergeUndoSection(merges = mergesIntoThisAccount, onUndoClick = { mergeToUndo = it })
         },
@@ -359,7 +357,6 @@ private fun AccountAuditDiffCard(
     diff: AccountAuditDiff,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onOwnerClick: (PersonId) -> Unit = {},
 ) {
     AuditDiffCard(
@@ -388,7 +385,6 @@ private fun AccountAuditDiffCard(
                     diff.source,
                     onApiSourceClick = onApiSourceClick,
                     onCsvSourceClick = onCsvSourceClick,
-                    onQifSourceClick = onQifSourceClick,
                 )
             }
 
@@ -416,7 +412,6 @@ private fun AccountAuditDiffCard(
                     diff.source,
                     onApiSourceClick = onApiSourceClick,
                     onCsvSourceClick = onCsvSourceClick,
-                    onQifSourceClick = onQifSourceClick,
                 )
             }
 
@@ -434,7 +429,6 @@ private fun AccountAuditDiffCard(
                     labelColor = errorColor.copy(alpha = 0.8f),
                     onApiSourceClick = onApiSourceClick,
                     onCsvSourceClick = onCsvSourceClick,
-                    onQifSourceClick = onQifSourceClick,
                 )
             }
         }

@@ -26,16 +26,10 @@ sealed interface Source {
     /** Recreated/reassigned by undoing an account merge (see AccountWriteRepository.unmergeAccount). */
     data object Unmerge : Source
 
-    /** Created during a CSV import; [rowIndex] is the originating row when known. */
+    /** Created during a CSV import (a QIF, Excel or PDF file is staged as one too); [rowIndex] is the originating row when known. */
     data class Csv(
         val importId: CsvImportId,
         val rowIndex: Long? = null,
-    ) : Source
-
-    /** Created during a QIF import; [recordIndex] is the originating record when known. */
-    data class Qif(
-        val importId: QifImportId,
-        val recordIndex: Long? = null,
     ) : Source
 
     /**
@@ -61,6 +55,5 @@ fun Source.toSourceType(): SourceType =
         Source.Merge -> SourceType.MERGE
         Source.Unmerge -> SourceType.MERGE_UNDO
         is Source.Csv -> SourceType.CSV_IMPORT
-        is Source.Qif -> SourceType.QIF_IMPORT
         is Source.Api -> SourceType.API
     }

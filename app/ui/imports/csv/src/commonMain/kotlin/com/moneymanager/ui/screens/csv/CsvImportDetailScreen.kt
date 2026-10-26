@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.csvimporter.Reimports
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.CsvImportId
@@ -56,8 +57,6 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.deleteCsvImport
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.qifimporter.Reimports
-import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.components.csv.PdfLinesTable
 import com.moneymanager.ui.components.imports.ReimportDialog
@@ -529,7 +528,7 @@ fun CsvImportDetailScreen(
     // changes apply retroactively.
     if (showReimportDialog && import != null) {
         ReimportDialog(
-            file = StagedFile.Csv(import!!),
+            file = import!!,
             reimports = reimports,
             pickers = ReimportPickerRepositories(accountRepository, categoryRepository, currencyRepository, personRepository),
             onDismiss = { showReimportDialog = false },

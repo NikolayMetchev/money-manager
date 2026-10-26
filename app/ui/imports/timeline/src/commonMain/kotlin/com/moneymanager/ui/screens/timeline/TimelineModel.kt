@@ -185,7 +185,7 @@ private fun rowLabel(
             when (range.kind) {
                 TimelineSourceKind.MANUAL -> MANUAL_ROW_LABEL
                 TimelineSourceKind.API -> range.strategyName ?: UNKNOWN_STRATEGY_LABEL
-                TimelineSourceKind.CSV, TimelineSourceKind.QIF -> range.strategyName ?: UNKNOWN_STRATEGY_LABEL
+                TimelineSourceKind.CSV -> range.strategyName ?: UNKNOWN_STRATEGY_LABEL
             }
         }
     }
@@ -195,10 +195,19 @@ private fun fileLabel(
     timeZone: TimeZone,
 ): String =
     when (range.kind) {
-        TimelineSourceKind.MANUAL -> range.fileName
-        TimelineSourceKind.API -> "[API] ${range.fileName} (${range.earliest.toLocalDate(timeZone)})"
-        TimelineSourceKind.CSV -> "[CSV] ${range.fileName}" + if (range.ignored) " (ignored)" else ""
-        TimelineSourceKind.QIF -> "[QIF] ${range.fileName}" + if (range.ignored) " (ignored)" else ""
+        TimelineSourceKind.MANUAL -> {
+            range.fileName
+        }
+
+        TimelineSourceKind.API -> {
+            "[API] ${range.fileName} (${range.earliest.toLocalDate(timeZone)})"
+        }
+
+        // Every staged file is a CSV import; a QIF file still reads as one.
+        TimelineSourceKind.CSV -> {
+            "[${if (range.fileName.endsWith(".qif", ignoreCase = true)) "QIF" else "CSV"}] ${range.fileName}" +
+                if (range.ignored) " (ignored)" else ""
+        }
     }
 
 /**

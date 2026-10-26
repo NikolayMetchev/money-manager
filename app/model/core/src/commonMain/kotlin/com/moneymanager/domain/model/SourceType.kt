@@ -22,9 +22,6 @@ enum class SourceType(
     /** Imported via REST API call */
     API(5),
 
-    /** Imported from QIF file */
-    QIF_IMPORT(6),
-
     /** Recreated by undoing an account merge */
     MERGE_UNDO(7),
 

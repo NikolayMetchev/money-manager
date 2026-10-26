@@ -159,8 +159,6 @@ exclude:
       - app/ui/imports/csv/src/commonMain/kotlin/com/moneymanager/ui/screens/csvstrategy/CsvStrategiesScreen.kt
       - app/ui/imports/csv/src/commonMain/kotlin/com/moneymanager/ui/screens/csvstrategy/StrategyDialogs.kt
       - app/ui/imports/importDirectory/src/commonMain/kotlin/com/moneymanager/ui/screens/importdirectory/DriveFolderPickerDialog.kt
-      - app/ui/imports/qif/src/commonMain/kotlin/com/moneymanager/ui/components/qif/QifRecordList.kt
-      - app/ui/imports/qif/src/commonMain/kotlin/com/moneymanager/ui/screens/qif/QifImportsScreen.kt
       - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/CardLast4Screen.kt
       - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/ReconciliationScreen.kt
       - app/ui/people/src/commonMain/kotlin/com/moneymanager/ui/screens/people/PeopleScreen.kt
@@ -253,7 +251,6 @@ exclude:
     paths:
       - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/CsvImportApplier.kt
       - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/CsvReimport.kt
-      - app/qifimporter/src/commonMain/kotlin/com/moneymanager/qifimporter/QifReimport.kt
       # Production code builds these audit entries only through Mappie mappers, whose constructor
       # calls are generated at compile time, so the linter sees nothing but test fixtures' constants.
       - app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/AccountAuditEntry.kt

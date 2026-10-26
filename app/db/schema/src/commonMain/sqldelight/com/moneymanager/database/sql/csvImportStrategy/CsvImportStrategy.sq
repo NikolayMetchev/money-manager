@@ -11,7 +11,7 @@ CREATE TABLE csv_import_strategy (
 
 CREATE INDEX idx_csv_import_strategy_name ON csv_import_strategy(name);
 
--- Marks a csv_import_strategy as targeting an Excel worksheet rather than a CSV file (like QIF, an
+-- Marks a csv_import_strategy as targeting an Excel worksheet rather than a CSV file (an
 -- XLSX strategy is an ordinary csv_import_strategy row that rides the CSV engine). Split into its own
 -- table rather than a field of config_json: unlike the optional per-strategy features in the config
 -- (file name pattern, conversion config, funding match), worksheet_name is a kind discriminator, not a

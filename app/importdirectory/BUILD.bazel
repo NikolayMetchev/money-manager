@@ -50,10 +50,7 @@ kmp_library(
         "//app/tasks",
         "@maven_kmp//:kotlinx_coroutines_core",
     ],
-    deps = [
-        "//app/qifimporter",
-        "//utils/coroutines",
-    ],
+    deps = ["//utils/coroutines"],
 )
 
 kmp_test(

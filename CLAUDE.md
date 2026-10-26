@@ -140,7 +140,7 @@ workflow because label events start it: any other label's run skips, without can
 | `utils/compose/{filePicker,scrollbar}/` | Platform file/folder pickers and scrollbar widgets. In the browser a picker is an `<input type=file>`, a save is a download, and folders are unsupported |
 | `app/model/core/` | The flat `domain.model` package: entities, ids, `Money`, audit entries. Depends on nothing but `utils/bigdecimal` and `utils/files` (and, in the browser, the zone database `@js-joda/timezone`) |
 | `app/model/rules/` | The strategy vocabulary that CSV and API share: `StrategyRule`/`RuleAction` and their `RuleEngine`, `Condition`, `ValueExpr`, `AssetCodeRules`, `FeeRule`, `ForeignAmount`, `RuleEvaluator` — see **Import Strategies** |
-| `app/model/{apistrategy,accountmapping,csv,qif,csvstrategy,importdirectory,passthrough,reconciliation,timeline}/` | One module per `domain.model` sub-package. All depend on `model/core`; `qif`→`csv`, `csvstrategy`→`qif`+`accountmapping` |
+| `app/model/{apistrategy,accountmapping,csv,qif,csvstrategy,importdirectory,passthrough,reconciliation,timeline}/` | One module per `domain.model` sub-package. All depend on `model/core` except `qif` (only `QifColumns`); `csvstrategy`→`qif`+`accountmapping` |
 | `app/model/repository/read/`, `app/model/repository/write/` | `*ReadRepository` / `*WriteRepository` interfaces. `write` depends on `read` (each write interface extends its read) |
 | `app/db/schema/`, `app/db/read/`, `app/db/repository/`, `app/db/write/`, `app/db/core/` | SQLDelight schema; generated read SQL + Mappie mappers + JSON codecs; read repository impls; write SQL + impls; `DatabaseManager` and services |
 | `app/db/worker/` | The browser's database worker, in JavaScript: sqlite-wasm (the npm `@sqlite.org/sqlite-wasm`) behind one message per request (`handler.mjs`), over OPFS in the app (`worker.mjs`) and over memory in the browser targets' tests (`memory.mjs`) |
@@ -156,7 +156,7 @@ workflow because label events start it: any other label's run skips, without can
 | `app/apiimport/` | `ApiImportService`: API-connection orchestration the desktop app, CLI and TUI share. Creates missing connection rows from the unlocked vault (`ensureConnections`), downloads a credential's new session (secrets from the vault, incremental unless forced, the statement-region gate from `currentCountryCode()`), imports a session (then marks it imported and refreshes the materialized views), and "download & import all": every download a child task, one import queue. Sessions whose counterparties need confirming come back as `needsAttention` |
 | `app/importengineapi/` | `ImportEngine` interface + `ImportBatch`/`ImportResult` model + `ImportEngine.*` write helpers (DB-free) |
 | `app/importer/` | `ImportEngineImpl` — the **sole** DB writer (consumes write repositories) |
-| `app/csvimporter/`, `app/qifimporter/`, `app/apiimporter/` | Parse/download sources and build an `ImportBatch` (DB-free, enforced) |
+| `app/csvimporter/`, `app/apiimporter/` | Parse/download sources and build an `ImportBatch` (DB-free, enforced). A QIF file is staged as a CSV import of its rows over `QifColumns` (`stageQifImport`, one row per transaction or split), so from then on it is a CSV import like any other |
 | `app/reconciliation/` | Source-agnostic reconciliation: leg matcher + shadow→real auto-link planner (DB-free, enforced) |
 | `app/strategies/` | Built-in strategy/pass-through definitions in Kotlin — rendered to the `webpage/strategy-library` catalog site by `tools/strategy-catalog` on Pages deploys (DB-free, nothing checked in or seeded). The catalog also publishes the ISO 4217 currency list (see **Money and Currency Handling**) |
 | `app/strategycatalog/` (+ `di/`) | Browse/install the published strategy catalog (`StrategyCatalogController`) |
@@ -171,7 +171,7 @@ workflow because label events start it: any other label's run skips, without can
 | `app/importfilesource/di/` | Platform factories for import file sources (not Metro — the entry points call these directly) |
 | `app/ui/core/` | Compose UI shell: app, navigation, setup wizard (JVM/Android only) |
 | `app/ui/{foundation,components}/` | Platform UI helpers; shared widgets and editors (pickers, `ConditionsEditor`, `StrategyRulesEditor`, …) |
-| `app/ui/{accounts,audit,categories,currencies,people,settings,transactions}/`, `app/ui/imports/{api,csv,qif,importDirectory,reconciliation,timeline}/` | One module per feature screen |
+| `app/ui/{accounts,audit,categories,currencies,people,settings,transactions}/`, `app/ui/imports/{api,csv,importDirectory,reconciliation,timeline}/` | One module per feature screen |
 | `tools/{strategy-catalog,crypto-dataset}/` | Build-time tools: catalog site renderer; crypto dataset builder |
 | `test/{app/db,app/ui,app/remotestorage,utils/credentialvault}/` | Test fixtures only (see **Testing**); `app/remotestorage` is the in-memory cloud store (`InMemoryStorageProvider`, `SingleProviderFactory`) |
 | `app/main/jvm/` | JVM Desktop entry point |
@@ -253,7 +253,7 @@ never wait, seeing uncommitted rows. The browser targets' tests run the worker's
 
 **Every database mutation goes through the `ImportEngine`.** The UI, importers, services, and DI
 bootstrap never call a `*WriteRepository` directly. A caller builds an `ImportBatch` declaratively
-(transfers + account/person/category/currency intents, CSV/API strategy + mapping + CSV/QIF staging +
+(transfers + account/person/category/currency intents, CSV/API strategy + mapping + CSV staging +
 API-session mutations, attribute-type names to resolve, settings) and calls `importEngine.import(batch)`,
 reading generated ids back from `ImportResult`. Convenience `ImportEngine.*` extensions
 (`ImportEngineActions.kt`, `ImportEngineConfigActions.kt` in `app/importengineapi`) wrap the common
@@ -483,11 +483,10 @@ any CSV strategy's `fundingAttributeMatch` column that its attribute type doesn'
 adds the value to the account's token set (`addAttributeToken`, so an account can own several cards) and
 re-imports the files that reference it.
 
-**Re-import is delete + re-run.** Re-importing a CSV/QIF file (`Reimports`, `app/qifimporter`, one path and one
-pair of dialogs for both formats) or an API session (`executeApiReimport`) goes through `executeSourceRerun`
+**Re-import is delete + re-run.** Re-importing a staged file (CSV, QIF, Excel or PDF: `Reimports`, `app/csvimporter`) or an API session (`executeApiReimport`) goes through `executeSourceRerun`
 (`app/importengineapi`): it un-hides the other sources' records the source had reconciled away, deletes every
 transfer and trade the source created, resets its records, runs the normal import again, re-runs other files'
-records that had matched against the deleted ones (found from provenance: a CSV row or QIF record linked to a
+records that had matched against the deleted ones (found from provenance: a staged row linked to a
 transaction it didn't create is a `matched = 1` `entity_source` entry, kept in step with the row's link; readers
 asking who wrote a revision filter on `matched = 0`), re-applies hand edits (from the audit log) to the
 re-created transfers (reporting those it can't match), and deletes accounts the source created that are now
@@ -703,7 +702,7 @@ set of writes.
   `app/model/*`, `app/importengineapi`, `app/tasks`, `app/cryptodata`, `utils/{regex,coroutines,rest}`,
   `utils/parsers/xlsx` (unsupported there, as on native), `app/importfilesource/{core,localfolder}` (local folders build but
   can't be read: the browser has no file times), the importers
-  (`app/{csvimporter,qifimporter,apiimporter,importer}`), `app/{reconciliation,strategies,query}`,
+  (`app/{csvimporter,apiimporter,importer}`), `app/{reconciliation,strategies,query}`,
   `app/presenter/*`, the database (`app/db/{schema,seed,read,write,repository,core,di}`,
   `app/di/params`, `test/app/db`), `utils/{archive,localsettings,credentialvault}` (+ their `di`), `app/{importdirectory,apiimport,session}`
   `app/remotestorage/{core,sync,googledrive}`, `app/strategycatalog` (+ `di`), and the Compose UI: `app/ui/*`,

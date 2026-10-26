@@ -2,7 +2,6 @@ package com.moneymanager.domain.model.importdirectory
 
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.QifImportId
 import kotlin.time.Instant
 
 /**
@@ -21,6 +20,5 @@ data class ImportDirectoryFile(
     val checksum: String? = null,
     val remoteContentHash: String? = null,
     val csvImportId: CsvImportId? = null,
-    val qifImportId: QifImportId? = null,
     val importedAt: Instant? = null,
 )

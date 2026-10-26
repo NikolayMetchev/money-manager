@@ -794,7 +794,7 @@ private fun ImportPreparation.skippedRowMutations(id: CsvImportId): List<CsvImpo
  * Applies [strategy] to [rows] of a single [csvImport] and writes back per-row statuses. Creates new
  * accounts the user accepted, persists/auto-captures account mappings, runs the central import engine,
  * and records the strategy application. Shared by the single-file dialog and the bulk path; the bulk
- * path passes [refreshViews] = false and refreshes once at the end. Mirrors QifImportApplier.runImport.
+ * path passes [refreshViews] = false and refreshes once at the end.
  */
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 suspend fun runCsvImport(

@@ -1,7 +1,6 @@
 package com.moneymanager.database.repository.write
 
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
-import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
@@ -18,11 +17,6 @@ class SettingsWriteRepositoryImpl(
     override suspend fun setDefaultCurrencyId(currencyId: CurrencyId): Unit =
         withContext(Dispatchers.Default) {
             writeQueries.upsertDefaultCurrency(currencyId.id)
-        }
-
-    override suspend fun setLastQifAccountId(accountId: AccountId): Unit =
-        withContext(Dispatchers.Default) {
-            writeQueries.upsertLastQifAccount(accountId.id)
         }
 
     override suspend fun setSetupWizardCompleted(completed: Boolean): Unit =

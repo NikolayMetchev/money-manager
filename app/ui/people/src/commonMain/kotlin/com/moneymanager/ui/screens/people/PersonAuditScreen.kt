@@ -19,7 +19,6 @@ import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAttributeAuditEntry
 import com.moneymanager.domain.model.PersonAuditEntry
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.ui.audit.AuditField
@@ -60,7 +59,6 @@ fun PersonAuditScreen(
     personRepository: PersonReadRepository,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onBack: () -> Unit,
 ) {
     AuditScreen(
@@ -91,7 +89,6 @@ fun PersonAuditScreen(
                 diff = diff,
                 onApiSourceClick = onApiSourceClick,
                 onCsvSourceClick = onCsvSourceClick,
-                onQifSourceClick = onQifSourceClick,
             ) { entry, valueColor ->
                 PersonAttributeChangesSection(entry.attributeChanges, valueColor)
             }

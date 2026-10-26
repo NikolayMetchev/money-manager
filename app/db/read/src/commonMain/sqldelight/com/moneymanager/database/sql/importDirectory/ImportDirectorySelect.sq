@@ -6,54 +6,47 @@ SELECT * FROM import_directory ORDER BY name;
 selectById:
 SELECT * FROM import_directory WHERE id = ?;
 
--- Select all tracked files for a directory, joining the csv/qif import a file staged into.
+-- Select all tracked files for a directory, joining the import a file staged into.
 selectFilesForDirectory:
-SELECT f.*, c.csv_import_id, q.qif_import_id
+SELECT f.*, c.csv_import_id
 FROM import_directory_file f
 LEFT JOIN import_directory_file_csv_import c ON c.file_id = f.id
-LEFT JOIN import_directory_file_qif_import q ON q.file_id = f.id
 WHERE f.directory_id = ?
 ORDER BY f.file_name;
 
--- Select a single tracked file by its (directory, file_ref) key, with its csv/qif import.
+-- Select a single tracked file by its (directory, file_ref) key, with its import.
 selectFileByRef:
-SELECT f.*, c.csv_import_id, q.qif_import_id
+SELECT f.*, c.csv_import_id
 FROM import_directory_file f
 LEFT JOIN import_directory_file_csv_import c ON c.file_id = f.id
-LEFT JOIN import_directory_file_qif_import q ON q.file_id = f.id
 WHERE f.directory_id = ? AND f.file_ref = ?;
 
 -- The tracked files a CSV import was staged from (more than one when the same content sits in two folders).
 selectFilesForCsvImport:
-SELECT f.*, c.csv_import_id, q.qif_import_id
+SELECT f.*, c.csv_import_id
 FROM import_directory_file f
 JOIN import_directory_file_csv_import c ON c.file_id = f.id
-LEFT JOIN import_directory_file_qif_import q ON q.file_id = f.id
 WHERE c.csv_import_id = ?
 ORDER BY f.imported_at DESC;
 
--- Effective account (own, else parent's) for every staged file that resolves to one, so a bulk CSV/QIF
--- import run can resolve each file's source account with one query instead of N+1. A file with neither
--- csv_import_id nor qif_import_id (not yet staged into either) is filtered out by the NOT NULL account
--- check combined with the child-table joins below.
+-- Effective account (own, else parent's) for every staged file that resolves to one, so a bulk import run
+-- can resolve each file's source account with one query instead of N+1.
 selectStagedImportAccounts:
-SELECT c.csv_import_id, q.qif_import_id, COALESCE(d.account_id, p.account_id) AS account_id
+SELECT c.csv_import_id, COALESCE(d.account_id, p.account_id) AS account_id
 FROM import_directory_file f
 JOIN import_directory d ON d.id = f.directory_id
 LEFT JOIN import_directory p ON p.id = d.parent_id
-LEFT JOIN import_directory_file_csv_import c ON c.file_id = f.id
-LEFT JOIN import_directory_file_qif_import q ON q.file_id = f.id
+JOIN import_directory_file_csv_import c ON c.file_id = f.id
 WHERE COALESCE(d.account_id, p.account_id) IS NOT NULL;
 
 -- The folder every staged file came from when neither it nor its parent has an account set, so a bulk
 -- import run can name the file's account after its own folder.
 selectStagedImportFoldersWithoutAccount:
-SELECT c.csv_import_id, q.qif_import_id, f.directory_id
+SELECT c.csv_import_id, f.directory_id
 FROM import_directory_file f
 JOIN import_directory d ON d.id = f.directory_id
 LEFT JOIN import_directory p ON p.id = d.parent_id
-LEFT JOIN import_directory_file_csv_import c ON c.file_id = f.id
-LEFT JOIN import_directory_file_qif_import q ON q.file_id = f.id
+JOIN import_directory_file_csv_import c ON c.file_id = f.id
 WHERE COALESCE(d.account_id, p.account_id) IS NULL;
 
 -- The directory every directory-scanned CSV import came from, for grouping/labelling the CSV imports
@@ -62,9 +55,3 @@ selectCsvImportDirectories:
 SELECT c.csv_import_id, f.directory_id
 FROM import_directory_file f
 JOIN import_directory_file_csv_import c ON c.file_id = f.id;
-
--- QIF equivalent of selectCsvImportDirectories.
-selectQifImportDirectories:
-SELECT q.qif_import_id, f.directory_id
-FROM import_directory_file f
-JOIN import_directory_file_qif_import q ON q.file_id = f.id;

@@ -6,10 +6,8 @@ import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
-import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.TransferSourceReadRepository
@@ -53,13 +51,6 @@ class TransferSourceReadRepositoryImpl(
                         .associate { TransferId(it.entity_id) to Source.Csv(importSource.importId, it.csv_row_index) }
                 }
 
-                is Source.Qif -> {
-                    queries
-                        .selectCreatedTransferRecordsByQifImport(importSource.importId.id.toString())
-                        .awaitAsList()
-                        .associate { TransferId(it.entity_id) to Source.Qif(importSource.importId, it.qif_record_index) }
-                }
-
                 is Source.Api -> {
                     queries
                         .selectCreatedTransferNodesByApiSession(importSource.sessionId.id)
@@ -79,18 +70,14 @@ class TransferSourceReadRepositoryImpl(
     override suspend fun getImportRecordsMatchedTo(
         transferIds: Set<TransferId>,
         tradeIds: Set<TradeId>,
-    ): List<Source> =
+    ): List<Source.Csv> =
         withContext(Dispatchers.Default) {
-            val records = linkedSetOf<Source>()
-            for (chunk in (transferIds.map { it.id } + tradeIds.map { it.id }).distinct().chunked(ID_CHUNK)) {
-                queries.selectImportRecordsMatchedTo(chunk).awaitAsList().mapTo(records) {
-                    when (it.source_type_id) {
-                        SourceType.CSV_IMPORT.id.toLong() -> Source.Csv(CsvImportId(Uuid.parse(it.import_id)), it.record_index)
-                        else -> Source.Qif(QifImportId(Uuid.parse(it.import_id)), it.record_index)
-                    }
-                }
-            }
-            records.toList()
+            (transferIds.map { it.id } + tradeIds.map { it.id })
+                .distinct()
+                .chunked(ID_CHUNK)
+                .flatMap { queries.selectImportRecordsMatchedTo(it).awaitAsList() }
+                .map { Source.Csv(CsvImportId(Uuid.parse(it.import_id)), it.record_index) }
+                .distinct()
         }
 
     override suspend fun getHandEditedTransferIds(ids: Collection<TransferId>): Set<TransferId> =

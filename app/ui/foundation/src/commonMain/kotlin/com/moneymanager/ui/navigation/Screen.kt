@@ -11,12 +11,11 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.strategy.StrategyKind
 import kotlinx.serialization.Serializable
 
-enum class ImportTab { DIRECTORIES, CSV, QIF, API, MISC, TIMELINE, RECONCILIATION }
+enum class ImportTab { DIRECTORIES, CSV, API, MISC, TIMELINE, RECONCILIATION }
 
 /**
  * Navigation destinations. Serializable [NavKey]s so the back stack survives process death via
@@ -120,22 +119,6 @@ sealed class Screen : NavKey {
         val scrollToRowIndex: Long? = null,
     ) : Screen() {
         override val title: String get() = "CSV Import"
-    }
-
-    @Serializable
-    data class QifImportDetail(
-        val importId: QifImportId,
-        val scrollToRecordIndex: Long? = null,
-    ) : Screen() {
-        override val title: String get() = "QIF Import"
-    }
-
-    @Serializable
-    data class QifStrategyEditor(
-        val qifImportId: QifImportId,
-        val strategyId: CsvImportStrategyId? = null,
-    ) : Screen() {
-        override val title: String get() = if (strategyId == null) "Create Strategy" else "Edit Strategy"
     }
 
     @Serializable

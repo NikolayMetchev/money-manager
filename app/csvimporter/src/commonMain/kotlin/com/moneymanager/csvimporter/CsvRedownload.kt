@@ -189,7 +189,8 @@ private suspend fun prepareFromSource(
 
             else -> {
                 val content = bytes.decodeToString()
-                parseStagedCsv(content) to sha256Hex(content)
+                val rows = if (isQifFileName(staged.originalFileName)) parseQifAsCsv(content) else parseStagedCsv(content)
+                rows to sha256Hex(content)
             }
         }
 

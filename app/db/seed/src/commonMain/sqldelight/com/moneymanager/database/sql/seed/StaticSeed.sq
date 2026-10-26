@@ -12,7 +12,6 @@ INSERT INTO source_type (id, name) VALUES (2, 'CSV_IMPORT');
 INSERT INTO source_type (id, name) VALUES (3, 'SAMPLE_GENERATOR');
 INSERT INTO source_type (id, name) VALUES (4, 'SYSTEM');
 INSERT INTO source_type (id, name) VALUES (5, 'API');
-INSERT INTO source_type (id, name) VALUES (6, 'QIF_IMPORT');
 INSERT INTO source_type (id, name) VALUES (7, 'MERGE_UNDO');
 INSERT INTO source_type (id, name) VALUES (8, 'MERGE');
 

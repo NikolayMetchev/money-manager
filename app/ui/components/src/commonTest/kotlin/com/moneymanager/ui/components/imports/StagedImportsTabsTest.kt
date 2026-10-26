@@ -8,15 +8,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.QifImportId
+import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
-import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -57,13 +57,14 @@ private val bank =
 private fun qifImport(
     fileName: String,
     appliedWith: CsvImportStrategy? = null,
-) = QifImport(
-    id = QifImportId(Uuid.random()),
+) = CsvImport(
+    id = CsvImportId(Uuid.random()),
+    tableName = "csv_import",
     originalFileName = fileName,
     importTimestamp = epoch,
-    recordCount = 1,
-    unsupportedCount = 0,
-    accountType = "BANK",
+    rowCount = 1,
+    columnCount = 0,
+    columns = emptyList(),
     deviceInfo = DeviceInfo.Jvm("os", "machine"),
     fileChecksum = fileName,
     fileLastModified = epoch,
@@ -80,8 +81,8 @@ private val importedFile = qifImport("old.qif", appliedWith = bank)
 // A factory rather than a @Composable helper: Qodana holds every function in a test source set to the
 // lowercase test-naming convention, which a PascalCase composable can't meet.
 private fun tabsContent(
-    onImportAll: (List<QifImport>) -> Unit = {},
-    onReimportAll: (List<QifImport>) -> Unit = {},
+    onImportAll: (List<CsvImport>) -> Unit = {},
+    onReimportAll: (List<CsvImport>) -> Unit = {},
 ): @Composable () -> Unit =
     {
         MaterialTheme {
@@ -111,7 +112,7 @@ class StagedImportsTabsTest {
     @Test
     fun unimportedFiles_areGroupedByFolderThenStrategy() {
         runMoneyManagerComposeUiTest {
-            var importAll: List<QifImport>? = null
+            var importAll: List<CsvImport>? = null
             setContent(tabsContent(onImportAll = { importAll = it }))
 
             onNodeWithText("Statements (1)").assertExists()
@@ -131,7 +132,7 @@ class StagedImportsTabsTest {
     @Test
     fun importedFiles_areGroupedByAppliedStrategy_withoutUnimportWhenTheFormatHasNone() {
         runMoneyManagerComposeUiTest {
-            var reimportAll: List<QifImport>? = null
+            var reimportAll: List<CsvImport>? = null
             setContent(tabsContent(onReimportAll = { reimportAll = it }))
 
             onNodeWithText("Imported (1)").performClick()

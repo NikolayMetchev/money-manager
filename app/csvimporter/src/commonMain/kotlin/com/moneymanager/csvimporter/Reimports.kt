@@ -1,17 +1,6 @@
-package com.moneymanager.qifimporter
+package com.moneymanager.csvimporter
 
 import co.touchlab.kermit.Logger
-import com.moneymanager.csvimporter.AttributeAccountMatcher
-import com.moneymanager.csvimporter.BULK_ENGINE_BATCH_SIZE
-import com.moneymanager.csvimporter.BulkReimportFileOutcome
-import com.moneymanager.csvimporter.BulkReimportResult
-import com.moneymanager.csvimporter.CsvImportResult
-import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
-import com.moneymanager.csvimporter.applyStagedCsv
-import com.moneymanager.csvimporter.ensureCryptoAssetsForImports
-import com.moneymanager.csvimporter.needsSourceAccountOverride
-import com.moneymanager.csvimporter.runBulkReimport
-import com.moneymanager.csvimporter.selectForImport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
@@ -21,8 +10,8 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
@@ -35,7 +24,6 @@ import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ManualEdit
-import com.moneymanager.importengineapi.QifImportMutation
 import com.moneymanager.importengineapi.RerunReads
 import com.moneymanager.importengineapi.SourceRerunPlan
 import com.moneymanager.importengineapi.SourceRerunResult
@@ -55,29 +43,6 @@ import kotlinx.coroutines.withContext
 
 private val logger = Logger.withTag("Reimports")
 
-/** A staged CSV or QIF file. Re-import treats both alike: QIF records are run as CSV rows (`QifCsvAdapter`). */
-sealed interface StagedFile {
-    val source: Source
-    val name: String
-    val recordCount: Int
-
-    data class Csv(
-        val import: CsvImport,
-    ) : StagedFile {
-        override val source get() = Source.Csv(import.id)
-        override val name get() = import.originalFileName
-        override val recordCount get() = import.rowCount
-    }
-
-    data class Qif(
-        val import: QifImport,
-    ) : StagedFile {
-        override val source get() = Source.Qif(import.id)
-        override val name get() = import.originalFileName
-        override val recordCount get() = import.recordCount
-    }
-}
-
 /**
  * The account and currency a file was imported with, read from the transactions it created, so a
  * re-import doesn't ask again: [accountId] is the one account every one of them moves money in or out
@@ -91,9 +56,19 @@ data class ImportedSettings(
 /** A strategy reads its currency from the record only when it maps one; otherwise the import supplies it. */
 fun CsvImportStrategy.needsCurrencyOverride(): Boolean = config.fieldMappings[TransferField.CURRENCY] == null
 
+/** This strategy with its currency hard-coded to [currencyId] (unchanged when null), for a file whose rows name none. */
+fun CsvImportStrategy.withCurrency(currencyId: CurrencyId?): CsvImportStrategy {
+    if (currencyId == null) return this
+    val currencyMapping = HardCodedCurrencyMapping(fieldType = TransferField.CURRENCY, currencyId = currencyId)
+    return copy(config = config.copy(fieldMappings = config.fieldMappings + (TransferField.CURRENCY to currencyMapping)))
+}
+
+/** The source a staged file's records are recorded under. */
+val CsvImport.source: Source get() = Source.Csv(id)
+
 /** What re-importing one [file] will do; [needsAccount] and [needsCurrency] say what the person must pick. */
 data class FileReimportPlan(
-    val file: StagedFile,
+    val file: CsvImport,
     /** The strategy it was last imported with, else the one its content selects; null when neither exists. */
     val strategy: CsvImportStrategy?,
     val imported: ImportedSettings,
@@ -105,7 +80,7 @@ data class FileReimportPlan(
 
 /** What a "re-import all" over [files] will do. */
 data class ReimportAllPlan(
-    val files: List<StagedFile>,
+    val files: List<CsvImport>,
     val strategies: Map<Source, CsvImportStrategy?>,
     val imported: Map<Source, ImportedSettings>,
     /** Every hand edit the run will put back. */
@@ -121,15 +96,8 @@ data class ReimportAllPlan(
         get() = files.any { strategies[it.source]?.needsCurrencyOverride() == true && imported[it.source]?.currencyId == null }
 }
 
-/** How a file's staged records ran: the CSV and QIF import results in one shape. */
-data class StagedRunResult(
-    val successCount: Int,
-    val duplicateCount: Int,
-    val failedRows: List<CsvImportResult.FailedRow> = emptyList(),
-)
-
 /**
- * The one way to re-import a CSV or QIF file, one at a time or all at once: what the file created is
+ * The one way to re-import a staged file (CSV, QIF, Excel or PDF), one at a time or all at once: what the file created is
  * deleted and its records run through the normal import again, with the strategy, account and currency
  * it was imported with ([executeSourceRerun]). Also the [AffectedRecordsRerunner] every re-import (API
  * sessions included) hands the other files' records to that were matched against a deleted transaction.
@@ -157,11 +125,11 @@ class Reimports(
      * On a large database this takes a while, so [onProgress] hears each step.
      */
     suspend fun plan(
-        file: StagedFile,
+        file: CsvImport,
         onProgress: (suspend (Progress) -> Unit)? = null,
     ): FileReimportPlan {
         val progress = PhasedProgress(onProgress)
-        progress.emit(base = 0f, detail = "Loading ${file.name}")
+        progress.emit(base = 0f, detail = "Loading ${file.originalFileName}")
         val loaded = file.reloaded()
         val strategy = strategyFor(loaded, csvImportStrategyRepository.getAllStrategies().first())
         progress.emit(base = PLAN_LOAD_SPAN, detail = READING_IMPORT_SETTINGS)
@@ -184,7 +152,7 @@ class Reimports(
         currencyId: CurrencyId?,
         onProgress: (suspend (Progress) -> Unit)? = null,
         refreshViews: Boolean = true,
-    ): SourceRerunResult<StagedRunResult?> = writeLock.withLock { rerunFile(plan, accountId, currencyId, onProgress, refreshViews) }
+    ): SourceRerunResult<CsvImportResult?> = writeLock.withLock { rerunFile(plan, accountId, currencyId, onProgress, refreshViews) }
 
     private suspend fun rerunFile(
         plan: FileReimportPlan,
@@ -192,8 +160,8 @@ class Reimports(
         currencyId: CurrencyId?,
         onProgress: (suspend (Progress) -> Unit)?,
         refreshViews: Boolean,
-    ): SourceRerunResult<StagedRunResult?> {
-        val strategy = requireNotNull(plan.strategy) { "No strategy matches ${plan.file.name}" }
+    ): SourceRerunResult<CsvImportResult?> {
+        val strategy = requireNotNull(plan.strategy) { "No strategy matches ${plan.file.originalFileName}" }
         val settings =
             ImportedSettings(plan.imported.accountId ?: accountId, plan.imported.currencyId ?: currencyId)
         return importEngine.executeSourceRerun(
@@ -214,12 +182,12 @@ class Reimports(
      * [onProgress] gives each file an equal slice of the bar.
      */
     suspend fun planAll(
-        files: List<StagedFile>,
+        files: List<CsvImport>,
         onProgress: (suspend (Progress) -> Unit)? = null,
     ): ReimportAllPlan {
         val progress = PhasedProgress(onProgress)
         val strategies = csvImportStrategyRepository.getAllStrategies().first()
-        val prefixes = files.mapIndexed { index, file -> "File ${index + 1} of ${files.size}: ${file.name}" }
+        val prefixes = files.mapIndexed { index, file -> "File ${index + 1} of ${files.size}: ${file.originalFileName}" }
         // Each file is read once, all of them at once (reads don't block one another), off the caller's
         // dispatcher (a dialog's is the UI thread); what spans them all (their transfers, the hand edits) is
         // then loaded in one go.
@@ -242,7 +210,7 @@ class Reimports(
                                 filesRead++
                                 progress.emit(
                                     base = PLAN_ALL_READ_SPAN * filesRead / files.size,
-                                    detail = "File $filesRead of ${files.size}: ${file.name} — $READING_IMPORT_SETTINGS",
+                                    detail = "File $filesRead of ${files.size}: ${file.originalFileName} — $READING_IMPORT_SETTINGS",
                                 )
                             }
                             read
@@ -292,8 +260,8 @@ class Reimports(
     ): BulkReimportResult =
         runBulkReimport(
             imports = plan.files,
-            rowCount = { it.recordCount },
-            fileName = { it.name },
+            rowCount = { it.rowCount },
+            fileName = { it.originalFileName },
             logLabel = "file",
             maintenance = maintenance,
             onProgress = onProgress,
@@ -301,7 +269,7 @@ class Reimports(
             prepare = {
                 // Every crypto asset the run needs exists before the first file, at the run-wide precision.
                 ensureCryptoAssetsForImports(
-                    plan.files.filterIsInstance<StagedFile.Csv>().map { it.import },
+                    plan.files,
                     csvImportStrategyRepository.getAllStrategies().first(),
                     currencies(),
                     reads.csvImportRepository,
@@ -313,7 +281,7 @@ class Reimports(
             val strategy = plan.strategies[file.source]
             when {
                 // An empty file has nothing to re-import, and (unlike a missing strategy) is not counted.
-                file.recordCount == 0 -> {
+                file.rowCount == 0 -> {
                     BulkReimportFileOutcome.NoWork
                 }
 
@@ -338,25 +306,7 @@ class Reimports(
     override suspend fun prepare(affected: AffectedRecords): suspend (onProgress: (suspend (Progress) -> Unit)?) -> AffectedRecords {
         val files =
             affected.byFile.keys.mapNotNull { file ->
-                when (file) {
-                    is Source.Csv -> {
-                        reads.csvImportRepository
-                            .getImport(file.importId)
-                            .first()
-                            ?.let(StagedFile::Csv)
-                    }
-
-                    is Source.Qif -> {
-                        reads.qifImportRepository
-                            .getImport(file.importId)
-                            .first()
-                            ?.let(StagedFile::Qif)
-                    }
-
-                    else -> {
-                        null
-                    }
-                }
+                (file as? Source.Csv)?.let { reads.csvImportRepository.getImport(it.importId).first() }
             }
         // Read now: once the re-import resets these records, a file that only matched others' transactions
         // has nothing left to read its account from.
@@ -383,7 +333,9 @@ class Reimports(
                 } catch (expected: CancellationException) {
                     throw expected
                 } catch (expected: Exception) {
-                    logger.e(expected) { "Re-running the records of ${file.name} matched against a re-imported transaction failed" }
+                    logger.e(
+                        expected,
+                    ) { "Re-running the records of ${file.originalFileName} matched against a re-imported transaction failed" }
                     notRerun += file.source
                 }
             }
@@ -423,15 +375,6 @@ class Reimports(
                 reads.csvImportRepository.getImportRows(source.importId, limit = Int.MAX_VALUE, offset = 0).mapNotNull { it.transferId }
             }
 
-            is Source.Qif -> {
-                reads.qifImportRepository
-                    .getImportRecords(
-                        source.importId,
-                        limit = Int.MAX_VALUE,
-                        offset = 0,
-                    ).mapNotNull { it.transferId }
-            }
-
             else -> {
                 emptyList()
             }
@@ -455,126 +398,57 @@ class Reimports(
     }
 
     private suspend fun rerunPlan(
-        file: StagedFile,
+        file: CsvImport,
         onProgress: (suspend (Progress) -> Unit)? = null,
     ): SourceRerunPlan =
-        when (file) {
-            is StagedFile.Csv -> {
-                planSourceRerun(
-                    source = file.source,
-                    tradeIds = reads.csvImportRepository.getTradeIdsCreatedByImport(file.import.id),
-                    createdAccountIds = reads.csvImportRepository.getAccountsCreatedByImport(file.import.id),
-                    reads = reads,
-                    onProgress = onProgress,
-                )
-            }
-
-            is StagedFile.Qif -> {
-                planSourceRerun(
-                    source = file.source,
-                    // QIF import never creates trades.
-                    tradeIds = emptySet(),
-                    createdAccountIds = reads.qifImportRepository.getAccountsCreatedByImport(file.import.id),
-                    reads = reads,
-                    onProgress = onProgress,
-                )
-            }
-        }
+        planSourceRerun(
+            source = file.source,
+            tradeIds = reads.csvImportRepository.getTradeIdsCreatedByImport(file.id),
+            createdAccountIds = reads.csvImportRepository.getAccountsCreatedByImport(file.id),
+            reads = reads,
+            onProgress = onProgress,
+        )
 
     // Returns every record to never-imported, keeping the file's import history.
-    private fun resetBatch(file: StagedFile): ImportBatch =
-        when (file) {
-            is StagedFile.Csv -> ImportBatch(csvImportMutations = listOf(CsvImportMutation.ResetRowStatuses(file.import.id, null)))
-            is StagedFile.Qif -> ImportBatch(qifImportMutations = listOf(QifImportMutation.ResetRecordStatuses(file.import.id, null)))
-        }
+    private fun resetBatch(file: CsvImport): ImportBatch =
+        ImportBatch(csvImportMutations = listOf(CsvImportMutation.ResetRowStatuses(file.id, null)))
 
-    // A listed import may lack what strategy selection reads (getAllImports() doesn't populate CSV columns).
-    private suspend fun StagedFile.reloaded(): StagedFile =
-        when (this) {
-            is StagedFile.Csv -> {
-                reads.csvImportRepository
-                    .getImport(import.id)
-                    .first()
-                    ?.let(StagedFile::Csv) ?: this
-            }
-
-            is StagedFile.Qif -> {
-                reads.qifImportRepository
-                    .getImport(import.id)
-                    .first()
-                    ?.let(StagedFile::Qif) ?: this
-            }
-        }
+    // A listed import may lack what strategy selection reads (getAllImports() doesn't populate columns).
+    private suspend fun CsvImport.reloaded(): CsvImport = reads.csvImportRepository.getImport(id).first() ?: this
 
     private suspend fun strategyFor(
-        file: StagedFile,
+        file: CsvImport,
         strategies: List<CsvImportStrategy>,
     ): CsvImportStrategy? =
-        when (file) {
-            is StagedFile.Csv -> {
-                file.import.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
-                    ?: strategies.selectForImport(file.import, reads.csvImportRepository)
-            }
-
-            is StagedFile.Qif -> {
-                val qifStrategies = strategies.qifCompatible()
-                file.import.lastAppliedStrategyId?.let { id -> qifStrategies.find { it.id == id } }
-                    ?: qifStrategies.selectForQifContent(
-                        QifCsvAdapter.toRows(
-                            reads.qifImportRepository.getImportRecords(file.import.id, STRATEGY_CONTENT_SAMPLE_SIZE, 0),
-                        ),
-                        QifCsvAdapter.columns,
-                    )
-            }
-        }
+        file.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
+            ?: strategies.selectForImport(file, reads.csvImportRepository)
 
     // Runs [strategy] over the file's records that are not yet imported or errored.
     private suspend fun runStaged(
-        file: StagedFile,
+        file: CsvImport,
         strategy: CsvImportStrategy,
         settings: ImportedSettings,
         currencies: List<Currency>,
         onProgress: (suspend (Progress) -> Unit)?,
-    ): StagedRunResult? {
-        val effective = strategy.withQifCurrency(settings.currencyId.takeIf { strategy.needsCurrencyOverride() })
-        return when (file) {
-            is StagedFile.Csv -> {
-                applyStagedCsv(
-                    csvImport = file.import,
-                    strategy = effective,
-                    sourceAccountOverride = settings.accountId,
-                    currencies = currencies,
-                    accountMappingRepository = accountMappingRepository,
-                    accountRepository = reads.accountRepository,
-                    csvImportRepository = reads.csvImportRepository,
-                    maintenance = maintenance,
-                    importEngine = importEngine,
-                    refreshViews = false,
-                    passThroughAccounts = passThroughAccountRepository.getAll().first(),
-                    onProgress = onProgress,
-                    engineBatchSize = BULK_ENGINE_BATCH_SIZE,
-                    cryptoRepository = cryptoRepository,
-                    attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first()),
-                    tradeRepository = reads.tradeRepository,
-                )?.let { StagedRunResult(it.successCount, it.duplicateCount, it.failedRows) }
-            }
-
-            is StagedFile.Qif -> {
-                applyStagedQif(
-                    qifImport = file.import,
-                    strategy = effective,
-                    sourceAccountOverride = settings.accountId,
-                    currencies = currencies,
-                    accountMappingRepository = accountMappingRepository,
-                    accountRepository = reads.accountRepository,
-                    qifImportRepository = reads.qifImportRepository,
-                    maintenance = maintenance,
-                    importEngine = importEngine,
-                    onProgress = onProgress,
-                )?.let { StagedRunResult(it.successCount, it.duplicateCount) }
-            }
-        }
-    }
+    ): CsvImportResult? =
+        applyStagedCsv(
+            csvImport = file,
+            strategy = strategy.withCurrency(settings.currencyId.takeIf { strategy.needsCurrencyOverride() }),
+            sourceAccountOverride = settings.accountId,
+            currencies = currencies,
+            accountMappingRepository = accountMappingRepository,
+            accountRepository = reads.accountRepository,
+            csvImportRepository = reads.csvImportRepository,
+            maintenance = maintenance,
+            importEngine = importEngine,
+            refreshViews = false,
+            passThroughAccounts = passThroughAccountRepository.getAll().first(),
+            onProgress = onProgress,
+            engineBatchSize = BULK_ENGINE_BATCH_SIZE,
+            cryptoRepository = cryptoRepository,
+            attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first()),
+            tradeRepository = reads.tradeRepository,
+        )
 
     private suspend fun currencies(): List<Currency> = currencyRepository.getAllCurrencies().first()
 }
@@ -588,7 +462,7 @@ private const val PLAN_ALL_READ_SPAN = 0.9f
 
 /** What "re-import all" planning reads from one [file]: the transfers it created and those its records point at. */
 private class FileReads(
-    val file: StagedFile,
+    val file: CsvImport,
     val created: Map<TransferId, Source>,
     val referenced: List<TransferId>,
 )

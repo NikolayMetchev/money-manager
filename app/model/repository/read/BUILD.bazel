@@ -7,7 +7,6 @@
 # gazelle:kmp_export //app/model/csvstrategy
 # gazelle:kmp_export //app/model/importdirectory
 # gazelle:kmp_export //app/model/passthrough
-# gazelle:kmp_export //app/model/qif
 # gazelle:kmp_export //app/model/reconciliation
 # gazelle:kmp_export //app/model/timeline
 # gazelle:kmp_export @maven_kmp//:kotlinx_coroutines_core
@@ -37,7 +36,6 @@ kmp_library(
         "//app/model/csvstrategy",
         "//app/model/importdirectory",
         "//app/model/passthrough",
-        "//app/model/qif",
         "//app/model/reconciliation",
         "//app/model/timeline",
         "@maven_kmp//:kotlinx_coroutines_core",

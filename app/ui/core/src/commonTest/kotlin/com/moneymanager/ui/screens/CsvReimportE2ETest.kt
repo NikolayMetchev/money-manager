@@ -1,5 +1,6 @@
 package com.moneymanager.ui.screens
 
+import com.moneymanager.csvimporter.CsvImportResult
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.database.di.DatabaseComponent
@@ -33,8 +34,6 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importer.ImportEngineImpl
-import com.moneymanager.qifimporter.StagedFile
-import com.moneymanager.qifimporter.StagedRunResult
 import com.moneymanager.regex.compileRegex
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
@@ -155,10 +154,10 @@ class CsvReimportE2ETest {
             .firstOrNull { it.name == DUPLICATE_NAME }
             ?.id
 
-    private suspend fun Fixture.reimport(strategy: CsvImportStrategy = this.strategy): SourceRerunResult<StagedRunResult?> {
+    private suspend fun Fixture.reimport(strategy: CsvImportStrategy = this.strategy): SourceRerunResult<CsvImportResult?> {
         val reimports = dc.reimports()
         val current = dc.csvImportRepository.getImport(csvImport.id).first()!!
-        val plan = reimports.plan(StagedFile.Csv(current)).copy(strategy = strategy)
+        val plan = reimports.plan(current).copy(strategy = strategy)
         return reimports.reimport(plan, accountId = sourceAccountId, currencyId = null)
     }
 
@@ -301,7 +300,6 @@ class CsvReimportE2ETest {
             apiImportStrategyRepository = dc.apiImportStrategyRepository,
             accountMappingRepository = dc.accountMappingRepository,
             csvImportRepository = dc.csvImportRepository,
-            qifImportRepository = dc.qifImportRepository,
             apiSessionRepository = dc.apiSessionRepository,
             settingsRepository = dc.settingsRepository,
             importDirectoryRepository = dc.importDirectoryRepository,

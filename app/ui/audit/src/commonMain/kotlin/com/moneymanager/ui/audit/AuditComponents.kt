@@ -22,7 +22,6 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
 
@@ -127,7 +126,7 @@ fun DeletedFinalValuesLabel(errorColor: Color) {
 
 /**
  * Renders the provenance of one audit revision: where the row came from, which device recorded it,
- * and — for imports — deep links back to the originating CSV row / QIF record / API response.
+ * and — for imports — deep links back to the originating staged row / API response.
  *
  * When [currentDeviceId] is supplied, sources recorded on that device are marked "(This Device)".
  */
@@ -139,7 +138,6 @@ fun SourceInfoSection(
     currentDeviceId: DeviceId? = null,
     onApiSourceClick: ((ApiSessionId, ApiRequestId, String) -> Unit)? = null,
     onCsvSourceClick: ((CsvImportId, Long) -> Unit)? = null,
-    onQifSourceClick: ((QifImportId, Long?) -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.padding(top = 8.dp),
@@ -199,38 +197,6 @@ fun SourceInfoSection(
                     }
                 } else if (fileName != null) {
                     FieldValueRow("File", fileName, labelWidth = labelWidth)
-                }
-                DeviceInfoRows(source.deviceInfo, labelWidth)
-            }
-
-            is Source.Qif -> {
-                val recordIndex = origin.recordIndex
-                val fileName = source.fileName
-                FieldValueRow("Origin", "QIF Import$deviceSuffix", labelWidth = labelWidth)
-                if (onQifSourceClick != null) {
-                    // The File link always opens the QIF import; entities derived from the import as a
-                    // whole (e.g. accounts) have no single record, so only show a Record link when known.
-                    QifSourceLinkRow(
-                        label = "File",
-                        value = fileName ?: "Unknown file",
-                        importId = origin.importId,
-                        recordIndex = recordIndex,
-                        onQifSourceClick = onQifSourceClick,
-                        labelWidth = labelWidth,
-                    )
-                    if (recordIndex != null) {
-                        QifSourceLinkRow(
-                            label = "Record",
-                            value = recordIndex.toString(),
-                            importId = origin.importId,
-                            recordIndex = recordIndex,
-                            onQifSourceClick = onQifSourceClick,
-                            labelWidth = labelWidth,
-                        )
-                    }
-                } else {
-                    FieldValueRow("File", fileName ?: "Unknown file", labelWidth = labelWidth)
-                    recordIndex?.let { FieldValueRow("Record", it.toString(), labelWidth = labelWidth) }
                 }
                 DeviceInfoRows(source.deviceInfo, labelWidth)
             }
@@ -330,35 +296,6 @@ private fun CsvSourceLinkRow(
         )
         TextButton(
             onClick = { onCsvSourceClick(importId, rowIndex) },
-            contentPadding = PaddingValues(0.dp),
-        ) {
-            Text(value)
-        }
-    }
-}
-
-@Composable
-private fun QifSourceLinkRow(
-    label: String,
-    value: String,
-    importId: QifImportId,
-    recordIndex: Long?,
-    onQifSourceClick: (QifImportId, Long?) -> Unit,
-    labelWidth: Dp = 100.dp,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "$label:",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(labelWidth),
-        )
-        TextButton(
-            onClick = { onQifSourceClick(importId, recordIndex) },
             contentPadding = PaddingValues(0.dp),
         ) {
             Text(value)

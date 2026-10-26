@@ -11,7 +11,6 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryFile
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
@@ -59,7 +58,6 @@ class ImportDirectoryReadRepositoryImpl(
                         it.checksum,
                         it.remote_content_hash,
                         it.csv_import_id,
-                        it.qif_import_id,
                         it.imported_at,
                     )
                 }
@@ -82,7 +80,6 @@ class ImportDirectoryReadRepositoryImpl(
                         it.checksum,
                         it.remote_content_hash,
                         it.csv_import_id,
-                        it.qif_import_id,
                         it.imported_at,
                     )
                 }
@@ -99,7 +96,6 @@ class ImportDirectoryReadRepositoryImpl(
                     it.checksum,
                     it.remote_content_hash,
                     it.csv_import_id,
-                    it.qif_import_id,
                     it.imported_at,
                 )
             }
@@ -111,21 +107,8 @@ class ImportDirectoryReadRepositoryImpl(
                 .selectStagedImportAccounts()
                 .awaitAsList()
                 .mapNotNull { row ->
-                    val csvImportId = row.csv_import_id ?: return@mapNotNull null
                     val accountId = row.account_id ?: return@mapNotNull null
-                    CsvImportId(Uuid.parse(csvImportId)) to AccountId(accountId)
-                }.toUnambiguousMap()
-        }
-
-    override suspend fun qifImportSourceAccounts(): Map<QifImportId, AccountId> =
-        withContext(coroutineContext) {
-            selectQueries
-                .selectStagedImportAccounts()
-                .awaitAsList()
-                .mapNotNull { row ->
-                    val qifImportId = row.qif_import_id ?: return@mapNotNull null
-                    val accountId = row.account_id ?: return@mapNotNull null
-                    QifImportId(Uuid.parse(qifImportId)) to AccountId(accountId)
+                    CsvImportId(Uuid.parse(row.csv_import_id)) to AccountId(accountId)
                 }.toUnambiguousMap()
         }
 
@@ -134,21 +117,8 @@ class ImportDirectoryReadRepositoryImpl(
             selectQueries
                 .selectStagedImportFoldersWithoutAccount()
                 .awaitAsList()
-                .mapNotNull { row ->
-                    val csvImportId = row.csv_import_id ?: return@mapNotNull null
-                    CsvImportId(Uuid.parse(csvImportId)) to ImportDirectoryId(Uuid.parse(row.directory_id))
-                }.toUnambiguousMap()
-        }
-
-    override suspend fun qifImportFoldersWithoutAccount(): Map<QifImportId, ImportDirectoryId> =
-        withContext(coroutineContext) {
-            selectQueries
-                .selectStagedImportFoldersWithoutAccount()
-                .awaitAsList()
-                .mapNotNull { row ->
-                    val qifImportId = row.qif_import_id ?: return@mapNotNull null
-                    QifImportId(Uuid.parse(qifImportId)) to ImportDirectoryId(Uuid.parse(row.directory_id))
-                }.toUnambiguousMap()
+                .map { row -> CsvImportId(Uuid.parse(row.csv_import_id)) to ImportDirectoryId(Uuid.parse(row.directory_id)) }
+                .toUnambiguousMap()
         }
 
     override fun csvImportDirectories(): Flow<Map<CsvImportId, List<ImportDirectoryId>>> =
@@ -157,13 +127,6 @@ class ImportDirectoryReadRepositoryImpl(
             .asFlow()
             .mapToList(coroutineContext)
             .map { rows -> rows.groupDirectories({ CsvImportId(Uuid.parse(it.csv_import_id)) }, { it.directory_id }) }
-
-    override fun qifImportDirectories(): Flow<Map<QifImportId, List<ImportDirectoryId>>> =
-        selectQueries
-            .selectQifImportDirectories()
-            .asFlow()
-            .mapToList(coroutineContext)
-            .map { rows -> rows.groupDirectories({ QifImportId(Uuid.parse(it.qif_import_id)) }, { it.directory_id }) }
 
     private fun <R, K> List<R>.groupDirectories(
         importId: (R) -> K,
@@ -209,7 +172,6 @@ class ImportDirectoryReadRepositoryImpl(
         checksum: String?,
         remoteContentHash: String?,
         csvImportId: String?,
-        qifImportId: String?,
         importedAt: Long?,
     ): ImportDirectoryFile =
         ImportDirectoryFile(
@@ -220,7 +182,6 @@ class ImportDirectoryReadRepositoryImpl(
             checksum = checksum,
             remoteContentHash = remoteContentHash,
             csvImportId = csvImportId?.let { CsvImportId(Uuid.parse(it)) },
-            qifImportId = qifImportId?.let { QifImportId(Uuid.parse(it)) },
             importedAt = importedAt?.let(Instant::fromEpochMilliseconds),
         )
 }

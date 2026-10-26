@@ -5,7 +5,7 @@ import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.BulkFileStatus
 import com.moneymanager.csvimporter.DirectoryRedownloadResult
-import com.moneymanager.csvimporter.STRATEGY_CONTENT_SAMPLE_SIZE
+import com.moneymanager.csvimporter.Reimports
 import com.moneymanager.csvimporter.ScanResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.discoverImportableFolders
@@ -20,13 +20,10 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
-import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -37,8 +34,6 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
-import com.moneymanager.domain.repository.QifImportReadRepository
-import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
@@ -47,14 +42,8 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.RerunReads
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createImportDirectory
-import com.moneymanager.importengineapi.setLastQifAccount
 import com.moneymanager.importengineapi.updateImportDirectory
 import com.moneymanager.importfilesource.ImportFileSourceFactory
-import com.moneymanager.qifimporter.QifCsvAdapter
-import com.moneymanager.qifimporter.Reimports
-import com.moneymanager.qifimporter.bulkApplyQif
-import com.moneymanager.qifimporter.qifCompatible
-import com.moneymanager.qifimporter.selectForQifContent
 import com.moneymanager.tasks.Progress
 import com.moneymanager.tasks.TaskScope
 import com.moneymanager.tasks.formatElapsedTime
@@ -74,7 +63,7 @@ import kotlin.uuid.Uuid
 
 /**
  * Everything import directories do beyond plain CRUD: downloading folders (with subfolder discovery),
- * re-downloading them, and planning + applying CSV/QIF "import all" and "re-import all". The desktop app,
+ * re-downloading them, and planning + applying "import all" and "re-import all". The desktop app,
  * Android and the CLI all run this, so the screens only start tasks and render plans.
  *
  * Directory runs report through the [TaskScope] they're given, one child task per folder, so whoever
@@ -90,7 +79,6 @@ import kotlin.uuid.Uuid
 class ImportDirectoryService(
     private val importDirectoryRepository: ImportDirectoryReadRepository,
     private val csvImportRepository: CsvImportReadRepository,
-    private val qifImportRepository: QifImportReadRepository,
     private val csvImportStrategyRepository: CsvImportStrategyReadRepository,
     private val accountMappingRepository: AccountMappingReadRepository,
     private val accountRepository: AccountReadRepository,
@@ -99,7 +87,6 @@ class ImportDirectoryService(
     private val cryptoRepository: CryptoReadRepository,
     private val tradeRepository: TradeReadRepository,
     private val passThroughAccountRepository: PassThroughAccountReadRepository,
-    private val settingsRepository: SettingsReadRepository,
     private val transactionRepository: TransactionReadRepository,
     private val transferRelationshipRepository: TransferRelationshipReadRepository,
     private val transferSourceRepository: TransferSourceReadRepository,
@@ -110,7 +97,7 @@ class ImportDirectoryService(
     private val deviceId: DeviceId,
     private val writeLock: Mutex = Mutex(),
 ) {
-    /** Re-imports this session's CSV and QIF files; see [Reimports]. */
+    /** Re-imports this session's staged files; see [Reimports]. */
     val reimports =
         Reimports(
             reads =
@@ -121,7 +108,6 @@ class ImportDirectoryService(
                     auditRepository = auditRepository,
                     accountRepository = accountRepository,
                     csvImportRepository = csvImportRepository,
-                    qifImportRepository = qifImportRepository,
                     tradeRepository = tradeRepository,
                 ),
             csvImportStrategyRepository = csvImportStrategyRepository,
@@ -334,7 +320,7 @@ class ImportDirectoryService(
     }
 
     /**
-     * Downloads every folder, then applies every unimported CSV and QIF file that needs no decision, each
+     * Downloads every folder, then applies every unimported staged file that needs no decision, each
      * phase a child of [task]. Files that need a person (no matching strategy, a source account nobody set)
      * are left staged and returned in [ImportAllResult.needsAttention], also reported as issues on [task],
      * with the card references the applied files carry that no account owns.
@@ -365,39 +351,32 @@ class ImportDirectoryService(
                 redownloaded?.reimportSuggested.orEmpty().map { NeedsAttention(it, NeedsAttentionReason.REIMPORT_SUGGESTED) }
         val download = task.child(DOWNLOAD_ALL_TASK_KEY, "Download all", "Listing folders.") { downloadAll(this, directories) }
         if (!apply) {
-            return ImportAllResult(download, BulkApplyResult(emptyList()), BulkApplyResult(emptyList()), redownloadAttention, redownloaded)
+            return ImportAllResult(download, BulkApplyResult(emptyList()), redownloadAttention, redownloaded)
         }
         val files = directories?.let { filesIn(scope(it, importDirectoryRepository.getAllDirectories().first())) }
         val csvPlan: CsvImportAllPlan
-        val qifPlan: QifImportAllPlan
         val csv: BulkApplyResult
-        val qif: BulkApplyResult
         try {
-            csvPlan = planCsvImportAll(files?.let { ids -> unimportedCsvFiles().filter { it.id.toString() in ids } })
+            csvPlan = planCsvImportAll(files?.let { ids -> unimportedCsvFiles().filter { it.id in ids } })
             csv =
                 task.child("${IMPORT_ALL_TASK_KEY}-csv", "Import CSV files", "Preparing") {
                     applyCsvImportAll(csvPlan.unattended(), sourceAccountOverride = null, onProgress = ::report, refreshViews = false)
                 }
-            qifPlan = planQifImportAll(files?.let { ids -> unimportedQifFiles().filter { it.id.toString() in ids } })
-            qif =
-                task.child("${IMPORT_ALL_TASK_KEY}-qif", "Import QIF files", "Preparing") {
-                    applyQifImportAll(qifPlan.unattended(), sourceAccountId = null, onProgress = ::report, refreshViews = false)
-                }
         } finally {
-            // Whatever the CSV phase wrote must show up even when the QIF phase fails or the run is cancelled.
+            // Whatever was written must show up even when a file fails or the run is cancelled.
             if (refreshViews) withContext(NonCancellable) { maintenance.refreshMaterializedViews() }
         }
         val needsAttention =
-            csvPlan.needsAttention + qifPlan.needsAttention + redownloadAttention + unassignedCards(csv)
+            csvPlan.needsAttention + redownloadAttention + unassignedCards(csv)
         needsAttention.forEach { task.reportIssue("${it.subject}: ${it.reason.description}") }
-        return ImportAllResult(download, csv, qif, needsAttention, redownloaded)
+        return ImportAllResult(download, csv, needsAttention, redownloaded)
     }
 
-    // The CSV and QIF import ids (as strings, the two id types differ) staged from [folders].
-    private suspend fun filesIn(folders: List<ImportDirectory>): Set<String> =
+    // The imports staged from [folders].
+    private suspend fun filesIn(folders: List<ImportDirectory>): Set<CsvImportId> =
         folders
             .flatMap { importDirectoryRepository.getTrackedFiles(it.id).first() }
-            .mapNotNullTo(mutableSetOf()) { file -> (file.csvImportId ?: file.qifImportId)?.toString() }
+            .mapNotNullTo(mutableSetOf()) { it.csvImportId }
 
     // Card references in the files [csv] imported that no account owns, as the Card Last-4 tab finds them.
     private suspend fun unassignedCards(csv: BulkApplyResult): List<NeedsAttention> {
@@ -488,81 +467,6 @@ class ImportDirectoryService(
             )
         }
 
-    /** Plans a QIF "import all" over [imports] (every unimported file when null). */
-    suspend fun planQifImportAll(imports: List<QifImport>? = null): QifImportAllPlan {
-        val files = imports ?: unimportedQifFiles()
-        val strategies = csvImportStrategyRepository.getAllStrategies().first()
-        val qifStrategies = strategies.qifCompatible()
-        val directoryAccounts = importDirectoryRepository.qifImportSourceAccounts()
-        val foldersWithoutAccount = importDirectoryRepository.qifImportFoldersWithoutAccount()
-        val folders = mutableMapOf<QifImportId, ImportDirectoryId>()
-        val needsAttention = mutableListOf<NeedsAttention>()
-        val blockedIds = mutableSetOf<QifImportId>()
-        for (file in files) {
-            val rows = qifSampleRows(file)
-            // An empty file imports nothing either way, so it's nothing to resolve.
-            if (rows.isEmpty()) continue
-            val strategy = qifStrategies.selectForQifContent(rows, QifCsvAdapter.columns)
-            val reason =
-                when {
-                    strategy == null -> {
-                        NeedsAttentionReason.NO_STRATEGY
-                    }
-
-                    file.id !in directoryAccounts && strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT] == null -> {
-                        val folder = foldersWithoutAccount[file.id]
-                        if (folder != null) folders[file.id] = folder
-                        NeedsAttentionReason.NEEDS_SOURCE_ACCOUNT.takeIf { folder == null }
-                    }
-
-                    else -> {
-                        null
-                    }
-                }
-            if (reason != null) {
-                needsAttention += NeedsAttention(file.originalFileName, reason)
-                blockedIds += file.id
-            }
-        }
-        return QifImportAllPlan(
-            files = files,
-            directoryAccounts = directoryAccounts,
-            folders = folders,
-            defaultSourceAccountId = lastQifAccountId(),
-            needsAttention = needsAttention,
-            strategies = strategies,
-            currencies = currencyRepository.getAllCurrencies().first(),
-            blockedIds = blockedIds,
-        )
-    }
-
-    /**
-     * Applies [plan]: a file from a folder without an account gets one named after the folder, and one from
-     * no folder uses [sourceAccountId], which is remembered.
-     */
-    suspend fun applyQifImportAll(
-        plan: QifImportAllPlan,
-        sourceAccountId: AccountId?,
-        onProgress: suspend (Progress) -> Unit,
-        refreshViews: Boolean = true,
-    ): BulkApplyResult =
-        writeLock.withLock {
-            bulkApplyQif(
-                imports = plan.files,
-                sourceAccountId = sourceAccountId,
-                strategies = plan.strategies,
-                currencies = plan.currencies,
-                accountMappingRepository = accountMappingRepository,
-                accountRepository = accountRepository,
-                qifImportRepository = qifImportRepository,
-                maintenance = maintenance,
-                importEngine = importEngine,
-                onProgress = onProgress,
-                directoryAccounts = plan.directoryAccounts + folderAccounts(plan.folders),
-                refreshViews = refreshViews,
-            ).also { sourceAccountId?.let { importEngine.setLastQifAccount(it) } }
-        }
-
     // The account each of [folders]' files belongs to: the folder's own or its parent's if one was set since
     // planning, else one named after the folder (an existing account of that name, or a new one), kept on the folder
     // so the folder list shows it and the person can change it there.
@@ -590,18 +494,6 @@ class ImportDirectoryService(
     private suspend fun unimportedCsvFiles(): List<CsvImport> =
         csvImportRepository.getAllImports().first().filter { !it.ignored && it.lastAppliedAt == null }
 
-    /** QIF equivalent of [matchCsvStrategies]. */
-    suspend fun matchQifStrategies(files: List<QifImport>): Map<QifImportId, CsvImportStrategy?> {
-        val qifStrategies = csvImportStrategyRepository.getAllStrategies().first().qifCompatible()
-        return files.associate { it.id to qifStrategies.selectForQifContent(qifSampleRows(it), QifCsvAdapter.columns) }
-    }
-
-    private suspend fun qifSampleRows(file: QifImport) =
-        QifCsvAdapter.toRows(qifImportRepository.getImportRecords(file.id, STRATEGY_CONTENT_SAMPLE_SIZE, 0))
-
-    private suspend fun unimportedQifFiles(): List<QifImport> =
-        qifImportRepository.getAllImports().first().filter { !it.ignored && it.lastAppliedAt == null }
-
     // getAllImports() doesn't populate columns, so the full import is re-read before matching.
     private suspend fun matchCsvStrategy(
         listed: CsvImport,
@@ -609,12 +501,6 @@ class ImportDirectoryService(
     ): CsvImportStrategy? {
         val full = csvImportRepository.getImport(listed.id).first() ?: return null
         return strategies.selectForImport(full, csvImportRepository)
-    }
-
-    // The last account a QIF import used, if it still exists.
-    private suspend fun lastQifAccountId(): AccountId? {
-        val last = settingsRepository.getLastQifAccountId().first() ?: return null
-        return last.takeIf { id -> accountRepository.getAllAccounts().first().any { it.id == id } }
     }
 
     private fun requireFileSourceFactory(): ImportFileSourceFactory =
@@ -630,7 +516,6 @@ class ImportDirectoryService(
             fileSource = requireFileSourceFactory().create(directory),
             importDirectoryRepository = importDirectoryRepository,
             csvImportRepository = csvImportRepository,
-            qifImportRepository = qifImportRepository,
             importEngine = importEngine,
             dbLock = writeLock,
             onProgress = { done, total -> task.report(Progress.counted("$done / $total files", done, total)) },

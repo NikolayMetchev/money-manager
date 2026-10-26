@@ -5,7 +5,6 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.SourceType
@@ -15,7 +14,7 @@ import kotlin.uuid.Uuid
 /**
  * The flat source columns a source-carrying query selects: which row this source belongs to and
  * when, the device metadata, and the per-source-type import detail. A source with no per-type
- * detail row (the strategy and import-directory tables have none) simply leaves the csv/qif/api
+ * detail row (the strategy and import-directory tables have none) simply leaves the csv/api
  * fields at their null defaults.
  *
  * Four call sites build one: [toSourceRecord] for everything in the unified `entity_source` store,
@@ -42,9 +41,6 @@ data class SourceColumns(
     val csvImportId: String? = null,
     val csvRowIndex: Long? = null,
     val csvFileName: String? = null,
-    val qifImportId: String? = null,
-    val qifRecordIndex: Long? = null,
-    val qifFileName: String? = null,
     val apiSessionId: Long? = null,
     val apiRequestId: Long? = null,
     val apiJsonPath: String? = null,
@@ -86,7 +82,7 @@ fun buildSourceRecord(columns: SourceColumns): SourceRecord? {
 
 /**
  * Reconstructs the [Source] for [sourceType] from this row's detail columns, paired with the
- * join-derived import file name (CSV/QIF only; null otherwise). Mirrors `Source.toSourceType`.
+ * join-derived import file name (CSV only; null otherwise). Mirrors `Source.toSourceType`.
  */
 private fun SourceColumns.reconstructSource(sourceType: SourceType): Pair<Source, String?> =
     when (sourceType) {
@@ -115,13 +111,6 @@ private fun SourceColumns.reconstructSource(sourceType: SourceType): Pair<Source
                 importId = CsvImportId(Uuid.parse(checkNotNull(csvImportId) { "CSV source row missing csv_import_id" })),
                 rowIndex = csvRowIndex,
             ) to csvFileName
-        }
-
-        SourceType.QIF_IMPORT -> {
-            Source.Qif(
-                importId = QifImportId(Uuid.parse(checkNotNull(qifImportId) { "QIF source row missing qif_import_id" })),
-                recordIndex = qifRecordIndex,
-            ) to qifFileName
         }
 
         SourceType.API -> {

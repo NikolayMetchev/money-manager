@@ -2,6 +2,7 @@ package com.moneymanager.database.csv
 
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.BulkApplyResult
+import com.moneymanager.csvimporter.CsvImportResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
@@ -15,8 +16,6 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.createAccount
-import com.moneymanager.qifimporter.StagedFile
-import com.moneymanager.qifimporter.StagedRunResult
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.reimports
@@ -252,7 +251,7 @@ class CryptoComCsvE2ETest : DbTest() {
         }
 
     /** Re-imports an already-imported Crypto.com Fiat file with its built-in strategy. */
-    private suspend fun reimportFiat(importId: CsvImportId): SourceRerunResult<StagedRunResult?> {
+    private suspend fun reimportFiat(importId: CsvImportId): SourceRerunResult<CsvImportResult?> {
         val current = repositories.csvImportRepository.getImport(importId).first()!!
         val strategy =
             repositories.csvImportStrategyRepository
@@ -260,7 +259,7 @@ class CryptoComCsvE2ETest : DbTest() {
                 .first()
                 .first { it.name == "Crypto.com Fiat" }
         val reimports = repositories.reimports(maintenance)
-        return reimports.reimport(reimports.plan(StagedFile.Csv(current)).copy(strategy = strategy), accountId = null, currencyId = null)
+        return reimports.reimport(reimports.plan(current).copy(strategy = strategy), accountId = null, currencyId = null)
     }
 
     @Test

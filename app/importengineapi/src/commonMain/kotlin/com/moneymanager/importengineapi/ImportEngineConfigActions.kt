@@ -12,7 +12,6 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.WellKnownIds
@@ -23,7 +22,6 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
-import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.regex.PortableRegex
 import kotlin.time.Instant
 
@@ -278,50 +276,10 @@ suspend fun ImportEngine.applyCsvImportMutations(mutations: List<CsvImportMutati
 
 // endregion
 
-// region QIF staging
-
-suspend fun ImportEngine.createQifImport(
-    fileName: String,
-    records: List<QifImportRecord>,
-    accountType: String,
-    fileChecksum: String,
-    fileLastModified: Instant,
-): QifImportId =
-    requireNotNull(
-        import(
-            ImportBatch(
-                qifImportMutations =
-                    listOf(QifImportMutation.Create(fileName, fileName, records, accountType, fileChecksum, fileLastModified)),
-            ),
-        ).createdQifImportIds[fileName],
-    )
-
-suspend fun ImportEngine.deleteQifImport(id: QifImportId) {
-    import(ImportBatch(qifImportMutations = listOf(QifImportMutation.Delete(id))))
-}
-
-suspend fun ImportEngine.setQifImportIgnored(
-    id: QifImportId,
-    ignored: Boolean,
-) {
-    import(ImportBatch(qifImportMutations = listOf(QifImportMutation.SetIgnored(id, ignored))))
-}
-
-/** Applies several QIF staging write-backs (status/error/application) in one batch. */
-suspend fun ImportEngine.applyQifImportMutations(mutations: List<QifImportMutation>) {
-    if (mutations.isNotEmpty()) import(ImportBatch(qifImportMutations = mutations))
-}
-
-// endregion
-
 // region Settings
 
 suspend fun ImportEngine.setDefaultCurrency(id: CurrencyId) {
     import(ImportBatch(settings = ImportSettings(defaultCurrencyId = id)))
-}
-
-suspend fun ImportEngine.setLastQifAccount(id: AccountId) {
-    import(ImportBatch(settings = ImportSettings(lastQifAccountId = id)))
 }
 
 suspend fun ImportEngine.setSetupWizardCompleted(completed: Boolean) {
@@ -456,7 +414,6 @@ suspend fun ImportEngine.recordDirectoryFileImported(
     checksum: String?,
     remoteContentHash: String? = null,
     csvImportId: CsvImportId? = null,
-    qifImportId: QifImportId? = null,
     importedAt: Instant,
 ) {
     import(
@@ -471,7 +428,6 @@ suspend fun ImportEngine.recordDirectoryFileImported(
                         checksum = checksum,
                         remoteContentHash = remoteContentHash,
                         csvImportId = csvImportId,
-                        qifImportId = qifImportId,
                         importedAt = importedAt,
                     ),
                 ),

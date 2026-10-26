@@ -21,6 +21,7 @@ import com.moneymanager.csv.CsvParseOptions
 import com.moneymanager.csv.CsvParser
 import com.moneymanager.csvimporter.sha256Hex
 import com.moneymanager.csvimporter.stagePdfImport
+import com.moneymanager.csvimporter.stageQifImport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.csv.CsvImport
@@ -42,7 +43,6 @@ import com.moneymanager.importengineapi.createCsvImport
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.ui.components.imports.ImportStatusMessage
 import com.moneymanager.ui.components.imports.ImportsEmptyMessage
 import com.moneymanager.ui.components.imports.ImportsScreenHeader
@@ -138,6 +138,36 @@ fun CsvImportsScreen(
             }
         }
 
+    // A QIF file is staged as a CSV import of its fixed QIF columns, one row per split.
+    val qifFilePicker =
+        rememberMultipleFilePicker(
+            mimeTypes = listOf("application/qif", "application/x-qif", "application/octet-stream"),
+        ) { results ->
+            if (results.isNotEmpty()) {
+                isImporting = true
+                importMessage = null
+                scope.launch {
+                    val outcome =
+                        importPickedFiles(results, fileName = { it.fileName }) { result ->
+                            val checksum = sha256Hex(result.content)
+                            if (csvImportRepository.findImportsByChecksum(checksum).isNotEmpty()) {
+                                return@importPickedFiles false
+                            }
+                            importEngine.stageQifImport(
+                                result.fileName,
+                                result.content,
+                                checksum,
+                                result.lastModified ?: Clock.System.now(),
+                            )
+                            true
+                        }
+                    isImporting = false
+                    importMessageIsError = outcome.isError
+                    importMessage = outcome.message
+                }
+            }
+        }
+
     // Excel and PDF files are staged from their bytes; one picked file at a time, skipped if already imported.
     fun stageBinaryFile(
         result: BinaryFilePickerResult,
@@ -193,6 +223,12 @@ fun CsvImportsScreen(
                 Text("+ Import Excel")
             }
             TextButton(
+                onClick = { qifFilePicker.launch() },
+                enabled = !isImporting,
+            ) {
+                Text("+ Import QIF")
+            }
+            TextButton(
                 onClick = { pdfFilePicker.launch() },
                 enabled = !isImporting,
             ) {
@@ -231,7 +267,7 @@ fun CsvImportsScreen(
 
             reimportAllScope?.let { scopedImported ->
                 ReimportAllDialog(
-                    files = scopedImported.map(StagedFile::Csv),
+                    files = scopedImported,
                     reimports = importDirectoryService.reimports,
                     pickers = ReimportPickerRepositories(accountRepository, categoryRepository, currencyRepository, personRepository),
                     onDismiss = { reimportAllScope = null },

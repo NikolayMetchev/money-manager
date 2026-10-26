@@ -5,14 +5,11 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Read-only aggregate of per-import transaction date ranges, powering the import Timeline view
- * and the date-range lines on the CSV/QIF/API import screens.
+ * and the date-range lines on the CSV and API import screens.
  */
 interface ImportTimelineReadRepository {
-    /** One entry per CSV import that produced transactions. */
+    /** One entry per staged import (CSV, QIF, Excel or PDF) that produced transactions. */
     fun getCsvImportDateRanges(): Flow<List<ImportFileDateRange>>
-
-    /** One entry per QIF import that produced transactions. */
-    fun getQifImportDateRanges(): Flow<List<ImportFileDateRange>>
 
     /** One entry per API session that produced transactions. */
     fun getApiSessionDateRanges(): Flow<List<ImportFileDateRange>>
@@ -25,9 +22,6 @@ interface ImportTimelineReadRepository {
 
     /** One entry per (CSV import, touched account) pair — a file touching several accounts repeats. */
     fun getCsvImportAccountRanges(): Flow<List<ImportFileDateRange>>
-
-    /** One entry per (QIF import, touched account) pair. */
-    fun getQifImportAccountRanges(): Flow<List<ImportFileDateRange>>
 
     /** One entry per (API session, touched account) pair. */
     fun getApiSessionAccountRanges(): Flow<List<ImportFileDateRange>>

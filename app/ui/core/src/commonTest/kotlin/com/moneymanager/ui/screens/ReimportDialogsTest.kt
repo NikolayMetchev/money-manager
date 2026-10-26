@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import com.moneymanager.csvimporter.AttributeAccountMatcher
+import com.moneymanager.csvimporter.CsvImportResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.di.openDatabaseComponent
@@ -28,8 +29,6 @@ import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.presenter.error.ProvideSchemaAwareScope
-import com.moneymanager.qifimporter.StagedFile
-import com.moneymanager.qifimporter.StagedRunResult
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
@@ -69,7 +68,7 @@ class ReimportDialogsTest {
         val pickers =
             ReimportPickerRepositories(dc.accountRepository, dc.categoryRepository, dc.currencyRepository, dc.personRepository)
 
-        suspend fun reloaded() = StagedFile.Csv(dc.csvImportRepository.getImport(csvImport.id).first()!!)
+        suspend fun reloaded() = dc.csvImportRepository.getImport(csvImport.id).first()!!
     }
 
     /** Imports a two-row Monzo export onto "Monzo" and edits the first row's transaction by hand. */
@@ -131,12 +130,12 @@ class ReimportDialogsTest {
     fun reimportDialog_previewsTheHandEdit_andReappliesIt() =
         runMoneyManagerComposeUiTest {
             val fixture = setUp()
-            var result: SourceRerunResult<StagedRunResult?>? = null
+            var result: SourceRerunResult<CsvImportResult?>? = null
 
             setContent {
                 ProvideSchemaAwareScope {
                     ReimportDialog(
-                        file = StagedFile.Csv(fixture.csvImport),
+                        file = fixture.csvImport,
                         reimports = fixture.dc.reimports(),
                         pickers = fixture.pickers,
                         onDismiss = { },
@@ -188,7 +187,7 @@ class ReimportDialogsTest {
             setContent {
                 ProvideSchemaAwareScope {
                     ReimportAllDialog(
-                        files = listOf(StagedFile.Csv(fixture.csvImport)),
+                        files = listOf(fixture.csvImport),
                         reimports = fixture.dc.reimports(),
                         pickers = fixture.pickers,
                         onDismiss = { },

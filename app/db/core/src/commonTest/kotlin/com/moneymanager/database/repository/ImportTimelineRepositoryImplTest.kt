@@ -7,7 +7,6 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -193,46 +192,6 @@ class ImportTimelineRepositoryImplTest : DbTest() {
                     .first()
                     .isEmpty(),
             )
-        }
-
-    @Test
-    fun `qif ranges mirror csv shape`() =
-        runDbTest {
-            setupAccountsAndCurrency()
-            val qifImportId: QifImportId =
-                repositories.qifImportRepository.createImport(
-                    fileName = "statement.qif",
-                    records = emptyList(),
-                    accountType = "Bank",
-                    fileChecksum = "qif-checksum",
-                    fileLastModified = fileLastModified,
-                )
-            val strategy = createStrategy()
-            repositories.qifImportRepository.recordImportApplication(qifImportId, strategy.id, strategy.name, appliedAt)
-            val transfer = createTransferAt(earliestTimestamp)
-            val source =
-                repositories.transferSourceRepository.getSourceByRevision(
-                    transactionId = transfer.id,
-                    revisionId = transfer.revisionId,
-                )
-            assertNotNull(source)
-            entitySourceQueries.insertQifSource(
-                id = source.id,
-                qif_import_id = qifImportId.id.toString(),
-                qif_record_index = 0,
-            )
-
-            val range =
-                repositories.importTimelineRepository
-                    .getQifImportDateRanges()
-                    .first()
-                    .single()
-            assertEquals(TimelineSourceKind.QIF, range.kind)
-            assertEquals("statement.qif", range.fileName)
-            assertEquals("Monzo", range.strategyName)
-            assertEquals(earliestTimestamp, range.earliest)
-            assertEquals(earliestTimestamp, range.latest)
-            assertEquals(1, range.transactionCount)
         }
 
     @Test

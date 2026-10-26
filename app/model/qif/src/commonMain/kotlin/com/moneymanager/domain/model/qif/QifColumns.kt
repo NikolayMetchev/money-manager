@@ -1,9 +1,9 @@
 package com.moneymanager.domain.model.qif
 
 /**
- * The fixed column names QIF records are presented as, so QIF can reuse the CSV strategy engine.
- * Domain vocabulary (db-free), so both the database (and the built-in QIF strategies) and the
- * QIF importer can reference the same names.
+ * The fixed columns a QIF file is staged as (one row per transaction, or per split), so a QIF import is a CSV
+ * import like any other. Domain vocabulary (db-free), so the built-in QIF strategies and the staging code
+ * name the same columns.
  */
 object QifColumns {
     const val COL_DATE = "Date"

@@ -29,7 +29,6 @@ import com.moneymanager.domain.repository.write.PassThroughAccountWriteRepositor
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
-import com.moneymanager.domain.repository.write.QifImportWriteRepository
 import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
@@ -82,7 +81,6 @@ interface DatabaseComponent {
     val personAttributeRepository: PersonAttributeWriteRepository
     val passThroughAccountRepository: PassThroughAccountWriteRepository
     val personRepository: PersonWriteRepository
-    val qifImportRepository: QifImportWriteRepository
     val relationshipTypeRepository: RelationshipTypeWriteRepository
     val settingsRepository: SettingsWriteRepository
     val transactionRepository: TransactionWriteRepository
