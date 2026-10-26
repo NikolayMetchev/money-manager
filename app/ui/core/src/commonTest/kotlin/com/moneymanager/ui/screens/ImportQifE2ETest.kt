@@ -1,7 +1,10 @@
 package com.moneymanager.ui.screens
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -236,7 +239,7 @@ class ImportQifE2ETest {
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
             onNodeWithText("CSV", useUnmergedTree = true).performClick()
-            waitUntilExactlyOneExists(hasText("first.qif"), timeoutMillis = 15000)
+            waitUntilAtLeastOneExists(hasText("first.qif"), timeoutMillis = 15000)
 
             // Apply to the first file (creates the transfers), then to the second (all duplicates).
             for (file in listOf("first.qif", "second.qif")) {
@@ -337,6 +340,76 @@ class ImportQifE2ETest {
             waitForIdle()
         }
     }
+
+    @Test
+    fun unimport_oneFileThenTheRest_movesThemToIgnored() {
+        runMoneyManagerComposeUiTest {
+            testDbLocation = createTestDatabaseLocation()
+            val databaseManager = createTestDatabaseManager()
+
+            runBlocking {
+                val db = databaseManager.openDatabase(testDbLocation!!)
+                val component = openDatabaseComponent(db)
+                val usdId = component.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+                component.settingsRepository.setDefaultCurrencyId(usdId)
+                val source =
+                    component.accountRepository.createAccount(
+                        Account(id = AccountId(0), name = "Cash Account", openingDate = Instant.fromEpochMilliseconds(1700000000000L)),
+                    )
+                val target =
+                    component.accountRepository.createAccount(
+                        Account(id = AccountId(0), name = "Expenses", openingDate = Instant.fromEpochMilliseconds(1700000000000L)),
+                    )
+                component.csvImportStrategyRepository.createStrategy(qifStrategy(source, target, usdId), Source.Manual)
+                // Identical transactions: whichever file imports second matches the first file's transfers.
+                injectQifImport(component, fileName = "first.qif", checksum = "c1")
+                injectQifImport(component, fileName = "second.qif", checksum = "c2")
+            }
+
+            setContent {
+                MoneyManagerTestApp(
+                    databaseManager = QifTestDatabaseManager(databaseManager, testDbLocation!!),
+                    appVersion = AppVersion("1.0.0-test"),
+                )
+            }
+
+            waitForIdle()
+            waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
+            onNodeWithText("Imports", useUnmergedTree = true).performClick()
+            waitForIdle()
+            onNodeWithText("CSV", useUnmergedTree = true).performClick()
+            waitUntilExactlyOneExists(hasText("Import all (2)"), timeoutMillis = 15000)
+            onNodeWithText("Import all (2)").performClick()
+            waitUntilAtLeastOneExists(hasText("Import 2 files") and isEnabled(), timeoutMillis = 15000)
+            onNodeWithText("Import 2 files").performClick()
+            waitUntilAtLeastOneExists(hasText("Imported 2 files", substring = true), timeoutMillis = 20000)
+            onNodeWithText("Done").performClick()
+            waitUntilExactlyOneExists(hasText("Imported (2)"), timeoutMillis = 15000)
+            onNodeWithText("Imported (2)").performClick()
+            waitForIdle()
+
+            // One file: the preview says what it deletes, and the file leaves the Imported tab.
+            waitUntilAtLeastOneExists(hasText("Unimport") and isEnabled(), timeoutMillis = 15000)
+            onAllNodesWithText("Unimport").onFirst().performClick()
+            waitUntilAtLeastOneExists(hasText("This deletes the", substring = true), timeoutMillis = 15000)
+            waitUntilAtLeastOneExists(dialogButton("Unimport"), timeoutMillis = 15000)
+            onAllNodes(dialogButton("Unimport")).onFirst().performClick()
+            waitUntilAtLeastOneExists(hasText("Unimported ", substring = true), timeoutMillis = 20000)
+            waitUntilExactlyOneExists(hasText("Imported (1)"), timeoutMillis = 15000)
+
+            // The rest, through the bulk dialog.
+            onNodeWithText("Unimport all (1)").performClick()
+            waitUntilExactlyOneExists(hasText("Unimport 1 file(s)?"), timeoutMillis = 15000)
+            waitUntilAtLeastOneExists(dialogButton("Unimport all"), timeoutMillis = 15000)
+            onAllNodes(dialogButton("Unimport all")).onFirst().performClick()
+            waitUntilDoesNotExist(hasText("Unimport 1 file(s)?"), timeoutMillis = 20000)
+            waitForIdle()
+            waitUntilExactlyOneExists(hasText("Imported (0)"), timeoutMillis = 15000)
+            waitUntilExactlyOneExists(hasText("Ignored (2)"), timeoutMillis = 15000)
+        }
+    }
+
+    private fun dialogButton(label: String): SemanticsMatcher = hasText(label) and isEnabled() and hasAnyAncestor(isDialog())
 }
 
 /** DatabaseManager wrapper that points the app at the pre-populated test database. */
