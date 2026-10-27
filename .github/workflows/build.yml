@@ -119,7 +119,7 @@ jobs:
       - name: Install the BuildBuddy CLI
         if: steps.where.outputs.remote == 'true'
         env:
-          BB_VERSION: 5.0.497  # renovate: buildbuddy-io/bazel
+          BB_VERSION: 5.0.498  # renovate: buildbuddy-io/bazel
         run: |
           release="https://github.com/buildbuddy-io/bazel/releases/download/$BB_VERSION/bazel-$BB_VERSION-linux-x86_64"
           mkdir -p "$RUNNER_TEMP/bb"
