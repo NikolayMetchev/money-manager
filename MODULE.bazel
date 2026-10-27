@@ -98,7 +98,7 @@ http_archive(
 # from native binaries through a loader that embeds it (#1191), and on Android through JNA (#1190): one shared library
 # per OS/arch, each build carrying only its target platform's (Android: arm64 devices and x64 emulators). Renovate bumps PDFIUM (the release's chromium build);
 # bazel/renovate/repin.sh then rewrites the SHA-256s.
-PDFIUM = "8111"
+PDFIUM = "8125"
 
 # The library, its VERSION, its C headers (the native loader includes them), and the license notices a binary
 # distribution must carry: bblanchon's LICENSE, and licenses/ for pdfium and each library it compiles in.
