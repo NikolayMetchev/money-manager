@@ -67,10 +67,10 @@ NODE = "26.13.0"
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node")
 node.toolchain(
     node_repositories = {
-        NODE + "-darwin_arm64": ["node-v" + NODE + "-darwin-arm64.tar.xz", "node-v" + NODE + "-darwin-arm64", "18830bf448fe187c650dc28c98aa8c968ed1d40b6dd032c081e70a384a1bf660"],
-        NODE + "-linux_amd64": ["node-v" + NODE + "-linux-x64.tar.xz", "node-v" + NODE + "-linux-x64", "6170b2d474e1c626f43cff3adc118df9fe3b573258a4fc3d850c8dbc6b079bbd"],
-        NODE + "-linux_arm64": ["node-v" + NODE + "-linux-arm64.tar.xz", "node-v" + NODE + "-linux-arm64", "42aa04922591ee5d4dbc7740d452621acf28508239daa512f5ee8c47ee224fdb"],
-        NODE + "-windows_amd64": ["node-v" + NODE + "-win-x64.zip", "node-v" + NODE + "-win-x64", "b3efd5c70cba3308ed46e7e699a9b8aac075bbc6b027fcb39c84c31acc25e2b4"],
+        NODE + "-darwin_arm64": ["node-v" + NODE + "-darwin-arm64.tar.xz", "node-v" + NODE + "-darwin-arm64", "6f5b3187d9df9fc007e881167905bc7d69ad26450ddc377c83d63256a2495b6e"],
+        NODE + "-linux_amd64": ["node-v" + NODE + "-linux-x64.tar.xz", "node-v" + NODE + "-linux-x64", "d28a96af6c38596f6d9d97c0ee531c13d238d757742387d1928de822d959e997"],
+        NODE + "-linux_arm64": ["node-v" + NODE + "-linux-arm64.tar.xz", "node-v" + NODE + "-linux-arm64", "406fe3fbde1c054adff8b297c16fdb5af6659db327c1ac8acd46b56ef1af9a92"],
+        NODE + "-windows_amd64": ["node-v" + NODE + "-win-x64.zip", "node-v" + NODE + "-win-x64", "dcc60d59a0746999f99064a01c020445d54d84228c691cdbf25b49ac3b59150a"],
     },
     node_version = NODE,
 )
