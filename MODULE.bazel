@@ -62,7 +62,7 @@ use_repo(sqlite_amalgamation, "sqlite_amalgamation")
 # Node.js, which runs the browser targets' tests (#84): only its toolchain, no npm. rules_nodejs knows releases up to
 # its own, so each platform's archive is listed here with its SHA-256 from nodejs.org's SHASUMS256.txt. Renovate bumps
 # NODE; bazel/renovate/repin.sh then rewrites the SHA-256s.
-NODE = "26.12.1"
+NODE = "26.13.0"
 
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node")
 node.toolchain(
