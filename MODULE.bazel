@@ -653,7 +653,7 @@ maven.install(
     artifacts = [
         "com.android.tools.build:builder:9.4.1",
         "com.android.tools.build:gradle:9.4.1",
-        "com.android.tools.build:gradle-api:9.4.1",
+        "com.android.tools.build:gradle-api:9.5.0",
         # Transitive versions held at the newest (see version_conflict_policy).
         "com.google.code.findbugs:jsr305:3.0.2",
         "com.google.code.gson:gson:2.15.0",
