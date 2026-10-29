@@ -11,7 +11,7 @@
     "org.ow2.asm:asm-util": -787144750,
     "org.schemaspy:schemaspy": -420104998,
     "org.slf4j:slf4j-api": -1626237844,
-    "org.xerial:sqlite-jdbc": -1568133487,
+    "org.xerial:sqlite-jdbc": -765649713,
     "repositories": -1949687017
   },
   "__RESOLVED_ARTIFACTS_HASH": {
@@ -84,7 +84,7 @@
     "org.slf4j:jul-to-slf4j": -91790967,
     "org.slf4j:log4j-over-slf4j": 1820529811,
     "org.slf4j:slf4j-api": -736053657,
-    "org.xerial:sqlite-jdbc": 363611074
+    "org.xerial:sqlite-jdbc": -253132852
   },
   "artifacts": {
     "ch.qos.logback:logback-classic": {
@@ -498,9 +498,9 @@
     },
     "org.xerial:sqlite-jdbc": {
       "shasums": {
-        "jar": "bcb1f51e36f940867e83342f9efbf5968ac44a6bef4d397bb4af7b17b45cd2fb"
+        "jar": "f8dce420a6016278497f4f0560f65602b9db858de141b541cf91a4644ebe4639"
       },
-      "version": "3.53.4.0"
+      "version": "3.54.1.0"
     }
   },
   "dependencies": {
