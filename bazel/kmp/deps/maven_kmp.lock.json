@@ -81,15 +81,15 @@
       "kotlinx-io-core": "org.jetbrains.kotlinx:kotlinx-io-core:0.9.1",
       "kotlinx-serialization-core": "org.jetbrains.kotlinx:kotlinx-serialization-core:1.12.0",
       "kotlinx-serialization-json": "org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0",
-      "ktor-client-auth": "io.ktor:ktor-client-auth:3.6.0",
-      "ktor-client-cio": "io.ktor:ktor-client-cio:3.6.0",
-      "ktor-client-core": "io.ktor:ktor-client-core:3.6.0",
-      "ktor-client-engine-defaults": "io.ktor:ktor-client-engine-defaults:3.6.0",
-      "ktor-client-mock": "io.ktor:ktor-client-mock:3.6.0",
-      "ktor-http": "io.ktor:ktor-http:3.6.0",
-      "ktor-io": "io.ktor:ktor-io:3.6.0",
-      "ktor-network": "io.ktor:ktor-network:3.6.0",
-      "ktor-utils": "io.ktor:ktor-utils:3.6.0",
+      "ktor-client-auth": "io.ktor:ktor-client-auth:3.6.1",
+      "ktor-client-cio": "io.ktor:ktor-client-cio:3.6.1",
+      "ktor-client-core": "io.ktor:ktor-client-core:3.6.1",
+      "ktor-client-engine-defaults": "io.ktor:ktor-client-engine-defaults:3.6.1",
+      "ktor-client-mock": "io.ktor:ktor-client-mock:3.6.1",
+      "ktor-http": "io.ktor:ktor-http:3.6.1",
+      "ktor-io": "io.ktor:ktor-io:3.6.1",
+      "ktor-network": "io.ktor:ktor-network:3.6.1",
+      "ktor-utils": "io.ktor:ktor-utils:3.6.1",
       "log4j-core": "org.apache.logging.log4j:log4j-core:2.26.1",
       "log4j-slf4j2-impl": "org.apache.logging.log4j:log4j-slf4j2-impl:2.26.1",
       "mappie-api": "tech.mappie:mappie-api:2.4.21-2.4.5",
@@ -11646,12 +11646,12 @@
     },
     "com.squareup.okhttp3:okhttp": {
       "android": {
-        "version": "5.5.0",
+        "version": "5.5.1",
         "files": [
           {
             "name": "okhttp.aar",
-            "url": "https://repo1.maven.org/maven2/com/squareup/okhttp3/okhttp-android/5.5.0/okhttp-android-5.5.0.aar",
-            "sha256": "6c7fd12f092e64ca2eae0b8a8023900c0d7ffec57888cf8abc8085c6f42e1dcc"
+            "url": "https://repo1.maven.org/maven2/com/squareup/okhttp3/okhttp-android/5.5.1/okhttp-android-5.5.1.aar",
+            "sha256": "ce00fd7751cf7e4f28ba73a0287b3cc0c62b8b83f038e428592eeef189513ee1"
           }
         ],
         "deps": [
@@ -11663,12 +11663,12 @@
         ]
       },
       "jvm": {
-        "version": "5.5.0",
+        "version": "5.5.1",
         "files": [
           {
-            "name": "okhttp-jvm-5.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/squareup/okhttp3/okhttp-jvm/5.5.0/okhttp-jvm-5.5.0.jar",
-            "sha256": "234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52"
+            "name": "okhttp-jvm-5.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/squareup/okhttp3/okhttp-jvm/5.5.1/okhttp-jvm-5.5.1.jar",
+            "sha256": "4039527bd1f2e40b66e20b0e52c689cf56074b938ea02678141495f5160f1047"
           }
         ],
         "deps": [
@@ -13866,12 +13866,12 @@
     },
     "io.ktor:ktor-client-auth": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-auth-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-jvm/3.6.0/ktor-client-auth-jvm-3.6.0.jar",
-            "sha256": "dcf49420eaff0fe74c78d569c12251072fa2d6d7c254ba00cbc900e10b3da255"
+            "name": "ktor-client-auth-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-jvm/3.6.1/ktor-client-auth-jvm-3.6.1.jar",
+            "sha256": "efdccdf8aeb229a6135954dc7ae00e187b666c76e5fbc02b782feee62a183219"
           }
         ],
         "deps": [
@@ -13881,11 +13881,11 @@
         ]
       },
       "js": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-auth-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-js/3.6.0/ktor-client-auth-js-3.6.0.klib",
+            "name": "ktor-client-auth-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-js/3.6.1/ktor-client-auth-js-3.6.1.klib",
             "sha256": "6614c125343d006908a95c6ce397c439a73ba2d40c799beae5fd058dffbf54f8"
           }
         ],
@@ -13900,12 +13900,12 @@
         ]
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-auth-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-jvm/3.6.0/ktor-client-auth-jvm-3.6.0.jar",
-            "sha256": "dcf49420eaff0fe74c78d569c12251072fa2d6d7c254ba00cbc900e10b3da255"
+            "name": "ktor-client-auth-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-jvm/3.6.1/ktor-client-auth-jvm-3.6.1.jar",
+            "sha256": "efdccdf8aeb229a6135954dc7ae00e187b666c76e5fbc02b782feee62a183219"
           }
         ],
         "deps": [
@@ -13915,11 +13915,11 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-auth-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-linuxarm64/3.6.0/ktor-client-auth-linuxarm64-3.6.0.klib",
+            "name": "ktor-client-auth-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-linuxarm64/3.6.1/ktor-client-auth-linuxarm64-3.6.1.klib",
             "sha256": "a458899118b07fadc63efc450ce643aac24cc732373ac08def24187ef1638c61"
           }
         ],
@@ -13930,11 +13930,11 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-auth-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-linuxx64/3.6.0/ktor-client-auth-linuxx64-3.6.0.klib",
+            "name": "ktor-client-auth-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-linuxx64/3.6.1/ktor-client-auth-linuxx64-3.6.1.klib",
             "sha256": "f20fe824e751f5fbe0f2a38326c4ccade6d3395ce44d36a7080c57f5ec4f462f"
           }
         ],
@@ -13945,11 +13945,11 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-auth-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-macosarm64/3.6.0/ktor-client-auth-macosarm64-3.6.0.klib",
+            "name": "ktor-client-auth-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-macosarm64/3.6.1/ktor-client-auth-macosarm64-3.6.1.klib",
             "sha256": "e9c0d7f768559f5154e7a8c4ca5f171b2609a90693e56848323f554f97cf9550"
           }
         ],
@@ -13960,11 +13960,11 @@
         ]
       },
       "metadata": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-auth-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth/3.6.0/ktor-client-auth-3.6.0.jar",
+            "name": "ktor-client-auth-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth/3.6.1/ktor-client-auth-3.6.1.jar",
             "sha256": "2ae2530a061ad20eb49733dca7ca3a2a04190c280192844c34ff328e17418493"
           }
         ],
@@ -13977,11 +13977,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-auth-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth/3.6.0/ktor-client-auth-3.6.0.jar",
+            "name": "ktor-client-auth-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth/3.6.1/ktor-client-auth-3.6.1.jar",
             "sha256": "2ae2530a061ad20eb49733dca7ca3a2a04190c280192844c34ff328e17418493"
           }
         ],
@@ -13994,11 +13994,11 @@
         ]
       },
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-auth-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-mingwx64/3.6.0/ktor-client-auth-mingwx64-3.6.0.klib",
+            "name": "ktor-client-auth-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-mingwx64/3.6.1/ktor-client-auth-mingwx64-3.6.1.klib",
             "sha256": "71ba4bb62df5d023c44fde483a8486806fc536cf095b26a798518d28faf3f779"
           }
         ],
@@ -14009,11 +14009,11 @@
         ]
       },
       "wasmJs": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-auth-wasm-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-wasm-js/3.6.0/ktor-client-auth-wasm-js-3.6.0.klib",
+            "name": "ktor-client-auth-wasm-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-auth-wasm-js/3.6.1/ktor-client-auth-wasm-js-3.6.1.klib",
             "sha256": "c49d0e915faa15241e55f2fb1889c7ffdc45c96c590a47f2d0a2726292d0230d"
           }
         ],
@@ -14029,12 +14029,12 @@
     },
     "io.ktor:ktor-client-cio": {
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-cio-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-cio-jvm/3.6.0/ktor-client-cio-jvm-3.6.0.jar",
-            "sha256": "a12b3d94e140cc235a9b77f37f6946deee5e4d32cb8afa7b64b29746412c1dd0"
+            "name": "ktor-client-cio-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-cio-jvm/3.6.1/ktor-client-cio-jvm-3.6.1.jar",
+            "sha256": "6f2b3194e8fbb28250b84e8868b1064731b54f1a950379b2a1c6d83c59e1d018"
           }
         ],
         "deps": [
@@ -14049,12 +14049,12 @@
     },
     "io.ktor:ktor-client-core": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-core-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-jvm/3.6.0/ktor-client-core-jvm-3.6.0.jar",
-            "sha256": "7dc9a3c76bf43f672e8331aad1ecb06864f69f464ab1517c24ed8a38c86f812f"
+            "name": "ktor-client-core-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-jvm/3.6.1/ktor-client-core-jvm-3.6.1.jar",
+            "sha256": "3a288b4d75a52d3b2460765067c2fc035bcd18ffcaa0a2296f4b9983cd2f041f"
           }
         ],
         "deps": [
@@ -14071,12 +14071,12 @@
         ]
       },
       "js": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-core-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-js/3.6.0/ktor-client-core-js-3.6.0.klib",
-            "sha256": "78489c68d8c4ca505538b319c1edfe2bfa8d9eaea2315142f6c68a09e1c21aaa"
+            "name": "ktor-client-core-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-js/3.6.1/ktor-client-core-js-3.6.1.klib",
+            "sha256": "97085b682d78e6f4bfae3cd476db64182868d7b5f2ce6357d57385de13c0d8b6"
           }
         ],
         "deps": [
@@ -14097,12 +14097,12 @@
         }
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-core-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-jvm/3.6.0/ktor-client-core-jvm-3.6.0.jar",
-            "sha256": "7dc9a3c76bf43f672e8331aad1ecb06864f69f464ab1517c24ed8a38c86f812f"
+            "name": "ktor-client-core-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-jvm/3.6.1/ktor-client-core-jvm-3.6.1.jar",
+            "sha256": "3a288b4d75a52d3b2460765067c2fc035bcd18ffcaa0a2296f4b9983cd2f041f"
           }
         ],
         "deps": [
@@ -14119,12 +14119,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-core-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-linuxarm64/3.6.0/ktor-client-core-linuxarm64-3.6.0.klib",
-            "sha256": "c855706582a80b154aa86a3b95def05ff2e5f1b6a06c2a708a59d0f584fed47a"
+            "name": "ktor-client-core-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-linuxarm64/3.6.1/ktor-client-core-linuxarm64-3.6.1.klib",
+            "sha256": "7ee98023f6c64bfe81700e03e190d1955dbd37f6dc61e5d74abfac8f93d2ec54"
           }
         ],
         "deps": [
@@ -14138,12 +14138,12 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-core-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-linuxx64/3.6.0/ktor-client-core-linuxx64-3.6.0.klib",
-            "sha256": "bef14132e555cdede6ab7aa44ed69198c59325d6c58819f020d9047f6ae54ba4"
+            "name": "ktor-client-core-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-linuxx64/3.6.1/ktor-client-core-linuxx64-3.6.1.klib",
+            "sha256": "f4104f2e2bd46b26d220276545809cf5845b4fbc5523447e05b834f163db5796"
           }
         ],
         "deps": [
@@ -14157,12 +14157,12 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-core-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-macosarm64/3.6.0/ktor-client-core-macosarm64-3.6.0.klib",
-            "sha256": "c85b4c301f3e26d790b67d19d592878e68424330e8f406192cf3a73796a3b130"
+            "name": "ktor-client-core-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-macosarm64/3.6.1/ktor-client-core-macosarm64-3.6.1.klib",
+            "sha256": "21e7a0219dbd4392691cc5242c074a5ea3054a8b4a94b973d6c280a1b83a78e1"
           }
         ],
         "deps": [
@@ -14176,12 +14176,12 @@
         ]
       },
       "metadata": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-core-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core/3.6.0/ktor-client-core-3.6.0.jar",
-            "sha256": "50ccade1e574d946603407be700b88b94a865f47311ed83374e7a24e57f67a57"
+            "name": "ktor-client-core-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core/3.6.1/ktor-client-core-3.6.1.jar",
+            "sha256": "c0f20a1c584a8c23bdd5bb4afce49a4ff0617a371f1e7f1fddb26d2219b9dabe"
           }
         ],
         "deps": [
@@ -14198,12 +14198,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-core-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core/3.6.0/ktor-client-core-3.6.0.jar",
-            "sha256": "50ccade1e574d946603407be700b88b94a865f47311ed83374e7a24e57f67a57"
+            "name": "ktor-client-core-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core/3.6.1/ktor-client-core-3.6.1.jar",
+            "sha256": "c0f20a1c584a8c23bdd5bb4afce49a4ff0617a371f1e7f1fddb26d2219b9dabe"
           }
         ],
         "deps": [
@@ -14219,12 +14219,12 @@
         ]
       },
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-core-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-mingwx64/3.6.0/ktor-client-core-mingwx64-3.6.0.klib",
-            "sha256": "71670a988a60179ee74647606f49358731c70481bb6c17b105b8c32ae5c5cf62"
+            "name": "ktor-client-core-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-mingwx64/3.6.1/ktor-client-core-mingwx64-3.6.1.klib",
+            "sha256": "17d5cf69d202a6eb3013fea103eaa031902a258354f145e87fa9bfbdae429287"
           }
         ],
         "deps": [
@@ -14238,12 +14238,12 @@
         ]
       },
       "wasmJs": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-core-wasm-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-wasm-js/3.6.0/ktor-client-core-wasm-js-3.6.0.klib",
-            "sha256": "da9274375d5abb4205a6b91b997d3e206c2aab03dc04a19d08fce78c05736bc5"
+            "name": "ktor-client-core-wasm-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-core-wasm-js/3.6.1/ktor-client-core-wasm-js-3.6.1.klib",
+            "sha256": "9133247d5298376fae49c422da549983a0274ac2af4a6697b9821a317d7e38e1"
           }
         ],
         "deps": [
@@ -14265,16 +14265,16 @@
     },
     "io.ktor:ktor-client-curl": {
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-curl-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-curl-linuxarm64/3.6.0/ktor-client-curl-linuxarm64-3.6.0.klib",
-            "sha256": "de9cb1172167e0a8e4e71f2b06d6a5f3d08c95359160960b691d0e3ca2b6b46d"
+            "name": "ktor-client-curl-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-curl-linuxarm64/3.6.1/ktor-client-curl-linuxarm64-3.6.1.klib",
+            "sha256": "91b5957182b6f394cb364f590d7b47f707ab55d69a5f59f0095fb2c3a814e018"
           },
           {
-            "name": "ktor-client-curl-linuxArm64Cinterop-libcurlMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-curl-linuxarm64/3.6.0/ktor-client-curl-linuxarm64-3.6.0-cinterop-libcurl.klib",
+            "name": "ktor-client-curl-linuxArm64Cinterop-libcurlMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-curl-linuxarm64/3.6.1/ktor-client-curl-linuxarm64-3.6.1-cinterop-libcurl.klib",
             "sha256": "9f31d8f99d18929fdd77e59205f2b13e7cdfb24988355a4404d575a1c80f91ef"
           }
         ],
@@ -14286,16 +14286,16 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-curl-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-curl-linuxx64/3.6.0/ktor-client-curl-linuxx64-3.6.0.klib",
+            "name": "ktor-client-curl-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-curl-linuxx64/3.6.1/ktor-client-curl-linuxx64-3.6.1.klib",
             "sha256": "437a8ff32970c2bff412555c888d69600ae325eecd5a32824dda9da9738d8088"
           },
           {
-            "name": "ktor-client-curl-linuxX64Cinterop-libcurlMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-curl-linuxx64/3.6.0/ktor-client-curl-linuxx64-3.6.0-cinterop-libcurl.klib",
+            "name": "ktor-client-curl-linuxX64Cinterop-libcurlMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-curl-linuxx64/3.6.1/ktor-client-curl-linuxx64-3.6.1-cinterop-libcurl.klib",
             "sha256": "7da47021727b43c7951872ad468a3ce4e6b455834c763db26553c7bb86f53de9"
           }
         ],
@@ -14309,11 +14309,11 @@
     },
     "io.ktor:ktor-client-darwin": {
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-darwin-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-darwin-macosarm64/3.6.0/ktor-client-darwin-macosarm64-3.6.0.klib",
+            "name": "ktor-client-darwin-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-darwin-macosarm64/3.6.1/ktor-client-darwin-macosarm64-3.6.1.klib",
             "sha256": "f2e34041f7d5aa9a24fafa323f0dad5de46fe970fb1299ed6c52d2fb51d2ed41"
           }
         ],
@@ -14327,12 +14327,12 @@
     },
     "io.ktor:ktor-client-engine-defaults": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-engine-defaults-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-jvm/3.6.0/ktor-client-engine-defaults-jvm-3.6.0.jar",
-            "sha256": "00646db7f1e3528d9215fb55a636b79ba5f9dea7c0f5396812d6ecac1303af99"
+            "name": "ktor-client-engine-defaults-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-jvm/3.6.1/ktor-client-engine-defaults-jvm-3.6.1.jar",
+            "sha256": "6df550c8d4b6398d4341b6012403480c364c95a09a1ee80f6f8d81996e0937d8"
           }
         ],
         "deps": [
@@ -14343,12 +14343,12 @@
         ]
       },
       "js": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-engine-defaults-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-js/3.6.0/ktor-client-engine-defaults-js-3.6.0.klib",
-            "sha256": "2a9915e8818d0e36c466e98bd165763a1fd4923f6473d94cdd07af55b61d0a70"
+            "name": "ktor-client-engine-defaults-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-js/3.6.1/ktor-client-engine-defaults-js-3.6.1.klib",
+            "sha256": "e7bd03ce8f1cb850e9f7a3d5384de62c7f6e81dc7e42c3b2f548e541f67a05c4"
           }
         ],
         "deps": [
@@ -14362,12 +14362,12 @@
         ]
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-engine-defaults-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-jvm/3.6.0/ktor-client-engine-defaults-jvm-3.6.0.jar",
-            "sha256": "00646db7f1e3528d9215fb55a636b79ba5f9dea7c0f5396812d6ecac1303af99"
+            "name": "ktor-client-engine-defaults-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-jvm/3.6.1/ktor-client-engine-defaults-jvm-3.6.1.jar",
+            "sha256": "6df550c8d4b6398d4341b6012403480c364c95a09a1ee80f6f8d81996e0937d8"
           }
         ],
         "deps": [
@@ -14378,12 +14378,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-engine-defaults-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-linuxarm64/3.6.0/ktor-client-engine-defaults-linuxarm64-3.6.0.klib",
-            "sha256": "162960859c02cbfe259ec95efab4e02668e7551f05affd86ad8f19d52ce18093"
+            "name": "ktor-client-engine-defaults-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-linuxarm64/3.6.1/ktor-client-engine-defaults-linuxarm64-3.6.1.klib",
+            "sha256": "46cc4802aa6afc4be231aa5de79e8c32052024eed27f7bf06cb7c861bd029b30"
           }
         ],
         "deps": [
@@ -14394,11 +14394,11 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-engine-defaults-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-linuxx64/3.6.0/ktor-client-engine-defaults-linuxx64-3.6.0.klib",
+            "name": "ktor-client-engine-defaults-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-linuxx64/3.6.1/ktor-client-engine-defaults-linuxx64-3.6.1.klib",
             "sha256": "50ba078f8cdaf771cd0d3f1b82cfa910ef9ea7472b238e10c276f6cb17f17e84"
           }
         ],
@@ -14410,11 +14410,11 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-engine-defaults-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-macosarm64/3.6.0/ktor-client-engine-defaults-macosarm64-3.6.0.klib",
+            "name": "ktor-client-engine-defaults-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-macosarm64/3.6.1/ktor-client-engine-defaults-macosarm64-3.6.1.klib",
             "sha256": "5a74ee0337a0d0ef1eb68168d3f7e60b9281617a23df5226d4d7d47c604ec515"
           }
         ],
@@ -14426,11 +14426,11 @@
         ]
       },
       "metadata": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-engine-defaults-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults/3.6.0/ktor-client-engine-defaults-3.6.0.jar",
+            "name": "ktor-client-engine-defaults-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults/3.6.1/ktor-client-engine-defaults-3.6.1.jar",
             "sha256": "db8c15f15e475361481d534af7fb5a93608d9e038e33dcf880f8ef2a8f5e8f50"
           }
         ],
@@ -14440,11 +14440,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-engine-defaults-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults/3.6.0/ktor-client-engine-defaults-3.6.0.jar",
+            "name": "ktor-client-engine-defaults-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults/3.6.1/ktor-client-engine-defaults-3.6.1.jar",
             "sha256": "db8c15f15e475361481d534af7fb5a93608d9e038e33dcf880f8ef2a8f5e8f50"
           }
         ],
@@ -14454,11 +14454,11 @@
         ]
       },
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-engine-defaults-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-mingwx64/3.6.0/ktor-client-engine-defaults-mingwx64-3.6.0.klib",
+            "name": "ktor-client-engine-defaults-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-mingwx64/3.6.1/ktor-client-engine-defaults-mingwx64-3.6.1.klib",
             "sha256": "fc245f4a8aba640b918807f2f1f68b5c4885ef8d988a3ae3ed9c50c1b47e3beb"
           }
         ],
@@ -14470,11 +14470,11 @@
         ]
       },
       "wasmJs": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-engine-defaults-wasm-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-wasm-js/3.6.0/ktor-client-engine-defaults-wasm-js-3.6.0.klib",
+            "name": "ktor-client-engine-defaults-wasm-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-engine-defaults-wasm-js/3.6.1/ktor-client-engine-defaults-wasm-js-3.6.1.klib",
             "sha256": "b1ce9937675ffa7690ff33c10dfce7cc60e92d321dda7b6d46f2b4eff7b4d780"
           }
         ],
@@ -14490,12 +14490,12 @@
     },
     "io.ktor:ktor-client-mock": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-mock-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-jvm/3.6.0/ktor-client-mock-jvm-3.6.0.jar",
-            "sha256": "9a65b4e2f799451b380e87729132768802389d2f1c4ac11d2f3fc6de9925cb41"
+            "name": "ktor-client-mock-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-jvm/3.6.1/ktor-client-mock-jvm-3.6.1.jar",
+            "sha256": "83b62118826bdfe963e27a89bdfb79e68b3b0f550154c7295483e5c4f0fea1fe"
           }
         ],
         "deps": [
@@ -14506,11 +14506,11 @@
         ]
       },
       "js": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-mock-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-js/3.6.0/ktor-client-mock-js-3.6.0.klib",
+            "name": "ktor-client-mock-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-js/3.6.1/ktor-client-mock-js-3.6.1.klib",
             "sha256": "6f63682f9a9a1feac4d7331510f8e4d9278e1601bd1fe667905f3d5001432f1b"
           }
         ],
@@ -14526,12 +14526,12 @@
         ]
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-mock-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-jvm/3.6.0/ktor-client-mock-jvm-3.6.0.jar",
-            "sha256": "9a65b4e2f799451b380e87729132768802389d2f1c4ac11d2f3fc6de9925cb41"
+            "name": "ktor-client-mock-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-jvm/3.6.1/ktor-client-mock-jvm-3.6.1.jar",
+            "sha256": "83b62118826bdfe963e27a89bdfb79e68b3b0f550154c7295483e5c4f0fea1fe"
           }
         ],
         "deps": [
@@ -14542,12 +14542,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-mock-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-linuxarm64/3.6.0/ktor-client-mock-linuxarm64-3.6.0.klib",
-            "sha256": "9972e09df527927ef5609c6ca7df1782f1849cd97382f94d65c2c14ce8dbc107"
+            "name": "ktor-client-mock-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-linuxarm64/3.6.1/ktor-client-mock-linuxarm64-3.6.1.klib",
+            "sha256": "33f2585117f4cdbec782c8698ebd0155cc4bd650a2cc302aaccde0cfbdd7ee8b"
           }
         ],
         "deps": [
@@ -14558,11 +14558,11 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-mock-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-linuxx64/3.6.0/ktor-client-mock-linuxx64-3.6.0.klib",
+            "name": "ktor-client-mock-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-linuxx64/3.6.1/ktor-client-mock-linuxx64-3.6.1.klib",
             "sha256": "5fcc8b7ae563b7be6feb9b088b9be8b2746763bceff819f7bece5383ad22a6fd"
           }
         ],
@@ -14574,11 +14574,11 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-mock-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-macosarm64/3.6.0/ktor-client-mock-macosarm64-3.6.0.klib",
+            "name": "ktor-client-mock-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-macosarm64/3.6.1/ktor-client-mock-macosarm64-3.6.1.klib",
             "sha256": "8a1573bd91b8586a229eb7306a43cf2fe55cd30449c2629d2683be6005275a65"
           }
         ],
@@ -14590,11 +14590,11 @@
         ]
       },
       "metadata": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-mock-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock/3.6.0/ktor-client-mock-3.6.0.jar",
+            "name": "ktor-client-mock-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock/3.6.1/ktor-client-mock-3.6.1.jar",
             "sha256": "535a6149b991698f4f0238860991ae4fb75424d0c1e2f3e155cd65863201b363"
           }
         ],
@@ -14608,11 +14608,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-mock-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock/3.6.0/ktor-client-mock-3.6.0.jar",
+            "name": "ktor-client-mock-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock/3.6.1/ktor-client-mock-3.6.1.jar",
             "sha256": "535a6149b991698f4f0238860991ae4fb75424d0c1e2f3e155cd65863201b363"
           }
         ],
@@ -14626,11 +14626,11 @@
         ]
       },
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-mock-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-mingwx64/3.6.0/ktor-client-mock-mingwx64-3.6.0.klib",
+            "name": "ktor-client-mock-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-mingwx64/3.6.1/ktor-client-mock-mingwx64-3.6.1.klib",
             "sha256": "dad465925eb2412a28632cb03acb8b5d3652d141b8b85f967fd8bc7e43b070b5"
           }
         ],
@@ -14642,11 +14642,11 @@
         ]
       },
       "wasmJs": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-mock-wasm-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-wasm-js/3.6.0/ktor-client-mock-wasm-js-3.6.0.klib",
+            "name": "ktor-client-mock-wasm-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-mock-wasm-js/3.6.1/ktor-client-mock-wasm-js-3.6.1.klib",
             "sha256": "281f3c85f2191dd48357507a2899789cfdfe2b8e70c220c55e6d956dcd22ffe1"
           }
         ],
@@ -14663,12 +14663,12 @@
     },
     "io.ktor:ktor-client-okhttp": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-okhttp-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-okhttp-jvm/3.6.0/ktor-client-okhttp-jvm-3.6.0.jar",
-            "sha256": "40ee72166eaf2c3cf868fc87bd78e83d79da0b3d0d43d16b389e21f2cd2c56c3"
+            "name": "ktor-client-okhttp-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-okhttp-jvm/3.6.1/ktor-client-okhttp-jvm-3.6.1.jar",
+            "sha256": "97645314f6f6be7bf94d475fe5b052285796376b1e2ab8d275536a0f6154a81d"
           }
         ],
         "deps": [
@@ -14680,12 +14680,12 @@
         ]
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-okhttp-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-okhttp-jvm/3.6.0/ktor-client-okhttp-jvm-3.6.0.jar",
-            "sha256": "40ee72166eaf2c3cf868fc87bd78e83d79da0b3d0d43d16b389e21f2cd2c56c3"
+            "name": "ktor-client-okhttp-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-okhttp-jvm/3.6.1/ktor-client-okhttp-jvm-3.6.1.jar",
+            "sha256": "97645314f6f6be7bf94d475fe5b052285796376b1e2ab8d275536a0f6154a81d"
           }
         ],
         "deps": [
@@ -14699,16 +14699,16 @@
     },
     "io.ktor:ktor-client-winhttp": {
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-client-winhttp-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-winhttp-mingwx64/3.6.0/ktor-client-winhttp-mingwx64-3.6.0.klib",
+            "name": "ktor-client-winhttp-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-winhttp-mingwx64/3.6.1/ktor-client-winhttp-mingwx64-3.6.1.klib",
             "sha256": "74de3d7569aec0dbdec2c50e38da6fecd21285215cdd053d902f1b99fde0d962"
           },
           {
-            "name": "ktor-client-winhttp-mingwX64Cinterop-winhttpMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-winhttp-mingwx64/3.6.0/ktor-client-winhttp-mingwx64-3.6.0-cinterop-winhttp.klib",
+            "name": "ktor-client-winhttp-mingwX64Cinterop-winhttpMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-client-winhttp-mingwx64/3.6.1/ktor-client-winhttp-mingwx64-3.6.1-cinterop-winhttp.klib",
             "sha256": "6b7b24a5de541a26e314bdb6308a6f47bba7c985bdd0614c4ed26d66ca33be73"
           }
         ],
@@ -14722,12 +14722,12 @@
     },
     "io.ktor:ktor-events": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-events-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-jvm/3.6.0/ktor-events-jvm-3.6.0.jar",
-            "sha256": "d3962f4a4244102d1ef8b84b21429ffc26be3512b5f1f96c607265ca1cec5c0b"
+            "name": "ktor-events-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-jvm/3.6.1/ktor-events-jvm-3.6.1.jar",
+            "sha256": "9759d0e39dcb8682479c5303625180b90b9cff94d70a5caf78081ba33f78d154"
           }
         ],
         "deps": [
@@ -14737,11 +14737,11 @@
         ]
       },
       "js": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-events-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-js/3.6.0/ktor-events-js-3.6.0.klib",
+            "name": "ktor-events-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-js/3.6.1/ktor-events-js-3.6.1.klib",
             "sha256": "3cbc4e06689ac834194e18eefedfa742d1b7ce2c34514057552a012c36c55357"
           }
         ],
@@ -14756,12 +14756,12 @@
         ]
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-events-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-jvm/3.6.0/ktor-events-jvm-3.6.0.jar",
-            "sha256": "d3962f4a4244102d1ef8b84b21429ffc26be3512b5f1f96c607265ca1cec5c0b"
+            "name": "ktor-events-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-jvm/3.6.1/ktor-events-jvm-3.6.1.jar",
+            "sha256": "9759d0e39dcb8682479c5303625180b90b9cff94d70a5caf78081ba33f78d154"
           }
         ],
         "deps": [
@@ -14771,12 +14771,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-events-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-linuxarm64/3.6.0/ktor-events-linuxarm64-3.6.0.klib",
-            "sha256": "87f99d63f03f02aa663992fe1ba2d92cfba00c300d6912b69214f2c30174baf1"
+            "name": "ktor-events-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-linuxarm64/3.6.1/ktor-events-linuxarm64-3.6.1.klib",
+            "sha256": "e433327788bf4069564a2d0c8affd0b2c4ab09deba1f2fe7c344a7e7d4a83b7e"
           }
         ],
         "deps": [
@@ -14786,11 +14786,11 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-events-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-linuxx64/3.6.0/ktor-events-linuxx64-3.6.0.klib",
+            "name": "ktor-events-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-linuxx64/3.6.1/ktor-events-linuxx64-3.6.1.klib",
             "sha256": "56c87dfa4155c950855155be885decfd0dabc39ed7f9482d523ed9cf3ef92314"
           }
         ],
@@ -14801,11 +14801,11 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-events-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-macosarm64/3.6.0/ktor-events-macosarm64-3.6.0.klib",
+            "name": "ktor-events-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-macosarm64/3.6.1/ktor-events-macosarm64-3.6.1.klib",
             "sha256": "e7a991ad3e6a84e8fdabd043f88555cf81cc24b00ef218258c86f68f44ea9da2"
           }
         ],
@@ -14816,11 +14816,11 @@
         ]
       },
       "metadata": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-events-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events/3.6.0/ktor-events-3.6.0.jar",
+            "name": "ktor-events-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events/3.6.1/ktor-events-3.6.1.jar",
             "sha256": "cb6b7f195fd9c83b172712fb1368bb99ee601c233aebeffb9edf172b6a102a40"
           }
         ],
@@ -14833,11 +14833,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-events-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events/3.6.0/ktor-events-3.6.0.jar",
+            "name": "ktor-events-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events/3.6.1/ktor-events-3.6.1.jar",
             "sha256": "cb6b7f195fd9c83b172712fb1368bb99ee601c233aebeffb9edf172b6a102a40"
           }
         ],
@@ -14850,11 +14850,11 @@
         ]
       },
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-events-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-mingwx64/3.6.0/ktor-events-mingwx64-3.6.0.klib",
+            "name": "ktor-events-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-mingwx64/3.6.1/ktor-events-mingwx64-3.6.1.klib",
             "sha256": "ef2dc627719b9521de3c9777d46d0872f5906e4b8cef97ac17f8fef428fbc0de"
           }
         ],
@@ -14865,11 +14865,11 @@
         ]
       },
       "wasmJs": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-events-wasm-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-wasm-js/3.6.0/ktor-events-wasm-js-3.6.0.klib",
+            "name": "ktor-events-wasm-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-events-wasm-js/3.6.1/ktor-events-wasm-js-3.6.1.klib",
             "sha256": "f0e958564cf705b62ba7f65e2578c2371fded6f561ec1794bafddffcb37aa3f6"
           }
         ],
@@ -14885,12 +14885,12 @@
     },
     "io.ktor:ktor-http": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-jvm/3.6.0/ktor-http-jvm-3.6.0.jar",
-            "sha256": "2a14cb160436b134c10793727aeed3055ae7014ff170c79ffbcd90b26dd90de2"
+            "name": "ktor-http-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-jvm/3.6.1/ktor-http-jvm-3.6.1.jar",
+            "sha256": "77bcd2f92be9c226c2434bcda04c95edc5d407fc3d1b3774a6401b8d95b7f671"
           }
         ],
         "deps": [
@@ -14901,12 +14901,12 @@
         ]
       },
       "js": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-js/3.6.0/ktor-http-js-3.6.0.klib",
-            "sha256": "bf0f5a349cc55e2d14bf3dbf3470d04f5c571c274d7c0c2c100301e068747f2b"
+            "name": "ktor-http-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-js/3.6.1/ktor-http-js-3.6.1.klib",
+            "sha256": "1ec75b4670eef35022ebf3edf8a88e4d96f7b9d83ba31e64b5c68ebea5929034"
           }
         ],
         "deps": [
@@ -14921,12 +14921,12 @@
         ]
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-jvm/3.6.0/ktor-http-jvm-3.6.0.jar",
-            "sha256": "2a14cb160436b134c10793727aeed3055ae7014ff170c79ffbcd90b26dd90de2"
+            "name": "ktor-http-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-jvm/3.6.1/ktor-http-jvm-3.6.1.jar",
+            "sha256": "77bcd2f92be9c226c2434bcda04c95edc5d407fc3d1b3774a6401b8d95b7f671"
           }
         ],
         "deps": [
@@ -14937,12 +14937,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-linuxarm64/3.6.0/ktor-http-linuxarm64-3.6.0.klib",
-            "sha256": "536e16e4e466e262d3e6570642d60b8ac9166e9a90e4aa9e313c4c61a00e1d33"
+            "name": "ktor-http-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-linuxarm64/3.6.1/ktor-http-linuxarm64-3.6.1.klib",
+            "sha256": "d49f15f677a54ada4fed2d0d0abc0b9bc8ca59e1782bef4da3c980d78bb82005"
           }
         ],
         "deps": [
@@ -14953,12 +14953,12 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-linuxx64/3.6.0/ktor-http-linuxx64-3.6.0.klib",
-            "sha256": "9152d44b82d6b06b7dc054f8fed341c70b037a0bda3b1eed9f2d7df49fbb2bc3"
+            "name": "ktor-http-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-linuxx64/3.6.1/ktor-http-linuxx64-3.6.1.klib",
+            "sha256": "2155ba8afdc4b56bb10983fdd1a072d0b9bd1cb978ed7acb69bab8cc363b50f1"
           }
         ],
         "deps": [
@@ -14969,12 +14969,12 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-macosarm64/3.6.0/ktor-http-macosarm64-3.6.0.klib",
-            "sha256": "a800260a9399ee6213630ded146dad550c123ce90a52d03b1b700159db4fba9b"
+            "name": "ktor-http-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-macosarm64/3.6.1/ktor-http-macosarm64-3.6.1.klib",
+            "sha256": "3c09e0a7c4ac21cc702afd8264248efe951057009cba2ed4a065bf28848eb4ca"
           }
         ],
         "deps": [
@@ -14985,11 +14985,11 @@
         ]
       },
       "metadata": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http/3.6.0/ktor-http-3.6.0.jar",
+            "name": "ktor-http-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http/3.6.1/ktor-http-3.6.1.jar",
             "sha256": "dc8cd84b0a592ef609c09cd6523516c4c6d2c6a6f24954cc2a41edd178dde037"
           }
         ],
@@ -15003,11 +15003,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http/3.6.0/ktor-http-3.6.0.jar",
+            "name": "ktor-http-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http/3.6.1/ktor-http-3.6.1.jar",
             "sha256": "dc8cd84b0a592ef609c09cd6523516c4c6d2c6a6f24954cc2a41edd178dde037"
           }
         ],
@@ -15021,12 +15021,12 @@
         ]
       },
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-mingwx64/3.6.0/ktor-http-mingwx64-3.6.0.klib",
-            "sha256": "87e91e0bf8be9681cc0587a9b5cb69304860a19038ca81ea09ce930a320fb6d8"
+            "name": "ktor-http-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-mingwx64/3.6.1/ktor-http-mingwx64-3.6.1.klib",
+            "sha256": "f8d2e5195b4fd31c8d068b2ac14539f30202daba9d15ec27ef4086170c503c01"
           }
         ],
         "deps": [
@@ -15037,12 +15037,12 @@
         ]
       },
       "wasmJs": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-wasm-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-wasm-js/3.6.0/ktor-http-wasm-js-3.6.0.klib",
-            "sha256": "7b54e9c145d8ef6ffcb2e79ebc64ee78e6c9e2e3187bb489ddbaf9ae34f20a1e"
+            "name": "ktor-http-wasm-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-wasm-js/3.6.1/ktor-http-wasm-js-3.6.1.klib",
+            "sha256": "d01bf2d3c6ab98858c1b4025b5f77aea32c9563fe1f25d3010cc27cd77d66fd6"
           }
         ],
         "deps": [
@@ -15058,12 +15058,12 @@
     },
     "io.ktor:ktor-http-cio": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-cio-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-jvm/3.6.0/ktor-http-cio-jvm-3.6.0.jar",
-            "sha256": "4cabe83cb367e0a807f849f2d4313b9de563cffcec0d262844a783d51a47738d"
+            "name": "ktor-http-cio-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-jvm/3.6.1/ktor-http-cio-jvm-3.6.1.jar",
+            "sha256": "cef2c4f69393eea3937bf3deeca4622a048951b76f38f699ea1d706ef5f5d3b7"
           }
         ],
         "deps": [
@@ -15075,12 +15075,12 @@
         ]
       },
       "js": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-cio-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-js/3.6.0/ktor-http-cio-js-3.6.0.klib",
-            "sha256": "f433beec33284a01a474d19c5fe8fa50699f25f4e52b93eab492e4790556b7a1"
+            "name": "ktor-http-cio-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-js/3.6.1/ktor-http-cio-js-3.6.1.klib",
+            "sha256": "dde57625f94d0aed0b510cb0bcdaf38a44cc9cd8d466232acad94bd6cd08c4c0"
           }
         ],
         "deps": [
@@ -15095,12 +15095,12 @@
         ]
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-cio-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-jvm/3.6.0/ktor-http-cio-jvm-3.6.0.jar",
-            "sha256": "4cabe83cb367e0a807f849f2d4313b9de563cffcec0d262844a783d51a47738d"
+            "name": "ktor-http-cio-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-jvm/3.6.1/ktor-http-cio-jvm-3.6.1.jar",
+            "sha256": "cef2c4f69393eea3937bf3deeca4622a048951b76f38f699ea1d706ef5f5d3b7"
           }
         ],
         "deps": [
@@ -15112,12 +15112,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-cio-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-linuxarm64/3.6.0/ktor-http-cio-linuxarm64-3.6.0.klib",
-            "sha256": "beb2cd00289c4f827384b4053c27c20427e5aff061c1df5751fe67c094d54ca2"
+            "name": "ktor-http-cio-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-linuxarm64/3.6.1/ktor-http-cio-linuxarm64-3.6.1.klib",
+            "sha256": "f43ace1fa6f99cb4e0c25619eb17618a50313b3080859d36e4442cf248917d9a"
           }
         ],
         "deps": [
@@ -15128,12 +15128,12 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-cio-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-linuxx64/3.6.0/ktor-http-cio-linuxx64-3.6.0.klib",
-            "sha256": "f44b969aa25f9c98453dd39a5090141da836c63a1a929e4a7064fa3f0396960b"
+            "name": "ktor-http-cio-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-linuxx64/3.6.1/ktor-http-cio-linuxx64-3.6.1.klib",
+            "sha256": "f695dad793cb82fc53557b59730767b6b8f02831a2c14ff7c41acdfb6184414a"
           }
         ],
         "deps": [
@@ -15144,12 +15144,12 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-cio-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-macosarm64/3.6.0/ktor-http-cio-macosarm64-3.6.0.klib",
-            "sha256": "206cfb8f8720920a6e1bd651926f2e30c05a79522845eb7d0f02173753b586a1"
+            "name": "ktor-http-cio-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-macosarm64/3.6.1/ktor-http-cio-macosarm64-3.6.1.klib",
+            "sha256": "935eedfe9e6e155feae51194baa32d80e9a2bdd19ee95f39fa1b716d54c61db5"
           }
         ],
         "deps": [
@@ -15160,12 +15160,12 @@
         ]
       },
       "metadata": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-cio-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio/3.6.0/ktor-http-cio-3.6.0.jar",
-            "sha256": "3659febd812086d17c40dddc85889f1d8d7c371e9b8cfa8e16c65f3c97d5650f"
+            "name": "ktor-http-cio-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio/3.6.1/ktor-http-cio-3.6.1.jar",
+            "sha256": "ec47bdb9a6108a28c1d965e6b656a757cbd95336363793677d1621ee85f23625"
           }
         ],
         "deps": [
@@ -15179,12 +15179,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-cio-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio/3.6.0/ktor-http-cio-3.6.0.jar",
-            "sha256": "3659febd812086d17c40dddc85889f1d8d7c371e9b8cfa8e16c65f3c97d5650f"
+            "name": "ktor-http-cio-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio/3.6.1/ktor-http-cio-3.6.1.jar",
+            "sha256": "ec47bdb9a6108a28c1d965e6b656a757cbd95336363793677d1621ee85f23625"
           }
         ],
         "deps": [
@@ -15197,12 +15197,12 @@
         ]
       },
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-cio-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-mingwx64/3.6.0/ktor-http-cio-mingwx64-3.6.0.klib",
-            "sha256": "8d1bf9677e0d8d4dc2e6f6079f9f6bf49dcae67ffde3c0037c3ef374c28de1c9"
+            "name": "ktor-http-cio-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-mingwx64/3.6.1/ktor-http-cio-mingwx64-3.6.1.klib",
+            "sha256": "c3cee99969bb1721872344b5cda3c2e8bc995223c4a0440b780db4e11be0008a"
           }
         ],
         "deps": [
@@ -15213,12 +15213,12 @@
         ]
       },
       "wasmJs": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-http-cio-wasm-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-wasm-js/3.6.0/ktor-http-cio-wasm-js-3.6.0.klib",
-            "sha256": "db9da0f4362cfca1cbc45c6925f28e2a8b4c878b6c9c00ebed3239f01e89f83d"
+            "name": "ktor-http-cio-wasm-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-http-cio-wasm-js/3.6.1/ktor-http-cio-wasm-js-3.6.1.klib",
+            "sha256": "86ca518929bb66613a49ba8f79e3490b2cd749341df5581969537e211f0d4969"
           }
         ],
         "deps": [
@@ -15234,12 +15234,12 @@
     },
     "io.ktor:ktor-io": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-io-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-jvm/3.6.0/ktor-io-jvm-3.6.0.jar",
-            "sha256": "7426ad1759833460507ee7065f17085410dc7b32081a1daee8c91cf6f40e257c"
+            "name": "ktor-io-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-jvm/3.6.1/ktor-io-jvm-3.6.1.jar",
+            "sha256": "94934d96b37c38f17dd7dfaaf9c50cd9c0255bea5ae60fd4cd2476838bd525d8"
           }
         ],
         "deps": [
@@ -15249,12 +15249,12 @@
         ]
       },
       "js": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-io-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-js/3.6.0/ktor-io-js-3.6.0.klib",
-            "sha256": "1c7c58595e9d6be197cf864d6d9e31a9aa0736de59206d13710233eae32f2e3f"
+            "name": "ktor-io-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-js/3.6.1/ktor-io-js-3.6.1.klib",
+            "sha256": "35d92d9fafbccf2ca50ec2115f3a522c67815f7dd7e24b348f1460c8128a708b"
           }
         ],
         "deps": [
@@ -15268,12 +15268,12 @@
         ]
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-io-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-jvm/3.6.0/ktor-io-jvm-3.6.0.jar",
-            "sha256": "7426ad1759833460507ee7065f17085410dc7b32081a1daee8c91cf6f40e257c"
+            "name": "ktor-io-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-jvm/3.6.1/ktor-io-jvm-3.6.1.jar",
+            "sha256": "94934d96b37c38f17dd7dfaaf9c50cd9c0255bea5ae60fd4cd2476838bd525d8"
           }
         ],
         "deps": [
@@ -15283,16 +15283,16 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-io-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-linuxarm64/3.6.0/ktor-io-linuxarm64-3.6.0.klib",
-            "sha256": "aa94bbb9f1b83ccc38b80479f1fa176c058100d0cf25ccaf233d03a6ab50465c"
+            "name": "ktor-io-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-linuxarm64/3.6.1/ktor-io-linuxarm64-3.6.1.klib",
+            "sha256": "63a79390870855a0a4340f31ddb7afc8f81e56342eca6c3620f288c16672a234"
           },
           {
-            "name": "ktor-io-linuxArm64Cinterop-mutexMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-linuxarm64/3.6.0/ktor-io-linuxarm64-3.6.0-cinterop-mutex.klib",
+            "name": "ktor-io-linuxArm64Cinterop-mutexMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-linuxarm64/3.6.1/ktor-io-linuxarm64-3.6.1-cinterop-mutex.klib",
             "sha256": "3cf9fdd44fd3b157b1f5f2055871e493803774dafd4d664a97e3b92187c650ca"
           }
         ],
@@ -15303,16 +15303,16 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-io-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-linuxx64/3.6.0/ktor-io-linuxx64-3.6.0.klib",
-            "sha256": "b727730836a7a7bc8e224c3460021ebe36bb7e351ecef945f7a284e2703ace1e"
+            "name": "ktor-io-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-linuxx64/3.6.1/ktor-io-linuxx64-3.6.1.klib",
+            "sha256": "fa00e6f8782ba1a7091e9474374f34d656d51ba71bd7650c55026ad183688033"
           },
           {
-            "name": "ktor-io-linuxX64Cinterop-mutexMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-linuxx64/3.6.0/ktor-io-linuxx64-3.6.0-cinterop-mutex.klib",
+            "name": "ktor-io-linuxX64Cinterop-mutexMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-linuxx64/3.6.1/ktor-io-linuxx64-3.6.1-cinterop-mutex.klib",
             "sha256": "f774a79d55fe9d34ed89080334ed2ac11c6fba153f8427a58bdd2fbbdd007556"
           }
         ],
@@ -15323,17 +15323,17 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-io-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-macosarm64/3.6.0/ktor-io-macosarm64-3.6.0.klib",
-            "sha256": "d9df0b42b182f7e602c210326bc84cfbc7f0eed698c7d098237473d88bbecbae"
+            "name": "ktor-io-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-macosarm64/3.6.1/ktor-io-macosarm64-3.6.1.klib",
+            "sha256": "b4586f4f871294e18c29f1d20dd6eff32412c9968f2fd78129534ec8b69e88b3"
           },
           {
-            "name": "ktor-io-macosArm64Cinterop-mutexMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-macosarm64/3.6.0/ktor-io-macosarm64-3.6.0-cinterop-mutex.klib",
-            "sha256": "d111e15d1cd2c6f904f5771d70c1fb128edfb85f2f59e1d0e5468455e2e7f73d"
+            "name": "ktor-io-macosArm64Cinterop-mutexMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-macosarm64/3.6.1/ktor-io-macosarm64-3.6.1-cinterop-mutex.klib",
+            "sha256": "aedaf8bdbc69a5b20f05b70ac81b556673a3a6506478ea557ef16969b4b2fc12"
           }
         ],
         "deps": [
@@ -15343,12 +15343,12 @@
         ]
       },
       "metadata": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-io-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io/3.6.0/ktor-io-3.6.0.jar",
-            "sha256": "32a750ed346a1f4497aa27696e68ca45eb7d294c3caba08f308d77fe312b3395"
+            "name": "ktor-io-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io/3.6.1/ktor-io-3.6.1.jar",
+            "sha256": "b598747433326fc66dcdbbaccb7309814eb5aeea9a4c319411ab6453c9e212f8"
           }
         ],
         "deps": [
@@ -15361,12 +15361,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-io-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io/3.6.0/ktor-io-3.6.0.jar",
-            "sha256": "32a750ed346a1f4497aa27696e68ca45eb7d294c3caba08f308d77fe312b3395"
+            "name": "ktor-io-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io/3.6.1/ktor-io-3.6.1.jar",
+            "sha256": "b598747433326fc66dcdbbaccb7309814eb5aeea9a4c319411ab6453c9e212f8"
           }
         ],
         "deps": [
@@ -15378,16 +15378,16 @@
         ]
       },
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-io-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-mingwx64/3.6.0/ktor-io-mingwx64-3.6.0.klib",
-            "sha256": "a8d8dd17f1910cd42345c9ef50ad90e5a6c5be9c6018021ef73a1ff3643b56bf"
+            "name": "ktor-io-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-mingwx64/3.6.1/ktor-io-mingwx64-3.6.1.klib",
+            "sha256": "3a74a40fd05398025c590b95a882d8b38119fcb83fc00115fef2d728f0c22e9a"
           },
           {
-            "name": "ktor-io-mingwX64Cinterop-mutexMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-mingwx64/3.6.0/ktor-io-mingwx64-3.6.0-cinterop-mutex.klib",
+            "name": "ktor-io-mingwX64Cinterop-mutexMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-mingwx64/3.6.1/ktor-io-mingwx64-3.6.1-cinterop-mutex.klib",
             "sha256": "bbf01c02e0c5c5fb1bb94d23d097d40caf98f55f3cf057c7250dcdf7c92087d0"
           }
         ],
@@ -15398,12 +15398,12 @@
         ]
       },
       "wasmJs": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-io-wasm-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-wasm-js/3.6.0/ktor-io-wasm-js-3.6.0.klib",
-            "sha256": "a6f2d3df41b2e438035deeb5a816bebe884f408feac79a94735e1f06343561c2"
+            "name": "ktor-io-wasm-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-io-wasm-js/3.6.1/ktor-io-wasm-js-3.6.1.klib",
+            "sha256": "e311c8bd1b7838082849b826e82944d4ef90ed053a76246886f4b3e50a36b5a1"
           }
         ],
         "deps": [
@@ -15418,12 +15418,12 @@
     },
     "io.ktor:ktor-network": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-network-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-jvm/3.6.0/ktor-network-jvm-3.6.0.jar",
-            "sha256": "746a751146d61865f51d6dd56b18e3e0fa68b36587561ee123ff7ce730d8c590"
+            "name": "ktor-network-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-jvm/3.6.1/ktor-network-jvm-3.6.1.jar",
+            "sha256": "3d1c8dba07e2d8939015fdb8436e2d28f3c7465e578ab938f9ff67cba5a4f535"
           }
         ],
         "deps": [
@@ -15433,11 +15433,11 @@
         ]
       },
       "js": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-network-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-js/3.6.0/ktor-network-js-3.6.0.klib",
+            "name": "ktor-network-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-js/3.6.1/ktor-network-js-3.6.1.klib",
             "sha256": "00aea9a117c20523ce4da163d9bbb619f1eb3217b084ca98a133b6c4d7367925"
           }
         ],
@@ -15452,12 +15452,12 @@
         ]
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-network-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-jvm/3.6.0/ktor-network-jvm-3.6.0.jar",
-            "sha256": "746a751146d61865f51d6dd56b18e3e0fa68b36587561ee123ff7ce730d8c590"
+            "name": "ktor-network-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-jvm/3.6.1/ktor-network-jvm-3.6.1.jar",
+            "sha256": "3d1c8dba07e2d8939015fdb8436e2d28f3c7465e578ab938f9ff67cba5a4f535"
           }
         ],
         "deps": [
@@ -15467,16 +15467,16 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-network-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-linuxarm64/3.6.0/ktor-network-linuxarm64-3.6.0.klib",
-            "sha256": "1750411f74c73c036b351ea36f0b295b7da537d2e7a1b3dadfeb2ecb9027ac11"
+            "name": "ktor-network-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-linuxarm64/3.6.1/ktor-network-linuxarm64-3.6.1.klib",
+            "sha256": "3ca434e8288baa280acee12d855e8b8803c1e4d6839a7e5c52062640b032b6a2"
           },
           {
-            "name": "ktor-network-linuxArm64Cinterop-networkMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-linuxarm64/3.6.0/ktor-network-linuxarm64-3.6.0-cinterop-network.klib",
+            "name": "ktor-network-linuxArm64Cinterop-networkMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-linuxarm64/3.6.1/ktor-network-linuxarm64-3.6.1-cinterop-network.klib",
             "sha256": "0082ae9f35473462011ef83791cc4e80da87b75acf1f55560ef9f9f82f632eb1"
           }
         ],
@@ -15487,16 +15487,16 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-network-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-linuxx64/3.6.0/ktor-network-linuxx64-3.6.0.klib",
-            "sha256": "9485cdc98028ce0639052125cbe0881f333ef146bbacb70899d4d0704647b44b"
+            "name": "ktor-network-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-linuxx64/3.6.1/ktor-network-linuxx64-3.6.1.klib",
+            "sha256": "2b2d44c39ecadebed6599053385493f047908152e70ef7e8c9a8fddaee1ce4f0"
           },
           {
-            "name": "ktor-network-linuxX64Cinterop-networkMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-linuxx64/3.6.0/ktor-network-linuxx64-3.6.0-cinterop-network.klib",
+            "name": "ktor-network-linuxX64Cinterop-networkMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-linuxx64/3.6.1/ktor-network-linuxx64-3.6.1-cinterop-network.klib",
             "sha256": "9621bf39fcffdb65a9b0287ba256d647a7a95905576e1f6452e17d2091ec4c15"
           }
         ],
@@ -15507,22 +15507,22 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-network-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-macosarm64/3.6.0/ktor-network-macosarm64-3.6.0.klib",
-            "sha256": "d55325e588be8c475e59091a8f6494b3cc427f76c10fb8212b20f4f8c4c865de"
+            "name": "ktor-network-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-macosarm64/3.6.1/ktor-network-macosarm64-3.6.1.klib",
+            "sha256": "a8ce09d58860fcede64090ab6e4f7d911159df0bbbc736a52318ba2000b38bff"
           },
           {
-            "name": "ktor-network-macosArm64Cinterop-networkMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-macosarm64/3.6.0/ktor-network-macosarm64-3.6.0-cinterop-network.klib",
-            "sha256": "a1700a03f12744d21144a9762f6c67cd08ebc83c3e80ac397d10f69f6e66d0ee"
+            "name": "ktor-network-macosArm64Cinterop-networkMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-macosarm64/3.6.1/ktor-network-macosarm64-3.6.1-cinterop-network.klib",
+            "sha256": "d183d6753235cf5eb7cbf992fbaa3a94eca839260319ba695f97e6c9a23271c3"
           },
           {
-            "name": "ktor-network-macosArm64Cinterop-unMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-macosarm64/3.6.0/ktor-network-macosarm64-3.6.0-cinterop-un.klib",
-            "sha256": "062f0d2042df2200272b65c586ee153bb1ddf5bcc7fdc41c171b4d7a0c3953cc"
+            "name": "ktor-network-macosArm64Cinterop-unMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-macosarm64/3.6.1/ktor-network-macosarm64-3.6.1-cinterop-un.klib",
+            "sha256": "03e549a9f79122c4c88792efe7322fb418f7973453e7d3559ed33df69711d38a"
           }
         ],
         "deps": [
@@ -15532,11 +15532,11 @@
         ]
       },
       "metadata": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-network-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network/3.6.0/ktor-network-3.6.0.jar",
+            "name": "ktor-network-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network/3.6.1/ktor-network-3.6.1.jar",
             "sha256": "cea1854f150d0a73c2bfc0eb0d3386951bb86b0dfc2b7bc9b86fb100eea13b31"
           }
         ],
@@ -15549,11 +15549,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-network-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network/3.6.0/ktor-network-3.6.0.jar",
+            "name": "ktor-network-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network/3.6.1/ktor-network-3.6.1.jar",
             "sha256": "cea1854f150d0a73c2bfc0eb0d3386951bb86b0dfc2b7bc9b86fb100eea13b31"
           }
         ],
@@ -15566,16 +15566,16 @@
         ]
       },
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-network-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-mingwx64/3.6.0/ktor-network-mingwx64-3.6.0.klib",
-            "sha256": "1825e2538053dfacac51c20d1407c637753c9c88a81756406650213051572f89"
+            "name": "ktor-network-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-mingwx64/3.6.1/ktor-network-mingwx64-3.6.1.klib",
+            "sha256": "9b2fb1c17eeb64984b4a1deeb63d1c7a2948f60047b3ad5500663dbfcbb7b0e2"
           },
           {
-            "name": "ktor-network-mingwX64Cinterop-afunixMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-mingwx64/3.6.0/ktor-network-mingwx64-3.6.0-cinterop-afunix.klib",
+            "name": "ktor-network-mingwX64Cinterop-afunixMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-mingwx64/3.6.1/ktor-network-mingwx64-3.6.1-cinterop-afunix.klib",
             "sha256": "f755088f7a055ce021c16b207643729810f21f859cf372b39977a1ff57b1566d"
           }
         ],
@@ -15586,11 +15586,11 @@
         ]
       },
       "wasmJs": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-network-wasm-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-wasm-js/3.6.0/ktor-network-wasm-js-3.6.0.klib",
+            "name": "ktor-network-wasm-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-wasm-js/3.6.1/ktor-network-wasm-js-3.6.1.klib",
             "sha256": "352b64161893e3ec0bf40b994b6cd3c46d552b719a76d1ff1e43a30db93ab87f"
           }
         ],
@@ -15606,12 +15606,12 @@
     },
     "io.ktor:ktor-network-tls": {
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-network-tls-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-tls-jvm/3.6.0/ktor-network-tls-jvm-3.6.0.jar",
-            "sha256": "09ed94b6783aacd3bb7d19ce606230153762bf68d399cbff0474299a00407a41"
+            "name": "ktor-network-tls-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-tls-jvm/3.6.1/ktor-network-tls-jvm-3.6.1.jar",
+            "sha256": "6491dfadbcd02cbe05660b42d841305044ad1a92d31f229037d2fe32a23550f8"
           }
         ],
         "deps": [
@@ -15623,11 +15623,11 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-network-tls-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-tls-macosarm64/3.6.0/ktor-network-tls-macosarm64-3.6.0.klib",
+            "name": "ktor-network-tls-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-network-tls-macosarm64/3.6.1/ktor-network-tls-macosarm64-3.6.1.klib",
             "sha256": "b07f3ee9a7277830b3e3e993f13a52ea13c0441d51c3441edfd5aeaff5251b0a"
           }
         ],
@@ -15642,12 +15642,12 @@
     },
     "io.ktor:ktor-serialization": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-serialization-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-jvm/3.6.0/ktor-serialization-jvm-3.6.0.jar",
-            "sha256": "d67f46cf64f8c97a2e14d4d5c0c1a4be315c8bc128bcc58370c0716363c258db"
+            "name": "ktor-serialization-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-jvm/3.6.1/ktor-serialization-jvm-3.6.1.jar",
+            "sha256": "c453ea5c53456c10b0cca4c86477190885042cfd92c68596bd36e34832da4e57"
           }
         ],
         "deps": [
@@ -15657,11 +15657,11 @@
         ]
       },
       "js": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-serialization-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-js/3.6.0/ktor-serialization-js-3.6.0.klib",
+            "name": "ktor-serialization-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-js/3.6.1/ktor-serialization-js-3.6.1.klib",
             "sha256": "cea8789eca02e87198fe4b42b23769b8cf2e16441c00143a801d6aa834ccba2e"
           }
         ],
@@ -15676,12 +15676,12 @@
         ]
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-serialization-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-jvm/3.6.0/ktor-serialization-jvm-3.6.0.jar",
-            "sha256": "d67f46cf64f8c97a2e14d4d5c0c1a4be315c8bc128bcc58370c0716363c258db"
+            "name": "ktor-serialization-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-jvm/3.6.1/ktor-serialization-jvm-3.6.1.jar",
+            "sha256": "c453ea5c53456c10b0cca4c86477190885042cfd92c68596bd36e34832da4e57"
           }
         ],
         "deps": [
@@ -15691,12 +15691,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-serialization-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-linuxarm64/3.6.0/ktor-serialization-linuxarm64-3.6.0.klib",
-            "sha256": "745fe19971cec52c94c646db20d85919fb897b994e05518b7b980a2c10cc1b79"
+            "name": "ktor-serialization-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-linuxarm64/3.6.1/ktor-serialization-linuxarm64-3.6.1.klib",
+            "sha256": "2c48c3c56afb36ef09a1237a7eac18085519338296b1422a1f013d90913a4c1e"
           }
         ],
         "deps": [
@@ -15706,11 +15706,11 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-serialization-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-linuxx64/3.6.0/ktor-serialization-linuxx64-3.6.0.klib",
+            "name": "ktor-serialization-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-linuxx64/3.6.1/ktor-serialization-linuxx64-3.6.1.klib",
             "sha256": "06b7442ed03cde0d6c03b9a07fd361a191aeaca7b7f773705befef7c3cf89f79"
           }
         ],
@@ -15721,11 +15721,11 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-serialization-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-macosarm64/3.6.0/ktor-serialization-macosarm64-3.6.0.klib",
+            "name": "ktor-serialization-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-macosarm64/3.6.1/ktor-serialization-macosarm64-3.6.1.klib",
             "sha256": "feec6c434e542951a32dd118d1344aa60f2f1497002a9d8b056cd448e3bca654"
           }
         ],
@@ -15736,11 +15736,11 @@
         ]
       },
       "metadata": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-serialization-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization/3.6.0/ktor-serialization-3.6.0.jar",
+            "name": "ktor-serialization-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization/3.6.1/ktor-serialization-3.6.1.jar",
             "sha256": "fd2aef1509733ca48e84c7953cc772e76816842895c9373a72d42accf6c10e56"
           }
         ],
@@ -15753,11 +15753,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-serialization-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization/3.6.0/ktor-serialization-3.6.0.jar",
+            "name": "ktor-serialization-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization/3.6.1/ktor-serialization-3.6.1.jar",
             "sha256": "fd2aef1509733ca48e84c7953cc772e76816842895c9373a72d42accf6c10e56"
           }
         ],
@@ -15770,11 +15770,11 @@
         ]
       },
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-serialization-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-mingwx64/3.6.0/ktor-serialization-mingwx64-3.6.0.klib",
+            "name": "ktor-serialization-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-mingwx64/3.6.1/ktor-serialization-mingwx64-3.6.1.klib",
             "sha256": "2767547e3ad64235eebd6a7eaf1638fc70c306e4d821b8c986c32d916e9c8ea5"
           }
         ],
@@ -15785,11 +15785,11 @@
         ]
       },
       "wasmJs": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-serialization-wasm-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-wasm-js/3.6.0/ktor-serialization-wasm-js-3.6.0.klib",
+            "name": "ktor-serialization-wasm-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-serialization-wasm-js/3.6.1/ktor-serialization-wasm-js-3.6.1.klib",
             "sha256": "de5fb768e3f62d65fbe7be41128d2d678d734e94542f890e91105be4e96e09b5"
           }
         ],
@@ -15805,12 +15805,12 @@
     },
     "io.ktor:ktor-sse": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-sse-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-jvm/3.6.0/ktor-sse-jvm-3.6.0.jar",
-            "sha256": "9fcb5074b74d14b9f18ace4ee9acd6263176ae01b4e8e5c8f72b6aa978c279ea"
+            "name": "ktor-sse-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-jvm/3.6.1/ktor-sse-jvm-3.6.1.jar",
+            "sha256": "365f54d957081de3a7c4d17937a9ece27ad8cc3140ae35a5e8159ea019508445"
           }
         ],
         "deps": [
@@ -15820,11 +15820,11 @@
         ]
       },
       "js": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-sse-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-js/3.6.0/ktor-sse-js-3.6.0.klib",
+            "name": "ktor-sse-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-js/3.6.1/ktor-sse-js-3.6.1.klib",
             "sha256": "d0ccd9e69f77aaade614baddc6bd7d3e7ae89372bc6e8c5d8c00ad66fe1306df"
           }
         ],
@@ -15839,12 +15839,12 @@
         ]
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-sse-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-jvm/3.6.0/ktor-sse-jvm-3.6.0.jar",
-            "sha256": "9fcb5074b74d14b9f18ace4ee9acd6263176ae01b4e8e5c8f72b6aa978c279ea"
+            "name": "ktor-sse-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-jvm/3.6.1/ktor-sse-jvm-3.6.1.jar",
+            "sha256": "365f54d957081de3a7c4d17937a9ece27ad8cc3140ae35a5e8159ea019508445"
           }
         ],
         "deps": [
@@ -15854,12 +15854,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-sse-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-linuxarm64/3.6.0/ktor-sse-linuxarm64-3.6.0.klib",
-            "sha256": "8f8e8ab576e45b87890707cb5318ad6292738b01580453da60f568f97ab8a36a"
+            "name": "ktor-sse-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-linuxarm64/3.6.1/ktor-sse-linuxarm64-3.6.1.klib",
+            "sha256": "c4c14bb5352f9a68f6f122778b087d1c35398bb3f33253ff0eb0910285f304b7"
           }
         ],
         "deps": [
@@ -15869,11 +15869,11 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-sse-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-linuxx64/3.6.0/ktor-sse-linuxx64-3.6.0.klib",
+            "name": "ktor-sse-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-linuxx64/3.6.1/ktor-sse-linuxx64-3.6.1.klib",
             "sha256": "dd178f978c1c88efe500c6ae9ea80d54d0afdd7c1c1d0ac94a9aca714158e021"
           }
         ],
@@ -15884,11 +15884,11 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-sse-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-macosarm64/3.6.0/ktor-sse-macosarm64-3.6.0.klib",
+            "name": "ktor-sse-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-macosarm64/3.6.1/ktor-sse-macosarm64-3.6.1.klib",
             "sha256": "60a4e6e5cc7009f2d43f3ef4b18cc6c263717663b664e0473709f21b96e49cf9"
           }
         ],
@@ -15899,11 +15899,11 @@
         ]
       },
       "metadata": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-sse-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse/3.6.0/ktor-sse-3.6.0.jar",
+            "name": "ktor-sse-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse/3.6.1/ktor-sse-3.6.1.jar",
             "sha256": "1f4838ddb7d57e84bdd3913af4b40627662abdbca2fba8921b867f1a62d0bf5d"
           }
         ],
@@ -15916,11 +15916,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-sse-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse/3.6.0/ktor-sse-3.6.0.jar",
+            "name": "ktor-sse-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse/3.6.1/ktor-sse-3.6.1.jar",
             "sha256": "1f4838ddb7d57e84bdd3913af4b40627662abdbca2fba8921b867f1a62d0bf5d"
           }
         ],
@@ -15933,11 +15933,11 @@
         ]
       },
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-sse-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-mingwx64/3.6.0/ktor-sse-mingwx64-3.6.0.klib",
+            "name": "ktor-sse-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-mingwx64/3.6.1/ktor-sse-mingwx64-3.6.1.klib",
             "sha256": "2b08e71aca2a0b74ae2d08d532b85cb7cc8e610dfc6ed7d3532752a8eb68a6fd"
           }
         ],
@@ -15948,11 +15948,11 @@
         ]
       },
       "wasmJs": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-sse-wasm-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-wasm-js/3.6.0/ktor-sse-wasm-js-3.6.0.klib",
+            "name": "ktor-sse-wasm-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-sse-wasm-js/3.6.1/ktor-sse-wasm-js-3.6.1.klib",
             "sha256": "8f58410f431eb8f7f398133163b6498e1e4417e29cc0c17597ee23e74d6550d8"
           }
         ],
@@ -15968,12 +15968,12 @@
     },
     "io.ktor:ktor-utils": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-utils-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-jvm/3.6.0/ktor-utils-jvm-3.6.0.jar",
-            "sha256": "05698e23c0539c7042676a98557e3358e77e19efa9fa4fc2145f20ad8721aefc"
+            "name": "ktor-utils-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-jvm/3.6.1/ktor-utils-jvm-3.6.1.jar",
+            "sha256": "0df228f4d134facd49218a5a309fb20a16ff53759dbcdf52714b7129572beafc"
           }
         ],
         "deps": [
@@ -15984,11 +15984,11 @@
         ]
       },
       "js": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-utils-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-js/3.6.0/ktor-utils-js-3.6.0.klib",
+            "name": "ktor-utils-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-js/3.6.1/ktor-utils-js-3.6.1.klib",
             "sha256": "70fb6fc74e41fc380797f0c3b8551ee37843133caf4584fc6ce43542a91fb4ae"
           }
         ],
@@ -16004,12 +16004,12 @@
         ]
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-utils-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-jvm/3.6.0/ktor-utils-jvm-3.6.0.jar",
-            "sha256": "05698e23c0539c7042676a98557e3358e77e19efa9fa4fc2145f20ad8721aefc"
+            "name": "ktor-utils-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-jvm/3.6.1/ktor-utils-jvm-3.6.1.jar",
+            "sha256": "0df228f4d134facd49218a5a309fb20a16ff53759dbcdf52714b7129572beafc"
           }
         ],
         "deps": [
@@ -16020,16 +16020,16 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-utils-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-linuxarm64/3.6.0/ktor-utils-linuxarm64-3.6.0.klib",
-            "sha256": "24eeb221c24beb08b96fa357954f23ec46117600fd8bd3dbe6254d91bfd80b96"
+            "name": "ktor-utils-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-linuxarm64/3.6.1/ktor-utils-linuxarm64-3.6.1.klib",
+            "sha256": "8b87e60130bd48af85ce855ca02e758d4436527e110070271d55d47139664916"
           },
           {
-            "name": "ktor-utils-linuxArm64Cinterop-threadUtilsMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-linuxarm64/3.6.0/ktor-utils-linuxarm64-3.6.0-cinterop-threadUtils.klib",
+            "name": "ktor-utils-linuxArm64Cinterop-threadUtilsMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-linuxarm64/3.6.1/ktor-utils-linuxarm64-3.6.1-cinterop-threadUtils.klib",
             "sha256": "56ba453973caf664fed48495936f38558ba3f3babd8a20523998cdd74e819919"
           }
         ],
@@ -16041,16 +16041,16 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-utils-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-linuxx64/3.6.0/ktor-utils-linuxx64-3.6.0.klib",
+            "name": "ktor-utils-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-linuxx64/3.6.1/ktor-utils-linuxx64-3.6.1.klib",
             "sha256": "54f2c4f3a0be46d5f1c63604a0d7d82b43379d59bc5917ae4299ea2848809ff8"
           },
           {
-            "name": "ktor-utils-linuxX64Cinterop-threadUtilsMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-linuxx64/3.6.0/ktor-utils-linuxx64-3.6.0-cinterop-threadUtils.klib",
+            "name": "ktor-utils-linuxX64Cinterop-threadUtilsMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-linuxx64/3.6.1/ktor-utils-linuxx64-3.6.1-cinterop-threadUtils.klib",
             "sha256": "c967dd297a22791a613d427b1aea1b5d7a088e5ba9ff57ace11461e32f8e6038"
           }
         ],
@@ -16062,17 +16062,17 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-utils-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-macosarm64/3.6.0/ktor-utils-macosarm64-3.6.0.klib",
+            "name": "ktor-utils-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-macosarm64/3.6.1/ktor-utils-macosarm64-3.6.1.klib",
             "sha256": "4c381ad34dcdd94c5a1830f3b0e2dc327dfad6d1082a9966fb501d6ccffeda9d"
           },
           {
-            "name": "ktor-utils-macosArm64Cinterop-threadUtilsMain-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-macosarm64/3.6.0/ktor-utils-macosarm64-3.6.0-cinterop-threadUtils.klib",
-            "sha256": "b4efcb989238da41c39c11df354539008830f06630c03203e5d1f4b2324a3c7f"
+            "name": "ktor-utils-macosArm64Cinterop-threadUtilsMain-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-macosarm64/3.6.1/ktor-utils-macosarm64-3.6.1-cinterop-threadUtils.klib",
+            "sha256": "5d847c03b20a3ca10113f701be1bf9f285bec5c0175f6060db1fbe1becda599a"
           }
         ],
         "deps": [
@@ -16083,11 +16083,11 @@
         ]
       },
       "metadata": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-utils-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils/3.6.0/ktor-utils-3.6.0.jar",
+            "name": "ktor-utils-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils/3.6.1/ktor-utils-3.6.1.jar",
             "sha256": "5aca932a872b735b4af37acfc74b79932ca73b921cef6617ad28001daefb73a5"
           }
         ],
@@ -16101,11 +16101,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-utils-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils/3.6.0/ktor-utils-3.6.0.jar",
+            "name": "ktor-utils-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils/3.6.1/ktor-utils-3.6.1.jar",
             "sha256": "5aca932a872b735b4af37acfc74b79932ca73b921cef6617ad28001daefb73a5"
           }
         ],
@@ -16119,11 +16119,11 @@
         ]
       },
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-utils-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-mingwx64/3.6.0/ktor-utils-mingwx64-3.6.0.klib",
+            "name": "ktor-utils-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-mingwx64/3.6.1/ktor-utils-mingwx64-3.6.1.klib",
             "sha256": "c73caf9cb4b283b67a51c425407c32499940c37b42a7988e0a39091fc912dcbf"
           }
         ],
@@ -16135,11 +16135,11 @@
         ]
       },
       "wasmJs": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-utils-wasm-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-wasm-js/3.6.0/ktor-utils-wasm-js-3.6.0.klib",
+            "name": "ktor-utils-wasm-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-utils-wasm-js/3.6.1/ktor-utils-wasm-js-3.6.1.klib",
             "sha256": "318519c10dd69af33d5c86b12e53a00e06dc439512331d1b0fb21977abbb6e34"
           }
         ],
@@ -16156,12 +16156,12 @@
     },
     "io.ktor:ktor-websocket-serialization": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websocket-serialization-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-jvm/3.6.0/ktor-websocket-serialization-jvm-3.6.0.jar",
-            "sha256": "c87fe370c17868dc8c101947452bf8a8622363cf4d83a342334666bb46fe627b"
+            "name": "ktor-websocket-serialization-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-jvm/3.6.1/ktor-websocket-serialization-jvm-3.6.1.jar",
+            "sha256": "d8dd32ed720cd6f940ef5df74a9f081a42c6c537e6b0a3762bc79f68730d868e"
           }
         ],
         "deps": [
@@ -16171,11 +16171,11 @@
         ]
       },
       "js": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websocket-serialization-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-js/3.6.0/ktor-websocket-serialization-js-3.6.0.klib",
+            "name": "ktor-websocket-serialization-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-js/3.6.1/ktor-websocket-serialization-js-3.6.1.klib",
             "sha256": "357efe9e15e754d9a9fdd772072cc80d132a3130753c9638725a56577d349971"
           }
         ],
@@ -16190,12 +16190,12 @@
         ]
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websocket-serialization-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-jvm/3.6.0/ktor-websocket-serialization-jvm-3.6.0.jar",
-            "sha256": "c87fe370c17868dc8c101947452bf8a8622363cf4d83a342334666bb46fe627b"
+            "name": "ktor-websocket-serialization-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-jvm/3.6.1/ktor-websocket-serialization-jvm-3.6.1.jar",
+            "sha256": "d8dd32ed720cd6f940ef5df74a9f081a42c6c537e6b0a3762bc79f68730d868e"
           }
         ],
         "deps": [
@@ -16205,12 +16205,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websocket-serialization-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-linuxarm64/3.6.0/ktor-websocket-serialization-linuxarm64-3.6.0.klib",
-            "sha256": "116ccc306b9f9ae0e448c96e912caedaa5690837a4e57e074c9f3ce778b254ce"
+            "name": "ktor-websocket-serialization-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-linuxarm64/3.6.1/ktor-websocket-serialization-linuxarm64-3.6.1.klib",
+            "sha256": "42aa64da3448d188611420c0f3123798d9046999c9813996fa2a9c1485597956"
           }
         ],
         "deps": [
@@ -16220,11 +16220,11 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websocket-serialization-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-linuxx64/3.6.0/ktor-websocket-serialization-linuxx64-3.6.0.klib",
+            "name": "ktor-websocket-serialization-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-linuxx64/3.6.1/ktor-websocket-serialization-linuxx64-3.6.1.klib",
             "sha256": "0c3030e4496e5cf70c9e2ca80694bb8fbc704eb7fc06251bed9d3d41b28aaebd"
           }
         ],
@@ -16235,11 +16235,11 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websocket-serialization-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-macosarm64/3.6.0/ktor-websocket-serialization-macosarm64-3.6.0.klib",
+            "name": "ktor-websocket-serialization-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-macosarm64/3.6.1/ktor-websocket-serialization-macosarm64-3.6.1.klib",
             "sha256": "4f1f2630db354a8cd6d8714520d6f8d7ff4d4189ab557241c7c785a214df44f6"
           }
         ],
@@ -16250,11 +16250,11 @@
         ]
       },
       "metadata": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websocket-serialization-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization/3.6.0/ktor-websocket-serialization-3.6.0.jar",
+            "name": "ktor-websocket-serialization-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization/3.6.1/ktor-websocket-serialization-3.6.1.jar",
             "sha256": "b7455559d7413f9c0b30889209f824401a2434d8f5cc5ea0ad388b48543b753b"
           }
         ],
@@ -16267,11 +16267,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websocket-serialization-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization/3.6.0/ktor-websocket-serialization-3.6.0.jar",
+            "name": "ktor-websocket-serialization-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization/3.6.1/ktor-websocket-serialization-3.6.1.jar",
             "sha256": "b7455559d7413f9c0b30889209f824401a2434d8f5cc5ea0ad388b48543b753b"
           }
         ],
@@ -16284,11 +16284,11 @@
         ]
       },
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websocket-serialization-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-mingwx64/3.6.0/ktor-websocket-serialization-mingwx64-3.6.0.klib",
+            "name": "ktor-websocket-serialization-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-mingwx64/3.6.1/ktor-websocket-serialization-mingwx64-3.6.1.klib",
             "sha256": "22ee656f003e28e332dcf160c5fea5b4c2aa5347a6056868b6bd2d6a17002c9a"
           }
         ],
@@ -16299,11 +16299,11 @@
         ]
       },
       "wasmJs": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websocket-serialization-wasm-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-wasm-js/3.6.0/ktor-websocket-serialization-wasm-js-3.6.0.klib",
+            "name": "ktor-websocket-serialization-wasm-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websocket-serialization-wasm-js/3.6.1/ktor-websocket-serialization-wasm-js-3.6.1.klib",
             "sha256": "c2d74634bb8973a9f92205a1ee63babf79456bf77ff8e26b56bc34580960ad92"
           }
         ],
@@ -16319,12 +16319,12 @@
     },
     "io.ktor:ktor-websockets": {
       "android": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websockets-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-jvm/3.6.0/ktor-websockets-jvm-3.6.0.jar",
-            "sha256": "3ef8b5d544dc7f9bd041a245bb8c2ff6647d0fd1e111a65b7be54977476a5464"
+            "name": "ktor-websockets-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-jvm/3.6.1/ktor-websockets-jvm-3.6.1.jar",
+            "sha256": "58a3b887d3f220bfcf1e6405386409dbc8eccc5072ff9bb1e75c70cf6388fb2d"
           }
         ],
         "deps": [
@@ -16335,11 +16335,11 @@
         ]
       },
       "js": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websockets-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-js/3.6.0/ktor-websockets-js-3.6.0.klib",
+            "name": "ktor-websockets-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-js/3.6.1/ktor-websockets-js-3.6.1.klib",
             "sha256": "b50640f05c1f407156f1c139a632599d7af705b02934167463198a54c5834fe3"
           }
         ],
@@ -16355,12 +16355,12 @@
         ]
       },
       "jvm": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websockets-jvm-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-jvm/3.6.0/ktor-websockets-jvm-3.6.0.jar",
-            "sha256": "3ef8b5d544dc7f9bd041a245bb8c2ff6647d0fd1e111a65b7be54977476a5464"
+            "name": "ktor-websockets-jvm-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-jvm/3.6.1/ktor-websockets-jvm-3.6.1.jar",
+            "sha256": "58a3b887d3f220bfcf1e6405386409dbc8eccc5072ff9bb1e75c70cf6388fb2d"
           }
         ],
         "deps": [
@@ -16371,12 +16371,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websockets-linuxArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-linuxarm64/3.6.0/ktor-websockets-linuxarm64-3.6.0.klib",
-            "sha256": "96ee62811efe00fd282003ee4a9fb0c0a9e8e9439b5c1d5f48294377e6451a9a"
+            "name": "ktor-websockets-linuxArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-linuxarm64/3.6.1/ktor-websockets-linuxarm64-3.6.1.klib",
+            "sha256": "ab80411d375578afd1985e0d272f87160fdf5a47b0db19c89e8e4eca5b6af070"
           }
         ],
         "deps": [
@@ -16387,11 +16387,11 @@
         ]
       },
       "linuxX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websockets-linuxX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-linuxx64/3.6.0/ktor-websockets-linuxx64-3.6.0.klib",
+            "name": "ktor-websockets-linuxX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-linuxx64/3.6.1/ktor-websockets-linuxx64-3.6.1.klib",
             "sha256": "d6b143df5da8fd553ff84c401a946f5e111dd9597e618e38a4efb22abd9ab86b"
           }
         ],
@@ -16403,11 +16403,11 @@
         ]
       },
       "macosArm64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websockets-macosArm64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-macosarm64/3.6.0/ktor-websockets-macosarm64-3.6.0.klib",
+            "name": "ktor-websockets-macosArm64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-macosarm64/3.6.1/ktor-websockets-macosarm64-3.6.1.klib",
             "sha256": "586cf3b3a8d283705a38ce67aa6818eba884782fcb72048be030cebdded67b3c"
           }
         ],
@@ -16419,11 +16419,11 @@
         ]
       },
       "metadata": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websockets-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets/3.6.0/ktor-websockets-3.6.0.jar",
+            "name": "ktor-websockets-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets/3.6.1/ktor-websockets-3.6.1.jar",
             "sha256": "e639140b0db0d00d27f6437fe8b438743033b424e43a1a9be61f91643c9f12d0"
           }
         ],
@@ -16437,11 +16437,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websockets-metadata-3.6.0.jar",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets/3.6.0/ktor-websockets-3.6.0.jar",
+            "name": "ktor-websockets-metadata-3.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets/3.6.1/ktor-websockets-3.6.1.jar",
             "sha256": "e639140b0db0d00d27f6437fe8b438743033b424e43a1a9be61f91643c9f12d0"
           }
         ],
@@ -16455,11 +16455,11 @@
         ]
       },
       "mingwX64": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websockets-mingwX64Main-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-mingwx64/3.6.0/ktor-websockets-mingwx64-3.6.0.klib",
+            "name": "ktor-websockets-mingwX64Main-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-mingwx64/3.6.1/ktor-websockets-mingwx64-3.6.1.klib",
             "sha256": "77431b6936b4ec66f4f7f57ad2f4f521280e253ee444b8d723eea4c9907c58e3"
           }
         ],
@@ -16471,11 +16471,11 @@
         ]
       },
       "wasmJs": {
-        "version": "3.6.0",
+        "version": "3.6.1",
         "files": [
           {
-            "name": "ktor-websockets-wasm-js-3.6.0.klib",
-            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-wasm-js/3.6.0/ktor-websockets-wasm-js-3.6.0.klib",
+            "name": "ktor-websockets-wasm-js-3.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/io/ktor/ktor-websockets-wasm-js/3.6.1/ktor-websockets-wasm-js-3.6.1.klib",
             "sha256": "f028b35d54e0797215cdbd059d0f2ecbd19358aa95f5970f7c99c79a94394861"
           }
         ],
