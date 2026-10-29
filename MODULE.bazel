@@ -609,7 +609,7 @@ maven.install(
     name = "schemaspy",
     artifacts = [
         "org.schemaspy:schemaspy:7.0.2",
-        "org.xerial:sqlite-jdbc:3.53.4.0",
+        "org.xerial:sqlite-jdbc:3.54.1.0",
         # Transitive versions held at the newest (see version_conflict_policy).
         "ch.qos.logback:logback-classic:1.6.6",
         "ch.qos.logback:logback-core:1.6.6",
