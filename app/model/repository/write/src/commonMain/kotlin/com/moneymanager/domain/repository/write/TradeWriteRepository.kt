@@ -44,7 +44,8 @@ interface TradeWriteRepository : TradeReadRepository {
         occurrence: Int = 0,
     ): TradeCreateResult
 
-    suspend fun deleteTrade(id: TradeId)
+    /** Deletes [ids] in one database transaction: one commit for the lot rather than one per trade. */
+    suspend fun deleteTrades(ids: Collection<TradeId>)
 
     /** Sets each of [attributes] on trade [id], replacing an existing value of the same type. */
     suspend fun upsertAttributes(

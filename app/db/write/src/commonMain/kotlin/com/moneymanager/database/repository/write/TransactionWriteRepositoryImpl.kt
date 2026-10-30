@@ -336,8 +336,10 @@ class TransactionWriteRepositoryImpl(
         return createdIds
     }
 
-    override suspend fun deleteTransaction(id: Long): Unit =
+    override suspend fun deleteTransactions(ids: Collection<TransferId>): Unit =
         withContext(Dispatchers.Default) {
-            transferWriteQueries.delete(id)
+            transferWriteQueries.transaction {
+                ids.forEach { transferWriteQueries.delete(it.id) }
+            }
         }
 }

@@ -444,7 +444,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // DELETE first transfer
-            repositories.transactionRepository.deleteTransaction(transfer1.id.id)
+            repositories.transactionRepository.deleteTransactions(listOf(transfer1.id))
 
             // Verify pending changes were tracked
             assertTrue(
@@ -489,7 +489,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             )
 
             // DELETE the only transfer
-            repositories.transactionRepository.deleteTransaction(transfer.id.id)
+            repositories.transactionRepository.deleteTransactions(listOf(transfer.id))
 
             // Verify incremental refresh produces correct results (should be empty)
             verifyMaterializedViewsMatchViews()

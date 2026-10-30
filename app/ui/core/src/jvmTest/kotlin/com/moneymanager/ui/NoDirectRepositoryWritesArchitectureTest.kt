@@ -18,7 +18,7 @@ class NoDirectRepositoryWritesArchitectureTest {
         listOf(
             "createTransfers",
             "updateTransfer",
-            "deleteTransaction",
+            "deleteTransactions",
             "createAccount",
             "updateAccountWithAttributes",
             "deleteAccount",

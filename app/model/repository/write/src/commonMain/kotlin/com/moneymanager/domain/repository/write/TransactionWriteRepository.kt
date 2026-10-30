@@ -56,7 +56,8 @@ interface TransactionWriteRepository : TransactionReadRepository {
         source: Source,
     )
 
-    suspend fun deleteTransaction(id: Long)
+    /** Deletes [ids] in one database transaction: one commit for the lot rather than one per transfer. */
+    suspend fun deleteTransactions(ids: Collection<TransferId>)
 
     /**
      * Creates new transfers AND applies updates to existing ones in a SINGLE database transaction, so

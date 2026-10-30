@@ -41,10 +41,13 @@ plugins:
   - id: org.jetbrains.bazel
 # The sync runs Bazel inside the container (the Qodana job mounts the runner's Android SDK and passes the BuildBuddy
 # RBE settings in user.bazelrc). Bazel downloads the JDK, Kotlin and every library itself; it needs only bazelisk and a C
-# compiler for the host toolchain's autodetection.
+# compiler for the host toolchain's autodetection. The image can ship a libcrypt1 newer than its apt repositories'
+# libcrypt-dev, which g++ needs (through libc6-dev) at exactly its own version, so libcrypt1 is moved to that version.
 bootstrap: >-
   apt-get update -qq &&
-  apt-get install -y -qq --no-install-recommends ca-certificates curl gcc g++ python3 > /dev/null &&
+  libcrypt=$(apt-cache policy libcrypt-dev | sed -n 's/ *Candidate: //p') &&
+  apt-get install -y -qq --no-install-recommends --allow-downgrades "libcrypt1=$libcrypt"
+  ca-certificates curl gcc g++ python3 > /dev/null &&
   mkdir -p /usr/local/bin &&
   curl -fsSL -o /usr/local/bin/bazel
   https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 &&
