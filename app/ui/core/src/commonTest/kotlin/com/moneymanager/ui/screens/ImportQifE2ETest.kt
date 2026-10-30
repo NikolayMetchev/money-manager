@@ -3,6 +3,7 @@ package com.moneymanager.ui.screens
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isEnabled
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
@@ -239,12 +241,13 @@ class ImportQifE2ETest {
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
             onNodeWithText("CSV", useUnmergedTree = true).performClick()
-            waitUntilAtLeastOneExists(hasText("first.qif"), timeoutMillis = 15000)
 
             // Apply to the first file (creates the transfers), then to the second (all duplicates).
             for (file in listOf("first.qif", "second.qif")) {
-                // After navigating back from the previous file the list re-renders, so wait for the
-                // row before clicking it (it may not be present on the first recomposition on CI).
+                // The list composes only the cards that fit (a phone's screen holds one), so scroll to the
+                // row; after navigating back from the previous file the list re-renders, so wait for it first.
+                waitUntilAtLeastOneExists(hasText(".qif", substring = true), timeoutMillis = 15000)
+                onNode(hasScrollToIndexAction()).performScrollToNode(hasText(file))
                 waitUntilAtLeastOneExists(hasText(file), timeoutMillis = 15000)
                 onAllNodesWithText(file).onFirst().performClick()
                 waitUntilAtLeastOneExists(hasText("Apply Strategy") and isEnabled(), timeoutMillis = 15000)
@@ -264,6 +267,9 @@ class ImportQifE2ETest {
             waitUntilExactlyOneExists(hasText("Imported (2)"), timeoutMillis = 15000)
             onNodeWithText("Imported (2)").performClick()
             waitForIdle()
+            // The list composes only the cards that fit, and the two files can land in either order.
+            waitUntilAtLeastOneExists(hasText(".qif", substring = true), timeoutMillis = 15000)
+            onNode(hasScrollToIndexAction()).performScrollToNode(hasText("second.qif"))
             waitUntilExactlyOneExists(hasText("second.qif"), timeoutMillis = 15000)
             onNodeWithText("Unimported (0)").assertExists()
         }
@@ -326,6 +332,9 @@ class ImportQifE2ETest {
             waitUntilExactlyOneExists(hasText("Imported (2)"), timeoutMillis = 15000)
             onNodeWithText("Imported (2)").performClick()
             waitForIdle()
+            // The list composes only the cards that fit, and the two files can land in either order.
+            waitUntilAtLeastOneExists(hasText(".qif", substring = true), timeoutMillis = 15000)
+            onNode(hasScrollToIndexAction()).performScrollToNode(hasText("second.qif"))
             waitUntilExactlyOneExists(hasText("second.qif"), timeoutMillis = 15000)
             onNodeWithText("Unimported (0)").assertExists()
 

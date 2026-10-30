@@ -47,7 +47,12 @@ class ImportsPresenterTest {
                 val idle = awaitItem()
                 assertNull(idle.lastRun)
                 idle.eventSink(ImportsEvent.Start(ImportKind.DIRECTORIES))
-                val done = awaitUntil { it.lastRun != null && !it.running }
+                // The run's outcome and its task's final status reach the model in separate emissions.
+                val done =
+                    awaitUntil { model ->
+                        model.lastRun != null && !model.running &&
+                            model.tasks.any { it.parentId == null && it.status != TaskStatus.RUNNING }
+                    }
                 assertEquals(listOf("noStrategy" to "unknown.csv"), done.attention.map { it.kind to it.subject })
                 assertEquals(TaskStatus.SUCCEEDED, done.tasks.single { it.parentId == null }.status)
                 cancelAndIgnoreRemainingEvents()
