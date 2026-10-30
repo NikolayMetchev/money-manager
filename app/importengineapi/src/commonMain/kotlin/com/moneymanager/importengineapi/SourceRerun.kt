@@ -246,11 +246,12 @@ private suspend fun rerunPartners(
     suspend fun createdAlongside(partner: TransferId): Pair<Source.Csv, Map<TransferId, Source>>? =
         reads.transferSourceRepository
             .getSourcesForTransaction(partner)
-            .filter { it.revisionId == 1L }
-            .mapNotNull { (it.source as? Source.Csv)?.let { csv -> Source.Csv(csv.importId) } }
-            .distinct()
-            .filter { it != source }
-            .firstNotNullOfOrNull { file ->
+            .mapNotNullTo(mutableSetOf()) { record ->
+                (record.source as? Source.Csv)
+                    ?.takeIf { record.revisionId == 1L }
+                    ?.let { Source.Csv(it.importId) }
+                    ?.takeIf { it != source }
+            }.firstNotNullOfOrNull { file ->
                 val created =
                     createdByFile.getOrPut(file) {
                         // A row that created a trade too can't be re-run without re-creating the trade.
