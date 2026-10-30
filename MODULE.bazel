@@ -653,7 +653,7 @@ maven.install(
     artifacts = [
         "com.android.tools.build:builder:9.4.1",
         "com.android.tools.build:gradle:9.4.1",
-        "com.android.tools.build:gradle-api:9.5.0",
+        "com.android.tools.build:gradle-api:9.4.1",
         # Transitive versions held at the newest (see version_conflict_policy).
         "com.google.code.findbugs:jsr305:3.0.2",
         "com.google.code.gson:gson:2.15.0",
@@ -711,6 +711,7 @@ maven.install(
     version_conflict_policy = "pinned",
 )
 # gradle-api's POM depends back on AGP (runtime scope; its Gradle module metadata doesn't), a cycle Bazel refuses.
+# amend_artifact only matches a directly listed artifact, so gradle-api is listed above (at AGP's version).
 maven.amend_artifact(
     name = "android_tools",
     coordinates = "com.android.tools.build:gradle-api",

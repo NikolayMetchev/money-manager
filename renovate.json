@@ -28,8 +28,8 @@
       "groupName": "kotlin monorepo"
     },
     {
-      "description": "AGP and the lint it runs release together (lint's version is AGP's + 23): @android_tools' AGP and builder, android_sdk.agp (aapt2) and @android_lint's lint-gradle move as one",
-      "matchPackageNames": ["com.android.tools.build:gradle", "com.android.tools.build:builder", "com.android.tools.lint:lint-gradle", "/^com\\.android\\.(application|kotlin\\.multiplatform\\.library)$/"],
+      "description": "AGP and the lint it runs release together (lint's version is AGP's + 23): @android_tools' AGP, builder and gradle-api (listed only so amend_artifact can break its POM cycle), android_sdk.agp (aapt2) and @android_lint's lint-gradle move as one",
+      "matchPackageNames": ["com.android.tools.build:gradle", "com.android.tools.build:builder", "com.android.tools.build:gradle-api", "com.android.tools.lint:lint-gradle", "/^com\\.android\\.(application|kotlin\\.multiplatform\\.library)$/"],
       "groupName": "android gradle plugin"
     },
     {
