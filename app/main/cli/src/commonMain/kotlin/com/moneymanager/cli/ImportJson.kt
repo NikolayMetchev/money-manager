@@ -8,7 +8,8 @@ import com.moneymanager.apiimport.ApiSessionImportStatus
 import com.moneymanager.csvimporter.BulkFileOutcome
 import com.moneymanager.csvimporter.BulkFileStatus
 import com.moneymanager.csvimporter.DirectoryRedownloadResult
-import com.moneymanager.csvimporter.isQifFileName
+import com.moneymanager.domain.model.ImportFileKind
+import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.importdirectory.ImportAllResult
 import kotlinx.serialization.Serializable
 
@@ -164,7 +165,7 @@ private fun BulkFileOutcome.toJson() =
     FileImportJson(
         id = fileId,
         file = fileName,
-        format = if (isQifFileName(fileName)) "qif" else "csv",
+        format = if (importFileKind(fileName) == ImportFileKind.QIF) "qif" else "csv",
         status =
             when (status) {
                 BulkFileStatus.IMPORTED -> "imported"

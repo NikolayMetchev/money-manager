@@ -15,7 +15,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.strategy.StrategyKind
 import kotlinx.serialization.Serializable
 
-enum class ImportTab { DIRECTORIES, CSV, API, MISC, TIMELINE, RECONCILIATION }
+enum class ImportTab { FILES, API, MISC, TIMELINE, RECONCILIATION }
 
 /**
  * Navigation destinations. Serializable [NavKey]s so the back stack survives process death via
@@ -56,7 +56,7 @@ sealed class Screen : NavKey {
 
     @Serializable
     data class Imports(
-        val tab: ImportTab = ImportTab.DIRECTORIES,
+        val tab: ImportTab = ImportTab.FILES,
     ) : Screen() {
         override val title: String get() = "Imports"
     }

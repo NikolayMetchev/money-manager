@@ -9,7 +9,7 @@ import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 
 internal const val MANUALLY_ADDED_LABEL = "Manually added"
 
-private const val PATH_SEPARATOR = " / "
+internal const val PATH_SEPARATOR = " / "
 
 /**
  * One strategy's files within a tab; [key] is null for the "no strategy"/"unknown strategy" bucket.

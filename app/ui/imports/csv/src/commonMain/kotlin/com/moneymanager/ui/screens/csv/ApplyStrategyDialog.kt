@@ -28,12 +28,12 @@ import com.moneymanager.csvimporter.buildCreatedAccountNameOverrides
 import com.moneymanager.csvimporter.buildPendingAccountMappings
 import com.moneymanager.csvimporter.ensureCryptoAssets
 import com.moneymanager.csvimporter.hasBlankNewAccountNames
-import com.moneymanager.csvimporter.isQifFileName
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CryptoAsset
+import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
@@ -41,6 +41,7 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -157,7 +158,7 @@ fun ApplyStrategyDialog(
                     csvImport.originalFileName,
                     csvImport.columns,
                     rows,
-                    wholeDocument = isQifFileName(csvImport.originalFileName),
+                    wholeDocument = importFileKind(csvImport.originalFileName) == ImportFileKind.QIF,
                 )
             selectedStrategy = matching ?: strategies.firstOrNull()
         }

@@ -47,7 +47,7 @@ import kotlin.uuid.Uuid
  *
  * The test flow:
  * 1. Create fresh database with Monzo CSV data injected (simulates file picker which can't be automated)
- * 2. Navigate to CSV Imports screen
+ * 2. Navigate to the Imports screen's Files tab
  * 3. Click on the imported CSV file
  * 4. Navigate to Accounts screen and create source account for Monzo
  * 5. Navigate back to CSV import and open Create Strategy dialog
@@ -88,16 +88,14 @@ class ImportMonzoCsvE2ETest {
             waitForIdle()
             waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
 
-            // Navigate to Imports screen using nav bar (lands on its first tab), then open CSV.
+            // Navigate to Imports screen using nav bar (lands on its Files tab).
             waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
-            waitUntilAtLeastOneExists(hasText("CSV"), timeoutMillis = 10000)
-            onNodeWithText("CSV", useUnmergedTree = true).performClick()
             waitForIdle()
 
             // Wait for navigation to complete - should show empty state
-            waitUntilExactlyOneExists(hasText("No CSV files imported yet", substring = true), timeoutMillis = 15000)
+            waitUntilExactlyOneExists(hasText("No files yet", substring = true), timeoutMillis = 15000)
         }
     }
 
@@ -147,12 +145,10 @@ class ImportMonzoCsvE2ETest {
             waitForIdle()
             waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
 
-            // Step 1: Navigate to CSV Imports screen
+            // Step 1: Navigate to the Imports screen's Files tab
             waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
-            waitUntilAtLeastOneExists(hasText("CSV"), timeoutMillis = 10000)
-            onNodeWithText("CSV", useUnmergedTree = true).performClick()
             waitForIdle()
 
             // Wait for the imported file to appear (more reliable than waiting for title)
@@ -310,8 +306,6 @@ class ImportMonzoCsvE2ETest {
             waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
-            waitUntilAtLeastOneExists(hasText("CSV"), timeoutMillis = 10000)
-            onNodeWithText("CSV", useUnmergedTree = true).performClick()
             waitForIdle()
 
             waitUntilExactlyOneExists(hasText("monzo_test_export.csv"), timeoutMillis = 15000)
@@ -405,8 +399,6 @@ class ImportMonzoCsvE2ETest {
             waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
-            waitUntilAtLeastOneExists(hasText("CSV"), timeoutMillis = 10000)
-            onNodeWithText("CSV", useUnmergedTree = true).performClick()
             waitForIdle()
 
             // The Unimported tab (default) shows only the file that hasn't been imported yet.
@@ -478,8 +470,6 @@ class ImportMonzoCsvE2ETest {
             waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
-            waitUntilAtLeastOneExists(hasText("CSV"), timeoutMillis = 10000)
-            onNodeWithText("CSV", useUnmergedTree = true).performClick()
             waitForIdle()
 
             // The Unimported tab offers a single "Import all (2)" action.

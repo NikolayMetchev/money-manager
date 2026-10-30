@@ -1,6 +1,8 @@
 package com.moneymanager.ui.screens.timeline
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ImportFileKind
+import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import kotlinx.datetime.LocalDate
@@ -203,9 +205,9 @@ private fun fileLabel(
             "[API] ${range.fileName} (${range.earliest.toLocalDate(timeZone)})"
         }
 
-        // Every staged file is a CSV import; a QIF file still reads as one.
+        // Every staged file is a CSV import, named here by the format it was staged from.
         TimelineSourceKind.CSV -> {
-            "[${if (range.fileName.endsWith(".qif", ignoreCase = true)) "QIF" else "CSV"}] ${range.fileName}" +
+            "[${importFileKind(range.fileName)?.label ?: ImportFileKind.CSV.label}] ${range.fileName}" +
                 if (range.ignored) " (ignored)" else ""
         }
     }

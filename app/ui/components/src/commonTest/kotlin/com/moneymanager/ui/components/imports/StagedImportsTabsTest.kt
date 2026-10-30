@@ -83,6 +83,7 @@ private val importedFile = qifImport("old.qif", appliedWith = bank)
 private fun tabsContent(
     onImportAll: (List<CsvImport>) -> Unit = {},
     onReimportAll: (List<CsvImport>) -> Unit = {},
+    filter: StagedImportFilter = StagedImportFilter(),
 ): @Composable () -> Unit =
     {
         MaterialTheme {
@@ -101,6 +102,8 @@ private fun tabsContent(
                     onImportAll = onImportAll,
                     onReimportAll = onReimportAll,
                     onSetIgnored = { _, _ -> },
+                    filter = filter,
+                    header = { item { Text("Header") } },
                 ) { import, placement ->
                     Text(if (placement.noMatchingStrategy) "${import.originalFileName} unmatched" else import.originalFileName)
                 }
@@ -144,6 +147,34 @@ class StagedImportsTabsTest {
             onNodeWithText("Re-import all (1)").performClick()
             waitForIdle()
             assertEquals(listOf(importedFile), reimportAll)
+        }
+    }
+
+    @Test
+    fun aFilter_narrowsTheCountsTheListAndImportAll() {
+        runMoneyManagerComposeUiTest {
+            var importAll: List<CsvImport>? = null
+            setContent(tabsContent(onImportAll = { importAll = it }, filter = StagedImportFilter(directories = setOf(statements.id))))
+
+            onNodeWithText("Header").assertExists()
+            onNodeWithText("Unimported (1)").assertExists()
+            onNodeWithText("Imported (0)").assertExists()
+            onNodeWithText("santander.qif").assertExists()
+            onNodeWithText("manual.qif unmatched").assertDoesNotExist()
+
+            onNodeWithText("Import all (1)").performClick()
+            waitForIdle()
+            assertEquals(listOf(santanderFile), importAll)
+        }
+    }
+
+    @Test
+    fun aFilterNothingMatches_saysSo() {
+        runMoneyManagerComposeUiTest {
+            setContent(tabsContent(filter = StagedImportFilter(text = "nothing like this")))
+
+            onNodeWithText("Unimported (0)").assertExists()
+            onNodeWithText(NO_MATCHING_FILES_MESSAGE).assertExists()
         }
     }
 }

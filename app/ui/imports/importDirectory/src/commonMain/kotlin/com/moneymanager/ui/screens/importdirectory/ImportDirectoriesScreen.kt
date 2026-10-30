@@ -68,7 +68,6 @@ import com.moneymanager.tasks.childrenOf
 import com.moneymanager.tasks.formatElapsedTime
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.foundation.LocalImportEngine
-import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.tasks.LocalTaskManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -77,13 +76,11 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 /**
- * Manages import directories (local folders / Google Drive folders) and runs manual downloads. A
- * download stages new/changed files into the CSV Imports tab; each row links to it to run
- * "Import All". Downloads run through [importDirectoryService] as tasks; other writes go through the import
- * engine. [driveFolderBrowser] powers the Drive folder picker.
+ * Import directories on a screen of their own, scrolling, under a title: the setup wizard's step. The imports
+ * screen shows [ImportDirectoriesSection] above its files instead.
  */
 @Composable
-@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
+@Suppress("LongParameterList")
 fun ImportDirectoriesScreen(
     importDirectoryService: ImportDirectoryService,
     importDirectoryRepository: ImportDirectoryReadRepository,
@@ -93,7 +90,50 @@ fun ImportDirectoriesScreen(
     personRepository: PersonReadRepository,
     deviceId: DeviceId,
     driveFolderBrowser: DriveFolderBrowser?,
-    onOpenImports: (ImportTab) -> Unit = {},
+    onOpenAudit: (ImportDirectory) -> Unit = {},
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("Import Directories", style = MaterialTheme.typography.headlineMedium)
+        ImportDirectoriesSection(
+            importDirectoryService = importDirectoryService,
+            importDirectoryRepository = importDirectoryRepository,
+            csvImportRepository = csvImportRepository,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            personRepository = personRepository,
+            deviceId = deviceId,
+            driveFolderBrowser = driveFolderBrowser,
+            onOpenAudit = onOpenAudit,
+        )
+    }
+}
+
+/**
+ * Manages import directories (local folders / Google Drive folders) and runs manual downloads, which stage
+ * new/changed files for the imports screen's files list. Downloads run through [importDirectoryService] as
+ * tasks; other writes go through the import engine. [driveFolderBrowser] powers the Drive folder picker. It
+ * doesn't scroll by itself, so it can sit inside the caller's scrolling list. [onShowFiles] (null hides it)
+ * shows one folder's files.
+ */
+@Composable
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
+fun ImportDirectoriesSection(
+    importDirectoryService: ImportDirectoryService,
+    importDirectoryRepository: ImportDirectoryReadRepository,
+    csvImportRepository: CsvImportReadRepository,
+    accountRepository: AccountReadRepository,
+    categoryRepository: CategoryReadRepository,
+    personRepository: PersonReadRepository,
+    deviceId: DeviceId,
+    driveFolderBrowser: DriveFolderBrowser?,
+    onShowFiles: ((ImportDirectory) -> Unit)? = null,
     onOpenAudit: (ImportDirectory) -> Unit = {},
     // Unimports one staged CSV file; offered by re-download for files whose imported rows changed. Null
     // hides that option.
@@ -144,39 +184,22 @@ fun ImportDirectoriesScreen(
     }
 
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // FlowRow so the buttons wrap below the title on narrow (phone) screens instead of being
-        // pushed off the right edge.
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                "Import Directories",
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.align(Alignment.CenterVertically),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    enabled = !scanning && directories.any(importDirectoryService::isScannable),
-                    onClick = {
-                        startRun(DOWNLOAD_ALL_TASK_KEY, "Download all") { importDirectoryService.downloadAll(this).summary() }
-                    },
-                ) { Text("Download all") }
-                Button(onClick = { showAddDialog = true }) { Text("Add directory") }
-            }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                enabled = !scanning && directories.any(importDirectoryService::isScannable),
+                onClick = {
+                    startRun(DOWNLOAD_ALL_TASK_KEY, "Download all") { importDirectoryService.downloadAll(this).summary() }
+                },
+            ) { Text("Download all") }
+            Button(onClick = { showAddDialog = true }) { Text("Add directory") }
         }
 
         Text(
             "\"Download & find subfolders\" on a top-level folder fetches its own files AND discovers importable " +
-                "subfolders; download those too, then use each row's import link. Tick \"Exclude\" to skip a folder.",
+                "subfolders; download those too, then import their files below. Tick \"Exclude\" to skip a folder.",
             style = MaterialTheme.typography.bodyMedium,
         )
 
@@ -241,7 +264,7 @@ fun ImportDirectoriesScreen(
                     onAccountChanged = { accountId ->
                         scope.launch { importEngine.updateImportDirectory(directory.copy(accountId = accountId)) }
                     },
-                    onImport = onOpenImports,
+                    onShowFiles = onShowFiles?.let { show -> { show(directory) } },
                     onAudit = { onOpenAudit(directory) },
                     onDelete = { scope.launch { importEngine.deleteImportDirectory(directory.id) } },
                 )
@@ -357,7 +380,7 @@ private fun ImportDirectoryRow(
     onRedownload: () -> Unit,
     onToggleExclude: () -> Unit,
     onAccountChanged: (AccountId?) -> Unit,
-    onImport: (ImportTab) -> Unit,
+    onShowFiles: (() -> Unit)?,
     onAudit: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -367,10 +390,8 @@ private fun ImportDirectoryRow(
 
     val isDownloading = scanProgress != null
     val csvCount = trackedFiles.count { it.csvImportId != null }
-    // lastAppliedAt != null means the staged file has been imported (a strategy was applied).
-    val csvImported = remember(csvImports) { csvImports.associate { it.id to (it.lastAppliedAt != null) } }
-    // "Outstanding" = a downloaded file whose staging row still exists and hasn't been imported yet.
-    val outstandingCsv = trackedFiles.any { it.csvImportId != null && csvImported[it.csvImportId] == false }
+    val stagedIds = remember(csvImports) { csvImports.mapTo(mutableSetOf()) { it.id } }
+    val hasStagedFiles = trackedFiles.any { it.csvImportId in stagedIds }
 
     val downloadedSummary = "${csvCount.takeIf { it > 0 } ?: "No"} files downloaded"
 
@@ -464,11 +485,9 @@ private fun ImportDirectoryRow(
                     onClick = onDownload,
                 ) { Text(if (isDownloading) "Working…" else actionLabel) }
                 TextButton(enabled = canRedownload && !onWrongDevice, onClick = onRedownload) { Text("Re-download") }
-                // Enabled only while the folder has downloaded files still to import.
-                TextButton(
-                    enabled = outstandingCsv,
-                    onClick = { onImport(ImportTab.CSV) },
-                ) { Text("Imports") }
+                if (onShowFiles != null) {
+                    TextButton(enabled = hasStagedFiles, onClick = onShowFiles) { Text("Show files") }
+                }
                 TextButton(onClick = onAudit) { Text("History") }
                 TextButton(onClick = { showAccountDialog = true }) { Text("Set account") }
                 TextButton(enabled = !isDownloading, onClick = onDelete) { Text("Delete") }

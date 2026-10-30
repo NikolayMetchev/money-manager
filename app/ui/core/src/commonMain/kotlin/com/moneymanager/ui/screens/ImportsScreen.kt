@@ -51,8 +51,8 @@ import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.screens.accountmapping.AccountMappingsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiSessionsScreen
-import com.moneymanager.ui.screens.csv.CsvImportsScreen
-import com.moneymanager.ui.screens.importdirectory.ImportDirectoriesScreen
+import com.moneymanager.ui.screens.csv.ImportFilesScreen
+import com.moneymanager.ui.screens.importdirectory.ImportDirectoriesSection
 import com.moneymanager.ui.screens.reconciliation.CardLast4Screen
 import com.moneymanager.ui.screens.reconciliation.ReconciliationScreen
 import com.moneymanager.ui.screens.timeline.ImportTimelineScreen
@@ -101,52 +101,22 @@ fun ImportsScreen(
     onTransactionsImported: () -> Unit,
     onBrowsePassThroughCatalog: () -> Unit = {},
     onReconciliationLegClick: (ReconciliationLeg) -> Unit = {},
-    tabs: List<ImportTab> = ImportTab.entries,
+    showImportDirectories: Boolean = true,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        // A tab this front end can't offer (Directories without an import file source) opens the first one instead.
-        val shownTab = selectedTab.takeIf { it in tabs } ?: tabs.first()
-        PrimaryTabRow(selectedTabIndex = tabs.indexOf(shownTab)) {
-            tabs.forEach { tab ->
+        PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
+            ImportTab.entries.forEach { tab ->
                 Tab(
-                    selected = shownTab == tab,
+                    selected = selectedTab == tab,
                     onClick = { onTabSelected(tab) },
                     text = { Text(tab.label) },
                 )
             }
         }
 
-        when (shownTab) {
-            ImportTab.DIRECTORIES -> {
-                ImportDirectoriesScreen(
-                    importDirectoryService = importDirectoryService,
-                    importDirectoryRepository = importDirectoryRepository,
-                    csvImportRepository = csvImportRepository,
-                    accountRepository = accountRepository,
-                    categoryRepository = categoryRepository,
-                    personRepository = personRepository,
-                    deviceId = deviceId,
-                    driveFolderBrowser = driveFolderBrowser,
-                    onOpenImports = onTabSelected,
-                    onOpenAudit = onImportDirectoryAuditClick,
-                    unimportCsv = { id ->
-                        executeCsvUnimport(
-                            plan = planCsvUnimport(id, csvImportRepository, transferSourceRepository),
-                            accountRepository = accountRepository,
-                            transactionRepository = transactionRepository,
-                            transferRelationshipRepository = transferRelationshipRepository,
-                            tradeRepository = tradeRepository,
-                            maintenance = maintenance,
-                            importEngine = importEngine,
-                        )
-                        // Unimport parks the file on the Ignored tab; re-downloading it is meant to import it again.
-                        importEngine.setCsvImportIgnored(id, ignored = false)
-                    },
-                )
-            }
-
-            ImportTab.CSV -> {
-                CsvImportsScreen(
+        when (selectedTab) {
+            ImportTab.FILES -> {
+                ImportFilesScreen(
                     importDirectoryService = importDirectoryService,
                     csvImportRepository = csvImportRepository,
                     transferSourceRepository = transferSourceRepository,
@@ -164,6 +134,39 @@ fun ImportsScreen(
                     importEngine = importEngine,
                     onImportClick = onCsvImportClick,
                     onStrategiesClick = onCsvStrategiesClick,
+                    directories =
+                        if (showImportDirectories) {
+                            { onShowFiles ->
+                                ImportDirectoriesSection(
+                                    importDirectoryService = importDirectoryService,
+                                    importDirectoryRepository = importDirectoryRepository,
+                                    csvImportRepository = csvImportRepository,
+                                    accountRepository = accountRepository,
+                                    categoryRepository = categoryRepository,
+                                    personRepository = personRepository,
+                                    deviceId = deviceId,
+                                    driveFolderBrowser = driveFolderBrowser,
+                                    onShowFiles = onShowFiles,
+                                    onOpenAudit = onImportDirectoryAuditClick,
+                                    unimportCsv = { id ->
+                                        executeCsvUnimport(
+                                            plan = planCsvUnimport(id, csvImportRepository, transferSourceRepository),
+                                            accountRepository = accountRepository,
+                                            transactionRepository = transactionRepository,
+                                            transferRelationshipRepository = transferRelationshipRepository,
+                                            tradeRepository = tradeRepository,
+                                            maintenance = maintenance,
+                                            importEngine = importEngine,
+                                        )
+                                        // Unimport parks the file on the Ignored tab; re-downloading it is meant to
+                                        // import it again.
+                                        importEngine.setCsvImportIgnored(id, ignored = false)
+                                    },
+                                )
+                            }
+                        } else {
+                            null
+                        },
                 )
             }
 
@@ -335,8 +338,7 @@ private fun MiscImportsTab(
 private val ImportTab.label: String
     get() =
         when (this) {
-            ImportTab.DIRECTORIES -> "Directories"
-            ImportTab.CSV -> "CSV"
+            ImportTab.FILES -> "Files"
             ImportTab.API -> "API"
             ImportTab.MISC -> "Misc"
             ImportTab.TIMELINE -> "Timeline"

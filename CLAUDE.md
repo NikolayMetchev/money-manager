@@ -590,7 +590,7 @@ stdout carries only the result: prompts, warnings and errors go to stderr, and I
 
 **Compose Multiplatform** with Material 3. JVM, Android and the browser (wasmJs, js: `app/main/web`, #84). A screen a
 front end can't back is left out by what it's given, not by platform checks: without an `ImportFileSourceFactory` (the
-browser) the Imports screen has no Directories tab and the setup wizard no import-folders step. Likewise a caveat:
+browser) the Imports screen's Files tab has no directories panel and the setup wizard no import-folders step. Likewise a caveat:
 the browser provides `LocalApiDownloadNotice`, which the API screens show.
 
 ## Presenters

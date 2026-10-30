@@ -1,11 +1,13 @@
 package com.moneymanager.csvimporter
 
+import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
+import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.domain.model.rules.ColumnRecord
 import com.moneymanager.domain.model.rules.RuleEvaluator
 import com.moneymanager.domain.repository.CsvImportReadRepository
@@ -128,7 +130,7 @@ suspend fun List<CsvImportStrategy>.selectForImport(
         val rows = staged.rows.mapIndexed { index, values -> CsvRow(index + 1L, values) }
         return selectForCsv(csvImport.originalFileName, columns, rows, wholeDocument = true)
     }
-    if (isQifFileName(csvImport.originalFileName)) {
+    if (importFileKind(csvImport.originalFileName) == ImportFileKind.QIF) {
         val rows = csvImportRepository.getImportRows(csvImport.id, limit = maxOf(csvImport.rowCount, 1), offset = 0)
         return selectForCsv(csvImport.originalFileName, csvImport.columns, rows, wholeDocument = true)
     }

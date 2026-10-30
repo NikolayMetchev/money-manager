@@ -316,7 +316,7 @@ fun MoneyManagerApp(
 
                                                 is Screen.Imports -> currentScreen.tab
 
-                                                else -> ImportTab.DIRECTORIES
+                                                else -> ImportTab.FILES
                                             },
                                         ),
                                     )
@@ -661,12 +661,7 @@ fun MoneyManagerApp(
                                                     )
                                                 },
                                                 // Folders need an import file source, which the browser doesn't have yet.
-                                                tabs =
-                                                    if (importFileSourceFactory != null) {
-                                                        ImportTab.entries
-                                                    } else {
-                                                        ImportTab.entries - ImportTab.DIRECTORIES
-                                                    },
+                                                showImportDirectories = importFileSourceFactory != null,
                                                 onTimelineFileClick = { file ->
                                                     when (file.kind) {
                                                         TimelineSourceKind.CSV -> {
@@ -785,7 +780,7 @@ fun MoneyManagerApp(
                                                 importEngine = services.transactions.importEngine,
                                                 reimports = importDirectoryService.reimports,
                                                 onBack = { navigationHistory.navigateBack() },
-                                                onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.CSV)) },
+                                                onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.FILES)) },
                                                 onCreateStrategy = { importId ->
                                                     navigationHistory.navigateTo(Screen.CsvStrategyEditor(importId))
                                                 },

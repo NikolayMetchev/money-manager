@@ -1,30 +1,31 @@
 package com.moneymanager.ui.screens.csv
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.compose.filepicker.BinaryFilePickerResult
-import com.moneymanager.compose.filepicker.rememberBinaryFilePicker
-import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
-import com.moneymanager.csv.CsvParseOptions
-import com.moneymanager.csv.CsvParser
-import com.moneymanager.csvimporter.sha256Hex
-import com.moneymanager.csvimporter.stagePdfImport
-import com.moneymanager.csvimporter.stageQifImport
+import com.moneymanager.compose.filepicker.rememberMultipleBinaryFilePicker
+import com.moneymanager.csvimporter.importFileChecksum
+import com.moneymanager.csvimporter.stageImportFile
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.importFileKind
+import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
@@ -39,28 +40,36 @@ import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.createCsvImport
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.components.MultiSelectFilterDropdown
+import com.moneymanager.ui.components.imports.ImportSectionHeader
 import com.moneymanager.ui.components.imports.ImportStatusMessage
-import com.moneymanager.ui.components.imports.ImportsEmptyMessage
 import com.moneymanager.ui.components.imports.ImportsScreenHeader
 import com.moneymanager.ui.components.imports.ReimportAllDialog
 import com.moneymanager.ui.components.imports.ReimportPickerRepositories
 import com.moneymanager.ui.components.imports.StagedImportCard
+import com.moneymanager.ui.components.imports.StagedImportFilter
+import com.moneymanager.ui.components.imports.StagedImportsData
 import com.moneymanager.ui.components.imports.StagedImportsTabs
 import com.moneymanager.ui.components.imports.importPickedFiles
 import com.moneymanager.ui.components.imports.rememberStagedImportsData
-import com.moneymanager.xlsx.createXlsxParser
+import com.moneymanager.ui.components.imports.stagedImportDirectoryOptions
+import com.moneymanager.ui.components.imports.stagedImportKinds
+import com.moneymanager.ui.components.imports.stagedImportStrategyOptions
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
-import kotlin.time.Instant
 
+/**
+ * Every staged file, whatever its format and wherever it came from: the import directories panel ([directories],
+ * null leaves it out, for a front end with no import folders), "+ Import files", a search and filters, then the
+ * Unimported / Imported / Ignored tabs. [directories] gets what a folder's "Show files" does: filter to that folder.
+ */
 @Suppress("LongParameterList", "LongMethod")
 @Composable
-fun CsvImportsScreen(
+fun ImportFilesScreen(
     importDirectoryService: ImportDirectoryService,
     csvImportRepository: CsvImportReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
@@ -78,6 +87,7 @@ fun CsvImportsScreen(
     importEngine: ImportEngine,
     onImportClick: (CsvImportId) -> Unit,
     onStrategiesClick: () -> Unit = {},
+    directories: (@Composable (onShowFiles: (ImportDirectory) -> Unit) -> Unit)? = null,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val imports by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
@@ -100,105 +110,37 @@ fun CsvImportsScreen(
     var isImporting by remember { mutableStateOf(false) }
     var importMessage by remember { mutableStateOf<String?>(null) }
     var importMessageIsError by remember { mutableStateOf(false) }
+    var filter by remember { mutableStateOf(StagedImportFilter()) }
+    // Null until the person opens or closes it: then open only while there are no files yet.
+    var directoriesExpanded by rememberSaveable { mutableStateOf<Boolean?>(null) }
 
     val filePicker =
-        rememberMultipleFilePicker(
-            mimeTypes = listOf("text/csv", "text/plain", "text/comma-separated-values"),
-        ) { results ->
+        rememberMultipleBinaryFilePicker(mimeTypes = IMPORT_FILE_MIME_TYPES) { results ->
             if (results.isNotEmpty()) {
                 isImporting = true
                 importMessage = null
                 scope.launch {
                     val outcome =
                         importPickedFiles(results, fileName = { it.fileName }) { result ->
-                            val checksum = sha256Hex(result.content)
+                            val kind =
+                                requireNotNull(importFileKind(result.fileName)) { "not a CSV, QIF, Excel or PDF file" }
+                            val checksum = importFileChecksum(kind, result.bytes)
                             if (csvImportRepository.findImportsByChecksum(checksum).isNotEmpty()) {
                                 return@importPickedFiles false
                             }
-                            val parser = CsvParser()
-                            val delimiter = parser.detectDelimiter(result.content)
-                            val parseResult =
-                                parser.parse(
-                                    result.content,
-                                    CsvParseOptions(delimiter = delimiter),
-                                )
-                            importEngine.createCsvImport(
-                                fileName = result.fileName,
-                                headers = parseResult.headers,
-                                rows = parseResult.rows,
-                                fileChecksum = checksum,
-                                fileLastModified = result.lastModified ?: Clock.System.now(),
-                            )
-                            true
-                        }
-                    isImporting = false
-                    importMessageIsError = outcome.isError
-                    importMessage = outcome.message
-                }
-            }
-        }
-
-    // A QIF file is staged as a CSV import of its fixed QIF columns, one row per split.
-    val qifFilePicker =
-        rememberMultipleFilePicker(
-            mimeTypes = listOf("application/qif", "application/x-qif", "application/octet-stream"),
-        ) { results ->
-            if (results.isNotEmpty()) {
-                isImporting = true
-                importMessage = null
-                scope.launch {
-                    val outcome =
-                        importPickedFiles(results, fileName = { it.fileName }) { result ->
-                            val checksum = sha256Hex(result.content)
-                            if (csvImportRepository.findImportsByChecksum(checksum).isNotEmpty()) {
-                                return@importPickedFiles false
-                            }
-                            importEngine.stageQifImport(
+                            importEngine.stageImportFile(
+                                kind,
                                 result.fileName,
-                                result.content,
+                                result.bytes,
                                 checksum,
                                 result.lastModified ?: Clock.System.now(),
+                                csvImportRepository,
                             )
                             true
                         }
                     isImporting = false
                     importMessageIsError = outcome.isError
                     importMessage = outcome.message
-                }
-            }
-        }
-
-    // Excel and PDF files are staged from their bytes; one picked file at a time, skipped if already imported.
-    fun stageBinaryFile(
-        result: BinaryFilePickerResult,
-        stage: suspend (checksum: String, lastModified: Instant) -> Unit,
-    ) {
-        isImporting = true
-        importMessage = null
-        scope.launch {
-            val staged = stagePickedFile(result, { csvImportRepository.findImportsByChecksum(it).isNotEmpty() }, stage)
-            importMessage = staged.message
-            importMessageIsError = staged.isError
-            isImporting = false
-        }
-    }
-
-    val xlsxFilePicker =
-        rememberBinaryFilePicker(
-            mimeTypes = listOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-        ) { result ->
-            if (result != null) {
-                stageBinaryFile(result) { checksum, lastModified ->
-                    importEngine.stageXlsxFile(result, createXlsxParser(), checksum, lastModified)
-                }
-            }
-        }
-
-    val pdfFilePicker =
-        rememberBinaryFilePicker(mimeTypes = listOf("application/pdf")) { result ->
-            if (result != null) {
-                stageBinaryFile(result) { checksum, lastModified ->
-                    importEngine.stagePdfImport(result.fileName, result.bytes, checksum, lastModified)
                 }
             }
         }
@@ -210,39 +152,18 @@ fun CsvImportsScreen(
                 .padding(16.dp),
     ) {
         ImportsScreenHeader(
-            title = "CSV Imports",
-            importButtonLabel = "+ Import CSV",
+            title = "Files",
+            importButtonLabel = "+ Import files",
             isImporting = isImporting,
             onImportClick = { filePicker.launch() },
             onStrategiesClick = onStrategiesClick,
-        ) {
-            TextButton(
-                onClick = { xlsxFilePicker.launch() },
-                enabled = !isImporting,
-            ) {
-                Text("+ Import Excel")
-            }
-            TextButton(
-                onClick = { qifFilePicker.launch() },
-                enabled = !isImporting,
-            ) {
-                Text("+ Import QIF")
-            }
-            TextButton(
-                onClick = { pdfFilePicker.launch() },
-                enabled = !isImporting,
-            ) {
-                Text("+ Import PDF")
-            }
-        }
+        )
 
         ImportStatusMessage(message = importMessage, isError = importMessageIsError)
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (imports.isEmpty() && !isImporting) {
-            ImportsEmptyMessage("No CSV files imported yet. Click '+ Import CSV' to add one or more.")
-        } else {
+        run {
             // The list to run "Import all" against (a folder's or strategy group's files, or every unimported
             // file when launched from the top-level button); null hides the dialog.
             var importAllScope by remember { mutableStateOf<List<CsvImport>?>(null) }
@@ -324,6 +245,42 @@ fun CsvImportsScreen(
                     scope.launch { files.forEach { importEngine.setCsvImportIgnored(it.id, ignore) } }
                 },
                 onUnimportAll = { unimportAllScope = it },
+                filter = filter,
+                header = {
+                    if (directories != null) {
+                        val expanded = directoriesExpanded ?: imports.isEmpty()
+                        item(key = "directories-header") {
+                            ImportSectionHeader(
+                                title = "Directories",
+                                count = data.directories.count { it.parentId == null },
+                                expanded = expanded,
+                                onToggleExpanded = { directoriesExpanded = !expanded },
+                            )
+                        }
+                        if (expanded) {
+                            item(key = "directories") {
+                                directories { directory ->
+                                    filter = StagedImportFilter(directories = setOf(directory.id))
+                                    directoriesExpanded = false
+                                }
+                            }
+                        }
+                    }
+                    if (imports.isEmpty()) {
+                        item(key = "no-files") {
+                            Text(
+                                "No files yet. Click '+ Import files' to add CSV, QIF, Excel or PDF files" +
+                                    if (directories != null) ", or download a directory." else ".",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    } else {
+                        item(key = "filters") {
+                            StagedImportFilters(imports, data, filter, onFilterChange = { filter = it })
+                        }
+                    }
+                },
             ) { import, placement ->
                 StagedImportCard(
                     import = import,
@@ -338,6 +295,77 @@ fun CsvImportsScreen(
                     onUnimport = { unimportTarget = import },
                 )
             }
+        }
+    }
+}
+
+// The JVM picker filters by the extensions these map to; Android and the browser pass them on as-is.
+private val IMPORT_FILE_MIME_TYPES =
+    listOf(
+        "text/csv",
+        "text/comma-separated-values",
+        "text/plain",
+        "application/qif",
+        "application/x-qif",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/pdf",
+        "application/octet-stream",
+    )
+
+/** The search field and the file type, strategy and directory filters; a filter with one choice is left out. */
+@Composable
+private fun StagedImportFilters(
+    imports: List<CsvImport>,
+    data: StagedImportsData<CsvImportId>,
+    filter: StagedImportFilter,
+    onFilterChange: (StagedImportFilter) -> Unit,
+) {
+    val kinds = remember(imports) { stagedImportKinds(imports) }
+    val strategies = remember(imports, data.matchedStrategies) { stagedImportStrategyOptions(imports, data.matchedStrategies) }
+    val folders =
+        remember(imports, data.importDirectories, data.directories) {
+            stagedImportDirectoryOptions(imports, data.importDirectories, data.directories)
+        }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = filter.text,
+            onValueChange = { onFilterChange(filter.copy(text = it)) },
+            label = { Text("Search files") },
+            placeholder = { Text("Type to search...") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+        )
+        if (kinds.size > 1) {
+            MultiSelectFilterDropdown(
+                items = kinds,
+                selectedKeys = filter.kinds,
+                itemKey = { it },
+                itemLabel = { it.label },
+                itemNoun = "file type",
+                onSelectionChange = { onFilterChange(filter.copy(kinds = it)) },
+            )
+        }
+        if (strategies.size > 1) {
+            MultiSelectFilterDropdown(
+                items = strategies,
+                selectedKeys = filter.strategies,
+                itemKey = { it.id },
+                itemLabel = { it.label },
+                itemNoun = "strategy",
+                itemNounPlural = "strategies",
+                onSelectionChange = { onFilterChange(filter.copy(strategies = it)) },
+            )
+        }
+        if (folders.size > 1 || filter.directories.isNotEmpty()) {
+            MultiSelectFilterDropdown(
+                items = folders,
+                selectedKeys = filter.directories,
+                itemKey = { it.first },
+                itemLabel = { it.second },
+                itemNoun = "directory",
+                itemNounPlural = "directories",
+                onSelectionChange = { onFilterChange(filter.copy(directories = it)) },
+            )
         }
     }
 }

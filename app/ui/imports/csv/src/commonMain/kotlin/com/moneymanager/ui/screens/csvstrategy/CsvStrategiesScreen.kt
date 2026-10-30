@@ -224,7 +224,7 @@ fun CsvStrategiesScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "To create a strategy, go to CSV Imports,\nselect a CSV file, and click \"Create Strategy\"",
+                            text = "To create a strategy, go to Imports → Files,\nselect a file, and click \"Create Strategy\"",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
