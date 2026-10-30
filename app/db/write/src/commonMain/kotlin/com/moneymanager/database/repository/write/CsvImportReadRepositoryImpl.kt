@@ -13,6 +13,7 @@ import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
@@ -180,6 +181,8 @@ class CsvImportReadRepositoryImpl(
         val lastAppliedStrategyId: String?,
         val lastAppliedStrategyName: String?,
         val lastAppliedAtMs: Long?,
+        val lastAppliedAccountId: Long?,
+        val lastAppliedCurrencyId: Long?,
         val lastUnimportedAtMs: Long?,
     )
 
@@ -198,6 +201,8 @@ class CsvImportReadRepositoryImpl(
         lastAppliedStrategyId: String?,
         lastAppliedStrategyName: String?,
         lastAppliedAtMs: Long?,
+        lastAppliedAccountId: Long?,
+        lastAppliedCurrencyId: Long?,
         lastUnimportedAtMs: Long?,
         platformName: String,
         osName: String?,
@@ -225,6 +230,8 @@ class CsvImportReadRepositoryImpl(
             lastAppliedStrategyId = lastAppliedStrategyId,
             lastAppliedStrategyName = lastAppliedStrategyName,
             lastAppliedAtMs = lastAppliedAtMs,
+            lastAppliedAccountId = lastAppliedAccountId,
+            lastAppliedCurrencyId = lastAppliedCurrencyId,
             lastUnimportedAtMs = lastUnimportedAtMs,
         )
 
@@ -257,6 +264,8 @@ class CsvImportReadRepositoryImpl(
             lastAppliedStrategyId = record.lastAppliedStrategyId,
             lastAppliedStrategyName = record.lastAppliedStrategyName,
             lastAppliedAtMs = record.lastAppliedAtMs,
+            lastAppliedAccountId = record.lastAppliedAccountId,
+            lastAppliedCurrencyId = record.lastAppliedCurrencyId,
             lastUnimportedAtMs = record.lastUnimportedAtMs,
             columns = columns,
         )
@@ -281,6 +290,8 @@ class CsvImportReadRepositoryImpl(
         lastAppliedStrategyId: String?,
         lastAppliedStrategyName: String?,
         lastAppliedAtMs: Long?,
+        lastAppliedAccountId: Long?,
+        lastAppliedCurrencyId: Long?,
         lastUnimportedAtMs: Long?,
         columns: List<CsvColumn>? = null,
     ): CsvImport =
@@ -314,6 +325,8 @@ class CsvImportReadRepositoryImpl(
                 lastAppliedAtMs?.let { appliedAt ->
                     Instant.fromEpochMilliseconds(appliedAt)
                 },
+            lastAppliedAccountId = lastAppliedAccountId?.let(::AccountId),
+            lastAppliedCurrencyId = lastAppliedCurrencyId?.let(::CurrencyId),
             lastUnimportedAt = lastUnimportedAtMs?.let(Instant::fromEpochMilliseconds),
         )
 

@@ -16,9 +16,11 @@ import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.applyCsvImportMutations
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.updateCsvStrategy
@@ -34,6 +36,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Re-import deletes what a file created and imports it again, then puts back what a person edited by
@@ -260,6 +263,31 @@ class SourceRerunE2ETest : DbTest() {
         }
 
     @Test
+    fun reimport_rerunsAnotherFilesDuplicateRowWithTheAccountItWasImportedWith() =
+        runDbTest {
+            repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
+            val monzo = createMonzoAccount()
+            val first =
+                stage(
+                    "MonzoDataExport.csv",
+                    listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee"), row("tx_2", "Book Store", "-12.00", "Books")),
+                )
+            assertEquals(2, apply(first, monzo).transfersCreated)
+            // One duplicate row: its one transaction has two accounts, so only the recorded account says which is the file's.
+            val second = stage("MonzoDataExport-later.csv", listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee")))
+            assertEquals(1, apply(second, monzo).duplicatesSkipped)
+
+            val reimports = repositories.reimports(maintenance)
+            val result = reimports.reimport(reimports.plan(reload(first.id)), accountId = null, currencyId = null)
+
+            assertEquals(1, result.affected.count)
+            assertTrue(result.notRerun.isEmpty)
+            val recreated = createdBy(first.id, row = 0)
+            val secondRow = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0).first()
+            assertEquals(recreated.id, secondRow.transferId, "the other file's row points at the replacement")
+        }
+
+    @Test
     fun reimport_reportsOtherFilesRowsItCannotRerun() =
         runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
@@ -270,9 +298,20 @@ class SourceRerunE2ETest : DbTest() {
                     listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee"), row("tx_2", "Book Store", "-12.00", "Books")),
                 )
             assertEquals(2, apply(first, monzo).transfersCreated)
-            // One duplicate row: its one transaction has two accounts, so the file's own account can't be read back.
             val second = stage("MonzoDataExport-later.csv", listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee")))
             assertEquals(1, apply(second, monzo).duplicatesSkipped)
+            // Its latest application records no account, so nothing says which account its row moves money on.
+            val secondImport = reload(second.id)
+            repositories.importEngine.applyCsvImportMutations(
+                listOf(
+                    CsvImportMutation.RecordApplication(
+                        id = second.id,
+                        strategyId = assertNotNull(secondImport.lastAppliedStrategyId),
+                        strategyName = assertNotNull(secondImport.lastAppliedStrategyName),
+                        appliedAt = assertNotNull(secondImport.lastAppliedAt) + 1.seconds,
+                    ),
+                ),
+            )
 
             val reimports = repositories.reimports(maintenance)
             val result = reimports.reimport(reimports.plan(reload(first.id)), accountId = null, currencyId = null)

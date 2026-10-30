@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.EXCLUDED_ATTRIBUTE_TYPE_NAME
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
+import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.ownedAttributeValues
@@ -427,7 +428,7 @@ suspend fun applyStagedCsv(
         // Scoped to allRows.isEmpty() so it never fires on re-import, which always has rows and whose
         // "nothing new to import" outcome must stay a null result.
         if (allRows.isEmpty() && stagedImport.lastAppliedAt == null) {
-            recordCsvApplication(importEngine, stagedImport.id, strategy)
+            recordCsvApplication(importEngine, stagedImport.id, strategy, sourceAccountOverride)
             return CsvImportResult(successCount = 0, failedRows = emptyList())
         }
         return null
@@ -557,13 +558,15 @@ suspend fun restageXlsxForStrategy(
 
 /**
  * Records that [strategy] was applied to [csvImportId], moving the file into the "Imported" tab
- * (`last_applied_at` becomes non-null). Failures are logged, not thrown — the transfers are already
- * committed, so a missing history row must not fail the import.
+ * (`last_applied_at` becomes non-null), with the source account and currency the run used, so a
+ * re-import runs with them again rather than asking. Failures are logged, not thrown — the transfers
+ * are already committed, so a missing history row must not fail the import.
  */
 private suspend fun recordCsvApplication(
     importEngine: ImportEngine,
     csvImportId: CsvImportId,
     strategy: CsvImportStrategy,
+    sourceAccountOverride: AccountId?,
 ) {
     runCatching {
         importEngine.applyCsvImportMutations(
@@ -573,6 +576,8 @@ private suspend fun recordCsvApplication(
                     strategyId = strategy.id,
                     strategyName = strategy.name,
                     appliedAt = Clock.System.now(),
+                    accountId = effectiveSourceFor(strategy, sourceAccountOverride),
+                    currencyId = (strategy.config.fieldMappings[TransferField.CURRENCY] as? HardCodedCurrencyMapping)?.currencyId,
                 ),
             ),
         )
@@ -1328,7 +1333,7 @@ suspend fun runCsvImport(
     }
 
     if ((successCount + duplicateCount + finalPrep.skippedRowIndexes.size) > 0) {
-        recordCsvApplication(importEngine, csvImport.id, strategy)
+        recordCsvApplication(importEngine, csvImport.id, strategy, selectedSourceAccountId)
     }
 
     logger.i { "Import completed successfully" }

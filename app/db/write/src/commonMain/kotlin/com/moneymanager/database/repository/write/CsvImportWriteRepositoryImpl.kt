@@ -5,8 +5,10 @@ import com.moneymanager.database.csv.CsvTableManager
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.forgetMatchedSources
 import com.moneymanager.database.write.recordMatchedSource
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
@@ -340,6 +342,8 @@ class CsvImportWriteRepositoryImpl(
         strategyId: CsvImportStrategyId,
         strategyName: String,
         appliedAt: Instant,
+        accountId: AccountId?,
+        currencyId: CurrencyId?,
     ): Unit =
         withContext(coroutineContext) {
             csvImportWriteQueries.insertApplication(
@@ -348,6 +352,8 @@ class CsvImportWriteRepositoryImpl(
                 strategy_id = strategyId.id.toString(),
                 strategy_name = strategyName,
                 applied_at = appliedAt.toEpochMilliseconds(),
+                account_id = accountId?.id,
+                currency_id = currencyId?.id,
             )
         }
 }
