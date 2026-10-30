@@ -45,8 +45,8 @@ deleteApplicationsByImportId:
 DELETE FROM csv_import_application WHERE csv_import_id = ?;
 
 insertApplication:
-INSERT INTO csv_import_application (id, csv_import_id, strategy_id, strategy_name, applied_at)
-VALUES (?, ?, ?, ?, ?);
+INSERT INTO csv_import_application (id, csv_import_id, strategy_id, strategy_name, applied_at, account_id, currency_id)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- csv_import_error queries
 insertOrReplaceError:

@@ -1,7 +1,9 @@
 package com.moneymanager.domain.repository.write
 
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvRowLink
 import com.moneymanager.domain.model.csv.PdfImportSource
@@ -159,11 +161,15 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
      * @param strategyId The strategy used for this application
      * @param strategyName The strategy name snapshot shown to users
      * @param appliedAt When this strategy application completed successfully
+     * @param accountId The source account the run used, if it supplied one
+     * @param currencyId The currency the run used, if it supplied one
      */
     suspend fun recordImportApplication(
         id: CsvImportId,
         strategyId: CsvImportStrategyId,
         strategyName: String,
         appliedAt: Instant,
+        accountId: AccountId? = null,
+        currencyId: CurrencyId? = null,
     )
 }

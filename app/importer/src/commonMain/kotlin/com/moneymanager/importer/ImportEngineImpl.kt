@@ -2390,6 +2390,8 @@ class ImportEngineImpl(
                         m.strategyId,
                         m.strategyName,
                         m.appliedAt,
+                        m.accountId,
+                        m.currencyId,
                     )
                 }
             }

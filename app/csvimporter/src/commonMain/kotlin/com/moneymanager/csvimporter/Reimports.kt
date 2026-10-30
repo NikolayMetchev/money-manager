@@ -6,7 +6,6 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -44,14 +43,17 @@ import kotlinx.coroutines.withContext
 private val logger = Logger.withTag("Reimports")
 
 /**
- * The account and currency a file was imported with, read from the transactions it created, so a
- * re-import doesn't ask again: [accountId] is the one account every one of them moves money in or out
- * of (null when none or several do), [currencyId] their most common currency.
+ * The source account and currency a file was last imported with, as its latest application recorded
+ * them, so a re-import doesn't ask again. Each is null when the strategy read it per row, or when the
+ * file was never imported.
  */
 data class ImportedSettings(
     val accountId: AccountId?,
     val currencyId: CurrencyId?,
 )
+
+/** What this file's latest application ran with; see [ImportedSettings]. */
+val CsvImport.importedSettings: ImportedSettings get() = ImportedSettings(lastAppliedAccountId, lastAppliedCurrencyId)
 
 /** A strategy reads its currency from the record only when it maps one; otherwise the import supplies it. */
 fun CsvImportStrategy.needsCurrencyOverride(): Boolean = config.fieldMappings[TransferField.CURRENCY] == null
@@ -132,19 +134,17 @@ class Reimports(
         progress.emit(base = 0f, detail = "Loading ${file.originalFileName}")
         val loaded = file.reloaded()
         val strategy = strategyFor(loaded, csvImportStrategyRepository.getAllStrategies().first())
-        progress.emit(base = PLAN_LOAD_SPAN, detail = READING_IMPORT_SETTINGS)
-        val imported = importedSettings(loaded.source)
         return FileReimportPlan(
             file = loaded,
             strategy = strategy,
-            imported = imported,
-            rerun = rerunPlan(loaded, progress.sink(base = PLAN_SETTINGS_END, span = 1f - PLAN_SETTINGS_END)),
+            imported = loaded.importedSettings,
+            rerun = rerunPlan(loaded, progress.sink(base = PLAN_LOAD_SPAN, span = 1f - PLAN_LOAD_SPAN)),
         )
     }
 
     /**
-     * Re-imports per [plan]. [accountId] and [currencyId] are used only where the file's own
-     * transactions don't say ([FileReimportPlan.needsAccount], [FileReimportPlan.needsCurrency]).
+     * Re-imports per [plan]. [accountId] and [currencyId] are used only where the file's last
+     * import didn't record them ([FileReimportPlan.needsAccount], [FileReimportPlan.needsCurrency]).
      */
     suspend fun reimport(
         plan: FileReimportPlan,
@@ -178,7 +178,7 @@ class Reimports(
     }
 
     /**
-     * Plans a "re-import all" over [files], reading each file's settings before any of them is deleted.
+     * Plans a "re-import all" over [files], reading what each file created before any of it is deleted.
      * [onProgress] gives each file an equal slice of the bar.
      */
     suspend fun planAll(
@@ -203,14 +203,13 @@ class Reimports(
                                 FileReads(
                                     file = reloaded,
                                     created = reads.transferSourceRepository.getTransfersCreatedBy(reloaded.source),
-                                    referenced = referencedTransferIds(reloaded.source),
                                 )
                             // Files finish in any order, so the bar counts files read rather than following the list.
                             progressLock.withLock {
                                 filesRead++
                                 progress.emit(
                                     base = PLAN_ALL_READ_SPAN * filesRead / files.size,
-                                    detail = "File $filesRead of ${files.size}: ${file.originalFileName} — $READING_IMPORT_SETTINGS",
+                                    detail = "File $filesRead of ${files.size}: ${file.originalFileName}",
                                 )
                             }
                             read
@@ -219,7 +218,6 @@ class Reimports(
             }
         val loaded = fileReads.map { it.file }
         val created = fileReads.associate { it.file.source to it.created }
-        val imported = importedSettingsOf(created, fileReads.associate { it.file.source to it.referenced })
         val indexOf = loaded.withIndex().associate { (index, file) -> file.source to index }
         val manualEdits =
             manualEditsOf(created, reads) { source, inner ->
@@ -236,14 +234,14 @@ class Reimports(
         return ReimportAllPlan(
             files = loaded,
             strategies = loaded.associate { it.source to strategyFor(it, strategies) },
-            imported = imported,
+            imported = loaded.associate { it.source to it.importedSettings },
             manualEdits = manualEdits.values.flatten(),
         )
     }
 
     /**
      * Re-imports every file of [plan], one after another, refreshing materialized views once at the end.
-     * [accountId] and [currencyId] are for the files whose own transactions don't say.
+     * [accountId] and [currencyId] are for the files whose last import didn't record them.
      */
     suspend fun reimportAll(
         plan: ReimportAllPlan,
@@ -308,9 +306,6 @@ class Reimports(
             affected.byFile.keys.mapNotNull { file ->
                 (file as? Source.Csv)?.let { reads.csvImportRepository.getImport(it.importId).first() }
             }
-        // Read now: once the re-import resets these records, a file that only matched others' transactions
-        // has nothing left to read its account from.
-        val settings = importedSettingsOf(files.map { it.source })
         return { onProgress ->
             val strategies = csvImportStrategyRepository.getAllStrategies().first()
             val currencies = currencies()
@@ -320,7 +315,7 @@ class Reimports(
                 // re-import that reset them, whose own work is already done.
                 try {
                     val strategy = strategyFor(file, strategies)
-                    val fileSettings = settings.getValue(file.source)
+                    val fileSettings = file.importedSettings
                     // Without the account or currency nobody is asked here, so the records wait for the file's next import.
                     if (strategy == null ||
                         (strategy.needsSourceAccountOverride() && fileSettings.accountId == null) ||
@@ -341,60 +336,6 @@ class Reimports(
             }
             AffectedRecords(affected.byFile.filterKeys { it in notRerun })
         }
-    }
-
-    /**
-     * Reads the account and currency [source] was imported with; see [ImportedSettings]. Rows that matched
-     * another file's transaction as duplicates count too, so a file that created nothing still knows them.
-     */
-    suspend fun importedSettings(source: Source): ImportedSettings = importedSettingsOf(listOf(source)).getValue(source)
-
-    private suspend fun importedSettingsOf(sources: List<Source>): Map<Source, ImportedSettings> =
-        importedSettingsOf(
-            created = sources.associateWith { reads.transferSourceRepository.getTransfersCreatedBy(it) },
-            referenced = sources.associateWith { referencedTransferIds(it) },
-        )
-
-    /**
-     * [importedSettings] for each source of [created] (the transfers it created; [referenced], those its
-     * records point at). Their transfers are loaded together: one batched load, not one per file.
-     */
-    private suspend fun importedSettingsOf(
-        created: Map<Source, Map<TransferId, Source>>,
-        referenced: Map<Source, List<TransferId>>,
-    ): Map<Source, ImportedSettings> {
-        val ids = created.mapValues { (source, transfers) -> transfers.keys + referenced[source].orEmpty() }
-        val transfers = reads.transactionRepository.getTransactionsByIds(ids.values.flatten().toSet())
-        return ids.mapValues { (_, fileIds) -> settingsOf(fileIds.mapNotNull(transfers::get)) }
-    }
-
-    // The transfers a file's records point at, its duplicates of other files' transfers included.
-    private suspend fun referencedTransferIds(source: Source): List<TransferId> =
-        when (source) {
-            is Source.Csv -> {
-                reads.csvImportRepository.getImportRows(source.importId, limit = Int.MAX_VALUE, offset = 0).mapNotNull { it.transferId }
-            }
-
-            else -> {
-                emptyList()
-            }
-        }
-
-    private fun settingsOf(transfers: List<Transfer>): ImportedSettings {
-        if (transfers.isEmpty()) return ImportedSettings(null, null)
-        val sharedAccount =
-            transfers
-                .map { setOf(it.sourceAccountId, it.targetAccountId) }
-                .reduce { shared, accounts -> shared intersect accounts }
-                .singleOrNull()
-        val currency =
-            transfers
-                .mapNotNull { it.amount.asset as? Currency }
-                .groupingBy { it.id }
-                .eachCount()
-                .maxByOrNull { it.value }
-                ?.key
-        return ImportedSettings(sharedAccount, currency)
     }
 
     private suspend fun rerunPlan(
@@ -453,16 +394,13 @@ class Reimports(
     private suspend fun currencies(): List<Currency> = currencyRepository.getAllCurrencies().first()
 }
 
-private const val READING_IMPORT_SETTINGS = "Reading import settings"
 private const val PLAN_LOAD_SPAN = 0.02f
-private const val PLAN_SETTINGS_END = 0.1f
 
 // Reading each file is nearly all of "re-import all" planning; its hand edits are the rest.
 private const val PLAN_ALL_READ_SPAN = 0.9f
 
-/** What "re-import all" planning reads from one [file]: the transfers it created and those its records point at. */
+/** What "re-import all" planning reads from one [file]: the transfers it created. */
 private class FileReads(
     val file: CsvImport,
     val created: Map<TransferId, Source>,
-    val referenced: List<TransferId>,
 )

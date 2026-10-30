@@ -304,7 +304,7 @@ fun ReimportAllDialog(
     }
 }
 
-// Asks only for what the files' own transactions don't say.
+// Asks only for what the files' last imports didn't record.
 @Suppress("LongParameterList")
 @Composable
 private fun ReimportSettingsPickers(

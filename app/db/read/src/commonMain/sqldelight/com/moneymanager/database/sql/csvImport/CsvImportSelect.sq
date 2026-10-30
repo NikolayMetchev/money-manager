@@ -25,6 +25,8 @@ SELECT
     latest_application.strategy_id AS last_applied_strategy_id,
     latest_application.strategy_name AS last_applied_strategy_name,
     latest_application.applied_at AS last_applied_at,
+    latest_application.account_id AS last_applied_account_id,
+    latest_application.currency_id AS last_applied_currency_id,
     (
         SELECT MAX(unimport.audit_timestamp)
         FROM csv_import_application_audit unimport
@@ -71,6 +73,8 @@ SELECT
     latest_application.strategy_id AS last_applied_strategy_id,
     latest_application.strategy_name AS last_applied_strategy_name,
     latest_application.applied_at AS last_applied_at,
+    latest_application.account_id AS last_applied_account_id,
+    latest_application.currency_id AS last_applied_currency_id,
     (
         SELECT MAX(unimport.audit_timestamp)
         FROM csv_import_application_audit unimport
@@ -117,6 +121,8 @@ SELECT
     latest_application.strategy_id AS last_applied_strategy_id,
     latest_application.strategy_name AS last_applied_strategy_name,
     latest_application.applied_at AS last_applied_at,
+    latest_application.account_id AS last_applied_account_id,
+    latest_application.currency_id AS last_applied_currency_id,
     (
         SELECT MAX(unimport.audit_timestamp)
         FROM csv_import_application_audit unimport

@@ -264,6 +264,10 @@ sealed interface CsvImportMutation {
         val strategyId: CsvImportStrategyId,
         val strategyName: String,
         val appliedAt: Instant,
+        /** The source account the run used, so a re-import uses it again; null when the strategy reads it per row. */
+        val accountId: AccountId? = null,
+        /** The currency the run used, so a re-import uses it again; null when the strategy reads it per row. */
+        val currencyId: CurrencyId? = null,
     ) : CsvImportMutation
 }
 
