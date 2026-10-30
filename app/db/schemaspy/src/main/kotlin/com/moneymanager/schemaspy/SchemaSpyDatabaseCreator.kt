@@ -19,7 +19,9 @@ suspend fun main(args: Array<String>) {
 
     val databaseManager = JvmDatabaseManager()
     val location = DbLocation(dbPath)
-    databaseManager.openDatabase(location)
+    // The database is in WAL mode: closing it checkpoints the schema into the file SchemaSpy reads, as the
+    // -wal sidecar isn't part of the output.
+    databaseManager.openDatabase(location).close()
 
     println("Database created successfully!")
 }
