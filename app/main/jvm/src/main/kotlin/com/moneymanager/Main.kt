@@ -32,6 +32,7 @@ import com.moneymanager.ui.foundation.CredentialVaultPromptHost
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.swing.Swing
+import kotlin.system.exitProcess
 
 private val logger = Logger.withTag("Main")
 
@@ -69,8 +70,29 @@ fun main() {
     runCatching { installCryptoCatalog() }
         .onFailure { logger.e(it) { "Failed to install crypto catalog" } }
 
-    application {
+    // Not System.exit while the window is still being torn down: exit runs at a safepoint, and libGLX's unload
+    // hook then waits for the X display lock, which AWT's X thread can be holding while its error handler (an X
+    // error from the window just destroyed) waits for that safepoint — the app hung on close. Returning instead
+    // lets the JVM end once AWT has shut itself down, by which point no X call is in flight.
+    application(exitProcessOnExit = false) {
         MainWindow(onExit = ::exitApplication)
+    }
+    logger.i { "Window closed; waiting for AWT to shut down" }
+    exitIfStillRunningAfterGracePeriod()
+}
+
+private const val EXIT_GRACE_MILLIS = 10_000L
+
+/** A non-daemon thread (an HTTP client's pool, say) would keep the JVM up; by now AWT is quiet, so exit is safe. */
+private fun exitIfStillRunningAfterGracePeriod() {
+    Thread {
+        Thread.sleep(EXIT_GRACE_MILLIS)
+        logger.w { "Still running ${EXIT_GRACE_MILLIS}ms after the window closed; exiting" }
+        exitProcess(0)
+    }.apply {
+        isDaemon = true
+        name = "exit-watchdog"
+        start()
     }
 }
 

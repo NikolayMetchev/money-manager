@@ -19,3 +19,6 @@ CREATE TABLE transfer_attribute (
 CREATE INDEX idx_transfer_attribute_transaction ON transfer_attribute(transaction_id);
 CREATE INDEX idx_transfer_attribute_type ON transfer_attribute(attribute_type_id);
 CREATE INDEX idx_transfer_attribute_group ON transfer_attribute(transaction_id, group_key);
+-- An import finds the existing transfers its unique ids name by value (selectByAccountsWithAttributeValues);
+-- without this it scans every transfer attribute for each file.
+CREATE INDEX idx_transfer_attribute_value ON transfer_attribute(attribute_value);
