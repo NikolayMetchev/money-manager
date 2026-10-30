@@ -1,7 +1,7 @@
 """aapt2, as AGP downloads it: `com.android.tools.build:aapt2:<AGP>-<build>:<os>` from Google's Maven.
 
-AGP names the build in `com/android/build/gradle/internal/res/aapt2_version.properties` (its plugin jar). After an
-AGP bump, set `AAPT2_BUILD` from that file and the checksums from the new jars (the download fails on a stale checksum).
+AGP names the build in `com/android/build/gradle/internal/res/aapt2_version.properties` (its plugin jar).
+bazel/renovate/repin_aapt2.py (run by repin.sh) rewrites both pins after an AGP bump.
 """
 
 AAPT2_BUILD = "15978811"
