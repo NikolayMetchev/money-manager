@@ -94,8 +94,8 @@
       "log4j-slf4j2-impl": "org.apache.logging.log4j:log4j-slf4j2-impl:2.26.1",
       "mappie-api": "tech.mappie:mappie-api:2.4.21-2.4.5",
       "mappie-compiler-plugin": "tech.mappie:mappie-compiler-plugin:2.4.21-2.4.5",
-      "metro-compiler": "dev.zacsweers.metro:compiler:1.5.0",
-      "metro-runtime": "dev.zacsweers.metro:runtime:1.5.0",
+      "metro-compiler": "dev.zacsweers.metro:compiler:1.5.1",
+      "metro-runtime": "dev.zacsweers.metro:runtime:1.5.1",
       "mokkery-core": "dev.mokkery:mokkery-core:3.6.0",
       "mokkery-plugin": "dev.mokkery:mokkery-plugin:3.6.0",
       "mokkery-runtime": "dev.mokkery:mokkery-runtime:3.6.0",
@@ -13638,33 +13638,33 @@
     },
     "dev.zacsweers.metro:compiler": {
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.5.1",
         "files": [
           {
-            "name": "compiler-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/compiler/1.5.0/compiler-1.5.0.jar",
-            "sha256": "e04152751d1001b3f92575e0ef330832e31588f299f273b90b3c9db534599efd"
+            "name": "compiler-1.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/compiler/1.5.1/compiler-1.5.1.jar",
+            "sha256": "bf211e99dbdb1677f8139dae3a6bd135064c5f22cb200c155bc59badea8230f8"
           }
         ]
       }
     },
     "dev.zacsweers.metro:runtime": {
       "android": {
-        "version": "1.5.0",
+        "version": "1.5.1",
         "files": [
           {
-            "name": "runtime-jvm-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-jvm/1.5.0/runtime-jvm-1.5.0.jar",
+            "name": "runtime-jvm-1.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-jvm/1.5.1/runtime-jvm-1.5.1.jar",
             "sha256": "9ab8bf5adc89936ef8e7061231cfa2b03b796b22cf6e2eb0bf2cc7486c42fbcd"
           }
         ]
       },
       "js": {
-        "version": "1.5.0",
+        "version": "1.5.1",
         "files": [
           {
-            "name": "runtime-js-1.5.0.klib",
-            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-js/1.5.0/runtime-js-1.5.0.klib",
+            "name": "runtime-js-1.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-js/1.5.1/runtime-js-1.5.1.klib",
             "sha256": "862050ec6ad2f23d8f3852ef22ae736945ced474271ec7cff7b377aa1fcb54d8"
           }
         ],
@@ -13673,51 +13673,51 @@
         ]
       },
       "jvm": {
-        "version": "1.5.0",
+        "version": "1.5.1",
         "files": [
           {
-            "name": "runtime-jvm-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-jvm/1.5.0/runtime-jvm-1.5.0.jar",
+            "name": "runtime-jvm-1.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-jvm/1.5.1/runtime-jvm-1.5.1.jar",
             "sha256": "9ab8bf5adc89936ef8e7061231cfa2b03b796b22cf6e2eb0bf2cc7486c42fbcd"
           }
         ]
       },
       "linuxArm64": {
-        "version": "1.5.0",
+        "version": "1.5.1",
         "files": [
           {
-            "name": "runtime-linuxArm64Main-1.5.0.klib",
-            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-linuxarm64/1.5.0/runtime-linuxarm64-1.5.0.klib",
+            "name": "runtime-linuxArm64Main-1.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-linuxarm64/1.5.1/runtime-linuxarm64-1.5.1.klib",
             "sha256": "bfc3d4b174a6b250e5b306de2dd3a5810b3f9cb765b213e6dd0847f8c8cfc3b4"
           }
         ]
       },
       "linuxX64": {
-        "version": "1.5.0",
+        "version": "1.5.1",
         "files": [
           {
-            "name": "runtime-linuxX64Main-1.5.0.klib",
-            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-linuxx64/1.5.0/runtime-linuxx64-1.5.0.klib",
+            "name": "runtime-linuxX64Main-1.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-linuxx64/1.5.1/runtime-linuxx64-1.5.1.klib",
             "sha256": "a954113dffeac332519b7bdb050cd1120684ca56134d3701e6b2fe754a7bef41"
           }
         ]
       },
       "macosArm64": {
-        "version": "1.5.0",
+        "version": "1.5.1",
         "files": [
           {
-            "name": "runtime-macosArm64Main-1.5.0.klib",
-            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-macosarm64/1.5.0/runtime-macosarm64-1.5.0.klib",
+            "name": "runtime-macosArm64Main-1.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-macosarm64/1.5.1/runtime-macosarm64-1.5.1.klib",
             "sha256": "ae0c4cfe6729810b1f621e1c5f8d27c0262f70bcd1b945bcbb57d4f7586e0f0e"
           }
         ]
       },
       "metadata": {
-        "version": "1.5.0",
+        "version": "1.5.1",
         "files": [
           {
-            "name": "runtime-metadata-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime/1.5.0/runtime-1.5.0.jar",
+            "name": "runtime-metadata-1.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime/1.5.1/runtime-1.5.1.jar",
             "sha256": "b92cdf5738251e6b31493feab4b036941e1f8810a018f1b9b13ab628044406b5"
           }
         ],
@@ -13726,11 +13726,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "1.5.0",
+        "version": "1.5.1",
         "files": [
           {
-            "name": "runtime-metadata-1.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime/1.5.0/runtime-1.5.0.jar",
+            "name": "runtime-metadata-1.5.1.jar",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime/1.5.1/runtime-1.5.1.jar",
             "sha256": "b92cdf5738251e6b31493feab4b036941e1f8810a018f1b9b13ab628044406b5"
           }
         ],
@@ -13739,21 +13739,21 @@
         ]
       },
       "mingwX64": {
-        "version": "1.5.0",
+        "version": "1.5.1",
         "files": [
           {
-            "name": "runtime-mingwX64Main-1.5.0.klib",
-            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-mingwx64/1.5.0/runtime-mingwx64-1.5.0.klib",
+            "name": "runtime-mingwX64Main-1.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-mingwx64/1.5.1/runtime-mingwx64-1.5.1.klib",
             "sha256": "9d6528248cddfc62f02d5eb49e0c1700e292c74beb94dda82006e13a2c4a335a"
           }
         ]
       },
       "wasmJs": {
-        "version": "1.5.0",
+        "version": "1.5.1",
         "files": [
           {
-            "name": "runtime-wasm-js-1.5.0.klib",
-            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-wasm-js/1.5.0/runtime-wasm-js-1.5.0.klib",
+            "name": "runtime-wasm-js-1.5.1.klib",
+            "url": "https://repo1.maven.org/maven2/dev/zacsweers/metro/runtime-wasm-js/1.5.1/runtime-wasm-js-1.5.1.klib",
             "sha256": "a2ca084b5c5ad29b2678711ef18e79033afdf5908c4f1f5306a02f58dd357cd5"
           }
         ]
