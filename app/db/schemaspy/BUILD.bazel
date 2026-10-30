@@ -1,5 +1,5 @@
 load("@rules_java//java:java_binary.bzl", "java_binary")
-load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 load("//bazel/pages:pages.bzl", "schemaspy_docs")
 
 # gazelle:kmp_generate true
@@ -37,4 +37,14 @@ schemaspy_docs(
     schemaspy = ":schemaspy_main",
     tags = ["manual"],
     visibility = ["//webpage:__pkg__"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":schemaspy",
+    jvm_deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:kotlinx_coroutines_test",
+    ],
+    jvm_srcs = glob(["src/test/kotlin/**/*.kt"]),
 )
