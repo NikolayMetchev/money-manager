@@ -6,7 +6,6 @@ import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TradeId

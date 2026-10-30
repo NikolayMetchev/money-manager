@@ -2,7 +2,6 @@ package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.QifImportId
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportRecord
 import kotlinx.coroutines.flow.Flow

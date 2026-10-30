@@ -81,16 +81,16 @@ class TransferSourceReadRepositoryImpl(
         tradeIds: Set<TradeId>,
     ): List<Source> =
         withContext(Dispatchers.Default) {
-            (transferIds.map { it.id } + tradeIds.map { it.id })
-                .distinct()
-                .chunked(ID_CHUNK)
-                .flatMap { queries.selectImportRecordsMatchedTo(it).awaitAsList() }
-                .map {
+            val records = linkedSetOf<Source>()
+            for (chunk in (transferIds.map { it.id } + tradeIds.map { it.id }).distinct().chunked(ID_CHUNK)) {
+                queries.selectImportRecordsMatchedTo(chunk).awaitAsList().mapTo(records) {
                     when (it.source_type_id) {
                         SourceType.CSV_IMPORT.id.toLong() -> Source.Csv(CsvImportId(Uuid.parse(it.import_id)), it.record_index)
                         else -> Source.Qif(QifImportId(Uuid.parse(it.import_id)), it.record_index)
                     }
-                }.distinct()
+                }
+            }
+            records.toList()
         }
 
     override suspend fun getHandEditedTransferIds(ids: Collection<TransferId>): Set<TransferId> =
