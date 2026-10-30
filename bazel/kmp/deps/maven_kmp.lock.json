@@ -96,9 +96,9 @@
       "mappie-compiler-plugin": "tech.mappie:mappie-compiler-plugin:2.4.21-2.4.5",
       "metro-compiler": "dev.zacsweers.metro:compiler:1.5.0",
       "metro-runtime": "dev.zacsweers.metro:runtime:1.5.0",
-      "mokkery-core": "dev.mokkery:mokkery-core:3.5.1",
-      "mokkery-plugin": "dev.mokkery:mokkery-plugin:3.5.1",
-      "mokkery-runtime": "dev.mokkery:mokkery-runtime:3.5.1",
+      "mokkery-core": "dev.mokkery:mokkery-core:3.6.0",
+      "mokkery-plugin": "dev.mokkery:mokkery-plugin:3.6.0",
+      "mokkery-runtime": "dev.mokkery:mokkery-runtime:3.6.0",
       "molecule-runtime": "app.cash.molecule:molecule-runtime:2.2.0",
       "mordant-core": "com.github.ajalt.mordant:mordant-core:3.1.0",
       "mosaic-runtime": "com.jakewharton.mosaic:mosaic-runtime:0.18.0",
@@ -2723,7 +2723,6 @@
       "dev.mokkery.matcher.collections",
       "dev.mokkery.matcher.logical",
       "dev.mokkery.matcher.nullable",
-      "dev.mokkery.matcher.varargs",
       "dev.mokkery.presets",
       "dev.mokkery.rendering",
       "dev.mokkery.templating"
@@ -12016,72 +12015,72 @@
     },
     "dev.mokkery:mokkery-core": {
       "android": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-core-jvm-3.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-jvm/3.5.1/mokkery-core-jvm-3.5.1.jar",
+            "name": "mokkery-core-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-jvm/3.6.0/mokkery-core-jvm-3.6.0.jar",
             "sha256": "10e385c1467b8dcc795d024812c02c82c8d4da1d447114ee1cb592246316985e"
           }
         ]
       },
       "js": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-core-js-3.5.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-js/3.5.1/mokkery-core-js-3.5.1.klib",
-            "sha256": "adc655e70a5bcfb07bd9b1e87616c2101e010f39a603242f82636c276183b1e9"
+            "name": "mokkery-core-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-js/3.6.0/mokkery-core-js-3.6.0.klib",
+            "sha256": "d557eaf0a16b1378fce4136f9f03bfbad64ed0bbe3245c19108e7bba87e3ce8f"
           }
         ]
       },
       "jvm": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-core-jvm-3.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-jvm/3.5.1/mokkery-core-jvm-3.5.1.jar",
+            "name": "mokkery-core-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-jvm/3.6.0/mokkery-core-jvm-3.6.0.jar",
             "sha256": "10e385c1467b8dcc795d024812c02c82c8d4da1d447114ee1cb592246316985e"
           }
         ]
       },
       "linuxArm64": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-core-linuxArm64Main-3.5.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-linuxarm64/3.5.1/mokkery-core-linuxarm64-3.5.1.klib",
-            "sha256": "d6cb8390d94e85c29b1bcf0521eb562a87811d4412fa0ce0eb76833aac318bea"
+            "name": "mokkery-core-linuxArm64Main-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-linuxarm64/3.6.0/mokkery-core-linuxarm64-3.6.0.klib",
+            "sha256": "1e46796147165b6893b5cf7d6872eee341fe2fc321c1b0b67e123fa8f1701b3b"
           }
         ]
       },
       "linuxX64": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-core-linuxX64Main-3.5.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-linuxx64/3.5.1/mokkery-core-linuxx64-3.5.1.klib",
-            "sha256": "03e3873b1e77d977098b66f3632e77667253e1eb025279686dae7222f0cf6123"
+            "name": "mokkery-core-linuxX64Main-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-linuxx64/3.6.0/mokkery-core-linuxx64-3.6.0.klib",
+            "sha256": "e66b6daf392f7855b78bd3805e4a5043f4975b5349d2005a45b85b0752cb2edd"
           }
         ]
       },
       "macosArm64": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-core-macosArm64Main-3.5.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-macosarm64/3.5.1/mokkery-core-macosarm64-3.5.1.klib",
-            "sha256": "b56bd676a2c4b02aa8b90dacce0d29b826183d1c1c3d9e3200480a63020a034e"
+            "name": "mokkery-core-macosArm64Main-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-macosarm64/3.6.0/mokkery-core-macosarm64-3.6.0.klib",
+            "sha256": "44ebd28053fc88aead6d699c5bb976a13e78c1128078797808dbb683d0afc0aa"
           }
         ]
       },
       "metadata": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-core-metadata-3.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core/3.5.1/mokkery-core-3.5.1.jar",
-            "sha256": "e1f763dddd933776aee93f6023351cdb0fad00be1748adf8ce49f98c448661a5"
+            "name": "mokkery-core-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core/3.6.0/mokkery-core-3.6.0.jar",
+            "sha256": "c3da91093736c3c9b6ad67993ab941b249826203ed4a290f964b3350bc78afd5"
           }
         ],
         "source_sets": [
@@ -12089,12 +12088,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-core-metadata-3.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core/3.5.1/mokkery-core-3.5.1.jar",
-            "sha256": "e1f763dddd933776aee93f6023351cdb0fad00be1748adf8ce49f98c448661a5"
+            "name": "mokkery-core-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core/3.6.0/mokkery-core-3.6.0.jar",
+            "sha256": "c3da91093736c3c9b6ad67993ab941b249826203ed4a290f964b3350bc78afd5"
           }
         ],
         "source_sets": [
@@ -12102,46 +12101,46 @@
         ]
       },
       "mingwX64": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-core-mingwX64Main-3.5.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-mingwx64/3.5.1/mokkery-core-mingwx64-3.5.1.klib",
-            "sha256": "9c83779b98b37368d6cd7d272a8270c65c5ac91cc0ebfed7c893a2a1ca9fd511"
+            "name": "mokkery-core-mingwX64Main-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-mingwx64/3.6.0/mokkery-core-mingwx64-3.6.0.klib",
+            "sha256": "08445e335ecff53c68d22524b3de1d3b49da0ed81aaa433210ea5f135d74132b"
           }
         ]
       },
       "wasmJs": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-core-wasm-js-3.5.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-wasm-js/3.5.1/mokkery-core-wasm-js-3.5.1.klib",
-            "sha256": "9c1fb9030197c593319cf0d875c765dd730b05ad7defe9810edf36680a131b8c"
+            "name": "mokkery-core-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-core-wasm-js/3.6.0/mokkery-core-wasm-js-3.6.0.klib",
+            "sha256": "75f1ada1b63e5d67b1d72f8367c8d52feecf665a8418943a678be33a84899a6a"
           }
         ]
       }
     },
     "dev.mokkery:mokkery-plugin": {
       "jvm": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-plugin-3.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-plugin/3.5.1/mokkery-plugin-3.5.1.jar",
-            "sha256": "030984b4585eb35a26323be2b694ae3a1e74967d27f76be1b9fac5f96a8536ff"
+            "name": "mokkery-plugin-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-plugin/3.6.0/mokkery-plugin-3.6.0.jar",
+            "sha256": "152d32ee2387a6a404b512bed117a29f0bba67c4cb52293468b2555d6ddcc905"
           }
         ]
       }
     },
     "dev.mokkery:mokkery-runtime": {
       "android": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-runtime-jvm-3.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-jvm/3.5.1/mokkery-runtime-jvm-3.5.1.jar",
-            "sha256": "785134f73cdeeea0a8714e641ed80c07f90daf0243fdfd29ad9a5c301ec99ae0"
+            "name": "mokkery-runtime-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-jvm/3.6.0/mokkery-runtime-jvm-3.6.0.jar",
+            "sha256": "07b3514f47869295d854da3a373f5226c139b56380ba6c9a23ad3dacc263585b"
           }
         ],
         "deps": [
@@ -12152,12 +12151,12 @@
         ]
       },
       "js": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-runtime-js-3.5.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-js/3.5.1/mokkery-runtime-js-3.5.1.klib",
-            "sha256": "2c6e47fc36c960d0d95a0797ad7886525f3d6f40c9ab01e3e31c3d79e2a7530a"
+            "name": "mokkery-runtime-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-js/3.6.0/mokkery-runtime-js-3.6.0.klib",
+            "sha256": "e74f98837b5add067e19593ef740617b184fc386e880a7ceededadd9c474d3b5"
           }
         ],
         "deps": [
@@ -12170,12 +12169,12 @@
         ]
       },
       "jvm": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-runtime-jvm-3.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-jvm/3.5.1/mokkery-runtime-jvm-3.5.1.jar",
-            "sha256": "785134f73cdeeea0a8714e641ed80c07f90daf0243fdfd29ad9a5c301ec99ae0"
+            "name": "mokkery-runtime-jvm-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-jvm/3.6.0/mokkery-runtime-jvm-3.6.0.jar",
+            "sha256": "07b3514f47869295d854da3a373f5226c139b56380ba6c9a23ad3dacc263585b"
           }
         ],
         "deps": [
@@ -12186,12 +12185,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-runtime-linuxArm64Main-3.5.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-linuxarm64/3.5.1/mokkery-runtime-linuxarm64-3.5.1.klib",
-            "sha256": "8cffdf46c4b864a34e57efabf2abc510d857710eba31b665e3f4b42fbf967e59"
+            "name": "mokkery-runtime-linuxArm64Main-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-linuxarm64/3.6.0/mokkery-runtime-linuxarm64-3.6.0.klib",
+            "sha256": "16242023e1cdd6eabb7c7ba96858d0b1e4545f0ac207c12079006877490d2125"
           }
         ],
         "deps": [
@@ -12201,12 +12200,12 @@
         ]
       },
       "linuxX64": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-runtime-linuxX64Main-3.5.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-linuxx64/3.5.1/mokkery-runtime-linuxx64-3.5.1.klib",
-            "sha256": "60efa4e6b89dba140f68aea281c65cda42b0e69f905c8ad145dd2c08362aec02"
+            "name": "mokkery-runtime-linuxX64Main-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-linuxx64/3.6.0/mokkery-runtime-linuxx64-3.6.0.klib",
+            "sha256": "79ca4c18e3101187eff6c6d69d0ace3717b8a8b581e5f06dcae5c35e932df2b2"
           }
         ],
         "deps": [
@@ -12216,12 +12215,12 @@
         ]
       },
       "macosArm64": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-runtime-macosArm64Main-3.5.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-macosarm64/3.5.1/mokkery-runtime-macosarm64-3.5.1.klib",
-            "sha256": "bddf423e239b1e335eed919ad2d07e95e9340fab0377ad6bf96d8dd358c3e473"
+            "name": "mokkery-runtime-macosArm64Main-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-macosarm64/3.6.0/mokkery-runtime-macosarm64-3.6.0.klib",
+            "sha256": "add9d46fae1b6f2b601043f88419a708115c0fc3bd3e207670c222609891689f"
           }
         ],
         "deps": [
@@ -12231,12 +12230,12 @@
         ]
       },
       "metadata": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-runtime-metadata-3.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime/3.5.1/mokkery-runtime-3.5.1.jar",
-            "sha256": "e2644966781888e3e52875bd33f9381d2c40637f1e55435965b91973da7bd64b"
+            "name": "mokkery-runtime-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime/3.6.0/mokkery-runtime-3.6.0.jar",
+            "sha256": "2aa33bef164e7506bdb439323bf953ee11e98dd8483f09421ceb4cda5efc4acc"
           }
         ],
         "deps": [
@@ -12248,12 +12247,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-runtime-metadata-3.5.1.jar",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime/3.5.1/mokkery-runtime-3.5.1.jar",
-            "sha256": "e2644966781888e3e52875bd33f9381d2c40637f1e55435965b91973da7bd64b"
+            "name": "mokkery-runtime-metadata-3.6.0.jar",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime/3.6.0/mokkery-runtime-3.6.0.jar",
+            "sha256": "2aa33bef164e7506bdb439323bf953ee11e98dd8483f09421ceb4cda5efc4acc"
           }
         ],
         "deps": [
@@ -12265,12 +12264,12 @@
         ]
       },
       "mingwX64": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-runtime-mingwX64Main-3.5.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-mingwx64/3.5.1/mokkery-runtime-mingwx64-3.5.1.klib",
-            "sha256": "150f881eae4e3bda0f449c749440609485a8b2545779d100f4c3bb5204f9bc01"
+            "name": "mokkery-runtime-mingwX64Main-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-mingwx64/3.6.0/mokkery-runtime-mingwx64-3.6.0.klib",
+            "sha256": "4baa4386a2e3cd113fff4bd3d9317a3ebe0848cf5d81a34d85132ef3846ad6b1"
           }
         ],
         "deps": [
@@ -12280,12 +12279,12 @@
         ]
       },
       "wasmJs": {
-        "version": "3.5.1",
+        "version": "3.6.0",
         "files": [
           {
-            "name": "mokkery-runtime-wasm-js-3.5.1.klib",
-            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-wasm-js/3.5.1/mokkery-runtime-wasm-js-3.5.1.klib",
-            "sha256": "739902ba85c79297db02632cc163540251bfa78ebb4136585dc5505816103c1e"
+            "name": "mokkery-runtime-wasm-js-3.6.0.klib",
+            "url": "https://repo1.maven.org/maven2/dev/mokkery/mokkery-runtime-wasm-js/3.6.0/mokkery-runtime-wasm-js-3.6.0.klib",
+            "sha256": "45bc2929d113d33aa6b9db9a7499e2fb0b5264a47ff28720af84debb395c3358"
           }
         ],
         "deps": [
@@ -20410,11 +20409,11 @@
     },
     "org.jetbrains.kotlin:kotlinx-atomicfu-runtime": {
       "js": {
-        "version": "2.4.20",
+        "version": "2.4.21",
         "files": [
           {
-            "name": "kotlinx-atomicfu-runtime-2.4.20.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlinx-atomicfu-runtime/2.4.20/kotlinx-atomicfu-runtime-2.4.20.klib",
+            "name": "kotlinx-atomicfu-runtime-2.4.21.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlinx-atomicfu-runtime/2.4.21/kotlinx-atomicfu-runtime-2.4.21.klib",
             "sha256": "c6deada2fac53b8ea6523dbda77597b128006674616f140f04df23264c6d1aa3"
           }
         ]
