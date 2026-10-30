@@ -36,7 +36,8 @@ interface QifImportWriteRepository : QifImportReadRepository {
 
     /**
      * Updates the import status (and optional linked transfer) for multiple records in a single
-     * database transaction.
+     * database transaction. A record linked to a transfer it didn't create is also recorded as a matched
+     * source of it (see `CsvImportWriteRepository.updateRowStatusesBatch`).
      */
     suspend fun updateRecordStatusesBatch(
         id: QifImportId,

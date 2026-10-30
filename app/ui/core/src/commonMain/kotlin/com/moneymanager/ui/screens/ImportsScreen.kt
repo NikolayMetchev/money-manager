@@ -45,6 +45,7 @@ import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
+import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setCsvImportIgnored
@@ -73,6 +74,7 @@ fun ImportsScreen(
     apiImportService: ApiImportService,
     driveFolderBrowser: DriveFolderBrowser?,
     csvImportRepository: CsvImportReadRepository,
+    transferSourceRepository: TransferSourceReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
     accountMappingExportService: AccountMappingExportService,
@@ -136,7 +138,7 @@ fun ImportsScreen(
                     onOpenAudit = onImportDirectoryAuditClick,
                     unimportCsv = { id ->
                         executeCsvUnimport(
-                            plan = planCsvUnimport(id, csvImportRepository),
+                            plan = planCsvUnimport(id, csvImportRepository, transferSourceRepository),
                             accountRepository = accountRepository,
                             transactionRepository = transactionRepository,
                             transferRelationshipRepository = transferRelationshipRepository,
@@ -154,6 +156,7 @@ fun ImportsScreen(
                 CsvImportsScreen(
                     importDirectoryService = importDirectoryService,
                     csvImportRepository = csvImportRepository,
+                    transferSourceRepository = transferSourceRepository,
                     importTimelineRepository = importTimelineRepository,
                     importDirectoryRepository = importDirectoryRepository,
                     csvImportStrategyRepository = csvImportStrategyRepository,

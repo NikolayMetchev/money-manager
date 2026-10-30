@@ -17,3 +17,26 @@ VALUES (?, ?, ?);
 insertQifSource:
 INSERT OR IGNORE INTO qif_entity_source (id, qif_import_id, qif_record_index)
 VALUES (?, ?, ?);
+
+-- Records an import record that links to a transaction from another record (a duplicate, or an update)
+-- as a matched source of the transaction's current revision. Transfers and trades share one id space, so whichever
+-- holds the id is the entity. Follow with lastInsertedSourceId and the format's detail row.
+insertMatchedSource:
+INSERT INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id, matched)
+SELECT 7, id, revision_id, :sourceTypeId, :deviceId, 1 FROM transfer WHERE id = :transactionId
+UNION ALL
+SELECT 11, id, revision_id, :sourceTypeId, :deviceId, 1 FROM trade WHERE id = :transactionId;
+
+lastInsertedSourceId:
+SELECT last_insert_rowid();
+
+-- Removes matched entries (never a writer's: the audit trail keeps those) once their record's link is gone.
+-- Detail rows first, as they reference entity_source.
+deleteCsvEntitySources:
+DELETE FROM csv_entity_source WHERE id IN ?;
+
+deleteQifEntitySources:
+DELETE FROM qif_entity_source WHERE id IN ?;
+
+deleteMatchedEntitySources:
+DELETE FROM entity_source WHERE id IN ? AND matched = 1;

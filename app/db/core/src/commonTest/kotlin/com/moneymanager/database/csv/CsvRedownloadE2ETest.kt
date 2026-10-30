@@ -130,7 +130,7 @@ class CsvRedownloadE2ETest : DbTest() {
             if (unimport) {
                 { importId ->
                     executeCsvUnimport(
-                        plan = planCsvUnimport(importId, repositories.csvImportRepository),
+                        plan = planCsvUnimport(importId, repositories.csvImportRepository, repositories.transferSourceRepository),
                         accountRepository = repositories.accountRepository,
                         transactionRepository = repositories.transactionRepository,
                         transferRelationshipRepository = repositories.transferRelationshipRepository,

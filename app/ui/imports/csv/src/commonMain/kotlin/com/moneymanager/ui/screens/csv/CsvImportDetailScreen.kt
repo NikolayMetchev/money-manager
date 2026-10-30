@@ -477,6 +477,7 @@ fun CsvImportDetailScreen(
         UnimportDialog(
             csvImport = import!!,
             csvImportRepository = csvImportRepository,
+            transferSourceRepository = transferSourceRepository,
             accountRepository = accountRepository,
             transactionRepository = transactionRepository,
             transferRelationshipRepository = transferRelationshipRepository,

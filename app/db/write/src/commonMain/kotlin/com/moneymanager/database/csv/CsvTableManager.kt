@@ -118,6 +118,7 @@ class CsvTableManager(
                 JOIN transfer ON transfer.id = entity_source.entity_id
                 WHERE csv_entity_source.csv_import_id = '$csvImportId'
                   AND entity_source.entity_type_id = 7
+                  AND entity_source.matched = 0
                 GROUP BY csv_entity_source.csv_import_id, csv_entity_source.csv_row_index
             ) source_rows ON source_rows.csv_import_id = '$csvImportId'
                 AND source_rows.csv_row_index = t.row_index
@@ -149,40 +150,6 @@ class CsvTableManager(
             "DROP TABLE IF EXISTS $tableName",
             0,
         )
-    }
-
-    /**
-     * Updates the transfer ID for a specific row.
-     *
-     * @param tableName The name of the table
-     * @param rowIndex The row index to update
-     * @param transferId The transfer ID to set
-     */
-    suspend fun updateTransferId(
-        tableName: String,
-        rowIndex: Long,
-        transferId: TransferId,
-    ) {
-        database.execute(
-            null,
-            "UPDATE $tableName SET transaction_id = '${transferId.id}' WHERE row_index = $rowIndex",
-            0,
-        )
-    }
-
-    /**
-     * Updates the transfer IDs for multiple rows in batch.
-     *
-     * @param tableName The name of the table
-     * @param rowTransferMap Map of row index to transfer ID
-     */
-    suspend fun updateTransferIdsBatch(
-        tableName: String,
-        rowTransferMap: Map<Long, TransferId>,
-    ) {
-        rowTransferMap.forEach { (rowIndex, transferId) ->
-            updateTransferId(tableName, rowIndex, transferId)
-        }
     }
 
     /**
@@ -230,30 +197,5 @@ class CsvTableManager(
     /** Returns every row of [tableName] to the never-imported state (see [resetRowStatuses]). */
     suspend fun resetAllRowStatuses(tableName: String) {
         database.execute(null, "UPDATE $tableName SET import_status = NULL, transaction_id = NULL", 0)
-    }
-
-    /**
-     * The rows of [tableName] whose linked transaction (transfer or trade — they share one id space) is
-     * one of [transactionIds]. The column is TEXT but may hold the id in either storage class, hence the
-     * cast.
-     */
-    suspend fun findRowsWithTransactionIds(
-        tableName: String,
-        transactionIds: Collection<Long>,
-    ): List<Long> {
-        val rows =
-            transactionIds.chunked(ID_CHUNK_SIZE).flatMap { chunk ->
-                database
-                    .rawQuery(
-                        "SELECT row_index FROM $tableName " +
-                            "WHERE CAST(transaction_id AS INTEGER) IN (${chunk.joinToString(",")}) ORDER BY row_index",
-                    ) { it.getLong(0)!! }
-                    .awaitAsList()
-            }
-        return rows.distinct().sorted()
-    }
-
-    private companion object {
-        const val ID_CHUNK_SIZE = 500
     }
 }

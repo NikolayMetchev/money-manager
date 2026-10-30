@@ -19,7 +19,7 @@ internal data class EntityRevision(
  * per-entity audit query repeated the same source join and the same flat column list, and every
  * audit mapper repeated the same fourteen-field construction. Instead this reads the sources for
  * an audit screen in one extra indexed query, which the caller attaches by [EntityRevision] —
- * `entity_source`'s UNIQUE (entity_type_id, entity_id, revision_id) makes that pairing exactly
+ * `entity_source`'s one writer per revision (idx_entity_source_writer) makes that pairing exactly
  * what the removed LEFT JOIN produced.
  *
  * A pre-joined SQL view was the other candidate and was rejected: SQLite cannot flatten a joined

@@ -11,6 +11,8 @@ import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
+import com.moneymanager.domain.repository.TransferSourceReadRepository
+import com.moneymanager.importengineapi.AffectedRecords
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportBatch
@@ -65,10 +67,16 @@ data class CsvUnimportResult(
 suspend fun planCsvUnimport(
     importId: CsvImportId,
     csvImportRepository: CsvImportReadRepository,
+    transferSourceRepository: TransferSourceReadRepository,
 ): CsvUnimportPlan {
     val transferIds = csvImportRepository.getTransferIdsCreatedByImport(importId)
     val tradeIds = csvImportRepository.getTradeIdsCreatedByImport(importId)
-    val referencing = csvImportRepository.findRowsReferencingTransactions(importId, transferIds, tradeIds)
+    val referencing =
+        AffectedRecords
+            .of(transferSourceRepository.getImportRecordsMatchedTo(transferIds, tradeIds), excluding = Source.Csv(importId))
+            .byFile
+            .mapNotNull { (file, rows) -> (file as? Source.Csv)?.let { it.importId to rows } }
+            .toMap()
     val fileNames =
         if (referencing.isEmpty()) {
             emptyMap()
@@ -187,8 +195,9 @@ data class CsvBulkUnimportPlan(
 suspend fun planCsvBulkUnimport(
     importIds: List<CsvImportId>,
     csvImportRepository: CsvImportReadRepository,
+    transferSourceRepository: TransferSourceReadRepository,
 ): CsvBulkUnimportPlan {
-    val plans = importIds.map { planCsvUnimport(it, csvImportRepository) }
+    val plans = importIds.map { planCsvUnimport(it, csvImportRepository, transferSourceRepository) }
     return CsvBulkUnimportPlan(plans, mergeAffectedFiles(plans.flatMap { it.affectedFiles }, importIds.toSet()))
 }
 
@@ -201,6 +210,7 @@ suspend fun planCsvBulkUnimport(
 suspend fun executeCsvBulkUnimport(
     plan: CsvBulkUnimportPlan,
     csvImportRepository: CsvImportReadRepository,
+    transferSourceRepository: TransferSourceReadRepository,
     accountRepository: AccountReadRepository,
     transactionRepository: TransactionReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
@@ -215,7 +225,7 @@ suspend fun executeCsvBulkUnimport(
             val label = "Unimporting file ${index + 1} of ${ids.size}"
             onProgress?.invoke(Progress(label, fraction = index.toFloat() / ids.size, processed = index, total = ids.size))
             executeCsvUnimport(
-                plan = planCsvUnimport(id, csvImportRepository),
+                plan = planCsvUnimport(id, csvImportRepository, transferSourceRepository),
                 accountRepository = accountRepository,
                 transactionRepository = transactionRepository,
                 transferRelationshipRepository = transferRelationshipRepository,

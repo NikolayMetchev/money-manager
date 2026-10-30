@@ -131,11 +131,3 @@ LIMIT ? OFFSET ?;
 
 countRecords:
 SELECT COUNT(*) FROM qif_record WHERE import_id = ?;
-
--- Records of other QIF imports linked to any of the given transactions: records they marked DUPLICATE
--- or UPDATED against them. transaction_id is stored as text.
-selectRecordsReferencingTransactions:
-SELECT import_id, record_index
-FROM qif_record
-WHERE import_id != ?
-  AND transaction_id IN ?;

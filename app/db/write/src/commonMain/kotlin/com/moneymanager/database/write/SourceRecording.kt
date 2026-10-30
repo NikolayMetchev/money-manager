@@ -1,5 +1,6 @@
 package com.moneymanager.database.write
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import app.cash.sqldelight.async.coroutines.awaitAsOne
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.domain.model.DeviceId
@@ -94,3 +95,66 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
         -> {}
     }
 }
+
+/**
+ * Records that an import record ([source]: a CSV row or QIF record) links to [transactionId], a transfer or
+ * trade another record wrote (it matched it as a duplicate, or updated it), as a matched `entity_source` of
+ * its current revision. Matched entries mirror the records' current links: a duplicate row changes nothing,
+ * so without one its link would live only in its import's staging table, and re-importing the
+ * transaction's own file would have to read every file to find it. Whoever replaces or clears a record's
+ * link calls [forgetMatchedSources] first. Called inside the caller's transaction, like [recordSource].
+ */
+suspend fun MoneyManagerDatabaseWrapper.recordMatchedSource(
+    deviceId: DeviceId,
+    source: Source,
+    transactionId: Long,
+) {
+    if (entitySourceWriteQueries.insertMatchedSource(source.toSourceType().id.toLong(), deviceId.id, transactionId) == 0L) {
+        return
+    }
+    val id = entitySourceWriteQueries.lastInsertedSourceId().awaitAsOne()
+    when (source) {
+        is Source.Csv -> entitySourceWriteQueries.insertCsvSource(id, source.importId.id.toString(), source.rowIndex)
+        is Source.Qif -> entitySourceWriteQueries.insertQifSource(id, source.importId.id.toString(), source.recordIndex)
+        else -> error("Only an import record can match a transaction: $source")
+    }
+}
+
+/**
+ * Removes the matched entries of [records] of [import] (a whole CSV or QIF import), or of all its records
+ * when null: their links are about to be replaced or cleared. Called inside the caller's transaction.
+ */
+suspend fun MoneyManagerDatabaseWrapper.forgetMatchedSources(
+    import: Source,
+    records: Collection<Long>?,
+) {
+    val selects = entitySourceSelectQueries
+    val ids =
+        when (import) {
+            is Source.Csv -> {
+                val importId = import.importId.id.toString()
+                records?.chunked(SOURCE_CHUNK)?.flatMap { selects.selectMatchedCsvSourceIds(importId, it).awaitAsList() }
+                    ?: selects.selectAllMatchedCsvSourceIds(importId).awaitAsList()
+            }
+
+            is Source.Qif -> {
+                val importId = import.importId.id.toString()
+                records?.chunked(SOURCE_CHUNK)?.flatMap { selects.selectMatchedQifSourceIds(importId, it).awaitAsList() }
+                    ?: selects.selectAllMatchedQifSourceIds(importId).awaitAsList()
+            }
+
+            else -> {
+                error("Only an import's records have matched sources: $import")
+            }
+        }
+    ids.chunked(SOURCE_CHUNK).forEach { chunk ->
+        when (import) {
+            is Source.Csv -> entitySourceWriteQueries.deleteCsvEntitySources(chunk)
+            else -> entitySourceWriteQueries.deleteQifEntitySources(chunk)
+        }
+        entitySourceWriteQueries.deleteMatchedEntitySources(chunk)
+    }
+}
+
+// Keeps each IN list well under SQLite's bound-parameter limit.
+private const val SOURCE_CHUNK = 500

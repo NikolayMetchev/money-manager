@@ -123,7 +123,7 @@ fun SourceRerunPreview(
             style = MaterialTheme.typography.bodySmall,
         )
         if (!plan.affected.isEmpty) {
-            val files = plan.affected.csvRows.size + plan.affected.qifRecords.size
+            val files = plan.affected.byFile.size
             ReimportPlanSection(
                 title = "Rows of other files to re-run (${plan.affected.count}):",
                 lines = emptyList(),

@@ -3,14 +3,19 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
+import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.uuid.Uuid
 
 /**
  * Read-only implementation of TransferSourceReadRepository using SQLDelight.
@@ -71,15 +76,32 @@ class TransferSourceReadRepositoryImpl(
             }
         }
 
+    override suspend fun getImportRecordsMatchedTo(
+        transferIds: Set<TransferId>,
+        tradeIds: Set<TradeId>,
+    ): List<Source> =
+        withContext(Dispatchers.Default) {
+            val records = linkedSetOf<Source>()
+            for (chunk in (transferIds.map { it.id } + tradeIds.map { it.id }).distinct().chunked(ID_CHUNK)) {
+                queries.selectImportRecordsMatchedTo(chunk).awaitAsList().mapTo(records) {
+                    when (it.source_type_id) {
+                        SourceType.CSV_IMPORT.id.toLong() -> Source.Csv(CsvImportId(Uuid.parse(it.import_id)), it.record_index)
+                        else -> Source.Qif(QifImportId(Uuid.parse(it.import_id)), it.record_index)
+                    }
+                }
+            }
+            records.toList()
+        }
+
     override suspend fun getHandEditedTransferIds(ids: Collection<TransferId>): Set<TransferId> =
         withContext(Dispatchers.Default) {
             val edited = mutableSetOf<TransferId>()
-            // Chunked so a large import stays under SQLite's bound-parameter limit.
-            for (chunk in ids.mapTo(mutableSetOf()) { it.id }.chunked(HAND_EDITED_CHUNK)) {
+            for (chunk in ids.mapTo(mutableSetOf()) { it.id }.chunked(ID_CHUNK)) {
                 queries.selectHandEditedTransferIds(chunk).awaitAsList().mapTo(edited) { TransferId(it) }
             }
             edited
         }
 }
 
-private const val HAND_EDITED_CHUNK = 500
+// Keeps each IN list well under SQLite's bound-parameter limit.
+private const val ID_CHUNK = 500

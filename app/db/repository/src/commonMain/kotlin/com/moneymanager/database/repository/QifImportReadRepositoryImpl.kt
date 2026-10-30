@@ -68,21 +68,6 @@ class QifImportReadRepositoryImpl(
             selectQueries.selectImportsByChecksum(checksum, ::toQifImport).awaitAsList()
         }
 
-    override suspend fun findRecordsReferencingTransfers(
-        excluding: QifImportId?,
-        transferIds: Set<TransferId>,
-    ): Map<QifImportId, List<Long>> =
-        withContext(coroutineContext) {
-            transferIds
-                .map { it.id.toString() }
-                .chunked(REFERENCING_CHUNK)
-                .flatMap { chunk ->
-                    selectQueries
-                        .selectRecordsReferencingTransactions(excluding?.id?.toString() ?: "", chunk)
-                        .awaitAsList()
-                }.groupBy({ QifImportId(Uuid.parse(it.import_id)) }, { it.record_index })
-        }
-
     override suspend fun getAccountsCreatedByImport(id: QifImportId): Set<AccountId> =
         withContext(coroutineContext) {
             entitySourceSelectQueries
@@ -171,5 +156,3 @@ class QifImportReadRepositoryImpl(
             lastAppliedAt = lastAppliedAtMs?.let { Instant.fromEpochMilliseconds(it) },
         )
 }
-
-private const val REFERENCING_CHUNK = 500

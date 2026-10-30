@@ -35,6 +35,7 @@ import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
+import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.tasks.Progress
@@ -54,6 +55,7 @@ private val logger = Logger.withTag("UnimportDialog")
 fun UnimportDialog(
     csvImport: CsvImport,
     csvImportRepository: CsvImportReadRepository,
+    transferSourceRepository: TransferSourceReadRepository,
     accountRepository: AccountReadRepository,
     transactionRepository: TransactionReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
@@ -71,7 +73,7 @@ fun UnimportDialog(
 
     LaunchedEffect(csvImport.id) {
         try {
-            plan = planCsvUnimport(csvImport.id, csvImportRepository)
+            plan = planCsvUnimport(csvImport.id, csvImportRepository, transferSourceRepository)
         } catch (expected: CancellationException) {
             throw expected
         } catch (expected: Exception) {
@@ -175,6 +177,7 @@ fun UnimportDialog(
 fun CsvUnimportAllDialog(
     imports: List<CsvImport>,
     csvImportRepository: CsvImportReadRepository,
+    transferSourceRepository: TransferSourceReadRepository,
     accountRepository: AccountReadRepository,
     transactionRepository: TransactionReadRepository,
     transferRelationshipRepository: TransferRelationshipReadRepository,
@@ -192,7 +195,7 @@ fun CsvUnimportAllDialog(
 
     LaunchedEffect(imports) {
         try {
-            plan = planCsvBulkUnimport(imports.map { it.id }, csvImportRepository)
+            plan = planCsvBulkUnimport(imports.map { it.id }, csvImportRepository, transferSourceRepository)
         } catch (expected: CancellationException) {
             throw expected
         } catch (expected: Exception) {
@@ -253,6 +256,7 @@ fun CsvUnimportAllDialog(
                                 executeCsvBulkUnimport(
                                     plan = currentPlan,
                                     csvImportRepository = csvImportRepository,
+                                    transferSourceRepository = transferSourceRepository,
                                     accountRepository = accountRepository,
                                     transactionRepository = transactionRepository,
                                     transferRelationshipRepository = transferRelationshipRepository,

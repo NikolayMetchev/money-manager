@@ -230,17 +230,6 @@ sealed interface CsvImportMutation {
         val id: CsvImportId,
     ) : CsvImportMutation
 
-    data class UpdateRowTransferId(
-        val id: CsvImportId,
-        val rowIndex: Long,
-        val transferId: TransferId,
-    ) : CsvImportMutation
-
-    data class UpdateRowTransferIds(
-        val id: CsvImportId,
-        val rowTransferMap: Map<Long, TransferId>,
-    ) : CsvImportMutation
-
     data class UpdateRowStatuses(
         val id: CsvImportId,
         val status: String,

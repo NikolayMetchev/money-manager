@@ -3,6 +3,7 @@ package com.moneymanager.database.qif
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.importengineapi.createAccountMapping
@@ -61,24 +62,34 @@ class QifReimportE2ETest : DbTest() {
         payee = payee,
     )
 
-    private suspend fun createImport(): QifImport {
-        val records =
-            listOf(
-                rec(0, "27/03/2021", "-7.32", "CARD PAYMENT TO VANGUARD,7.32 GBP, RATE 1.00/GBP ON 27-03-2021, 7.32"),
-                rec(1, "28/03/2021", "-10.00", "CARD PAYMENT TO VANGUARD,10.00 GBP, RATE 1.00/GBP ON 28-03-2021, 10.00"),
-                rec(
-                    2,
-                    "01/03/2021",
-                    "-1352.23",
-                    "DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 374693512504002, MANDATE NO 0013, 1352.23",
+    private suspend fun createImport(): QifImport =
+        createImport(
+            fileName = "santander.qif",
+            checksum = "santander-reimport-checksum",
+            records =
+                listOf(
+                    rec(0, "27/03/2021", "-7.32", "CARD PAYMENT TO VANGUARD,7.32 GBP, RATE 1.00/GBP ON 27-03-2021, 7.32"),
+                    rec(1, "28/03/2021", "-10.00", "CARD PAYMENT TO VANGUARD,10.00 GBP, RATE 1.00/GBP ON 28-03-2021, 10.00"),
+                    rec(
+                        2,
+                        "01/03/2021",
+                        "-1352.23",
+                        "DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 374693512504002, MANDATE NO 0013, 1352.23",
+                    ),
                 ),
-            )
+        )
+
+    private suspend fun createImport(
+        fileName: String,
+        checksum: String,
+        records: List<QifImportRecord>,
+    ): QifImport {
         val id =
             repositories.qifImportRepository.createImport(
-                fileName = "santander.qif",
+                fileName = fileName,
                 records = records,
                 accountType = "BANK",
-                fileChecksum = "santander-reimport-checksum",
+                fileChecksum = checksum,
                 fileLastModified = now,
             )
         return repositories.qifImportRepository.getImport(id).first()!!
@@ -129,6 +140,46 @@ class QifReimportE2ETest : DbTest() {
             onProgress = { },
         )
     }
+
+    @Test
+    fun reimport_rerunsAnotherFilesDuplicateRecord() =
+        runDbTest {
+            val first = createImport()
+            apply(first)
+            val overlap =
+                createImport(
+                    "santander-later.qif",
+                    "santander-later-checksum",
+                    // Two payees, so the account the file was imported against is the one they share.
+                    listOf(
+                        rec(0, "27/03/2021", "-7.32", "CARD PAYMENT TO VANGUARD,7.32 GBP, RATE 1.00/GBP ON 27-03-2021, 7.32"),
+                        rec(
+                            1,
+                            "01/03/2021",
+                            "-1352.23",
+                            "DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 374693512504002, MANDATE NO 0013, 1352.23",
+                        ),
+                    ),
+                )
+            apply(overlap)
+            val duplicates = repositories.qifImportRepository.getImportRecords(overlap.id, limit = 10, offset = 0)
+            assertEquals(listOf(ImportStatus.DUPLICATE, ImportStatus.DUPLICATE), duplicates.map { it.importStatus })
+
+            val reimports = repositories.reimports(maintenance)
+            val plan = reimports.plan(StagedFile.Qif(repositories.qifImportRepository.getImport(first.id).first()!!))
+            assertEquals(2, plan.rerun.affected.count, "the later file's duplicate records are re-run too")
+
+            reimports.reimport(plan, accountId = sourceAccountId(), currencyId = null)
+
+            val relinked = repositories.qifImportRepository.getImportRecords(overlap.id, limit = 10, offset = 0)
+            assertTrue(
+                relinked.all {
+                    it.importStatus == ImportStatus.DUPLICATE && it.transferId != null
+                },
+                "matched the re-created transfers again: $relinked",
+            )
+            assertEquals(3L, repositories.accountRepository.countTransfersByAccount(sourceAccountId()))
+        }
 
     @Test
     fun reimportWithNoChange_isNoOp() =
