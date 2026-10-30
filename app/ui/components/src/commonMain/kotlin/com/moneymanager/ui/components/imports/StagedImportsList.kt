@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -234,7 +233,6 @@ private fun <F : StagedImport<*>> LazyListScope.directoryTreeItems(
             onToggleExpanded = { expandedSections[node.key] = !expanded },
             actionLabel = "Import all",
             onAction = { onImportAll(node.allImports) },
-            isWarning = false,
             titleStyle = if (depth == 0) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
             indent = TREE_INDENT * depth,
             badge = node.provider?.label(),
