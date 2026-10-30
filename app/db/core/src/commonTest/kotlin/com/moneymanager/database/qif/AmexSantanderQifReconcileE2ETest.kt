@@ -1,15 +1,23 @@
 package com.moneymanager.database.qif
 
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.csvimporter.CsvImportResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.stageQifImport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportOperation
+import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.installBuiltInCsvStrategies
+import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -75,18 +83,21 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
         append("^\n")
     }
 
-    private suspend fun amexStatement(): CsvImport =
+    private suspend fun amexStatement(
+        fileName: String = "amex.qif",
+        referencePrefix: String = "9936181",
+    ): CsvImport =
         stage(
-            "amex.qif",
+            fileName,
             payments.mapIndexed { i, (date, _, amount) ->
-                record(date, amount, "PAYMENT RECEIVED - THANK YOU", memo = "  Process Date $date", checkNumber = "9936181$i")
+                record(date, amount, "PAYMENT RECEIVED - THANK YOU", memo = "  Process Date $date", checkNumber = "$referencePrefix$i")
             } +
                 record(
                     "19/03/2020",
                     "-16.10",
                     "SAINSBURY'S",
                     memo = " GOODS Process Date 19/03/2020",
-                    checkNumber = "10698290",
+                    checkNumber = "${referencePrefix}9",
                 ),
         )
 
@@ -130,7 +141,10 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
         assertEquals(1, result.filesImported, "$accountName: ${result.files}")
     }
 
-    private suspend fun assertEachPaymentCountedOnceFromTheBank() {
+    private suspend fun assertEachPaymentCountedOnceFromTheBank(
+        cardRecords: Int = 1,
+        step: String = "",
+    ) {
         val amexId = accountId(AMEX)
         val names =
             repositories.accountRepository
@@ -150,11 +164,11 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
                     .map { transfer ->
                         names.getValue(transfer.sourceAccountId) to transfer.attributes.any { it.attributeType.name == "excluded" }
                     }
-            assertEquals(2, forPayment.size, "£$amount: both statements' records are kept: $forPayment")
+            assertEquals(1 + cardRecords, forPayment.size, "$step£$amount: every statement's record is kept: $forPayment")
             assertEquals(
                 listOf(SANTANDER),
                 forPayment.filterNot { it.second }.map { it.first },
-                "£$amount: only the bank's record, which names the payer, is counted: $forPayment",
+                "$step£$amount: only the bank's record, which names the payer, is counted: $forPayment",
             )
         }
     }
@@ -177,6 +191,86 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
             apply(amexStatement(), AMEX)
             apply(santanderStatement(), SANTANDER)
             assertEachPaymentCountedOnceFromTheBank()
+        }
+
+    /** Santander's statement, then two statements of the card that each record every payment (the QIF's and a PDF's, say). */
+    private suspend fun importBankAndBothCardStatements(): Pair<CsvImport, CsvImport> {
+        repositories.installBuiltInCsvStrategies()
+        accountId(AMEX)
+        apply(santanderStatement(), SANTANDER)
+        val card = amexStatement()
+        apply(card, AMEX)
+        val secondCard = amexStatement("amex-pdf.qif", referencePrefix = "8836181")
+        apply(secondCard, AMEX)
+        assertEachPaymentCountedOnceFromTheBank(cardRecords = 2, step = "Before the re-import: ")
+        return card to secondCard
+    }
+
+    private suspend fun reimport(file: CsvImport): SourceRerunResult<CsvImportResult?> {
+        val reimports = repositories.reimports(maintenance)
+        return reimports.reimport(
+            reimports.plan(repositories.csvImportRepository.getImport(file.id).first()!!),
+            accountId = accountId(AMEX),
+            currencyId = null,
+        )
+    }
+
+    // The second statement's placeholders reconciled against the first's, which lost to the bank's records. Deleting
+    // the first statement's would leave them counted, as its re-run never looks at them: they are re-run after it.
+    @Test
+    fun reimportingTheFirstCardStatement_reconcilesTheSecondsPlaceholdersAgain() =
+        runDbTest {
+            val (card, _) = importBankAndBothCardStatements()
+            reimport(card)
+            assertEachPaymentCountedOnceFromTheBank(cardRecords = 2, step = "After re-importing the first statement: ")
+        }
+
+    @Test
+    fun reimportingTheSecondCardStatement_reconcilesItsPlaceholdersAgain() =
+        runDbTest {
+            val (_, secondCard) = importBankAndBothCardStatements()
+            reimport(secondCard)
+            assertEachPaymentCountedOnceFromTheBank(cardRecords = 2, step = "After re-importing the second statement: ")
+        }
+
+    @Test
+    fun reimportingTheFirstCardStatement_keepsHandEditsOfTheSecondsPlaceholders() =
+        runDbTest {
+            val (card, secondCard) = importBankAndBothCardStatements()
+            val placeholder =
+                repositories.transferSourceRepository
+                    .getTransfersCreatedBy(Source.Csv(secondCard.id))
+                    .keys
+                    .let { repositories.transactionRepository.getTransactionsByIds(it).values }
+                    .first { it.description.startsWith("PAYMENT RECEIVED") }
+            repositories.importEngine.import(
+                ImportBatch.manualEdits(
+                    transfers =
+                        listOf(
+                            ImportTransfer(
+                                source = Source.Manual,
+                                operation = ImportOperation.UPDATE,
+                                existingId = placeholder.id,
+                                fromAccount = AccountRef.Existing(placeholder.sourceAccountId),
+                                toAccount = AccountRef.Existing(placeholder.targetAccountId),
+                                timestamp = placeholder.timestamp,
+                                description = "Paid from Santander",
+                                amount = placeholder.amount,
+                            ),
+                        ),
+                ),
+            )
+
+            val result = reimport(card)
+
+            assertEquals(listOf("Paid from Santander"), result.reappliedEdits.map { it.description }, "unmatched: ${result.unmatchedEdits}")
+            val recreated =
+                repositories.transferSourceRepository
+                    .getTransfersCreatedBy(Source.Csv(secondCard.id))
+                    .keys
+                    .let { repositories.transactionRepository.getTransactionsByIds(it).values }
+            assertEquals(1, recreated.count { it.description == "Paid from Santander" && it.amount == placeholder.amount })
+            assertEachPaymentCountedOnceFromTheBank(cardRecords = 2, step = "After re-importing the first statement: ")
         }
 
     private companion object {
