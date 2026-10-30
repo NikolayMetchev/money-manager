@@ -13,6 +13,7 @@
 # gazelle:kmp_export //app/model/repository/read
 # gazelle:kmp_export @maven_kmp//:kotlinx_coroutines_core
 # gazelle:kmp_export //app/tasks jvmMain
+# gazelle:kmp_export //utils/parsers/csv
 # gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_jdk jvmMain
 # gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_openssl3_prebuilt nativeMain
 # gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_jdk androidMain
@@ -61,13 +62,13 @@ kmp_library(
         "//app/model/qif",
         "//app/model/repository/read",
         "//app/tasks",
+        "//utils/parsers/csv",
         "@maven_kmp//:kotlinx_coroutines_core",
     ],
     deps = [
         "//app/model/rules",
         "//utils/bigdecimal",
         "//utils/coroutines",
-        "//utils/parsers/csv",
         "//utils/parsers/pdf",
         "//utils/parsers/qif",
         "//utils/parsers/xlsx",
@@ -113,7 +114,6 @@ kmp_test(
         "//app/strategies",
         "//bazel/kmp/deps:kotlin_test",
         "//utils/bigdecimal",
-        "//utils/parsers/qif",
         "//utils/regex",
         "@maven_kmp//:kotlinx_coroutines_test",
         "@maven_kmp//:kotlinx_datetime",

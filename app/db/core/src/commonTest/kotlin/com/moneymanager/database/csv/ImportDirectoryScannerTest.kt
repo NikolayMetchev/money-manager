@@ -1,9 +1,7 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.scanImportDirectory
-import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
@@ -11,7 +9,6 @@ import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createImportDirectory
 import com.moneymanager.importengineapi.deleteCsvImport
-import com.moneymanager.importengineapi.recordDirectoryFileImported
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
@@ -24,7 +21,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -89,7 +85,6 @@ class ImportDirectoryScannerTest : DbTest() {
             apiImportStrategyRepository = repositories.apiImportStrategyRepository,
             accountMappingRepository = repositories.accountMappingRepository,
             csvImportRepository = repositories.csvImportRepository,
-            qifImportRepository = repositories.qifImportRepository,
             apiSessionRepository = repositories.apiSessionRepository,
             settingsRepository = repositories.settingsRepository,
             importDirectoryRepository = repositories.importDirectoryRepository,
@@ -130,7 +125,6 @@ class ImportDirectoryScannerTest : DbTest() {
         fileSource = source,
         importDirectoryRepository = repositories.importDirectoryRepository,
         csvImportRepository = repositories.csvImportRepository,
-        qifImportRepository = repositories.qifImportRepository,
         importEngine = engine,
     )
 
@@ -228,25 +222,6 @@ class ImportDirectoryScannerTest : DbTest() {
                     .first()
                     .size,
             )
-        }
-
-    @Test
-    fun `recordFileImported rejects a file that resolves to both csv and qif`() =
-        runDbTest {
-            val engine = engine()
-            val directory = newDirectory(engine)
-            assertFailsWith<IllegalArgumentException> {
-                engine.recordDirectoryFileImported(
-                    directoryId = directory.id,
-                    fileRef = "both.csv",
-                    fileName = "both.csv",
-                    lastModified = Clock.System.now(),
-                    checksum = "abc",
-                    csvImportId = CsvImportId(Uuid.random()),
-                    qifImportId = QifImportId(Uuid.random()),
-                    importedAt = Clock.System.now(),
-                )
-            }
         }
 
     @Test

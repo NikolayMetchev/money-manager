@@ -64,7 +64,7 @@ sealed interface BulkReimportFileOutcome {
 
 /**
  * Runs [reimportFile] over every file in [imports] and folds the outcomes into one [BulkReimportResult]
- * — the machinery both `bulkReimportCsv` and `bulkReimportQif` need: row-weighted run-wide progress via
+ * — the machinery re-imports need: row-weighted run-wide progress via
  * a [WeightedProgress], a per-file try/catch that logs and counts a failure instead of aborting the run,
  * and a single closing [Maintenance.refreshMaterializedViews] (each file's own re-import is expected to
  * be called with `refreshViews = false`).

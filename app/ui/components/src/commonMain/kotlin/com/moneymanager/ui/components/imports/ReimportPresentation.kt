@@ -100,7 +100,7 @@ fun ReimportPlanSection(
 }
 
 /**
- * The preview every re-import dialog shows (CSV, QIF and API): what the source created and will create
+ * The preview every re-import dialog shows (staged files and API sessions): what the source created and will create
  * again, the other files' rows matched against it, which are re-run too, and the hand edits that will be
  * put back. [recordNoun] names the source's records ("row", "record", "item").
  */

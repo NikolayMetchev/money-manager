@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
  * auto-matched from its column headers (files with no match are skipped). The shared source account
  * chosen here is used only for files whose strategy needs a user-chosen source; strategies that
  * hard-code or per-row-resolve the source ignore it. Payee accounts auto-create with detected names.
- * Mirrors QifImportAllDialog by design (CSV has no currency choice — currency comes from the strategy).
+ * CSV has no currency choice here — currency comes from the strategy.
  */
 @Composable
 fun CsvImportAllDialog(

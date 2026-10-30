@@ -15,12 +15,12 @@ import co.touchlab.kermit.Logger
 import com.moneymanager.apiimporter.ApiBulkReimportResult
 import com.moneymanager.apiimporter.ApiImportReads
 import com.moneymanager.apiimporter.bulkReimportApiSessions
+import com.moneymanager.csvimporter.Reimports
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.qifimporter.Reimports
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
 import com.moneymanager.ui.components.imports.UnmatchedEditsReport

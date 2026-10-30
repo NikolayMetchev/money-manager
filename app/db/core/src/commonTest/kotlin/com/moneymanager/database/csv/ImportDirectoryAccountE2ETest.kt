@@ -109,7 +109,6 @@ class ImportDirectoryAccountE2ETest : DbTest() {
                 fileSource = SingleFileSource(fileName, content),
                 importDirectoryRepository = repositories.importDirectoryRepository,
                 csvImportRepository = repositories.csvImportRepository,
-                qifImportRepository = repositories.qifImportRepository,
                 importEngine = repositories.importEngine,
             )
         assertEquals(1, result.filesDownloaded, "the file should be staged")
@@ -184,19 +183,20 @@ class ImportDirectoryAccountE2ETest : DbTest() {
         }
 
     @Test
-    fun `qifImportDirectories maps each scanned QIF file to its directory`() =
+    fun `a scanned QIF file is staged as a CSV import mapped to its directory`() =
         runDbTest {
             val first = directory("First", accountId = null)
             val second = directory("Second", accountId = null)
             stageInto(first, "first.qif", "!Type:Bank\nD19/11/2023\nT-25.00\nPSome Merchant\n^\n")
             stageInto(second, "second.csv", monzoCsv("tx-second"))
 
-            val qif =
-                repositories.qifImportRepository
-                    .getAllImports()
-                    .first()
-                    .single()
-            assertEquals(mapOf(qif.id to listOf(first.id)), repositories.importDirectoryRepository.qifImportDirectories().first())
+            val imports = repositories.csvImportRepository.getAllImports().first()
+            val qif = imports.single { it.originalFileName == "first.qif" }
+            val csv = imports.single { it.originalFileName == "second.csv" }
+            assertEquals(
+                mapOf(qif.id to listOf(first.id), csv.id to listOf(second.id)),
+                repositories.importDirectoryRepository.csvImportDirectories().first(),
+            )
         }
 
     @Test

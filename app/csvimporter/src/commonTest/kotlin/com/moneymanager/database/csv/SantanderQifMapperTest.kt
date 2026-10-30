@@ -3,16 +3,17 @@ package com.moneymanager.database.csv
 import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.MappingResult
+import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.accountmapping.AccountMapping
+import com.moneymanager.domain.model.csv.CsvColumn
+import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
-import com.moneymanager.qifimporter.QifCsvAdapter
-import com.moneymanager.qifimporter.qifCompatible
-import com.moneymanager.qifimporter.selectForQifContent
+import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.regex.compileRegex
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,6 +21,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 /**
  * Exercises the built-in Santander QIF strategy ([BuiltInCsvStrategies.buildSantanderQifStrategy]) — which
@@ -38,14 +40,14 @@ class SantanderQifMapperTest {
     private fun mapper(): CsvTransferMapper =
         CsvTransferMapper(
             strategy = strategy,
-            columns = QifCsvAdapter.columns,
+            columns = qifColumns,
             existingAccounts = mapOf(santander.name to santander),
             existingCurrencies = mapOf(gbp.id to gbp),
             existingCurrenciesByCode = mapOf(gbp.code to gbp),
             sourceAccountOverride = santander.id,
         )
 
-    /** Builds a QIF-shaped row (columns in [QifCsvAdapter] order) with the given payee and amount. */
+    /** Builds a QIF-shaped row (columns in [QifColumns.headers] order) with the given payee and amount. */
     private fun row(
         payee: String,
         amount: String,
@@ -155,7 +157,7 @@ class SantanderQifMapperTest {
         val mapper =
             CsvTransferMapper(
                 strategy = strategy,
-                columns = QifCsvAdapter.columns,
+                columns = qifColumns,
                 existingAccounts = mapOf(santander.name to santander, mapped.name to mapped),
                 existingCurrencies = mapOf(gbp.id to gbp),
                 existingCurrenciesByCode = mapOf(gbp.code to gbp),
@@ -174,13 +176,13 @@ class SantanderQifMapperTest {
 
     @Test
     fun `content auto-detect picks Santander for santander rows and nothing for another bank`() {
-        val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now).qifCompatible()
+        val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now)
         val santanderRows =
             listOf(row("DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF X, MANDATE NO 1, 5.00", "-5.00"))
         val genericRows = listOf(row("Tesco", "-5.00"))
 
-        assertEquals("Santander (QIF)", strategies.selectForQifContent(santanderRows, QifCsvAdapter.columns)?.name)
-        assertNull(strategies.selectForQifContent(genericRows, QifCsvAdapter.columns))
+        assertEquals("Santander (QIF)", strategies.selectForCsv("statement.qif", qifColumns, santanderRows, wholeDocument = true)?.name)
+        assertNull(strategies.selectForCsv("statement.qif", qifColumns, genericRows, wholeDocument = true))
     }
 
     /** The new (counterparty) account discovered on the target side, regardless of flip. */
@@ -189,3 +191,5 @@ class SantanderQifMapperTest {
         return r.newAccounts.first().name
     }
 }
+
+private val qifColumns = QifColumns.headers.mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }

@@ -21,7 +21,6 @@ import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
@@ -40,7 +39,6 @@ import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
@@ -50,13 +48,11 @@ import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.importfilesource.DriveFolderBrowser
-import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.screens.accountmapping.AccountMappingsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiSessionsScreen
 import com.moneymanager.ui.screens.csv.CsvImportsScreen
 import com.moneymanager.ui.screens.importdirectory.ImportDirectoriesScreen
-import com.moneymanager.ui.screens.qif.QifImportsScreen
 import com.moneymanager.ui.screens.reconciliation.CardLast4Screen
 import com.moneymanager.ui.screens.reconciliation.ReconciliationScreen
 import com.moneymanager.ui.screens.timeline.ImportTimelineScreen
@@ -79,7 +75,6 @@ fun ImportsScreen(
     accountMappingRepository: AccountMappingReadRepository,
     accountMappingExportService: AccountMappingExportService,
     appVersion: AppVersion,
-    qifImportRepository: QifImportReadRepository,
     passThroughAccountRepository: PassThroughAccountReadRepository,
     categoryRepository: CategoryReadRepository,
     apiSessionRepository: ApiSessionReadRepository,
@@ -99,7 +94,6 @@ fun ImportsScreen(
     onCsvImportClick: (CsvImportId) -> Unit,
     onTimelineFileClick: (ImportFileDateRange) -> Unit,
     onCsvStrategiesClick: () -> Unit,
-    onQifImportClick: (QifImportId) -> Unit,
     onAddCredentialClick: () -> Unit,
     onApiStrategiesClick: () -> Unit,
     onSessionClick: (ApiSession) -> Unit,
@@ -128,7 +122,6 @@ fun ImportsScreen(
                     importDirectoryService = importDirectoryService,
                     importDirectoryRepository = importDirectoryRepository,
                     csvImportRepository = csvImportRepository,
-                    qifImportRepository = qifImportRepository,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
@@ -170,23 +163,6 @@ fun ImportsScreen(
                     maintenance = maintenance,
                     importEngine = importEngine,
                     onImportClick = onCsvImportClick,
-                    onStrategiesClick = onCsvStrategiesClick,
-                )
-            }
-
-            ImportTab.QIF -> {
-                QifImportsScreen(
-                    importDirectoryService = importDirectoryService,
-                    qifImportRepository = qifImportRepository,
-                    importTimelineRepository = importTimelineRepository,
-                    importDirectoryRepository = importDirectoryRepository,
-                    csvImportStrategyRepository = csvImportStrategyRepository,
-                    accountRepository = accountRepository,
-                    categoryRepository = categoryRepository,
-                    currencyRepository = currencyRepository,
-                    personRepository = personRepository,
-                    importEngine = importEngine,
-                    onImportClick = onQifImportClick,
                     onStrategiesClick = onCsvStrategiesClick,
                 )
             }
@@ -265,7 +241,7 @@ fun ImportsScreen(
                             reimportFiles = { ids ->
                                 val reimports = importDirectoryService.reimports
                                 val files =
-                                    ids.mapNotNull { id -> csvImportRepository.getImport(id).first()?.let(StagedFile::Csv) }
+                                    ids.mapNotNull { id -> csvImportRepository.getImport(id).first() }
                                 // The files keep the account and currency they were imported with.
                                 reimports
                                     .reimportAll(reimports.planAll(files), accountId = null, currencyId = null, onProgress = {})
@@ -361,7 +337,6 @@ private val ImportTab.label: String
         when (this) {
             ImportTab.DIRECTORIES -> "Directories"
             ImportTab.CSV -> "CSV"
-            ImportTab.QIF -> "QIF"
             ImportTab.API -> "API"
             ImportTab.MISC -> "Misc"
             ImportTab.TIMELINE -> "Timeline"

@@ -548,13 +548,6 @@ sealed interface ImportRowKey {
         val rowIndex: Long,
     ) : ImportRowKey
 
-    data class QifRecord(
-        val recordIndex: Long,
-        // QIF split records expand to several transfers sharing one recordIndex; splitIndex keeps the
-        // row keys unique while recordIndex remains the unit of status write-back.
-        val splitIndex: Int = 0,
-    ) : ImportRowKey
-
     data class ApiJsonPath(
         val requestId: ApiRequestId,
         val jsonPath: String,
@@ -567,7 +560,7 @@ sealed interface ImportRowKey {
 }
 
 /**
- * The unified intermediate import model. CSV/QIF/API importers build this and hand it to the central
+ * The unified intermediate import model. CSV and API importers build this and hand it to the central
  * import engine, which creates accounts/people/ownerships, dedupes, and bulk-writes transfers.
  */
 data class ImportBatch(
@@ -587,7 +580,6 @@ data class ImportBatch(
     val passThroughMutations: List<PassThroughMutation> = emptyList(),
     val accountMappingMutations: List<AccountMappingMutation> = emptyList(),
     val csvImportMutations: List<CsvImportMutation> = emptyList(),
-    val qifImportMutations: List<QifImportMutation> = emptyList(),
     val importDirectoryMutations: List<ImportDirectoryMutation> = emptyList(),
     val apiSessionMutations: List<ApiSessionMutation> = emptyList(),
     val settings: ImportSettings? = null,

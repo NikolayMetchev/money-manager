@@ -1,9 +1,6 @@
 package com.moneymanager.database.repository
-import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountId
 import com.moneymanager.importengineapi.setSetupWizardCompleted
 import com.moneymanager.test.database.DbTest
-import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,21 +8,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlin.time.Clock
 
 class SettingsRepositoryImplTest : DbTest() {
-    private suspend fun createAccount(): AccountId {
-        val name = "Cash Account"
-        repositories.accountRepository.createAccount(
-            Account(id = AccountId(0), name = name, openingDate = Clock.System.now()),
-        )
-        return repositories.accountRepository
-            .getAllAccounts()
-            .first()
-            .first { it.name == name }
-            .id
-    }
-
     @Test
     fun `fresh database returns null default currency`() =
         runDbTest {
@@ -61,22 +45,6 @@ class SettingsRepositoryImplTest : DbTest() {
         }
 
     @Test
-    fun `fresh database returns null last qif account`() =
-        runDbTest {
-            assertNull(repositories.settingsRepository.getLastQifAccountId().first())
-        }
-
-    @Test
-    fun `set and get last qif account`() =
-        runDbTest {
-            val accountId = createAccount()
-
-            repositories.settingsRepository.setLastQifAccountId(accountId)
-
-            assertEquals(accountId, repositories.settingsRepository.getLastQifAccountId().first())
-        }
-
-    @Test
     fun `settings columns are independent - writing one does not clear the other`() =
         runDbTest {
             val eur =
@@ -84,14 +52,13 @@ class SettingsRepositoryImplTest : DbTest() {
                     .getAllCurrencies()
                     .first()
                     .first { it.code == "EUR" }
-            val accountId = createAccount()
 
-            // Set the last QIF account first, then the default currency: the currency upsert must
-            // not wipe the account, and vice versa.
-            repositories.settingsRepository.setLastQifAccountId(accountId)
+            // Complete the wizard first, then set the default currency: the currency upsert must not
+            // clear the flag, and vice versa.
+            repositories.settingsRepository.setSetupWizardCompleted(true)
             repositories.settingsRepository.setDefaultCurrencyId(eur.id)
 
-            assertEquals(accountId, repositories.settingsRepository.getLastQifAccountId().first())
+            assertTrue(repositories.settingsRepository.isSetupWizardCompleted().first())
             assertEquals(eur.id, repositories.settingsRepository.getDefaultCurrencyId().first())
         }
 

@@ -42,7 +42,6 @@ import com.moneymanager.database.json.CsvStrategyExportCodec
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.isPdfStrategy
 import com.moneymanager.domain.model.csvstrategy.isQifStrategy
@@ -52,7 +51,6 @@ import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.domain.strategy.CsvImportParseResult
 import com.moneymanager.domain.strategy.CsvStrategyImportExport
 import com.moneymanager.domain.strategy.StrategyLibrary
@@ -64,7 +62,6 @@ import kotlinx.coroutines.launch
 fun CsvStrategiesScreen(
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     csvImportRepository: CsvImportReadRepository,
-    qifImportRepository: QifImportReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
@@ -76,7 +73,6 @@ fun CsvStrategiesScreen(
     onBrowseCatalog: () -> Unit = {},
     onBack: () -> Unit = {},
     onEditStrategy: (CsvImportStrategyId, CsvImportId) -> Unit = { _, _ -> },
-    onEditQifStrategy: (CsvImportStrategyId, QifImportId) -> Unit = { _, _ -> },
     onAuditHistoryClick: (CsvImportStrategy) -> Unit = {},
 ) {
     val strategies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
@@ -84,7 +80,6 @@ fun CsvStrategiesScreen(
     }
 
     // Edit flow state: pick a sample file to edit the strategy against, then navigate to the editor.
-    // QIF strategies (columns are the fixed QIF fields) need a QIF file as sample data, not a CSV one.
     var strategyToEdit by remember { mutableStateOf<CsvImportStrategy?>(null) }
     var showSelectFileDialog by remember { mutableStateOf(false) }
 
@@ -273,35 +268,27 @@ fun CsvStrategiesScreen(
         }
     }
 
-    // Show the sample-file selector, then navigate to the editor. QIF strategies (whose identification
-    // columns are exactly the fixed QIF fields) pick a QIF file and route to the QIF editor; all other
-    // strategies pick a CSV file.
+    // Show the sample-file selector, then navigate to the editor.
     val editingStrategy = strategyToEdit
     if (showSelectFileDialog && editingStrategy != null) {
         val dismiss = {
             showSelectFileDialog = false
             strategyToEdit = null
         }
-        if (editingStrategy.isQifStrategy()) {
-            SelectQifImportDialog(
-                qifImportRepository = qifImportRepository,
-                onQifSelected = { qifImport ->
-                    dismiss()
-                    onEditQifStrategy(editingStrategy.id, qifImport.id)
+        SelectCsvImportDialog(
+            csvImportRepository = csvImportRepository,
+            kind =
+                when {
+                    editingStrategy.isPdfStrategy() -> SampleFileKind.PDF
+                    editingStrategy.isQifStrategy() -> SampleFileKind.QIF
+                    else -> SampleFileKind.CSV
                 },
-                onDismiss = dismiss,
-            )
-        } else {
-            SelectCsvImportDialog(
-                csvImportRepository = csvImportRepository,
-                pdf = editingStrategy.isPdfStrategy(),
-                onCsvSelected = { csvImport ->
-                    dismiss()
-                    onEditStrategy(editingStrategy.id, csvImport.id)
-                },
-                onDismiss = dismiss,
-            )
-        }
+            onCsvSelected = { csvImport ->
+                dismiss()
+                onEditStrategy(editingStrategy.id, csvImport.id)
+            },
+            onDismiss = dismiss,
+        )
     }
 
     // Show import dialog when a strategy file has been parsed

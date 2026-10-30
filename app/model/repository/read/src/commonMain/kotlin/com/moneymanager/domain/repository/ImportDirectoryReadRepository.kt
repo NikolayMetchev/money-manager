@@ -3,7 +3,6 @@ package com.moneymanager.domain.repository
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryFile
 import kotlinx.coroutines.flow.Flow
@@ -34,18 +33,12 @@ interface ImportDirectoryReadRepository {
      */
     suspend fun csvImportSourceAccounts(): Map<CsvImportId, AccountId>
 
-    /** QIF equivalent of [csvImportSourceAccounts]. */
-    suspend fun qifImportSourceAccounts(): Map<QifImportId, AccountId>
-
     /**
      * The folder each staged CSV import came from, for imports that neither their folder nor its parent
      * gives an account: a bulk import run names their account after that folder. An import staged from
      * more than one such folder is left out.
      */
     suspend fun csvImportFoldersWithoutAccount(): Map<CsvImportId, ImportDirectoryId>
-
-    /** QIF equivalent of [csvImportFoldersWithoutAccount]. */
-    suspend fun qifImportFoldersWithoutAccount(): Map<QifImportId, ImportDirectoryId>
 
     /**
      * The directories every directory-scanned CSV import was staged from. A list because an import can be
@@ -54,7 +47,4 @@ interface ImportDirectoryReadRepository {
      * leaving the import list unchanged, so watching imports alone would miss it.
      */
     fun csvImportDirectories(): Flow<Map<CsvImportId, List<ImportDirectoryId>>>
-
-    /** QIF equivalent of [csvImportDirectories]. */
-    fun qifImportDirectories(): Flow<Map<QifImportId, List<ImportDirectoryId>>>
 }

@@ -2,7 +2,6 @@ package com.moneymanager.domain.repository.write
 
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
@@ -37,7 +36,7 @@ interface ImportDirectoryWriteRepository : ImportDirectoryReadRepository {
 
     /**
      * Records (or advances) the change-detection cursor for a file just imported from a directory.
-     * Exactly one of [csvImportId] / [qifImportId] is set, matching the directory's import type.
+     * [csvImportId] is the import the file staged into, null when it staged nothing.
      */
     suspend fun recordFileImported(
         directoryId: ImportDirectoryId,
@@ -47,7 +46,6 @@ interface ImportDirectoryWriteRepository : ImportDirectoryReadRepository {
         checksum: String?,
         remoteContentHash: String?,
         csvImportId: CsvImportId?,
-        qifImportId: QifImportId?,
         importedAt: Instant,
     )
 }

@@ -34,8 +34,6 @@ class ImportTimelineScreenTest {
         object : ImportTimelineReadRepository {
             override fun getCsvImportDateRanges(): Flow<List<ImportFileDateRange>> = flowOf(emptyList())
 
-            override fun getQifImportDateRanges(): Flow<List<ImportFileDateRange>> = flowOf(emptyList())
-
             override fun getApiSessionDateRanges(): Flow<List<ImportFileDateRange>> = flowOf(emptyList())
 
             override fun getManualDateRange(): Flow<ImportFileDateRange?> = flowOf(null)
@@ -43,8 +41,6 @@ class ImportTimelineScreenTest {
             override fun getAllDateRanges(): Flow<List<ImportFileDateRange>> = flowOf(ranges)
 
             override fun getCsvImportAccountRanges(): Flow<List<ImportFileDateRange>> = flowOf(emptyList())
-
-            override fun getQifImportAccountRanges(): Flow<List<ImportFileDateRange>> = flowOf(emptyList())
 
             override fun getApiSessionAccountRanges(): Flow<List<ImportFileDateRange>> = flowOf(emptyList())
 
@@ -145,7 +141,7 @@ class ImportTimelineScreenTest {
             val ranges =
                 listOf(
                     range(strategyName = "Monzo", kind = TimelineSourceKind.CSV, fileName = "monzo.csv"),
-                    range(strategyName = "Monzo", kind = TimelineSourceKind.QIF, fileName = "monzo.qif"),
+                    range(strategyName = "Monzo", kind = TimelineSourceKind.CSV, fileName = "monzo.qif"),
                     range(strategyName = "Crypto.com Card", kind = TimelineSourceKind.CSV, fileName = "card.csv"),
                     range(strategyName = null, kind = TimelineSourceKind.MANUAL, fileName = "Manual entries"),
                 )

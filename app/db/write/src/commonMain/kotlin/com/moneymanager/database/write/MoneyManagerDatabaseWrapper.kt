@@ -48,7 +48,6 @@ class MoneyManagerDatabaseWrapper(
     val personAttributeWriteQueries get() = writeDb.personAttributeWriteQueries
     val personWriteQueries get() = writeDb.personWriteQueries
     val passThroughAccountWriteQueries get() = writeDb.passThroughAccountWriteQueries
-    val qifImportWriteQueries get() = writeDb.qifImportWriteQueries
     val reconciliationLinkWriteQueries get() = writeDb.reconciliationLinkWriteQueries
     val relationshipTypeWriteQueries get() = writeDb.relationshipTypeWriteQueries
     val settingsWriteQueries get() = writeDb.settingsWriteQueries
@@ -81,7 +80,7 @@ class MoneyManagerDatabaseWrapper(
      * folds together three things:
      *  - the total number of rows across the append-only `*_audit` tables (every entity
      *    create/update/delete appends one),
-     *  - the values of the singleton `settings` row (default currency, last QIF account), which is
+     *  - the values of the singleton `settings` row (its default currency), which is
      *    excluded from the audit trail but is still part of the synced database and must register as a
      *    change — otherwise e.g. setting the default currency would never be detected as unsynced, and
      *  - a rolling hash of the `account_mapping` table, which is user-managed first-class data but is
@@ -136,13 +135,13 @@ class MoneyManagerDatabaseWrapper(
 
     /**
      * Mixes the non-audited `settings` row (id = 1) into [base] with a rolling hash, so a change to any
-     * tracked setting (default currency, last QIF account) yields a different token even though the
+     * tracked setting (the default currency) yields a different token even though the
      * settings table appends no audit rows. A missing row leaves [base] unchanged.
      */
     private suspend fun foldSettingsInto(base: Long): Long =
         rawQuery(
-            "SELECT COALESCE(default_currency_id, 0), COALESCE(last_qif_account_id, 0) FROM settings WHERE id = 1",
-        ) { cursor -> List(2) { cursor.getLong(it)!! } }
+            "SELECT COALESCE(default_currency_id, 0) FROM settings WHERE id = 1",
+        ) { cursor -> listOf(cursor.getLong(0)!!) }
             .awaitAsOneOrNull()
             .mixInto(base)
 
@@ -307,7 +306,6 @@ class MoneyManagerDatabaseWrapper(
             "import_directory_source",
             "import_directory_file",
             "import_directory_file_csv_import",
-            "import_directory_file_qif_import",
             "android_metadata",
             "account_balance_materialized_view",
             "running_balance_materialized_view",
@@ -328,12 +326,7 @@ class MoneyManagerDatabaseWrapper(
             "source_type",
             "entity_source",
             "csv_entity_source",
-            "qif_entity_source",
             "entity_type",
-            "qif_import_metadata",
-            "qif_record",
-            "qif_import_application",
-            "qif_import_error",
             "api_entity_source",
             "platform",
             "os",

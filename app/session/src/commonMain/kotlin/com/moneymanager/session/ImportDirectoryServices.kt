@@ -17,7 +17,6 @@ fun AppServices.importDirectoryService(
     ImportDirectoryService(
         importDirectoryRepository = imports.importDirectoryRepository,
         csvImportRepository = imports.csvImportRepository,
-        qifImportRepository = imports.qifImportRepository,
         csvImportStrategyRepository = imports.csvImportStrategyRepository,
         accountMappingRepository = imports.accountMappingRepository,
         accountRepository = accounts.accountRepository,
@@ -26,7 +25,6 @@ fun AppServices.importDirectoryService(
         cryptoRepository = accounts.cryptoRepository,
         tradeRepository = transactions.tradeRepository,
         passThroughAccountRepository = imports.passThroughAccountRepository,
-        settingsRepository = settings.settingsRepository,
         transactionRepository = transactions.transactionRepository,
         transferRelationshipRepository = transactions.transferRelationshipRepository,
         transferSourceRepository = transactions.transferSourceRepository,

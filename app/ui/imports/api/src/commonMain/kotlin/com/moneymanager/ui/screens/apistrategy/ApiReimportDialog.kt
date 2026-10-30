@@ -24,6 +24,7 @@ import com.moneymanager.apiimporter.ApiImportReads
 import com.moneymanager.apiimporter.ApiRerunCounts
 import com.moneymanager.apiimporter.executeApiReimport
 import com.moneymanager.apiimporter.planApiReimport
+import com.moneymanager.csvimporter.Reimports
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
@@ -31,7 +32,6 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.SourceRerunPlan
 import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.qifimporter.Reimports
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.components.imports.SourceRerunPreview
@@ -45,7 +45,7 @@ private val logger = Logger.withTag("ApiReimportDialog")
  * Re-imports an already-imported API session so a strategy config change (e.g. an internal-transfer
  * reconcile bridge added after the fact) applies retroactively: deletes what the session created, then
  * re-parses its stored responses under the current strategy, re-running the other files' records
- * matched against it and putting hand edits back, as CSV and QIF re-import do.
+ * matched against it and putting hand edits back, as a staged file's re-import does.
  */
 @Suppress("LongParameterList")
 @Composable

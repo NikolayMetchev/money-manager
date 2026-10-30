@@ -1,5 +1,5 @@
 -- An import directory: a local folder or Google Drive folder to download importable files from.
--- On a manual "Scan now" the app lists the folder and DOWNLOADS new/changed files into the CSV/QIF
+-- On a manual "Scan now" the app lists the folder and DOWNLOADS new/changed files into the CSV
 -- staging tables (so they appear in the Imports section); the existing "Import All" then applies the
 -- matching strategy. See import_directory_file for the per-file change-detection cursor.
 -- provider_type_id: FK to import_directory_provider ('LOCAL' | 'GDRIVE'). Supported files (.csv/.qif)
@@ -67,8 +67,8 @@ CREATE INDEX IF NOT EXISTS idx_import_directory_source_revision ON import_direct
 
 -- Per-(directory, file) change-detection cursor. last_modified is compared against the file's
 -- current last-modified on each scan; a newer timestamp (sha256-confirmed) triggers a re-import,
--- producing a fresh csv_import_metadata / qif_import_metadata staging row. The csv/qif import a file
--- staged into lives in the import_directory_file_csv_import / _qif_import child tables (at most one).
+-- producing a fresh csv_import_metadata staging row (a QIF file is staged as a CSV import too). The import a
+-- file staged into lives in the import_directory_file_csv_import child table.
 CREATE TABLE import_directory_file (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     directory_id TEXT NOT NULL,
@@ -86,7 +86,7 @@ CREATE TABLE import_directory_file (
 
 CREATE INDEX IF NOT EXISTS idx_import_directory_file_directory ON import_directory_file(directory_id);
 
--- The CSV import a tracked file staged into (1:1; row present only for .csv files). Mirrors
+-- The CSV import a tracked file staged into (1:1; row present once the file is staged). Mirrors
 -- csv_entity_source: PK = the parent import_directory_file.id.
 CREATE TABLE import_directory_file_csv_import (
     file_id INTEGER PRIMARY KEY,
@@ -94,28 +94,3 @@ CREATE TABLE import_directory_file_csv_import (
     FOREIGN KEY (file_id) REFERENCES import_directory_file(id) ON DELETE CASCADE,
     FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id)
 );
-
--- The QIF import a tracked file staged into (1:1; row present only for .qif files).
-CREATE TABLE import_directory_file_qif_import (
-    file_id INTEGER PRIMARY KEY,
-    qif_import_id TEXT NOT NULL,
-    FOREIGN KEY (file_id) REFERENCES import_directory_file(id) ON DELETE CASCADE,
-    FOREIGN KEY (qif_import_id) REFERENCES qif_import_metadata(id)
-);
-
--- A file stages into at most one import type: forbid a file_id present in both child tables.
-CREATE TRIGGER trigger_import_directory_file_csv_import_single
-BEFORE INSERT ON import_directory_file_csv_import
-FOR EACH ROW
-WHEN EXISTS (SELECT 1 FROM import_directory_file_qif_import WHERE file_id = new.file_id)
-BEGIN
-    SELECT RAISE(ABORT, 'import_directory_file already has a QIF import');
-END;
-
-CREATE TRIGGER trigger_import_directory_file_qif_import_single
-BEFORE INSERT ON import_directory_file_qif_import
-FOR EACH ROW
-WHEN EXISTS (SELECT 1 FROM import_directory_file_csv_import WHERE file_id = new.file_id)
-BEGIN
-    SELECT RAISE(ABORT, 'import_directory_file already has a CSV import');
-END;

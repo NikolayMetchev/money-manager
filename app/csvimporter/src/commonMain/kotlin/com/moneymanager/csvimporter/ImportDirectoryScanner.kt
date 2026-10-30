@@ -3,19 +3,15 @@ package com.moneymanager.csvimporter
 import co.touchlab.kermit.Logger
 import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.domain.model.CsvImportId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
-import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createCsvImport
-import com.moneymanager.importengineapi.createQifImport
 import com.moneymanager.importengineapi.createXlsxImport
 import com.moneymanager.importengineapi.recordDirectoryFileImported
 import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
-import com.moneymanager.qif.QifParser
 import com.moneymanager.xlsx.createXlsxParser
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -45,7 +41,7 @@ internal fun isSupportedImportFile(fileName: String): Boolean = supportedKind(fi
 
 /**
  * Scans one configured [directory]: lists its files and DOWNLOADS new/changed **supported** files
- * (.csv → CSV staging, .qif → QIF staging, .xlsx → CSV staging of its first worksheet, .pdf → CSV staging
+ * (.csv → CSV staging, .qif → CSV staging of its records, .xlsx → CSV staging of its first worksheet, .pdf → CSV staging
  * of its text lines) into the Imports section. Unsupported files are skipped without downloading. Excel
  * (Apache POI) and PDF (pdfium) parsing are JVM-only; elsewhere such a file is recorded as a per-file scan
  * failure rather than crashing the scan. It does NOT apply a strategy — the user runs the existing "Import All".
@@ -63,14 +59,13 @@ suspend fun scanImportDirectory(
     fileSource: ImportFileSource,
     importDirectoryRepository: ImportDirectoryReadRepository,
     csvImportRepository: CsvImportReadRepository,
-    qifImportRepository: QifImportReadRepository,
     importEngine: ImportEngine,
     dbLock: Mutex = Mutex(),
     onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
 ): ScanResult {
     val entries = fileSource.list()
     val context =
-        ScanContext(directory, fileSource, importDirectoryRepository, csvImportRepository, qifImportRepository, importEngine, dbLock)
+        ScanContext(directory, fileSource, importDirectoryRepository, csvImportRepository, importEngine, dbLock)
     val progressLock = Mutex()
     var done = 0
     onProgress(0, entries.size)
@@ -112,7 +107,6 @@ private class ScanContext(
     val fileSource: ImportFileSource,
     val importDirectoryRepository: ImportDirectoryReadRepository,
     val csvImportRepository: CsvImportReadRepository,
-    val qifImportRepository: QifImportReadRepository,
     val importEngine: ImportEngine,
     val dbLock: Mutex,
 )
@@ -141,7 +135,6 @@ private suspend fun ScanContext.scanFile(entry: ImportFileEntry): FileOutcome {
                         checksum = tracked.checksum,
                         remoteContentHash = remoteContentHash,
                         csvImportId = tracked.csvImportId,
-                        qifImportId = tracked.qifImportId,
                         importedAt = Clock.System.now(),
                     )
                     return FileOutcome.Unchanged
@@ -168,14 +161,12 @@ private suspend fun ScanContext.scanFile(entry: ImportFileEntry): FileOutcome {
                     checksum = checksum,
                     remoteContentHash = remoteContentHash,
                     csvImportId = tracked.csvImportId,
-                    qifImportId = tracked.qifImportId,
                     importedAt = Clock.System.now(),
                 )
                 return FileOutcome.Unchanged
             }
 
             var csvImportId: CsvImportId? = null
-            var qifImportId: QifImportId? = null
             when (kind) {
                 SupportedKind.CSV -> {
                     csvImportId =
@@ -184,9 +175,9 @@ private suspend fun ScanContext.scanFile(entry: ImportFileEntry): FileOutcome {
                 }
 
                 SupportedKind.QIF -> {
-                    qifImportId =
-                        qifImportRepository.findImportsByChecksum(checksum).firstOrNull()?.id
-                            ?: stageQif(importEngine, entry, checkNotNull(content), checksum, lastModified)
+                    csvImportId =
+                        csvImportRepository.findImportsByChecksum(checksum).firstOrNull()?.id
+                            ?: importEngine.stageQifImport(entry.name, checkNotNull(content), checksum, lastModified)
                 }
 
                 SupportedKind.XLSX -> {
@@ -210,7 +201,6 @@ private suspend fun ScanContext.scanFile(entry: ImportFileEntry): FileOutcome {
                 checksum = checksum,
                 remoteContentHash = remoteContentHash,
                 csvImportId = csvImportId,
-                qifImportId = qifImportId,
                 importedAt = Clock.System.now(),
             )
         }
@@ -264,23 +254,6 @@ private suspend fun stageXlsx(
         fileLastModified = lastModified,
         xlsxBytes = bytes,
         xlsxWorksheetName = sheetName,
-    )
-}
-
-private suspend fun stageQif(
-    importEngine: ImportEngine,
-    entry: ImportFileEntry,
-    content: String,
-    checksum: String,
-    lastModified: Instant,
-): QifImportId {
-    val parsed = QifParser().parse(content)
-    return importEngine.createQifImport(
-        fileName = entry.name,
-        records = parsed.toStagingRecords(),
-        accountType = parsed.dominantAccountTypeOrUnknown(),
-        fileChecksum = checksum,
-        fileLastModified = lastModified,
     )
 }
 

@@ -3,7 +3,7 @@ package com.moneymanager.domain.model
 import kotlin.time.Instant
 
 /**
- * A file staged for import (a CSV or a QIF file): what the imports screens group into tabs, folders and
+ * A file staged for import (a CSV, QIF, Excel or PDF file): what the imports screens group into tabs, folders and
  * strategies, the same way for every format.
  */
 interface StagedImport<Id : Any> {

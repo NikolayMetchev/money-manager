@@ -9,7 +9,6 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.importengineapi.createAccount
-import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.reimports
@@ -24,7 +23,7 @@ import kotlin.time.Duration
  * Monzo CSV has no SOURCE_ACCOUNT mapping, so a fresh import needs a user-chosen source account. Once
  * a file has imported successfully, though, its source account is a recoverable fact — the account
  * appearing on every one of its created transfers — so re-import must derive it automatically rather
- * than asking again ([Reimports.importedSettings][com.moneymanager.qifimporter.Reimports.importedSettings]).
+ * than asking again ([Reimports.importedSettings][com.moneymanager.csvimporter.Reimports.importedSettings]).
  */
 class CsvReimportHistoricalSourceAccountE2ETest : DbTest() {
     override val installBuiltInStrategies: Boolean = true
@@ -147,7 +146,7 @@ class CsvReimportHistoricalSourceAccountE2ETest : DbTest() {
             // Re-import with NO source account override at all — this is the bug: it must not need one.
             val reimportResult =
                 reimports.reimportAll(
-                    reimports.planAll(listOf(StagedFile.Csv(imported))),
+                    reimports.planAll(listOf(imported)),
                     accountId = null,
                     currencyId = null,
                     onProgress = { },

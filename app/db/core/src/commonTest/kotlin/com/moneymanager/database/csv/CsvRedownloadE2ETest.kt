@@ -94,7 +94,6 @@ class CsvRedownloadE2ETest : DbTest() {
             fileSource = source,
             importDirectoryRepository = repositories.importDirectoryRepository,
             csvImportRepository = repositories.csvImportRepository,
-            qifImportRepository = repositories.qifImportRepository,
             importEngine = repositories.importEngine,
         )
 

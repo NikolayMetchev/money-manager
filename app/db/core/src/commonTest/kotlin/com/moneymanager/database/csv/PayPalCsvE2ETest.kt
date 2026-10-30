@@ -16,7 +16,6 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.importengineapi.createAccount
-import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.reimports
@@ -620,7 +619,7 @@ class PayPalCsvE2ETest : DbTest() {
                 .first { it.name == "Crypto.com Card" }
         val strategy = installed.copy(config = changeConfig(installed.config))
         val reimports = repositories.reimports(maintenance)
-        val plan = reimports.plan(StagedFile.Csv(current)).copy(strategy = strategy)
+        val plan = reimports.plan(current).copy(strategy = strategy)
         assertTrue(plan.rerun.createdTransfers.isNotEmpty(), "the re-import deletes the card chains it re-creates")
         reimports.reimport(plan, accountId = null, currencyId = null)
     }

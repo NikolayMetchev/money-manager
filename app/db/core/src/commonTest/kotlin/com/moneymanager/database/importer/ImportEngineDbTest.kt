@@ -79,7 +79,6 @@ class ImportEngineDbTest : DbTest() {
             apiImportStrategyRepository = repositories.apiImportStrategyRepository,
             accountMappingRepository = repositories.accountMappingRepository,
             csvImportRepository = repositories.csvImportRepository,
-            qifImportRepository = repositories.qifImportRepository,
             apiSessionRepository = repositories.apiSessionRepository,
             settingsRepository = repositories.settingsRepository,
             importDirectoryRepository = repositories.importDirectoryRepository,

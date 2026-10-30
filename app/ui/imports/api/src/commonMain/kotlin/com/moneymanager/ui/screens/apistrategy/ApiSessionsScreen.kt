@@ -80,6 +80,7 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.StoredApiCredential
 import com.moneymanager.credentialvault.VaultState
+import com.moneymanager.csvimporter.Reimports
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiCredential
 import com.moneymanager.domain.model.ApiCredentialId
@@ -104,7 +105,6 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.qifimporter.Reimports
 import com.moneymanager.tasks.Progress
 import com.moneymanager.tasks.TaskState
 import com.moneymanager.tasks.formatElapsedTime

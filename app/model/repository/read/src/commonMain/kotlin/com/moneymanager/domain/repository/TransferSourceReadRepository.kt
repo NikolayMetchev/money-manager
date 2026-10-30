@@ -32,20 +32,20 @@ interface TransferSourceReadRepository {
 
     /**
      * The still-existing transfers [importSource] created (not merely updated), each with the record it
-     * came from: [Source.Csv] with its row, [Source.Qif] with its record, [Source.Api] with its request
+     * came from: [Source.Csv] with its row, [Source.Api] with its request
      * and JSON path. [importSource] names a whole import or session; any other source created none.
      */
     suspend fun getTransfersCreatedBy(importSource: Source): Map<TransferId, Source>
 
     /**
-     * The CSV rows ([Source.Csv]) and QIF records ([Source.Qif]) currently linked to any of [transferIds] or
+     * The staged rows currently linked to any of [transferIds] or
      * [tradeIds] without having created it: those that matched it as a duplicate or updated it. Read from
      * their provenance, so no import's staged rows are read.
      */
     suspend fun getImportRecordsMatchedTo(
         transferIds: Set<TransferId>,
         tradeIds: Set<TradeId>,
-    ): List<Source>
+    ): List<Source.Csv>
 
     /** Those of [ids] a person has edited by hand since they were created. */
     suspend fun getHandEditedTransferIds(ids: Collection<TransferId>): Set<TransferId>

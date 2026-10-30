@@ -39,37 +39,6 @@ LEFT JOIN csv_import_application latest_application
         LIMIT 1
     );
 
-selectQifImportDateRanges:
-SELECT
-    qif_import_metadata.id AS import_id,
-    qif_import_metadata.original_file_name AS file_name,
-    qif_import_metadata.ignored,
-    latest_application.strategy_id AS strategy_id,
-    latest_application.strategy_name AS strategy_name,
-    ranges.earliest_ms,
-    ranges.latest_ms,
-    ranges.transaction_count
-FROM (
-    SELECT
-        qif_entity_source.qif_import_id AS import_id,
-        MIN(transfer.timestamp) AS earliest_ms,
-        MAX(transfer.timestamp) AS latest_ms,
-        COUNT(DISTINCT transfer.id) AS transaction_count
-    FROM qif_entity_source
-    JOIN entity_source ON entity_source.id = qif_entity_source.id AND entity_source.entity_type_id = 7 AND entity_source.matched = 0
-    JOIN transfer ON transfer.id = entity_source.entity_id
-    GROUP BY qif_entity_source.qif_import_id
-) ranges
-JOIN qif_import_metadata ON qif_import_metadata.id = ranges.import_id
-LEFT JOIN qif_import_application latest_application
-    ON latest_application.id = (
-        SELECT application.id
-        FROM qif_import_application application
-        WHERE application.qif_import_id = qif_import_metadata.id
-        ORDER BY application.applied_at DESC, application.id DESC
-        LIMIT 1
-    );
-
 -- One row per API session that produced transactions. strategy_name is NULL for legacy
 -- credential-less / strategy-less sessions — callers fall back to a generic label.
 selectApiSessionDateRanges:
@@ -143,42 +112,6 @@ FROM (
     FROM csv_import_metadata
     JOIN csv_entity_source ON csv_entity_source.csv_import_id = csv_import_metadata.id
     JOIN entity_source ON entity_source.id = csv_entity_source.id AND entity_source.entity_type_id = 7 AND entity_source.matched = 0
-    JOIN transfer ON transfer.id = entity_source.entity_id
-)
-GROUP BY import_id, account_id;
-
-selectQifImportAccountRanges:
-SELECT
-    import_id,
-    file_name,
-    ignored,
-    account_id,
-    MIN(timestamp) AS earliest_ms,
-    MAX(timestamp) AS latest_ms,
-    COUNT(DISTINCT transfer_id) AS transaction_count
-FROM (
-    SELECT
-        qif_import_metadata.id AS import_id,
-        qif_import_metadata.original_file_name AS file_name,
-        qif_import_metadata.ignored AS ignored,
-        transfer.id AS transfer_id,
-        transfer.source_account_id AS account_id,
-        transfer.timestamp AS timestamp
-    FROM qif_import_metadata
-    JOIN qif_entity_source ON qif_entity_source.qif_import_id = qif_import_metadata.id
-    JOIN entity_source ON entity_source.id = qif_entity_source.id AND entity_source.entity_type_id = 7 AND entity_source.matched = 0
-    JOIN transfer ON transfer.id = entity_source.entity_id
-    UNION ALL
-    SELECT
-        qif_import_metadata.id,
-        qif_import_metadata.original_file_name,
-        qif_import_metadata.ignored,
-        transfer.id,
-        transfer.target_account_id,
-        transfer.timestamp
-    FROM qif_import_metadata
-    JOIN qif_entity_source ON qif_entity_source.qif_import_id = qif_import_metadata.id
-    JOIN entity_source ON entity_source.id = qif_entity_source.id AND entity_source.entity_type_id = 7 AND entity_source.matched = 0
     JOIN transfer ON transfer.id = entity_source.entity_id
 )
 GROUP BY import_id, account_id;

@@ -124,7 +124,7 @@ class TimelineModelTest {
             buildTimelineMatrix(
                 listOf(
                     range("2024-01-01", "2024-01-31", kind = TimelineSourceKind.CSV, strategyName = "Monzo"),
-                    range("2024-02-01", "2024-02-28", kind = TimelineSourceKind.QIF, strategyName = "Monzo"),
+                    range("2024-02-01", "2024-02-28", fileName = "monzo.qif", strategyName = "Monzo"),
                     range("2024-01-01", "2024-03-31", kind = TimelineSourceKind.CSV, strategyName = "Barclays"),
                 ),
                 timeZone,

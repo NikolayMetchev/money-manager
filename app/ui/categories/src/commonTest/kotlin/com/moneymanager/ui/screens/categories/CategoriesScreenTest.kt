@@ -57,7 +57,6 @@ class CategoriesScreenTest {
             apiImportStrategyRepository = mock(MockMode.autoUnit),
             accountMappingRepository = mock(MockMode.autoUnit),
             csvImportRepository = mock(MockMode.autoUnit),
-            qifImportRepository = mock(MockMode.autoUnit),
             apiSessionRepository = mock(MockMode.autoUnit),
             settingsRepository = mock(MockMode.autoUnit),
             importDirectoryRepository = mock(MockMode.autoUnit),

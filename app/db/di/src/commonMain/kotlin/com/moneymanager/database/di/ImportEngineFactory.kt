@@ -29,7 +29,6 @@ fun DatabaseComponent.createImportEngine(editGate: EditGate): ImportEngine =
         apiImportStrategyRepository = apiImportStrategyRepository,
         accountMappingRepository = accountMappingRepository,
         csvImportRepository = csvImportRepository,
-        qifImportRepository = qifImportRepository,
         apiSessionRepository = apiSessionRepository,
         settingsRepository = settingsRepository,
         importDirectoryRepository = importDirectoryRepository,

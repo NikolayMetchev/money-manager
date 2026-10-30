@@ -1,9 +1,5 @@
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
-# gazelle:kmp_plugins serialization
-# gazelle:kmp_export //app/model/core
-# gazelle:kmp_export //app/model/csv
-# gazelle:kmp_export @maven_kmp//:kotlinx_serialization_core jvmMain
 
 load("//bazel/kmp:defs.bzl", "kmp_library")
 
@@ -17,15 +13,9 @@ kmp_library(
         "macosArm64",
         "mingwX64",
     ],
-    plugins = ["serialization"],
     visibility = ["//visibility:public"],
     web_targets = [
         "wasmJs",
         "js",
-    ],
-    exports = [
-        "//app/model/core",
-        "//app/model/csv",
-        "@maven_kmp//:kotlinx_serialization_core",
     ],
 )

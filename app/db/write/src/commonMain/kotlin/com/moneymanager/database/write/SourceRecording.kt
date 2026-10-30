@@ -3,6 +3,7 @@ package com.moneymanager.database.write
 import app.cash.sqldelight.async.coroutines.awaitAsList
 import app.cash.sqldelight.async.coroutines.awaitAsOne
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Source
@@ -38,7 +39,7 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
         // import) is preserved even when no single originating row/record is known — e.g. an account or
         // category derived from the import as a whole (the row/record index stays null). Guard on the
         // persisted source type (mirroring the API branch): INSERT OR IGNORE above keeps any pre-existing
-        // row for this (entity, revision), so only attach CSV/QIF detail when that row is actually CSV/QIF.
+        // row for this (entity, revision), so only attach CSV detail when that row is actually CSV.
         is Source.Csv -> {
             val entitySource = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).awaitAsOne()
             if (entitySource.source_type_id == SourceType.CSV_IMPORT.id.toLong()) {
@@ -46,17 +47,6 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
                     id = entitySource.id,
                     csv_import_id = source.importId.id.toString(),
                     csv_row_index = source.rowIndex,
-                )
-            }
-        }
-
-        is Source.Qif -> {
-            val entitySource = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).awaitAsOne()
-            if (entitySource.source_type_id == SourceType.QIF_IMPORT.id.toLong()) {
-                entitySourceWriteQueries.insertQifSource(
-                    id = entitySource.id,
-                    qif_import_id = source.importId.id.toString(),
-                    qif_record_index = source.recordIndex,
                 )
             }
         }
@@ -97,7 +87,7 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
 }
 
 /**
- * Records that an import record ([source]: a CSV row or QIF record) links to [transactionId], a transfer or
+ * Records that a staged row ([source]) links to [transactionId], a transfer or
  * trade another record wrote (it matched it as a duplicate, or updated it), as a matched `entity_source` of
  * its current revision. Matched entries mirror the records' current links: a duplicate row changes nothing,
  * so without one its link would live only in its import's staging table, and re-importing the
@@ -106,52 +96,31 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
  */
 suspend fun MoneyManagerDatabaseWrapper.recordMatchedSource(
     deviceId: DeviceId,
-    source: Source,
+    source: Source.Csv,
     transactionId: Long,
 ) {
     if (entitySourceWriteQueries.insertMatchedSource(source.toSourceType().id.toLong(), deviceId.id, transactionId) == 0L) {
         return
     }
     val id = entitySourceWriteQueries.lastInsertedSourceId().awaitAsOne()
-    when (source) {
-        is Source.Csv -> entitySourceWriteQueries.insertCsvSource(id, source.importId.id.toString(), source.rowIndex)
-        is Source.Qif -> entitySourceWriteQueries.insertQifSource(id, source.importId.id.toString(), source.recordIndex)
-        else -> error("Only an import record can match a transaction: $source")
-    }
+    entitySourceWriteQueries.insertCsvSource(id, source.importId.id.toString(), source.rowIndex)
 }
 
 /**
- * Removes the matched entries of [records] of [import] (a whole CSV or QIF import), or of all its records
- * when null: their links are about to be replaced or cleared. Called inside the caller's transaction.
+ * Removes the matched entries of [rows] of [import], or of all its rows when null: their links are about to be
+ * replaced or cleared. Called inside the caller's transaction.
  */
 suspend fun MoneyManagerDatabaseWrapper.forgetMatchedSources(
-    import: Source,
-    records: Collection<Long>?,
+    import: CsvImportId,
+    rows: Collection<Long>?,
 ) {
     val selects = entitySourceSelectQueries
+    val importId = import.id.toString()
     val ids =
-        when (import) {
-            is Source.Csv -> {
-                val importId = import.importId.id.toString()
-                records?.chunked(SOURCE_CHUNK)?.flatMap { selects.selectMatchedCsvSourceIds(importId, it).awaitAsList() }
-                    ?: selects.selectAllMatchedCsvSourceIds(importId).awaitAsList()
-            }
-
-            is Source.Qif -> {
-                val importId = import.importId.id.toString()
-                records?.chunked(SOURCE_CHUNK)?.flatMap { selects.selectMatchedQifSourceIds(importId, it).awaitAsList() }
-                    ?: selects.selectAllMatchedQifSourceIds(importId).awaitAsList()
-            }
-
-            else -> {
-                error("Only an import's records have matched sources: $import")
-            }
-        }
+        rows?.chunked(SOURCE_CHUNK)?.flatMap { selects.selectMatchedCsvSourceIds(importId, it).awaitAsList() }
+            ?: selects.selectAllMatchedCsvSourceIds(importId).awaitAsList()
     ids.chunked(SOURCE_CHUNK).forEach { chunk ->
-        when (import) {
-            is Source.Csv -> entitySourceWriteQueries.deleteCsvEntitySources(chunk)
-            else -> entitySourceWriteQueries.deleteQifEntitySources(chunk)
-        }
+        entitySourceWriteQueries.deleteCsvEntitySources(chunk)
         entitySourceWriteQueries.deleteMatchedEntitySources(chunk)
     }
 }

@@ -15,7 +15,7 @@ import com.moneymanager.tasks.Progress
 /**
  * One determinate bar for a whole bulk import run: the run's detail (file counter, current file and
  * phase) and row counter over a `LinearProgressIndicator` driven by the row-weighted fraction, so the bar
- * advances within large files instead of jumping once per file. Shared by the CSV and QIF
+ * advances within large files instead of jumping once per file. Shared by the staged-file
  * "Import all"/"Re-import all" dialogs.
  */
 @Composable

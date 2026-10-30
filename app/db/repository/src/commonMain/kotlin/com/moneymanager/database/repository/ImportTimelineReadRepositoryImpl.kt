@@ -30,29 +30,7 @@ class ImportTimelineReadRepositoryImpl(
             .mapToList(coroutineContext)
             .map { rows ->
                 rows.map { row ->
-                    fileRange(
-                        kind = TimelineSourceKind.CSV,
-                        fileId = row.import_id,
-                        fileName = row.file_name,
-                        ignored = row.ignored,
-                        strategyName = row.strategy_name,
-                        earliestMs = row.earliest_ms,
-                        latestMs = row.latest_ms,
-                        transactionCount = row.transaction_count,
-                    )
-                }
-            }
-
-    override fun getQifImportDateRanges(): Flow<List<ImportFileDateRange>> =
-        queries
-            .selectQifImportDateRanges()
-            .asFlow()
-            .throttleLatest(LISTING_REFRESH_PERIOD)
-            .mapToList(coroutineContext)
-            .map { rows ->
-                rows.map { row ->
-                    fileRange(
-                        kind = TimelineSourceKind.QIF,
+                    csvFileRange(
                         fileId = row.import_id,
                         fileName = row.file_name,
                         ignored = row.ignored,
@@ -107,11 +85,10 @@ class ImportTimelineReadRepositoryImpl(
     override fun getAllDateRanges(): Flow<List<ImportFileDateRange>> =
         combine(
             getCsvImportDateRanges(),
-            getQifImportDateRanges(),
             getApiSessionDateRanges(),
             getManualDateRange(),
-        ) { csv, qif, api, manual ->
-            csv + qif + api + listOfNotNull(manual)
+        ) { csv, api, manual ->
+            csv + api + listOfNotNull(manual)
         }
 
     override fun getCsvImportAccountRanges(): Flow<List<ImportFileDateRange>> =
@@ -122,30 +99,7 @@ class ImportTimelineReadRepositoryImpl(
             .mapToList(coroutineContext)
             .map { rows ->
                 rows.map { row ->
-                    fileRange(
-                        kind = TimelineSourceKind.CSV,
-                        fileId = row.import_id,
-                        fileName = row.file_name,
-                        ignored = row.ignored,
-                        strategyName = null,
-                        earliestMs = row.earliest_ms,
-                        latestMs = row.latest_ms,
-                        transactionCount = row.transaction_count,
-                        accountId = AccountId(row.account_id),
-                    )
-                }
-            }
-
-    override fun getQifImportAccountRanges(): Flow<List<ImportFileDateRange>> =
-        queries
-            .selectQifImportAccountRanges()
-            .asFlow()
-            .throttleLatest(LISTING_REFRESH_PERIOD)
-            .mapToList(coroutineContext)
-            .map { rows ->
-                rows.map { row ->
-                    fileRange(
-                        kind = TimelineSourceKind.QIF,
+                    csvFileRange(
                         fileId = row.import_id,
                         fileName = row.file_name,
                         ignored = row.ignored,
@@ -203,16 +157,14 @@ class ImportTimelineReadRepositoryImpl(
     override fun getAllAccountRanges(): Flow<List<ImportFileDateRange>> =
         combine(
             getCsvImportAccountRanges(),
-            getQifImportAccountRanges(),
             getApiSessionAccountRanges(),
             getManualAccountRanges(),
-        ) { csv, qif, api, manual ->
-            csv + qif + api + manual
+        ) { csv, api, manual ->
+            csv + api + manual
         }
 
     @Suppress("LongParameterList")
-    private fun fileRange(
-        kind: TimelineSourceKind,
+    private fun csvFileRange(
         fileId: String,
         fileName: String,
         ignored: Long,
@@ -223,7 +175,7 @@ class ImportTimelineReadRepositoryImpl(
         accountId: AccountId? = null,
     ): ImportFileDateRange =
         ImportFileDateRange(
-            kind = kind,
+            kind = TimelineSourceKind.CSV,
             fileId = fileId,
             fileName = fileName,
             strategyName = strategyName,

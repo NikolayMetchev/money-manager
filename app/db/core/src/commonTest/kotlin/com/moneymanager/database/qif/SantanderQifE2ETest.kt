@@ -1,14 +1,14 @@
 package com.moneymanager.database.qif
 
+import com.moneymanager.csvimporter.bulkApplyCsv
+import com.moneymanager.csvimporter.stageQifImport
 import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.qif.QifImport
-import com.moneymanager.domain.model.qif.QifImportRecord
-import com.moneymanager.qifimporter.bulkApplyQif
+import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
@@ -45,55 +45,42 @@ class SantanderQifE2ETest : DbTest() {
             override suspend fun fullRefreshMaterializedViews(): Duration = Duration.ZERO
         }
 
-    private suspend fun createImport(): QifImport {
+    private suspend fun createImport(): CsvImport {
         // Two VANGUARD rows prove merchant consolidation; three person payees prove Person creation.
         val records =
             listOf(
-                rec(0, "27/03/2021", "-7.32", "CARD PAYMENT TO VANGUARD,7.32 GBP, RATE 1.00/GBP ON 27-03-2021, 7.32"),
-                rec(1, "28/03/2021", "-10.00", "CARD PAYMENT TO VANGUARD,10.00 GBP, RATE 1.00/GBP ON 28-03-2021, 10.00"),
+                rec("27/03/2021", "-7.32", "CARD PAYMENT TO VANGUARD,7.32 GBP, RATE 1.00/GBP ON 27-03-2021, 7.32"),
+                rec("28/03/2021", "-10.00", "CARD PAYMENT TO VANGUARD,10.00 GBP, RATE 1.00/GBP ON 28-03-2021, 10.00"),
                 rec(
-                    2,
                     "01/03/2021",
                     "-1352.23",
                     "DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013, 1352.23",
                 ),
-                rec(3, "02/03/2021", "250.00", "FASTER PAYMENTS RECEIPT REF.OLGA FROM ZAKHARENKO O, 250.00"),
-                rec(4, "03/03/2021", "1000.00", "FASTER PAYMENTS RECEIPT  FROM NIKOLAY METCHEV, 1000.00"),
+                rec("02/03/2021", "250.00", "FASTER PAYMENTS RECEIPT REF.OLGA FROM ZAKHARENKO O, 250.00"),
+                rec("03/03/2021", "1000.00", "FASTER PAYMENTS RECEIPT  FROM NIKOLAY METCHEV, 1000.00"),
                 rec(
-                    5,
                     "04/03/2021",
                     "-27.00",
                     "BILL PAYMENT VIA FASTER PAYMENT TO JASMINA KRUMOVA REFERENCE CLEANING , MANDATE NO 1, 27.00",
                 ),
             )
         val id =
-            repositories.qifImportRepository.createImport(
+            repositories.importEngine.stageQifImport(
                 fileName = "santander.qif",
-                records = records,
-                accountType = "BANK",
+                content = "!Type:Bank\n" + records.joinToString(""),
                 fileChecksum = "santander-checksum",
                 fileLastModified = now,
             )
-        return repositories.qifImportRepository.getImport(id).first()!!
+        return repositories.csvImportRepository.getImport(id).first()!!
     }
 
     private fun rec(
-        index: Long,
         date: String,
         amount: String,
         payee: String,
-    ) = QifImportRecord(
-        recordIndex = index,
-        sectionType = "BANK",
-        accountName = "Santander",
-        supported = true,
-        rawText = "",
-        date = date,
-        amount = amount,
-        payee = payee,
-    )
+    ) = "D$date\nT$amount\nP$payee\n^\n"
 
-    private suspend fun apply(qifImport: QifImport) {
+    private suspend fun apply(qifImport: CsvImport) {
         // Strategies are no longer seeded; the pipeline auto-detects among the installed ones.
         if (repositories.csvImportStrategyRepository
                 .getAllStrategies()
@@ -110,14 +97,14 @@ class SantanderQifE2ETest : DbTest() {
                 ?.id
                 ?: repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Santander", openingDate = now))
         val progress = mutableListOf<Progress>()
-        bulkApplyQif(
+        bulkApplyCsv(
             imports = listOf(qifImport),
-            sourceAccountId = sourceId,
+            sourceAccountOverride = sourceId,
             strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
             currencies = repositories.currencyRepository.getAllCurrencies().first(),
             accountMappingRepository = repositories.accountMappingRepository,
             accountRepository = repositories.accountRepository,
-            qifImportRepository = repositories.qifImportRepository,
+            csvImportRepository = repositories.csvImportRepository,
             maintenance = maintenance,
             importEngine = repositories.importEngine,
             onProgress = { progress += it },
@@ -163,16 +150,16 @@ class SantanderQifE2ETest : DbTest() {
                     .size,
             )
 
-            // Each person's creation source links back to the exact originating QIF record, so the
-            // audit UI can navigate to that row (not just the file).
+            // Each person's creation source links back to the exact originating row of the staged QIF file,
+            // so the audit UI can navigate to that row (not just the file).
             for (person in repositories.personRepository.getAllPeople().first()) {
                 val insert =
                     repositories.auditRepository
                         .getAuditHistoryForPerson(person.id)
                         .first { it.auditType == AuditType.INSERT }
                 val source = insert.source?.source
-                assertIs<Source.Qif>(source, "person ${person.fullName} should have a QIF source")
-                assertNotNull(source.recordIndex, "person ${person.fullName} should link to a specific QIF record")
+                assertIs<Source.Csv>(source, "person ${person.fullName} should have the staged QIF file as its source")
+                assertNotNull(source.rowIndex, "person ${person.fullName} should link to a specific row")
             }
         }
 
@@ -193,7 +180,7 @@ class SantanderQifE2ETest : DbTest() {
                     .size
 
             // Re-apply the same import: the engine dedups transfers, accounts (by name) and people (by name key).
-            apply(repositories.qifImportRepository.getImport(qifImport.id).first()!!)
+            apply(repositories.csvImportRepository.getImport(qifImport.id).first()!!)
 
             assertEquals(
                 accountsAfterFirst,

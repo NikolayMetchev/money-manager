@@ -7,11 +7,9 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
-import com.moneymanager.domain.model.qif.QifImport
 
 /** Why something can't be finished without a person deciding something. */
 enum class NeedsAttentionReason(
@@ -67,43 +65,12 @@ data class CsvImportAllPlan(
 }
 
 /**
- * What a QIF "import all" over [files] will do. QIF always matches *some* strategy when one exists, so
- * the question is mostly the source account: [directoryAccounts] covers files from a folder with one,
- * [folders] files from a folder without one (applying names an account after the folder), and
- * [defaultSourceAccountId] (the last account a QIF import used) preselects the shared pick.
- */
-data class QifImportAllPlan(
-    val files: List<QifImport>,
-    val directoryAccounts: Map<QifImportId, AccountId>,
-    val folders: Map<QifImportId, ImportDirectoryId>,
-    val defaultSourceAccountId: AccountId?,
-    val needsAttention: List<NeedsAttention>,
-    val strategies: List<CsvImportStrategy>,
-    val currencies: List<Currency>,
-    private val blockedIds: Set<QifImportId>,
-) {
-    /** Some file came from no folder, so the dialog offers a shared account. */
-    val needsSourceAccount: Boolean get() = files.any { it.id !in directoryAccounts && it.id !in folders }
-
-    fun unattended(): QifImportAllPlan =
-        copy(
-            files =
-                files.filter {
-                    it.id !in blockedIds
-                },
-            needsAttention = emptyList(),
-            blockedIds = emptySet(),
-        )
-}
-
-/**
  * What an unattended [ImportDirectoryService.importAll] did: an optional re-download, the download, then
  * the apply (empty when the run only downloaded), plus what it left for a person.
  */
 data class ImportAllResult(
     val download: DownloadAllResult,
     val csv: BulkApplyResult,
-    val qif: BulkApplyResult,
     val needsAttention: List<NeedsAttention>,
     val redownload: DirectoryRedownloadResult? = null,
 ) {
@@ -111,8 +78,7 @@ data class ImportAllResult(
         buildString {
             redownload?.let { append(it.summary()).append(' ') }
             append(download.summary())
-            append(" CSV: ${csv.toSummary()}.")
-            append(" QIF: ${qif.toSummary()}.")
+            append(" Files: ${csv.toSummary()}.")
             if (needsAttention.isNotEmpty()) append(" ${needsAttention.size} item(s) need attention.")
         }
 }

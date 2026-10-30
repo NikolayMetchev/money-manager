@@ -105,7 +105,7 @@ class CsvImportWriteRepositoryImpl(
                 // Recreate the dynamic table with the new column shape and rows. The row_index sequence
                 // restarts, so any previously written per-row errors are stale — clear them.
                 // The new rows carry no links, so neither may their matched entries.
-                database.forgetMatchedSources(Source.Csv(id), records = null)
+                database.forgetMatchedSources(id, rows = null)
                 tableManager.dropCsvTable(import.table_name)
                 tableManager.createCsvTable(import.table_name, columnCount)
                 tableManager.insertRowsBatch(import.table_name, rows, columnCount)
@@ -211,7 +211,7 @@ class CsvImportWriteRepositoryImpl(
                 // delete isn't blocked and the next scan of that folder stages the file again.
                 csvImportWriteQueries.deleteDirectoryFilesForImport(id.id.toString())
                 // Its rows' links go with it; their matched entries would otherwise block the delete.
-                database.forgetMatchedSources(Source.Csv(id), records = null)
+                database.forgetMatchedSources(id, rows = null)
 
                 tableManager.dropCsvTable(import.table_name)
 
@@ -229,7 +229,7 @@ class CsvImportWriteRepositoryImpl(
                     ?: return@withContext
 
             database.transaction {
-                database.forgetMatchedSources(Source.Csv(id), records = null)
+                database.forgetMatchedSources(id, rows = null)
                 tableManager.resetAllRowStatuses(import.table_name)
                 csvImportWriteQueries.deleteErrorsByImportId(id.id.toString())
                 csvImportWriteQueries.deleteApplicationsByImportId(id.id.toString())
@@ -257,7 +257,7 @@ class CsvImportWriteRepositoryImpl(
                     ?: return@withContext
 
             database.transaction {
-                database.forgetMatchedSources(Source.Csv(id), rowTransferMap.keys)
+                database.forgetMatchedSources(id, rowTransferMap.keys)
                 rowTransferMap.forEach { (rowIndex, transferId) ->
                     tableManager.updateRowStatus(import.table_name, rowIndex, status, transferId)
                     if (transferId != null && status != ImportStatus.IMPORTED.name) {
@@ -279,7 +279,7 @@ class CsvImportWriteRepositoryImpl(
                     ?: return@withContext
 
             database.transaction {
-                database.forgetMatchedSources(Source.Csv(id), rowIndexes)
+                database.forgetMatchedSources(id, rowIndexes)
                 if (rowIndexes == null) {
                     tableManager.resetAllRowStatuses(import.table_name)
                 } else {

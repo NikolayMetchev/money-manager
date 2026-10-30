@@ -22,7 +22,6 @@ import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.updateCsvStrategy
-import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.reimports
@@ -213,10 +212,10 @@ class SourceRerunE2ETest : DbTest() {
 
             val reimports = repositories.reimports(maintenance)
             val planProgress = mutableListOf<Progress>()
-            val plan = reimports.plan(StagedFile.Csv(reload(first.id)), onProgress = { planProgress += it })
+            val plan = reimports.plan(reload(first.id), onProgress = { planProgress += it })
             assertProgressesTo(planProgress, "Checking other files for records matched against it", "Reading manual edits")
             val planAllProgress = mutableListOf<Progress>()
-            reimports.planAll(listOf(StagedFile.Csv(reload(first.id))), onProgress = { planAllProgress += it })
+            reimports.planAll(listOf(reload(first.id)), onProgress = { planAllProgress += it })
             assertProgressesTo(planAllProgress, "File 1 of 1: MonzoDataExport.csv — Reading manual edits")
             assertEquals(monzo, plan.imported.accountId, "the account is read from what the file created")
             assertEquals(1, plan.rerun.affected.count, "the second file's duplicate row is re-run too")
@@ -250,7 +249,7 @@ class SourceRerunE2ETest : DbTest() {
             assertEquals(recreated.id, secondRow.transferId, "the other file's row points at the replacement")
 
             // The edit is re-applied as a hand edit, so the next re-import keeps it too.
-            val again = reimports.plan(StagedFile.Csv(reload(first.id)))
+            val again = reimports.plan(reload(first.id))
             assertEquals(
                 "Flat white",
                 again.rerun.manualEdits
@@ -276,7 +275,7 @@ class SourceRerunE2ETest : DbTest() {
             assertEquals(1, apply(second, monzo).duplicatesSkipped)
 
             val reimports = repositories.reimports(maintenance)
-            val result = reimports.reimport(reimports.plan(StagedFile.Csv(reload(first.id))), accountId = null, currencyId = null)
+            val result = reimports.reimport(reimports.plan(reload(first.id)), accountId = null, currencyId = null)
 
             assertTrue(result.affected.isEmpty, "nothing is reported as re-run")
             assertEquals(setOf<Source>(Source.Csv(second.id)), result.notRerun.byFile.keys)
@@ -300,7 +299,7 @@ class SourceRerunE2ETest : DbTest() {
             editByHand(books, description = "Novels", note = "gift")
 
             val reimports = repositories.reimports(maintenance)
-            val plan = reimports.plan(StagedFile.Csv(reload(file.id)))
+            val plan = reimports.plan(reload(file.id))
             val strategy = assertNotNull(plan.strategy)
             // The strategy now skips the edited row, so the re-import doesn't create its transaction again.
             val skipBooks =
@@ -318,7 +317,7 @@ class SourceRerunE2ETest : DbTest() {
                 ),
             )
 
-            val result = reimports.reimport(reimports.plan(StagedFile.Csv(reload(file.id))), accountId = null, currencyId = null)
+            val result = reimports.reimport(reimports.plan(reload(file.id)), accountId = null, currencyId = null)
 
             assertTrue(result.reappliedEdits.isEmpty())
             assertEquals("Novels", result.unmatchedEdits.single().description)

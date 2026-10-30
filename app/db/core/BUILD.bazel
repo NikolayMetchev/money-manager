@@ -179,7 +179,6 @@ kmp_test(
         "//app/model/repository/write:write_for_tests",
         "//app/model/rules",
         "//app/model/timeline",
-        "//app/qifimporter",
         "//app/reconciliation",
         "//app/strategies",
         "//app/tasks",

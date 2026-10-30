@@ -115,7 +115,6 @@ class ImportDirectoryServiceTest : DbTest() {
     ) = ImportDirectoryService(
         importDirectoryRepository = repositories.importDirectoryRepository,
         csvImportRepository = repositories.csvImportRepository,
-        qifImportRepository = repositories.qifImportRepository,
         csvImportStrategyRepository = repositories.csvImportStrategyRepository,
         accountMappingRepository = repositories.accountMappingRepository,
         accountRepository = repositories.accountRepository,
@@ -124,7 +123,6 @@ class ImportDirectoryServiceTest : DbTest() {
         cryptoRepository = repositories.cryptoRepository,
         tradeRepository = repositories.tradeRepository,
         passThroughAccountRepository = repositories.passThroughAccountRepository,
-        settingsRepository = repositories.settingsRepository,
         transactionRepository = repositories.transactionRepository,
         transferRelationshipRepository = repositories.transferRelationshipRepository,
         transferSourceRepository = repositories.transferSourceRepository,
@@ -343,8 +341,7 @@ class ImportDirectoryServiceTest : DbTest() {
             val (result, _) = backgroundScope.runTask { service(factory).importAll(this) }
 
             assertEquals(emptyList(), result.needsAttention, "every file's folder names its account")
-            assertEquals(2, result.qif.filesImported)
-            assertEquals(1, result.csv.filesImported)
+            assertEquals(3, result.csv.filesImported, "two QIF files and one CSV")
             val accounts = repositories.accountRepository.getAllAccounts().first()
             val accountNames = accounts.map { it.name }
             assertTrue("Santander" in accountNames && "Amex" in accountNames, accountNames.toString())
@@ -405,7 +402,7 @@ class ImportDirectoryServiceTest : DbTest() {
 
             val (result, _) = backgroundScope.runTask { service(factory).importAll(this) }
 
-            assertEquals(1, result.qif.filesImported)
+            assertEquals(1, result.csv.filesImported)
             assertEquals(
                 listOf("Monzo Main"),
                 repositories.accountRepository

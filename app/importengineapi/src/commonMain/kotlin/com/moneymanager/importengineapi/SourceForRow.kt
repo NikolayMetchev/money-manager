@@ -15,10 +15,6 @@ fun Source.forRow(rowKey: ImportRowKey): Source =
             copy(rowIndex = (rowKey as ImportRowKey.CsvRow).rowIndex)
         }
 
-        is Source.Qif -> {
-            copy(recordIndex = (rowKey as ImportRowKey.QifRecord).recordIndex)
-        }
-
         is Source.Api -> {
             val key = rowKey as ImportRowKey.ApiJsonPath
             copy(requestId = key.requestId, jsonPath = JsonPath(key.jsonPath))

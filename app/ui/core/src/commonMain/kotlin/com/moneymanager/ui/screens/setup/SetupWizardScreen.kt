@@ -218,7 +218,6 @@ private fun ColumnScope.StepBody(
                 importDirectoryService = importDirectoryService,
                 importDirectoryRepository = services.imports.importDirectoryRepository,
                 csvImportRepository = services.imports.csvImportRepository,
-                qifImportRepository = services.imports.qifImportRepository,
                 accountRepository = services.accounts.accountRepository,
                 categoryRepository = services.accounts.categoryRepository,
                 personRepository = services.people.personRepository,

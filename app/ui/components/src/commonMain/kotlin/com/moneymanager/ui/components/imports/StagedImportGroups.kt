@@ -50,7 +50,7 @@ internal fun ImportDirectoryProvider.label(): String =
 
 /**
  * Resolves each import's source directories (sorted by label) from [importDirectories] (see
- * `ImportDirectoryReadRepository.csvImportDirectories`/`qifImportDirectories`). Directories no longer
+ * `ImportDirectoryReadRepository.csvImportDirectories`). Directories no longer
  * known are dropped, so an import whose every directory was removed reads as manually added.
  */
 fun <K> resolveImportDirectories(

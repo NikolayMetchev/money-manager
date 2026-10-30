@@ -31,7 +31,7 @@ import kotlin.time.TimeSource
  * "Cancel" that disappears once there is nothing left to cancel.
  *
  * Only the shell lives here. What the caller collects before the run and what it says afterwards are
- * genuinely per-source (QIF picks a currency and a source account, CSV resolves each file's strategy,
+ * genuinely per-source (a staged file resolves its strategy and maybe a source account,
  * the API flow has no form at all), so they stay with their own screen as [form] and [report].
  *
  * [result] doubles as the "finished" flag: non-null means the run completed and its outcome is what

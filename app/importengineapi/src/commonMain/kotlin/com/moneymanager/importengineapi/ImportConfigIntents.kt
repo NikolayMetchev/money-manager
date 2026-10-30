@@ -7,7 +7,6 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.QifImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
@@ -19,12 +18,11 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
-import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.regex.PortableRegex
 import kotlin.time.Instant
 
 /*
- * Intents for the import-configuration and staging tables (strategies, account mappings, CSV/QIF
+ * Intents for the import-configuration and staging tables (strategies, account mappings, CSV
  * staging rows, settings, device). The engine applies these so callers never hold the corresponding
  * write repository. Create variants carry a String `key` whose generated id is read back from the
  * matching map on ImportResult.
@@ -269,61 +267,6 @@ sealed interface CsvImportMutation {
     ) : CsvImportMutation
 }
 
-/** A write on the QIF staging tables (the stored file + per-record status write-back). */
-sealed interface QifImportMutation {
-    data class Create(
-        val key: String,
-        val fileName: String,
-        val records: List<QifImportRecord>,
-        val accountType: String,
-        val fileChecksum: String,
-        val fileLastModified: Instant,
-    ) : QifImportMutation
-
-    data class Delete(
-        val id: QifImportId,
-    ) : QifImportMutation
-
-    /** Toggles the "ignored" flag; ignored files are hidden from the actionable lists. */
-    data class SetIgnored(
-        val id: QifImportId,
-        val ignored: Boolean,
-    ) : QifImportMutation
-
-    data class UpdateRecordStatuses(
-        val id: QifImportId,
-        val status: String,
-        val recordTransferMap: Map<Long, TransferId?>,
-    ) : QifImportMutation
-
-    /**
-     * Returns records to the never-imported state, after their transfers were deleted, so a re-run
-     * re-imports them. Null [recordIndexes] resets every record.
-     */
-    data class ResetRecordStatuses(
-        val id: QifImportId,
-        val recordIndexes: Collection<Long>?,
-    ) : QifImportMutation
-
-    data class SaveError(
-        val id: QifImportId,
-        val recordIndex: Long,
-        val errorMessage: String,
-    ) : QifImportMutation
-
-    data class ClearErrors(
-        val id: QifImportId,
-        val recordIndexes: Collection<Long>,
-    ) : QifImportMutation
-
-    data class RecordApplication(
-        val id: QifImportId,
-        val strategyId: CsvImportStrategyId,
-        val strategyName: String,
-        val appliedAt: Instant,
-    ) : QifImportMutation
-}
-
 /** A write on the import-directory config + its per-file change-detection cursor. */
 sealed interface ImportDirectoryMutation {
     data class Create(
@@ -351,7 +294,6 @@ sealed interface ImportDirectoryMutation {
         /** Server-provided content hash (e.g. Drive md5Checksum) used to skip re-downloading; null for local. */
         val remoteContentHash: String?,
         val csvImportId: CsvImportId?,
-        val qifImportId: QifImportId?,
         val importedAt: Instant,
     ) : ImportDirectoryMutation
 }
@@ -359,6 +301,5 @@ sealed interface ImportDirectoryMutation {
 /** Settings writes; non-null fields are applied. */
 data class ImportSettings(
     val defaultCurrencyId: CurrencyId? = null,
-    val lastQifAccountId: AccountId? = null,
     val setupWizardCompleted: Boolean? = null,
 )

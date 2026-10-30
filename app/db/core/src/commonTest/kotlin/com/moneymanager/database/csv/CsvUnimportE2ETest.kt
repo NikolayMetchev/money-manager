@@ -18,7 +18,6 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportHistoryEvent
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.setCsvImportIgnored
-import com.moneymanager.qifimporter.StagedFile
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.reimports
 import com.moneymanager.test.database.upsertCurrencyByCode
@@ -228,7 +227,7 @@ class CsvUnimportE2ETest : DbTest() {
             // Re-importing the surviving file restores its movement.
             val reimports = repositories.reimports(maintenance)
             reimports.reimportAll(
-                reimports.planAll(listOf(StagedFile.Csv(reload(second.id)))),
+                reimports.planAll(listOf(reload(second.id))),
                 accountId = monzo,
                 currencyId = null,
                 onProgress = { },

@@ -17,8 +17,7 @@ const val STRATEGY_CONTENT_SAMPLE_SIZE = 50
 
 /**
  * Ranks a scored strategy `(strategy, contentScore)`: highest score first, ties broken
- * deterministically by name then id. Shared by the CSV ([selectForCsv]) and QIF
- * (`selectForQifContent`) selectors so both resolve a tie the same way.
+ * deterministically by name then id.
  */
 val byContentScoreThenNameThenId: Comparator<Pair<CsvImportStrategy, Int>> =
     compareByDescending<Pair<CsvImportStrategy, Int>> { it.second }
@@ -27,8 +26,8 @@ val byContentScoreThenNameThenId: Comparator<Pair<CsvImportStrategy, Int>> =
 
 /**
  * Counts sampled rows with a value matching any of this strategy's
- * [CsvStrategyConfig.contentMatchRules] (any of them holding counts the row). Shared by the
- * CSV selector below and the QIF selector. A strategy with no content rules scores 0.
+ * [CsvStrategyConfig.contentMatchRules] (any of them holding counts the row). A strategy with no
+ * content rules scores 0.
  */
 fun CsvImportStrategy.contentScore(
     sample: List<CsvRow>,
@@ -54,7 +53,8 @@ fun CsvImportStrategy.contentScore(
  *    [STRATEGY_CONTENT_SAMPLE_SIZE] of [rows]; only scores covering at least half the sample count.
  *    The threshold keeps a file that merely *contains* a few matching rows (e.g. crypto.com's
  *    crypto_ file carrying the odd viban_purchase) from being misrouted — such files are skipped.
- *    With [wholeDocument] (a PDF's lines, where a statement names its issuer on one line of hundreds)
+ *    With [wholeDocument] (a PDF's lines, where a statement names its issuer on one line of hundreds, or
+ *    a QIF file, whose fixed columns say nothing of the bank and whose rows may each look like another's)
  *    every row is scored and one matching row is enough.
  * 3. **Fallback**: a candidate carrying no signals at all (no content rules, no filename pattern)
  *    matches on columns alone — the pre-existing behavior for single-strategy column sets.
@@ -114,7 +114,8 @@ private fun CsvImportStrategy.matchesFileName(fileName: String): Boolean {
 /**
  * Picks the strategy for the staged [csvImport] (see [selectForCsv]), reading what it needs from
  * [csvImportRepository]. A PDF import is matched on its text lines, whatever rows a strategy has staged from
- * them since, so it can match again (and differently) once its strategies change.
+ * them since, so it can match again (and differently) once its strategies change. A QIF import is matched on
+ * all its rows, as a whole document.
  */
 suspend fun List<CsvImportStrategy>.selectForImport(
     csvImport: CsvImport,
@@ -126,6 +127,10 @@ suspend fun List<CsvImportStrategy>.selectForImport(
         val columns = staged.headers.mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }
         val rows = staged.rows.mapIndexed { index, values -> CsvRow(index + 1L, values) }
         return selectForCsv(csvImport.originalFileName, columns, rows, wholeDocument = true)
+    }
+    if (isQifFileName(csvImport.originalFileName)) {
+        val rows = csvImportRepository.getImportRows(csvImport.id, limit = maxOf(csvImport.rowCount, 1), offset = 0)
+        return selectForCsv(csvImport.originalFileName, csvImport.columns, rows, wholeDocument = true)
     }
     val sampleRows = csvImportRepository.getImportRows(csvImport.id, limit = STRATEGY_CONTENT_SAMPLE_SIZE, offset = 0)
     return selectForCsv(csvImport.originalFileName, csvImport.columns, sampleRows)

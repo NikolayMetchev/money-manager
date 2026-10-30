@@ -40,13 +40,11 @@ import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
-import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.QifImportReadRepository
 import com.moneymanager.importdirectory.DOWNLOAD_ALL_TASK_KEY
 import com.moneymanager.importdirectory.FOLDER_DOWNLOAD_TASK_PREFIX
 import com.moneymanager.importdirectory.IMPORT_DIRECTORIES_TASK_PREFIX
@@ -80,7 +78,7 @@ import kotlin.uuid.Uuid
 
 /**
  * Manages import directories (local folders / Google Drive folders) and runs manual downloads. A
- * download stages new/changed files into the CSV/QIF Imports tabs; each row links to those tabs to run
+ * download stages new/changed files into the CSV Imports tab; each row links to it to run
  * "Import All". Downloads run through [importDirectoryService] as tasks; other writes go through the import
  * engine. [driveFolderBrowser] powers the Drive folder picker.
  */
@@ -90,7 +88,6 @@ fun ImportDirectoriesScreen(
     importDirectoryService: ImportDirectoryService,
     importDirectoryRepository: ImportDirectoryReadRepository,
     csvImportRepository: CsvImportReadRepository,
-    qifImportRepository: QifImportReadRepository,
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
@@ -113,9 +110,6 @@ fun ImportDirectoriesScreen(
     // All staged imports, used to tell whether a directory's downloaded files are still un-imported.
     val csvImports by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         csvImportRepository.getAllImports()
-    }
-    val qifImports by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
-        qifImportRepository.getAllImports()
     }
 
     var showAddDialog by remember { mutableStateOf(false) }
@@ -230,7 +224,6 @@ fun ImportDirectoriesScreen(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     csvImports = csvImports,
-                    qifImports = qifImports,
                     deviceId = deviceId,
                     indent = indent,
                     canDownload = importDirectoryService.isScannable(directory) && !scanning,
@@ -354,7 +347,6 @@ private fun ImportDirectoryRow(
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
     csvImports: List<CsvImport>,
-    qifImports: List<QifImport>,
     deviceId: DeviceId,
     indent: Dp,
     canDownload: Boolean,
@@ -375,19 +367,12 @@ private fun ImportDirectoryRow(
 
     val isDownloading = scanProgress != null
     val csvCount = trackedFiles.count { it.csvImportId != null }
-    val qifCount = trackedFiles.count { it.qifImportId != null }
     // lastAppliedAt != null means the staged file has been imported (a strategy was applied).
     val csvImported = remember(csvImports) { csvImports.associate { it.id to (it.lastAppliedAt != null) } }
-    val qifImported = remember(qifImports) { qifImports.associate { it.id to (it.lastAppliedAt != null) } }
     // "Outstanding" = a downloaded file whose staging row still exists and hasn't been imported yet.
     val outstandingCsv = trackedFiles.any { it.csvImportId != null && csvImported[it.csvImportId] == false }
-    val outstandingQif = trackedFiles.any { it.qifImportId != null && qifImported[it.qifImportId] == false }
 
-    val downloadedSummary =
-        listOfNotNull(
-            csvCount.takeIf { it > 0 }?.let { "$it csv" },
-            qifCount.takeIf { it > 0 }?.let { "$it qif" },
-        ).joinToString(" and ").ifEmpty { "No" }.let { "$it files downloaded" }
+    val downloadedSummary = "${csvCount.takeIf { it > 0 } ?: "No"} files downloaded"
 
     val onWrongDevice = !directory.isOn(deviceId)
     // Top-level folders download their own files AND discover/create child directories for subfolders;
@@ -479,15 +464,11 @@ private fun ImportDirectoryRow(
                     onClick = onDownload,
                 ) { Text(if (isDownloading) "Working…" else actionLabel) }
                 TextButton(enabled = canRedownload && !onWrongDevice, onClick = onRedownload) { Text("Re-download") }
-                // One link per type; enabled only while that type has downloaded files still to import.
+                // Enabled only while the folder has downloaded files still to import.
                 TextButton(
                     enabled = outstandingCsv,
                     onClick = { onImport(ImportTab.CSV) },
-                ) { Text("CSV imports") }
-                TextButton(
-                    enabled = outstandingQif,
-                    onClick = { onImport(ImportTab.QIF) },
-                ) { Text("QIF imports") }
+                ) { Text("Imports") }
                 TextButton(onClick = onAudit) { Text("History") }
                 TextButton(onClick = { showAccountDialog = true }) { Text("Set account") }
                 TextButton(enabled = !isDownloading, onClick = onDelete) { Text("Delete") }
