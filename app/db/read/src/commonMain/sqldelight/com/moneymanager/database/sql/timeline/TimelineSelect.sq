@@ -5,6 +5,9 @@
 -- since deleted (entity_source.entity_id has no FK to transfer).
 -- Strategy attribution uses the latest application's snapshot name, so files imported before and
 -- after a strategy rename group separately.
+-- The ranges are aggregated per import before the latest application is looked up: joined first, that
+-- correlated lookup ran once per transfer row rather than once per file, half the query's time. The CSV
+-- screen re-runs this while an import writes.
 selectCsvImportDateRanges:
 SELECT
     csv_import_metadata.id AS import_id,
@@ -12,13 +15,21 @@ SELECT
     csv_import_metadata.ignored,
     latest_application.strategy_id AS strategy_id,
     latest_application.strategy_name AS strategy_name,
-    MIN(transfer.timestamp) AS earliest_ms,
-    MAX(transfer.timestamp) AS latest_ms,
-    COUNT(DISTINCT transfer.id) AS transaction_count
-FROM csv_import_metadata
-JOIN csv_entity_source ON csv_entity_source.csv_import_id = csv_import_metadata.id
-JOIN entity_source ON entity_source.id = csv_entity_source.id AND entity_source.entity_type_id = 7
-JOIN transfer ON transfer.id = entity_source.entity_id
+    ranges.earliest_ms,
+    ranges.latest_ms,
+    ranges.transaction_count
+FROM (
+    SELECT
+        csv_entity_source.csv_import_id AS import_id,
+        MIN(transfer.timestamp) AS earliest_ms,
+        MAX(transfer.timestamp) AS latest_ms,
+        COUNT(DISTINCT transfer.id) AS transaction_count
+    FROM csv_entity_source
+    JOIN entity_source ON entity_source.id = csv_entity_source.id AND entity_source.entity_type_id = 7
+    JOIN transfer ON transfer.id = entity_source.entity_id
+    GROUP BY csv_entity_source.csv_import_id
+) ranges
+JOIN csv_import_metadata ON csv_import_metadata.id = ranges.import_id
 LEFT JOIN csv_import_application latest_application
     ON latest_application.id = (
         SELECT application.id
@@ -26,8 +37,7 @@ LEFT JOIN csv_import_application latest_application
         WHERE application.csv_import_id = csv_import_metadata.id
         ORDER BY application.applied_at DESC, application.id DESC
         LIMIT 1
-    )
-GROUP BY csv_import_metadata.id;
+    );
 
 selectQifImportDateRanges:
 SELECT
@@ -36,13 +46,21 @@ SELECT
     qif_import_metadata.ignored,
     latest_application.strategy_id AS strategy_id,
     latest_application.strategy_name AS strategy_name,
-    MIN(transfer.timestamp) AS earliest_ms,
-    MAX(transfer.timestamp) AS latest_ms,
-    COUNT(DISTINCT transfer.id) AS transaction_count
-FROM qif_import_metadata
-JOIN qif_entity_source ON qif_entity_source.qif_import_id = qif_import_metadata.id
-JOIN entity_source ON entity_source.id = qif_entity_source.id AND entity_source.entity_type_id = 7
-JOIN transfer ON transfer.id = entity_source.entity_id
+    ranges.earliest_ms,
+    ranges.latest_ms,
+    ranges.transaction_count
+FROM (
+    SELECT
+        qif_entity_source.qif_import_id AS import_id,
+        MIN(transfer.timestamp) AS earliest_ms,
+        MAX(transfer.timestamp) AS latest_ms,
+        COUNT(DISTINCT transfer.id) AS transaction_count
+    FROM qif_entity_source
+    JOIN entity_source ON entity_source.id = qif_entity_source.id AND entity_source.entity_type_id = 7
+    JOIN transfer ON transfer.id = entity_source.entity_id
+    GROUP BY qif_entity_source.qif_import_id
+) ranges
+JOIN qif_import_metadata ON qif_import_metadata.id = ranges.import_id
 LEFT JOIN qif_import_application latest_application
     ON latest_application.id = (
         SELECT application.id
@@ -50,8 +68,7 @@ LEFT JOIN qif_import_application latest_application
         WHERE application.qif_import_id = qif_import_metadata.id
         ORDER BY application.applied_at DESC, application.id DESC
         LIMIT 1
-    )
-GROUP BY qif_import_metadata.id;
+    );
 
 -- One row per API session that produced transactions. strategy_name is NULL for legacy
 -- credential-less / strategy-less sessions — callers fall back to a generic label.
