@@ -335,7 +335,7 @@ private fun StagedImportFilters(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
-        if (kinds.size > 1) {
+        if (kinds.size > 1 || filter.kinds.isNotEmpty()) {
             MultiSelectFilterDropdown(
                 items = kinds,
                 selectedKeys = filter.kinds,
@@ -345,7 +345,7 @@ private fun StagedImportFilters(
                 onSelectionChange = { onFilterChange(filter.copy(kinds = it)) },
             )
         }
-        if (strategies.size > 1) {
+        if (strategies.size > 1 || filter.strategies.isNotEmpty()) {
             MultiSelectFilterDropdown(
                 items = strategies,
                 selectedKeys = filter.strategies,
