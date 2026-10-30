@@ -262,20 +262,6 @@ class CsvImportWriteRepositoryImpl(
             tableManager.updateTransferIdsBatch(import.table_name, rowTransferMap)
         }
 
-    override suspend fun updateRowStatus(
-        id: CsvImportId,
-        rowIndex: Long,
-        status: String,
-        transferId: TransferId?,
-    ): Unit =
-        withContext(coroutineContext) {
-            val import =
-                csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
-                    ?: return@withContext
-
-            tableManager.updateRowStatus(import.table_name, rowIndex, status, transferId)
-        }
-
     override suspend fun updateRowStatusesBatch(
         id: CsvImportId,
         status: String,
@@ -313,18 +299,23 @@ class CsvImportWriteRepositoryImpl(
             }
         }
 
-    override suspend fun saveError(
+    override suspend fun saveErrors(
         id: CsvImportId,
-        rowIndex: Long,
-        errorMessage: String,
+        errors: Map<Long, String>,
     ): Unit =
         withContext(coroutineContext) {
-            csvImportWriteQueries.insertOrReplaceError(
-                csv_import_id = id.id.toString(),
-                row_index = rowIndex,
-                error_message = errorMessage,
-                error_timestamp = Clock.System.now().toEpochMilliseconds(),
-            )
+            if (errors.isEmpty()) return@withContext
+            val timestamp = Clock.System.now().toEpochMilliseconds()
+            database.transaction {
+                errors.forEach { (rowIndex, errorMessage) ->
+                    csvImportWriteQueries.insertOrReplaceError(
+                        csv_import_id = id.id.toString(),
+                        row_index = rowIndex,
+                        error_message = errorMessage,
+                        error_timestamp = timestamp,
+                    )
+                }
+            }
         }
 
     override suspend fun clearError(

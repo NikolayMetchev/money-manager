@@ -17,11 +17,11 @@ class NoDirectRepositoryWritesArchitectureTest {
     private val forbiddenWrites =
         listOf(
             "createTransfers",
-            "updateTransfer",
+            "updateTransfers",
             "deleteTransactions",
             "createAccount",
             "updateAccountWithAttributes",
-            "deleteAccount",
+            "deleteAccounts",
             "mergeAccounts",
             "unmergeAccount",
             "createCategory",

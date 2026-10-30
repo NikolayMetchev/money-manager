@@ -43,6 +43,7 @@ import com.moneymanager.domain.repository.write.CsvImportWriteRepository
 import com.moneymanager.domain.repository.write.CurrencyWriteRepository
 import com.moneymanager.domain.repository.write.ExchangeOrderWriteRepository
 import com.moneymanager.domain.repository.write.ImportDirectoryWriteRepository
+import com.moneymanager.domain.repository.write.NewTrade
 import com.moneymanager.domain.repository.write.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
@@ -53,6 +54,7 @@ import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
 import com.moneymanager.domain.repository.write.TradeWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
+import com.moneymanager.domain.repository.write.TransferEdit
 import com.moneymanager.domain.repository.write.TransferUpdate
 import com.moneymanager.importengineapi.AccountMappingMutation
 import com.moneymanager.importengineapi.AccountMatchKey
@@ -72,6 +74,7 @@ import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ImportRowKey
+import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
@@ -195,12 +198,12 @@ class ImportEngineImpl(
         val createdTradeIds = mutableMapOf<LocalTradeKey, TradeId>()
         val dedupedTradeKeys = mutableSetOf<LocalTradeKey>()
 
-        // Multiset idempotency (see TradeWriteRepository.createTrade): N intents sharing the exact same
+        // Multiset idempotency (see NewTrade.occurrence): N intents sharing the exact same
         // field tuple (e.g. an exchange order split into several byte-identical fills) must book as N
         // trades, not collapse to one. Count how many identical tuples this pass has already claimed and
         // pass that count as the occurrence index, so each one reuses a distinct existing row (re-import)
         // or inserts a distinct new one (first import). The key must group exactly the intents that
-        // createTrade cannot tell apart, so the timestamp is the persisted millisecond value — an Instant
+        // createTrades cannot tell apart, so the timestamp is the persisted millisecond value — an Instant
         // can carry sub-ms precision (e.g. Kraken's float epoch-seconds) that the trade row does not.
         // The description is deliberately absent: it plays no part in identifying a conversion (see
         // TradeSelect.sq's selectMatchingTradeId), so two rows describing one movement differently share
@@ -224,6 +227,7 @@ class ImportEngineImpl(
         // order claims are held back from it. A conversion is never part of an order.
         val orderLinkedTradeKeys = batch.orders.flatMapTo(mutableSetOf()) { it.tradeKeys }
         val conversionReconciler = buildConversionTradeReconciler(batch, orderLinkedTradeKeys)
+        val tradesToWrite = mutableListOf<Pair<ImportTradeIntent, NewTrade>>()
         for (intent in batch.trades.creates()) {
             // Either kind of cross-source match suppresses the write; they differ only in what can be
             // reported, so they are resolved together and the write is skipped once.
@@ -246,8 +250,9 @@ class ImportEngineImpl(
                     intent.toAmount,
                 )
             val occurrence = tradeOccurrences[tupleKey] ?: 0
-            val tradeResult =
-                tradeRepository.createTrade(
+            tradesToWrite +=
+                intent to
+                NewTrade(
                     timestamp = requireNotNull(intent.timestamp),
                     description = requireNotNull(intent.description),
                     fromAccountId = requireNotNull(intent.fromAccountId),
@@ -256,9 +261,13 @@ class ImportEngineImpl(
                     toAmount = requireNotNull(intent.toAmount),
                     source = intent.source,
                     occurrence = occurrence,
+                    attributes = intent.attributes,
                 )
             tradeOccurrences[tupleKey] = occurrence + 1
-            if (intent.attributes.isNotEmpty()) tradeRepository.upsertAttributes(tradeResult.id, intent.attributes)
+        }
+        val tradeResults =
+            if (tradesToWrite.isEmpty()) emptyList() else tradeRepository.createTrades(tradesToWrite.map { it.second })
+        for ((intent, tradeResult) in tradesToWrite.map { it.first }.zip(tradeResults)) {
             // A re-imported trade loses the attributes its source owns but no longer reports (e.g. the
             // `excluded` of a trade the source has since un-deleted), like a transfer UPDATE.
             if (!tradeResult.created) {
@@ -334,16 +343,18 @@ class ImportEngineImpl(
         val transfers = importTransferCreates(batch.transfers.creates(), batch, accountResolution.keyToId, batchSize, onProgress)
 
         // ----- UPDATE phase -----
-        for (intent in batch.transfers.updates()) {
-            transactionRepository.updateTransfer(
-                transfer = intent.toUpdatedTransfer(),
-                deletedAttributeIds = intent.deletedAttributeIds,
-                updatedAttributes = intent.updatedAttributes,
-                newAttributes = intent.attributes,
-                transactionId = requireNotNull(intent.existingId),
-                source = intent.source,
-            )
-        }
+        transactionRepository.updateTransfers(
+            batch.transfers.updates().map { intent ->
+                TransferEdit(
+                    transfer = intent.toUpdatedTransfer(),
+                    transactionId = requireNotNull(intent.existingId),
+                    source = intent.source,
+                    deletedAttributeIds = intent.deletedAttributeIds,
+                    updatedAttributes = intent.updatedAttributes,
+                    newAttributes = intent.attributes,
+                )
+            },
+        )
         for (intent in batch.accountsToCreate.updates()) {
             accountRepository.updateAccountWithAttributes(
                 account = intent.account,
@@ -408,7 +419,7 @@ class ImportEngineImpl(
             tradeRepository.deleteTrades(chunk)
             reportDeleted(chunk.size)
         }
-        batch.accountsToCreate.deletes().forEach { accountRepository.deleteAccount(requireNotNull(it.existingId)) }
+        accountRepository.deleteAccounts(batch.accountsToCreate.deletes().map { requireNotNull(it.existingId) })
         batch.categories.deletes().forEach { categoryRepository.deleteCategory(requireNotNull(it.existingId)) }
         batch.currencies.deletes().forEach { currencyRepository.deleteCurrency(requireNotNull(it.existingId)) }
         batch.cryptoAssets.deletes().forEach { cryptoRepository.deleteCryptoAsset(requireNotNull(it.existingId)) }
@@ -683,6 +694,7 @@ class ImportEngineImpl(
      */
     private suspend fun writeConversionTrades(toImport: List<Classified>) {
         val occurrences = mutableMapOf<List<Any>, Int>()
+        val trades = mutableListOf<NewTrade>()
         for (classified in toImport) {
             val transfer = classified.transfer
             val conversion = transfer.conversion ?: continue
@@ -690,12 +702,12 @@ class ImportEngineImpl(
             val timestamp = requireNotNull(transfer.timestamp)
             val account = requireId(if (conversion.incoming) transfer.toAccount else transfer.fromAccount)
             val (from, to) = if (conversion.incoming) amount to conversion.settled else conversion.settled to amount
-            // Keyed on the persisted millisecond, as createTrade matches on it (see the leg-group trade loop).
+            // Keyed on the persisted millisecond, as createTrades matches on it (see the leg-group trade loop).
             val key = listOf(timestamp.toEpochMilliseconds(), account, from, to)
             val occurrence = occurrences[key] ?: 0
             occurrences[key] = occurrence + 1
-            val trade =
-                tradeRepository.createTrade(
+            trades +=
+                NewTrade(
                     timestamp = timestamp,
                     description = "Convert ${from.asset.code} to ${to.asset.code}",
                     fromAccountId = account,
@@ -704,10 +716,10 @@ class ImportEngineImpl(
                     toAmount = to,
                     source = transfer.source.forRow(requireNotNull(transfer.rowKey)),
                     occurrence = occurrence,
+                    attributes = transfer.attributes.filter { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID },
                 )
-            val exclusion = transfer.attributes.filter { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
-            if (exclusion.isNotEmpty()) tradeRepository.upsertAttributes(trade.id, exclusion)
         }
+        if (trades.isNotEmpty()) tradeRepository.createTrades(trades)
     }
 
     /**
@@ -2366,10 +2378,6 @@ class ImportEngineImpl(
                     csvImportRepository.updateRowTransferIdsBatch(m.id, m.rowTransferMap)
                 }
 
-                is CsvImportMutation.UpdateRowStatus -> {
-                    csvImportRepository.updateRowStatus(m.id, m.rowIndex, m.status, m.transferId)
-                }
-
                 is CsvImportMutation.UpdateRowStatuses -> {
                     csvImportRepository.updateRowStatusesBatch(m.id, m.status, m.rowTransferMap)
                 }
@@ -2378,8 +2386,8 @@ class ImportEngineImpl(
                     csvImportRepository.resetRowStatuses(m.id, m.rowIndexes)
                 }
 
-                is CsvImportMutation.SaveError -> {
-                    csvImportRepository.saveError(m.id, m.rowIndex, m.errorMessage)
+                is CsvImportMutation.SaveErrors -> {
+                    csvImportRepository.saveErrors(m.id, m.errors)
                 }
 
                 is CsvImportMutation.ClearError -> {

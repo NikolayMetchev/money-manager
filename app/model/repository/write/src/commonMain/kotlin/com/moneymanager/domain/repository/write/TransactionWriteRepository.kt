@@ -29,32 +29,10 @@ interface TransactionWriteRepository : TransactionReadRepository {
     ): List<TransferId>
 
     /**
-     * Updates a transfer and its attributes atomically, creating only ONE revision bump.
-     *
-     * This method handles the case where both transfer fields AND attributes change.
-     * Without this method, updating the transfer would bump revision (1→2), and then
-     * each attribute change would bump it again (2→3, etc.).
-     *
-     * With this method:
-     * - If only transfer changes: bumps to rev 2
-     * - If only attributes change: bumps to rev 2
-     * - If BOTH change: bumps to rev 2 (not 3+)
-     *
-     * @param transfer The updated transfer (null if transfer fields didn't change)
-     * @param deletedAttributeIds IDs of attributes to delete
-     * @param updatedAttributes Map of attribute ID to (typeId, value) for updates
-     * @param newAttributes List of (typeId, value) pairs for new attributes
-     * @param transactionId The transaction ID (needed when transfer is null)
-     * @param source Provenance recorded against the new revision.
+     * Applies [edits] in one database transaction: one commit for the lot rather than one per transfer.
+     * Each edit creates only ONE revision bump, however many of its transfer fields and attributes change.
      */
-    suspend fun updateTransfer(
-        transfer: Transfer?,
-        deletedAttributeIds: Set<Long>,
-        updatedAttributes: Map<Long, NewAttribute>,
-        newAttributes: List<NewAttribute>,
-        transactionId: TransferId,
-        source: Source,
-    )
+    suspend fun updateTransfers(edits: List<TransferEdit>)
 
     /** Deletes [ids] in one database transaction: one commit for the lot rather than one per transfer. */
     suspend fun deleteTransactions(ids: Collection<TransferId>)
@@ -93,16 +71,16 @@ interface TransactionWriteRepository : TransactionReadRepository {
         // to run everything in one transaction and record the per-update source.
         val created =
             createTransfers(transfers = transfers, newAttributes = newAttributes, sources = sources)
-        updates.forEachIndexed { index, update ->
-            updateTransfer(
-                transfer = update.transfer,
-                deletedAttributeIds = emptySet(),
-                updatedAttributes = emptyMap(),
-                newAttributes = update.newAttributes,
-                transactionId = update.transfer.id,
-                source = updateSources[index],
-            )
-        }
+        updateTransfers(
+            updates.mapIndexed { index, update ->
+                TransferEdit(
+                    transfer = update.transfer,
+                    newAttributes = update.newAttributes,
+                    transactionId = update.transfer.id,
+                    source = updateSources[index],
+                )
+            },
+        )
         return created
     }
 }
@@ -117,4 +95,25 @@ data class TransferUpdate(
     val transfer: Transfer,
     val newAttributes: List<NewAttribute>,
     val removedAttributes: Map<AttributeTypeId, Set<String>?> = emptyMap(),
+)
+
+/**
+ * A change to an existing transfer, applied by [TransactionWriteRepository.updateTransfers] with ONE revision
+ * bump: without it, updating the transfer would bump the revision (1→2) and each attribute change again
+ * (2→3, …). Whether only the transfer, only its attributes or both change, the revision goes to 2.
+ *
+ * @param transfer The updated transfer (null if transfer fields didn't change)
+ * @param deletedAttributeIds IDs of attributes to delete
+ * @param updatedAttributes Map of attribute ID to (typeId, value) for updates
+ * @param newAttributes List of (typeId, value) pairs for new attributes
+ * @param transactionId The transaction ID (needed when transfer is null)
+ * @param source Provenance recorded against the new revision.
+ */
+data class TransferEdit(
+    val transfer: Transfer?,
+    val transactionId: TransferId,
+    val source: Source,
+    val deletedAttributeIds: Set<Long> = emptySet(),
+    val updatedAttributes: Map<Long, NewAttribute> = emptyMap(),
+    val newAttributes: List<NewAttribute> = emptyList(),
 )

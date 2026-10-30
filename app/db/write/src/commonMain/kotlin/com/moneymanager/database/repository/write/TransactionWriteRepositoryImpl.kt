@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
+import com.moneymanager.domain.repository.write.TransferEdit
 import com.moneymanager.domain.repository.write.TransferUpdate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -72,95 +73,95 @@ class TransactionWriteRepositoryImpl(
             createdIds
         }
 
-    override suspend fun updateTransfer(
-        transfer: Transfer?,
-        deletedAttributeIds: Set<Long>,
-        updatedAttributes: Map<Long, NewAttribute>,
-        newAttributes: List<NewAttribute>,
-        transactionId: TransferId,
-        source: Source,
-    ): Unit =
+    override suspend fun updateTransfers(edits: List<TransferEdit>): Unit =
         withContext(Dispatchers.Default) {
-            val hasAttributeChanges =
-                deletedAttributeIds.isNotEmpty() ||
-                    updatedAttributes.isNotEmpty() ||
-                    newAttributes.isNotEmpty()
+            transferWriteQueries.transaction { edits.forEach { applyEdit(it) } }
+        }
 
-            // Use transfer.id when available, fall back to transactionId for attribute-only updates
-            val effectiveTransactionId = transfer?.id ?: transactionId
+    /** Applies one [TransferEdit]. Must be called inside an open transaction. */
+    private suspend fun applyEdit(edit: TransferEdit) {
+        val transfer = edit.transfer
+        val deletedAttributeIds = edit.deletedAttributeIds
+        val updatedAttributes = edit.updatedAttributes
+        val newAttributes = edit.newAttributes
+        val hasAttributeChanges =
+            deletedAttributeIds.isNotEmpty() ||
+                updatedAttributes.isNotEmpty() ||
+                newAttributes.isNotEmpty()
 
-            transferWriteQueries.transaction {
-                // Step 1: Update transfer if provided (bumps revision via trigger)
-                if (transfer != null) {
-                    transferWriteQueries.update(
-                        timestamp = transfer.timestamp.toEpochMilliseconds(),
-                        description = transfer.description,
-                        source_account_id = transfer.sourceAccountId.id,
-                        target_account_id = transfer.targetAccountId.id,
-                        asset_id = transfer.amount.asset.id.id,
-                        amount = transfer.amount.amount.toString(),
-                        id = transfer.id.id,
-                    )
-                } else if (hasAttributeChanges) {
-                    // No transfer change but has attribute changes - need to bump revision first
-                    transferWriteQueries.bumpRevisionOnly(effectiveTransactionId.id)
+        // Use transfer.id when available, fall back to transactionId for attribute-only updates
+        val effectiveTransactionId = transfer?.id ?: edit.transactionId
+
+        // Step 1: Update transfer if provided (bumps revision via trigger)
+        if (transfer != null) {
+            transferWriteQueries.update(
+                timestamp = transfer.timestamp.toEpochMilliseconds(),
+                description = transfer.description,
+                source_account_id = transfer.sourceAccountId.id,
+                target_account_id = transfer.targetAccountId.id,
+                asset_id = transfer.amount.asset.id.id,
+                amount = transfer.amount.amount.toString(),
+                id = transfer.id.id,
+            )
+        } else if (hasAttributeChanges) {
+            // No transfer change but has attribute changes - need to bump revision first
+            transferWriteQueries.bumpRevisionOnly(effectiveTransactionId.id)
+        }
+
+        // Step 2: Apply attribute changes in creation mode (record audit but don't bump again)
+        if (hasAttributeChanges) {
+            database.beginCreationMode()
+            try {
+                // Delete attributes
+                deletedAttributeIds.forEach { id ->
+                    transferAttributeWriteQueries.deleteById(id)
                 }
 
-                // Step 2: Apply attribute changes in creation mode (record audit but don't bump again)
-                if (hasAttributeChanges) {
-                    database.beginCreationMode()
-                    try {
-                        // Delete attributes
-                        deletedAttributeIds.forEach { id ->
-                            transferAttributeWriteQueries.deleteById(id)
-                        }
-
-                        // Update attributes
-                        updatedAttributes.forEach { (id, attr) ->
-                            // Check if type changed (requires delete + insert)
-                            val current = transferAttributeSelectQueries.selectById(id).awaitAsOneOrNull()
-                            val slot = current?.let { it.attribute_type_id to it.group_key }
-                            if (slot != null && slot != (attr.typeId.id to attr.groupKey)) {
-                                // Type or group changed: the row belongs in a different UNIQUE slot, so
-                                // delete and recreate rather than UPDATE it where it sits.
-                                transferAttributeWriteQueries.deleteById(id)
-                                transferAttributeWriteQueries.insert(
-                                    transaction_id = effectiveTransactionId.id,
-                                    attribute_type_id = attr.typeId.id,
-                                    attribute_value = attr.value,
-                                    group_key = attr.groupKey,
-                                )
-                            } else {
-                                // Only value changed
-                                transferAttributeWriteQueries.updateValue(attr.value, id)
-                            }
-                        }
-
-                        // Insert new attributes
-                        newAttributes.forEach { attr ->
-                            transferAttributeWriteQueries.insert(
-                                transaction_id = effectiveTransactionId.id,
-                                attribute_type_id = attr.typeId.id,
-                                attribute_value = attr.value,
-                                group_key = attr.groupKey,
-                            )
-                        }
-                    } finally {
-                        database.endCreationMode()
+                // Update attributes
+                updatedAttributes.forEach { (id, attr) ->
+                    // Check if type changed (requires delete + insert)
+                    val current = transferAttributeSelectQueries.selectById(id).awaitAsOneOrNull()
+                    val slot = current?.let { it.attribute_type_id to it.group_key }
+                    if (slot != null && slot != (attr.typeId.id to attr.groupKey)) {
+                        // Type or group changed: the row belongs in a different UNIQUE slot, so
+                        // delete and recreate rather than UPDATE it where it sits.
+                        transferAttributeWriteQueries.deleteById(id)
+                        transferAttributeWriteQueries.insert(
+                            transaction_id = effectiveTransactionId.id,
+                            attribute_type_id = attr.typeId.id,
+                            attribute_value = attr.value,
+                            group_key = attr.groupKey,
+                        )
+                    } else {
+                        // Only value changed
+                        transferAttributeWriteQueries.updateValue(attr.value, id)
                     }
                 }
 
-                // Record the source against the new revision.
-                val persisted = transferSelectQueries.selectById(effectiveTransactionId.id, TransferMapper::mapRaw).awaitAsOne()
-                database.recordSource(
-                    deviceId,
-                    EntityType.TRANSFER,
-                    persisted.id.id,
-                    persisted.revisionId,
-                    source,
-                )
+                // Insert new attributes
+                newAttributes.forEach { attr ->
+                    transferAttributeWriteQueries.insert(
+                        transaction_id = effectiveTransactionId.id,
+                        attribute_type_id = attr.typeId.id,
+                        attribute_value = attr.value,
+                        group_key = attr.groupKey,
+                    )
+                }
+            } finally {
+                database.endCreationMode()
             }
         }
+
+        // Record the source against the new revision.
+        val persisted = transferSelectQueries.selectById(effectiveTransactionId.id, TransferMapper::mapRaw).awaitAsOne()
+        database.recordSource(
+            deviceId,
+            EntityType.TRANSFER,
+            persisted.id.id,
+            persisted.revisionId,
+            edit.source,
+        )
+    }
 
     override suspend fun importTransfers(
         transfers: List<Transfer>,

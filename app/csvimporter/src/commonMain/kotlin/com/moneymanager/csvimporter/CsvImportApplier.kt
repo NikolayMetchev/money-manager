@@ -904,12 +904,14 @@ suspend fun runCsvImport(
     // Mark mapping errors as ERROR status in database and save error messages. Skipped rows are settled
     // too, so they never count as pending again.
     importEngine.applyCsvImportMutations(
-        finalPrep.errorRows.flatMap { errorRow ->
-            listOf(
-                CsvImportMutation.UpdateRowStatus(csvImport.id, errorRow.rowIndex, ImportStatus.ERROR.name),
-                CsvImportMutation.SaveError(csvImport.id, errorRow.rowIndex, errorRow.errorMessage),
-            )
-        } + finalPrep.skippedRowMutations(csvImport.id),
+        listOf(
+            CsvImportMutation.UpdateRowStatuses(
+                csvImport.id,
+                ImportStatus.ERROR.name,
+                finalPrep.errorRows.associate { it.rowIndex to null },
+            ),
+            CsvImportMutation.SaveErrors(csvImport.id, finalPrep.errorRows.associate { it.rowIndex to it.errorMessage }),
+        ) + finalPrep.skippedRowMutations(csvImport.id),
     )
 
     // Pre-resolve attribute types. The unidentified-counterparty marker is engine-facing rather than a

@@ -149,9 +149,10 @@ class AccountWriteRepositoryImpl(
             }
         }
 
-    override suspend fun deleteAccount(id: AccountId): Unit =
+    override suspend fun deleteAccounts(ids: Collection<AccountId>): Unit =
         withContext(Dispatchers.Default) {
-            writeQueries.delete(id.id)
+            if (ids.isEmpty()) return@withContext
+            database.transaction { ids.forEach { writeQueries.delete(it.id) } }
         }
 
     override suspend fun mergeAccounts(

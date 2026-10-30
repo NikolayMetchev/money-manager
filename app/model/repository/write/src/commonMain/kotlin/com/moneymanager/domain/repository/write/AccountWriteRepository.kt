@@ -41,7 +41,8 @@ interface AccountWriteRepository : AccountReadRepository {
         source: Source,
     ): Long
 
-    suspend fun deleteAccount(id: AccountId)
+    /** Deletes [ids] in one database transaction: one commit for the lot rather than one per account. */
+    suspend fun deleteAccounts(ids: Collection<AccountId>)
 
     /**
      * Merges [deletedAccount] into [survivingAccount]: reassigns all of the deleted account's

@@ -56,7 +56,7 @@ class AccountRepositoryImplTest : DbTest() {
                     Account(id = AccountId(0), name = "Shared", openingDate = now),
                 )
             repositories.accountRepository.updateAccount(Account(id = b, name = "B Renamed", openingDate = now))
-            repositories.accountRepository.deleteAccount(b)
+            repositories.accountRepository.deleteAccounts(listOf(b))
 
             // "Shared" must resolve to the still-existing A, not be dropped because B's newer row won MAX(id).
             assertEquals(a, repositories.accountRepository.getPreviousAccountNames()["shared"])
@@ -192,7 +192,7 @@ class AccountRepositoryImplTest : DbTest() {
                 )
             val accountId = repositories.accountRepository.createAccount(account)
 
-            repositories.accountRepository.deleteAccount(accountId)
+            repositories.accountRepository.deleteAccounts(listOf(accountId))
 
             val deleted = repositories.accountRepository.getAccountById(accountId).first()
             assertEquals(null, deleted)
@@ -703,7 +703,7 @@ class AccountRepositoryImplTest : DbTest() {
                     Account(id = AccountId(0), name = "No Transfers", openingDate = now),
                 )
 
-            repositories.accountRepository.deleteAccount(accountId)
+            repositories.accountRepository.deleteAccounts(listOf(accountId))
 
             val deleted = repositories.accountRepository.getAccountById(accountId).first()
             assertEquals(null, deleted)

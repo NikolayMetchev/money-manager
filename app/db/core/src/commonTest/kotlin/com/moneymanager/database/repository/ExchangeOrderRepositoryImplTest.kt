@@ -126,7 +126,7 @@ class ExchangeOrderRepositoryImplTest : DbTest() {
             val order = upsert(accountId)
             assertEquals(1L, repositories.exchangeOrderRepository.countOrdersByAccount(accountId).first())
 
-            repositories.accountRepository.deleteAccount(accountId)
+            repositories.accountRepository.deleteAccounts(listOf(accountId))
 
             assertEquals(0L, repositories.exchangeOrderRepository.countOrdersByAccount(accountId).first())
             assertEquals(null, repositories.exchangeOrderRepository.getOrderById(order.id).first())

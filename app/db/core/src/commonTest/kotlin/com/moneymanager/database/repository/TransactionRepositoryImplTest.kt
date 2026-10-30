@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.repository.write.TransferEdit
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
@@ -135,13 +136,17 @@ class TransactionRepositoryImplTest : DbTest() {
                         targetAccountId = sourceAccountId,
                         amount = Money.fromDisplayValue("100", currency),
                     )
-                repositories.transactionRepository.updateTransfer(
-                    transfer = invalidTransfer,
-                    deletedAttributeIds = emptySet(),
-                    updatedAttributes = emptyMap(),
-                    newAttributes = emptyList(),
-                    source = Source.Manual,
-                    transactionId = createdTransfer.id,
+                repositories.transactionRepository.updateTransfers(
+                    listOf(
+                        TransferEdit(
+                            transfer = invalidTransfer,
+                            deletedAttributeIds = emptySet(),
+                            updatedAttributes = emptyMap(),
+                            newAttributes = emptyList(),
+                            source = Source.Manual,
+                            transactionId = createdTransfer.id,
+                        ),
+                    ),
                 )
             }
         }
