@@ -240,7 +240,7 @@ private suspend fun rerunPartners(
             .filter { it.isOrphanedBy(deletedIds) }
             .mapNotNull { it.update.existingId }
     if (orphaned.isEmpty()) return RerunPartners()
-    val createdByFile = mutableMapOf<Source.Csv, Map<TransferId, Source>?>()
+    val createdByFile = mutableMapOf<Source.Csv, Map<TransferId, Source>>()
 
     // What [partner]'s file created, when another file's row created it and that file can be re-run row by row.
     suspend fun createdAlongside(partner: TransferId): Pair<Source.Csv, Map<TransferId, Source>>? =
@@ -254,14 +254,15 @@ private suspend fun rerunPartners(
             }.firstNotNullOfOrNull { file ->
                 val created =
                     createdByFile.getOrPut(file) {
-                        // A row that created a trade too can't be re-run without re-creating the trade.
+                        // A row that created a trade too can't be re-run without re-creating the trade, so such a
+                        // file offers none of its rows (empty, rather than null, so getOrPut keeps it).
                         if (reads.csvImportRepository.getTradeIdsCreatedByImport(file.importId).isEmpty()) {
                             reads.transferSourceRepository.getTransfersCreatedBy(file)
                         } else {
-                            null
+                            emptyMap()
                         }
                     }
-                created?.takeIf { partner in it }?.let { file to it }
+                created.takeIf { partner in it }?.let { file to it }
             }
 
     val transfers = mutableMapOf<TransferId, Source>()
