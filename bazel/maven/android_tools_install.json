@@ -3,7 +3,7 @@
   "__INPUT_ARTIFACTS_HASH": {
     "com.android.tools.build:builder": 1163505021,
     "com.android.tools.build:gradle": -1651580133,
-    "com.android.tools.build:gradle-api": -1474801499,
+    "com.android.tools.build:gradle-api": -1485304603,
     "com.google.code.findbugs:jsr305": 86638414,
     "com.google.code.gson:gson": -1217141342,
     "com.google.crypto.tink:tink": -841464665,
@@ -27,40 +27,40 @@
   },
   "__RESOLVED_ARTIFACTS_HASH": {
     "androidx.databinding:databinding-common": -363117406,
-    "androidx.databinding:databinding-compiler-common": -1484745139,
+    "androidx.databinding:databinding-compiler-common": 1694465015,
     "com.android.databinding:baseLibrary": -1243719728,
-    "com.android.tools.analytics-library:crash": 1783472759,
+    "com.android.tools.analytics-library:crash": -316771807,
     "com.android.tools.analytics-library:protos": -811090399,
-    "com.android.tools.analytics-library:shared": 1192907260,
-    "com.android.tools.analytics-library:tracker": -251659606,
+    "com.android.tools.analytics-library:shared": -870743852,
+    "com.android.tools.analytics-library:tracker": -374195568,
     "com.android.tools.build.jetifier:jetifier-core": 413517567,
     "com.android.tools.build.jetifier:jetifier-processor": -1954709276,
     "com.android.tools.build:aapt2-proto": -334134589,
-    "com.android.tools.build:aaptcompiler": 1930878084,
+    "com.android.tools.build:aaptcompiler": -2120898336,
     "com.android.tools.build:apksig": 716803789,
     "com.android.tools.build:apkzlib": -1148921343,
-    "com.android.tools.build:builder": 1319858410,
-    "com.android.tools.build:builder-model": -531287877,
-    "com.android.tools.build:builder-test-api": -2121746616,
+    "com.android.tools.build:builder": 301177026,
+    "com.android.tools.build:builder-model": 706058705,
+    "com.android.tools.build:builder-test-api": 1131201262,
     "com.android.tools.build:bundletool": 226614824,
-    "com.android.tools.build:gradle": 425469075,
-    "com.android.tools.build:gradle-api": 849598073,
-    "com.android.tools.build:gradle-common-api": 1804530715,
-    "com.android.tools.build:gradle-settings-api": -1025450001,
-    "com.android.tools.build:manifest-merger": -643133770,
-    "com.android.tools.ddms:ddmlib": 1063544332,
-    "com.android.tools.layoutlib:layoutlib-api": -881924208,
-    "com.android.tools.lint:lint-model": 183825017,
-    "com.android.tools.lint:lint-typedef-remover": 208380655,
+    "com.android.tools.build:gradle": -1488972717,
+    "com.android.tools.build:gradle-api": -218205822,
+    "com.android.tools.build:gradle-common-api": -133065819,
+    "com.android.tools.build:gradle-settings-api": 1852748880,
+    "com.android.tools.build:manifest-merger": 940634764,
+    "com.android.tools.ddms:ddmlib": -842199779,
+    "com.android.tools.layoutlib:layoutlib-api": -122627752,
+    "com.android.tools.lint:lint-model": -460496526,
+    "com.android.tools.lint:lint-typedef-remover": 864093721,
     "com.android.tools.utp:gradle-work-action-api": 1321762346,
-    "com.android.tools:annotations": -818232588,
-    "com.android.tools:common": -664747831,
-    "com.android.tools:dvlib": -2097732240,
-    "com.android.tools:repository": 104052665,
-    "com.android.tools:sdk-common": 1384067517,
-    "com.android.tools:sdklib": 1933567635,
-    "com.android:signflinger": 2041135288,
-    "com.android:zipflinger": -963383161,
+    "com.android.tools:annotations": 2036980914,
+    "com.android.tools:common": -1279647048,
+    "com.android.tools:dvlib": -1770481794,
+    "com.android.tools:repository": -458186967,
+    "com.android.tools:sdk-common": 103889086,
+    "com.android.tools:sdklib": -790019769,
+    "com.android:signflinger": -1957174776,
+    "com.android:zipflinger": -496800995,
     "com.google.auto.value:auto-value-annotations": -1038469351,
     "com.google.code.findbugs:jsr305": 870839855,
     "com.google.code.gson:gson": 2019875040,
@@ -233,7 +233,7 @@
       "shasums": {
         "jar": "3cdf0caf8b2a104eb6239d4ea3e95a6c20ba2e76fa0ad1134c8e93e7757bd432"
       },
-      "version": "9.5.0"
+      "version": "9.4.1"
     },
     "com.android.tools.build:bundletool": {
       "shasums": {
@@ -249,15 +249,15 @@
     },
     "com.android.tools.build:gradle-api": {
       "shasums": {
-        "jar": "823d13843e854cdbffaaba566c7fd8e9ba4420ad27de1558370cedd382a2e2f1"
+        "jar": "f2996c141c2b36dd8a02075395f7abc3d2a7a648d6b08f867700ba88d29b18e8"
       },
-      "version": "9.5.0"
+      "version": "9.4.1"
     },
     "com.android.tools.build:gradle-common-api": {
       "shasums": {
-        "jar": "4d0ba07b257875ca6381316ff463a76feeaad6fb39d810ba27db6dfe890667a3"
+        "jar": "5f8ceb1738037707d166f79b13bde052024a63fc52b8ad11ad2cbc780efbb8d2"
       },
-      "version": "9.5.0"
+      "version": "9.4.1"
     },
     "com.android.tools.build:gradle-settings-api": {
       "shasums": {
@@ -273,9 +273,9 @@
     },
     "com.android.tools.ddms:ddmlib": {
       "shasums": {
-        "jar": "a816d5bb12077fcb320c949cf46956a83e68fbeb915581863b77f0f252271d65"
+        "jar": "ad7b49fc07ca341d205fb7eb17cd0610a18cd1678e55b6b4a869bbdee3fbf0e3"
       },
-      "version": "32.5.0"
+      "version": "32.4.1"
     },
     "com.android.tools.layoutlib:layoutlib-api": {
       "shasums": {
@@ -303,15 +303,15 @@
     },
     "com.android.tools:annotations": {
       "shasums": {
-        "jar": "c2c8afae90aa72cf1b94e345f793f47e4c46336f1ed5b0503afc61326035163a"
+        "jar": "32e90226ae4c7b59ed61b06689ae8356bab080cd79f6569455fd92925439a339"
       },
-      "version": "32.5.0"
+      "version": "32.4.1"
     },
     "com.android.tools:common": {
       "shasums": {
-        "jar": "8a5e42e351ce4a0e7d33470387a219165c54da789ab65f1ec5d6095fe6cf05fc"
+        "jar": "cace5b28f2342119fe1a2db5baa36f8bd3391a086788e04fb8326bb70d6c4989"
       },
-      "version": "32.5.0"
+      "version": "32.4.1"
     },
     "com.android.tools:dvlib": {
       "shasums": {
