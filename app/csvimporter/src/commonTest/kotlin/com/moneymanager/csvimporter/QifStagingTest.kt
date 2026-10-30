@@ -39,9 +39,4 @@ class QifStagingTest {
 
         assertEquals(listOf("-1.00"), parsed.rows.map { it[amount] })
     }
-
-    @Test
-    fun onlyQifFileNamesAreQif() {
-        assertEquals(listOf(true, true, false), listOf("a.qif", "B.QIF", "c.csv").map(::isQifFileName))
-    }
 }

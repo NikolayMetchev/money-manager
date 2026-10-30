@@ -10,8 +10,8 @@ expect class FilePickerLauncher {
     fun launch()
 }
 
-/** Platform-specific file picker launcher that reads the selection as raw bytes (e.g. `.xlsx`). */
-expect class BinaryFilePickerLauncher {
+/** Platform-specific multi-file picker launcher that reads the selection as raw bytes (e.g. `.xlsx`). */
+expect class MultipleBinaryFilePickerLauncher {
     /**
      * Opens the file picker dialog.
      */

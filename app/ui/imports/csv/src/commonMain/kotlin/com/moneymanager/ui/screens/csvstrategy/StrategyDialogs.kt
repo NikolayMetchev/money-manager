@@ -29,10 +29,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.moneymanager.csvimporter.isQifFileName
 import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.humanreadable.HumanReadable
 import com.moneymanager.importengineapi.deleteCsvStrategy
@@ -140,7 +141,7 @@ fun SelectCsvImportDialog(
         allImports.filter {
             when {
                 it.id in pdfImportIds -> SampleFileKind.PDF
-                isQifFileName(it.originalFileName) -> SampleFileKind.QIF
+                importFileKind(it.originalFileName) == ImportFileKind.QIF -> SampleFileKind.QIF
                 else -> SampleFileKind.CSV
             } == kind
         }

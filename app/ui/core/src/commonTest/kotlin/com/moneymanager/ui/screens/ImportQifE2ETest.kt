@@ -54,7 +54,7 @@ import kotlin.uuid.Uuid
 
 /**
  * End-to-end test for the QIF import flow: a QIF file is staged as a CSV import of its rows and listed on the
- * CSV tab. The built-in strategies (CSV ones referencing columns like "Name", and the bank QIF ones with
+ * Files tab. The built-in strategies (CSV ones referencing columns like "Name", and the bank QIF ones with
  * content rules) are installed too, so this also guards against the apply dialog auto-selecting one of them
  * for a QIF file they don't recognise.
  */
@@ -175,10 +175,9 @@ class ImportQifE2ETest {
             waitForIdle()
             waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
 
-            // Imports -> CSV tab -> open the import
+            // Imports (Files tab) -> open the import
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
-            onNodeWithText("CSV", useUnmergedTree = true).performClick()
             waitUntilExactlyOneExists(hasText("statement.qif"), timeoutMillis = 15000)
             onNodeWithText("statement.qif").performClick()
 
@@ -240,7 +239,6 @@ class ImportQifE2ETest {
             waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
-            onNodeWithText("CSV", useUnmergedTree = true).performClick()
 
             // Apply to the first file (creates the transfers), then to the second (all duplicates).
             for (file in listOf("first.qif", "second.qif")) {
@@ -312,7 +310,6 @@ class ImportQifE2ETest {
             waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
-            onNodeWithText("CSV", useUnmergedTree = true).performClick()
 
             // The Unimported tab shows a single "Import all (2)" action.
             waitUntilExactlyOneExists(hasText("Import all (2)"), timeoutMillis = 15000)
@@ -386,7 +383,6 @@ class ImportQifE2ETest {
             waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
-            onNodeWithText("CSV", useUnmergedTree = true).performClick()
             waitUntilExactlyOneExists(hasText("Import all (2)"), timeoutMillis = 15000)
             onNodeWithText("Import all (2)").performClick()
             waitUntilAtLeastOneExists(hasText("Import 2 files") and isEnabled(), timeoutMillis = 15000)

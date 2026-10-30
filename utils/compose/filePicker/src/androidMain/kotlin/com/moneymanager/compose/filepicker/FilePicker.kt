@@ -42,43 +42,21 @@ actual fun rememberFilePicker(
 }
 
 @Composable
-actual fun rememberMultipleFilePicker(
+actual fun rememberMultipleBinaryFilePicker(
     mimeTypes: List<String>,
-    onResult: (List<FilePickerResult>) -> Unit,
-): MultipleFilePickerLauncher {
+    onResult: (List<BinaryFilePickerResult>) -> Unit,
+): MultipleBinaryFilePickerLauncher {
     val context = LocalContext.current
 
     val launcher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.OpenMultipleDocuments(),
         ) { uris: List<Uri> ->
-            onResult(uris.mapNotNull { uri -> readFileContent(context, uri) })
+            onResult(uris.mapNotNull { uri -> readBinaryFileContent(context, uri) })
         }
 
     return remember(launcher, mimeTypes) {
-        MultipleFilePickerLauncher(
-            mimeTypes = mimeTypes.toTypedArray(),
-            launcher = { types -> launcher.launch(types) },
-        )
-    }
-}
-
-@Composable
-actual fun rememberBinaryFilePicker(
-    mimeTypes: List<String>,
-    onResult: (BinaryFilePickerResult?) -> Unit,
-): BinaryFilePickerLauncher {
-    val context = LocalContext.current
-
-    val launcher =
-        rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.OpenDocument(),
-        ) { uri: Uri? ->
-            onResult(uri?.let { readBinaryFileContent(context, it) })
-        }
-
-    return remember(launcher, mimeTypes) {
-        BinaryFilePickerLauncher(
+        MultipleBinaryFilePickerLauncher(
             mimeTypes = mimeTypes.toTypedArray(),
             launcher = { types -> launcher.launch(types) },
         )
@@ -105,7 +83,7 @@ private fun readBinaryFileContent(
     uri: Uri,
 ): BinaryFilePickerResult? {
     return try {
-        val fileName = getFileName(context, uri) ?: "unknown.xlsx"
+        val fileName = getFileName(context, uri) ?: "unknown"
         val lastModified = getLastModified(context, uri)
         val inputStream = context.contentResolver.openInputStream(uri) ?: return null
         val bytes = inputStream.use { it.readBytes() }

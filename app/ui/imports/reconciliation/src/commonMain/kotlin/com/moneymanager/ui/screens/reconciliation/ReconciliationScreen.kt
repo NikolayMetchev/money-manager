@@ -103,7 +103,7 @@ fun ReconciliationScreen(
     if (loadedSources.isEmpty()) {
         Text(
             "No reconciliation sources yet. Install a reconciliation strategy (e.g. Koinly) from the strategy " +
-                "catalog, then import its export on the CSV tab.",
+                "catalog, then import its export on the Files tab.",
             modifier = Modifier.padding(16.dp),
         )
         return

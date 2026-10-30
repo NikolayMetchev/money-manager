@@ -25,25 +25,14 @@ actual class FilePickerLauncher(
     }
 }
 
-actual class MultipleFilePickerLauncher(
+actual class MultipleBinaryFilePickerLauncher(
     private val mimeTypes: List<String>,
-    private val onResult: (List<FilePickerResult>) -> Unit,
+    private val onResult: (List<BinaryFilePickerResult>) -> Unit,
 ) {
     actual fun launch() {
         val files = showLoadDialog("Select files", mimeTypes, multiple = true)
         files.firstOrNull()?.parent?.let { localSettings.putString(KEY_LAST_DIRECTORY, it) }
-        onResult(files.mapNotNull { readFileAsResult(it) })
-    }
-}
-
-actual class BinaryFilePickerLauncher(
-    private val mimeTypes: List<String>,
-    private val onResult: (BinaryFilePickerResult?) -> Unit,
-) {
-    actual fun launch() {
-        val files = showLoadDialog("Select a file", mimeTypes, multiple = false)
-        files.firstOrNull()?.parent?.let { localSettings.putString(KEY_LAST_DIRECTORY, it) }
-        onResult(files.firstOrNull()?.let { readFileAsBinaryResult(it) })
+        onResult(files.mapNotNull { readFileAsBinaryResult(it) })
     }
 }
 

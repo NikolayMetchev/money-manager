@@ -9,9 +9,6 @@ import com.moneymanager.qif.QifParser
 import com.moneymanager.qif.QifRecord
 import kotlin.time.Instant
 
-/** Whether [fileName] is a QIF file, which is staged from its records rather than read as CSV text. */
-fun isQifFileName(fileName: String): Boolean = fileName.substringAfterLast('.', "").equals("qif", ignoreCase = true)
-
 /**
  * The QIF text [content] as the CSV rows it is staged as, over [QifColumns.headers]: one row per transaction, or
  * one per split of a split transaction (a split's own memo, else the transaction's). Records that aren't

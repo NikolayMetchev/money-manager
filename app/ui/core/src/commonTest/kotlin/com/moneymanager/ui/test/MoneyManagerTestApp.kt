@@ -38,7 +38,7 @@ private sealed class TestDatabaseState {
     ) : TestDatabaseState()
 }
 
-/** Like the desktop app, the tests offer import folders (and so the Directories tab), but never open one. */
+/** Like the desktop app, the tests offer import folders (and so the Files tab's directories panel), but never open one. */
 private object NoFolderAccess : ImportFileSourceFactory {
     override suspend fun create(directory: ImportDirectory): ImportFileSource = error("UI tests don't open import folders")
 }

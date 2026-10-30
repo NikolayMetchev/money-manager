@@ -111,9 +111,12 @@ fun ImportTabsRow(
 
 /** A centred placeholder filling the rest of an import screen when there is nothing to list. */
 @Composable
-fun ImportsEmptyMessage(text: String) {
+fun ImportsEmptyMessage(
+    text: String,
+    modifier: Modifier = Modifier.fillMaxSize(),
+) {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier,
         contentAlignment = Alignment.Center,
     ) {
         Text(

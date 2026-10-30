@@ -92,11 +92,11 @@ class NavigationHistoryTest {
     @Test
     fun replaceCurrentScreenSwapsLastEntryWithoutTouchingHistory() {
         val history = NavigationHistory(Screen.Accounts())
-        history.navigateTo(Screen.Imports(ImportTab.DIRECTORIES))
+        history.navigateTo(Screen.Imports(ImportTab.FILES))
 
-        history.replaceCurrentScreen(Screen.Imports(ImportTab.CSV))
+        history.replaceCurrentScreen(Screen.Imports(ImportTab.API))
 
-        assertEquals(Screen.Imports(ImportTab.CSV), history.currentScreen)
+        assertEquals(Screen.Imports(ImportTab.API), history.currentScreen)
         assertEquals(2, history.backStack.size)
 
         history.navigateBack()

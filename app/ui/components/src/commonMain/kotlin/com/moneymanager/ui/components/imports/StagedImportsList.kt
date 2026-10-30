@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,6 +39,8 @@ import kotlin.time.Instant
 
 private val TREE_INDENT = 20.dp
 
+internal const val NO_MATCHING_FILES_MESSAGE = "No files match the current filters."
+
 /** What the list needs a file's card to show where it draws it; see [StagedImportCard]. */
 data class StagedImportCardPlacement(
     val ignored: Boolean,
@@ -57,9 +58,10 @@ data class StagedImportCardPlacement(
  * Unimported tab is a folder tree split by matched strategy, the Imported tab is grouped by the strategy
  * each file was applied with, and the Ignored tab is flat. Each folder and group offers its scoped bulk
  * action through [onImportAll], [onReimportAll] and (for formats that can unimport) [onUnimportAll];
- * [card] draws one file. [data] comes from [rememberStagedImportsData].
+ * [card] draws one file. [data] comes from [rememberStagedImportsData]. Only the files [filter] keeps are
+ * counted, listed and acted on. [header] goes first in the same scrolling list, above the tabs.
  */
-@Suppress("LongParameterList", "LongMethod")
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 fun <K : Any, F : StagedImport<K>> StagedImportsTabs(
     imports: List<F>,
@@ -68,51 +70,21 @@ fun <K : Any, F : StagedImport<K>> StagedImportsTabs(
     onReimportAll: (List<F>) -> Unit,
     onSetIgnored: (List<F>, Boolean) -> Unit,
     onUnimportAll: ((List<F>) -> Unit)? = null,
+    filter: StagedImportFilter = StagedImportFilter(),
+    header: LazyListScope.() -> Unit = {},
     card: @Composable (F, StagedImportCardPlacement) -> Unit,
 ) {
+    val kept =
+        remember(imports, filter, data.importDirectories, data.directories, data.matchedStrategies) {
+            filterStagedImports(imports, filter, data.importDirectories, data.directories, data.matchedStrategies)
+        }
     // Split files into those still needing a strategy applied vs. already imported, so a large set of
     // files is easy to work through. The Unimported tab is the default/actionable one. Ignored files
     // are dismissed by the user and kept out of both actionable lists.
-    val unimported = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt == null } }
-    val importedList = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt != null } }
-    val ignoredList = remember(imports) { imports.filter { it.ignored } }
+    val unimported = remember(kept) { kept.filter { !it.ignored && it.lastAppliedAt == null } }
+    val importedList = remember(kept) { kept.filter { !it.ignored && it.lastAppliedAt != null } }
+    val ignoredList = remember(kept) { kept.filter { it.ignored } }
     var selectedTab by remember { mutableStateOf(ImportTab.UNIMPORTED) }
-
-    ImportTabsRow(
-        selectedTab = selectedTab,
-        unimportedCount = unimported.size,
-        importedCount = importedList.size,
-        ignoredCount = ignoredList.size,
-        onTabSelected = { selectedTab = it },
-    )
-
-    Spacer(modifier = Modifier.height(12.dp))
-
-    if (selectedTab == ImportTab.UNIMPORTED && unimported.isNotEmpty()) {
-        Button(onClick = { onImportAll(unimported) }, modifier = Modifier.fillMaxWidth()) {
-            Text("Import all (${unimported.size})")
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-    }
-
-    if (selectedTab == ImportTab.IMPORTED && importedList.isNotEmpty()) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { onReimportAll(importedList) }, modifier = Modifier.weight(1f)) {
-                Text("Re-import all (${importedList.size})")
-            }
-            if (onUnimportAll != null) {
-                OutlinedButton(
-                    onClick = { onUnimportAll(importedList) },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) {
-                    Text("Unimport all (${importedList.size})")
-                }
-            }
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-    }
-
     val shown =
         when (selectedTab) {
             ImportTab.UNIMPORTED -> unimported
@@ -120,28 +92,72 @@ fun <K : Any, F : StagedImport<K>> StagedImportsTabs(
             else -> ignoredList
         }
     val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
-    when {
-        shown.isEmpty() -> {
-            ImportsEmptyMessage(emptyImportTabMessage(selectedTab))
+    val tree =
+        remember(unimported, data.importDirectories, data.directories, data.matchedStrategies) {
+            buildUnimportedDirectoryTree(unimported, data.importDirectories, data.directories, data.matchedStrategies)
+        }
+    val groups = remember(importedList) { buildImportedStrategyGroups(importedList) }
+
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        header()
+
+        item(key = "tabs") {
+            ImportTabsRow(
+                selectedTab = selectedTab,
+                unimportedCount = unimported.size,
+                importedCount = importedList.size,
+                ignoredCount = ignoredList.size,
+                onTabSelected = { selectedTab = it },
+            )
         }
 
-        selectedTab == ImportTab.IGNORED -> {
-            // Ignored files span every strategy and need no scoped bulk action, so this tab stays flat.
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (selectedTab == ImportTab.UNIMPORTED && unimported.isNotEmpty()) {
+            item(key = "bulk") {
+                Button(onClick = { onImportAll(unimported) }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                    Text("Import all (${unimported.size})")
+                }
+            }
+        }
+
+        if (selectedTab == ImportTab.IMPORTED && importedList.isNotEmpty()) {
+            item(key = "bulk") {
+                Row(modifier = Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { onReimportAll(importedList) }, modifier = Modifier.weight(1f)) {
+                        Text("Re-import all (${importedList.size})")
+                    }
+                    if (onUnimportAll != null) {
+                        OutlinedButton(
+                            onClick = { onUnimportAll(importedList) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        ) {
+                            Text("Unimport all (${importedList.size})")
+                        }
+                    }
+                }
+            }
+        }
+
+        when {
+            shown.isEmpty() -> {
+                item(key = "empty") {
+                    ImportsEmptyMessage(
+                        if (filter.isActive) NO_MATCHING_FILES_MESSAGE else emptyImportTabMessage(selectedTab),
+                        modifier = Modifier.fillParentMaxWidth().padding(vertical = 48.dp),
+                    )
+                }
+            }
+
+            selectedTab == ImportTab.IGNORED -> {
+                // Ignored files span every strategy and need no scoped bulk action, so this tab stays flat.
                 // Indexed `items` throughout: Qodana reports the List overload's import as unused when the
                 // element type is generic.
                 items(shown.size, key = { shown[it].id.toString() }) { index ->
                     card(shown[index], StagedImportCardPlacement(ignored = true, showDirectories = true))
                 }
             }
-        }
 
-        selectedTab == ImportTab.UNIMPORTED -> {
-            val tree =
-                remember(unimported, data.importDirectories, data.directories, data.matchedStrategies) {
-                    buildUnimportedDirectoryTree(unimported, data.importDirectories, data.directories, data.matchedStrategies)
-                }
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            selectedTab == ImportTab.UNIMPORTED -> {
                 tree.forEach { root ->
                     directoryTreeItems(
                         node = root,
@@ -163,11 +179,8 @@ fun <K : Any, F : StagedImport<K>> StagedImportsTabs(
                     }
                 }
             }
-        }
 
-        else -> {
-            val groups = remember(importedList) { buildImportedStrategyGroups(importedList) }
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            else -> {
                 groups.forEach { group ->
                     val sectionKey = "imported:${group.key?.toString() ?: "none"}"
                     val expanded = expandedSections[sectionKey] ?: true
@@ -220,7 +233,6 @@ private fun <F : StagedImport<*>> LazyListScope.directoryTreeItems(
             onToggleExpanded = { expandedSections[node.key] = !expanded },
             actionLabel = "Import all",
             onAction = { onImportAll(node.allImports) },
-            isWarning = false,
             titleStyle = if (depth == 0) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
             indent = TREE_INDENT * depth,
             badge = node.provider?.label(),
@@ -263,15 +275,16 @@ private fun <F : StagedImport<*>> LazyListScope.directoryTreeItems(
     }
 }
 
+/** A collapsible section's title row in an import list, with its count and an optional action. */
 @Composable
-private fun ImportSectionHeader(
+fun ImportSectionHeader(
     title: String,
     count: Int,
     expanded: Boolean,
     onToggleExpanded: () -> Unit,
-    actionLabel: String?,
-    onAction: () -> Unit,
-    isWarning: Boolean,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
+    isWarning: Boolean = false,
     titleStyle: TextStyle = MaterialTheme.typography.titleSmall,
     indent: Dp = 0.dp,
     // A small tag after the title, e.g. whether a directory is on Google Drive or local.

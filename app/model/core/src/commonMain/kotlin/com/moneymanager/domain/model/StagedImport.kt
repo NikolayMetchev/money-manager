@@ -19,3 +19,6 @@ interface StagedImport<Id : Any> {
     /** User dismissed this file: hidden from the actionable lists and skipped by "Import all". */
     val ignored: Boolean
 }
+
+/** The format this file was staged from, or null when its name has no extension Money Manager reads. */
+val StagedImport<*>.fileKind: ImportFileKind? get() = importFileKind(originalFileName)

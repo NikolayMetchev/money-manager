@@ -142,6 +142,7 @@ kmp_test(
         "@maven_kmp//:kotlinx_serialization_json",
         "@maven_kmp//:sqldelight_runtime",
         "//test/utils/parsers/pdf",
+        "@maven_kmp//:poi_ooxml",
     ],
     jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
     keep_deps = ["@maven_kmp//:androidx_test_runner"],
