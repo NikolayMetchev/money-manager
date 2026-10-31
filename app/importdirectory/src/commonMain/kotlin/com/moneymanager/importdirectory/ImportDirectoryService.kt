@@ -545,7 +545,6 @@ class ImportDirectoryService(
                                 provider = root.provider,
                                 folderRef = folder.folderRef,
                                 displayPath = folder.displayPath,
-                                providerConfig = root.providerConfig,
                                 deviceId = root.deviceId,
                                 topLevel = false,
                                 parentId = root.id,
@@ -565,7 +564,7 @@ class ImportDirectoryService(
 }
 
 // A throwaway directory used only to open an arbitrary folder [folderRef] via the file-source factory
-// (which reads provider/folderRef/providerConfig); other fields are inherited from [root].
+// (which reads provider/folderRef); other fields are inherited from [root].
 private fun probeDirectory(
     root: ImportDirectory,
     folderRef: String,

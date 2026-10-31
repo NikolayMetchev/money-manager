@@ -313,7 +313,6 @@ SELECT
     import_directory_provider.name AS provider_type,
     import_directory_audit.folder_ref,
     import_directory_audit.folder_display_path,
-    import_directory_audit.provider_config,
     import_directory_audit.device_id,
     import_directory_audit.top_level,
     import_directory_audit.parent_id,

@@ -257,7 +257,6 @@ CREATE TABLE import_directory_audit (
     provider_type_id INTEGER NOT NULL,
     folder_ref TEXT NOT NULL,
     folder_display_path TEXT,
-    provider_config TEXT,
     device_id INTEGER,
     top_level INTEGER NOT NULL,
     parent_id TEXT,
@@ -289,7 +288,6 @@ CREATE TABLE pass_through_account_audit (
     name TEXT NOT NULL,
     conduit_account_name TEXT NOT NULL,
     relationship_type_id INTEGER NOT NULL,
-    rules_json TEXT NOT NULL,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 

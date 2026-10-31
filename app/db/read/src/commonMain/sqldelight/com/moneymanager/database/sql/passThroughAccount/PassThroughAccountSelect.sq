@@ -5,3 +5,6 @@ SELECT * FROM pass_through_account ORDER BY name;
 -- Select a definition by id.
 selectById:
 SELECT * FROM pass_through_account WHERE id = ?;
+
+selectAllRules:
+SELECT * FROM pass_through_rule ORDER BY pass_through_account_id, position;

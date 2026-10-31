@@ -339,6 +339,7 @@ class MoneyManagerDatabaseWrapper(
             "transfer_attribute",
             "relationship_type",
             "pass_through_account",
+            "pass_through_rule",
             "pass_through_account_audit",
             "holiday_calendar",
             "holiday_calendar_country",

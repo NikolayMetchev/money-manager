@@ -19,13 +19,12 @@ import com.moneymanager.remotestorage.googledrive.loopback.googleDriveTokenSourc
 // installed-app loopback flow with consent opened by a BrowserLauncher. Android has its own SAF and token sources.
 
 private suspend fun signedInTokenSource(
-    providerConfig: String?,
     vault: CredentialVault,
     browser: BrowserLauncher,
 ): GoogleAccessTokenSource {
     val tokenSource =
         googleDriveTokenSource(
-            config = providerConfig ?: GoogleOAuthDefaults.providerConfig(),
+            config = GoogleOAuthDefaults.providerConfig(),
             vault = vault,
             browser = browser,
         )
@@ -45,7 +44,7 @@ internal fun loopbackImportFileSourceFactory(
                 }
 
                 ImportDirectoryProvider.GDRIVE -> {
-                    driveImportFileSource(signedInTokenSource(directory.providerConfig, vault, browser), directory.folderRef)
+                    driveImportFileSource(signedInTokenSource(vault, browser), directory.folderRef)
                 }
             }
     }
@@ -58,11 +57,8 @@ internal fun loopbackDriveFolderBrowser(
         override val rootFolderId: String = DriveImportFileSource.ROOT_FOLDER_ID
         override val sharedWithMeFolderId: String = DriveImportFileSource.SHARED_WITH_ME_FOLDER_ID
 
-        override suspend fun listChildFolders(
-            providerConfig: String?,
-            parentId: String,
-        ): List<ImportFolder> =
+        override suspend fun listChildFolders(parentId: String): List<ImportFolder> =
             DriveImportFileSource
-                .listChildFolders(signedInTokenSource(providerConfig, vault, browser), parentId)
+                .listChildFolders(signedInTokenSource(vault, browser), parentId)
                 .map { ImportFolder(id = it.id, name = it.name) }
     }

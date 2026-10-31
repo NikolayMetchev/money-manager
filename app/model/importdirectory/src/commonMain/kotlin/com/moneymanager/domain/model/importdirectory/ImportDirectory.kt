@@ -32,7 +32,6 @@ enum class ImportDirectoryProvider(
  *   filesystem path (JVM), an Android Storage Access Framework tree/document URI, or a Drive folder id.
  * @property displayPath Human-readable full path shown in the UI (e.g. "My Drive / Statements"); null
  *   falls back to [folderRef] (e.g. JVM local folders, whose path ref is already readable).
- * @property providerConfig Provider-specific config (e.g. Drive OAuth client JSON); null for LOCAL.
  * @property deviceId Set for LOCAL directories (scanned only on that device); null for shared GDRIVE.
  * @property topLevel True for a user-picked folder (download discovers + creates child directories);
  *   false for a discovered subfolder (download fetches its own importable files).
@@ -52,7 +51,6 @@ data class ImportDirectory(
     val provider: ImportDirectoryProvider,
     val folderRef: String,
     val displayPath: String? = null,
-    val providerConfig: String? = null,
     val deviceId: DeviceId? = null,
     val topLevel: Boolean = true,
     val parentId: ImportDirectoryId? = null,

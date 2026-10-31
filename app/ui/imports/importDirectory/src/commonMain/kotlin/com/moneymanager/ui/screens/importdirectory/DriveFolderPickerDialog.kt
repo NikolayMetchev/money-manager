@@ -85,7 +85,7 @@ fun DriveFolderPickerDialog(
         error = null
         children = null
         try {
-            children = browser.listChildFolders(null, currentParentId)
+            children = browser.listChildFolders(currentParentId)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (expected: Exception) {

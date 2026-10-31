@@ -135,6 +135,7 @@ kmp_test(
         "@maven_kmp//:sqldelight_async_extensions",
         "//app/model/calendar",
         "@maven_kmp//:kotlinx_datetime",
+        "//app/model/passthrough",
     ],
     device_srcs = glob([
         "src/commonTest/kotlin/com/moneymanager/database/repository/**/*.kt",
@@ -179,6 +180,7 @@ kmp_test(
         "//app/model/csv",
         "//app/model/csvstrategy",
         "//app/model/importdirectory",
+        "//app/model/passthrough",
         "//app/model/qif",
         "//app/model/repository/read",
         "//app/model/repository/write:write_for_tests",

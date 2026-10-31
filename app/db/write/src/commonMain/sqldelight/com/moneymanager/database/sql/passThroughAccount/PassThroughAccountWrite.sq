@@ -1,7 +1,7 @@
 -- Insert a new pass-through account definition; returns the generated id.
 insert:
-INSERT INTO pass_through_account (name, conduit_account_name, relationship_type_id, rules_json)
-VALUES (?, ?, ?, ?);
+INSERT INTO pass_through_account (name, conduit_account_name, relationship_type_id)
+VALUES (?, ?, ?);
 
 lastInsertRowId:
 SELECT last_insert_rowid();
@@ -9,9 +9,16 @@ SELECT last_insert_rowid();
 -- Update an existing definition.
 update:
 UPDATE pass_through_account
-SET name = ?, conduit_account_name = ?, relationship_type_id = ?, rules_json = ?
+SET name = ?, conduit_account_name = ?, relationship_type_id = ?
 WHERE id = ?;
 
--- Delete a definition by id.
+insertRule:
+INSERT INTO pass_through_rule (pass_through_account_id, position, detection_pattern, merchant_pattern, merchant_template)
+VALUES (?, ?, ?, ?, ?);
+
+deleteRules:
+DELETE FROM pass_through_rule WHERE pass_through_account_id = ?;
+
+-- Delete a definition by id (its rules go with it).
 deleteById:
 DELETE FROM pass_through_account WHERE id = ?;
