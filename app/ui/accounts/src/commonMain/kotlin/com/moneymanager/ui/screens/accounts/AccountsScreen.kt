@@ -29,6 +29,7 @@ import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.HolidayCalendarReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
@@ -63,6 +64,7 @@ fun AccountsScreen(
     personRepository: PersonReadRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     maintenance: Maintenance,
+    holidayCalendarRepository: HolidayCalendarReadRepository? = null,
     scrollToAccountId: AccountId?,
     onAccountClick: (Account) -> Unit,
     onAuditClick: (Account) -> Unit = {},
@@ -251,6 +253,7 @@ fun AccountsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
+            holidayCalendarRepository = holidayCalendarRepository,
             onDismiss = { accountToEdit = null },
             existingNames = accounts.filter { it.account.id != currentAccountToEdit.id }.map { it.account.name }.toSet(),
         )

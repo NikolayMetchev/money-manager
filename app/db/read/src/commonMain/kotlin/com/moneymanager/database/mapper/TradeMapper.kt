@@ -20,6 +20,7 @@ object TradeMapper {
         fromAssetCode: String,
         fromAssetName: String,
         fromAssetScaleFactor: Long,
+        fromAssetFractionDigits: Long?,
         fromAssetKind: String,
         toAccountId: Long,
         toAssetId: Long,
@@ -27,10 +28,19 @@ object TradeMapper {
         toAssetCode: String,
         toAssetName: String,
         toAssetScaleFactor: Long,
+        toAssetFractionDigits: Long?,
         toAssetKind: String,
     ): Trade {
-        val fromAsset = AssetRowMapper.buildAsset(fromAssetId, fromAssetCode, fromAssetName, fromAssetScaleFactor, fromAssetKind)
-        val toAsset = AssetRowMapper.buildAsset(toAssetId, toAssetCode, toAssetName, toAssetScaleFactor, toAssetKind)
+        val fromAsset =
+            AssetRowMapper.buildAsset(
+                fromAssetId,
+                fromAssetCode,
+                fromAssetName,
+                fromAssetScaleFactor,
+                fromAssetFractionDigits,
+                fromAssetKind,
+            )
+        val toAsset = AssetRowMapper.buildAsset(toAssetId, toAssetCode, toAssetName, toAssetScaleFactor, toAssetFractionDigits, toAssetKind)
         return Trade(
             id = TradeId(id),
             revisionId = revisionId,

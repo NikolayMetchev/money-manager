@@ -1,20 +1,18 @@
 package com.moneymanager.database.repository
-import com.moneymanager.database.DatabaseConfig
+import com.moneymanager.domain.model.Source
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.testCurrencies
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CurrencyRepositoryImplTest : DbTest() {
-    // These tests assert against the full bundled currency list, so opt out of the
-    // minimal test seeding.
-    override val seedAllCurrencies: Boolean = true
-
-    // Number of seeded currencies from DatabaseConfig
-    private val seededCurrencyCount = DatabaseConfig.allCurrencies.size
+    private val seededCodes = testCurrencies.mapTo(mutableSetOf()) { it.code }
+    private val seededCurrencyCount = seededCodes.size
 
     // UPSERT TESTS
 
@@ -144,6 +142,33 @@ class CurrencyRepositoryImplTest : DbTest() {
             )
         }
 
+    @Test
+    fun `a currency keeps its minor unit and every currency read carries it`() =
+        runDbTest {
+            val id = repositories.currencyRepository.upsertCurrencyByCode("KWD", "Kuwaiti Dinar", 3, Source.SampleGenerator)
+            assertEquals(
+                3,
+                repositories.currencyRepository
+                    .getCurrencyById(id)
+                    .first()
+                    ?.fractionDigits,
+            )
+            assertEquals(
+                2,
+                repositories.currencyRepository
+                    .getCurrencyByCode("GBP")
+                    .first()
+                    ?.fractionDigits,
+            )
+            assertNull(
+                repositories.currencyRepository
+                    .getCurrencyById(
+                        repositories.currencyRepository.upsertCurrencyByCode("XYZ", "Test"),
+                    ).first()
+                    ?.fractionDigits,
+            )
+        }
+
     // GET ALL CURRENCIES TESTS
 
     @Test
@@ -153,7 +178,6 @@ class CurrencyRepositoryImplTest : DbTest() {
             assertEquals(seededCurrencyCount, currencies.size)
 
             val codes = currencies.map { it.code }.toSet()
-            val seededCodes = DatabaseConfig.allCurrencies.map { it.code }.toSet()
             assertEquals(seededCodes, codes)
         }
 
@@ -169,7 +193,6 @@ class CurrencyRepositoryImplTest : DbTest() {
             // Then - should have seeded currencies plus the new one
             assertEquals(seededCurrencyCount + 1, currencies.size)
             val codes = currencies.map { it.code }.toSet()
-            val seededCodes = DatabaseConfig.allCurrencies.map { it.code }.toSet()
             assertTrue(codes.containsAll(seededCodes))
             assertTrue(codes.contains("XYZ"))
         }

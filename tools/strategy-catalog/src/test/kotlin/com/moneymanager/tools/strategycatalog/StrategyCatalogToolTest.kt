@@ -1,9 +1,11 @@
 package com.moneymanager.tools.strategycatalog
 
+import com.moneymanager.database.json.HolidayCalendarExportCodec
 import com.moneymanager.database.json.StrategyArtifactCodec
 import com.moneymanager.domain.strategy.StrategyFileNaming
 import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.strategycatalog.CatalogManifestCodec
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -61,9 +63,21 @@ class StrategyCatalogToolTest {
                 StrategyKind.API,
                 StrategyKind.PASS_THROUGH,
                 StrategyKind.CURRENCIES,
+                StrategyKind.HOLIDAY_CALENDAR,
             ),
             kinds,
         )
+    }
+
+    @Test
+    fun `the catalog publishes every Strata location`() {
+        val published =
+            builtInArtifacts()
+                .filterKeys { it.kind == StrategyKind.HOLIDAY_CALENDAR }
+                .map { (key, json) -> key.name to HolidayCalendarExportCodec.decode(json).calendar }
+                .toMap()
+        assertEquals(strataCalendarIds(), published.keys)
+        assertTrue(LocalDate(2021, 4, 5) in published.getValue("GBLO").holidays, "Easter Monday 2021")
     }
 
     @Test

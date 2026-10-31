@@ -118,6 +118,19 @@ class CsvImportReadRepositoryImpl(
                 .toSet()
         }
 
+    override suspend fun getStatementAccounts(ids: Collection<TransferId>): Map<TransferId, AccountId> =
+        withContext(coroutineContext) {
+            ids
+                .map { it.id }
+                .chunked(STATEMENT_ACCOUNT_CHUNK)
+                .flatMap { chunk ->
+                    entitySourceSelectQueries
+                        .selectStatementAccountsOfTransfers(chunk)
+                        .awaitAsList()
+                        .map { TransferId(it.entity_id) to AccountId(requireNotNull(it.statement_account_id)) }
+                }.toMap()
+        }
+
     override suspend fun getTradeIdsCreatedByImport(id: CsvImportId): Set<TradeId> =
         withContext(coroutineContext) {
             entitySourceSelectQueries
@@ -342,3 +355,6 @@ class CsvImportReadRepositoryImpl(
                 )
             }
 }
+
+/** SQLite binds at most 999 variables; statement-account lookups bind one per transfer id. */
+private const val STATEMENT_ACCOUNT_CHUNK = 500

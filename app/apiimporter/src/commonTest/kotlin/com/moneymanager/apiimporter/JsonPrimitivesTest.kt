@@ -142,11 +142,25 @@ class JsonPrimitivesTest {
     }
 
     @Test
-    fun `minor-units integer uses each currency ISO decimal places`() {
-        val jpy = Currency(id = CurrencyId(2), code = "JPY", name = "Japanese Yen", scaleFactor = 1_000_000_000_000_000_000L)
-        val bhd = Currency(id = CurrencyId(3), code = "BHD", name = "Bahraini Dinar", scaleFactor = 1_000_000_000_000_000_000L)
+    fun `minor-units integer uses each currency recorded minor unit`() {
+        val jpy =
+            Currency(id = CurrencyId(2), code = "JPY", name = "Japanese Yen", scaleFactor = 1_000_000_000_000_000_000L, fractionDigits = 0)
+        val bhd =
+            Currency(
+                id = CurrencyId(3),
+                code = "BHD",
+                name = "Bahraini Dinar",
+                scaleFactor = 1_000_000_000_000_000_000L,
+                fractionDigits = 3,
+            )
         assertEquals("4194", minorUnitsToMoney(4194L, jpy, decimalPlacesOverrides = emptyMap()).toDisplayValue().toString())
         assertEquals("4.194", minorUnitsToMoney(4194L, bhd, decimalPlacesOverrides = emptyMap()).toDisplayValue().toString())
+    }
+
+    @Test
+    fun `minor-units integer of a currency without a recorded minor unit has two decimal places`() {
+        val unknown = Currency(id = CurrencyId(4), code = "ZZZ", name = "Hand-made", scaleFactor = 1_000_000_000_000_000_000L)
+        assertEquals("41.94", minorUnitsToMoney(4194L, unknown, decimalPlacesOverrides = emptyMap()).toDisplayValue().toString())
     }
 
     @Test

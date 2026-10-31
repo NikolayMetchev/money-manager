@@ -28,6 +28,7 @@ import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.LegRole
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
+import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorState
@@ -239,7 +240,8 @@ class StrategyFormRoundTripTest {
                                 Condition("Direction", ConditionOp.MATCHES, "OUT"),
                                 Condition("Reference", ConditionOp.MATCHES, "CRV\\*"),
                             ),
-                        crossSourceReconcileWindowSeconds = 120,
+                        crossSourceReconcileWindow = SettlementWindow.Elapsed(120),
+                        placeholderReconcileWindow = SettlementWindow.BusinessDays(3),
                         legGroups =
                             listOf(
                                 LegGroupRule(
@@ -289,7 +291,8 @@ class StrategyFormRoundTripTest {
 
         assertEquals(original.config.rules, rebuilt.config.rules)
         assertEquals(original.config.contentMatchRules, rebuilt.config.contentMatchRules)
-        assertEquals(original.config.crossSourceReconcileWindowSeconds, rebuilt.config.crossSourceReconcileWindowSeconds)
+        assertEquals(original.config.crossSourceReconcileWindow, rebuilt.config.crossSourceReconcileWindow)
+        assertEquals(original.config.placeholderReconcileWindow, rebuilt.config.placeholderReconcileWindow)
         assertEquals(original.config.legGroups, rebuilt.config.legGroups)
     }
 

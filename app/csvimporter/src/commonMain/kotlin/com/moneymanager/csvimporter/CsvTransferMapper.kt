@@ -108,6 +108,11 @@ sealed interface MappingResult {
         val unidentifiedCounterpartyAccountId: AccountId? = null,
         /** The own account's conversion when [transfer] is booked in a foreign currency; null otherwise. */
         val conversion: ImportConversion? = null,
+        /**
+         * The account whose statement the row is (its own account, on whichever side the direction put it); null
+         * when it isn't known. [UNRESOLVED_ACCOUNT_ID] until the account exists.
+         */
+        val statementAccountId: AccountId? = null,
     ) : MappingResult {
         /** Convenience for flows where only the target side can discover a new account. */
         val newAccountName: String? get() = newAccounts.firstOrNull()?.name
@@ -236,6 +241,8 @@ data class CsvTransferWithAttributes(
      * received (see `RuleAction.Foreign`); null otherwise.
      */
     val conversion: ImportConversion? = null,
+    /** The account whose statement the row is (see [MappingResult.Success.statementAccountId]). */
+    val statementAccountId: AccountId? = null,
 )
 
 /**
@@ -397,6 +404,7 @@ class CsvTransferMapper(
                             feeDescription = result.feeDescription,
                             fundingMatchValue = result.fundingMatchValue,
                             unidentifiedCounterpartyAccountId = result.unidentifiedCounterpartyAccountId,
+                            statementAccountId = result.statementAccountId,
                             conversion = result.conversion,
                         ),
                     )
@@ -827,6 +835,7 @@ class CsvTransferMapper(
                 unidentifiedCounterpartyAccountId = unidentifiedCounterpartyAccountId,
                 // The own account is the source of a payment and the target of a refund (flipped row).
                 conversion = foreign?.let { ImportConversion(settled = settled, incoming = flipAccounts) },
+                statementAccountId = ownAccountId,
             )
         } catch (expected: Exception) {
             MappingResult.Error(row.rowIndex, expected.message ?: "Unknown error")

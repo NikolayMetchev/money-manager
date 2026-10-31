@@ -13,6 +13,8 @@ import com.moneymanager.domain.model.csvstrategy.isXlsxStrategy
  * the single combined file holding all global account mappings. [PASS_THROUGH] is one pass-through
  * (conduit) account definition per file. [CURRENCIES] is the reference list of currencies a database is
  * seeded with (one file, [StrategyFileNaming.CURRENCIES_NAME]); applying it only adds missing codes.
+ * [HOLIDAY_CALENDAR] is one location (holiday calendar) per file, named by its code; applying it replaces that
+ * location.
  */
 enum class StrategyKind {
     CSV,
@@ -23,6 +25,7 @@ enum class StrategyKind {
     GLOBAL_MAPPINGS,
     PASS_THROUGH,
     CURRENCIES,
+    HOLIDAY_CALENDAR,
 }
 
 /** Which of the CSV engine's kinds this strategy's library file is. */
@@ -53,10 +56,15 @@ data class LocalStrategyEntry(
     val contentHash: String,
 )
 
-/** Unresolved references found while parsing an incoming artifact, to be resolved before applying. */
+/**
+ * Unresolved references found while parsing an incoming artifact, to be resolved before applying, and the names of
+ * the entities the artifact itself creates ([provides], such as the currency list's codes), which resolve those
+ * references in the other artifacts installed with it.
+ */
 data class StrategyParseResult(
     val key: StrategyKey,
     val unresolvedReferences: List<CsvUnresolvedReference>,
+    val provides: Map<CsvReferenceType, Set<String>> = emptyMap(),
 )
 
 /**
@@ -76,6 +84,7 @@ object StrategyFileNaming {
     private const val API_INFIX = ".api"
     private const val PASS_THROUGH_INFIX = ".passthrough"
     private const val CURRENCIES_INFIX = ".currencies"
+    private const val HOLIDAY_CALENDAR_INFIX = ".calendar"
 
     fun fileName(key: StrategyKey): String =
         when (key.kind) {
@@ -87,6 +96,7 @@ object StrategyFileNaming {
             StrategyKind.GLOBAL_MAPPINGS -> "$GLOBAL_MAPPINGS_NAME$SUFFIX"
             StrategyKind.PASS_THROUGH -> "${key.name}$PASS_THROUGH_INFIX$SUFFIX"
             StrategyKind.CURRENCIES -> "${key.name}$CURRENCIES_INFIX$SUFFIX"
+            StrategyKind.HOLIDAY_CALENDAR -> "${key.name}$HOLIDAY_CALENDAR_INFIX$SUFFIX"
         }
 
     /** Parses a remote filename back into a [StrategyKey], or null if it isn't a library file. */
@@ -97,14 +107,41 @@ object StrategyFileNaming {
             return StrategyKey(StrategyKind.GLOBAL_MAPPINGS, GLOBAL_MAPPINGS_NAME)
         }
         return when {
-            stem.endsWith(XLSX_INFIX) -> StrategyKey(StrategyKind.XLSX, stem.removeSuffix(XLSX_INFIX))
-            stem.endsWith(PDF_INFIX) -> StrategyKey(StrategyKind.PDF, stem.removeSuffix(PDF_INFIX))
-            stem.endsWith(CSV_INFIX) -> StrategyKey(StrategyKind.CSV, stem.removeSuffix(CSV_INFIX))
-            stem.endsWith(QIF_INFIX) -> StrategyKey(StrategyKind.QIF, stem.removeSuffix(QIF_INFIX))
-            stem.endsWith(API_INFIX) -> StrategyKey(StrategyKind.API, stem.removeSuffix(API_INFIX))
-            stem.endsWith(PASS_THROUGH_INFIX) -> StrategyKey(StrategyKind.PASS_THROUGH, stem.removeSuffix(PASS_THROUGH_INFIX))
-            stem.endsWith(CURRENCIES_INFIX) -> StrategyKey(StrategyKind.CURRENCIES, stem.removeSuffix(CURRENCIES_INFIX))
-            else -> null
+            stem.endsWith(XLSX_INFIX) -> {
+                StrategyKey(StrategyKind.XLSX, stem.removeSuffix(XLSX_INFIX))
+            }
+
+            stem.endsWith(PDF_INFIX) -> {
+                StrategyKey(StrategyKind.PDF, stem.removeSuffix(PDF_INFIX))
+            }
+
+            stem.endsWith(CSV_INFIX) -> {
+                StrategyKey(StrategyKind.CSV, stem.removeSuffix(CSV_INFIX))
+            }
+
+            stem.endsWith(QIF_INFIX) -> {
+                StrategyKey(StrategyKind.QIF, stem.removeSuffix(QIF_INFIX))
+            }
+
+            stem.endsWith(API_INFIX) -> {
+                StrategyKey(StrategyKind.API, stem.removeSuffix(API_INFIX))
+            }
+
+            stem.endsWith(PASS_THROUGH_INFIX) -> {
+                StrategyKey(StrategyKind.PASS_THROUGH, stem.removeSuffix(PASS_THROUGH_INFIX))
+            }
+
+            stem.endsWith(CURRENCIES_INFIX) -> {
+                StrategyKey(StrategyKind.CURRENCIES, stem.removeSuffix(CURRENCIES_INFIX))
+            }
+
+            stem.endsWith(HOLIDAY_CALENDAR_INFIX) -> {
+                StrategyKey(StrategyKind.HOLIDAY_CALENDAR, stem.removeSuffix(HOLIDAY_CALENDAR_INFIX))
+            }
+
+            else -> {
+                null
+            }
         }?.takeIf { it.name.isNotBlank() }
     }
 }

@@ -341,7 +341,7 @@ class StrategySyncControllerTest {
         }
 
     @Test
-    fun `an unreadable remote copy of a local strategy is neither compared nor overwritten`() =
+    fun `an unreadable remote copy of a local strategy is neither compared nor overwritten by a sync`() =
         runTest {
             val provider = InMemoryStorageProvider()
             val key = StrategyKey(StrategyKind.CSV, "Wise")
@@ -350,12 +350,36 @@ class StrategySyncControllerTest {
             val controller = controllerWith(provider)
             controller.connectTo(provider)
 
-            val summary = controller.syncNow(library, version, forceUpload = setOf(key))
+            val summary = controller.syncNow(library, version)
 
             assertEquals(0, summary.uploaded)
-            assertEquals(StrategyItemStatus.UNREADABLE, statusOf(controller, "Wise"))
+            val item =
+                controller.state.value.items
+                    .single()
+            assertEquals(StrategyItemStatus.UNREADABLE, item.status)
+            assertEquals(true, item.hasLocal, "the local copy can replace it")
             val remote = provider.list().single { it.name == StrategyFileNaming.fileName(key) }
             assertEquals("${FakeStrategyLibrary.UNREADABLE}-v9", provider.download(remote.id).decodeToString())
+        }
+
+    // An older app's copy in a retired format stays unreadable for good, so the person can replace it with theirs.
+    @Test
+    fun `an unreadable remote copy is replaced by the local one when the person chooses to`() =
+        runTest {
+            val provider = InMemoryStorageProvider()
+            val key = StrategyKey(StrategyKind.CSV, "Wise")
+            provider.upload(null, StrategyFileNaming.fileName(key), "${FakeStrategyLibrary.UNREADABLE}-v9".encodeToByteArray())
+            val library = FakeStrategyLibrary(listOf(entry("Wise", "wise-v1")))
+            val controller = controllerWith(provider)
+            controller.connectTo(provider)
+            controller.refresh(library, version)
+
+            val summary = controller.syncNow(library, version, forceUpload = setOf(key))
+
+            assertEquals(1, summary.uploaded)
+            assertEquals(StrategyItemStatus.IN_SYNC, statusOf(controller, "Wise"))
+            val remote = provider.list().single { it.name == StrategyFileNaming.fileName(key) }
+            assertEquals("wise-v1", provider.download(remote.id).decodeToString())
         }
 
     @Test

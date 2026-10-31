@@ -1,6 +1,7 @@
 package com.moneymanager.strategycatalog
 
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.strategy.CsvReferenceType
 import com.moneymanager.domain.strategy.CsvResolution
 import com.moneymanager.domain.strategy.CsvUnresolvedReference
 import com.moneymanager.domain.strategy.LocalStrategyEntry
@@ -48,6 +49,8 @@ class StrategyCatalogControllerTest {
     // driven purely by what applyIncoming recorded.
     private class FakeLibrary : StrategyLibrary {
         val installed = mutableMapOf<StrategyKey, String>()
+        val applyOrder = mutableListOf<StrategyKey>()
+        var parse: (StrategyKey) -> StrategyParseResult = { StrategyParseResult(it, emptyList()) }
         var failOnApply = false
         var failOnKey: StrategyKey? = null
 
@@ -62,7 +65,7 @@ class StrategyCatalogControllerTest {
         override suspend fun parseIncoming(
             key: StrategyKey,
             json: String,
-        ): StrategyParseResult = StrategyParseResult(key, emptyList())
+        ): StrategyParseResult = parse(key)
 
         override suspend fun applyIncoming(
             key: StrategyKey,
@@ -71,23 +74,30 @@ class StrategyCatalogControllerTest {
         ) {
             check(!failOnApply && key != failOnKey) { "apply failed" }
             installed[key] = json
+            applyOrder += key
         }
     }
 
     private val monzoKey = StrategyKey(StrategyKind.CSV, "Monzo CSV")
     private val curveKey = StrategyKey(StrategyKind.PASS_THROUGH, "Curve")
 
-    private fun manifest(): String =
+    private val currenciesKey = StrategyKey(StrategyKind.CURRENCIES, "Currencies")
+    private val currenciesEntry = CatalogEntry("Currencies", StrategyKind.CURRENCIES, "Currencies.currencies.json", "hash:currencies-json")
+
+    private fun manifest(extra: List<CatalogEntry> = emptyList()): String =
         CatalogManifestCodec.encode(
             CatalogManifest(
                 listOf(
                     CatalogEntry("Monzo CSV", StrategyKind.CSV, "Monzo CSV.csv.json", "hash:monzo-json"),
                     CatalogEntry("Curve", StrategyKind.PASS_THROUGH, "Curve.passthrough.json", "hash:curve-json"),
-                ),
+                ) + extra,
             ),
         )
 
-    private fun controller(failWith: HttpStatusCode? = null): StrategyCatalogController {
+    private fun controller(
+        failWith: HttpStatusCode? = null,
+        extra: List<CatalogEntry> = emptyList(),
+    ): StrategyCatalogController {
         val engine =
             MockEngine { request ->
                 if (failWith != null) return@MockEngine respondError(failWith)
@@ -96,8 +106,9 @@ class StrategyCatalogControllerTest {
                         .decodeURLPart()
                         .substringAfterLast('/')
                 ) {
-                    "index.json" -> respond(manifest())
+                    "index.json" -> respond(manifest(extra))
                     "Monzo CSV.csv.json" -> respond("monzo-json")
+                    "Currencies.currencies.json" -> respond("currencies-json")
                     "Curve.passthrough.json" -> respond("curve-json")
                     else -> respondError(HttpStatusCode.NotFound)
                 }
@@ -248,5 +259,38 @@ class StrategyCatalogControllerTest {
 
             val previews = controller.previewInstall(library, setOf(monzoKey))
             assertEquals(listOf(monzoKey), previews.map { it.key })
+        }
+
+    @Test
+    fun aCurrencyTheSelectedCurrencyListAddsIsResolvedAndInstalledFirst() =
+        runTest {
+            val gbp = CsvUnresolvedReference(CsvReferenceType.CURRENCY, "GBP", null)
+            val xyz = CsvUnresolvedReference(CsvReferenceType.CURRENCY, "XYZ", null)
+            val library = FakeLibrary()
+            library.parse = { key ->
+                when (key) {
+                    monzoKey -> StrategyParseResult(key, listOf(gbp, xyz))
+                    currenciesKey -> StrategyParseResult(key, emptyList(), provides = mapOf(CsvReferenceType.CURRENCY to setOf("GBP")))
+                    else -> StrategyParseResult(key, emptyList())
+                }
+            }
+            val controller = controller(extra = listOf(currenciesEntry))
+            controller.refresh(library, version)
+
+            assertEquals(
+                listOf(gbp, xyz),
+                controller.previewInstall(library, setOf(monzoKey)).single().unresolvedReferences,
+                "without the currency list, GBP is unresolved",
+            )
+            val withList =
+                controller
+                    .previewInstall(
+                        library,
+                        setOf(monzoKey, currenciesKey),
+                    ).associate { it.key to it.unresolvedReferences }
+            assertEquals(listOf(xyz), withList[monzoKey], "the list adds GBP, not XYZ")
+
+            controller.install(library, version, setOf(monzoKey, currenciesKey))
+            assertEquals(currenciesKey, library.applyOrder.first(), "the currency list installs before the strategy naming GBP")
         }
 }

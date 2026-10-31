@@ -41,6 +41,7 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.HolidayCalendarReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.strategy.StrategyLibrary
@@ -164,6 +165,7 @@ fun SettingsScreen(
     accountRepository: AccountReadRepository? = null,
     categoryRepository: CategoryReadRepository? = null,
     personRepository: PersonReadRepository? = null,
+    holidayCalendarRepository: HolidayCalendarReadRepository? = null,
 ) {
     val importEngine = LocalImportEngine.current
     var showWarningDialog by remember { mutableStateOf(false) }
@@ -211,12 +213,16 @@ fun SettingsScreen(
 
             Text(
                 text =
-                    "The setup wizard walks you through currencies, import strategies, strategy sync, " +
+                    "The setup wizard walks you through currency and location, import strategies, strategy sync, " +
                         "import folders and API connections.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             OutlinedButton(onClick = onRunSetupWizard) { Text("Run setup wizard") }
+        }
+
+        holidayCalendarRepository?.let { repository ->
+            HolidayCalendarsCard(holidayCalendarRepository = repository, settingsRepository = settingsRepository)
         }
 
         // Database Section

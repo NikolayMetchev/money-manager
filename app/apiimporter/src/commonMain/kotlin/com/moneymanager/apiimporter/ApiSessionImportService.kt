@@ -13,7 +13,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.IsoMinorUnitDecimals
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
@@ -101,8 +100,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.absoluteValue
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 private val logger = Logger.withTag("ApiSessionImportService")
@@ -112,20 +109,6 @@ private val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID = AttributeTypeId(WellKnownI
 private val ACCOUNT_SORT_CODE_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID)
 private val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
 private val ACCOUNT_COUNTERPARTY_NAME_KEY_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCOUNT_COUNTERPARTY_NAME_KEY_ATTR_TYPE_ID)
-
-// How far apart two providers may timestamp the same real movement and still be reconciled as one
-// (a Faster Payment is near-instant; this absorbs send-vs-settle timing differences between banks).
-// Reconciliation is additionally restricted to cross-source matches, so this window does not collapse
-// genuine repeat transfers from the same provider.
-private val RECONCILE_WINDOW = 5.minutes
-
-/**
- * Window for superseding a placeholder leg another source left for a movement this feed identifies at
- * both ends (see `DedupePolicy.ApiMultiKey.unidentifiedCounterpartyWindow`). Matches the CSV side's
- * fuzzy date tolerance: a bank feed and the receiving account's own export stamp one transfer hours or
- * a day apart, and all a placeholder match has is the account, direction and amount.
- */
-private val UNIDENTIFIED_COUNTERPARTY_WINDOW = 3.days
 
 data class ApiSessionImportResult(
     val accountCount: Int,
@@ -1705,12 +1688,12 @@ private suspend fun runImportEngine(
             transfers = importTransfers,
             dedupePolicy =
                 DedupePolicy.ApiMultiKey(
-                    reconcileWindow = RECONCILE_WINDOW,
+                    reconcileWindow = setup.strategy.config.reconcileWindows.crossSource,
                     reconciledExclusionAttributeTypeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID),
                     reconciledRelationshipTypeId = RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
                     unidentifiedCounterpartyAttributeTypeId =
                         setup.attributeTypeCache.getOrCreate(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME),
-                    unidentifiedCounterpartyWindow = UNIDENTIFIED_COUNTERPARTY_WINDOW,
+                    unidentifiedCounterpartyWindow = setup.strategy.config.reconcileWindows.placeholder,
                 ),
             accountsToCreate = setup.accountResolver.intents(),
             peopleToCreate = setup.peopleResolver.intents(),
@@ -3125,12 +3108,16 @@ private data class TransferData(
     val isIncoming: Boolean,
 )
 
+// Most currencies have two decimal places, so a currency created without its minor unit is read as having two.
+private const val DEFAULT_MINOR_UNIT_DECIMALS = 2
+
 /**
  * Converts a raw integer a bank API reports in its own ISO 4217 minor units (e.g. Monzo's `1234`
  * meaning £12.34) into [Money] at the app's storage precision. Constructing `Money` directly from
  * the raw integer would treat it as already being in the app's own (much higher) storage scale,
  * silently truncating every amount toward zero — the provider's minor-unit width and the app's
- * storage scale are unrelated (see [IsoMinorUnitDecimals]). [decimalPlacesOverrides] lets a strategy
+ * storage scale are unrelated. The width is the currency's ISO minor unit
+ * ([Currency.fractionDigits], from the catalog's currency list), else 2; [decimalPlacesOverrides] lets a strategy
  * correct a provider that doesn't follow the ISO standard for a given currency.
  */
 internal fun minorUnitsToMoney(
@@ -3138,7 +3125,7 @@ internal fun minorUnitsToMoney(
     currency: Currency,
     decimalPlacesOverrides: Map<String, Int>,
 ): Money {
-    val decimalPlaces = decimalPlacesOverrides[currency.code.uppercase()] ?: IsoMinorUnitDecimals.getDecimalPlaces(currency.code)
+    val decimalPlaces = decimalPlacesOverrides[currency.code.uppercase()] ?: currency.fractionDigits ?: DEFAULT_MINOR_UNIT_DECIMALS
     // The editor rejects negatives, but hand-edited or imported JSON can carry one, and a negative shift would
     // silently scale the amount up instead of down.
     require(decimalPlaces >= 0) { "Minor-unit decimal places for ${currency.code} must not be negative: $decimalPlaces" }

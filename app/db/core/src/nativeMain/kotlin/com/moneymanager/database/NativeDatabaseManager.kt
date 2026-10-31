@@ -6,7 +6,7 @@ import co.touchlab.kermit.Logger
 import co.touchlab.sqliter.DatabaseConfiguration
 import co.touchlab.sqliter.JournalMode
 import co.touchlab.sqliter.NO_VERSION_CHECK
-import com.moneymanager.currency.IsoCurrency
+import com.moneymanager.domain.model.CurrencyExportEntry
 import kotlinx.coroutines.IO
 import kotlinx.io.files.Path
 import co.touchlab.sqliter.interop.Logger as SqliterLogger
@@ -24,7 +24,7 @@ import co.touchlab.sqliter.interop.Logger as SqliterLogger
  * output; [KermitSqliterLogger] sends it to Kermit instead.
  */
 class NativeDatabaseManager(
-    currenciesToSeed: () -> List<IsoCurrency> = { DatabaseConfig.allCurrencies },
+    currenciesToSeed: () -> List<CurrencyExportEntry> = { emptyList() },
 ) : FileDatabaseManager(currenciesToSeed) {
     override fun openDriver(file: Path): SqlDriver =
         NativeSqliteDriver(

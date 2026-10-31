@@ -1,6 +1,8 @@
 CREATE TABLE settings (
     id INTEGER PRIMARY KEY,
     default_currency_id INTEGER REFERENCES currency(id),
+    -- The holiday_calendar code an account without its own 'location' attribute settles on; NULL: weekends only.
+    default_location TEXT,
     -- 0/1; absent (NULL) on a database whose setup wizard has never run to completion.
     setup_wizard_completed INTEGER
 );

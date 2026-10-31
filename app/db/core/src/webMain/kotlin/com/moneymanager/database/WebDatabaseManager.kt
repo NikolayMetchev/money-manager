@@ -2,8 +2,8 @@
 
 package com.moneymanager.database
 
-import com.moneymanager.currency.IsoCurrency
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
+import com.moneymanager.domain.model.CurrencyExportEntry
 import com.moneymanager.domain.model.DEFAULT_DATABASE_NAME
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.tasks.Progress
@@ -20,7 +20,7 @@ import kotlin.js.ExperimentalWasmJsInterop
  */
 class WebDatabaseManager(
     private val channel: SqliteChannel,
-    private val currenciesToSeed: () -> List<IsoCurrency> = { DatabaseConfig.allCurrencies },
+    private val currenciesToSeed: () -> List<CurrencyExportEntry> = { emptyList() },
 ) : DatabaseManager {
     override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper = openDatabaseWithProgress(location) {}
 

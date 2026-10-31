@@ -1,0 +1,27 @@
+-- Creates a calendar, or replaces the one with its code. Always updates the row, even when only its days change, so
+-- every replacement is audited.
+upsert:
+INSERT INTO holiday_calendar (code, name, time_zone) VALUES (?, ?, ?)
+ON CONFLICT(code) DO UPDATE SET name = excluded.name, time_zone = excluded.time_zone;
+
+deleteCountries:
+DELETE FROM holiday_calendar_country WHERE calendar_code = ?;
+
+insertCountry:
+INSERT INTO holiday_calendar_country (calendar_code, country_code) VALUES (?, ?);
+
+deleteWeekendDays:
+DELETE FROM holiday_calendar_weekend_day WHERE calendar_code = ?;
+
+insertWeekendDay:
+INSERT INTO holiday_calendar_weekend_day (calendar_code, iso_day_of_week) VALUES (?, ?);
+
+deleteDays:
+DELETE FROM holiday_calendar_day WHERE calendar_code = ?;
+
+insertDay:
+INSERT INTO holiday_calendar_day (calendar_code, epoch_day, working) VALUES (?, ?, ?);
+
+-- The calendar's countries, weekend and days go with it (ON DELETE CASCADE).
+deleteByCode:
+DELETE FROM holiday_calendar WHERE code = ?;

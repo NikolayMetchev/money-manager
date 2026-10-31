@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.moneymanager.builtin.BuiltInCsvStrategies
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csvstrategy.PdfLineConfig
@@ -22,7 +23,7 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class PdfLinesRulesTabTest {
-    private val strategy = BuiltInCsvStrategies.buildAmexPdfStrategy(Instant.fromEpochMilliseconds(1_000))
+    private val strategy = BuiltInCsvStrategies.buildAmexPdfStrategy(Instant.fromEpochMilliseconds(1_000), CurrencyId(1))
     private val columnNames =
         (PdfLineConfig.BASE_COLUMNS + listOf("statementDate", "date", "description", "amount", "credit")).toSet()
 
@@ -36,7 +37,10 @@ class PdfLinesRulesTabTest {
 
     @Test
     fun `a CSV strategy has no line rules`() {
-        val csv = BuiltInCsvStrategies.buildAmexPdfStrategy(strategy.createdAt).let { it.copy(config = it.config.copy(pdfLines = null)) }
+        val csv =
+            BuiltInCsvStrategies.buildAmexPdfStrategy(strategy.createdAt, CurrencyId(1)).let {
+                it.copy(config = it.config.copy(pdfLines = null))
+            }
         val rebuilt = buildStrategyFromEditorState(CsvStrategyEditorState(csv, columnNames), csv.id, csv.createdAt, csv.updatedAt)
         assertNull(rebuilt.config.pdfLines)
     }

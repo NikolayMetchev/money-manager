@@ -1,7 +1,7 @@
 package com.moneymanager.database.service
 
-import com.moneymanager.currency.IsoCurrencies
 import com.moneymanager.database.json.CurrencyListExportCodec
+import com.moneymanager.database.json.HolidayCalendarExportCodec
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiImportStrategyId
@@ -18,6 +18,8 @@ import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
+import com.moneymanager.domain.model.calendar.HolidayCalendarExport
+import com.moneymanager.domain.model.calendar.testing.TestHolidayCalendars
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.PdfLineConfig
@@ -36,7 +38,9 @@ import com.moneymanager.importengineapi.deleteCsvStrategy
 import com.moneymanager.regex.compileRegex
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInPassThroughs
+import com.moneymanager.test.database.testCurrencies
 import kotlinx.coroutines.flow.first
+import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -236,11 +240,11 @@ class StrategyLibraryServiceTest : DbTest() {
             val library = repositories.strategyLibrary
             val engine = repositories.importEngine
             val key = StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)
-            engine.createCurrency("ZZZ", "Hand-made", Source.Manual)
+            engine.createCurrency("ZZZ", "Hand-made", null, Source.Manual)
 
             val entry = library.listLocal(version).first { it.key == key }
             val listed = CurrencyListExportCodec.decode(entry.json).currencies.map { it.code }
-            // Seeded GBP + the minimal test seed (USD, EUR); the user's own currency isn't part of the list.
+            // The test seed (GBP, USD, EUR); the user's own currency isn't part of the list.
             assertEquals(listOf("EUR", "GBP", "USD"), listed)
 
             val published =
@@ -273,16 +277,49 @@ class StrategyLibraryServiceTest : DbTest() {
         }
 
     @Test
-    fun `a database seeded from the bundled table matches the published list for the same table`() =
+    fun `a database holding the published list hashes as it`() =
         runDbTest {
             val key = StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)
-            val seeded = IsoCurrencies.all.filter { it.code in setOf("EUR", "GBP", "USD") }
-            val published =
-                CurrencyListExport(
-                    name = StrategyFileNaming.CURRENCIES_NAME,
-                    currencies = seeded.map { CurrencyExportEntry(it.code, it.name) }.reversed(),
-                )
+            val published = CurrencyListExport(name = StrategyFileNaming.CURRENCIES_NAME, currencies = testCurrencies.reversed())
             val local = repositories.strategyLibrary.listLocal(version).first { it.key == key }
             assertEquals(local.contentHash, repositories.strategyLibrary.canonicalHash(key, CurrencyListExportCodec.encode(published)))
         }
+
+    @Test
+    fun `a published location replaces the database's copy and round-trips`() =
+        runDbTest {
+            val library = repositories.strategyLibrary
+            val key = StrategyKey(StrategyKind.HOLIDAY_CALENDAR, "GBLO")
+            library.applyIncoming(
+                key,
+                HolidayCalendarExportCodec.encode(HolidayCalendarExport(calendar = TestHolidayCalendars.LONDON)),
+                emptyMap(),
+            )
+            val local = library.listLocal(version).first { it.key == key }
+            val seeded = HolidayCalendarExportCodec.decode(local.json).calendar
+            assertEquals(TestHolidayCalendars.LONDON, seeded)
+
+            val announced = LocalDate(2027, 6, 7)
+            val published = HolidayCalendarExport(calendar = seeded.copy(holidays = seeded.holidays + announced))
+            library.applyIncoming(key, HolidayCalendarExportCodec.encode(published), emptyMap())
+
+            val installed =
+                repositories.holidayCalendarRepository
+                    .getAll()
+                    .first()
+                    .first { it.id == "GBLO" }
+            assertTrue(announced in installed.holidays, "the published holiday is installed")
+            assertEquals(
+                library.listLocal(version).first { it.key == key }.contentHash,
+                library.canonicalHash(key, HolidayCalendarExportCodec.encode(published)),
+                "the installed copy hashes as the published one, so the catalog shows it up to date",
+            )
+        }
+
+    @Test
+    fun `location files are named by their code`() {
+        val key = StrategyKey(StrategyKind.HOLIDAY_CALENDAR, "GBLO")
+        assertEquals(expected = "GBLO.calendar.json", actual = StrategyFileNaming.fileName(key))
+        assertEquals(expected = key, actual = StrategyFileNaming.parse("GBLO.calendar.json"))
+    }
 }

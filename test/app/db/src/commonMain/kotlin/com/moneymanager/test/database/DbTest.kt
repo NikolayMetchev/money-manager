@@ -21,9 +21,6 @@ open class DbTest {
     protected lateinit var repositories: DatabaseComponent
     protected lateinit var entitySourceQueries: EntitySourceWriteQueries
 
-    /** Override (= true) in tests that assert against the full bundled currency list. */
-    protected open val seedAllCurrencies: Boolean = false
-
     /**
      * Override (= true) in tests that exercise the built-in strategies/pass-throughs. Fresh databases
      * no longer seed them (they are installed on demand from the strategy-library catalog), so opting
@@ -44,7 +41,7 @@ open class DbTest {
 
     protected suspend fun openTestDatabase() {
         testDbLocation = createTestDatabaseLocation()
-        database = createTestDatabaseManager(seedAllCurrencies).openDatabase(testDbLocation)
+        database = createTestDatabaseManager().openDatabase(testDbLocation)
         repositories = openDatabaseComponent(database)
         entitySourceQueries = database.entitySourceWriteQueries
         if (installBuiltInStrategies) {

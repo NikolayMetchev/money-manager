@@ -367,8 +367,7 @@ it is relative, so it runs under any prefix.
   that runs it. Native and device tests aren't covered: nothing instruments them. Don't use `bazel coverage`, which
   is JaCoCo.
 - **Tools**: `tools/*` and `app/db/schemaspy` are ordinary modules plus `java_binary`s.
-  `bazel run //tools/strategy-catalog:generate_bundled_currencies` and `bazel run //tools/crypto-dataset:generate`
-  write into the workspace (`BUILD_WORKSPACE_DIRECTORY`).
+  `bazel run //tools/crypto-dataset:generate` writes into the workspace (`BUILD_WORKSPACE_DIRECTORY`).
 - **Pages** (`pages/`): `//webpage:site` is the artifact `static.yml` uploads: `webpage/*.html` with SchemaSpy's
   schema docs (`database/`; its action runs locally, since it needs the host's Graphviz), the strategy catalog,
   `kdoc/` and the browser app (`app/`, `//app/main/web:dist`). `modules-graph.json` (`//webpage:modules-graph`, `module_graph`) is every module's

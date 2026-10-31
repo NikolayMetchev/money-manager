@@ -27,6 +27,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.HolidayCalendarReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -43,9 +44,13 @@ import com.moneymanager.ui.components.transactions.EditableAttribute
 import com.moneymanager.ui.components.transactions.EditableAttributesSection
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 private val logger = Logger.withTag("EditAccountDialog")
+
+// The seeded attribute type (WellKnownIds.ACCOUNT_LOCATION_ATTR_TYPE_ID) the engine reads locations from.
+private const val LOCATION_ATTRIBUTE = "location"
 
 /**
  * A dialog for editing an existing account with category, owner, and attribute selection.
@@ -60,6 +65,9 @@ fun EditAccountDialog(
     personAttributeRepository: PersonAttributeReadRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     onDismiss: () -> Unit,
+    // Offers a location picker: the holiday calendar this account's business-day reconcile windows count. Without
+    // it, the location is still an ordinary attribute below.
+    holidayCalendarRepository: HolidayCalendarReadRepository? = null,
     // Account names are globally unique (account.name UNIQUE). Passing the other accounts' current names
     // (excluding this one) lets the dialog reject a clash before submitting; callers that don't have the
     // list handy still fail safely via the submit-time catch below.
@@ -107,6 +115,10 @@ fun EditAccountDialog(
                 attributesLoaded = true
             }
         }
+    }
+
+    val calendars by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        holidayCalendarRepository?.getAll() ?: flowOf(emptyList())
     }
 
     val scope = rememberSchemaAwareCoroutineScope()
@@ -275,6 +287,44 @@ fun EditAccountDialog(
                     ) {
                         Text("+ Add New Person")
                     }
+                }
+
+                if (holidayCalendarRepository != null) {
+                    // The picker edits the same attribute row the list below shows, so one save path writes both.
+                    val locationEntry = editableAttributes.entries.firstOrNull { it.value.typeName == LOCATION_ATTRIBUTE }
+                    LocationPicker(
+                        calendars = calendars,
+                        selectedCode = locationEntry?.value?.value?.takeIf { it.isNotBlank() },
+                        onLocationSelected = { code ->
+                            editableAttributes =
+                                when {
+                                    code == null -> {
+                                        editableAttributes.filterKeys { it != locationEntry?.key }
+                                    }
+
+                                    locationEntry != null -> {
+                                        editableAttributes +
+                                            (locationEntry.key to locationEntry.value.copy(value = code))
+                                    }
+
+                                    else -> {
+                                        (
+                                            editableAttributes + (
+                                                nextTempId to
+                                                    EditableAttribute(
+                                                        LOCATION_ATTRIBUTE,
+                                                        code,
+                                                    )
+                                            )
+                                        ).also { nextTempId-- }
+                                    }
+                                }
+                        },
+                        label = "Location (holiday calendar)",
+                        noneLabel = "Default location",
+                        enabled = !accountState.isSaving,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
 
                 EditableAttributesSection(

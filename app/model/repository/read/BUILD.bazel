@@ -2,6 +2,7 @@
 # gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_export //app/model/accountmapping
 # gazelle:kmp_export //app/model/apistrategy
+# gazelle:kmp_export //app/model/calendar
 # gazelle:kmp_export //app/model/core
 # gazelle:kmp_export //app/model/csv
 # gazelle:kmp_export //app/model/csvstrategy
@@ -31,6 +32,7 @@ kmp_library(
     exports = [
         "//app/model/accountmapping",
         "//app/model/apistrategy",
+        "//app/model/calendar",
         "//app/model/core",
         "//app/model/csv",
         "//app/model/csvstrategy",

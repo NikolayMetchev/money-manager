@@ -22,6 +22,7 @@ object AccountRowMapper {
         assetCode: String,
         assetName: String,
         assetScaleFactor: Long,
+        assetFractionDigits: Long?,
         assetKind: String,
         // Nullable because the running-balance row LEFT JOINs both transfer and trade and COALESCEs the
         // accounts; every row is one or the other, so exactly one side is non-null.
@@ -36,7 +37,7 @@ object AccountRowMapper {
         exchangeOrderId: Long?,
         transactionKind: String,
     ): AccountRow {
-        val asset = AssetRowMapper.buildAsset(assetId, assetCode, assetName, assetScaleFactor, assetKind)
+        val asset = AssetRowMapper.buildAsset(assetId, assetCode, assetName, assetScaleFactor, assetFractionDigits, assetKind)
         return AccountRow(
             transactionId = TransferId(id),
             timestamp = fromEpochMilliseconds(timestamp),

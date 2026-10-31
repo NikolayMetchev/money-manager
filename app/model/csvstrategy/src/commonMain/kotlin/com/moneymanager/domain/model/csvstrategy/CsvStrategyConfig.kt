@@ -2,6 +2,7 @@ package com.moneymanager.domain.model.csvstrategy
 
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.SortedConditionListSerializer
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
@@ -41,11 +42,15 @@ import kotlinx.serialization.encoding.Encoder
  *                           imported file's original name. The strongest selection signal for
  *                           sources whose exports share a column set but differ by filename
  *                           (e.g. crypto.com's card_/fiat_/crypto_transactions_record files).
- * @property crossSourceReconcileWindowSeconds When set, a row that fuzzy-matches an existing
- *                                             transfer from a different source (same accounts and
- *                                             amount, timestamps within this window) is imported
- *                                             but tagged excluded and linked as reconciled instead
- *                                             of counting twice. Null disables reconciliation.
+ * @property crossSourceReconcileWindow When set, a row that fuzzy-matches an existing transfer from a
+ *                                      different source (same accounts and amount, within this window)
+ *                                      is imported but tagged excluded and linked as reconciled instead
+ *                                      of counting twice. Null disables reconciliation.
+ * @property placeholderReconcileWindow How far apart a placeholder leg (a counterparty the row can only
+ *                                      describe, such as a card statement's "PAYMENT RECEIVED") and the
+ *                                      record naming the far end may be. Null: three days, as clock time.
+ *                                      Business days suit a statement that books a payment after a bank
+ *                                      holiday weekend.
  * @property legGroups How this source splits single movements — trades, conversions — across several
  *                  rows, and how those rows are reassembled (see [LegGroupRule]). Empty when every
  *                  movement arrives on one row.
@@ -54,7 +59,7 @@ import kotlinx.serialization.encoding.Encoder
  *                             e.g. Curve's "Funding Card Last 4 Digits" column against the `card-last4`
  *                             attribute). A row whose value resolves to a single account is reconciled
  *                             against an unconsumed funding leg into the row's source account (same
- *                             amount+currency within [crossSourceReconcileWindowSeconds]), ignoring the
+ *                             amount+currency within [crossSourceReconcileWindow]), ignoring the
  *                             merchant. Null disables funding reconciliation.
  * @property assetCodes How the source's asset codes map onto Money Manager's, applied to every currency
  *                      column before lookup (e.g. Koinly's legacy `KNCL` → `KNC`), so the source neither
@@ -79,7 +84,10 @@ data class CsvStrategyConfig<out M>(
     @Serializable(with = SortedConditionListSerializer::class)
     val contentMatchRules: List<Condition> = emptyList(),
     val fileNamePattern: String? = null,
-    val crossSourceReconcileWindowSeconds: Long? = null,
+    val crossSourceReconcileWindow: SettlementWindow? = null,
+    // NEVER-encoded when null, so only a strategy that sets it rehashes.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val placeholderReconcileWindow: SettlementWindow? = null,
     // Omitted from JSON when null (unlike the fields above, which encode their null under the export
     // codec's encodeDefaults=true) so ADDING this field did not change the canonical hash of every
     // existing strategy — only a strategy that actually sets it (Curve) rehashed. Prevents a spurious
@@ -109,7 +117,8 @@ data class CsvStrategyConfig<out M>(
             companionTransactionRules = companionTransactionRules,
             contentMatchRules = contentMatchRules,
             fileNamePattern = fileNamePattern,
-            crossSourceReconcileWindowSeconds = crossSourceReconcileWindowSeconds,
+            crossSourceReconcileWindow = crossSourceReconcileWindow,
+            placeholderReconcileWindow = placeholderReconcileWindow,
             fundingAttributeMatch = fundingAttributeMatch,
             legGroups = legGroups,
             reconciliation = reconciliation,

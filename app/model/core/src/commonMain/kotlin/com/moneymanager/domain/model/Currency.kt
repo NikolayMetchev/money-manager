@@ -15,6 +15,8 @@ import kotlin.jvm.JvmInline
  *                       at their ISO 4217 decimal-place count — see [CurrencyScaleFactors] for why.
  *                       There is deliberately no default: an implicit scale is how amounts end up
  *                       rounded to a precision no real database uses.
+ * @property fractionDigits The ISO 4217 minor unit (2 for GBP, 0 for JPY), installed with the catalog's currency
+ *                       list. Display only: native and the browser pad amounts to it. Null when unknown or none.
  */
 data class Currency(
     override val id: CurrencyId,
@@ -22,6 +24,7 @@ data class Currency(
     override val code: String,
     override val name: String,
     override val scaleFactor: Long,
+    val fractionDigits: Int? = null,
 ) : Asset
 
 @Serializable

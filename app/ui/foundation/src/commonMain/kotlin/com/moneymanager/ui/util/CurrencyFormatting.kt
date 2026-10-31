@@ -3,6 +3,7 @@ package com.moneymanager.ui.util
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.CryptoAsset
+import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Money
 import com.moneymanager.currency.Currency as CurrencyFormatter
 
@@ -26,7 +27,7 @@ fun formatAmount(
         "$amount ${asset.code}"
     } else {
         try {
-            CurrencyFormatter(asset.code).format(amount)
+            CurrencyFormatter(asset.code, (asset as? Currency)?.fractionDigits).format(amount)
         } catch (_: IllegalArgumentException) {
             // Fallback for unknown currency codes - just format as number with currency code
             "$amount ${asset.code}"

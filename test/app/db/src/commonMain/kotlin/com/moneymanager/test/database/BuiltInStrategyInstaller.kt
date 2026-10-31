@@ -4,10 +4,10 @@ import com.moneymanager.builtin.BuiltInApiStrategies
 import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.builtin.BuiltInPassThroughs
 import com.moneymanager.database.di.DatabaseComponent
-import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.createCsvStrategy
 import com.moneymanager.importengineapi.createPassThroughAccount
+import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
 
 /**
@@ -17,7 +17,8 @@ import kotlin.time.Clock
  * built-ins call these from their setup.
  */
 suspend fun DatabaseComponent.installBuiltInCsvStrategies() {
-    for (strategy in BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), GBP_CURRENCY_ID)) {
+    val gbp = checkNotNull(currencyRepository.getCurrencyByCode("GBP").first()) { "GBP isn't installed" }
+    for (strategy in BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), gbp.id)) {
         importEngine.createCsvStrategy(strategy)
     }
 }
@@ -33,6 +34,3 @@ suspend fun DatabaseComponent.installBuiltInPassThroughs() {
         importEngine.createPassThroughAccount(definition)
     }
 }
-
-// GBP is statically seeded with fixed id 1 (StaticSeed.sq); the QIF built-ins pre-select it.
-private val GBP_CURRENCY_ID = CurrencyId(1)

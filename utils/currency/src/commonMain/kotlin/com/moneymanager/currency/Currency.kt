@@ -6,9 +6,12 @@ import com.moneymanager.bigdecimal.BigDecimal
  * Represents a currency with formatting capabilities.
  *
  * @param code ISO 4217 currency code (e.g., "USD", "GBP", "EUR")
+ * @param fractionDigits the code's ISO minor unit (2 for GBP), as the database's currency records it. Only native and
+ *   the browser read it: they have no locale data, so it is how wide they pad. JVM and Android ask `java.util.Currency`.
  */
 expect class Currency(
     code: String,
+    fractionDigits: Int? = null,
 ) {
     /**
      * The ISO 4217 currency code.

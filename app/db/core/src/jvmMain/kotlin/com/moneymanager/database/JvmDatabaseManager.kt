@@ -1,13 +1,13 @@
 package com.moneymanager.database
 
 import app.cash.sqldelight.db.SqlDriver
-import com.moneymanager.currency.IsoCurrency
+import com.moneymanager.domain.model.CurrencyExportEntry
 import kotlinx.io.files.Path
 import java.util.Properties
 
 /** The desktop [FileDatabaseManager]: SQLite over sqlite-jdbc, with cached prepared statements. */
 class JvmDatabaseManager(
-    currenciesToSeed: () -> List<IsoCurrency> = { DatabaseConfig.allCurrencies },
+    currenciesToSeed: () -> List<CurrencyExportEntry> = { emptyList() },
 ) : FileDatabaseManager(currenciesToSeed) {
     override fun openDriver(file: Path): SqlDriver {
         // Per-connection pragmas go in Properties, since the driver opens several connections; a PRAGMA

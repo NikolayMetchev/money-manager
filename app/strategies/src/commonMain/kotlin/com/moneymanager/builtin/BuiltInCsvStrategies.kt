@@ -35,6 +35,7 @@ import com.moneymanager.domain.model.rules.ForeignAmount
 import com.moneymanager.domain.model.rules.LegRole
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
+import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
@@ -336,13 +337,19 @@ object BuiltInCsvStrategies {
     private const val BINANCE_TRADE_RECONCILE_WINDOW_SECONDS = 5L
 
     /**
-     * Cross-source window for the bank and card QIF strategies (Santander, American Express). QIF dates are
-     * date-only and a card statement books a payment up to a few days from the paying bank, so the
-     * placeholder rule that pairs a card's "PAYMENT RECEIVED" with the bank's direct debit matches within
-     * the engine's fuzzy date tolerance (3 days). This window, for an exact same-accounts match, allows two
-     * days, like the other statement exports (Curve, PayPal).
+     * Cross-source window for the bank and card statement strategies (Santander, American Express). For an exact
+     * same-accounts match it allows two days, like the other statement exports (Curve, PayPal).
      */
     private const val QIF_STATEMENT_RECONCILE_WINDOW_SECONDS = 172_800L
+
+    /**
+     * How far a card's "PAYMENT RECEIVED" placeholder may sit from the bank's direct debit it records. Statement
+     * dates are date-only and a card books a payment a few days after the paying bank, counting only the days banks
+     * settle on: the Easter 2021 payment left Santander on Maundy Thursday and reached American Express on Easter
+     * Monday, four calendar days but no business days apart. Clock time wide enough for that pairs unrelated
+     * payments of the same amount.
+     */
+    private val STATEMENT_PLACEHOLDER_WINDOW = SettlementWindow.BusinessDays(3)
 
     /**
      * An American Express payee recording a payment INTO the card ("PAYMENT RECEIVED - THANK YOU"). It never
@@ -364,13 +371,12 @@ object BuiltInCsvStrategies {
     private const val BINANCE_CONVERSION_PAIRING_WINDOW_SECONDS = 2L
 
     /**
-     * All built-in CSV import strategies seeded into a fresh database. [qifCurrencyId] is the fixed
-     * currency the QIF strategies carry (the default the QIF import dialog pre-selects); it is resolved
-     * to GBP at seed time. Defaults to the first currency for callers without a resolved id (e.g. tests).
+     * All built-in CSV import strategies. [qifCurrencyId] is the database's GBP, the currency the QIF and PDF
+     * statements are in; the catalog publishes it as the code "GBP", which an install resolves in its database.
      */
     fun builtInCsvStrategies(
         now: Instant,
-        qifCurrencyId: CurrencyId = CurrencyId(1),
+        qifCurrencyId: CurrencyId,
     ): List<CsvImportStrategy> =
         listOf(
             buildSantanderQifStrategy(now, qifCurrencyId),
@@ -499,7 +505,7 @@ object BuiltInCsvStrategies {
                     rules = rules,
                     contentMatchRules = listOf(Condition("Transaction Kind", ConditionOp.MATCHES, "^$")),
                     fileNamePattern = "^card_transactions_record_",
-                    crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(CRYPTO_COM_RECONCILE_WINDOW_SECONDS),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -614,7 +620,7 @@ object BuiltInCsvStrategies {
                     rules = rules,
                     fileNamePattern = "Card Transaction History",
                     // Same physical card as the CSV export above, so the two overlap wherever their date ranges do.
-                    crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(CRYPTO_COM_RECONCILE_WINDOW_SECONDS),
                 ),
             worksheetName = "Sheet1",
             createdAt = now,
@@ -740,7 +746,7 @@ object BuiltInCsvStrategies {
                     rules = rules,
                     contentMatchRules = listOf(Condition("Transaction Kind", ConditionOp.MATCHES, "^(viban_|crypto_viban)")),
                     fileNamePattern = "^fiat_transactions_record_",
-                    crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(CRYPTO_COM_RECONCILE_WINDOW_SECONDS),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -892,7 +898,7 @@ object BuiltInCsvStrategies {
                     fieldMappings = fieldMappings,
                     rules = rules,
                     fileNamePattern = "^crypto_transactions_record_",
-                    crossSourceReconcileWindowSeconds = CRYPTO_COM_RECONCILE_WINDOW_SECONDS,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(CRYPTO_COM_RECONCILE_WINDOW_SECONDS),
                     legGroups =
                         listOf(
                             LegGroupRule(
@@ -989,7 +995,7 @@ object BuiltInCsvStrategies {
                     // Only a tiebreaker among column-matched candidates; Curve's column set is disjoint from
                     // Wise's transaction-history.csv, so the two never compete.
                     fileNamePattern = "^Transaction History",
-                    crossSourceReconcileWindowSeconds = CURVE_RECONCILE_WINDOW_SECONDS,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(CURVE_RECONCILE_WINDOW_SECONDS),
                     // Reconcile each spend against the funding leg on the account whose card-last4 attribute
                     // matches this column, so a Curve charge isn't double-counted against the underlying card's
                     // own import.
@@ -1089,7 +1095,7 @@ object BuiltInCsvStrategies {
                     fieldMappings = fieldMappings,
                     rules = rules,
                     fileNamePattern = "^Transactions",
-                    crossSourceReconcileWindowSeconds = CURVE_RECONCILE_WINDOW_SECONDS,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(CURVE_RECONCILE_WINDOW_SECONDS),
                     fundingAttributeMatch =
                         AttributeAccountMatch(
                             column = "Card Last 4 Digits",
@@ -1280,7 +1286,7 @@ object BuiltInCsvStrategies {
             identificationColumns = identificationColumns,
             fieldMappings = fieldMappings,
             rules = rules,
-            crossSourceReconcileWindowSeconds = PAYPAL_RECONCILE_WINDOW_SECONDS,
+            crossSourceReconcileWindow = SettlementWindow.Elapsed(PAYPAL_RECONCILE_WINDOW_SECONDS),
             legGroups =
                 listOf(
                     LegGroupRule(
@@ -1455,7 +1461,7 @@ object BuiltInCsvStrategies {
     @Suppress("LongMethod")
     fun buildSantanderQifStrategy(
         now: Instant,
-        currencyId: CurrencyId = CurrencyId(1),
+        currencyId: CurrencyId,
     ): CsvImportStrategy {
         // First-match-wins rules over the Payee field; ${cp} extracts the clean counterparty name.
         // Tuned against a full Santander statement history (~7k records, ~99.9% parsed). The middle
@@ -1696,7 +1702,8 @@ object BuiltInCsvStrategies {
                         ),
                     // Opts in to cross-source reconciliation, so a payment the bank names both ends of (a direct
                     // debit to a card) supersedes the card statement's placeholder record of it.
-                    crossSourceReconcileWindowSeconds = QIF_STATEMENT_RECONCILE_WINDOW_SECONDS,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(QIF_STATEMENT_RECONCILE_WINDOW_SECONDS),
+                    placeholderReconcileWindow = STATEMENT_PLACEHOLDER_WINDOW,
                 ),
             createdAt = now,
             updatedAt = now,
@@ -1713,7 +1720,7 @@ object BuiltInCsvStrategies {
      */
     fun buildAmexQifStrategy(
         now: Instant,
-        currencyId: CurrencyId = CurrencyId(1),
+        currencyId: CurrencyId,
     ): CsvImportStrategy {
         val fieldMappings =
             mapOf(
@@ -1773,7 +1780,8 @@ object BuiltInCsvStrategies {
                     fieldMappings = fieldMappings,
                     rules = rules,
                     contentMatchRules = listOf(Condition(QifColumns.COL_MEMO, ConditionOp.MATCHES, AMEX_PROCESS_DATE)),
-                    crossSourceReconcileWindowSeconds = QIF_STATEMENT_RECONCILE_WINDOW_SECONDS,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(QIF_STATEMENT_RECONCILE_WINDOW_SECONDS),
+                    placeholderReconcileWindow = STATEMENT_PLACEHOLDER_WINDOW,
                 ),
             createdAt = now,
             updatedAt = now,
@@ -1795,7 +1803,7 @@ object BuiltInCsvStrategies {
      */
     fun buildAmexPdfStrategy(
         now: Instant,
-        currencyId: CurrencyId = CurrencyId(1),
+        currencyId: CurrencyId,
     ): CsvImportStrategy {
         val month = "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*"
         val money = "[\\d,]+\\.\\d\\d"
@@ -1891,7 +1899,8 @@ object BuiltInCsvStrategies {
                     fieldMappings = fieldMappings,
                     rules = rules,
                     contentMatchRules = listOf(Condition(PdfLineConfig.TEXT, ConditionOp.MATCHES, "\\bamericanexpress\\.co\\.uk\\b")),
-                    crossSourceReconcileWindowSeconds = QIF_STATEMENT_RECONCILE_WINDOW_SECONDS,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(QIF_STATEMENT_RECONCILE_WINDOW_SECONDS),
+                    placeholderReconcileWindow = STATEMENT_PLACEHOLDER_WINDOW,
                     pdfLines = PdfLineConfig(lineRules),
                 ),
             createdAt = now,
@@ -2001,7 +2010,7 @@ object BuiltInCsvStrategies {
                     identificationColumns = identificationColumns,
                     fieldMappings = fieldMappings,
                     rules = rules,
-                    crossSourceReconcileWindowSeconds = MONZO_RECONCILE_WINDOW_SECONDS,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(MONZO_RECONCILE_WINDOW_SECONDS),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -2205,7 +2214,7 @@ object BuiltInCsvStrategies {
                     // Binance names its exports with bare UUIDs, so there is no filename signal to use - and a
                     // filename match would win outright over content scoring and let a legacy file through.
                     contentMatchRules = listOf(Condition("User_ID", ConditionOp.MATCHES, "^\\s*\\d+\\s*$")),
-                    crossSourceReconcileWindowSeconds = BINANCE_RECONCILE_WINDOW_SECONDS,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(BINANCE_RECONCILE_WINDOW_SECONDS),
                     legGroups =
                         listOf(
                             LegGroupRule(
@@ -2389,7 +2398,7 @@ object BuiltInCsvStrategies {
                     fieldMappings = bybitFieldMappings("Time(UTC)", "Amount", "Coin"),
                     rules = rules,
                     contentMatchRules = listOf(bybitUidRule),
-                    crossSourceReconcileWindowSeconds = BYBIT_RECONCILE_WINDOW_SECONDS,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(BYBIT_RECONCILE_WINDOW_SECONDS),
                     legGroups =
                         listOf(
                             LegGroupRule(
@@ -2430,7 +2439,7 @@ object BuiltInCsvStrategies {
                     fieldMappings = bybitFieldMappings("Date & Time(UTC)", "QTY", "Coin"),
                     rules = bybitRules("QTY", internalTransfer, targets, listOf(attribute("Description", "bybit-description"))),
                     contentMatchRules = listOf(bybitUidRule),
-                    crossSourceReconcileWindowSeconds = BYBIT_RECONCILE_WINDOW_SECONDS,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(BYBIT_RECONCILE_WINDOW_SECONDS),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -2476,7 +2485,7 @@ object BuiltInCsvStrategies {
                     fieldMappings = bybitFieldMappings("Time(UTC)", "Change", "Currency"),
                     rules = bybitRules("Change", internalTransfer, targets, listOf(attribute("Contract", "bybit-contract"))),
                     contentMatchRules = listOf(bybitUidRule),
-                    crossSourceReconcileWindowSeconds = BYBIT_RECONCILE_WINDOW_SECONDS,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(BYBIT_RECONCILE_WINDOW_SECONDS),
                 ),
             createdAt = now,
             updatedAt = now,

@@ -43,9 +43,6 @@ import kotlin.time.Instant
 class CurveCsvE2ETest : DbTest() {
     override val installBuiltInStrategies: Boolean = true
 
-    // The foreign-currency Curve row needs its currency (EUR) to exist.
-    override val seedAllCurrencies: Boolean = true
-
     private val now = Clock.System.now()
 
     private val maintenance =

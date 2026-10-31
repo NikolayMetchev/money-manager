@@ -57,4 +57,4 @@ suspend fun CategoryWriteRepository.updateCategory(category: Category): Unit = u
 suspend fun CurrencyWriteRepository.upsertCurrencyByCode(
     code: String,
     name: String,
-): CurrencyId = upsertCurrencyByCode(code, name, TEST_SOURCE)
+): CurrencyId = upsertCurrencyByCode(code, name, null, TEST_SOURCE)

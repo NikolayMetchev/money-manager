@@ -27,7 +27,10 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferRelationship
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.rules.SettlementWindow
+import com.moneymanager.domain.model.rules.widen
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.write.AccountAttributeWriteRepository
 import com.moneymanager.domain.repository.write.AccountMappingWriteRepository
@@ -41,6 +44,7 @@ import com.moneymanager.domain.repository.write.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.write.CsvImportWriteRepository
 import com.moneymanager.domain.repository.write.CurrencyWriteRepository
 import com.moneymanager.domain.repository.write.ExchangeOrderWriteRepository
+import com.moneymanager.domain.repository.write.HolidayCalendarWriteRepository
 import com.moneymanager.domain.repository.write.ImportDirectoryWriteRepository
 import com.moneymanager.domain.repository.write.NewTrade
 import com.moneymanager.domain.repository.write.PassThroughAccountWriteRepository
@@ -64,6 +68,7 @@ import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.EditGate
+import com.moneymanager.importengineapi.HolidayCalendarMutation
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportDirectoryMutation
@@ -93,7 +98,6 @@ import com.moneymanager.importengineapi.forRow
 import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.flow.first
-import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -151,6 +155,11 @@ class ImportEngineImpl(
     private val importDirectoryRepository: ImportDirectoryWriteRepository,
     private val passThroughAccountRepository: PassThroughAccountWriteRepository,
     /**
+     * The locations business-day reconcile windows count on. Optional like [transferRelationshipRepository]: without
+     * it every account is on a weekends-only calendar. DI supplies it.
+     */
+    private val holidayCalendarRepository: HolidayCalendarWriteRepository? = null,
+    /**
      * Read-only view of transfer relationships, used to see which existing legs a `reconciled` link
      * already claims (see [ImportDeduper.claimedReconcileTargets]). Optional so the hand-built engines in
      * tests need not wire it; the DI-built engine always supplies it.
@@ -183,6 +192,7 @@ class ImportEngineImpl(
                 currencyRepository.upsertCurrencyByCode(
                     requireNotNull(intent.code),
                     requireNotNull(intent.name),
+                    intent.fractionDigits,
                     intent.source,
                 )
         }
@@ -611,7 +621,8 @@ class ImportEngineImpl(
             }
 
         onProgress?.invoke(Progress("Detecting duplicates"))
-        val existing = loadExisting(resolvedTransfers, batch)
+        val calendars = settlementCalendars(batch.dedupePolicy)
+        val existing = loadExisting(resolvedTransfers, batch, calendars)
         val existingRelationships = existingRelationships(existing)
         val classified =
             ImportDeduper(
@@ -626,7 +637,8 @@ class ImportEngineImpl(
                         .associate { it.id1 to it.id2 },
                 ownBatchAccounts = resolvedTransfers.flatMapTo(mutableSetOf()) { listOf(it.fromAccount, it.toAccount).map(::requireId) },
                 passThroughOnward = passThroughOnward(existing, existingRelationships),
-                ownSourceLegs = ownSourceLegs(resolvedTransfers),
+                ownSourceLegs = ownSourceLegs(resolvedTransfers, existing),
+                calendars = calendars,
             ).classify(resolvedTransfers)
 
         val toImport = resolveReversalLinks(classified.filter { it.status == ImportStatus.IMPORTED })
@@ -1387,11 +1399,47 @@ class ImportEngineImpl(
 
     // region Transfers
 
-    /** Transfers the batch's own CSV files created on an earlier import (see [ImportDeduper]'s `ownSourceLegs`). */
-    private suspend fun ownSourceLegs(transfers: List<ImportTransfer>): Set<TransferId> =
-        transfers
-            .mapNotNullTo(mutableSetOf()) { (it.source as? Source.Csv)?.importId }
-            .flatMapTo(mutableSetOf()) { csvImportRepository.getTransferIdsCreatedByImport(it) }
+    /**
+     * Existing records of the batch's own source (see [ImportDeduper]'s `ownSourceLegs`): what its CSV files created on
+     * an earlier import, and the other lines of the statements it covers. An account books a movement once, on one
+     * date, so every export of its statements records it at that time; a record carrying the batch's unique identifier
+     * ([ExistingTransferInfo.uniqueKey]), booked from the statement of an account the batch's rows are statements of,
+     * at a time and amount none of those rows records, is another line of that account's statements (an equal purchase
+     * two days earlier, posted onto the next month's card statement), never another source's record of a row's
+     * movement. Another export of the same statement still reconciles, as does a second account's export of a
+     * transfer between the two: its lines are that account's statement.
+     */
+    private suspend fun ownSourceLegs(
+        transfers: List<ImportTransfer>,
+        existing: List<ExistingTransferInfo>,
+    ): Set<TransferId> {
+        val ownFiles =
+            transfers
+                .mapNotNullTo(mutableSetOf()) { (it.source as? Source.Csv)?.importId }
+                .flatMapTo(mutableSetOf()) { csvImportRepository.getTransferIdsCreatedByImport(it) }
+        val statementLines =
+            transfers.mapNotNullTo(mutableSetOf()) { transfer ->
+                (transfer.source as? Source.Csv)?.statementAccountId?.let { StatementLine(it, transfer.timestamp, transfer.amount) }
+            }
+        val identified = existing.filter { it.uniqueKey.isNotEmpty() }.associateBy { it.transferId }
+        if (statementLines.isEmpty() || identified.isEmpty()) return ownFiles
+        val statementAccounts = statementLines.mapTo(mutableSetOf()) { it.account }
+        val otherLines =
+            csvImportRepository
+                .getStatementAccounts(identified.keys)
+                .filter { (id, account) ->
+                    val transfer = identified.getValue(id).transfer
+                    account in statementAccounts && StatementLine(account, transfer.timestamp, transfer.amount) !in statementLines
+                }.keys
+        return ownFiles + otherLines
+    }
+
+    /** One line of [account]'s statement: what it booked, and when. */
+    private data class StatementLine(
+        val account: AccountId,
+        val timestamp: Instant?,
+        val amount: Money?,
+    )
 
     /**
      * The relationships touching [existing], loaded once for the deduper. Among them: the `reconciled`
@@ -1513,9 +1561,25 @@ class ImportEngineImpl(
         return if (legs.isEmpty()) null else ConversionTradeReconciler(policy.window, legs, creates)
     }
 
+    /**
+     * The locations a business-day window of [policy] counts on: every account's `location` attribute, the default
+     * location and the calendars they name. A policy with clock-time windows only reads none of them.
+     */
+    private suspend fun settlementCalendars(policy: DedupePolicy): SettlementCalendars {
+        val repository = holidayCalendarRepository
+        if (repository == null || policy.windows().none { it is SettlementWindow.BusinessDays }) return SettlementCalendars.WEEKENDS_ONLY
+        val locations =
+            accountAttributeRepository
+                .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_LOCATION_ATTR_TYPE_ID))
+                .first()
+                .associate { it.accountId to it.value }
+        return SettlementCalendars(locations, settingsRepository.getDefaultLocation().first(), repository.getAll().first())
+    }
+
     private suspend fun loadExisting(
         transfers: List<ImportTransfer>,
         batch: ImportBatch,
+        calendars: SettlementCalendars,
     ): List<ExistingTransferInfo> {
         if (transfers.isEmpty()) return emptyList()
 
@@ -1542,17 +1606,20 @@ class ImportEngineImpl(
                     // tolerance or the cross-source reconcile window — is available as a candidate. This
                     // matters for date-only exports (e.g. Curve stamps a date that parses to noon) where
                     // the counterpart card leg lands hours later the same day, or a day or two later.
-                    val slack = maxOf(policy.dateTolerance, policy.reconcileWindow ?: Duration.ZERO)
-                    val minTs = transfers.minOf { requireNotNull(it.timestamp) } - slack
-                    val maxTs = transfers.maxOf { requireNotNull(it.timestamp) } + slack
+                    val range =
+                        policy.windows().reach(
+                            transfers.minOf { requireNotNull(it.timestamp) }..transfers.maxOf { requireNotNull(it.timestamp) },
+                            calendars.strictest,
+                            times = 1,
+                        )
                     accountIds
                         .flatMap {
-                            transactionRepository.getTransactionsByAccountAndDateRange(it, minTs, maxTs).first()
+                            transactionRepository.getTransactionsByAccountAndDateRange(it, range.start, range.endInclusive).first()
                         }.distinctBy { it.id }
                 }
 
                 is DedupePolicy.UniqueIdentifier -> {
-                    loadAroundBatch(transfers, accountIds.toList(), batch.dedupePolicy.windows())
+                    loadAroundBatch(transfers, accountIds.toList(), batch.dedupePolicy.windows(), calendars)
                 }
 
                 is DedupePolicy.ApiMultiKey -> {
@@ -1563,6 +1630,7 @@ class ImportEngineImpl(
                         transfers,
                         (accountIds + policy.internalTransferBridges.map { it.appAccountId }).toList(),
                         policy.windows(),
+                        calendars,
                     )
                 }
 
@@ -1608,7 +1676,7 @@ class ImportEngineImpl(
      *
      * Every other rule pairs an existing leg with a batch row inside one of the policy's [windows], or (the
      * split-conduit pass) with an existing placeholder that is itself inside the window of a batch row, so
-     * twice the widest window covers each one. A leg outside that cannot match anything; loading it changed
+     * widening by every window twice covers each one. A leg outside that cannot match anything; loading it changed
      * nothing but the cost, which on a large database was most of a re-import.
      *
      * The result keeps the order the full-history load gave (account by account, newest first), since the
@@ -1617,13 +1685,15 @@ class ImportEngineImpl(
     private suspend fun loadAroundBatch(
         transfers: List<ImportTransfer>,
         accountIds: List<AccountId>,
-        windows: List<Duration?>,
+        windows: List<SettlementWindow>,
+        calendars: SettlementCalendars,
     ): List<Transfer> {
         val timestamps = transfers.map { it.timestamp ?: return loadFullHistory(accountIds) }
-        val slack = (windows.filterNotNull().maxOrNull() ?: Duration.ZERO) * 2
-        val from = timestamps.min() - slack
         // An approximately-dated row may have happened as late as its approximateUntil.
-        val until = transfers.maxOf { maxOf(requireNotNull(it.timestamp), it.approximateUntil ?: Instant.DISTANT_PAST) } + slack
+        val latest = transfers.maxOf { maxOf(requireNotNull(it.timestamp), it.approximateUntil ?: Instant.DISTANT_PAST) }
+        val range = windows.reach(timestamps.min()..latest, calendars.strictest, times = 2)
+        val from = range.start
+        val until = range.endInclusive
         val ids = transfers.flatMap { it.uniqueKey?.values.orEmpty() + listOfNotNull(it.apiId) }
         val loaded =
             accountIds.flatMap { transactionRepository.getTransactionsByAccountAndDateRange(it, from, until).first() } +
@@ -1646,12 +1716,34 @@ class ImportEngineImpl(
         accountIds.flatMap { transactionRepository.getTransactionsByAccount(it).first() }.distinctBy { it.id }
 
     /** Every window within which a rule of this policy pairs an incoming row with an existing leg. */
-    private fun DedupePolicy.windows(): List<Duration?> =
+    private fun DedupePolicy.windows(): List<SettlementWindow> =
         when (this) {
-            is DedupePolicy.UniqueIdentifier -> listOf(reconcileWindow, unidentifiedCounterpartyWindow)
-            is DedupePolicy.ApiMultiKey -> listOf(reconcileWindow, unidentifiedCounterpartyWindow, internalTransferWindow)
-            is DedupePolicy.FuzzyAllFields -> listOf(dateTolerance, reconcileWindow)
-            DedupePolicy.None -> emptyList()
+            is DedupePolicy.UniqueIdentifier -> {
+                listOfNotNull(reconcileWindow, unidentifiedCounterpartyWindow)
+            }
+
+            is DedupePolicy.ApiMultiKey -> {
+                listOfNotNull(reconcileWindow, unidentifiedCounterpartyWindow, internalTransferWindow)
+            }
+
+            is DedupePolicy.FuzzyAllFields -> {
+                listOfNotNull(SettlementWindow.Elapsed(dateTolerance.inWholeSeconds), reconcileWindow, unidentifiedCounterpartyWindow)
+            }
+
+            DedupePolicy.None -> {
+                emptyList()
+            }
+        }
+
+    /** [range] widened [times] over by each of these windows: every instant a match could carry. */
+    private fun List<SettlementWindow>.reach(
+        range: ClosedRange<Instant>,
+        calendar: BusinessDayCalendar,
+        times: Int,
+    ): ClosedRange<Instant> =
+        fold(range) { reached, window ->
+            val widened = (1..times).fold(range) { r, _ -> window.widen(r.start, r.endInclusive, calendar) }
+            minOf(reached.start, widened.start)..maxOf(reached.endInclusive, widened.endInclusive)
         }
 
     /**
@@ -2255,6 +2347,13 @@ class ImportEngineImpl(
                 is PassThroughMutation.Delete -> passThroughAccountRepository.delete(m.id)
             }
         }
+        for (m in batch.holidayCalendarMutations) {
+            val repository = checkNotNull(holidayCalendarRepository) { "This engine has no holiday calendar repository" }
+            when (m) {
+                is HolidayCalendarMutation.Upsert -> repository.upsert(m.calendar)
+                is HolidayCalendarMutation.Delete -> repository.delete(m.code)
+            }
+        }
         val csvStrategyIds = mutableMapOf<String, CsvImportStrategyId>()
         for (m in batch.csvStrategyMutations) {
             when (m) {
@@ -2504,6 +2603,7 @@ class ImportEngineImpl(
 
         batch.settings?.let { s ->
             s.defaultCurrencyId?.let { settingsRepository.setDefaultCurrencyId(it) }
+            s.defaultLocation?.let { settingsRepository.setDefaultLocation(it.code) }
             s.setupWizardCompleted?.let { settingsRepository.setSetupWizardCompleted(it) }
         }
 

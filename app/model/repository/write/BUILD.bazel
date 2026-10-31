@@ -5,6 +5,7 @@
 # gazelle:kmp_visibility //app/db/core:__pkg__ //app/db/di:__pkg__ //app/db/write:__pkg__ //app/di/core:__pkg__ //app/importer:__pkg__ //test/app/db:__pkg__
 # gazelle:kmp_export //app/model/accountmapping
 # gazelle:kmp_export //app/model/apistrategy
+# gazelle:kmp_export //app/model/calendar
 # gazelle:kmp_export //app/model/core
 # gazelle:kmp_export //app/model/csv
 # gazelle:kmp_export //app/model/csvstrategy
@@ -39,6 +40,7 @@ kmp_library(
     exports = [
         "//app/model/accountmapping",
         "//app/model/apistrategy",
+        "//app/model/calendar",
         "//app/model/core",
         "//app/model/csv",
         "//app/model/csvstrategy",

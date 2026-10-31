@@ -10,11 +10,13 @@ interface CurrencyWriteRepository : CurrencyReadRepository {
      * Creates a new currency or returns the existing one if a currency with the same code exists.
      * @param code The ISO 4217 currency code (e.g., "USD")
      * @param name The human-readable name of the currency (e.g., "US Dollar")
+     * @param fractionDigits The ISO minor unit (2 for USD), or null when it has none or isn't known
      * @return The CurrencyId of the created or existing currency
      */
     suspend fun upsertCurrencyByCode(
         code: String,
         name: String,
+        fractionDigits: Int?,
         source: Source,
     ): CurrencyId
 

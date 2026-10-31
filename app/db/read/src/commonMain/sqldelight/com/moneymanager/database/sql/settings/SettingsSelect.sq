@@ -1,5 +1,8 @@
 selectDefaultCurrencyId:
 SELECT default_currency_id FROM settings LIMIT 1;
 
+selectDefaultLocation:
+SELECT default_location FROM settings LIMIT 1;
+
 selectSetupWizardCompleted:
 SELECT setup_wizard_completed FROM settings LIMIT 1;

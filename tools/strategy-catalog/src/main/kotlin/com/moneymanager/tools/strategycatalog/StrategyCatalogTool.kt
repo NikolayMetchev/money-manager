@@ -6,10 +6,12 @@ import com.moneymanager.builtin.BuiltInPassThroughs
 import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.database.json.CsvStrategyExportCodec
 import com.moneymanager.database.json.CurrencyListExportCodec
+import com.moneymanager.database.json.HolidayCalendarExportCodec
 import com.moneymanager.database.json.PassThroughExportCodec
 import com.moneymanager.database.json.StrategyArtifactCodec
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
+import com.moneymanager.domain.model.calendar.HolidayCalendarExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExportMapper
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.export.PassThroughExport
@@ -27,25 +29,21 @@ import kotlin.time.Instant
 // them, and the canonical hash blanks the version anyway.
 private const val LIBRARY_VERSION = ""
 
-// The QIF built-ins hard-code a currency the apply flow pre-selects; in exports it travels as a code.
+// The QIF built-ins hard-code GBP. A strategy carries a currency id, but its export names the code, so any id that
+// maps to "GBP" here renders the same artifact.
 private val GBP_CURRENCY_ID = CurrencyId(1)
 private const val GBP_CURRENCY_CODE = "GBP"
 
 /**
  * Generates the strategy catalog for the GitHub Pages site: renders every Kotlin built-in definition
- * (app/strategies) plus the ISO 4217 currency list to its portable JSON artifact and writes
+ * (app/strategies), the ISO 4217 currency list and Strata's locations to their portable JSON artifacts and writes
  * `<webpageDir>/strategy-library/` — index.json plus one file per artifact. Nothing is checked in; CI
- * runs this before uploading the `webpage/` directory to Pages. `currencies <file>` instead regenerates
- * the currency table bundled into the app from the same JDK list.
+ * runs this before uploading the `webpage/` directory to Pages.
  */
 fun main(args: Array<String>) {
-    val usage = "usage: generate <webpageDir> | currencies <IsoCurrencies.kt>"
-    require(args.size == 2) { usage }
-    when (args[0]) {
-        "generate" -> generateCatalogSite(workspaceFile(args[1]))
-        "currencies" -> workspaceFile(args[1]).writeText(renderIsoCurrenciesSource(jdkIsoCurrencies()))
-        else -> error(usage)
-    }
+    val usage = "usage: generate <webpageDir>"
+    require(args.size == 2 && args[0] == "generate") { usage }
+    generateCatalogSite(workspaceFile(args[1]))
 }
 
 // `bazel run` starts a tool in its runfiles tree, so a relative path names a file in the workspace.
@@ -77,10 +75,15 @@ internal fun builtInArtifacts(): Map<StrategyKey, String> {
         artifacts[StrategyKey(StrategyKind.PASS_THROUGH, definition.name)] = PassThroughExportCodec.encode(definition.toExport())
     }
 
-    // Rendered from this JDK rather than the bundled table, so the site can carry codes newer than an
-    // installed app's bundle.
+    // The app bundles no currencies or locations: a new database installs them from here, rendered from this JDK and
+    // from Strata when the site is published.
     artifacts[StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)] =
         CurrencyListExportCodec.encode(currencyListExport(jdkIsoCurrencies()))
+
+    for (calendar in strataHolidayCalendars()) {
+        artifacts[StrategyKey(StrategyKind.HOLIDAY_CALENDAR, calendar.id)] =
+            HolidayCalendarExportCodec.encode(HolidayCalendarExport(calendar = calendar))
+    }
 
     return artifacts
 }

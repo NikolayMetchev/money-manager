@@ -28,6 +28,7 @@ class CurrencyWriteRepositoryImpl(
     override suspend fun upsertCurrencyByCode(
         code: String,
         name: String,
+        fractionDigits: Int?,
         source: Source,
     ): CurrencyId =
         withContext(Dispatchers.Default) {
@@ -39,7 +40,7 @@ class CurrencyWriteRepositoryImpl(
                         // Allocate an id from the shared `asset` id space, then insert the currency with it.
                         assetWriteQueries.insert()
                         val newId = assetWriteQueries.lastInsertedId().awaitAsOne()
-                        writeQueries.insert(newId, code, name, scaleFactor)
+                        writeQueries.insert(newId, code, name, scaleFactor, fractionDigits?.toLong())
                         // Only a freshly inserted currency records a source (the existing branch keeps its own).
                         database.recordSource(deviceId, EntityType.CURRENCY, newId, 1L, source)
                         CurrencyId(newId)
@@ -57,6 +58,7 @@ class CurrencyWriteRepositoryImpl(
                     code = currency.code,
                     name = currency.name,
                     scale_factor = currency.scaleFactor,
+                    fraction_digits = currency.fractionDigits?.toLong(),
                     id = currency.id.id,
                 )
                 val revision = selectQueries.selectById(currency.id.id).awaitAsOne().revision_id

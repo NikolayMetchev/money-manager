@@ -21,6 +21,13 @@ class SettingsReadRepositoryImpl(
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.default_currency_id?.let(::CurrencyId) }
 
+    override fun getDefaultLocation(): Flow<String?> =
+        selectQueries
+            .selectDefaultLocation()
+            .asFlow()
+            .mapToOneOrNull(Dispatchers.Default)
+            .map { it?.default_location }
+
     override fun isSetupWizardCompleted(): Flow<Boolean> =
         selectQueries
             .selectSetupWizardCompleted()

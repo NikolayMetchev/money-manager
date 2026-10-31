@@ -315,6 +315,7 @@ class CsvImportRepositoryImplTest : DbTest() {
                 id = createdSource.id,
                 csv_import_id = importId.id.toString(),
                 csv_row_index = 1,
+                statement_account_id = null,
             )
             repositories.csvImportRepository.updateRowStatusesBatch(
                 id = importId,

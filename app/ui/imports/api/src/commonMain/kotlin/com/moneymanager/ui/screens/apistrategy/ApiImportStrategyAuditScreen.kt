@@ -113,6 +113,7 @@ private val sectionLabels =
         "requestSigning" to "Request signing",
         "tokenExchange" to "Token exchange",
         "internalTransferReconcile" to "Internal transfer reconcile",
+        "reconcileWindows" to "Reconcile windows",
     )
 
 private val acronyms =

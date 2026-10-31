@@ -162,7 +162,7 @@ class DatabaseSessionsTest {
             val session = sessions(controller).open(location)
             controller.createRemote(OneFileProvider.ID, null, "db.mmdb", location, session.database, "pw")
             // Not uploaded, so the cloud copy the reload brings back doesn't have it.
-            session.importEngine.createCurrency("ZZZ", "Test")
+            session.importEngine.createCurrency("ZZZ", "Test", null)
 
             val reloaded = sessions(controller).reloadFromRemote(session)
             try {
@@ -230,7 +230,7 @@ class DatabaseSessionsTest {
             val controller = controller(provider)
             val session = sessions(controller).open(location)
             controller.createRemote(OneFileProvider.ID, null, "db.mmdb", location, session.database, "pw")
-            session.importEngine.createCurrency("ZZZ", "Test")
+            session.importEngine.createCurrency("ZZZ", "Test", null)
 
             val decision = assertNotNull(controller.closeDecision(session.database))
             assertEquals("db.mmdb", decision.remoteName)

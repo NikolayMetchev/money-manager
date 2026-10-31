@@ -4,12 +4,14 @@ import com.moneymanager.database.json.AccountMappingExportCodec
 import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.database.json.CsvStrategyExportCodec
 import com.moneymanager.database.json.CurrencyListExportCodec
+import com.moneymanager.database.json.HolidayCalendarExportCodec
 import com.moneymanager.database.json.PassThroughExportCodec
 import com.moneymanager.database.json.StrategyArtifactCodec
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyExportEntry
 import com.moneymanager.domain.model.CurrencyListExport
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.calendar.HolidayCalendarExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
@@ -18,6 +20,7 @@ import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.HolidayCalendarReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.strategy.CsvReferenceType
 import com.moneymanager.domain.strategy.CsvResolution
@@ -39,6 +42,7 @@ import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.createPassThroughAccount
 import com.moneymanager.importengineapi.updateApiStrategy
 import com.moneymanager.importengineapi.updatePassThroughAccount
+import com.moneymanager.importengineapi.upsertHolidayCalendar
 import kotlinx.coroutines.flow.first
 
 /**
@@ -52,6 +56,7 @@ class StrategyLibraryService(
     private val accountMappingRepository: AccountMappingReadRepository,
     private val passThroughAccountRepository: PassThroughAccountReadRepository,
     private val currencyRepository: CurrencyReadRepository,
+    private val holidayCalendarRepository: HolidayCalendarReadRepository,
     private val csvStrategyExportService: CsvStrategyExportService,
     private val apiStrategyExportService: ApiStrategyExportService,
     private val accountMappingExportService: AccountMappingExportService,
@@ -87,10 +92,15 @@ class StrategyLibraryService(
                 CurrencyListExport(
                     version = appVersion.value,
                     name = StrategyFileNaming.CURRENCIES_NAME,
-                    currencies = listCurrencies.map { CurrencyExportEntry(it.code, it.name) },
+                    currencies = listCurrencies.map { CurrencyExportEntry(it.code, it.name, it.fractionDigits) },
                 )
             entries +=
                 entry(StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME), CurrencyListExportCodec.encode(export))
+        }
+
+        for (calendar in holidayCalendarRepository.getAll().first()) {
+            val json = HolidayCalendarExportCodec.encode(HolidayCalendarExport(version = appVersion.value, calendar = calendar))
+            entries += entry(StrategyKey(StrategyKind.HOLIDAY_CALENDAR, calendar.id), json)
         }
 
         return entries
@@ -107,9 +117,14 @@ class StrategyLibraryService(
                 StrategyParseResult(key, refs)
             }
 
-            // API strategies, pass-through definitions and the currency list carry no entity references to resolve.
-            StrategyKind.API, StrategyKind.PASS_THROUGH, StrategyKind.CURRENCIES -> {
+            // API strategies, pass-through definitions, the currency list and locations carry no entity references.
+            StrategyKind.API, StrategyKind.PASS_THROUGH, StrategyKind.HOLIDAY_CALENDAR -> {
                 StrategyParseResult(key, emptyList())
+            }
+
+            StrategyKind.CURRENCIES -> {
+                val codes = CurrencyListExportCodec.decode(json).currencies.mapTo(mutableSetOf()) { it.code }
+                StrategyParseResult(key, emptyList(), provides = mapOf(CsvReferenceType.CURRENCY to codes))
             }
 
             StrategyKind.GLOBAL_MAPPINGS -> {
@@ -133,6 +148,7 @@ class StrategyLibraryService(
             StrategyKind.PASS_THROUGH -> applyPassThrough(key.name, json)
             StrategyKind.GLOBAL_MAPPINGS -> applyGlobalMappings(json, resolutions)
             StrategyKind.CURRENCIES -> applyCurrencies(json)
+            StrategyKind.HOLIDAY_CALENDAR -> applyHolidayCalendar(key.name, json)
         }
     }
 
@@ -154,10 +170,27 @@ class StrategyLibraryService(
             ImportBatch(
                 currencies =
                     missing.map {
-                        ImportCurrencyIntent(key = LocalCurrencyKey(it.code), source = Source.System, code = it.code, name = it.name)
+                        ImportCurrencyIntent(
+                            key = LocalCurrencyKey(it.code),
+                            source = Source.System,
+                            code = it.code,
+                            name = it.name,
+                            fractionDigits = it.fractionDigits,
+                        )
                     },
             ),
         )
+    }
+
+    /**
+     * The file is authoritative for its location, as for a strategy: it replaces the database's copy, holidays and
+     * all, keyed by the filename's code. Accounts name a location by code, so they keep pointing at it.
+     */
+    private suspend fun applyHolidayCalendar(
+        code: String,
+        json: String,
+    ) {
+        importEngine.upsertHolidayCalendar(HolidayCalendarExportCodec.decode(json).calendar.copy(id = code))
     }
 
     private suspend fun applyCsv(

@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.calendar.HolidayCalendar
 import com.moneymanager.domain.model.csv.CsvRowLink
 import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -41,6 +42,18 @@ sealed interface PassThroughMutation {
     data class Delete(
         val id: PassThroughAccountId,
     ) : PassThroughMutation
+}
+
+/** A write on the locations' holiday calendars, keyed by code ([HolidayCalendar.id]). */
+sealed interface HolidayCalendarMutation {
+    /** Creates the calendar, or replaces the one with its code. */
+    data class Upsert(
+        val calendar: HolidayCalendar,
+    ) : HolidayCalendarMutation
+
+    data class Delete(
+        val code: String,
+    ) : HolidayCalendarMutation
 }
 
 /** A direct edit of one attribute on an existing trade. */
@@ -305,5 +318,11 @@ sealed interface ImportDirectoryMutation {
 /** Settings writes; non-null fields are applied. */
 data class ImportSettings(
     val defaultCurrencyId: CurrencyId? = null,
+    val defaultLocation: DefaultLocation? = null,
     val setupWizardCompleted: Boolean? = null,
+)
+
+/** The holiday calendar [code] accounts without their own location settle on; null clears it (weekends only). */
+data class DefaultLocation(
+    val code: String?,
 )

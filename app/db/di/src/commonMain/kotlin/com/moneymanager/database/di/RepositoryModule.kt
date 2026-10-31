@@ -15,6 +15,7 @@ import com.moneymanager.database.repository.CsvImportStrategyReadRepositoryImpl
 import com.moneymanager.database.repository.CurrencyReadRepositoryImpl
 import com.moneymanager.database.repository.DeviceReadRepositoryImpl
 import com.moneymanager.database.repository.ExchangeOrderReadRepositoryImpl
+import com.moneymanager.database.repository.HolidayCalendarReadRepositoryImpl
 import com.moneymanager.database.repository.ImportDirectoryReadRepositoryImpl
 import com.moneymanager.database.repository.ImportTimelineReadRepositoryImpl
 import com.moneymanager.database.repository.PassThroughAccountReadRepositoryImpl
@@ -43,6 +44,7 @@ import com.moneymanager.database.repository.write.CsvImportWriteRepositoryImpl
 import com.moneymanager.database.repository.write.CurrencyWriteRepositoryImpl
 import com.moneymanager.database.repository.write.DeviceWriteRepositoryImpl
 import com.moneymanager.database.repository.write.ExchangeOrderWriteRepositoryImpl
+import com.moneymanager.database.repository.write.HolidayCalendarWriteRepositoryImpl
 import com.moneymanager.database.repository.write.ImportDirectoryWriteRepositoryImpl
 import com.moneymanager.database.repository.write.PassThroughAccountWriteRepositoryImpl
 import com.moneymanager.database.repository.write.PersonAccountOwnershipWriteRepositoryImpl
@@ -77,6 +79,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.DeviceReadRepository
 import com.moneymanager.domain.repository.ExchangeOrderReadRepository
+import com.moneymanager.domain.repository.HolidayCalendarReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
@@ -104,6 +107,7 @@ import com.moneymanager.domain.repository.write.CsvImportWriteRepository
 import com.moneymanager.domain.repository.write.CurrencyWriteRepository
 import com.moneymanager.domain.repository.write.DeviceWriteRepository
 import com.moneymanager.domain.repository.write.ExchangeOrderWriteRepository
+import com.moneymanager.domain.repository.write.HolidayCalendarWriteRepository
 import com.moneymanager.domain.repository.write.ImportDirectoryWriteRepository
 import com.moneymanager.domain.repository.write.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
@@ -208,6 +212,18 @@ object RepositoryModule {
         deviceId: DeviceId,
         reader: CategoryReadRepository,
     ): CategoryWriteRepository = CategoryWriteRepositoryImpl(database, deviceId, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideHolidayCalendarReadRepository(database: MoneyManagerDatabaseWrapper): HolidayCalendarReadRepository =
+        HolidayCalendarReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideHolidayCalendarWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: HolidayCalendarReadRepository,
+    ): HolidayCalendarWriteRepository = HolidayCalendarWriteRepositoryImpl(database, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -446,6 +462,7 @@ object RepositoryModule {
         accountMappingRepository: AccountMappingReadRepository,
         passThroughAccountRepository: PassThroughAccountReadRepository,
         currencyRepository: CurrencyReadRepository,
+        holidayCalendarRepository: HolidayCalendarReadRepository,
         csvStrategyExportService: CsvStrategyExportService,
         apiStrategyExportService: ApiStrategyExportService,
         accountMappingExportService: AccountMappingExportService,
@@ -457,6 +474,7 @@ object RepositoryModule {
             accountMappingRepository,
             passThroughAccountRepository,
             currencyRepository,
+            holidayCalendarRepository,
             csvStrategyExportService,
             apiStrategyExportService,
             accountMappingExportService,
@@ -537,6 +555,7 @@ object RepositoryModule {
         settingsRepository: SettingsWriteRepository,
         importDirectoryRepository: ImportDirectoryWriteRepository,
         passThroughAccountRepository: PassThroughAccountWriteRepository,
+        holidayCalendarRepository: HolidayCalendarWriteRepository,
         transferRelationshipRepository: TransferRelationshipReadRepository,
         reconciliationLinkRepository: ReconciliationLinkWriteRepository,
     ): ImportEngine =
@@ -562,6 +581,7 @@ object RepositoryModule {
             settingsRepository = settingsRepository,
             importDirectoryRepository = importDirectoryRepository,
             passThroughAccountRepository = passThroughAccountRepository,
+            holidayCalendarRepository = holidayCalendarRepository,
             transferRelationshipRepository = transferRelationshipRepository,
             reconciliationLinkRepository = reconciliationLinkRepository,
         )

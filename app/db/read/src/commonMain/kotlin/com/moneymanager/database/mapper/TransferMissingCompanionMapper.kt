@@ -23,9 +23,10 @@ object TransferMissingCompanionMapper {
         assetCode: String,
         assetName: String,
         assetScaleFactor: Long,
+        assetFractionDigits: Long?,
         assetKind: String,
     ): TransferMissingCompanion {
-        val asset = AssetRowMapper.buildAsset(assetId, assetCode, assetName, assetScaleFactor, assetKind)
+        val asset = AssetRowMapper.buildAsset(assetId, assetCode, assetName, assetScaleFactor, assetFractionDigits, assetKind)
         return TransferMissingCompanion(
             transferId = TransferId(id),
             matchValue = matchValue,

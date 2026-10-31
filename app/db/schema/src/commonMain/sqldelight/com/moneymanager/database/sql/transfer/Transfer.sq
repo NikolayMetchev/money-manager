@@ -96,6 +96,7 @@ SELECT
     asset_details.code AS asset_code,
     asset_details.name AS asset_name,
     asset_details.scale_factor AS asset_scale_factor,
+    asset_details.fraction_digits AS asset_fraction_digits,
     asset_details.kind AS asset_kind
 FROM transfer
 JOIN asset_details ON transfer.asset_id = asset_details.id;
@@ -117,6 +118,7 @@ SELECT
     asset_details.code AS asset_code,
     asset_details.name AS asset_name,
     asset_details.scale_factor AS asset_scale_factor,
+    asset_details.fraction_digits AS asset_fraction_digits,
     asset_details.kind AS asset_kind,
     COALESCE(transfer.source_account_id, trade.from_account_id) AS source_account_id,
     COALESCE(transfer.target_account_id, trade.to_account_id) AS target_account_id,

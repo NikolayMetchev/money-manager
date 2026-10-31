@@ -52,7 +52,6 @@ kmp_library(
         "//app/db/schema",
         "//app/importengineapi",
         "//utils/bigdecimal",
-        "//utils/currency",
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_coroutines_test",
     ],

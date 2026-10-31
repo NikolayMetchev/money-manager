@@ -26,7 +26,7 @@ class CurrenciesScreenTest {
             every { getAllCurrencies() } returns flowOf(currencies)
             every { getCurrencyById(any()) } returns flowOf(null)
             every { getCurrencyByCode(any()) } returns flowOf(null)
-            everySuspend { upsertCurrencyByCode(any(), any(), any()) } returns CurrencyId(999L)
+            everySuspend { upsertCurrencyByCode(any(), any(), any(), any()) } returns CurrencyId(999L)
         }
 
     @Test

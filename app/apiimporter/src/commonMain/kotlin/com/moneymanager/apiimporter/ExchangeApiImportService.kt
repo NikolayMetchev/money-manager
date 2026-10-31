@@ -71,13 +71,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.DurationUnit
 import kotlin.time.Instant
-import kotlin.time.toDuration
 
 private val logger = Logger.withTag("ExchangeApiImportService")
 
@@ -101,27 +97,7 @@ private const val WALLET_ADDRESS_ATTR = "blockchain-wallet-address"
 private const val BLOCKCHAIN_TXID_ATTR = "blockchain-txid"
 
 /**
- * How far apart this exchange and another source may timestamp the same movement and still be
- * reconciled as one. Cross-source reconciliation is unconditional here — an exchange's own statement
- * export records the very movements its API returns, so *every* exchange strategy needs it, whether or
- * not it also declares `internalTransferReconcile` bridges to an app account.
- *
- * Restricted to existing transfers this provider cannot identify by its own id, so a genuine repeat
- * from the same exchange is never collapsed (see `DedupePolicy.ApiMultiKey`).
- */
-private val RECONCILE_WINDOW = 5.minutes
-
-/**
- * Window for superseding the placeholder counterparty another source left for a movement this feed
- * identifies at both ends — a statement export says only "Deposit" where the API names the on-chain
- * address it arrived from. All such a match has to go on is the account, direction and amount, and the
- * two sources stamp the movement anything up to a day apart, so it is deliberately much wider than
- * [RECONCILE_WINDOW]. Mirrors `ApiSessionImportService`'s window of the same name.
- */
-private val UNIDENTIFIED_COUNTERPARTY_WINDOW = 3.days
-
-/**
- * Trade reconciliation window. Far tighter than [RECONCILE_WINDOW]: two sources agree about a
+ * Trade reconciliation window. Far tighter than the transfer windows (`ApiReconcileWindows`): two sources agree about a
  * conversion's instant to the second and differ only in sub-second rounding (an export stamps the
  * second, the API the millisecond), while matching aggregates against fill sets means a wide window
  * would drag a later order's fills in and stop the sums agreeing at all. Matches the Binance CSV
@@ -1234,15 +1210,15 @@ suspend fun importApiSessionExchange(
                         // exchange bridges to, while every exchange's statement export re-records the
                         // movements its API returns. Tying the two together left Binance and Kraken —
                         // which declare no bridge — importing every CSV-covered movement a second time.
-                        reconcileWindow = RECONCILE_WINDOW,
+                        reconcileWindow = strategy.config.reconcileWindows.crossSource,
                         reconciledExclusionAttributeTypeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID),
                         reconciledRelationshipTypeId = RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
                         // The export cannot name the far end of a deposit or withdrawal, so it leaves a
                         // placeholder leg; this feed knows the address and supersedes it.
                         unidentifiedCounterpartyAttributeTypeId = unidentifiedCounterpartyAttr,
-                        unidentifiedCounterpartyWindow = UNIDENTIFIED_COUNTERPARTY_WINDOW,
+                        unidentifiedCounterpartyWindow = strategy.config.reconcileWindows.placeholder,
                         internalTransferBridges = bridges,
-                        internalTransferWindow = reconcile?.windowSeconds?.toDuration(DurationUnit.SECONDS),
+                        internalTransferWindow = reconcile?.window,
                         internalTransferAmountTolerance =
                             reconcile?.amountTolerancePercent?.let { runCatching { BigDecimal(it) }.getOrNull() } ?: BigDecimal.ZERO,
                     ),

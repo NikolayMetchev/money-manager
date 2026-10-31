@@ -8,9 +8,9 @@ CREATE TABLE asset (
 );
 
 -- asset_details: unifying read view over every asset subtype, exposing the common columns plus a
--- `kind` discriminator so a reader (e.g. a transfer/trade mapper) can resolve any asset_id to the
+-- `kind` discriminator (and a currency's ISO minor unit, `fraction_digits`, NULL for crypto) so a reader (e.g. a transfer/trade mapper) can resolve any asset_id to the
 -- right domain type without knowing which subtype table it lives in.
 CREATE VIEW asset_details AS
-SELECT id, revision_id, code, name, scale_factor, 'FIAT' AS kind FROM currency
+SELECT id, revision_id, code, name, scale_factor, fraction_digits, 'FIAT' AS kind FROM currency
 UNION ALL
-SELECT id, revision_id, code, name, scale_factor, 'CRYPTO' AS kind FROM crypto;
+SELECT id, revision_id, code, name, scale_factor, NULL AS fraction_digits, 'CRYPTO' AS kind FROM crypto;

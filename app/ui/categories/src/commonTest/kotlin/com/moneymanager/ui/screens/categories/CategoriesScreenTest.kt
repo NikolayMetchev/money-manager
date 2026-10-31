@@ -68,7 +68,7 @@ class CategoriesScreenTest {
             every { getAllCurrencies() } returns flowOf(emptyList())
             every { getCurrencyById(any()) } returns flowOf(null)
             every { getCurrencyByCode(any()) } returns flowOf(null)
-            everySuspend { upsertCurrencyByCode(any(), any(), any()) } returns CurrencyId(1L)
+            everySuspend { upsertCurrencyByCode(any(), any(), any(), any()) } returns CurrencyId(1L)
         }
 
     // region Display Tests

@@ -1,0 +1,37 @@
+-- The locations accounts settle on: one holiday calendar each, shaped after Strata's `ImmutableHolidayCalendar` and keyed
+-- by its code (Strata's `GBLO`, `USNY`, …), which an account's 'location' attribute (-11) and settings.default_location
+-- name. Business-day reconcile windows count the days of the calendars a pair of records' accounts are in. The app
+-- bundles none: they are installed from the strategy catalog. time_zone is the IANA zone a record's time is read in to
+-- find its date. Like pass_through_account, this is config with no provenance (EXCLUDED_FROM_AUDIT), audited by its own
+-- triggers so edits register in dataChangeToken() and sync; the rows below are only ever written with their calendar's.
+CREATE TABLE holiday_calendar (
+    code TEXT NOT NULL PRIMARY KEY CHECK(length(trim(code)) > 0),
+    name TEXT NOT NULL,
+    time_zone TEXT NOT NULL
+);
+
+-- The ISO 3166 countries a location serves, so a device's locale can suggest one.
+CREATE TABLE holiday_calendar_country (
+    calendar_code TEXT NOT NULL,
+    country_code TEXT NOT NULL,
+    PRIMARY KEY (calendar_code, country_code),
+    FOREIGN KEY (calendar_code) REFERENCES holiday_calendar(code) ON DELETE CASCADE
+);
+
+-- A location's weekend, as ISO day numbers (1 = Monday … 7 = Sunday).
+CREATE TABLE holiday_calendar_weekend_day (
+    calendar_code TEXT NOT NULL,
+    iso_day_of_week INTEGER NOT NULL CHECK(iso_day_of_week BETWEEN 1 AND 7),
+    PRIMARY KEY (calendar_code, iso_day_of_week),
+    FOREIGN KEY (calendar_code) REFERENCES holiday_calendar(code) ON DELETE CASCADE
+);
+
+-- A location's exceptions to its weekend, as days since 1970-01-01: a holiday (working = 0), a closed day off the
+-- weekend, or a working day (working = 1), a business day on the weekend (Budapest's working Saturdays).
+CREATE TABLE holiday_calendar_day (
+    calendar_code TEXT NOT NULL,
+    epoch_day INTEGER NOT NULL,
+    working INTEGER NOT NULL CHECK(working IN (0, 1)),
+    PRIMARY KEY (calendar_code, epoch_day),
+    FOREIGN KEY (calendar_code) REFERENCES holiday_calendar(code) ON DELETE CASCADE
+);

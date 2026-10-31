@@ -33,6 +33,7 @@ SELECT
     fa.code AS from_asset_code,
     fa.name AS from_asset_name,
     fa.scale_factor AS from_asset_scale_factor,
+    fa.fraction_digits AS from_asset_fraction_digits,
     fa.kind AS from_asset_kind,
     trade.to_account_id,
     trade.to_asset_id,
@@ -40,6 +41,7 @@ SELECT
     ta.code AS to_asset_code,
     ta.name AS to_asset_name,
     ta.scale_factor AS to_asset_scale_factor,
+    ta.fraction_digits AS to_asset_fraction_digits,
     ta.kind AS to_asset_kind
 FROM exchange_order_trade
 JOIN trade ON trade.id = exchange_order_trade.trade_id

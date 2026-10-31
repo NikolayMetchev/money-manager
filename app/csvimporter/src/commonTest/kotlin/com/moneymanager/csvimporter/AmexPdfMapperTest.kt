@@ -27,7 +27,7 @@ import kotlin.uuid.Uuid
 /** The built-in American Express PDF strategy ([BuiltInCsvStrategies.buildAmexPdfStrategy]) over its statements' layouts. */
 class AmexPdfMapperTest {
     private val now = Clock.System.now()
-    private val strategy = BuiltInCsvStrategies.buildAmexPdfStrategy(now)
+    private val strategy = BuiltInCsvStrategies.buildAmexPdfStrategy(now, CurrencyId(1))
 
     private val gbp =
         Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)

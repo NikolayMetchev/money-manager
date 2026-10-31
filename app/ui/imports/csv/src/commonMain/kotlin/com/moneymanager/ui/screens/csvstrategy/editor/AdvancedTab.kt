@@ -19,6 +19,8 @@ import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.rules.SettlementWindow
+import com.moneymanager.ui.components.rules.SettlementWindowEditor
 import com.moneymanager.ui.screens.accountmapping.AccountMappingsSection
 import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
@@ -87,7 +89,7 @@ internal fun AdvancedTab(
         Text("Cross-source Reconciliation (Optional)", style = MaterialTheme.typography.titleSmall)
         Text(
             "Import rows that fuzzy-match an existing transfer from another source (same accounts and " +
-                "amount, timestamps within this window) as excluded+reconciled instead of double-counting. " +
+                "amount, within this window) as excluded+reconciled instead of double-counting. " +
                 "Funding reconciliation above reuses this window.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -95,8 +97,8 @@ internal fun AdvancedTab(
         Spacer(modifier = Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Switch(
-                checked = state.crossSourceReconcileWindowSeconds != null,
-                onCheckedChange = { checked -> state.crossSourceReconcileWindowSeconds = if (checked) 60 else null },
+                checked = state.crossSourceReconcileWindow != null,
+                onCheckedChange = { checked -> state.crossSourceReconcileWindow = if (checked) SettlementWindow.Elapsed(60) else null },
                 enabled = enabled,
             )
             Text(
@@ -105,14 +107,45 @@ internal fun AdvancedTab(
                 modifier = Modifier.padding(start = 8.dp),
             )
         }
-        state.crossSourceReconcileWindowSeconds?.let { window ->
+        state.crossSourceReconcileWindow?.let { window ->
             Spacer(modifier = Modifier.height(4.dp))
-            LongField(
-                value = window,
-                onValueChange = { state.crossSourceReconcileWindowSeconds = it },
-                label = "Reconcile window (seconds)",
+            SettlementWindowEditor(
+                window = window,
+                onWindowChange = { state.crossSourceReconcileWindow = it },
+                label = "Reconcile window",
                 enabled = enabled,
             )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "A row whose counterparty is only a placeholder (a card statement's \"PAYMENT RECEIVED\") pairs with " +
+                    "the record naming the far end within this wider window. Business days skip the weekends and " +
+                    "holidays of the accounts' locations.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Switch(
+                    checked = state.placeholderReconcileWindow != null,
+                    onCheckedChange = { checked ->
+                        state.placeholderReconcileWindow =
+                            if (checked) SettlementWindow.Elapsed(DEFAULT_PLACEHOLDER_WINDOW_SECONDS) else null
+                    },
+                    enabled = enabled,
+                )
+                Text(
+                    "Custom placeholder window (default: 3 days)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+            state.placeholderReconcileWindow?.let { placeholder ->
+                SettlementWindowEditor(
+                    window = placeholder,
+                    onWindowChange = { state.placeholderReconcileWindow = it },
+                    label = "Placeholder window",
+                    enabled = enabled,
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -231,3 +264,5 @@ internal fun AdvancedTab(
         }
     }
 }
+
+private const val DEFAULT_PLACEHOLDER_WINDOW_SECONDS = 3 * 86_400L

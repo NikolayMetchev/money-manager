@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiAccountBridge
 import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
+import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.importengineapi.updateApiStrategy
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.reimports
@@ -161,7 +162,7 @@ class KrakenReimportE2ETest : DbTest() {
                             internalTransferReconcile =
                                 ApiInternalTransferReconcile(
                                     bridges = listOf(ApiAccountBridge(otherAccountName = "Monzo")),
-                                    windowSeconds = 86_400,
+                                    window = SettlementWindow.Elapsed(86_400),
                                 ),
                         ),
                 ),

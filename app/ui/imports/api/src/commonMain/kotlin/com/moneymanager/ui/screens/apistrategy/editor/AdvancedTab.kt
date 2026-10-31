@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.apistrategy.ApiTokenExchange
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.ui.components.rules.SettlementWindowEditor
 
 /** Edits the challenge-response [ApiSigningConfig] in place; a no-op while signing is disabled. */
 private fun ApiStrategyEditorState.updateSigning(block: ApiSigningConfig.() -> ApiSigningConfig) =
@@ -100,6 +101,29 @@ internal fun AdvancedTab(
         RequestSigningEditor(
             config = state.config.requestSigning,
             onChange = { v -> state.updateConfig { copy(requestSigning = v) } },
+            enabled = enabled,
+        )
+
+        HorizontalDivider()
+        SectionHeader("Cross-source reconciliation")
+        Text(
+            text =
+                "How far apart this feed and another source (a statement export, another bank's feed) may record " +
+                    "one movement and still count it once. Business days skip the weekends and holidays of the " +
+                    "accounts' locations.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SettlementWindowEditor(
+            window = state.config.reconcileWindows.crossSource,
+            onWindowChange = { v -> state.updateConfig { copy(reconcileWindows = reconcileWindows.copy(crossSource = v)) } },
+            label = "Same accounts on both records",
+            enabled = enabled,
+        )
+        SettlementWindowEditor(
+            window = state.config.reconcileWindows.placeholder,
+            onWindowChange = { v -> state.updateConfig { copy(reconcileWindows = reconcileWindows.copy(placeholder = v)) } },
+            label = "The other record names only one end (a placeholder)",
             enabled = enabled,
         )
 

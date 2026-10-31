@@ -9,7 +9,7 @@ import com.moneymanager.domain.model.CurrencyId
 /**
  * Builds the right [Asset] subtype from a joined `asset_details` row. The `kind` discriminator
  * (see asset/Asset.sq) selects fiat [Currency] vs [CryptoAsset]; both carry the same id/code/name/
- * scaleFactor columns.
+ * scaleFactor columns, and a currency its minor unit.
  */
 object AssetRowMapper {
     const val KIND_CRYPTO = "CRYPTO"
@@ -19,11 +19,12 @@ object AssetRowMapper {
         code: String,
         name: String,
         scaleFactor: Long,
+        fractionDigits: Long?,
         kind: String,
     ): Asset =
         if (kind == KIND_CRYPTO) {
             CryptoAsset(id = CryptoId(id), code = code, name = name, scaleFactor = scaleFactor)
         } else {
-            Currency(id = CurrencyId(id), code = code, name = name, scaleFactor = scaleFactor)
+            Currency(id = CurrencyId(id), code = code, name = name, scaleFactor = scaleFactor, fractionDigits = fractionDigits?.toInt())
         }
 }

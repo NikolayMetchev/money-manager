@@ -53,6 +53,7 @@ import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.ForeignAmount
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
+import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
@@ -739,7 +740,7 @@ object BuiltInApiStrategies {
                     internalTransferReconcile =
                         ApiInternalTransferReconcile(
                             bridges = listOf(ApiAccountBridge(otherAccountName = "Crypto.com")),
-                            windowSeconds = 24 * 3600,
+                            window = SettlementWindow.Elapsed(24 * 3600),
                             amountTolerancePercent = "2",
                         ),
                     tokenPageUrl = "https://exchange.crypto.com/settings/api-management",

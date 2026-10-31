@@ -169,7 +169,8 @@ internal class CsvStrategyEditorState(
         mutableStateOf(config?.fundingAttributeMatch?.attributeTypeName ?: WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME)
 
     var contentMatchRules by mutableStateOf(config?.contentMatchRules.orEmpty())
-    var crossSourceReconcileWindowSeconds by mutableStateOf(config?.crossSourceReconcileWindowSeconds)
+    var crossSourceReconcileWindow by mutableStateOf(config?.crossSourceReconcileWindow)
+    var placeholderReconcileWindow by mutableStateOf(config?.placeholderReconcileWindow)
 
     // Carried through verbatim (like content-match/companion rules): its column references may name
     // columns absent from the uploaded sample, but dropping them would corrupt the strategy.

@@ -47,6 +47,7 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
                     id = entitySource.id,
                     csv_import_id = source.importId.id.toString(),
                     csv_row_index = source.rowIndex,
+                    statement_account_id = source.statementAccountId?.id,
                 )
             }
         }
@@ -103,7 +104,7 @@ suspend fun MoneyManagerDatabaseWrapper.recordMatchedSource(
         return
     }
     val id = entitySourceWriteQueries.lastInsertedSourceId().awaitAsOne()
-    entitySourceWriteQueries.insertCsvSource(id, source.importId.id.toString(), source.rowIndex)
+    entitySourceWriteQueries.insertCsvSource(id, source.importId.id.toString(), source.rowIndex, source.statementAccountId?.id)
 }
 
 /**

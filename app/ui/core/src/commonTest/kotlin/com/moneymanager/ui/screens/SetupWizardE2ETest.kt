@@ -57,7 +57,7 @@ class SetupWizardE2ETest {
 
             waitForIdle()
             waitUntilAtLeastOneExists(hasText("Set up Money Manager"), timeoutMillis = 20000)
-            onNodeWithText(SetupWizardStep.CURRENCY.subtitle).assertExists()
+            onNodeWithText(SetupWizardStep.CURRENCY_AND_LOCATION.subtitle).assertExists()
 
             // Finish only enables once the currency has been preselected, which is an async settings read —
             // clicking before then is a no-op that would leave the wizard up until the timeout.

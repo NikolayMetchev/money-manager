@@ -21,6 +21,7 @@ SELECT
     asset_details.code AS asset_code,
     asset_details.name AS asset_name,
     asset_details.scale_factor AS asset_scale_factor,
+    asset_details.fraction_digits AS asset_fraction_digits,
     asset_details.kind AS asset_kind
 FROM category_balance_view
 JOIN asset_details ON category_balance_view.asset_id = asset_details.id

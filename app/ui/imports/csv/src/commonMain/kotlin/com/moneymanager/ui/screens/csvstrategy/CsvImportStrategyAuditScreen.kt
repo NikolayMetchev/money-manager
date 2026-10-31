@@ -12,6 +12,7 @@ import com.moneymanager.ui.audit.AuditScreenData
 import com.moneymanager.ui.audit.NamedConfigAuditDiffCard
 import com.moneymanager.ui.audit.NamedConfigRevision
 import com.moneymanager.ui.audit.computeNamedConfigAuditDiffs
+import com.moneymanager.ui.components.rules.summary
 import kotlinx.coroutines.flow.first
 
 @Composable
@@ -65,7 +66,8 @@ private fun flattenConfig(config: CsvStrategyConfig<FieldMapping>): Map<String, 
         putIfNotEmpty("Companion rules", config.companionTransactionRules)
         putIfNotEmpty("Content match rules", config.contentMatchRules)
         config.fileNamePattern?.let { put("File name pattern", it) }
-        config.crossSourceReconcileWindowSeconds?.let { put("Cross-source reconcile window (seconds)", it.toString()) }
+        config.crossSourceReconcileWindow?.let { put("Cross-source reconcile window", it.summary()) }
+        config.placeholderReconcileWindow?.let { put("Placeholder reconcile window", it.summary()) }
         putIfNotEmpty("Leg groups", config.legGroups)
         config.fundingAttributeMatch?.let { put("Funding attribute match", it.toString()) }
     }

@@ -32,13 +32,9 @@ fun DefaultCurrencyInitDialog(currencyRepository: CurrencyReadRepository) {
 
     LaunchedEffect(Unit) {
         if (!initialized) {
-            val localeCode = Currency.getDefaultCurrencyCode()
-            if (localeCode != null) {
-                val currency = currencyRepository.getCurrencyByCode(localeCode).firstOrNull()
-                if (currency != null) {
-                    selectedCurrencyId = currency.id
-                }
-            }
+            // The locale's currency, else (a new database holds only what the catalog installed) any there is.
+            val localeCurrency = Currency.getDefaultCurrencyCode()?.let { currencyRepository.getCurrencyByCode(it).firstOrNull() }
+            selectedCurrencyId = (localeCurrency ?: currencyRepository.getAllCurrencies().firstOrNull()?.firstOrNull())?.id
             initialized = true
         }
     }

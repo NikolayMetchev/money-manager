@@ -34,6 +34,7 @@ import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
+import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.test.Test
@@ -140,7 +141,7 @@ class ApiStrategyJsonCodecTest {
                 internalTransferReconcile =
                     ApiInternalTransferReconcile(
                         bridges = listOf(ApiAccountBridge(otherAccountName = "Crypto.com")),
-                        windowSeconds = 3600,
+                        window = SettlementWindow.Elapsed(3600),
                         amountTolerancePercent = "1",
                     ),
                 dataEndpoints =

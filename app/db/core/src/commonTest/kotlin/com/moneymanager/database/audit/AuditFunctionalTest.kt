@@ -291,6 +291,7 @@ class AuditFunctionalTest : DbTest() {
                 code = "TST2",
                 name = "Updated Name",
                 scale_factor = 100,
+                fraction_digits = null,
                 id = currencyId.id,
             )
 

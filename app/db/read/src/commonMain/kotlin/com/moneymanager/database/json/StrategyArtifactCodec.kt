@@ -42,6 +42,10 @@ object StrategyArtifactCodec {
                 StrategyKind.CURRENCIES -> {
                     CurrencyListExportCodec.encode(CurrencyListExportCodec.decode(json).copy(version = ""))
                 }
+
+                StrategyKind.HOLIDAY_CALENDAR -> {
+                    HolidayCalendarExportCodec.encode(HolidayCalendarExportCodec.decode(json).copy(version = ""))
+                }
             }
         return contentHash(canonical)
     }
@@ -60,6 +64,7 @@ object StrategyArtifactCodec {
             StrategyKind.GLOBAL_MAPPINGS -> StrategyFileNaming.GLOBAL_MAPPINGS_NAME
             StrategyKind.PASS_THROUGH -> PassThroughExportCodec.decode(json).name
             StrategyKind.CURRENCIES -> CurrencyListExportCodec.decode(json).name
+            StrategyKind.HOLIDAY_CALENDAR -> HolidayCalendarExportCodec.decode(json).calendar.id
         }
 
     fun canonicalHash(

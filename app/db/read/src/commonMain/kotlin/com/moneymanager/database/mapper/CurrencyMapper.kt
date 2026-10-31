@@ -14,5 +14,6 @@ object CurrencyMapper : ObjectMappie<DbCurrency, Currency>(), IdConversions {
             code = from.code,
             name = from.name,
             scaleFactor = from.scale_factor,
+            fractionDigits = from.fraction_digits?.toInt(),
         )
 }

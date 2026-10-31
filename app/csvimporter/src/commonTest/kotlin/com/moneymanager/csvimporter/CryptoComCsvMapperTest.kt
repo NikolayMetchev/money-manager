@@ -346,7 +346,7 @@ class CryptoComCsvMapperTest {
 
     @Test
     fun `selection routes card and fiat files by filename and skips crypto files`() {
-        val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now)
+        val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now, CurrencyId(1))
         val fiatRows = listOf(row("Top Up Card", "GBP", "200.0", "GBP", "200.0", "200.0", "viban_card_top_up"))
         val cardRows = listOf(row("Spotify", "GBP", "-12.99", "", "", "-12.99", ""))
         val cryptoRows =
@@ -377,7 +377,7 @@ class CryptoComCsvMapperTest {
 
     @Test
     fun `older 10-column exports without Transaction Hash still route by filename`() {
-        val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now)
+        val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now, CurrencyId(1))
         // crypto.com added the "Transaction Hash" column later; 2021/2022 exports have one fewer column.
         val legacyColumns =
             columns.dropLast(1).mapIndexed { index, c -> CsvColumn(CsvColumnId(Uuid.random()), index, c.originalName) }

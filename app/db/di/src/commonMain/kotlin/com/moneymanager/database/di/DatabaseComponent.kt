@@ -24,6 +24,7 @@ import com.moneymanager.domain.repository.write.CsvImportWriteRepository
 import com.moneymanager.domain.repository.write.CurrencyWriteRepository
 import com.moneymanager.domain.repository.write.DeviceWriteRepository
 import com.moneymanager.domain.repository.write.ExchangeOrderWriteRepository
+import com.moneymanager.domain.repository.write.HolidayCalendarWriteRepository
 import com.moneymanager.domain.repository.write.ImportDirectoryWriteRepository
 import com.moneymanager.domain.repository.write.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
@@ -80,6 +81,7 @@ interface DatabaseComponent {
     val personAccountOwnershipRepository: PersonAccountOwnershipWriteRepository
     val personAttributeRepository: PersonAttributeWriteRepository
     val passThroughAccountRepository: PassThroughAccountWriteRepository
+    val holidayCalendarRepository: HolidayCalendarWriteRepository
     val personRepository: PersonWriteRepository
     val relationshipTypeRepository: RelationshipTypeWriteRepository
     val settingsRepository: SettingsWriteRepository

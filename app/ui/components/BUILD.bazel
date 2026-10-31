@@ -43,6 +43,7 @@ kmp_library(
     deps = [
         "//app/csvimporter",
         "//app/importengineapi",
+        "//app/model/calendar",
         "//app/model/core",
         "//app/model/csv",
         "//app/model/csvstrategy",

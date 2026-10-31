@@ -22,13 +22,17 @@ import kotlin.time.Instant
 suspend fun ImportEngine.createCurrency(
     code: String,
     name: String,
+    fractionDigits: Int?,
     source: Source = Source.Manual,
 ): CurrencyId {
     val key = LocalCurrencyKey(code)
     val result =
         import(
             ImportBatch(
-                currencies = listOf(ImportCurrencyIntent(key = key, source = source, code = code, name = name)),
+                currencies =
+                    listOf(
+                        ImportCurrencyIntent(key = key, source = source, code = code, name = name, fractionDigits = fractionDigits),
+                    ),
             ),
         )
     return requireNotNull(result.createdCurrencyIds[key]) { "Currency $code was not created" }

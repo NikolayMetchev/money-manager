@@ -47,6 +47,9 @@ interface CsvImportReadRepository {
      */
     suspend fun getTransferIdsCreatedByImport(id: CsvImportId): Set<TransferId>
 
+    /** The account whose statement each of [ids] came from, for those a CSV row created (its own account). */
+    suspend fun getStatementAccounts(ids: Collection<TransferId>): Map<TransferId, AccountId>
+
     /** Ids of the still-existing trades this import created. See [getTransferIdsCreatedByImport]. */
     suspend fun getTradeIdsCreatedByImport(id: CsvImportId): Set<TradeId>
 

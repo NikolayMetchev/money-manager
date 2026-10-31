@@ -234,6 +234,8 @@ data class ImportCurrencyIntent(
     override val source: Source,
     val code: String? = null,
     val name: String? = null,
+    /** CREATE: the ISO minor unit, if known. */
+    val fractionDigits: Int? = null,
     override val operation: ImportOperation = ImportOperation.CREATE,
     val existingId: CurrencyId? = null,
     /** UPDATE: the new currency row, passed straight to the repository. */
@@ -578,6 +580,7 @@ data class ImportBatch(
     val csvStrategyMutations: List<CsvStrategyMutation> = emptyList(),
     val apiStrategyMutations: List<ApiStrategyMutation> = emptyList(),
     val passThroughMutations: List<PassThroughMutation> = emptyList(),
+    val holidayCalendarMutations: List<HolidayCalendarMutation> = emptyList(),
     val accountMappingMutations: List<AccountMappingMutation> = emptyList(),
     val csvImportMutations: List<CsvImportMutation> = emptyList(),
     val importDirectoryMutations: List<ImportDirectoryMutation> = emptyList(),

@@ -49,9 +49,11 @@ kmp_library(
         "@maven_kmp//:kotlinx_coroutines_core",
     ],
     deps = [
+        "//app/model/calendar",
         "//utils/bigdecimal",
         "//utils/coroutines",
         "//utils/regex",
+        "@maven_kmp//:kotlinx_datetime",
         "@maven_kmp//:sqldelight_async_extensions",
         "@maven_kmp//:sqldelight_coroutines_extensions",
     ],

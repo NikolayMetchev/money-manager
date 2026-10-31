@@ -17,6 +17,7 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.calendar.HolidayCalendar
 import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
@@ -71,6 +72,18 @@ suspend fun ImportEngine.updatePassThroughAccount(account: PassThroughAccount) {
 
 suspend fun ImportEngine.deletePassThroughAccount(id: PassThroughAccountId) {
     import(ImportBatch(passThroughMutations = listOf(PassThroughMutation.Delete(id))))
+}
+
+// endregion
+
+// region Holiday calendars
+
+suspend fun ImportEngine.upsertHolidayCalendar(calendar: HolidayCalendar) {
+    import(ImportBatch(holidayCalendarMutations = listOf(HolidayCalendarMutation.Upsert(calendar))))
+}
+
+suspend fun ImportEngine.deleteHolidayCalendar(code: String) {
+    import(ImportBatch(holidayCalendarMutations = listOf(HolidayCalendarMutation.Delete(code))))
 }
 
 // endregion
@@ -280,6 +293,10 @@ suspend fun ImportEngine.applyCsvImportMutations(mutations: List<CsvImportMutati
 
 suspend fun ImportEngine.setDefaultCurrency(id: CurrencyId) {
     import(ImportBatch(settings = ImportSettings(defaultCurrencyId = id)))
+}
+
+suspend fun ImportEngine.setDefaultLocation(code: String?) {
+    import(ImportBatch(settings = ImportSettings(defaultLocation = DefaultLocation(code))))
 }
 
 suspend fun ImportEngine.setSetupWizardCompleted(completed: Boolean) {

@@ -4,10 +4,9 @@ import com.moneymanager.domain.model.serialization.SortedByListSerializer
 import kotlinx.serialization.Serializable
 
 /**
- * Portable JSON artifact for the reference list of currencies a database is seeded with, published in
- * the strategy catalog next to the built-in strategies so an installed app picks up codes added after it
- * shipped. Applying it only ever adds currencies (see `StrategyLibraryService`), so [currencies] is a
- * set in spirit and serializes in code order.
+ * Portable JSON artifact for the ISO 4217 currency list, published in the strategy catalog next to the built-in
+ * strategies. The app bundles no currencies: a new database installs them from here. Applying it only ever adds
+ * currencies (see `StrategyLibraryService`), so [currencies] is a set in spirit and serializes in code order.
  */
 @Serializable
 data class CurrencyListExport(
@@ -22,6 +21,8 @@ data class CurrencyListExport(
 data class CurrencyExportEntry(
     val code: String,
     val name: String,
+    /** The ISO minor-unit width (2 for GBP, 0 for JPY), which native and the browser pad amounts to; null for none. */
+    val fractionDigits: Int? = null,
 )
 
 object SortedCurrencyExportEntryListSerializer : SortedByListSerializer<CurrencyExportEntry>(

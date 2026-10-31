@@ -20,7 +20,7 @@ import kotlinx.serialization.Serializable
  * @property name The group's name, which the rules' leg actions refer to.
  * @property reconcileWindowSeconds When set, an event another source already recorded — as trades, or as
  *   the individual fills a trade group aggregates — is not booked again. Deliberately **not** the
- *   strategy's `crossSourceReconcileWindowSeconds`: that window has to be wide enough for a bank's
+ *   strategy's `crossSourceReconcileWindow`: that window has to be wide enough for a bank's
  *   settlement lag, and a wide window here would pull a later event's legs into the candidate set and
  *   stop the sums matching at all. Two sources disagree about an event's instant only by sub-second
  *   rounding, so keep this to a few seconds. Null disables it.

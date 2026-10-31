@@ -3,6 +3,7 @@ package com.moneymanager.database.service
 import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.database.json.CsvStrategyExportCodec
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInCsvStrategies
 import kotlinx.coroutines.flow.first
@@ -38,7 +39,7 @@ class CsvStrategyExportRoundTripTest : DbTest() {
             assertTrue(strategies.isNotEmpty(), "Expected built-in CSV strategies to be installed")
             // Compare against the authoritative built-in list so new strategies are picked up automatically
             assertEquals(
-                BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now()).map { it.name }.toSet(),
+                BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1)).map { it.name }.toSet(),
                 strategies.map { it.name }.toSet(),
             )
 

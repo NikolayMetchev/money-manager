@@ -225,6 +225,7 @@ POKO = "0.23.2"  # renovate: dev.drewhamilton.poko:poko-annotations
 SKIKO = "0.150.2"
 SLF4J = "2.0.20"  # renovate: org.slf4j:slf4j-api
 SQLDELIGHT = "2.4.1"  # renovate: app.cash.sqldelight:android-driver
+STRATA = "2.12.78"  # renovate: com.opengamma.strata:strata-basics
 TURBINE = "1.2.1"  # renovate: app.cash.turbine:turbine
 
 # npm packages the browser programs load, each with a `# renovate-npm:` comment naming the package. kotlinx-datetime
@@ -363,6 +364,8 @@ maven_kmp.install(
         "sqldelight-native-driver": "app.cash.sqldelight:native-driver:" + SQLDELIGHT,
         "sqldelight-runtime": "app.cash.sqldelight:runtime:" + SQLDELIGHT,
         "sqldelight-sqlite-driver": "app.cash.sqldelight:sqlite-driver:" + SQLDELIGHT,
+        # The holiday calendars tools/strategy-catalog generates the bundled locations from (#1183).
+        "strata-basics": "com.opengamma.strata:strata-basics:" + STRATA,
         "turbine": "app.cash.turbine:turbine:" + TURBINE,
     },
     # Gradle's classpath substitutions: these modules resolve to this version on the JVM and in common metadata,
@@ -498,6 +501,8 @@ maven_kmp.install(
         "sqldelight-gradle-plugin": ["jvm"],
         "sqldelight-jdbc-driver": ["jvm"],
         "sqldelight-sqlite-driver": ["jvm"],
+        # A build-time tool's input only (tools/strategy-catalog), whose Guava would otherwise reach Android.
+        "strata-basics": ["jvm"],
     },
     lock_file = "//bazel/kmp/deps:maven_kmp.lock.json",
     # alias → name@version: npm packages our own browser code imports (`@JsModule`), named like the libraries, with a

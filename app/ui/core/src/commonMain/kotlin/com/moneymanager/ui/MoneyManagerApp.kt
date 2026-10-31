@@ -110,6 +110,7 @@ import com.moneymanager.ui.tasks.TaskPanel
 import com.moneymanager.ui.tasks.rememberTaskManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
@@ -164,6 +165,12 @@ fun MoneyManagerApp(
             .getDefaultCurrencyId()
             .onEach { defaultCurrencyLoaded = true }
             .collectAsStateWithSchemaErrorHandling(initial = null)
+        // A new database has no currencies until the catalog's list is installed, so there is nothing to pick yet.
+        val hasCurrencies by rememberFlowAsStateWithSchemaErrorHandling(initial = false) {
+            services.accounts.currencyRepository
+                .getAllCurrencies()
+                .map { it.isNotEmpty() }
+        }
 
         // Null until the flag has been read: showing the wizard on a `false` we haven't loaded yet would
         // flash it over an already-configured database on every launch.
@@ -419,6 +426,7 @@ fun MoneyManagerApp(
                                                 personRepository = services.people.personRepository,
                                                 personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                                 maintenance = services.imports.maintenance,
+                                                holidayCalendarRepository = services.settings.holidayCalendarRepository,
                                                 scrollToAccountId = screen.scrollToAccountId,
                                                 onAccountClick = { account ->
                                                     // Replace current screen with one that remembers the clicked account
@@ -491,6 +499,7 @@ fun MoneyManagerApp(
                                                 strategyLibrary = services.imports.strategyLibrary,
                                                 cryptoCatalogRefresher = cryptoCatalogRefresher,
                                                 appVersion = appVersion,
+                                                holidayCalendarRepository = services.settings.holidayCalendarRepository,
                                                 accountRepository = services.accounts.accountRepository,
                                                 categoryRepository = services.accounts.categoryRepository,
                                                 personRepository = services.people.personRepository,
@@ -524,6 +533,7 @@ fun MoneyManagerApp(
                                                 attributeTypeRepository = services.transactions.attributeTypeRepository,
                                                 personRepository = services.people.personRepository,
                                                 personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                                holidayCalendarRepository = services.settings.holidayCalendarRepository,
                                                 exchangeOrderRepository = services.transactions.exchangeOrderRepository,
                                                 maintenance = services.imports.maintenance,
                                                 tradeRepository = services.transactions.tradeRepository,
@@ -954,7 +964,7 @@ fun MoneyManagerApp(
                     }
                 }
 
-                if (defaultCurrencyLoaded && defaultCurrencyId == null) {
+                if (defaultCurrencyLoaded && defaultCurrencyId == null && hasCurrencies) {
                     DefaultCurrencyInitDialog(
                         currencyRepository = services.accounts.currencyRepository,
                     )

@@ -9,8 +9,8 @@ class SetupWizardStepTest {
         assertEquals(
             listOf(
                 SetupWizardStep.DATABASE,
-                SetupWizardStep.CURRENCY,
                 SetupWizardStep.STRATEGIES,
+                SetupWizardStep.CURRENCY_AND_LOCATION,
                 SetupWizardStep.STRATEGY_SYNC,
                 SetupWizardStep.IMPORT_DIRECTORIES,
                 SetupWizardStep.API_IMPORTS,
@@ -39,9 +39,9 @@ class SetupWizardStepTest {
     }
 
     @Test
-    fun `a manual re-run without cloud or file-source support is currency plus catalog only`() {
+    fun `a manual re-run without cloud or file-source support is the catalog then currency only`() {
         assertEquals(
-            listOf(SetupWizardStep.CURRENCY, SetupWizardStep.STRATEGIES),
+            listOf(SetupWizardStep.STRATEGIES, SetupWizardStep.CURRENCY_AND_LOCATION),
             setupWizardSteps(
                 includeDatabaseStep = false,
                 strategyCatalogAvailable = true,

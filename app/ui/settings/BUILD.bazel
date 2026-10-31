@@ -39,6 +39,7 @@ kmp_library(
     deps = [
         "//app/db/write",
         "//app/importengineapi",
+        "//app/model/calendar",
         "//app/model/core",
         "//app/model/csvstrategy",
         "//app/model/repository/read",
@@ -60,6 +61,7 @@ kmp_library(
         "@maven_kmp//:compose_ui",
         "@maven_kmp//:kermit",
         "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_datetime",
         "@maven_kmp//:org_jetbrains_compose_foundation_foundation_layout",
         "@maven_kmp//:org_jetbrains_compose_ui_ui_geometry",
         "@maven_kmp//:org_jetbrains_compose_ui_ui_text",

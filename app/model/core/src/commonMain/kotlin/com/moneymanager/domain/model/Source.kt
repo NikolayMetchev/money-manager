@@ -26,10 +26,15 @@ sealed interface Source {
     /** Recreated/reassigned by undoing an account merge (see AccountWriteRepository.unmergeAccount). */
     data object Unmerge : Source
 
-    /** Created during a CSV import (a QIF, Excel or PDF file is staged as one too); [rowIndex] is the originating row when known. */
+    /**
+     * Created during a CSV import (a QIF, Excel or PDF file is staged as one too); [rowIndex] is the originating row when
+     * known. [statementAccountId] is the account whose statement the row is (its own account): an importer sets it on
+     * the transfers it writes, and it is recorded with their provenance, never read back into a [Csv].
+     */
     data class Csv(
         val importId: CsvImportId,
         val rowIndex: Long? = null,
+        val statementAccountId: AccountId? = null,
     ) : Source
 
     /**
