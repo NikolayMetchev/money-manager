@@ -91,7 +91,7 @@ fun SetupWizardScreen(
 
     var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
     // Prefer the currency this database already uses (a re-run should show the current default, not reset it),
-    // and fall back to the locale's currency on a fresh database. The locale need not name one we know.
+    // and fall back to the locale's currency on a fresh database. The locale need not name one installed, so then any.
     LaunchedEffect(onCurrencyAndLocation) {
         if (!onCurrencyAndLocation || selectedCurrencyId != null) return@LaunchedEffect
         val existing =
@@ -104,7 +104,12 @@ fun SetupWizardScreen(
                     .getCurrencyByCode(code)
                     .firstOrNull()
             }
-        selectedCurrencyId = existing ?: localeCurrency?.id
+        val anyCurrency =
+            services.accounts.currencyRepository
+                .getAllCurrencies()
+                .firstOrNull()
+                ?.firstOrNull()
+        selectedCurrencyId = existing ?: localeCurrency?.id ?: anyCurrency?.id
     }
 
     val calendars by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
