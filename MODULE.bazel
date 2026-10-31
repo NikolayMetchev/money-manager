@@ -18,7 +18,7 @@ bazel_dep(name = "rules_nodejs", version = "6.7.7")
 bazel_dep(name = "rules_shell", version = "0.8.0")
 
 # Not used by our BUILD files: the Android Studio Bazel plugin's query-sync aspect loads @rules_cc from the main repo.
-bazel_dep(name = "rules_cc", version = "0.2.17")
+bazel_dep(name = "rules_cc", version = "0.2.27")
 
 # rules_go only hosts the Gazelle language extension (//bazel/gazelle/kmp): Gazelle extensions are Go.
 bazel_dep(name = "rules_go", version = "0.65.0")
