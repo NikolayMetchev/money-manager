@@ -1,3 +1,12 @@
 -- Every holiday calendar, ordered by name.
 selectAll:
 SELECT * FROM holiday_calendar ORDER BY name, code;
+
+selectAllCountries:
+SELECT * FROM holiday_calendar_country ORDER BY calendar_code, country_code;
+
+selectAllWeekendDays:
+SELECT * FROM holiday_calendar_weekend_day ORDER BY calendar_code, iso_day_of_week;
+
+selectAllDays:
+SELECT * FROM holiday_calendar_day ORDER BY calendar_code, epoch_day;

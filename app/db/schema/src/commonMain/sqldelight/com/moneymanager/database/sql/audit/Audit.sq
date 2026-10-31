@@ -307,7 +307,7 @@ CREATE TABLE holiday_calendar_audit (
     audit_type_id INTEGER NOT NULL,
     code TEXT NOT NULL,
     name TEXT NOT NULL,
-    calendar_json TEXT NOT NULL,
+    time_zone TEXT NOT NULL,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 

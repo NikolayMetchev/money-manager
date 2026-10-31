@@ -133,6 +133,8 @@ kmp_test(
         "@maven_kmp//:androidx_test_runner",
         "//utils/regex",
         "@maven_kmp//:sqldelight_async_extensions",
+        "//app/model/calendar",
+        "@maven_kmp//:kotlinx_datetime",
     ],
     device_srcs = glob([
         "src/commonTest/kotlin/com/moneymanager/database/repository/**/*.kt",
