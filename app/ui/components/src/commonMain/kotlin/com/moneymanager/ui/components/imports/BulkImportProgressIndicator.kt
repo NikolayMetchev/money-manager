@@ -10,11 +10,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.humanreadable.HumanReadable
 import com.moneymanager.tasks.Progress
 
 /**
  * One determinate bar for a whole bulk import run: the run's detail (file counter, current file and
- * phase) and row counter over a `LinearProgressIndicator` driven by the row-weighted fraction, so the bar
+ * phase) and how far through its rows it is ("10% of 300K rows") over a `LinearProgressIndicator` driven by the row-weighted fraction, so the bar
  * advances within large files instead of jumping once per file. Shared by the staged-file
  * "Import all"/"Re-import all" dialogs.
  */
@@ -24,8 +25,9 @@ fun BulkImportProgressIndicator(progress: Progress) {
         val label =
             buildString {
                 append(progress.detail)
-                if (progress.processed != null && progress.total != null) {
-                    append(" — ${progress.processed} of ${progress.total} rows")
+                val total = progress.total
+                if (total != null) {
+                    append(" — ${((progress.fraction ?: 0f) * PERCENT).toInt()}% of ${HumanReadable.count(total.toLong())} rows")
                 }
             }
         Text(
@@ -37,3 +39,5 @@ fun BulkImportProgressIndicator(progress: Progress) {
         LinearProgressIndicator(progress = { progress.fraction ?: 0f }, modifier = Modifier.fillMaxWidth())
     }
 }
+
+private const val PERCENT = 100

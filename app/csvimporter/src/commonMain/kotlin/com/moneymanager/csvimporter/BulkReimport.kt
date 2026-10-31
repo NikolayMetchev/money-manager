@@ -70,7 +70,8 @@ sealed interface BulkReimportFileOutcome {
  * be called with `refreshViews = false`).
  *
  * [prepare] runs once after the bar appears and before the first file, producing the run-wide context
- * [reimportFile] needs; a flow with nothing to prepare passes `Unit`. [logLabel] names the flow in the
+ * [reimportFile] needs. It prepares each file (weighted by its rows, at the start of the bar) and reports each,
+ * by its index in [imports], as it's done. [logLabel] names the flow in the
  * per-file failure log ("CSV", "QIF").
  */
 @Suppress("LongParameterList")
@@ -82,14 +83,20 @@ suspend fun <T, C> runBulkReimport(
     maintenance: Maintenance,
     onProgress: suspend (Progress) -> Unit,
     startDetail: String? = null,
-    prepare: suspend () -> C,
+    prepare: suspend (onPrepared: suspend (index: Int) -> Unit) -> C,
     reimportFile: suspend (index: Int, file: T, context: C, onFileProgress: suspend (Progress) -> Unit) -> BulkReimportFileOutcome,
 ): BulkReimportResult {
     var result = BulkReimportResult(0, 0, 0, 0, 0)
 
-    val tracker = WeightedProgress(imports.map(rowCount), onProgress = onProgress)
+    val tracker =
+        WeightedProgress(
+            weights = imports.map(rowCount),
+            preparation = imports.map(rowCount),
+            preparationNoun = "files",
+            onProgress = onProgress,
+        )
     tracker.started(detail = startDetail)
-    val context = prepare()
+    val context = prepare { index -> tracker.prepared(index, "Prepared", fileName(imports[index])) }
 
     imports.forEachIndexed { index, file ->
         val name = fileName(file)

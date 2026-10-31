@@ -264,16 +264,16 @@ class Reimports(
             maintenance = maintenance,
             onProgress = onProgress,
             startDetail = "Preparing",
-            prepare = {
+            prepare = { onPrepared ->
                 // Every crypto asset the run needs exists before the first file, at the run-wide precision.
-                ensureCryptoAssetsForImports(
+                prepareImports(
                     plan.files,
                     csvImportStrategyRepository.getAllStrategies().first(),
                     currencies(),
                     reads.csvImportRepository,
                     importEngine,
                     cryptoRepository,
-                )
+                ) { index, _ -> onPrepared(index) }
             },
         ) { _, file, _, onFileProgress ->
             val strategy = plan.strategies[file.source]
