@@ -1,0 +1,7 @@
+-- Creates a calendar, or replaces the one with its code.
+upsert:
+INSERT INTO holiday_calendar (code, name, calendar_json) VALUES (?, ?, ?)
+ON CONFLICT(code) DO UPDATE SET name = excluded.name, calendar_json = excluded.calendar_json;
+
+deleteByCode:
+DELETE FROM holiday_calendar WHERE code = ?;

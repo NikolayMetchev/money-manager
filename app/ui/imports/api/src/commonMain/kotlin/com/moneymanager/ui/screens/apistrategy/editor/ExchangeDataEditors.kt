@@ -33,6 +33,7 @@ import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
@@ -40,6 +41,7 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.components.AccountPicker
+import com.moneymanager.ui.components.rules.SettlementWindowEditor
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -413,7 +415,7 @@ internal fun InternalTransferReconcileEditor(
         label = "Enable internal-transfer reconciliation",
         checked = config != null,
         onCheckedChange = { on ->
-            onChange(if (on) ApiInternalTransferReconcile(bridges = emptyList(), windowSeconds = 3600) else null)
+            onChange(if (on) ApiInternalTransferReconcile(bridges = emptyList(), window = SettlementWindow.Elapsed(3600)) else null)
         },
         enabled = enabled,
     )
@@ -477,13 +479,11 @@ internal fun InternalTransferReconcileEditor(
             Spacer(Modifier.width(4.dp))
             Text("Add bridge")
         }
-        LongFieldRow(
-            label = "Window (seconds)",
-            value = c.windowSeconds,
-            onValueChange = { onChange(c.copy(windowSeconds = it)) },
+        SettlementWindowEditor(
+            window = c.window,
+            onWindowChange = { onChange(c.copy(window = it)) },
+            label = "Window",
             enabled = enabled,
-            isError = c.windowSeconds <= 0,
-            supportingText = "Must be a positive number of seconds",
         )
         TextFieldRow(
             label = "Amount tolerance percent",
@@ -562,7 +562,7 @@ internal fun List<ApiDataEndpoint>.isValidForSave(): Boolean =
 internal fun ApiInternalTransferReconcile.isValidForSave(): Boolean =
     bridges.isNotEmpty() &&
         bridges.all { it.otherAccountName.isNotBlank() } &&
-        windowSeconds > 0 &&
+        window.isPositive() &&
         amountTolerancePercent.isNonNegativeDecimal()
 
 /** Whether a synthetic-account config is complete enough to save. */
@@ -573,3 +573,9 @@ internal fun ApiAccountsSource.Single.isValidForSave(): Boolean = name.isNotBlan
  * rather than a Double, per the repository's monetary-parsing guideline.
  */
 internal fun String.isNonNegativeDecimal(): Boolean = runCatching { BigDecimal(trim()) }.getOrNull()?.let { it >= BigDecimal.ZERO } ?: false
+
+private fun SettlementWindow.isPositive(): Boolean =
+    when (this) {
+        is SettlementWindow.Elapsed -> seconds > 0
+        is SettlementWindow.BusinessDays -> days > 0
+    }

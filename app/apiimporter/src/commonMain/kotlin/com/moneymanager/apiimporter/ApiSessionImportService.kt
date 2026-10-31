@@ -113,20 +113,6 @@ private val ACCOUNT_SORT_CODE_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCOUN
 private val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
 private val ACCOUNT_COUNTERPARTY_NAME_KEY_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCOUNT_COUNTERPARTY_NAME_KEY_ATTR_TYPE_ID)
 
-// How far apart two providers may timestamp the same real movement and still be reconciled as one
-// (a Faster Payment is near-instant; this absorbs send-vs-settle timing differences between banks).
-// Reconciliation is additionally restricted to cross-source matches, so this window does not collapse
-// genuine repeat transfers from the same provider.
-private val RECONCILE_WINDOW = 5.minutes
-
-/**
- * Window for superseding a placeholder leg another source left for a movement this feed identifies at
- * both ends (see `DedupePolicy.ApiMultiKey.unidentifiedCounterpartyWindow`). Matches the CSV side's
- * fuzzy date tolerance: a bank feed and the receiving account's own export stamp one transfer hours or
- * a day apart, and all a placeholder match has is the account, direction and amount.
- */
-private val UNIDENTIFIED_COUNTERPARTY_WINDOW = 3.days
-
 data class ApiSessionImportResult(
     val accountCount: Int,
     val transactionCount: Int,
@@ -1705,12 +1691,12 @@ private suspend fun runImportEngine(
             transfers = importTransfers,
             dedupePolicy =
                 DedupePolicy.ApiMultiKey(
-                    reconcileWindow = RECONCILE_WINDOW,
+                    reconcileWindow = setup.strategy.config.reconcileWindows.crossSource,
                     reconciledExclusionAttributeTypeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID),
                     reconciledRelationshipTypeId = RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
                     unidentifiedCounterpartyAttributeTypeId =
                         setup.attributeTypeCache.getOrCreate(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME),
-                    unidentifiedCounterpartyWindow = UNIDENTIFIED_COUNTERPARTY_WINDOW,
+                    unidentifiedCounterpartyWindow = setup.strategy.config.reconcileWindows.placeholder,
                 ),
             accountsToCreate = setup.accountResolver.intents(),
             peopleToCreate = setup.peopleResolver.intents(),

@@ -47,6 +47,8 @@ kmp_library(
         "//app/tasks",
     ],
     deps = [
+        "//app/model/calendar",
+        "//app/model/rules",
         "//utils/bigdecimal",
         "@maven_kmp//:kotlinx_coroutines_core",
     ],
@@ -74,10 +76,13 @@ kmp_test(
     ],
     deps = [
         "//app/importengineapi",
+        "//app/model/calendar",
         "//app/model/core",
         "//app/model/csv",
         "//app/model/passthrough",
+        "//app/model/rules",
         "//bazel/kmp/deps:kotlin_test",
         "//utils/bigdecimal",
+        "@maven_kmp//:kotlinx_datetime",
     ],
 )

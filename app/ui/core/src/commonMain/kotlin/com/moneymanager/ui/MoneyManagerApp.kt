@@ -419,6 +419,7 @@ fun MoneyManagerApp(
                                                 personRepository = services.people.personRepository,
                                                 personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                                 maintenance = services.imports.maintenance,
+                                                holidayCalendarRepository = services.settings.holidayCalendarRepository,
                                                 scrollToAccountId = screen.scrollToAccountId,
                                                 onAccountClick = { account ->
                                                     // Replace current screen with one that remembers the clicked account
@@ -491,6 +492,7 @@ fun MoneyManagerApp(
                                                 strategyLibrary = services.imports.strategyLibrary,
                                                 cryptoCatalogRefresher = cryptoCatalogRefresher,
                                                 appVersion = appVersion,
+                                                holidayCalendarRepository = services.settings.holidayCalendarRepository,
                                                 accountRepository = services.accounts.accountRepository,
                                                 categoryRepository = services.accounts.categoryRepository,
                                                 personRepository = services.people.personRepository,
@@ -524,6 +526,7 @@ fun MoneyManagerApp(
                                                 attributeTypeRepository = services.transactions.attributeTypeRepository,
                                                 personRepository = services.people.personRepository,
                                                 personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                                holidayCalendarRepository = services.settings.holidayCalendarRepository,
                                                 exchangeOrderRepository = services.transactions.exchangeOrderRepository,
                                                 maintenance = services.imports.maintenance,
                                                 tradeRepository = services.transactions.tradeRepository,

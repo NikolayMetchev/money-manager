@@ -1,0 +1,52 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_generate true
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
+# gazelle:kmp_plugins serialization
+# gazelle:kmp_export //app/model/core
+
+kmp_library(
+    name = "calendar",
+    android = True,
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["serialization"],
+    visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+    exports = ["//app/model/core"],
+    deps = [
+        "@maven_kmp//:kotlinx_datetime",
+        "@maven_kmp//:kotlinx_serialization_core",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    android = True,
+    associate = ":calendar",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["serialization"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+    deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:kotlinx_datetime",
+        "@maven_kmp//:kotlinx_serialization_json",
+    ],
+)

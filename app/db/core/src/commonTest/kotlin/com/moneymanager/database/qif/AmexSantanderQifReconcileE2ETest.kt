@@ -14,6 +14,7 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.SourceRerunResult
+import com.moneymanager.importengineapi.setDefaultLocation
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.installBuiltInCsvStrategies
@@ -28,8 +29,8 @@ import kotlin.time.Duration
  * A card payment recorded by both the card's statement and the paying bank's is counted once. American
  * Express records the payment as "PAYMENT RECEIVED - THANK YOU", which names no payer; Santander records
  * the same money as its direct debit to the card, naming both ends. The Amex row's payer is a placeholder
- * that reconciles against the bank's record (same card, direction and amount, within the engine's date
- * tolerance), in either import order, and the bank's record is the one kept.
+ * that reconciles against the bank's record (same card, direction and amount, within the statement's
+ * 3-business-day placeholder window), in either import order, and the bank's record is the one kept.
  */
 class AmexSantanderQifReconcileE2ETest : DbTest() {
     private val now = Clock.System.now()
@@ -48,7 +49,7 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
         }
 
     /** The 2020 payments: (Amex date, Santander direct debit date, amount). The last is three days apart. */
-    private val payments =
+    private var payments =
         listOf(
             Triple("02/02/2020", "04/02/2020", "1239.68"),
             Triple("04/03/2020", "04/03/2020", "738.42"),
@@ -271,6 +272,54 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
                     .let { repositories.transactionRepository.getTransactionsByIds(it).values }
             assertEquals(1, recreated.count { it.description == "Paid from Santander" && it.amount == placeholder.amount })
             assertEachPaymentCountedOnceFromTheBank(cardRecords = 2, step = "After re-importing the first statement: ")
+        }
+
+    // Amex books Santander's Maundy Thursday payment on Easter Monday: four calendar days, but one London business
+    // day (Good Friday and Easter Monday are bank holidays), so the statements' 3-business-day window still pairs them.
+    private val easter2021 = listOf(Triple("05/04/2021", "01/04/2021", "2087.67"))
+
+    // The same amount a week later is a different payment: five business days apart, outside the window.
+    private val weekApart = listOf(Triple("22/04/2021", "15/04/2021", "2087.67"))
+
+    private suspend fun atLondon(paymentList: List<Triple<String, String, String>>) {
+        payments = paymentList
+        repositories.installBuiltInCsvStrategies()
+        repositories.importEngine.setDefaultLocation("GBLO")
+        accountId(AMEX)
+    }
+
+    @Test
+    fun bankFirst_reconcilesAPaymentAcrossTheEasterWeekend() =
+        runDbTest {
+            atLondon(easter2021)
+            apply(santanderStatement(), SANTANDER)
+            apply(amexStatement(), AMEX)
+            assertEachPaymentCountedOnceFromTheBank()
+        }
+
+    @Test
+    fun cardFirst_reconcilesAPaymentAcrossTheEasterWeekend() =
+        runDbTest {
+            atLondon(easter2021)
+            apply(amexStatement(), AMEX)
+            apply(santanderStatement(), SANTANDER)
+            assertEachPaymentCountedOnceFromTheBank()
+        }
+
+    @Test
+    fun theSameAmountAWeekApart_isNotReconciled() =
+        runDbTest {
+            atLondon(weekApart)
+            apply(santanderStatement(), SANTANDER)
+            apply(amexStatement(), AMEX)
+            val amexId = accountId(AMEX)
+            val counted =
+                repositories.transactionRepository
+                    .getTransactionsByAccount(amexId)
+                    .first()
+                    .filter { it.targetAccountId == amexId && it.amount.toDisplayValue().compareTo(BigDecimal("2087.67")) == 0 }
+                    .filterNot { transfer -> transfer.attributes.any { it.attributeType.name == "excluded" } }
+            assertEquals(2, counted.size, "both records stay counted: $counted")
         }
 
     private companion object {

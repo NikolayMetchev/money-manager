@@ -14,9 +14,11 @@ enum class SetupWizardStep(
         title = "Database",
         subtitle = "Where your data lives.",
     ),
-    CURRENCY(
-        title = "Default currency",
-        subtitle = "Used for new transactions and for totals across accounts.",
+    CURRENCY_AND_LOCATION(
+        title = "Currency and location",
+        subtitle =
+            "The currency new transactions and totals use, and the location whose bank holidays decide which days " +
+                "count as business days when imports are matched up. Each account can override the location.",
     ),
     STRATEGIES(
         title = "Import strategies",
@@ -54,7 +56,7 @@ fun setupWizardSteps(
 ): List<SetupWizardStep> =
     buildList {
         if (includeDatabaseStep) add(SetupWizardStep.DATABASE)
-        add(SetupWizardStep.CURRENCY)
+        add(SetupWizardStep.CURRENCY_AND_LOCATION)
         if (strategyCatalogAvailable) add(SetupWizardStep.STRATEGIES)
         if (strategySyncAvailable) add(SetupWizardStep.STRATEGY_SYNC)
         if (importDirectoriesAvailable) add(SetupWizardStep.IMPORT_DIRECTORIES)

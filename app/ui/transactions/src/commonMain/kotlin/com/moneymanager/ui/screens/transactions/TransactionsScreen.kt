@@ -74,6 +74,7 @@ import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ExchangeOrderReadRepository
+import com.moneymanager.domain.repository.HolidayCalendarReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
@@ -191,6 +192,7 @@ fun AccountTransactionsScreen(
     attributeTypeRepository: AttributeTypeReadRepository,
     personRepository: PersonReadRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
+    holidayCalendarRepository: HolidayCalendarReadRepository? = null,
     exchangeOrderRepository: ExchangeOrderReadRepository,
     maintenance: Maintenance,
     // Null disables trade editing (the exclusion toggle); tests of transfer behaviour needn't supply it.
@@ -1278,6 +1280,7 @@ fun AccountTransactionsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
+            holidayCalendarRepository = holidayCalendarRepository,
             // No onSaved refresh needed: allAccounts is collected from a Flow and updates automatically
             onDismiss = { accountToEdit = null },
         )

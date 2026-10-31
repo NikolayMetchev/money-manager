@@ -100,6 +100,7 @@ kmp_library(
     ],
     deps = [
         "//app/db/seed",
+        "//app/model/calendar",
         "//utils/bigdecimal",
         "//utils/coroutines",
         "//utils/files",

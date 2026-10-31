@@ -17,6 +17,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.DeviceReadRepository
 import com.moneymanager.domain.repository.ExchangeOrderReadRepository
+import com.moneymanager.domain.repository.HolidayCalendarReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
@@ -91,6 +92,7 @@ data class PeopleDomain(
 
 data class SettingsDomain(
     val settingsRepository: SettingsReadRepository,
+    val holidayCalendarRepository: HolidayCalendarReadRepository,
     val deviceRepository: DeviceReadRepository,
 )
 
@@ -147,6 +149,7 @@ fun DatabaseComponent.toAppServices(importEngine: ImportEngine) =
         settings =
             SettingsDomain(
                 settingsRepository = settingsRepository,
+                holidayCalendarRepository = holidayCalendarRepository,
                 deviceRepository = deviceRepository,
             ),
         audit = AuditDomain(auditRepository = auditRepository),

@@ -397,6 +397,33 @@ BEGIN
     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.id, new.name, new.conduit_account_name, new.relationship_type_id, new.rules_json);
 END;
 
+-- trigger_holiday_calendar_delete_audit
+CREATE TRIGGER trigger_holiday_calendar_delete_audit
+AFTER DELETE ON holiday_calendar
+FOR EACH ROW
+BEGIN
+    INSERT INTO holiday_calendar_audit (audit_timestamp, audit_type_id, code, name, calendar_json)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.code, old.name, old.calendar_json);
+END;
+
+-- trigger_holiday_calendar_insert_audit
+CREATE TRIGGER trigger_holiday_calendar_insert_audit
+AFTER INSERT ON holiday_calendar
+FOR EACH ROW
+BEGIN
+    INSERT INTO holiday_calendar_audit (audit_timestamp, audit_type_id, code, name, calendar_json)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.code, new.name, new.calendar_json);
+END;
+
+-- trigger_holiday_calendar_update_audit
+CREATE TRIGGER trigger_holiday_calendar_update_audit
+AFTER UPDATE ON holiday_calendar
+FOR EACH ROW
+BEGIN
+    INSERT INTO holiday_calendar_audit (audit_timestamp, audit_type_id, code, name, calendar_json)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.code, new.name, new.calendar_json);
+END;
+
 -- trigger_person_account_ownership_delete_audit
 CREATE TRIGGER trigger_person_account_ownership_delete_audit
 AFTER DELETE ON person_account_ownership

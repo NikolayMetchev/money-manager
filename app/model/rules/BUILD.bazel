@@ -27,8 +27,10 @@ kmp_library(
         "@maven_kmp//:kotlinx_serialization_core",
     ],
     deps = [
+        "//app/model/calendar",
         "//utils/bigdecimal",
         "//utils/regex",
+        "@maven_kmp//:kotlinx_datetime",
     ],
 )
 
@@ -49,6 +51,7 @@ kmp_test(
         "js",
     ],
     deps = [
+        "//app/model/calendar",
         "//bazel/kmp/deps:kotlin_test",
         "@maven_kmp//:kotlinx_serialization_json",
     ],

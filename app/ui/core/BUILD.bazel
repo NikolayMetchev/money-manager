@@ -55,6 +55,7 @@ kmp_library(
         "//app/importdirectory",
         "//app/importengineapi",
         "//app/importfilesource/core",
+        "//app/model/calendar",
         "//app/model/core",
         "//app/model/csvstrategy",
         "//app/model/importdirectory",

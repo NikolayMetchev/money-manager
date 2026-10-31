@@ -1,0 +1,11 @@
+-- The locations accounts settle on: one holiday calendar each (weekend days, holidays, working weekend days), keyed by
+-- its code (Strata's `GBLO`, `USNY`, …), which an account's 'location' attribute (-11) and settings.default_location
+-- name. Business-day reconcile windows count the days of the calendars a pair of records' accounts are in. The whole
+-- calendar is kept as JSON (`HolidayCalendar`); name is duplicated for listing. New databases are seeded with the
+-- bundled Strata calendars. Like pass_through_account, this is config with no provenance (EXCLUDED_FROM_AUDIT), audited
+-- by its own triggers so edits register in dataChangeToken() and sync.
+CREATE TABLE holiday_calendar (
+    code TEXT NOT NULL PRIMARY KEY CHECK(length(trim(code)) > 0),
+    name TEXT NOT NULL,
+    calendar_json TEXT NOT NULL
+);

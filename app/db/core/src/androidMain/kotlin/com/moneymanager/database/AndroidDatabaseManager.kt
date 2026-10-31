@@ -93,6 +93,7 @@ class AndroidDatabaseManager(
             if (isNewDatabase) {
                 onProgress(Progress.counted("Adding default currencies...", 5, 6))
                 DatabaseConfig.seedCurrencies(database, currenciesToSeed())
+                DatabaseConfig.seedHolidayCalendars(database)
             } else {
                 onProgress(Progress.counted("Preparing repositories...", 5, 6))
             }

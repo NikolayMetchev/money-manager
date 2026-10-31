@@ -4,6 +4,7 @@ import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.RelationshipTypeId
+import com.moneymanager.domain.model.rules.SettlementWindow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 
@@ -42,7 +43,7 @@ sealed interface DedupePolicy {
      * off for all pre-existing behavior.
      */
     data class UniqueIdentifier(
-        val reconcileWindow: Duration? = null,
+        val reconcileWindow: SettlementWindow? = null,
         val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
         val reconciledRelationshipTypeId: RelationshipTypeId? = null,
         /**
@@ -52,7 +53,7 @@ sealed interface DedupePolicy {
          */
         val unidentifiedCounterpartyAttributeTypeId: AttributeTypeId? = null,
         /** Window for [unidentifiedCounterpartyAttributeTypeId]; see [ApiMultiKey.unidentifiedCounterpartyWindow]. */
-        val unidentifiedCounterpartyWindow: Duration? = null,
+        val unidentifiedCounterpartyWindow: SettlementWindow? = null,
     ) : DedupePolicy
 
     /**
@@ -74,7 +75,7 @@ sealed interface DedupePolicy {
     data class FuzzyAllFields(
         val dateTolerance: Duration = 3.days,
         val similarityThreshold: Double = DESCRIPTION_SIMILARITY_THRESHOLD,
-        val reconcileWindow: Duration? = null,
+        val reconcileWindow: SettlementWindow? = null,
         val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
         val reconciledRelationshipTypeId: RelationshipTypeId? = null,
         /**
@@ -85,13 +86,15 @@ sealed interface DedupePolicy {
          * is** — the one field the placeholder row cannot state. The placeholder leg is the one excluded:
          * incoming when it is the unidentified one, otherwise the existing leg carrying this attribute
          * (so the two import orders agree). Each existing leg is claimed at most once, nearest timestamp
-         * first, within [dateTolerance].
+         * first, within [unidentifiedCounterpartyWindow].
          *
          * This is what stops a bank export and an account's own export double-counting the same deposit:
          * the bank names the account by sort code + account number, while the account's own export says
          * only "GBP Deposit (via FPS)" and so cannot name the bank.
          */
         val unidentifiedCounterpartyAttributeTypeId: AttributeTypeId? = null,
+        /** Window for [unidentifiedCounterpartyAttributeTypeId]; null: [dateTolerance], as clock time. */
+        val unidentifiedCounterpartyWindow: SettlementWindow? = null,
     ) : DedupePolicy
 
     /**
@@ -112,7 +115,7 @@ sealed interface DedupePolicy {
      * identify (apiId == null) so genuine repeat transfers from the same provider are never collapsed.
      */
     data class ApiMultiKey(
-        val reconcileWindow: Duration? = null,
+        val reconcileWindow: SettlementWindow? = null,
         val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
         val reconciledRelationshipTypeId: RelationshipTypeId? = null,
         /**
@@ -125,7 +128,7 @@ sealed interface DedupePolicy {
          * via the `reconciled` relationship. See the Crypto.com App↔Exchange case.
          */
         val internalTransferBridges: List<AccountBridge> = emptyList(),
-        val internalTransferWindow: Duration? = null,
+        val internalTransferWindow: SettlementWindow? = null,
         /** Allowed amount difference as a percentage (BigDecimal for precise monetary comparison). */
         val internalTransferAmountTolerance: BigDecimal = BigDecimal.ZERO,
         /**
@@ -142,7 +145,7 @@ sealed interface DedupePolicy {
          * while a placeholder match has only the account, direction and amount to go on — and a statement
          * export stamps the movement hours (sometimes a day) away from the bank feed's own timestamp.
          */
-        val unidentifiedCounterpartyWindow: Duration? = null,
+        val unidentifiedCounterpartyWindow: SettlementWindow? = null,
     ) : DedupePolicy
 
     /** No deduplication — every transfer is imported. */

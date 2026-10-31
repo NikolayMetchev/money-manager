@@ -68,6 +68,7 @@ kmp_library(
         "@maven_kmp//:sqldelight_runtime",
     ],
     deps = [
+        "//app/model/calendar",
         "//utils/coroutines",
         "//utils/regex",
         "@maven_kmp//:sqldelight_async_extensions",

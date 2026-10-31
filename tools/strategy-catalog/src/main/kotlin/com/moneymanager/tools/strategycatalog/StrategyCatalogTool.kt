@@ -36,14 +36,16 @@ private const val GBP_CURRENCY_CODE = "GBP"
  * (app/strategies) plus the ISO 4217 currency list to its portable JSON artifact and writes
  * `<webpageDir>/strategy-library/` — index.json plus one file per artifact. Nothing is checked in; CI
  * runs this before uploading the `webpage/` directory to Pages. `currencies <file>` instead regenerates
- * the currency table bundled into the app from the same JDK list.
+ * the currency table bundled into the app from the same JDK list, and `calendars <file>` the holiday calendars from
+ * OpenGamma Strata.
  */
 fun main(args: Array<String>) {
-    val usage = "usage: generate <webpageDir> | currencies <IsoCurrencies.kt>"
+    val usage = "usage: generate <webpageDir> | currencies <IsoCurrencies.kt> | calendars <StrataHolidayCalendars.kt>"
     require(args.size == 2) { usage }
     when (args[0]) {
         "generate" -> generateCatalogSite(workspaceFile(args[1]))
         "currencies" -> workspaceFile(args[1]).writeText(renderIsoCurrenciesSource(jdkIsoCurrencies()))
+        "calendars" -> workspaceFile(args[1]).writeText(renderStrataHolidayCalendarsSource(strataHolidayCalendars()))
         else -> error(usage)
     }
 }

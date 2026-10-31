@@ -139,6 +139,7 @@ workflow because label events start it: any other label's run skips, without can
 | `utils/httpclient/` | The one place the Ktor engine is chosen: `platformHttpClient()` runs on Ktor's `ktor-client-engine-defaults` (OkHttp on JVM/Android, Curl on Linux, Darwin on macOS, WinHttp on Windows; native TLS comes from the OS or the statically linked libcurl), found by engine discovery. Build every production `HttpClient` with it, never with a named engine. ProGuard keeps `OkHttpEngineContainer` for the ServiceLoader lookup |
 | `utils/compose/{filePicker,scrollbar}/` | Platform file/folder pickers and scrollbar widgets. In the browser a picker is an `<input type=file>`, a save is a download, and folders are unsupported |
 | `app/model/core/` | The flat `domain.model` package: entities, ids, `Money`, audit entries. Depends on nothing but `utils/bigdecimal` and `utils/files` (and, in the browser, the zone database `@js-joda/timezone`) |
+| `app/model/calendar/` | Locations: `HolidayCalendar` (Strata's shape: a code like `GBLO`, zone, weekend days, explicit holidays and weekend working days), `CombinedCalendar` (a day is open only if every calendar is), `WeekendOnlyCalendar`, and the bundled `StrataHolidayCalendars`, generated 1950–2099 from OpenGamma Strata by `bazel run //tools/strategy-catalog:generate_bundled_calendars` |
 | `app/model/rules/` | The strategy vocabulary that CSV and API share: `StrategyRule`/`RuleAction` and their `RuleEngine`, `Condition`, `ValueExpr`, `AssetCodeRules`, `FeeRule`, `ForeignAmount`, `RuleEvaluator` — see **Import Strategies** |
 | `app/model/{apistrategy,accountmapping,csv,qif,csvstrategy,importdirectory,passthrough,reconciliation,timeline}/` | One module per `domain.model` sub-package. All depend on `model/core` except `qif` (only `QifColumns`); `csvstrategy`→`qif`+`accountmapping` |
 | `app/model/repository/read/`, `app/model/repository/write/` | `*ReadRepository` / `*WriteRepository` interfaces. `write` depends on `read` (each write interface extends its read) |
@@ -204,6 +205,12 @@ from the Pages build's JDK, so an installed app can install codes it didn't ship
 missing codes and never renames or deletes. Only SYSTEM-created currencies (seeded or installed) count as
 the local copy, so user-created ones don't show up as a change. A JDK bump that adds codes fails
 `IsoCurrencyTableTest` until you rerun `bazel run //tools/strategy-catalog:generate_bundled_currencies`.
+
+**Locations**: new databases are likewise seeded with `StrataHolidayCalendars` (`holiday_calendar` table), which
+Settings → Locations and holiday calendars edits. The database has a default location (`settings.default_location`,
+like the default currency, chosen in the setup wizard from the device's country) that an account overrides with its
+`location` attribute (the account editor's picker). A location naming no calendar fails a business-day import with a
+clear error rather than guessing.
 
 **Key Classes**:
 - `Money`: Value class storing amount as `Long` with associated `Currency`
@@ -397,6 +404,7 @@ What isn't a per-record decision stays structural config:
 | Concept | Type | Replaced |
 |---|---|---|
 | "Does this row/item match?" | `Condition`, evaluated by one `RuleEvaluator` over CSV rows and JSON items (rule conditions, strategy selection, content-match rules) | row conditions, predicates, item filters |
+| Reconcile windows | `SettlementWindow`: `Elapsed(seconds)` or `BusinessDays(days)`, counted on the combined calendars of every account on both records (the `location` account attribute, -11, else the database's default location, else weekends only). Every reconcile window, CSV (`crossSourceReconcileWindow`, `placeholderReconcileWindow`) and API (`reconcileWindows`, the internal-transfer `window`), edited by one `SettlementWindowEditor`. Trade-side windows (`TradeDedupePolicy.Fuzzy`, the conversion reconcilers, `LegGroupRule.reconcileWindowSeconds`) stay clock time: exchanges stamp trades to the second | `crossSourceReconcileWindowSeconds`, the hard-coded 5-minute and 3-day API windows, the placeholder window borrowed from `dateTolerance` |
 | "Compute a value" | `ValueExpr`: ordered fallback columns/paths, extraction | per-field fallback/extraction settings |
 | Asset tickers | `AssetCodeRules`: aliases + suffix handling | separate CSV and API alias/suffix settings |
 | Multi-row grouping | `LegGroupRule` (name, key, window) with `Trade` or `ThroughAccount` assembly; rows join it through `Leg` actions (no accounts + `fundingWhen` = link two rows as one pass-through, e.g. PayPal's card deposit → payment) | `ConversionConfig`, `TradeGroupConfig` |
@@ -624,7 +632,8 @@ the presenter directly).
 ## Setup Wizard
 
 A full-screen stepper (`app/ui/core/.../screens/setup/`) that guides a user through setting up a database:
-default currency → strategy catalog → strategy cloud sync → import folders → API credentials. Each step body
+default currency and location (one step, from the locale) → strategy catalog → strategy cloud sync → import folders →
+API credentials. Each step body
 is the same composable the feature uses elsewhere (`StrategyCatalogScreen`, `StrategyCloudCard`,
 `ImportDirectoriesScreen`, `ApiConnectScreen`), so the wizard adds ordering and explanation, never a parallel
 set of writes.

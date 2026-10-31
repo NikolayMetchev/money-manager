@@ -33,6 +33,7 @@ import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.rules.ColumnRecord
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleEvaluator
+import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
@@ -604,21 +605,26 @@ fun effectiveSourceFor(
 
 /**
  * The fuzzy dedupe policy for this strategy's rows, which CSV and QIF imports share. Cross-source
- * reconciliation is opt-in per strategy (`CsvStrategyConfig.crossSourceReconcileWindowSeconds`):
+ * reconciliation is opt-in per strategy (`CsvStrategyConfig.crossSourceReconcileWindow`):
  * a row recording a movement another export already imported (same accounts + amount within that window,
  * or, when one side's counterparty is only a placeholder marked by [unidentifiedCounterpartyTypeId], the
- * same owned account + direction + amount within the fuzzy date tolerance) is kept but excluded and
+ * same owned account + direction + amount within the placeholder window) is kept but excluded and
  * linked instead of double-counting. Mirrors the API importer.
  */
 fun CsvImportStrategy.fuzzyDedupePolicy(unidentifiedCounterpartyTypeId: AttributeTypeId?): DedupePolicy.FuzzyAllFields {
-    val reconcileWindow = config.crossSourceReconcileWindowSeconds?.seconds
+    val reconcileWindow = config.crossSourceReconcileWindow
     return DedupePolicy.FuzzyAllFields(
         reconcileWindow = reconcileWindow,
         reconciledExclusionAttributeTypeId = reconcileWindow?.let { AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID) },
         reconciledRelationshipTypeId = reconcileWindow?.let { RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID) },
         unidentifiedCounterpartyAttributeTypeId = reconcileWindow?.let { unidentifiedCounterpartyTypeId },
+        unidentifiedCounterpartyWindow = reconcileWindow?.let { placeholderWindow() },
     )
 }
+
+/** How far a placeholder leg may sit from the record naming its far end: three days unless the strategy says. */
+private fun CsvImportStrategy.placeholderWindow(): SettlementWindow =
+    config.placeholderReconcileWindow ?: SettlementWindow.Elapsed(DedupePolicy.FuzzyAllFields().dateTolerance.inWholeSeconds)
 
 /** True when `strategy` needs a user-chosen source account (no SOURCE_ACCOUNT mapping of its own). */
 fun CsvImportStrategy.needsSourceAccountOverride(): Boolean = config.fieldMappings[TransferField.SOURCE_ACCOUNT] == null
@@ -1225,7 +1231,7 @@ suspend fun runCsvImport(
                     // Cross-source reconciliation for unique-id strategies whose sources issue a
                     // different id per side of the same movement (e.g. Monzo's own- and joint-account
                     // exports each carry their own Transaction ID for one transfer).
-                    val reconcileWindow = strategy.config.crossSourceReconcileWindowSeconds?.seconds
+                    val reconcileWindow = strategy.config.crossSourceReconcileWindow
                     DedupePolicy.UniqueIdentifier(
                         reconcileWindow = reconcileWindow,
                         reconciledExclusionAttributeTypeId =
@@ -1233,9 +1239,9 @@ suspend fun runCsvImport(
                         reconciledRelationshipTypeId =
                             reconcileWindow?.let { RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID) },
                         unidentifiedCounterpartyAttributeTypeId = reconcileWindow?.let { unidentifiedCounterpartyTypeId },
-                        // A placeholder match has only account, direction and amount to go on, so it uses the
-                        // fuzzy policy's date tolerance rather than this strategy's exact-pair window.
-                        unidentifiedCounterpartyWindow = reconcileWindow?.let { DedupePolicy.FuzzyAllFields().dateTolerance },
+                        // A placeholder match has only account, direction and amount to go on, so it has its own,
+                        // wider window rather than this strategy's exact-pair one.
+                        unidentifiedCounterpartyWindow = reconcileWindow?.let { strategy.placeholderWindow() },
                     )
                 },
             uniqueKeyExtractor =

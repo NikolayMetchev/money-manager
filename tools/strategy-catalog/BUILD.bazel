@@ -15,6 +15,9 @@ kmp_library(
         "//app/strategies",
         "//app/strategycatalog",
         "//utils/currency",
+        "//app/model/calendar",
+        "@maven_kmp//:kotlinx_datetime",
+        "@maven_kmp//:strata_basics",
     ],
     jvm_srcs = glob(["src/main/kotlin/**/*.kt"]),
     visibility = ["//visibility:public"],
@@ -30,6 +33,7 @@ kmp_test(
         "//bazel/kmp/deps:kotlin_test",
         "//utils/currency",
         "@maven_kmp//:kotlinx_serialization_json",
+        "//app/model/calendar",
     ],
     jvm_srcs = glob(["src/test/kotlin/**/*.kt"]),
 )
@@ -49,6 +53,18 @@ java_binary(
     args = [
         "currencies",
         "utils/currency/src/commonMain/kotlin/com/moneymanager/currency/IsoCurrencies.kt",
+    ],
+    main_class = _MAIN_CLASS,
+    runtime_deps = [":strategy-catalog_jvm"],
+)
+
+# `bazel run //tools/strategy-catalog:generate_bundled_calendars` rewrites app/model/calendar's
+# locations from OpenGamma Strata's holiday calendars.
+java_binary(
+    name = "generate_bundled_calendars",
+    args = [
+        "calendars",
+        "app/model/calendar/src/commonMain/kotlin/com/moneymanager/domain/model/calendar/StrataHolidayCalendars.kt",
     ],
     main_class = _MAIN_CLASS,
     runtime_deps = [":strategy-catalog_jvm"],

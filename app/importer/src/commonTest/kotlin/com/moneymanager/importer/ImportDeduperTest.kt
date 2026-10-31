@@ -13,17 +13,22 @@ import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.calendar.StrataHolidayCalendars
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.importengineapi.AccountBridge
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atTime
+import kotlinx.datetime.toInstant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -149,7 +154,7 @@ class ImportDeduperTest {
 
     private val reconcilingUniqueIdPolicy =
         DedupePolicy.UniqueIdentifier(
-            reconcileWindow = 5.minutes,
+            reconcileWindow = SettlementWindow.Elapsed(5 * 60L),
             reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
             reconciledRelationshipTypeId = RelationshipTypeId(1),
         )
@@ -283,7 +288,7 @@ class ImportDeduperTest {
 
     private val reconcilingPolicy =
         DedupePolicy.ApiMultiKey(
-            reconcileWindow = 5.minutes,
+            reconcileWindow = SettlementWindow.Elapsed(5 * 60L),
             reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
             reconciledRelationshipTypeId = RelationshipTypeId(1),
         )
@@ -355,7 +360,7 @@ class ImportDeduperTest {
     private val appAccount = AccountId(3)
 
     private fun internalTransferPolicy(
-        window: Duration = 24.hours,
+        window: SettlementWindow = SettlementWindow.Elapsed(24 * 3600L),
         tolerance: BigDecimal = BigDecimal.ZERO,
     ) = DedupePolicy.ApiMultiKey(
         reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
@@ -458,7 +463,7 @@ class ImportDeduperTest {
 
     private val reconcilingFuzzyPolicy =
         DedupePolicy.FuzzyAllFields(
-            reconcileWindow = 60.minutes,
+            reconcileWindow = SettlementWindow.Elapsed(60 * 60L),
             reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
             reconciledRelationshipTypeId = RelationshipTypeId(1),
         )
@@ -576,7 +581,7 @@ class ImportDeduperTest {
 
     private val unidentifiedPolicy =
         DedupePolicy.FuzzyAllFields(
-            reconcileWindow = 60.minutes,
+            reconcileWindow = SettlementWindow.Elapsed(60 * 60L),
             reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
             reconciledRelationshipTypeId = RelationshipTypeId(1),
             unidentifiedCounterpartyAttributeTypeId = AttributeTypeId(-9),
@@ -844,11 +849,11 @@ class ImportDeduperTest {
             )
         val policy =
             DedupePolicy.UniqueIdentifier(
-                reconcileWindow = 60.minutes,
+                reconcileWindow = SettlementWindow.Elapsed(60 * 60L),
                 reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
                 reconciledRelationshipTypeId = RelationshipTypeId(1),
                 unidentifiedCounterpartyAttributeTypeId = AttributeTypeId(-9),
-                unidentifiedCounterpartyWindow = 3.days,
+                unidentifiedCounterpartyWindow = SettlementWindow.Elapsed(3 * 86_400L),
             )
         val charge =
             importTransfer(0, description = "PAYPAL *UBERTRIP 3", uniqueKey = mapOf("txid" to "tx_1"), src = card, tgt = wallet)
@@ -1120,7 +1125,7 @@ class ImportDeduperTest {
     fun approximateRow_isExcludedAgainstAPreciseLegInItsWindow() {
         val apiPolicy =
             DedupePolicy.ApiMultiKey(
-                reconcileWindow = 60.minutes,
+                reconcileWindow = SettlementWindow.Elapsed(60 * 60L),
                 reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
                 reconciledRelationshipTypeId = RelationshipTypeId(1),
             )
@@ -1145,7 +1150,7 @@ class ImportDeduperTest {
         // A row that already counts nowhere must not use up the precise leg a real record will need.
         val apiPolicy =
             DedupePolicy.ApiMultiKey(
-                reconcileWindow = 60.minutes,
+                reconcileWindow = SettlementWindow.Elapsed(60 * 60L),
                 reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
                 reconciledRelationshipTypeId = RelationshipTypeId(1),
             )
@@ -1298,11 +1303,11 @@ class ImportDeduperTest {
     // A card's own statement (a unique-id export) says only "PAYMENT RECEIVED"; the paying bank names both ends.
     private val uniqueIdPlaceholderPolicy =
         DedupePolicy.UniqueIdentifier(
-            reconcileWindow = 60.minutes,
+            reconcileWindow = SettlementWindow.Elapsed(60 * 60L),
             reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
             reconciledRelationshipTypeId = RelationshipTypeId(1),
             unidentifiedCounterpartyAttributeTypeId = AttributeTypeId(-9),
-            unidentifiedCounterpartyWindow = 3.days,
+            unidentifiedCounterpartyWindow = SettlementWindow.Elapsed(3 * 86_400L),
         )
 
     private val reconciled = AttributeTypeId(-1) to "reconciled"
@@ -1389,5 +1394,74 @@ class ImportDeduperTest {
             )
         val result = deduper.classify(listOf(placeholderDeposit(0).copy(uniqueKey = mapOf("line" to "2")))).single()
         assertTrue(result.transfer.relationships.none { it.relatedTransferId == TransferId(50) })
+    }
+
+    // Business-day windows (#1183): the Easter 2021 card payment left the bank on Maundy Thursday and reached the
+    // card on Easter Monday, four calendar days but no London business days apart.
+    private val londonCalendars =
+        SettlementCalendars(
+            locations = mapOf(bank to "GBLO", wallet to "GBLO"),
+            defaultLocation = null,
+            calendars = StrataHolidayCalendars.all.filter { it.id == "GBLO" },
+        )
+
+    private fun businessDayPolicy(placeholderWindow: SettlementWindow) =
+        uniqueIdPlaceholderPolicy.copy(unidentifiedCounterpartyWindow = placeholderWindow)
+
+    private fun londonNoon(date: String) = LocalDate.parse(date).atTime(12, 0).toInstant(TimeZone.of("Europe/London"))
+
+    private fun placeholderAgainstBank(
+        policy: DedupePolicy,
+        bankDate: String,
+        cardDate: String,
+    ): Classified =
+        ImportDeduper(policy, existing = listOf(bankCredit(40, timestamp = londonNoon(bankDate))), calendars = londonCalendars)
+            .classify(listOf(placeholderDeposit(0, timestamp = londonNoon(cardDate)).copy(uniqueKey = mapOf("line" to "1"))))
+            .single()
+
+    @Test
+    fun businessDays_placeholderReconcilesAcrossTheEasterWeekend() {
+        val result = placeholderAgainstBank(businessDayPolicy(SettlementWindow.BusinessDays(3)), "2021-04-01", "2021-04-05")
+        assertEquals(listOf(TransferId(40)), result.transfer.relationships.map { it.relatedTransferId })
+    }
+
+    @Test
+    fun businessDays_bankRecordSupersedesAPlaceholderAcrossTheEasterWeekend() {
+        val existingPlaceholder =
+            existing(
+                50,
+                src = placeholder,
+                tgt = wallet,
+                timestamp = londonNoon("2021-04-05"),
+                attributes = mapOf(AttributeTypeId(-9) to "true"),
+            )
+        val deduper =
+            ImportDeduper(
+                businessDayPolicy(SettlementWindow.BusinessDays(3)),
+                existing = listOf(existingPlaceholder),
+                calendars = londonCalendars,
+            )
+        val bankRow = importTransfer(0, src = bank, tgt = wallet, timestamp = londonNoon("2021-04-01"), uniqueKey = mapOf("ref" to "b"))
+        assertEquals(
+            TransferId(50),
+            deduper
+                .classify(listOf(bankRow))
+                .single()
+                .excludeExisting
+                ?.transfer
+                ?.id,
+        )
+    }
+
+    @Test
+    fun businessDays_rejectTheSameAmountAWeekAway() {
+        val result = placeholderAgainstBank(businessDayPolicy(SettlementWindow.BusinessDays(3)), "2021-04-15", "2021-04-22")
+        assertTrue(result.transfer.relationships.isEmpty())
+    }
+
+    @Test
+    fun elapsedThreeDays_missesTheEasterWeekend() {
+        val result = placeholderAgainstBank(businessDayPolicy(SettlementWindow.Elapsed(3 * 86_400L)), "2021-04-01", "2021-04-05")
+        assertTrue(result.transfer.relationships.isEmpty())
     }
 }

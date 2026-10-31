@@ -10,12 +10,16 @@ import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.calendar.BusinessDayCalendar
+import com.moneymanager.domain.model.calendar.WeekendOnlyCalendar
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.rules.SettlementWindow
+import com.moneymanager.domain.model.rules.contains
+import com.moneymanager.domain.model.rules.meets
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.StringSimilarity
-import kotlin.time.Duration
 import kotlin.time.Instant
 
 /**
@@ -162,6 +166,8 @@ class ImportDeduper(
      * of the file's rows and [ownBatchAccounts] no longer covers the rest of the file.
      */
     private val ownSourceLegs: Set<TransferId> = emptySet(),
+    /** Which days a business-day window counts, per pair of records (see [SettlementCalendars]). */
+    private val calendars: SettlementCalendars = SettlementCalendars.WEEKENDS_ONLY,
 ) {
     /**
      * Exact-match key over a transfer's core fields. Incoming-side fields are nullable, so an
@@ -357,7 +363,7 @@ class ImportDeduper(
 
     /** What the placeholder rules need from the policy, or null when it leaves them off. */
     private class PlaceholderSettings(
-        val window: Duration,
+        val window: SettlementWindow,
         val exclusionTypeId: AttributeTypeId,
         val relationshipTypeId: RelationshipTypeId,
     )
@@ -368,7 +374,7 @@ class ImportDeduper(
             val (window, exclusion, relationship) =
                 when (policy) {
                     is DedupePolicy.FuzzyAllFields -> {
-                        Triple(policy.dateTolerance, policy.reconciledExclusionAttributeTypeId, policy.reconciledRelationshipTypeId)
+                        Triple(policy.placeholderWindow(), policy.reconciledExclusionAttributeTypeId, policy.reconciledRelationshipTypeId)
                     }
 
                     is DedupePolicy.ApiMultiKey -> {
@@ -569,14 +575,14 @@ class ImportDeduper(
     private fun splitSetFor(
         placeholder: PlaceholderMovement,
         chains: List<ChainMovement>,
-        window: Duration,
+        window: SettlementWindow,
     ): List<ChainMovement>? {
         val target = placeholder.amount.amount
         return chains
             .filter { chain ->
                 chain.conduit == placeholder.conduit &&
                     chain.amount.asset == placeholder.amount.asset &&
-                    (chain.timestamp - placeholder.timestamp).absoluteValue <= window &&
+                    window.holds(chain.timestamp, placeholder.timestamp, listOf(chain.conduit, chain.merchant)) &&
                     (placeholder.batchIndex == null || chain.existing != null)
             }.groupBy { it.merchant }
             .values
@@ -781,7 +787,7 @@ class ImportDeduper(
      */
     private class ReconcileRule(
         val keeps: Keeps,
-        val find: (transfer: ImportTransfer, window: Duration) -> Found?,
+        val find: (transfer: ImportTransfer, window: SettlementWindow) -> Found?,
     )
 
     /**
@@ -793,7 +799,7 @@ class ImportDeduper(
     private fun reconcile(
         transfer: ImportTransfer,
         rule: ReconcileRule,
-        window: Duration?,
+        window: SettlementWindow?,
         exclusionTypeId: AttributeTypeId?,
         relationshipTypeId: RelationshipTypeId?,
     ): Classified? {
@@ -834,13 +840,17 @@ class ImportDeduper(
         }
     }
 
-    /** The unclaimed leg of [candidates] nearest [timestamp] within [window], claimed by the match. */
+    /** The unclaimed leg of [candidates] nearest [transfer]'s [timestamp] within [window], claimed by the match. */
     private fun nearestUnclaimed(
         candidates: List<Pair<TransferId, Transfer>>,
+        transfer: ImportTransfer,
         timestamp: Instant,
-        window: Duration,
+        window: SettlementWindow,
     ): Found? {
-        val id = selectNearestUnconsumedLeg(candidates, timestamp, window, consumedReconcileIds) ?: return null
+        val id =
+            selectNearestUnconsumedLeg(candidates, timestamp, consumedReconcileIds) { existing ->
+                window.holds(timestamp, existing.timestamp, transfer.accounts() + existing.accounts())
+            } ?: return null
         return Found(id, candidates.first { it.first == id }.second, claims = listOf(id))
     }
 
@@ -890,7 +900,7 @@ class ImportDeduper(
             if (passThrough == null) {
                 // Funding leg is fundingAccount -> conduit; the incoming row's source IS the conduit.
                 val key = DirectedAmountKey(fundingAccountId, transfer.fromAccount.requireId(), transfer.amount)
-                return@ReconcileRule reconcileCandidatesByDirectedAmount[key]?.let { nearestUnclaimed(it, timestamp, window) }
+                return@ReconcileRule reconcileCandidatesByDirectedAmount[key]?.let { nearestUnclaimed(it, transfer, timestamp, window) }
             }
             val conduit = passThrough.conduit.requireId()
             val key =
@@ -900,7 +910,7 @@ class ImportDeduper(
                     DirectedAmountKey(fundingAccountId, conduit, transfer.amount)
                 }
             reconcileCandidatesByDirectedAmount[key]
-                ?.let { nearestUnclaimed(it, timestamp, window) }
+                ?.let { nearestUnclaimed(it, transfer, timestamp, window) }
                 ?.let { it.copy(supersedes = onwardLegsFrom(it.id, conduit)) }
         }
 
@@ -938,7 +948,7 @@ class ImportDeduper(
                             counterparty != placeholder &&
                             counterparty !in ownBatchAccounts
                     }.orEmpty()
-            nearestUnclaimed(candidates, timestamp, window)?.let { it.copy(supersedes = onwardLegsFrom(it.id, owned)) }
+            nearestUnclaimed(candidates, transfer, timestamp, window)?.let { it.copy(supersedes = onwardLegsFrom(it.id, owned)) }
         }
 
     /**
@@ -975,7 +985,7 @@ class ImportDeduper(
      */
     private fun classifyAsConduitStatement(
         transfer: ImportTransfer,
-        window: Duration?,
+        window: SettlementWindow?,
         exclusionTypeId: AttributeTypeId?,
         relationshipTypeId: RelationshipTypeId?,
     ): Classified? {
@@ -990,7 +1000,7 @@ class ImportDeduper(
                     ?.filter { (id, _) ->
                         id in existingUnidentifiedLegs && id !in existingExcludedLegs && id !in claimedReconcileTargets
                     }.orEmpty()
-            nearestUnclaimed(candidates, timestamp, window)?.let { found ->
+            nearestUnclaimed(candidates, transfer, timestamp, window)?.let { found ->
                 consumedReconcileIds += found.claims
                 pairedInBatch += found.id
                 Classified(
@@ -1026,7 +1036,7 @@ class ImportDeduper(
                                 id !in claimedReconcileTargets &&
                                 (if (inflow) existingTransfer.sourceAccountId else existingTransfer.targetAccountId) != counterparty
                         }.orEmpty()
-                nearestUnclaimed(candidates, timestamp, window)
+                nearestUnclaimed(candidates, transfer, timestamp, window)
             }
         }
 
@@ -1055,7 +1065,13 @@ class ImportDeduper(
                         id !in existingExcludedLegs &&
                         id !in claimedReconcileTargets &&
                         id !in consumedReconcileIds &&
-                        spansMeet(timestamp, null, existing.timestamp, approximateUntilById[id], window)
+                        window.spansMeet(
+                            timestamp,
+                            null,
+                            existing.timestamp,
+                            approximateUntilById[id],
+                            transfer.accounts() + existing.accounts(),
+                        )
                 }.minByOrNull { (_, existing) -> (timestamp - existing.timestamp).absoluteValue }
                 ?.let { (id, existing) -> Found(id, existing, claims = listOf(id)) }
         }
@@ -1081,7 +1097,7 @@ class ImportDeduper(
                         id !in claimedReconcileTargets &&
                         id !in consumedReconcileIds &&
                         id !in approximateUntilById &&
-                        spansMeet(timestamp, until, existing.timestamp, null, window)
+                        window.spansMeet(timestamp, until, existing.timestamp, null, transfer.accounts() + existing.accounts())
                 }.minByOrNull { (_, existing) -> (existing.timestamp - timestamp).absoluteValue }
                 ?.let { (id, existing) -> Found(id, existing, claims = listOf(id)) }
         }
@@ -1107,7 +1123,7 @@ class ImportDeduper(
                     reconcileCandidatesByAccountFlow[AccountFlowKey(owned, inflow, gross)]
                         ?.filter { (id, _) -> id !in existingExcludedLegs && id !in claimedReconcileTargets }
                         .orEmpty()
-                nearestUnclaimed(candidates, timestamp, window)
+                nearestUnclaimed(candidates, transfer, timestamp, window)
             }
         }
 
@@ -1142,7 +1158,7 @@ class ImportDeduper(
                             id !in existingExcludedLegs &&
                             id !in claimedReconcileTargets &&
                             id !in consumedReconcileIds &&
-                            (timestamp - existing.timestamp).absoluteValue <= window
+                            window.holds(timestamp, existing.timestamp, transfer.accounts() + existing.accounts())
                     }
             usable
                 .groupBy { (_, existing) -> existing.timestamp }
@@ -1216,7 +1232,9 @@ class ImportDeduper(
                                     (exchangeIsSource && existing.targetAccountId == bridge.appAccountId)
                             )
                     }
-                selectNearestUnconsumedLeg(candidates, timestamp, window, consumedReconcileIds)?.let { matchId ->
+                selectNearestUnconsumedLeg(candidates, timestamp, consumedReconcileIds) { existing ->
+                    window.holds(timestamp, existing.timestamp, transfer.accounts() + existing.accounts())
+                }?.let { matchId ->
                     consumedReconcileIds += matchId
                     val existingTransfer = candidates.first { it.first == matchId }.second
                     val rewritten =
@@ -1253,29 +1271,46 @@ class ImportDeduper(
     private fun reconcileMatches(
         transfer: ImportTransfer,
         existing: Transfer,
-        window: Duration,
+        window: SettlementWindow,
     ): Boolean {
         if (transfer.amount != existing.amount) return false
         if (transfer.fromAccount.requireId() != existing.sourceAccountId) return false
         if (transfer.toAccount.requireId() != existing.targetAccountId) return false
-        return spansMeet(requireNotNull(transfer.timestamp), transfer.approximateUntil, existing.timestamp, null, window)
+        return window.spansMeet(
+            requireNotNull(transfer.timestamp),
+            transfer.approximateUntil,
+            existing.timestamp,
+            null,
+            transfer.accounts(),
+        )
     }
 
+    /** Whether [a] and [b] are within this window, on the business days of [accounts]' locations. */
+    private fun SettlementWindow.holds(
+        a: Instant,
+        b: Instant,
+        accounts: List<AccountId>,
+    ): Boolean = contains(a, b, calendarFor(accounts))
+
     /**
-     * True when two movements' possible instants come within [window] of each other. A precise leg's span
+     * True when two movements' possible instants come within this window of each other. A precise leg's span
      * is its timestamp alone; an approximate one runs from its timestamp to its `until` bound.
      */
-    private fun spansMeet(
+    private fun SettlementWindow.spansMeet(
         start: Instant,
         until: Instant?,
         otherStart: Instant,
         otherUntil: Instant?,
-        window: Duration,
-    ): Boolean {
-        val end = maxOf(start, until ?: start)
-        val otherEnd = maxOf(otherStart, otherUntil ?: otherStart)
-        return otherStart - window <= end && start - window <= otherEnd
-    }
+        accounts: List<AccountId>,
+    ): Boolean = meets(start, until, otherStart, otherUntil, calendarFor(accounts))
+
+    // Clock time reads no calendar, so an elapsed window never needs the accounts' locations.
+    private fun SettlementWindow.calendarFor(accounts: List<AccountId>): BusinessDayCalendar =
+        if (this is SettlementWindow.Elapsed) WeekendOnlyCalendar else calendars.forAccounts(accounts)
+
+    private fun ImportTransfer.accounts(): List<AccountId> = listOf(fromAccount.requireId(), toAccount.requireId())
+
+    private fun Transfer.accounts(): List<AccountId> = listOf(sourceAccountId, targetAccountId)
 
     /** The existing transfers that could satisfy [apiMatches] (exact timestamp + amount bucket). */
     private fun apiMatchCandidatesFor(transfer: ImportTransfer): List<Pair<TransferId, Transfer>> {
@@ -1417,14 +1452,14 @@ class ImportDeduper(
         // Matched within the date tolerance, like the placeholder rules below it is one of.
         classifyAsConduitStatement(
             transfer,
-            policy.dateTolerance,
+            policy.placeholderWindow(),
             policy.reconciledExclusionAttributeTypeId,
             policy.reconciledRelationshipTypeId,
         )?.let { return it }
         val rules =
             listOf(
-                identifiedTwin to policy.dateTolerance,
-                placeholderTwin to policy.dateTolerance,
+                identifiedTwin to policy.placeholderWindow(),
+                placeholderTwin to policy.placeholderWindow(),
                 itemisedTwin to policy.reconcileWindow,
             )
         for ((rule, window) in rules) {
@@ -1483,6 +1518,9 @@ class ImportDeduper(
         return withinDateTolerance &&
             StringSimilarity.similarity(transfer.description, existing.description) >= policy.similarityThreshold
     }
+
+    private fun DedupePolicy.FuzzyAllFields.placeholderWindow(): SettlementWindow =
+        unidentifiedCounterpartyWindow ?: SettlementWindow.Elapsed(dateTolerance.inWholeSeconds)
 
     // Dedupe runs on resolved CREATE transfers, whose fields are present; null indicates a builder error.
     private fun AccountRef?.requireId(): AccountId =

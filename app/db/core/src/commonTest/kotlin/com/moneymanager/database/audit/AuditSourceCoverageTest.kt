@@ -72,6 +72,8 @@ class AuditSourceCoverageTest : DbTest() {
                 // A strategy application is itself the provenance event for a CSV file's transactions;
                 // it has no revision of its own for an entity_source row to attribute.
                 "csv_import_application_audit",
+                // Locations are config like pass_through_account: seeded or edited in Settings, never imported.
+                "holiday_calendar_audit",
             )
 
         // Provenanced entity types whose write paths (with source recording) are not implemented yet.

@@ -2,12 +2,11 @@ package com.moneymanager.importer
 
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import kotlin.time.Duration
 import kotlin.time.Instant
 
 /**
  * Picks the existing leg a reconcile candidate should link against: the unconsumed [candidates] transfer
- * whose timestamp is nearest [targetTimestamp] and within [window], or null when none qualifies.
+ * whose timestamp is nearest [targetTimestamp] and [within] the reconcile window, or null when none qualifies.
  *
  * Callers pre-filter their own candidates first (e.g. by (fundingAccount, conduit, amount), or by
  * asset+tolerance+direction for an internal-transfer bridge), so this resolves only the one-to-one,
@@ -18,11 +17,11 @@ import kotlin.time.Instant
 internal fun selectNearestUnconsumedLeg(
     candidates: List<Pair<TransferId, Transfer>>,
     targetTimestamp: Instant,
-    window: Duration,
     consumed: Set<TransferId>,
+    within: (Transfer) -> Boolean,
 ): TransferId? =
     candidates
         .asSequence()
-        .filter { (id, existing) -> id !in consumed && (targetTimestamp - existing.timestamp).absoluteValue <= window }
+        .filter { (id, existing) -> id !in consumed && within(existing) }
         .minByOrNull { (_, existing) -> (targetTimestamp - existing.timestamp).absoluteValue }
         ?.first

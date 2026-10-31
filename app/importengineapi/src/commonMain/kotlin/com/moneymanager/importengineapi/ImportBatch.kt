@@ -578,6 +578,7 @@ data class ImportBatch(
     val csvStrategyMutations: List<CsvStrategyMutation> = emptyList(),
     val apiStrategyMutations: List<ApiStrategyMutation> = emptyList(),
     val passThroughMutations: List<PassThroughMutation> = emptyList(),
+    val holidayCalendarMutations: List<HolidayCalendarMutation> = emptyList(),
     val accountMappingMutations: List<AccountMappingMutation> = emptyList(),
     val csvImportMutations: List<CsvImportMutation> = emptyList(),
     val importDirectoryMutations: List<ImportDirectoryMutation> = emptyList(),

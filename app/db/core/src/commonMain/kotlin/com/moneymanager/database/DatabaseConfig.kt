@@ -3,6 +3,7 @@ package com.moneymanager.database
 import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.currency.IsoCurrencies
 import com.moneymanager.currency.IsoCurrency
+import com.moneymanager.database.json.HolidayCalendarJsonCodec
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.CurrencyScaleFactors
@@ -10,6 +11,8 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.model.calendar.HolidayCalendar
+import com.moneymanager.domain.model.calendar.StrataHolidayCalendars
 
 /**
  * Centralized database configuration for SQLite PRAGMA settings and seed data.
@@ -76,6 +79,19 @@ object DatabaseConfig {
                     Source.System,
                 )
             }
+        }
+    }
+
+    /**
+     * Seeds the bundled locations (Strata's holiday calendars) for a freshly created database, so business-day reconcile
+     * windows count real holidays from the start. A person edits or deletes them like any other calendar.
+     */
+    suspend fun seedHolidayCalendars(
+        database: MoneyManagerDatabaseWrapper,
+        calendars: List<HolidayCalendar> = StrataHolidayCalendars.all,
+    ) {
+        calendars.forEach { calendar ->
+            database.holidayCalendarWriteQueries.upsert(calendar.id, calendar.name, HolidayCalendarJsonCodec.encode(calendar))
         }
     }
 }

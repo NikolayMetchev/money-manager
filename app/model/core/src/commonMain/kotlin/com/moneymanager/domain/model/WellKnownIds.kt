@@ -61,6 +61,12 @@ object WellKnownIds {
     const val ACCOUNT_RECONCILIATION_AUTO_LINK_DECLINED_ATTR_TYPE_ID: Long = -10
 
     /**
+     * "location" account attribute: the code of the holiday calendar (`GBLO`) whose business days the account settles
+     * on, for business-day reconcile windows. An account without one is at the database's default location.
+     */
+    const val ACCOUNT_LOCATION_ATTR_TYPE_ID: Long = -11
+
+    /**
      * "unidentified-counterparty" transfer attribute: this leg's counterparty account is only the raw
      * description the export carried (no strategy rule, persisted mapping or bank identity resolved it),
      * so the account is a placeholder standing in for whoever the real other end was. Marks the leg as

@@ -28,6 +28,7 @@ internal suspend fun createSchema(
         // The rest of the bundled ISO 4217 list is seeded here for a freshly created database.
         onProgress(Progress.counted("Adding default currencies...", 5, OPEN_STEPS))
         DatabaseConfig.seedCurrencies(database, currencies())
+        DatabaseConfig.seedHolidayCalendars(database)
     }
 }
 

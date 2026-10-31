@@ -15,12 +15,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.apiimport.ApiImportService
+import com.moneymanager.apiimport.currentCountryCode
 import com.moneymanager.currency.Currency
 import com.moneymanager.database.di.AppServices
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.calendar.HolidayCalendar
+import com.moneymanager.domain.model.calendar.forCountry
 import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.setDefaultCurrency
+import com.moneymanager.importengineapi.setDefaultLocation
 import com.moneymanager.importengineapi.setSetupWizardCompleted
 import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.importfilesource.ImportFileSourceFactory
@@ -29,6 +33,7 @@ import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.strategycatalog.StrategyCatalogController
 import com.moneymanager.ui.components.CurrencyPicker
+import com.moneymanager.ui.components.LocationPicker
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.screens.apistrategy.ApiConnectionsScreen
 import com.moneymanager.ui.screens.importdirectory.ImportDirectoriesScreen
@@ -38,7 +43,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
 /**
- * The guided setup for a database: default currency → strategy catalog → strategy cloud sync → import
+ * The guided setup for a database: default currency and location → strategy catalog → strategy cloud sync → import
  * folders → API credentials. It runs automatically until it is finished or skipped (a per-database flag in
  * the `settings` table) and can be re-run from Settings at any time.
  *
@@ -80,7 +85,7 @@ fun SetupWizardScreen(
     // The step list grows while the wizard is open (installing an API strategy adds the API step), so track
     // the step itself rather than an index into a list that shifts under us.
     val navigableSteps = steps.filter { it != SetupWizardStep.DATABASE }
-    var currentStep by remember { mutableStateOf(SetupWizardStep.CURRENCY) }
+    var currentStep by remember { mutableStateOf(SetupWizardStep.CURRENCY_AND_LOCATION) }
 
     var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
     // Prefer the currency this database already uses (a re-run should show the current default, not reset it),
@@ -100,6 +105,27 @@ fun SetupWizardScreen(
         selectedCurrencyId = existing ?: localeCurrency?.id
     }
 
+    val calendars by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        services.settings.holidayCalendarRepository.getAll()
+    }
+    // Like the currency: the database's own default first, then the calendar for the locale's country. Null (no
+    // location) is a valid answer, as weekends alone then decide business days.
+    var selectedLocation by remember { mutableStateOf<String?>(null) }
+    var locationInitialized by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val existing =
+            services.settings.settingsRepository
+                .getDefaultLocation()
+                .firstOrNull()
+        val installed =
+            services.settings.holidayCalendarRepository
+                .getAll()
+                .firstOrNull()
+                .orEmpty()
+        selectedLocation = existing ?: installed.forCountry(currentCountryCode())?.id
+        locationInitialized = true
+    }
+
     fun finish() {
         scope.launch {
             importEngine.setSetupWizardCompleted(true)
@@ -117,9 +143,13 @@ fun SetupWizardScreen(
     }
 
     fun onNext() {
-        if (currentStep == SetupWizardStep.CURRENCY) {
+        if (currentStep == SetupWizardStep.CURRENCY_AND_LOCATION) {
             val id = selectedCurrencyId ?: return
-            scope.launch { importEngine.setDefaultCurrency(id) }
+            val location = selectedLocation
+            scope.launch {
+                importEngine.setDefaultCurrency(id)
+                if (locationInitialized) importEngine.setDefaultLocation(location)
+            }
         }
         advance()
     }
@@ -129,8 +159,8 @@ fun SetupWizardScreen(
         steps = steps,
         currentStep = currentStep,
         canGoBack = navigableSteps.indexOf(currentStep) > 0,
-        canSkip = currentStep != SetupWizardStep.CURRENCY && !isLastStep,
-        nextEnabled = currentStep != SetupWizardStep.CURRENCY || selectedCurrencyId != null,
+        canSkip = currentStep != SetupWizardStep.CURRENCY_AND_LOCATION && !isLastStep,
+        nextEnabled = currentStep != SetupWizardStep.CURRENCY_AND_LOCATION || selectedCurrencyId != null,
         nextLabel = if (isLastStep) "Finish" else "Next",
         onBack = ::goBack,
         onSkip = ::advance,
@@ -148,6 +178,9 @@ fun SetupWizardScreen(
             driveFolderBrowser = driveFolderBrowser,
             selectedCurrencyId = selectedCurrencyId,
             onCurrencySelected = { selectedCurrencyId = it },
+            calendars = calendars,
+            selectedLocation = selectedLocation,
+            onLocationSelected = { selectedLocation = it },
         )
     }
 }
@@ -165,17 +198,28 @@ private fun ColumnScope.StepBody(
     driveFolderBrowser: DriveFolderBrowser?,
     selectedCurrencyId: CurrencyId?,
     onCurrencySelected: (CurrencyId) -> Unit,
+    calendars: List<HolidayCalendar>,
+    selectedLocation: String?,
+    onLocationSelected: (String?) -> Unit,
 ) {
     when (step) {
         // Chosen before the database existed, so it is never rendered as a body.
         SetupWizardStep.DATABASE -> {}
 
-        SetupWizardStep.CURRENCY -> {
+        SetupWizardStep.CURRENCY_AND_LOCATION -> {
             CurrencyPicker(
                 selectedCurrencyId = selectedCurrencyId,
                 onCurrencySelected = onCurrencySelected,
                 label = "Default Currency",
                 currencyRepository = services.accounts.currencyRepository,
+                modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp),
+            )
+            LocationPicker(
+                calendars = calendars,
+                selectedCode = selectedLocation,
+                onLocationSelected = onLocationSelected,
+                label = "Default location (holiday calendar)",
+                noneLabel = "None (weekends only)",
                 modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp),
             )
         }

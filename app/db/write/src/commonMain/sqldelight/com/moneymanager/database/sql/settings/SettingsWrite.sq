@@ -3,6 +3,10 @@ upsertDefaultCurrency:
 INSERT INTO settings(id, default_currency_id) VALUES (1, ?)
 ON CONFLICT(id) DO UPDATE SET default_currency_id = excluded.default_currency_id;
 
+upsertDefaultLocation:
+INSERT INTO settings(id, default_location) VALUES (1, ?)
+ON CONFLICT(id) DO UPDATE SET default_location = excluded.default_location;
+
 upsertSetupWizardCompleted:
 INSERT INTO settings(id, setup_wizard_completed) VALUES (1, ?)
 ON CONFLICT(id) DO UPDATE SET setup_wizard_completed = excluded.setup_wizard_completed;

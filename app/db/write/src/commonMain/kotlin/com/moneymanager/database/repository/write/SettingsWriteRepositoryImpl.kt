@@ -19,6 +19,11 @@ class SettingsWriteRepositoryImpl(
             writeQueries.upsertDefaultCurrency(currencyId.id)
         }
 
+    override suspend fun setDefaultLocation(code: String?): Unit =
+        withContext(Dispatchers.Default) {
+            writeQueries.upsertDefaultLocation(code)
+        }
+
     override suspend fun setSetupWizardCompleted(completed: Boolean): Unit =
         withContext(Dispatchers.Default) {
             writeQueries.upsertSetupWizardCompleted(if (completed) 1L else 0L)

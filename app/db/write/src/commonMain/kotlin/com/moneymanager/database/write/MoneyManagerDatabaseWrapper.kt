@@ -48,6 +48,7 @@ class MoneyManagerDatabaseWrapper(
     val personAttributeWriteQueries get() = writeDb.personAttributeWriteQueries
     val personWriteQueries get() = writeDb.personWriteQueries
     val passThroughAccountWriteQueries get() = writeDb.passThroughAccountWriteQueries
+    val holidayCalendarWriteQueries get() = writeDb.holidayCalendarWriteQueries
     val reconciliationLinkWriteQueries get() = writeDb.reconciliationLinkWriteQueries
     val relationshipTypeWriteQueries get() = writeDb.relationshipTypeWriteQueries
     val settingsWriteQueries get() = writeDb.settingsWriteQueries
@@ -80,7 +81,7 @@ class MoneyManagerDatabaseWrapper(
      * folds together three things:
      *  - the total number of rows across the append-only `*_audit` tables (every entity
      *    create/update/delete appends one),
-     *  - the values of the singleton `settings` row (its default currency), which is
+     *  - the values of the singleton `settings` row (its default currency and location), which is
      *    excluded from the audit trail but is still part of the synced database and must register as a
      *    change — otherwise e.g. setting the default currency would never be detected as unsynced, and
      *  - a rolling hash of the `account_mapping` table, which is user-managed first-class data but is
@@ -140,8 +141,8 @@ class MoneyManagerDatabaseWrapper(
      */
     private suspend fun foldSettingsInto(base: Long): Long =
         rawQuery(
-            "SELECT COALESCE(default_currency_id, 0) FROM settings WHERE id = 1",
-        ) { cursor -> listOf(cursor.getLong(0)!!) }
+            "SELECT COALESCE(default_currency_id, 0), default_location FROM settings WHERE id = 1",
+        ) { cursor -> listOf(cursor.getLong(0)!!, cursor.getString(1).hashCode().toLong()) }
             .awaitAsOneOrNull()
             .mixInto(base)
 
@@ -339,6 +340,8 @@ class MoneyManagerDatabaseWrapper(
             "relationship_type",
             "pass_through_account",
             "pass_through_account_audit",
+            "holiday_calendar",
+            "holiday_calendar_audit",
             "transfer_relationship",
             "account_attribute",
             "person_attribute",

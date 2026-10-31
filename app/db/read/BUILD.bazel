@@ -55,6 +55,7 @@ kmp_library(
         "@maven_kmp//:mappie_api",
     ],
     deps = [
+        "//app/model/calendar",
         "//utils/bigdecimal",
         "@maven_kmp//:kotlinx_serialization_json",
     ],
