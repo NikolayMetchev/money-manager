@@ -205,7 +205,7 @@ class StrategySelectorTest {
 
     @Test
     fun `a Curve export selects the Curve CSV strategy`() {
-        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
         val curveColumns =
             listOf(
                 CsvColumn(CsvColumnId(Uuid.random()), 0, ""),
@@ -229,7 +229,7 @@ class StrategySelectorTest {
     fun `a Wise export still selects the Wise CSV strategy alongside Curve`() {
         // Both Curve and Wise name their export "transaction-history"-ish, so this guards against the
         // Curve fileNamePattern hijacking a Wise file — the disjoint column sets must keep them apart.
-        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
         val wiseHeaders =
             listOf(
                 "ID",
@@ -298,7 +298,7 @@ class StrategySelectorTest {
 
     @Test
     fun `a modern Binance export selects the Binance CSV strategy`() {
-        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
         val rows =
             List(4) { i ->
                 binanceRow(
@@ -313,7 +313,7 @@ class StrategySelectorTest {
 
     @Test
     fun `a legacy Binance export without User_ID selects no strategy`() {
-        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
         val legacyHeaders = binanceHeaders.drop(1)
         val rows =
             List(4) { i ->
@@ -329,7 +329,7 @@ class StrategySelectorTest {
 
     @Test
     fun `each Bybit wallet ledger selects its own strategy`() {
-        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
         val spot = listOf(binanceRow(0, listOf("12345678", "trade", "USDT", "-15.42", "685.10", "2022-01-05 13:18:18")))
         assertEquals(
             "Bybit Spot CSV",
@@ -345,7 +345,7 @@ class StrategySelectorTest {
 
     @Test
     fun `an older Bybit export without Uid selects no strategy`() {
-        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
         // The 2023-era spot_part export holds the same rows as the newer one, minus the Uid column.
         val rows = listOf(binanceRow(0, listOf("trade", "USDT", "-15.42", "685.10", "2022-01-05 13:18:18")))
         assertNull(
@@ -355,7 +355,7 @@ class StrategySelectorTest {
 
     @Test
     fun `a Monzo export still selects the Monzo CSV strategy alongside Binance`() {
-        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now())
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
         val monzo = builtIns.single { it.name == "Monzo CSV" }
         val monzoColumns =
             monzo.config.identificationColumns

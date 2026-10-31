@@ -23,7 +23,7 @@ internal suspend fun createSchema(
     // separately, about a thousand syncs to disk, which takes seconds where syncing is slow (Windows).
     database.transaction {
         onProgress(Progress.counted("Creating the database schema...", 4, OPEN_STEPS))
-        // Lookups, the system device and GBP are seeded inside Schema.create (the :app:db:seed module).
+        // Lookups and the system device are seeded inside Schema.create (the :app:db:seed module).
         MoneyManagerDatabase.Schema.create(database.driver).await()
         // The app installs the rest from the strategy catalog; only tests seed any here.
         onProgress(Progress.counted("Preparing repositories...", 5, OPEN_STEPS))

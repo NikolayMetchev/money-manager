@@ -42,9 +42,7 @@ class ReleaseSmokeTest {
         waitFor("Welcome to Money Manager")
         tap("Local database")
         tap("Skip setup")
-        // Skipping the wizard still leaves a fresh database without a default currency.
-        waitFor("Select Default Currency")
-        tap("Confirm")
+        // A skipped wizard installs no currencies, so there is no default currency to ask for.
         waitFor("Accounts")
         for (screen in listOf("Categories", "People", "Imports", "Settings", "Accounts")) {
             tap(screen)

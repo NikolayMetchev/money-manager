@@ -4,6 +4,7 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.strategy.CsvResolution
 import com.moneymanager.domain.strategy.CsvUnresolvedReference
 import com.moneymanager.domain.strategy.StrategyKey
+import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.domain.strategy.StrategyParseResult
 import com.moneymanager.localsettings.KEY_STRATEGY_CATALOG_LOCAL_DIRECTORY
@@ -11,6 +12,8 @@ import com.moneymanager.localsettings.LocalSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+
+private val REFERENCE_DATA_KINDS = setOf(StrategyKind.CURRENCIES, StrategyKind.HOLIDAY_CALENDAR)
 
 /** How a catalog artifact stands relative to the local database. */
 enum class CatalogItemStatus {
@@ -108,14 +111,23 @@ class StrategyCatalogController(
         }
     }
 
-    /** Downloads the artifacts for [keys] and reports their unresolved references (install preview). */
+    /**
+     * Downloads the artifacts for [keys] and reports their unresolved references (install preview). A reference that
+     * another of them provides (a currency code in the currency list) isn't reported: [install] applies the provider
+     * first.
+     */
     suspend fun previewInstall(
         library: StrategyLibrary,
         keys: Set<StrategyKey>,
     ): List<StrategyParseResult> =
         clearingBusyOnFailure {
-            entriesFor(keys).map { entry ->
-                library.parseIncoming(entry.key, source.fetchArtifact(entry.fileName))
+            val parsed =
+                entriesFor(keys).map { entry ->
+                    library.parseIncoming(entry.key, source.fetchArtifact(entry.fileName))
+                }
+            val provided = parsed.flatMap { it.provides.entries }.groupBy({ it.key }, { it.value }).mapValues { it.value.flatten().toSet() }
+            parsed.map { result ->
+                result.copy(unresolvedReferences = result.unresolvedReferences.filterNot { it.name in provided[it.type].orEmpty() })
             }
         }
 
@@ -150,10 +162,12 @@ class StrategyCatalogController(
         return installed
     }
 
+    // Reference data first, so the strategies installed with it resolve the currencies it adds.
     private fun entriesFor(keys: Set<StrategyKey>): List<CatalogEntry> =
         _state.value.items
             .map { it.entry }
             .filter { it.key in keys }
+            .sortedBy { it.key.kind !in REFERENCE_DATA_KINDS }
 
     private fun classify(
         localHash: String?,

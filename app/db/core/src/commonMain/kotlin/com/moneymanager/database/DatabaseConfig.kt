@@ -31,16 +31,12 @@ object DatabaseConfig {
      */
     const val BUSY_TIMEOUT_MS = 5000
 
-    // GBP is seeded with a fixed id in :app:db:seed (StaticSeed.sq) so the built-in QIF strategies can
-    // reference it as a constant; seeding below skips it to avoid a duplicate.
-    private const val GBP_CODE = "GBP"
-
     /**
-     * Seeds [currencies] (every code except [GBP_CODE]) for a freshly created database, recording
+     * Seeds [currencies] for a freshly created database, recording
      * SYSTEM provenance for each — the provenance that marks a currency as part of the catalog's
      * currency list (see `StrategyLibraryService`). The app seeds none (a person installs the list from the
-     * catalog); tests seed the few they use. Runs after Schema.create (which already seeded the lookups, the
-     * system device, and GBP).
+     * catalog); tests seed the few they use. Runs after Schema.create (which already seeded the lookups and the
+     * system device).
      */
     suspend fun seedCurrencies(
         database: MoneyManagerDatabaseWrapper,
@@ -48,7 +44,6 @@ object DatabaseConfig {
     ) {
         with(database) {
             currencies.forEach { currency ->
-                if (currency.code == GBP_CODE) return@forEach
                 val scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR
                 // Allocate an id from the shared `asset` id space first (asset has no triggers, so
                 // last_insert_rowid() is reliable), then insert the currency with that id.

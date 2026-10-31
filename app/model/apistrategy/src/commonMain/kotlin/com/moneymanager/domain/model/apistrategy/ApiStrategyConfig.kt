@@ -1204,10 +1204,10 @@ data class ApiStrategyConfig(
     /** Maximum retries for a request repeatedly classified as rate-limited before giving up. */
     val maxRateLimitRetries: Int = 5,
     /**
-     * Overrides [com.moneymanager.domain.model.IsoMinorUnitDecimals]' per-currency decimal places for
+     * Overrides a currency's ISO minor unit (`Currency.fractionDigits`) as the decimal places for
      * interpreting a [ApiAmountFormat.MINOR_UNITS_INTEGER] amount (a bank API's raw integer in its own
      * minor units). A provider whose minor-unit width doesn't follow the ISO 4217 standard for a given
-     * currency can be corrected here instead of the global table. Decimal places rather than a divisor,
+     * currency can be corrected here. Decimal places rather than a divisor,
      * so the conversion is an exact decimal-point shift.
      */
     @Serializable(with = SortedStringToIntMapSerializer::class)

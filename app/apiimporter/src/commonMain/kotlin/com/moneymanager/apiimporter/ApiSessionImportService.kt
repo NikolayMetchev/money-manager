@@ -13,7 +13,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.IsoMinorUnitDecimals
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
@@ -3109,12 +3108,16 @@ private data class TransferData(
     val isIncoming: Boolean,
 )
 
+// Most currencies have two decimal places, so a currency created without its minor unit is read as having two.
+private const val DEFAULT_MINOR_UNIT_DECIMALS = 2
+
 /**
  * Converts a raw integer a bank API reports in its own ISO 4217 minor units (e.g. Monzo's `1234`
  * meaning £12.34) into [Money] at the app's storage precision. Constructing `Money` directly from
  * the raw integer would treat it as already being in the app's own (much higher) storage scale,
  * silently truncating every amount toward zero — the provider's minor-unit width and the app's
- * storage scale are unrelated (see [IsoMinorUnitDecimals]). [decimalPlacesOverrides] lets a strategy
+ * storage scale are unrelated. The width is the currency's ISO minor unit
+ * ([Currency.fractionDigits], from the catalog's currency list), else 2; [decimalPlacesOverrides] lets a strategy
  * correct a provider that doesn't follow the ISO standard for a given currency.
  */
 internal fun minorUnitsToMoney(
@@ -3122,7 +3125,7 @@ internal fun minorUnitsToMoney(
     currency: Currency,
     decimalPlacesOverrides: Map<String, Int>,
 ): Money {
-    val decimalPlaces = decimalPlacesOverrides[currency.code.uppercase()] ?: IsoMinorUnitDecimals.getDecimalPlaces(currency.code)
+    val decimalPlaces = decimalPlacesOverrides[currency.code.uppercase()] ?: currency.fractionDigits ?: DEFAULT_MINOR_UNIT_DECIMALS
     // The editor rejects negatives, but hand-edited or imported JSON can carry one, and a negative shift would
     // silently scale the amount up instead of down.
     require(decimalPlaces >= 0) { "Minor-unit decimal places for ${currency.code} must not be negative: $decimalPlaces" }

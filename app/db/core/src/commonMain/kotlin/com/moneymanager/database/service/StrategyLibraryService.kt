@@ -118,8 +118,13 @@ class StrategyLibraryService(
             }
 
             // API strategies, pass-through definitions, the currency list and locations carry no entity references.
-            StrategyKind.API, StrategyKind.PASS_THROUGH, StrategyKind.CURRENCIES, StrategyKind.HOLIDAY_CALENDAR -> {
+            StrategyKind.API, StrategyKind.PASS_THROUGH, StrategyKind.HOLIDAY_CALENDAR -> {
                 StrategyParseResult(key, emptyList())
+            }
+
+            StrategyKind.CURRENCIES -> {
+                val codes = CurrencyListExportCodec.decode(json).currencies.mapTo(mutableSetOf()) { it.code }
+                StrategyParseResult(key, emptyList(), provides = mapOf(CsvReferenceType.CURRENCY to codes))
             }
 
             StrategyKind.GLOBAL_MAPPINGS -> {

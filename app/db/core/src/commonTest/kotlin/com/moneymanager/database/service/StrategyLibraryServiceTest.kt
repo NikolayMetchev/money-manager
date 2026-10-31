@@ -244,7 +244,7 @@ class StrategyLibraryServiceTest : DbTest() {
 
             val entry = library.listLocal(version).first { it.key == key }
             val listed = CurrencyListExportCodec.decode(entry.json).currencies.map { it.code }
-            // Seeded GBP + the minimal test seed (USD, EUR); the user's own currency isn't part of the list.
+            // The test seed (GBP, USD, EUR); the user's own currency isn't part of the list.
             assertEquals(listOf("EUR", "GBP", "USD"), listed)
 
             val published =
@@ -280,8 +280,7 @@ class StrategyLibraryServiceTest : DbTest() {
     fun `a database holding the published list hashes as it`() =
         runDbTest {
             val key = StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)
-            val seeded = listOf(CurrencyExportEntry("GBP", "British Pound", 2)) + testCurrencies
-            val published = CurrencyListExport(name = StrategyFileNaming.CURRENCIES_NAME, currencies = seeded.reversed())
+            val published = CurrencyListExport(name = StrategyFileNaming.CURRENCIES_NAME, currencies = testCurrencies.reversed())
             val local = repositories.strategyLibrary.listLocal(version).first { it.key == key }
             assertEquals(local.contentHash, repositories.strategyLibrary.canonicalHash(key, CurrencyListExportCodec.encode(published)))
         }

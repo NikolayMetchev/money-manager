@@ -31,7 +31,7 @@ import kotlin.uuid.Uuid
  */
 class SantanderQifMapperTest {
     private val now = Clock.System.now()
-    private val strategy = BuiltInCsvStrategies.buildSantanderQifStrategy(now)
+    private val strategy = BuiltInCsvStrategies.buildSantanderQifStrategy(now, CurrencyId(1))
 
     private val gbp =
         Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
@@ -176,7 +176,7 @@ class SantanderQifMapperTest {
 
     @Test
     fun `content auto-detect picks Santander for santander rows and nothing for another bank`() {
-        val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now)
+        val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now, CurrencyId(1))
         val santanderRows =
             listOf(row("DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF X, MANDATE NO 1, 5.00", "-5.00"))
         val genericRows = listOf(row("Tesco", "-5.00"))

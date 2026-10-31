@@ -56,10 +56,15 @@ data class LocalStrategyEntry(
     val contentHash: String,
 )
 
-/** Unresolved references found while parsing an incoming artifact, to be resolved before applying. */
+/**
+ * Unresolved references found while parsing an incoming artifact, to be resolved before applying, and the names of
+ * the entities the artifact itself creates ([provides], such as the currency list's codes), which resolve those
+ * references in the other artifacts installed with it.
+ */
 data class StrategyParseResult(
     val key: StrategyKey,
     val unresolvedReferences: List<CsvUnresolvedReference>,
+    val provides: Map<CsvReferenceType, Set<String>> = emptyMap(),
 )
 
 /**

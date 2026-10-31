@@ -199,8 +199,7 @@ workflow because label events start it: any other label's run skips, without can
 `CurrencyScaleFactors` (in `app/model/core`) documents why. Assuming 100 is how you get spurious
 "Rounding necessary" failures, so `Currency.scaleFactor` has no default — always pass it explicitly.
 
-**The currency list**: the app bundles none. A new database holds only GBP (`StaticSeed.sq`, id 1, which the
-built-in QIF strategies name); the rest come from the strategy catalog's `StrategyKind.CURRENCIES` artifact,
+**The currency list**: the app bundles none. A new database holds none (strategies name a currency by its ISO code); they all come from the strategy catalog's `StrategyKind.CURRENCIES` artifact,
 rendered from the Pages build's JDK with each code's ISO minor unit (`CurrencyExportEntry.fractionDigits`, stored in
 `currency.fraction_digits`, which native and the browser format with). Installing only adds missing codes and
 never renames or deletes. Only SYSTEM-created currencies (seeded or installed) count as the local copy, so

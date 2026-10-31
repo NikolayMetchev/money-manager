@@ -29,7 +29,8 @@ import kotlin.time.Instant
 // them, and the canonical hash blanks the version anyway.
 private const val LIBRARY_VERSION = ""
 
-// The QIF built-ins hard-code a currency the apply flow pre-selects; in exports it travels as a code.
+// The QIF built-ins hard-code GBP. A strategy carries a currency id, but its export names the code, so any id that
+// maps to "GBP" here renders the same artifact.
 private val GBP_CURRENCY_ID = CurrencyId(1)
 private const val GBP_CURRENCY_CODE = "GBP"
 

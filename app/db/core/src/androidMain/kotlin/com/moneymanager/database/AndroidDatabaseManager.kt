@@ -87,7 +87,7 @@ class AndroidDatabaseManager(
             )
             val database = MoneyManagerDatabaseWrapper(driver)
 
-            // Lookups, the system device and GBP are seeded inside Schema.create (the :app:db:seed module).
+            // Lookups and the system device are seeded inside Schema.create (the :app:db:seed module).
             onProgress(Progress.counted("Applying database settings...", 4, 6))
             if (isNewDatabase) {
                 DatabaseConfig.seedCurrencies(database, currenciesToSeed())

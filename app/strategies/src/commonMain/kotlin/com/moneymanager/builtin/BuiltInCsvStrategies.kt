@@ -371,13 +371,12 @@ object BuiltInCsvStrategies {
     private const val BINANCE_CONVERSION_PAIRING_WINDOW_SECONDS = 2L
 
     /**
-     * All built-in CSV import strategies seeded into a fresh database. [qifCurrencyId] is the fixed
-     * currency the QIF strategies carry (the default the QIF import dialog pre-selects); it is resolved
-     * to GBP at seed time. Defaults to the first currency for callers without a resolved id (e.g. tests).
+     * All built-in CSV import strategies. [qifCurrencyId] is the database's GBP, the currency the QIF and PDF
+     * statements are in; the catalog publishes it as the code "GBP", which an install resolves in its database.
      */
     fun builtInCsvStrategies(
         now: Instant,
-        qifCurrencyId: CurrencyId = CurrencyId(1),
+        qifCurrencyId: CurrencyId,
     ): List<CsvImportStrategy> =
         listOf(
             buildSantanderQifStrategy(now, qifCurrencyId),
@@ -1462,7 +1461,7 @@ object BuiltInCsvStrategies {
     @Suppress("LongMethod")
     fun buildSantanderQifStrategy(
         now: Instant,
-        currencyId: CurrencyId = CurrencyId(1),
+        currencyId: CurrencyId,
     ): CsvImportStrategy {
         // First-match-wins rules over the Payee field; ${cp} extracts the clean counterparty name.
         // Tuned against a full Santander statement history (~7k records, ~99.9% parsed). The middle
@@ -1721,7 +1720,7 @@ object BuiltInCsvStrategies {
      */
     fun buildAmexQifStrategy(
         now: Instant,
-        currencyId: CurrencyId = CurrencyId(1),
+        currencyId: CurrencyId,
     ): CsvImportStrategy {
         val fieldMappings =
             mapOf(
@@ -1804,7 +1803,7 @@ object BuiltInCsvStrategies {
      */
     fun buildAmexPdfStrategy(
         now: Instant,
-        currencyId: CurrencyId = CurrencyId(1),
+        currencyId: CurrencyId,
     ): CsvImportStrategy {
         val month = "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*"
         val money = "[\\d,]+\\.\\d\\d"

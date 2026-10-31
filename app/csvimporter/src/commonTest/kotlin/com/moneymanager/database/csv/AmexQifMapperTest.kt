@@ -25,7 +25,7 @@ import kotlin.uuid.Uuid
 /** The built-in American Express QIF strategy ([BuiltInCsvStrategies.buildAmexQifStrategy]) over Amex's record shapes. */
 class AmexQifMapperTest {
     private val now = Clock.System.now()
-    private val strategy = BuiltInCsvStrategies.buildAmexQifStrategy(now)
+    private val strategy = BuiltInCsvStrategies.buildAmexQifStrategy(now, CurrencyId(1))
 
     private val gbp =
         Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
@@ -95,7 +95,7 @@ class AmexQifMapperTest {
 
     @Test
     fun `content auto-detect picks American Express for amex rows and nothing for another bank`() {
-        val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now)
+        val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now, CurrencyId(1))
         val amexRows = listOf(row("ZIPCAR WIMBLEDON", "-45.00", "  Process Date 21/03/2020"))
         val genericRows = listOf(CsvRow(rowIndex = 1, values = listOf("19/03/2020", "-5.00", "Tesco", "", "", "", "", "", "")))
 

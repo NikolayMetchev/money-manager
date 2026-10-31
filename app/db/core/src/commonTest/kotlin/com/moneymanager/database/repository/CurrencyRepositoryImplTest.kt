@@ -11,8 +11,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CurrencyRepositoryImplTest : DbTest() {
-    // GBP (seeded by the schema) and the test databases' currencies.
-    private val seededCodes = setOf("GBP") + testCurrencies.map { it.code }
+    private val seededCodes = testCurrencies.mapTo(mutableSetOf()) { it.code }
     private val seededCurrencyCount = seededCodes.size
 
     // UPSERT TESTS
