@@ -1,18 +1,14 @@
 package com.moneymanager.database
 
 import app.cash.sqldelight.async.coroutines.awaitAsOne
-import com.moneymanager.currency.IsoCurrencies
-import com.moneymanager.currency.IsoCurrency
-import com.moneymanager.database.json.HolidayCalendarJsonCodec
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
+import com.moneymanager.domain.model.CurrencyExportEntry
 import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.WellKnownIds
-import com.moneymanager.domain.model.calendar.HolidayCalendar
-import com.moneymanager.domain.model.calendar.StrataHolidayCalendars
 
 /**
  * Centralized database configuration for SQLite PRAGMA settings and seed data.
@@ -35,27 +31,20 @@ object DatabaseConfig {
      */
     const val BUSY_TIMEOUT_MS = 5000
 
-    /**
-     * The ISO 4217 currencies a new database is seeded with: the table bundled into the app, the same on
-     * every platform. The strategy catalog publishes a newer copy that installs any codes added since.
-     */
-    val allCurrencies: List<IsoCurrency>
-        get() = IsoCurrencies.all
-
-    // GBP is seeded with a fixed id in :app:db:seed (StaticSeed.sq) so the build-time-generated QIF
-    // strategies can reference it as a constant; runtime seeding below skips it to avoid a duplicate.
+    // GBP is seeded with a fixed id in :app:db:seed (StaticSeed.sq) so the built-in QIF strategies can
+    // reference it as a constant; seeding below skips it to avoid a duplicate.
     private const val GBP_CODE = "GBP"
 
     /**
      * Seeds [currencies] (every code except [GBP_CODE]) for a freshly created database, recording
      * SYSTEM provenance for each — the provenance that marks a currency as part of the catalog's
-     * currency list (see `StrategyLibraryService`). Tests pass a minimal list instead: seeding ~230 currencies
-     * (with audit triggers) per test dominated DB-test setup time. Runs after Schema.create (which
-     * already seeded the lookups, the system device, and GBP).
+     * currency list (see `StrategyLibraryService`). The app seeds none (a person installs the list from the
+     * catalog); tests seed the few they use. Runs after Schema.create (which already seeded the lookups, the
+     * system device, and GBP).
      */
     suspend fun seedCurrencies(
         database: MoneyManagerDatabaseWrapper,
-        currencies: List<IsoCurrency> = allCurrencies,
+        currencies: List<CurrencyExportEntry>,
     ) {
         with(database) {
             currencies.forEach { currency ->
@@ -70,7 +59,7 @@ object DatabaseConfig {
                         assetWriteQueries.insert()
                         assetWriteQueries.lastInsertedId().awaitAsOne()
                     }
-                currencyWriteQueries.insert(currencyId, currency.code, currency.name, scaleFactor)
+                currencyWriteQueries.insert(currencyId, currency.code, currency.name, scaleFactor, currency.fractionDigits?.toLong())
                 recordSource(
                     DeviceId(WellKnownIds.SYSTEM_DEVICE_ID),
                     EntityType.CURRENCY,
@@ -79,19 +68,6 @@ object DatabaseConfig {
                     Source.System,
                 )
             }
-        }
-    }
-
-    /**
-     * Seeds the bundled locations (Strata's holiday calendars) for a freshly created database, so business-day reconcile
-     * windows count real holidays from the start. A person edits or deletes them like any other calendar.
-     */
-    suspend fun seedHolidayCalendars(
-        database: MoneyManagerDatabaseWrapper,
-        calendars: List<HolidayCalendar> = StrataHolidayCalendars.all,
-    ) {
-        calendars.forEach { calendar ->
-            database.holidayCalendarWriteQueries.upsert(calendar.id, calendar.name, HolidayCalendarJsonCodec.encode(calendar))
         }
     }
 }

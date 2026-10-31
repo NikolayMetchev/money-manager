@@ -92,7 +92,7 @@ class StrategyLibraryService(
                 CurrencyListExport(
                     version = appVersion.value,
                     name = StrategyFileNaming.CURRENCIES_NAME,
-                    currencies = listCurrencies.map { CurrencyExportEntry(it.code, it.name) },
+                    currencies = listCurrencies.map { CurrencyExportEntry(it.code, it.name, it.fractionDigits) },
                 )
             entries +=
                 entry(StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME), CurrencyListExportCodec.encode(export))
@@ -165,7 +165,13 @@ class StrategyLibraryService(
             ImportBatch(
                 currencies =
                     missing.map {
-                        ImportCurrencyIntent(key = LocalCurrencyKey(it.code), source = Source.System, code = it.code, name = it.name)
+                        ImportCurrencyIntent(
+                            key = LocalCurrencyKey(it.code),
+                            source = Source.System,
+                            code = it.code,
+                            name = it.name,
+                            fractionDigits = it.fractionDigits,
+                        )
                     },
             ),
         )

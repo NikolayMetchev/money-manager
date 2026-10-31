@@ -1,7 +1,7 @@
 package com.moneymanager.domain.model.rules
 
-import com.moneymanager.domain.model.calendar.StrataHolidayCalendars
 import com.moneymanager.domain.model.calendar.WeekendOnlyCalendar
+import com.moneymanager.domain.model.calendar.testing.TestHolidayCalendars
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,7 +11,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 class SettlementWindowTest {
-    private val london = StrataHolidayCalendars.all.single { it.id == "GBLO" }
+    private val london = TestHolidayCalendars.LONDON
     private val threeDays = SettlementWindow.BusinessDays(3)
 
     private fun at(text: String) = Instant.parse(text)

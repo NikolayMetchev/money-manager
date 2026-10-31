@@ -23,6 +23,7 @@ SELECT
     asset_details.code AS asset_code,
     asset_details.name AS asset_name,
     asset_details.scale_factor AS asset_scale_factor,
+    asset_details.fraction_digits AS asset_fraction_digits,
     asset_details.kind AS asset_kind
 FROM transfer_audit
 JOIN audit_type ON transfer_audit.audit_type_id = audit_type.id
@@ -373,11 +374,13 @@ SELECT
     from_asset.code AS from_asset_code,
     from_asset.name AS from_asset_name,
     from_asset.scale_factor AS from_asset_scale_factor,
+    from_asset.fraction_digits AS from_asset_fraction_digits,
     from_asset.kind AS from_asset_kind,
     to_asset.id AS to_asset_id,
     to_asset.code AS to_asset_code,
     to_asset.name AS to_asset_name,
     to_asset.scale_factor AS to_asset_scale_factor,
+    to_asset.fraction_digits AS to_asset_fraction_digits,
     to_asset.kind AS to_asset_kind
 FROM trade_audit
 JOIN audit_type ON trade_audit.audit_type_id = audit_type.id

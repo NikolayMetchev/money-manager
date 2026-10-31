@@ -21,9 +21,10 @@ object TransferMapper {
         assetCode: String,
         assetName: String,
         assetScaleFactor: Long,
+        assetFractionDigits: Long?,
         assetKind: String,
     ): Transfer {
-        val asset = AssetRowMapper.buildAsset(assetId, assetCode, assetName, assetScaleFactor, assetKind)
+        val asset = AssetRowMapper.buildAsset(assetId, assetCode, assetName, assetScaleFactor, assetFractionDigits, assetKind)
         return Transfer(
             id = TransferId(id),
             revisionId = revisionId,

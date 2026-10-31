@@ -208,6 +208,7 @@ kmp_modules(
         "//app/db/schemaspy:test_module",
         "//app/model/calendar:calendar_module",
         "//app/model/calendar:test_module",
+        "//test/app/model/calendar:calendar_module",
     ],
     visibility = ["//visibility:public"],
 )

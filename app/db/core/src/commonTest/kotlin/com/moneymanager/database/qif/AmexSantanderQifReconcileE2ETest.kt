@@ -8,6 +8,7 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.calendar.testing.TestHolidayCalendars
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
@@ -15,6 +16,7 @@ import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.setDefaultLocation
+import com.moneymanager.importengineapi.upsertHolidayCalendar
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.installBuiltInCsvStrategies
@@ -284,6 +286,7 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
     private suspend fun atLondon(paymentList: List<Triple<String, String, String>>) {
         payments = paymentList
         repositories.installBuiltInCsvStrategies()
+        repositories.importEngine.upsertHolidayCalendar(TestHolidayCalendars.LONDON)
         repositories.importEngine.setDefaultLocation("GBLO")
         accountId(AMEX)
     }

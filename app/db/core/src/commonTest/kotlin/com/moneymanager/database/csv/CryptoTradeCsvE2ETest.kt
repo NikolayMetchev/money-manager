@@ -34,8 +34,6 @@ import kotlin.uuid.Uuid
  * with the BTC asset created on demand — so both accounts show correct, full-precision balances.
  */
 class CryptoTradeCsvE2ETest : DbTest() {
-    override val seedAllCurrencies: Boolean = false
-
     private val now = Clock.System.now()
     private val headers = listOf("Date", "Amount", "Currency", "To Amount", "To Currency", "Description")
 

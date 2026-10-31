@@ -53,6 +53,7 @@ kmp_test(
     deps = [
         "//app/model/calendar",
         "//bazel/kmp/deps:kotlin_test",
+        "//test/app/model/calendar",
         "@maven_kmp//:kotlinx_serialization_json",
     ],
 )

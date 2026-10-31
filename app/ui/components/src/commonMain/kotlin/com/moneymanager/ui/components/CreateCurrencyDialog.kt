@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.CurrencyId
@@ -45,6 +46,7 @@ fun CreateCurrencyDialog(
     val importEngine = LocalImportEngine.current
     var code by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
+    var decimalPlaces by remember { mutableStateOf("") }
     val saveState = rememberDialogSaveState()
 
     val scope = rememberSchemaAwareCoroutineScope()
@@ -83,7 +85,7 @@ fun CreateCurrencyDialog(
                 saveState.errorMessage = null
                 scope.launch {
                     try {
-                        val currencyId = importEngine.createCurrency(code.trim(), name.trim())
+                        val currencyId = importEngine.createCurrency(code.trim(), name.trim(), decimalPlaces.toIntOrNull())
                         onCurrencyCreated(currencyId)
                     } catch (expected: Exception) {
                         logger.e(expected) { "Failed to create currency: ${expected.message}" }
@@ -132,7 +134,18 @@ fun CreateCurrencyDialog(
                     singleLine = true,
                     enabled = !saveState.isSaving,
                     isError = nameError,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                )
+
+                // Only native and the browser read it, padding amounts to this many decimals.
+                OutlinedTextField(
+                    value = decimalPlaces,
+                    onValueChange = { input -> decimalPlaces = input.filter { it.isDigit() }.take(1) },
+                    label = { Text("Decimal places (optional, e.g. 2)") },
+                    modifier = Modifier.fillMaxWidth().onEnterKeyDown(submit),
+                    singleLine = true,
+                    enabled = !saveState.isSaving,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { submit() }),
                 )
 

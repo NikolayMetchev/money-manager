@@ -234,6 +234,8 @@ data class ImportCurrencyIntent(
     override val source: Source,
     val code: String? = null,
     val name: String? = null,
+    /** CREATE: the ISO minor unit, if known. */
+    val fractionDigits: Int? = null,
     override val operation: ImportOperation = ImportOperation.CREATE,
     val existingId: CurrencyId? = null,
     /** UPDATE: the new currency row, passed straight to the repository. */

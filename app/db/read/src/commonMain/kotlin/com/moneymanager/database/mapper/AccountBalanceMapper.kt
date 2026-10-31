@@ -19,5 +19,6 @@ private fun SelectAllBalances.toAsset() =
         code = asset_code,
         name = asset_name,
         scaleFactor = asset_scale_factor,
+        fractionDigits = asset_fraction_digits,
         kind = asset_kind,
     )

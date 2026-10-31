@@ -14,15 +14,17 @@ enum class SetupWizardStep(
         title = "Database",
         subtitle = "Where your data lives.",
     ),
+    STRATEGIES(
+        title = "Strategy catalog",
+        subtitle =
+            "Install the currencies and locations you use, and a strategy for each bank, card or exchange. " +
+                "You can add more later.",
+    ),
     CURRENCY_AND_LOCATION(
         title = "Currency and location",
         subtitle =
             "The currency new transactions and totals use, and the location whose bank holidays decide which days " +
                 "count as business days when imports are matched up. Each account can override the location.",
-    ),
-    STRATEGIES(
-        title = "Import strategies",
-        subtitle = "Install a strategy for each bank, card or exchange you use. You can add more later.",
     ),
     STRATEGY_SYNC(
         title = "Share strategies via Google Drive",
@@ -56,8 +58,9 @@ fun setupWizardSteps(
 ): List<SetupWizardStep> =
     buildList {
         if (includeDatabaseStep) add(SetupWizardStep.DATABASE)
-        add(SetupWizardStep.CURRENCY_AND_LOCATION)
+        // The catalog comes first: it is where a new database's currencies and locations come from.
         if (strategyCatalogAvailable) add(SetupWizardStep.STRATEGIES)
+        add(SetupWizardStep.CURRENCY_AND_LOCATION)
         if (strategySyncAvailable) add(SetupWizardStep.STRATEGY_SYNC)
         if (importDirectoriesAvailable) add(SetupWizardStep.IMPORT_DIRECTORIES)
         if (hasApiStrategies) add(SetupWizardStep.API_IMPORTS)

@@ -1,12 +1,12 @@
 -- id must be an already-allocated `asset` id (see asset/AssetWrite.sq).
 insert:
-INSERT INTO currency(id, code, name, scale_factor)
-VALUES (?, ?, ?, ?);
+INSERT INTO currency(id, code, name, scale_factor, fraction_digits)
+VALUES (?, ?, ?, ?, ?);
 
 update:
 UPDATE currency
 SET revision_id = revision_id + 1,
-    code = ?, name = ?, scale_factor = ?
+    code = ?, name = ?, scale_factor = ?, fraction_digits = ?
 WHERE id = ?;
 
 delete:

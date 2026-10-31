@@ -1,37 +1,16 @@
 package com.moneymanager.domain.model.calendar
 
+import com.moneymanager.domain.model.calendar.testing.TestHolidayCalendars
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class HolidayCalendarTest {
-    private val london = StrataHolidayCalendars.all.single { it.id == "GBLO" }
-
-    // gov.uk's bank-holidays.json, England and Wales, 2019–2027.
-    private val govUkEnglandAndWales =
-        (
-            "2019-01-01 2019-04-19 2019-04-22 2019-05-06 2019-05-27 2019-08-26 2019-12-25 2019-12-26 2020-01-01 " +
-                "2020-04-10 2020-04-13 2020-05-08 2020-05-25 2020-08-31 2020-12-25 2020-12-28 2021-01-01 2021-04-02 " +
-                "2021-04-05 2021-05-03 2021-05-31 2021-08-30 2021-12-27 2021-12-28 2022-01-03 2022-04-15 2022-04-18 " +
-                "2022-05-02 2022-06-02 2022-06-03 2022-08-29 2022-09-19 2022-12-26 2022-12-27 2023-01-02 2023-04-07 " +
-                "2023-04-10 2023-05-01 2023-05-08 2023-05-29 2023-08-28 2023-12-25 2023-12-26 2024-01-01 2024-03-29 " +
-                "2024-04-01 2024-05-06 2024-05-27 2024-08-26 2024-12-25 2024-12-26 2025-01-01 2025-04-18 2025-04-21 " +
-                "2025-05-05 2025-05-26 2025-08-25 2025-12-25 2025-12-26 2026-01-01 2026-04-03 2026-04-06 2026-05-04 " +
-                "2026-05-25 2026-08-31 2026-12-25 2026-12-28 2027-01-01 2027-03-26 2027-03-29 2027-05-03 2027-05-31 " +
-                "2027-08-30 2027-12-27 2027-12-28"
-        ).split(' ').map(LocalDate::parse)
-
-    @Test
-    fun `London's bundled holidays are gov_uk's England and Wales bank holidays`() {
-        val bundled = london.holidays.filter { it.year in 2019..2027 }
-        assertEquals(govUkEnglandAndWales, bundled)
-        assertEquals(HolidayCalendar.DEFAULT_WEEKEND, london.weekend)
-    }
+    private val london = TestHolidayCalendars.LONDON
 
     @Test
     fun `Easter 2021 has no London business day between Thursday and Easter Monday`() {
@@ -65,7 +44,7 @@ class HolidayCalendarTest {
 
     @Test
     fun `a combined calendar is closed whenever any of its calendars is`() {
-        val newYork = StrataHolidayCalendars.all.single { it.id == "USNY" }
+        val newYork = TestHolidayCalendars.NEW_YORK_2024
         val both = CombinedCalendar(listOf(london, newYork))
         // Independence Day, a London business day.
         assertTrue(london.isBusinessDay(LocalDate(2024, 7, 4)))
@@ -81,22 +60,15 @@ class HolidayCalendarTest {
         val calendar = HolidayCalendar("TEST", "Test", "UTC", workingDays = listOf(LocalDate(2024, 6, 1)))
         assertTrue(calendar.isBusinessDay(LocalDate(2024, 6, 1)))
         assertFalse(calendar.isBusinessDay(LocalDate(2024, 6, 2)))
-        assertTrue(StrataHolidayCalendars.all.any { it.workingDays.isNotEmpty() })
     }
 
     @Test
     fun `a locale's country suggests a location`() {
-        assertEquals("GBLO", StrataHolidayCalendars.all.forCountry("gb")?.id)
-        assertEquals("EUTA", StrataHolidayCalendars.all.forCountry("DE")?.id)
-        assertNull(StrataHolidayCalendars.all.forCountry("AQ"))
-        assertNull(StrataHolidayCalendars.all.forCountry(null))
-    }
-
-    @Test
-    fun `every bundled calendar has a valid zone and no country served twice`() {
-        for (calendar in StrataHolidayCalendars.all) assertNotNull(calendar.zone)
-        val countries = StrataHolidayCalendars.all.flatMap { it.countries }
-        assertEquals(countries.size, countries.toSet().size)
+        val installed = listOf(TestHolidayCalendars.NEW_YORK_2024, TestHolidayCalendars.LONDON)
+        assertEquals("GBLO", installed.forCountry("gb")?.id)
+        assertEquals("USNY", installed.forCountry("US")?.id)
+        assertNull(installed.forCountry("AQ"))
+        assertNull(installed.forCountry(null))
     }
 
     @Test

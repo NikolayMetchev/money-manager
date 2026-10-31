@@ -35,21 +35,14 @@ private const val GBP_CURRENCY_CODE = "GBP"
 
 /**
  * Generates the strategy catalog for the GitHub Pages site: renders every Kotlin built-in definition
- * (app/strategies) plus the ISO 4217 currency list to its portable JSON artifact and writes
+ * (app/strategies), the ISO 4217 currency list and Strata's locations to their portable JSON artifacts and writes
  * `<webpageDir>/strategy-library/` — index.json plus one file per artifact. Nothing is checked in; CI
- * runs this before uploading the `webpage/` directory to Pages. `currencies <file>` instead regenerates
- * the currency table bundled into the app from the same JDK list, and `calendars <file>` the holiday calendars from
- * OpenGamma Strata.
+ * runs this before uploading the `webpage/` directory to Pages.
  */
 fun main(args: Array<String>) {
-    val usage = "usage: generate <webpageDir> | currencies <IsoCurrencies.kt> | calendars <StrataHolidayCalendars.kt>"
-    require(args.size == 2) { usage }
-    when (args[0]) {
-        "generate" -> generateCatalogSite(workspaceFile(args[1]))
-        "currencies" -> workspaceFile(args[1]).writeText(renderIsoCurrenciesSource(jdkIsoCurrencies()))
-        "calendars" -> workspaceFile(args[1]).writeText(renderStrataHolidayCalendarsSource(strataHolidayCalendars()))
-        else -> error(usage)
-    }
+    val usage = "usage: generate <webpageDir>"
+    require(args.size == 2 && args[0] == "generate") { usage }
+    generateCatalogSite(workspaceFile(args[1]))
 }
 
 // `bazel run` starts a tool in its runfiles tree, so a relative path names a file in the workspace.
@@ -81,12 +74,11 @@ internal fun builtInArtifacts(): Map<StrategyKey, String> {
         artifacts[StrategyKey(StrategyKind.PASS_THROUGH, definition.name)] = PassThroughExportCodec.encode(definition.toExport())
     }
 
-    // Rendered from this JDK rather than the bundled table, so the site can carry codes newer than an
-    // installed app's bundle.
+    // The app bundles no currencies or locations: a new database installs them from here, rendered from this JDK and
+    // from Strata when the site is published.
     artifacts[StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)] =
         CurrencyListExportCodec.encode(currencyListExport(jdkIsoCurrencies()))
 
-    // Likewise from Strata itself, so a holiday announced after an app shipped reaches it through the catalog.
     for (calendar in strataHolidayCalendars()) {
         artifacts[StrategyKey(StrategyKind.HOLIDAY_CALENDAR, calendar.id)] =
             HolidayCalendarExportCodec.encode(HolidayCalendarExport(version = LIBRARY_VERSION, calendar = calendar))

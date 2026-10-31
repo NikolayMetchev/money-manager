@@ -46,6 +46,7 @@ kmp_test(
     ],
     deps = [
         "//bazel/kmp/deps:kotlin_test",
+        "//test/app/model/calendar",
         "@maven_kmp//:kotlinx_datetime",
         "@maven_kmp//:kotlinx_serialization_json",
     ],

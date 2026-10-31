@@ -76,12 +76,12 @@ kmp_test(
     ],
     deps = [
         "//app/importengineapi",
-        "//app/model/calendar",
         "//app/model/core",
         "//app/model/csv",
         "//app/model/passthrough",
         "//app/model/rules",
         "//bazel/kmp/deps:kotlin_test",
+        "//test/app/model/calendar",
         "//utils/bigdecimal",
         "@maven_kmp//:kotlinx_datetime",
     ],

@@ -1522,7 +1522,7 @@ class AccountTransactionsScreenTest {
             every { getAllCurrencies() } returns flowOf(currencies)
             every { getCurrencyById(any()) } calls { (id: CurrencyId) -> flowOf(currencies.find { it.id == id }) }
             every { getCurrencyByCode(any()) } calls { (code: String) -> flowOf(currencies.find { it.code == code }) }
-            everySuspend { upsertCurrencyByCode(any(), any(), any()) } returns CurrencyId(1L)
+            everySuspend { upsertCurrencyByCode(any(), any(), any(), any()) } returns CurrencyId(1L)
         }
 
     private fun createCategoryRepository(): CategoryWriteRepository =

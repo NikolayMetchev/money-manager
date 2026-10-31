@@ -68,7 +68,14 @@ class ReconciliationReadRepositoryImpl(
             }.sortedWith(compareBy({ it.timestamp }, { it.id }))
                 .map { row ->
                     val asset =
-                        AssetRowMapper.buildAsset(row.asset_id, row.asset_code, row.asset_name, row.asset_scale_factor, row.asset_kind)
+                        AssetRowMapper.buildAsset(
+                            row.asset_id,
+                            row.asset_code,
+                            row.asset_name,
+                            row.asset_scale_factor,
+                            row.asset_fraction_digits,
+                            row.asset_kind,
+                        )
                     val magnitude = BigInteger(row.amount)
                     ReconciliationLeg(
                         transactionId = row.id,

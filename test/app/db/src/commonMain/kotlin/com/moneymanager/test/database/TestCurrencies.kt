@@ -1,11 +1,10 @@
 package com.moneymanager.test.database
 
-import com.moneymanager.currency.IsoCurrencies
+import com.moneymanager.domain.model.CurrencyExportEntry
 
 /**
- * Currencies seeded into fresh test databases when [createTestDatabaseManager] is called with
- * `seedAllCurrencies = false`. GBP is always present (seeded with a fixed id by Schema.create),
- * so together tests see GBP, USD and EUR. Seeding the full bundled list (~230+ codes, each
- * firing audit triggers) dominated per-test DB setup time.
+ * Currencies seeded into fresh test databases. The app seeds none (it installs the catalog's list), but GBP is always
+ * present (seeded with a fixed id by Schema.create), so together tests see GBP, USD and EUR.
  */
-internal val minimalTestCurrencies = IsoCurrencies.all.filter { it.code == "USD" || it.code == "EUR" }
+val testCurrencies: List<CurrencyExportEntry> =
+    listOf(CurrencyExportEntry("USD", "US Dollar", 2), CurrencyExportEntry("EUR", "Euro", 2))

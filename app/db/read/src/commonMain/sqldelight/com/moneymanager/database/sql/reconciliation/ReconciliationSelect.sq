@@ -35,6 +35,7 @@ selectLegsForAccounts:
         ad.code AS asset_code,
         ad.name AS asset_name,
         ad.scale_factor AS asset_scale_factor,
+        ad.fraction_digits AS asset_fraction_digits,
         ad.kind AS asset_kind,
         CASE WHEN EXISTS (
             SELECT 1 FROM transfer_attribute ta
@@ -68,6 +69,7 @@ selectLegsForAccounts:
         ad.code,
         ad.name,
         ad.scale_factor,
+        ad.fraction_digits,
         ad.kind,
         CASE WHEN EXISTS (
             SELECT 1 FROM transfer_attribute ta
@@ -101,6 +103,7 @@ selectLegsForAccounts:
         ad.code,
         ad.name,
         ad.scale_factor,
+        ad.fraction_digits,
         ad.kind,
         CASE WHEN EXISTS (
             SELECT 1 FROM trade_attribute ta
@@ -132,6 +135,7 @@ selectLegsForAccounts:
         ad.code,
         ad.name,
         ad.scale_factor,
+        ad.fraction_digits,
         ad.kind,
         CASE WHEN EXISTS (
             SELECT 1 FROM trade_attribute ta

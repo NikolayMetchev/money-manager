@@ -192,6 +192,7 @@ class ImportEngineImpl(
                 currencyRepository.upsertCurrencyByCode(
                     requireNotNull(intent.code),
                     requireNotNull(intent.name),
+                    intent.fractionDigits,
                     intent.source,
                 )
         }

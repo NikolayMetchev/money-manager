@@ -9,6 +9,7 @@ import java.util.Currency as JavaCurrency
 
 actual class Currency actual constructor(
     actual val code: String,
+    @Suppress("UNUSED_PARAMETER", "UnusedParameter") fractionDigits: Int?,
 ) {
     private val javaCurrency: JavaCurrency = JavaCurrency.getInstance(code)
     private val formatter: NumberFormat =

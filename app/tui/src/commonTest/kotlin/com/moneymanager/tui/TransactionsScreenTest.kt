@@ -37,7 +37,7 @@ class TransactionsScreenTest {
                 val engine = session.importEngine
                 val gbp =
                     Currency(
-                        id = engine.createCurrency("GBP", "Pound Sterling"),
+                        id = engine.createCurrency("GBP", "Pound Sterling", 2),
                         code = "GBP",
                         name = "Pound Sterling",
                         scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR,

@@ -40,9 +40,6 @@ import kotlin.time.Instant
 class PayPalCsvE2ETest : DbTest() {
     override val installBuiltInStrategies: Boolean = true
 
-    // The foreign-currency payment needs USD.
-    override val seedAllCurrencies: Boolean = true
-
     private val now = Clock.System.now()
 
     private val maintenance =

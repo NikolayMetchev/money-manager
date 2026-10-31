@@ -13,7 +13,7 @@ import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.calendar.StrataHolidayCalendars
+import com.moneymanager.domain.model.calendar.testing.TestHolidayCalendars
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.importengineapi.AccountBridge
@@ -1402,7 +1402,7 @@ class ImportDeduperTest {
         SettlementCalendars(
             locations = mapOf(bank to "GBLO", wallet to "GBLO"),
             defaultLocation = null,
-            calendars = StrataHolidayCalendars.all.filter { it.id == "GBLO" },
+            calendars = listOf(TestHolidayCalendars.LONDON),
         )
 
     private fun businessDayPolicy(placeholderWindow: SettlementWindow) =

@@ -85,13 +85,15 @@ fun SetupWizardScreen(
     // The step list grows while the wizard is open (installing an API strategy adds the API step), so track
     // the step itself rather than an index into a list that shifts under us.
     val navigableSteps = steps.filter { it != SetupWizardStep.DATABASE }
-    var currentStep by remember { mutableStateOf(SetupWizardStep.CURRENCY_AND_LOCATION) }
+    var currentStep by remember { mutableStateOf(navigableSteps.first()) }
+    // The defaults are read on reaching their step, after the catalog step has installed currencies and locations.
+    val onCurrencyAndLocation = currentStep == SetupWizardStep.CURRENCY_AND_LOCATION
 
     var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
     // Prefer the currency this database already uses (a re-run should show the current default, not reset it),
     // and fall back to the locale's currency on a fresh database. The locale need not name one we know.
-    LaunchedEffect(Unit) {
-        if (selectedCurrencyId != null) return@LaunchedEffect
+    LaunchedEffect(onCurrencyAndLocation) {
+        if (!onCurrencyAndLocation || selectedCurrencyId != null) return@LaunchedEffect
         val existing =
             services.settings.settingsRepository
                 .getDefaultCurrencyId()
@@ -112,7 +114,8 @@ fun SetupWizardScreen(
     // location) is a valid answer, as weekends alone then decide business days.
     var selectedLocation by remember { mutableStateOf<String?>(null) }
     var locationInitialized by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(onCurrencyAndLocation) {
+        if (!onCurrencyAndLocation || locationInitialized) return@LaunchedEffect
         val existing =
             services.settings.settingsRepository
                 .getDefaultLocation()

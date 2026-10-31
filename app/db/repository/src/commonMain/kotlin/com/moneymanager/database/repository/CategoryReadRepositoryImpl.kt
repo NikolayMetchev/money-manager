@@ -46,6 +46,7 @@ class CategoryReadRepositoryImpl(
                                 code = first.asset_code,
                                 name = first.asset_name,
                                 scaleFactor = first.asset_scale_factor,
+                                fractionDigits = first.asset_fraction_digits,
                                 kind = first.asset_kind,
                             )
                         val total = rows.fold(BigInteger.ZERO) { acc, r -> acc + BigInteger(r.balance) }

@@ -55,7 +55,7 @@ class UpdateProvenanceTest : DbTest() {
     fun updateCurrencyRecordsSource() =
         runDbTest {
             val currencyId =
-                repositories.currencyRepository.upsertCurrencyByCode("ZAR", "South African Rand", Source.SampleGenerator)
+                repositories.currencyRepository.upsertCurrencyByCode("ZAR", "South African Rand", 2, Source.SampleGenerator)
             val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
             repositories.currencyRepository.updateCurrency(currency.copy(name = "Rand"), Source.Manual)
 

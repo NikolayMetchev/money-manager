@@ -24,6 +24,7 @@ private fun SelectAuditHistoryForTrade.fromAsset() =
         code = from_asset_code,
         name = from_asset_name,
         scaleFactor = from_asset_scale_factor,
+        fractionDigits = from_asset_fraction_digits,
         kind = from_asset_kind,
     )
 
@@ -33,5 +34,6 @@ private fun SelectAuditHistoryForTrade.toAsset() =
         code = to_asset_code,
         name = to_asset_name,
         scaleFactor = to_asset_scale_factor,
+        fractionDigits = to_asset_fraction_digits,
         kind = to_asset_kind,
     )

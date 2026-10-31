@@ -34,8 +34,6 @@ import kotlin.uuid.Uuid
  * duplicate asset, balance unchanged.
  */
 class CryptoCsvReimportE2ETest : DbTest() {
-    override val seedAllCurrencies: Boolean = false
-
     private val now = Clock.System.now()
     private val headers = listOf("Date", "Amount", "Currency", "Description")
 

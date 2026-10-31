@@ -58,6 +58,7 @@ SELECT
     asset_details.code AS asset_code,
     asset_details.name AS asset_name,
     asset_details.scale_factor AS asset_scale_factor,
+    asset_details.fraction_digits AS asset_fraction_digits,
     asset_details.kind AS asset_kind
 FROM account_balance_materialized_view
 JOIN account ON account_balance_materialized_view.account_id = account.id
@@ -176,6 +177,7 @@ SELECT
     asset_details.code AS asset_code,
     asset_details.name AS asset_name,
     asset_details.scale_factor AS asset_scale_factor,
+    asset_details.fraction_digits AS asset_fraction_digits,
     asset_details.kind AS asset_kind
 FROM transfer
 JOIN transfer_attribute match_attr ON match_attr.transaction_id = transfer.id

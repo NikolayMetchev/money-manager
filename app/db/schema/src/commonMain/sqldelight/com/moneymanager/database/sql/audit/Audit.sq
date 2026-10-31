@@ -29,6 +29,7 @@ CREATE TABLE currency_audit (
     code TEXT NOT NULL,
     name TEXT NOT NULL,
     scale_factor INTEGER NOT NULL,
+    fraction_digits INTEGER,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 

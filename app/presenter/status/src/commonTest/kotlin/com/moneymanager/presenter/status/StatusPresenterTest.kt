@@ -67,7 +67,7 @@ class StatusPresenterTest {
                 assertTrue(cloud.connected)
                 assertEquals(SyncStatus.IN_SYNC, cloud.sync.status)
 
-                session.importEngine.createCurrency("ZZZ", "Test")
+                session.importEngine.createCurrency("ZZZ", "Test", null)
                 val edited = awaitUntil { it.cloud?.sync?.status == SyncStatus.LOCAL_AHEAD }
                 assertTrue(checkNotNull(edited.cloud).localChanges)
 

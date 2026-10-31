@@ -2,8 +2,8 @@ package com.moneymanager.database
 
 import app.cash.sqldelight.db.SqlDriver
 import com.moneymanager.coroutines.ioDispatcher
-import com.moneymanager.currency.IsoCurrency
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
+import com.moneymanager.domain.model.CurrencyExportEntry
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.defaultFileDatabaseLocation
 import com.moneymanager.files.absolutePath
@@ -25,11 +25,11 @@ import kotlin.random.Random
  * "empty" would try to create the schema again over a desktop-created file. There is no DB versioning yet
  * (#426), so nothing else reads `user_version` either.
  *
- * @param currenciesToSeed deferred so the currency list is only built when a fresh database is seeded;
- *   tests inject a minimal list (see :test:app:db's createTestDatabaseManager).
+ * @param currenciesToSeed the currencies a fresh database starts with besides GBP: none in the app, which installs
+ *   them from the strategy catalog; tests seed the few they use (see :test:app:db's createTestDatabaseManager).
  */
 abstract class FileDatabaseManager(
-    private val currenciesToSeed: () -> List<IsoCurrency>,
+    private val currenciesToSeed: () -> List<CurrencyExportEntry>,
 ) : DatabaseManager {
     /**
      * Opens a SQLite driver on [file] (an absolute path whose parent directory exists), with foreign keys,

@@ -25,7 +25,7 @@ interface BusinessDayCalendar {
  * A location's holidays, shaped after OpenGamma Strata's `ImmutableHolidayCalendar`: the [weekend] days, every other
  * non-business day listed in [holidays], and the [workingDays] that fall on a weekend yet are business days (Budapest's
  * working Saturdays). [id] is Strata's code for the location (`GBLO` for London, `USNY` for New York), which accounts
- * and the database's default location name. Built-ins are generated from Strata's data (`StrataHolidayCalendars`).
+ * and the database's default location name. The strategy catalog publishes Strata's, rendered when it is published.
  * [countries] are the ISO 3166 codes the location serves, so a device's locale can suggest one.
  *
  * Outside the years [holidays] covers only the weekend is known, so those days are business days.
