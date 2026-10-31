@@ -1,9 +1,8 @@
 package com.moneymanager.database.repository
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import app.cash.sqldelight.coroutines.asFlow
-import app.cash.sqldelight.coroutines.mapToList
-import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.sql.passThroughAccount.Pass_through_account
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
@@ -12,6 +11,7 @@ import com.moneymanager.domain.model.passthrough.PassThroughRule
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlin.coroutines.CoroutineContext
 
@@ -22,22 +22,28 @@ class PassThroughAccountReadRepositoryImpl(
     private val selectQueries = database.passThroughAccountSelectQueries
 
     // An account's rules are only ever written together with it, so a change to the account table is a change to any.
+    // They're read in one transaction, so an account is never paired with another write's rules.
     override fun getAll(): Flow<List<PassThroughAccount>> =
         selectQueries
             .selectAll()
             .asFlow()
-            .mapToList(coroutineContext)
-            .map { rows ->
-                val rules = rulesByAccount()
-                rows.map { toDomain(it, rules) }
-            }
+            .map {
+                selectQueries.transactionWithResult {
+                    val rows = selectQueries.selectAll().awaitAsList()
+                    val rules = rulesByAccount()
+                    rows.map { toDomain(it, rules) }
+                }
+            }.flowOn(coroutineContext)
 
     override fun getById(id: PassThroughAccountId): Flow<PassThroughAccount?> =
         selectQueries
             .selectById(id.value)
             .asFlow()
-            .mapToOneOrNull(coroutineContext)
-            .map { row -> row?.let { toDomain(it, rulesByAccount()) } }
+            .map {
+                selectQueries.transactionWithResult {
+                    selectQueries.selectById(id.value).awaitAsOneOrNull()?.let { toDomain(it, rulesByAccount()) }
+                }
+            }.flowOn(coroutineContext)
 
     private suspend fun rulesByAccount(): Map<Long, List<PassThroughRule>> =
         selectQueries.selectAllRules().awaitAsList().groupBy(
