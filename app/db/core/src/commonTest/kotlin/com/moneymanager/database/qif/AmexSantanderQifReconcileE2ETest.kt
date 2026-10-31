@@ -218,6 +218,32 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
         )
     }
 
+    // Two equal purchases from one shop two days apart, the earlier posted onto the next month's statement: two lines
+    // of the card's statements, each with its own reference, never two sources' records of one purchase.
+    @Test
+    fun equalPurchasesOnTwoStatements_bothCounted() =
+        runDbTest {
+            repositories.installBuiltInCsvStrategies()
+            val amexId = accountId(AMEX)
+            val purchase = { date: String, reference: String ->
+                record(date, "-2.35", "TESCO STORES", memo = " GOODS Process Date $date", checkNumber = reference)
+            }
+            apply(stage("amex-october.qif", listOf(purchase("08/10/2008", "1001"))), AMEX)
+            apply(stage("amex-november.qif", listOf(purchase("06/10/2008", "2001"))), AMEX)
+
+            val purchases =
+                repositories.transactionRepository
+                    .getTransactionsByAccount(amexId)
+                    .first()
+                    .filter { it.sourceAccountId == amexId }
+            assertEquals(2, purchases.size, "$purchases")
+            assertEquals(
+                emptyList(),
+                purchases.filter { t -> t.attributes.any { it.attributeType.name == "excluded" } },
+                "neither purchase is reconciled away against the other",
+            )
+        }
+
     // The second statement's placeholders reconciled against the first's, which lost to the bank's records. Deleting
     // the first statement's would leave them counted, as its re-run never looks at them: they are re-run after it.
     @Test

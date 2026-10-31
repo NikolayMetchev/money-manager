@@ -1140,7 +1140,7 @@ suspend fun runCsvImport(
                     rowKey = ImportRowKey.CsvRow(row.rowIndex),
                     fromAccount = AccountRef.Existing(row.transfer.sourceAccountId),
                     toAccount = AccountRef.Existing(row.transfer.targetAccountId),
-                    source = Source.Csv(csvImport.id),
+                    source = Source.Csv(csvImport.id, statementAccountId = row.statementAccountId?.takeIf { it != UNRESOLVED_ACCOUNT_ID }),
                     timestamp = row.transfer.timestamp,
                     description = row.transfer.description,
                     amount = row.transfer.amount,

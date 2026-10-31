@@ -637,7 +637,7 @@ class ImportEngineImpl(
                         .associate { it.id1 to it.id2 },
                 ownBatchAccounts = resolvedTransfers.flatMapTo(mutableSetOf()) { listOf(it.fromAccount, it.toAccount).map(::requireId) },
                 passThroughOnward = passThroughOnward(existing, existingRelationships),
-                ownSourceLegs = ownSourceLegs(resolvedTransfers),
+                ownSourceLegs = ownSourceLegs(resolvedTransfers, existing),
                 calendars = calendars,
             ).classify(resolvedTransfers)
 
@@ -1399,11 +1399,47 @@ class ImportEngineImpl(
 
     // region Transfers
 
-    /** Transfers the batch's own CSV files created on an earlier import (see [ImportDeduper]'s `ownSourceLegs`). */
-    private suspend fun ownSourceLegs(transfers: List<ImportTransfer>): Set<TransferId> =
-        transfers
-            .mapNotNullTo(mutableSetOf()) { (it.source as? Source.Csv)?.importId }
-            .flatMapTo(mutableSetOf()) { csvImportRepository.getTransferIdsCreatedByImport(it) }
+    /**
+     * Existing records of the batch's own source (see [ImportDeduper]'s `ownSourceLegs`): what its CSV files created on
+     * an earlier import, and the other lines of the statements it covers. An account books a movement once, on one
+     * date, so every export of its statements records it at that time; a record carrying the batch's unique identifier
+     * ([ExistingTransferInfo.uniqueKey]), booked from the statement of an account the batch's rows are statements of,
+     * at a time and amount none of those rows records, is another line of that account's statements (an equal purchase
+     * two days earlier, posted onto the next month's card statement), never another source's record of a row's
+     * movement. Another export of the same statement still reconciles, as does a second account's export of a
+     * transfer between the two: its lines are that account's statement.
+     */
+    private suspend fun ownSourceLegs(
+        transfers: List<ImportTransfer>,
+        existing: List<ExistingTransferInfo>,
+    ): Set<TransferId> {
+        val ownFiles =
+            transfers
+                .mapNotNullTo(mutableSetOf()) { (it.source as? Source.Csv)?.importId }
+                .flatMapTo(mutableSetOf()) { csvImportRepository.getTransferIdsCreatedByImport(it) }
+        val statementLines =
+            transfers.mapNotNullTo(mutableSetOf()) { transfer ->
+                (transfer.source as? Source.Csv)?.statementAccountId?.let { StatementLine(it, transfer.timestamp, transfer.amount) }
+            }
+        val identified = existing.filter { it.uniqueKey.isNotEmpty() }.associateBy { it.transferId }
+        if (statementLines.isEmpty() || identified.isEmpty()) return ownFiles
+        val statementAccounts = statementLines.mapTo(mutableSetOf()) { it.account }
+        val otherLines =
+            csvImportRepository
+                .getStatementAccounts(identified.keys)
+                .filter { (id, account) ->
+                    val transfer = identified.getValue(id).transfer
+                    account in statementAccounts && StatementLine(account, transfer.timestamp, transfer.amount) !in statementLines
+                }.keys
+        return ownFiles + otherLines
+    }
+
+    /** One line of [account]'s statement: what it booked, and when. */
+    private data class StatementLine(
+        val account: AccountId,
+        val timestamp: Instant?,
+        val amount: Money?,
+    )
 
     /**
      * The relationships touching [existing], loaded once for the deduper. Among them: the `reconciled`

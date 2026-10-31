@@ -218,6 +218,10 @@ class AccountWriteRepositoryImpl(
                     targetAccount = survivingAccount.id,
                     accountToDelete = deletedAccount.id,
                 )
+                database.entitySourceWriteQueries.reassignStatementAccount(
+                    survivingAccountId = survivingAccount.id,
+                    deletedAccountId = deletedAccount.id,
+                )
                 // The reassignment bumped each affected transfer's revision; source those new revisions
                 // as a merge so the transaction audit trail isn't left with "source data missing".
                 (sourceSet + targetSet).forEach { transferId ->

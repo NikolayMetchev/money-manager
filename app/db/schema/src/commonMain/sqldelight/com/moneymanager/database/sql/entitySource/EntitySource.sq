@@ -73,10 +73,14 @@ CREATE INDEX IF NOT EXISTS idx_api_entity_source_request ON api_entity_source(ap
 -- new account), so the audit trail can link back to that row in the CSV import detail.
 -- csv_row_index is nullable: an entity created from the import as a whole (e.g. an account derived
 -- from many rows) has a known import id but no single originating row.
+-- statement_account_id is the account whose statement the row is (its own account, before any direction
+-- flip), so reconciliation can tell two of one account's statement lines from two accounts' records of one
+-- movement. No foreign key: an account merge repoints it, and only a transfer's provenance carries it.
 CREATE TABLE csv_entity_source (
     id INTEGER PRIMARY KEY,  -- Same as entity_source.id
     csv_import_id TEXT NOT NULL,
     csv_row_index INTEGER,
+    statement_account_id INTEGER,
     FOREIGN KEY (id) REFERENCES entity_source(id),
     FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id)
 );
