@@ -1,0 +1,21 @@
+# Project view for Android Studio's Bazel plugin (ASwB). ASwB keeps its project outside the repository: create it
+# with File → Import Bazel Project, choose "Import project view file" and pick this file. See
+# docs/bazel/ide-evaluation.md.
+
+# Not ".": ASwB's query sync skips every scanned directory holding a MODULE.bazel, the workspace root included,
+# so list the top-level source directories instead.
+directories:
+  app
+  bazel
+  test
+  tools
+  utils
+  webpage
+
+derive_targets_from_directories: true
+
+android_sdk_platform: android-36
+
+# ASwB's own Android launch only takes rules_android targets, so the app is launched by script.
+import_run_configurations:
+  tools/android-studio/run_android_debug.xml

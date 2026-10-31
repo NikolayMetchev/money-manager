@@ -71,7 +71,12 @@ dependencies, so no file gets analysis:
   ui-tooling under that alias (`maven_kmp.install(aliases = …)`), so this build no longer fails on a missing
   target. It still fails on the aspect, as above.
 - Our Android rules (`bazel/kmp/android`) aren't `rules_android`, so ASwB wouldn't see Android modules even with
-  a working aspect.
+  a working aspect. Its Android launch has nothing to pick either, so the project view imports the "Android debug
+  (Bazel)" run configuration, which builds `//app/main/android:debug`, installs it with `adb` and starts it
+  (`tools/android-studio/run_android_debug.sh`).
+- **Project view.** Import with File → Import Bazel Project, choosing `tools/android-studio/money-manager.bazelproject`.
+  It lists the top-level directories rather than `.`: ASwB skips every scanned directory holding a `MODULE.bazel`,
+  the workspace root included, so `.` imports nothing.
 
 Until then, use IntelliJ with the JetBrains Bazel plugin (above).
 
