@@ -404,7 +404,7 @@
     ],
     "npm": {
       "embedpdf-pdfium": "@embedpdf/pdfium@2.15.1",
-      "js-joda-timezone": "@js-joda/timezone@3.2.0",
+      "js-joda-timezone": "@js-joda/timezone@3.2.1",
       "sqlite-wasm": "@sqlite.org/sqlite-wasm@3.54.1-build1"
     },
     "npm_forces": {
@@ -22400,11 +22400,11 @@
       "url": "https://registry.npmjs.org/@js-joda/core/-/core-6.3.2.tgz",
       "integrity": "sha512-BVsYu84Gut8YTNR1v5/PnifmqXv4SVcfA/hVIM/mXADZfIocip/DfNppBtv+4am5hGH1XuH6FSoU8OHkBvZMeA=="
     },
-    "@js-joda/timezone@3.2.0": {
+    "@js-joda/timezone@3.2.1": {
       "name": "@js-joda/timezone",
-      "version": "3.2.0",
-      "url": "https://registry.npmjs.org/@js-joda/timezone/-/timezone-3.2.0.tgz",
-      "integrity": "sha512-KReBYz7rW1kkmkpnwjZHUIjT4mXMBYbm1hxuf2mUEWjZzqcccRj8MTKbxH1LYETsxbpWZUwGkC4JwGwuwwEOMQ==",
+      "version": "3.2.1",
+      "url": "https://registry.npmjs.org/@js-joda/timezone/-/timezone-3.2.1.tgz",
+      "integrity": "sha512-0a0y7kcaIrbEGyOozsbqO25ac64PEDQNezXnOmmmrWww93LgKQrHERoey0Kt85LbEkjyLTfChOWM1pJ1fAVSfQ==",
       "deps": {
         "@js-joda/core": "6.3.2"
       }
@@ -22424,7 +22424,7 @@
   },
   "npm_libraries": {
     "embedpdf-pdfium": "@embedpdf/pdfium@2.15.1",
-    "js-joda-timezone": "@js-joda/timezone@3.2.0",
+    "js-joda-timezone": "@js-joda/timezone@3.2.1",
     "sqlite-wasm": "@sqlite.org/sqlite-wasm@3.54.1-build1"
   }
 }
