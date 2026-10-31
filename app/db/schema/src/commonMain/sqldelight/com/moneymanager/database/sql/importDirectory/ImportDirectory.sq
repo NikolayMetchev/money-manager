@@ -23,7 +23,6 @@ CREATE TABLE import_directory (
     provider_type_id INTEGER NOT NULL,
     folder_ref TEXT NOT NULL,
     folder_display_path TEXT,
-    provider_config TEXT,
     device_id INTEGER,
     -- 1 = a folder the user picked: its download discovers + creates child directories (no file download).
     -- 0 = a discovered subfolder: its download fetches its own importable files.

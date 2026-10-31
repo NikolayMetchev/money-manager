@@ -15,12 +15,7 @@ actual fun createDriveFolderBrowser(
         override val rootFolderId: String = DriveImportFileSource.ROOT_FOLDER_ID
         override val sharedWithMeFolderId: String = DriveImportFileSource.SHARED_WITH_ME_FOLDER_ID
 
-        // providerConfig (bring-your-own OAuth client) is a JVM concept and is deliberately ignored:
-        // Android auth is bound to the app's package + signing key via the GMS AuthorizationClient.
-        override suspend fun listChildFolders(
-            providerConfig: String?,
-            parentId: String,
-        ): List<ImportFolder> {
+        override suspend fun listChildFolders(parentId: String): List<ImportFolder> {
             val tokenSource = params.googleDriveImportTokenSource
             if (!tokenSource.isSignedInWithRequiredScopes()) tokenSource.signIn()
             return DriveImportFileSource

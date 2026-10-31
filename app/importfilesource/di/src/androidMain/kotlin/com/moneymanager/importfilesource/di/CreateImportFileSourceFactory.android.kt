@@ -29,8 +29,6 @@ actual fun createImportFileSourceFactory(
                 }
 
                 ImportDirectoryProvider.GDRIVE -> {
-                    // directory.providerConfig (bring-your-own OAuth client) is a JVM concept and is
-                    // deliberately ignored: Android auth is bound to the app's package + signing key.
                     val tokenSource = params.googleDriveImportTokenSource
                     if (!tokenSource.isSignedInWithRequiredScopes()) tokenSource.signIn()
                     driveImportFileSource(tokenSource, directory.folderRef)

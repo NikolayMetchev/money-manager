@@ -153,7 +153,6 @@ class ImportDirectoryReadRepositoryImpl(
             provider = ImportDirectoryProvider.fromId(entity.provider_type_id),
             folderRef = entity.folder_ref,
             displayPath = entity.folder_display_path,
-            providerConfig = entity.provider_config,
             deviceId = entity.device_id?.let(::DeviceId),
             topLevel = entity.top_level != 0L,
             parentId = entity.parent_id?.let { ImportDirectoryId(Uuid.parse(it)) },
