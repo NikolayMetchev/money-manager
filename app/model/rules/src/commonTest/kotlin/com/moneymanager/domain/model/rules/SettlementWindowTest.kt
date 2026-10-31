@@ -68,7 +68,7 @@ class SettlementWindowTest {
 
     @Test
     fun `windows serialize by kind`() {
-        val windows = listOf<SettlementWindow>(SettlementWindow.Elapsed(300), threeDays)
+        val windows = listOf(SettlementWindow.Elapsed(300), threeDays)
         val json = Json.encodeToString(windows)
         assertEquals("""[{"type":"elapsed","seconds":300},{"type":"businessDays","days":3}]""", json)
         assertEquals(windows, Json.decodeFromString<List<SettlementWindow>>(json))

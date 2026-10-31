@@ -320,7 +320,7 @@ class StrategyLibraryServiceTest : DbTest() {
     @Test
     fun `location files are named by their code`() {
         val key = StrategyKey(StrategyKind.HOLIDAY_CALENDAR, "GBLO")
-        assertEquals("GBLO.calendar.json", StrategyFileNaming.fileName(key))
+        assertEquals(expected = "GBLO.calendar.json", actual = StrategyFileNaming.fileName(key))
         assertEquals(key, StrategyFileNaming.parse("GBLO.calendar.json"))
     }
 }

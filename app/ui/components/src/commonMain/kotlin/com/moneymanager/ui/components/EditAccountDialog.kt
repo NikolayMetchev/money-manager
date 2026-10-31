@@ -314,7 +314,6 @@ fun EditAccountDialog(
                                                     EditableAttribute(
                                                         LOCATION_ATTRIBUTE,
                                                         code,
-                                                        "",
                                                     )
                                             )
                                         ).also { nextTempId-- }

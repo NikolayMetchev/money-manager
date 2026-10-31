@@ -81,7 +81,7 @@ internal fun builtInArtifacts(): Map<StrategyKey, String> {
 
     for (calendar in strataHolidayCalendars()) {
         artifacts[StrategyKey(StrategyKind.HOLIDAY_CALENDAR, calendar.id)] =
-            HolidayCalendarExportCodec.encode(HolidayCalendarExport(version = LIBRARY_VERSION, calendar = calendar))
+            HolidayCalendarExportCodec.encode(HolidayCalendarExport(calendar = calendar))
     }
 
     return artifacts
