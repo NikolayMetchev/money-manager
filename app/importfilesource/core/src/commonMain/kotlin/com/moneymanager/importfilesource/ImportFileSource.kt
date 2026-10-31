@@ -51,8 +51,7 @@ data class ImportFolder(
 
 /**
  * Browses the user's Google Drive folder hierarchy for the add-directory folder picker, one level at a
- * time. Signs in (requesting the read-only Drive scope) if needed. `providerConfig` is the OAuth client
- * config, or null to use the app's shipped default credentials.
+ * time. Signs in (requesting the read-only Drive scope) if needed.
  */
 interface DriveFolderBrowser {
     /** The id of the My Drive root, used as the starting parent for the "My Drive" root. */
@@ -62,8 +61,5 @@ interface DriveFolderBrowser {
     val sharedWithMeFolderId: String
 
     /** Lists the immediate subfolders of [parentId] ([rootFolderId] / [sharedWithMeFolderId] = roots). */
-    suspend fun listChildFolders(
-        providerConfig: String?,
-        parentId: String,
-    ): List<ImportFolder>
+    suspend fun listChildFolders(parentId: String): List<ImportFolder>
 }

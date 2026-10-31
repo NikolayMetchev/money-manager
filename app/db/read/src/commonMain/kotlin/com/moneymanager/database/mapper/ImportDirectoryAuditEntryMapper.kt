@@ -41,7 +41,6 @@ object ImportDirectoryAuditEntryMapper {
             providerType = from.provider_type,
             folderRef = from.folder_ref,
             displayPath = from.folder_display_path,
-            providerConfig = from.provider_config,
             deviceId = from.device_id?.let(::DeviceId),
             topLevel = from.top_level != 0L,
             parentId = from.parent_id?.let { ImportDirectoryId(Uuid.parse(it)) },

@@ -16,7 +16,6 @@ data class ImportDirectoryAuditEntry(
     val providerType: String,
     val folderRef: String,
     val displayPath: String?,
-    val providerConfig: String?,
     val deviceId: DeviceId?,
     val topLevel: Boolean,
     val parentId: ImportDirectoryId?,
