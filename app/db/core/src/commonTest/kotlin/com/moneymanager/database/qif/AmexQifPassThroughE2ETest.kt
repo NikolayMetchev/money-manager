@@ -119,11 +119,15 @@ class AmexQifPassThroughE2ETest : DbTest() {
             val statement = amexStatement()
             apply(statement)
             val reimports = repositories.reimports(maintenance)
-            reimports.reimport(
-                reimports.plan(repositories.csvImportRepository.getImport(statement.id).first()!!),
-                accountId = null,
-                currencyId = null,
-            )
+            val result =
+                reimports.reimport(
+                    reimports.plan(repositories.csvImportRepository.getImport(statement.id).first()!!),
+                    accountId = null,
+                    currencyId = null,
+                )
+            // The chain's two legs and the ordinary row went, and both rows were imported again.
+            assertEquals(3, result.deletedTransfers)
+            assertEquals(2, result.rerun?.successCount, "${result.rerun}")
             assertEquals(expected, transfers())
         }
 }
