@@ -6,8 +6,9 @@ package com.moneymanager.domain.model.calendar
 
 /**
  * The locations bundled into the app: OpenGamma Strata's holiday calendars, 1950–2099. New databases are
- * seeded from this on every platform; Settings edits a database's own copy (a holiday announced after the app
- * shipped, or a location Strata doesn't cover).
+ * seeded from this on every platform. The strategy catalog publishes each location too, rendered from Strata when it
+ * is published, so a holiday announced after the app shipped reaches it there; Settings edits a database's own copy
+ * (a location Strata doesn't cover).
  */
 object StrataHolidayCalendars {
     val all: List<HolidayCalendar> by lazy {

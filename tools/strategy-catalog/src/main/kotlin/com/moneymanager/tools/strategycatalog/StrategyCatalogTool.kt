@@ -6,10 +6,12 @@ import com.moneymanager.builtin.BuiltInPassThroughs
 import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.database.json.CsvStrategyExportCodec
 import com.moneymanager.database.json.CurrencyListExportCodec
+import com.moneymanager.database.json.HolidayCalendarExportCodec
 import com.moneymanager.database.json.PassThroughExportCodec
 import com.moneymanager.database.json.StrategyArtifactCodec
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
+import com.moneymanager.domain.model.calendar.HolidayCalendarExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExportMapper
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.export.PassThroughExport
@@ -83,6 +85,12 @@ internal fun builtInArtifacts(): Map<StrategyKey, String> {
     // installed app's bundle.
     artifacts[StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)] =
         CurrencyListExportCodec.encode(currencyListExport(jdkIsoCurrencies()))
+
+    // Likewise from Strata itself, so a holiday announced after an app shipped reaches it through the catalog.
+    for (calendar in strataHolidayCalendars()) {
+        artifacts[StrategyKey(StrategyKind.HOLIDAY_CALENDAR, calendar.id)] =
+            HolidayCalendarExportCodec.encode(HolidayCalendarExport(version = LIBRARY_VERSION, calendar = calendar))
+    }
 
     return artifacts
 }

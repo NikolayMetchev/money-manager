@@ -444,4 +444,5 @@ private fun StrategyKey.displayLabel(): String =
         StrategyKind.API -> "$name (API)"
         StrategyKind.PASS_THROUGH -> "$name (Pass-through)"
         StrategyKind.CURRENCIES -> "$name (Currencies)"
+        StrategyKind.HOLIDAY_CALENDAR -> "$name (Location)"
     }

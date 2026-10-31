@@ -210,7 +210,9 @@ the local copy, so user-created ones don't show up as a change. A JDK bump that 
 Settings → Locations and holiday calendars edits. The database has a default location (`settings.default_location`,
 like the default currency, chosen in the setup wizard from the device's country) that an account overrides with its
 `location` attribute (the account editor's picker). A location naming no calendar fails a business-day import with a
-clear error rather than guessing.
+clear error rather than guessing. The catalog publishes each Strata location as a `StrategyKind.HOLIDAY_CALENDAR` artifact
+(`<code>.calendar.json`, rendered from Strata at publish time), and the strategy library syncs a database's locations
+like its strategies: installing one replaces that location's copy, keyed by code.
 
 **Key Classes**:
 - `Money`: Value class storing amount as `Long` with associated `Currency`

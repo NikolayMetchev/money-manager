@@ -172,6 +172,7 @@ kmp_test(
         "//app/importfilesource/core",
         "//app/model/accountmapping",
         "//app/model/apistrategy",
+        "//app/model/calendar",
         "//app/model/core",
         "//app/model/csv",
         "//app/model/csvstrategy",
