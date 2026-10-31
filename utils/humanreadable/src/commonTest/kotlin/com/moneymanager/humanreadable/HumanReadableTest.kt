@@ -11,6 +11,18 @@ import kotlin.time.Instant
 
 class HumanReadableTest {
     @Test
+    fun count_shortensToTheLargestThousandsUnit() {
+        assertEquals("0", HumanReadable.count(0))
+        assertEquals("999", HumanReadable.count(999))
+        assertEquals("1K", HumanReadable.count(1_000))
+        assertEquals("12.5K", HumanReadable.count(12_500))
+        assertEquals("300K", HumanReadable.count(300_000))
+        assertEquals("1M", HumanReadable.count(999_960))
+        assertEquals("1.2M", HumanReadable.count(1_234_567))
+        assertEquals("-2.5K", HumanReadable.count(-2_500))
+    }
+
+    @Test
     fun fileSize_belowOneKibibyte_isWholeBytes() {
         assertEquals("0 B", HumanReadable.fileSize(0))
         assertEquals("1023 B", HumanReadable.fileSize(1_023))

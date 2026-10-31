@@ -55,6 +55,7 @@ kmp_library(
         "//app/tasks",
         "//app/ui/foundation",
         "//utils/currency",
+        "//utils/humanreadable",
         "@maven_kmp//:androidx_compose_runtime",
         "@maven_kmp//:compose_foundation",
         "@maven_kmp//:compose_ui",

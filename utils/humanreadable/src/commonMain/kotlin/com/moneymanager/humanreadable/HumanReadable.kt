@@ -29,6 +29,21 @@ object HumanReadable {
             else -> "${(bytes / TIB.toDouble()).formatNumber(decimals)} TB"
         }
 
+    /**
+     * A count shortened to its largest unit of 1000 with at most one decimal: "950", "12.5K", "300K", "1.2M". A
+     * count that rounds up to the next unit takes it ("1M", not "1,000K").
+     */
+    fun count(count: Long): String {
+        var value = count.toDouble().absoluteValue
+        var unit = 0
+        while (unit < COUNT_UNITS.lastIndex && (value * 10).roundToLong() >= THOUSAND * 10) {
+            value /= THOUSAND
+            unit++
+        }
+        val text = value.formatNumber(if (unit == 0) 0 else 1).removeSuffix(".0")
+        return "${if (count < 0) "-" else ""}$text${COUNT_UNITS[unit]}"
+    }
+
     /** The largest sensible unit, rounded: "45 seconds", "3 hours", "2 weeks", "1 year". */
     fun duration(duration: Duration): String {
         val seconds = duration.inWholeSeconds
@@ -88,6 +103,8 @@ object HumanReadable {
     private const val GIB = MIB * KIB
     private const val TIB = GIB * KIB
     private const val DIGITS_PER_GROUP = 3
+    private const val THOUSAND = 1_000
+    private val COUNT_UNITS = listOf("", "K", "M", "B")
     private const val SECONDS_PER_MINUTE = 60L
     private const val SECONDS_PER_HOUR = 3_600L
     private const val DAYS_PER_WEEK = 7L

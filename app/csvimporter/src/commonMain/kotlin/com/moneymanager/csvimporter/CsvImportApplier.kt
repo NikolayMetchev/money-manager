@@ -71,7 +71,13 @@ import com.moneymanager.importengineapi.restageXlsxImport
 import com.moneymanager.tasks.Progress
 import com.moneymanager.tasks.WeightedProgress
 import com.moneymanager.xlsx.createXlsxParser
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -183,48 +189,83 @@ suspend fun ensureCryptoAssets(
 }
 
 /**
- * Pre-creates every crypto asset needed across a whole batch of [imports] **before** any file is
- * imported. This is what the per-file [ensureCryptoAssets] cannot do: a fiat file processed before
- * the crypto file that introduces a ticker would fail with "Currency not found". Creating everything
- * up front removes that ordering dependency. Returns the full crypto-asset set. No-op without
- * [cryptoRepository].
+ * Prepares a whole batch of [imports] before any file is imported, the files in parallel: stages each file as the
+ * strategy it matches reads it (a PDF's rows assembled by its line rules, an Excel file's worksheet), then
+ * pre-creates every crypto asset the batch needs, which the per-file [ensureCryptoAssets] cannot do: a fiat file
+ * processed before the crypto file that introduces a ticker would fail with "Currency not found". Creating
+ * everything up front removes that ordering dependency. Restaging is written one file at a time, as the engine
+ * doesn't serialize writes. [onPrepared] hears of each file, with its index in [imports], as it's done, in the
+ * order they finish. Returns the full crypto-asset set (empty without [cryptoRepository]).
  */
-suspend fun ensureCryptoAssetsForImports(
+@Suppress("LongParameterList")
+suspend fun prepareImports(
     imports: List<CsvImport>,
     strategies: List<CsvImportStrategy>,
     currencies: List<Currency>,
     csvImportRepository: CsvImportReadRepository,
     importEngine: ImportEngine,
     cryptoRepository: CryptoReadRepository?,
+    onPrepared: suspend (index: Int, file: CsvImport) -> Unit = { _, _ -> },
 ): List<CryptoAsset> {
-    if (cryptoRepository == null) return emptyList()
     val fiatCodes = currencies.mapTo(mutableSetOf()) { it.code.uppercase() }
-    val existingCrypto = cryptoRepository.getAllCryptoAssets().first().mapTo(mutableSetOf()) { it.code.uppercase() }
-
-    val codes = mutableSetOf<String>()
-    for (listedImport in imports) {
-        codes += cryptoCodesForImport(listedImport, strategies, csvImportRepository, importEngine, fiatCodes, existingCrypto)
-    }
+    val existingCrypto = cryptoRepository?.getAllCryptoAssets()?.first()?.mapTo(mutableSetOf()) { it.code.uppercase() }
+    val writes = Mutex()
+    val reports = Mutex()
+    val codes =
+        coroutineScope {
+            imports
+                .mapIndexed { index, listed ->
+                    async(Dispatchers.Default) {
+                        val staged = stageForStrategy(listed, strategies, csvImportRepository, importEngine, writes)
+                        val fileCodes =
+                            if (staged == null || existingCrypto == null) {
+                                emptySet()
+                            } else {
+                                cryptoCodesForImport(staged.first, staged.second, csvImportRepository, fiatCodes, existingCrypto)
+                            }
+                        reports.withLock { onPrepared(index, listed) }
+                        fileCodes
+                    }
+                }.awaitAll()
+                .flatten()
+                .toSet()
+        }
+    if (cryptoRepository == null) return emptyList()
     createCryptoAssets(codes, importEngine)
     return cryptoRepository.getAllCryptoAssets().first()
 }
 
-/** Per-import crypto codes for the batch pre-pass: matches the strategy and scans importable rows. */
-private suspend fun cryptoCodesForImport(
-    listedImport: CsvImport,
+// [listed] staged as the strategy it matches reads it, with that strategy; null when none matches. [writes] keeps
+// the restaging writes to one at a time.
+private suspend fun stageForStrategy(
+    listed: CsvImport,
     strategies: List<CsvImportStrategy>,
     csvImportRepository: CsvImportReadRepository,
     importEngine: ImportEngine,
+    writes: Mutex,
+): Pair<CsvImport, CsvImportStrategy>? {
+    val full = csvImportRepository.getImport(listed.id).first() ?: return null
+    val strategy =
+        full.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
+            ?: strategies.selectForImport(full, csvImportRepository)
+            ?: return null
+    val sheetStaged = writes.withLock { restageXlsxForStrategy(full, strategy, csvImportRepository, importEngine) }
+    // Assembling a PDF's rows is the slow part, so only its write waits for the others.
+    val staged =
+        assemblePdfForStrategy(sheetStaged, strategy, csvImportRepository)
+            ?.let { restage -> writes.withLock { restage.write(importEngine, csvImportRepository) } }
+            ?: sheetStaged
+    return staged to strategy
+}
+
+// The crypto tickers [csvImport]'s rows name that aren't assets yet.
+private suspend fun cryptoCodesForImport(
+    csvImport: CsvImport,
+    strategy: CsvImportStrategy,
+    csvImportRepository: CsvImportReadRepository,
     fiatCodes: Set<String>,
     existingCrypto: Set<String>,
 ): Set<String> {
-    val listed = csvImportRepository.getImport(listedImport.id).first() ?: return emptySet()
-    val strategy =
-        listed.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
-            ?: strategies.selectForImport(listed, csvImportRepository)
-            ?: return emptySet()
-    // A PDF's rows are the ones its strategy assembles, so they're staged before they're scanned.
-    val csvImport = restageForStrategy(listed, strategy, csvImportRepository, importEngine)
     // Scan ALL rows, not just importable ones: a re-import remaps already-IMPORTED rows too (value
     // updates, transfer→trade conversions), and their tickers must resolve at plan time. For a fresh
     // import every row is unimported, so this is the same set.
@@ -315,12 +356,21 @@ suspend fun bulkApplyCsv(
 ): BulkApplyResult {
     val outcomes = mutableListOf<BulkFileOutcome>()
 
-    val tracker = WeightedProgress(imports.map { it.rowCount }, onProgress = onProgress)
+    // Preparing a file reads every one of its rows (a PDF's lines, until they're assembled), so they weigh it.
+    val tracker =
+        WeightedProgress(
+            weights = imports.map { it.rowCount },
+            preparation = imports.map { it.rowCount },
+            preparationNoun = "files",
+            onProgress = onProgress,
+        )
     tracker.started(detail = "Preparing")
 
-    // Create every crypto asset the batch needs up front, sized to the batch-wide max precision per
-    // ticker, so cross-file ordering never leaves a ticker missing or a scale factor too small.
-    ensureCryptoAssetsForImports(imports, strategies, currencies, csvImportRepository, importEngine, cryptoRepository)
+    // Stage every file and create every crypto asset the batch needs up front, sized to the batch-wide max precision
+    // per ticker, so cross-file ordering never leaves a ticker missing or a scale factor too small.
+    prepareImports(imports, strategies, currencies, csvImportRepository, importEngine, cryptoRepository) { index, file ->
+        tracker.prepared(index, "Prepared", file.originalFileName)
+    }
 
     imports.forEachIndexed { index, listedImport ->
         tracker.itemStarted(index, listedImport.originalFileName)
@@ -516,20 +566,48 @@ suspend fun restagePdfForStrategy(
     csvImportRepository: CsvImportReadRepository,
     importEngine: ImportEngine,
 ): CsvImport {
-    val pdf = csvImportRepository.getPdfSource(csvImport.id) ?: return csvImport
+    val restage = assemblePdfForStrategy(csvImport, strategy, csvImportRepository) ?: return csvImport
+    return restage.write(importEngine, csvImportRepository)
+}
+
+/** A PDF import's rows as a strategy's line rules assembled them, not yet staged ([write]). */
+class PdfRestage internal constructor(
+    private val csvImport: CsvImport,
+    private val staged: PdfStagedRows,
+    private val rulesHash: String?,
+    private val lineCount: Int,
+) {
+    /** Stages the rows in place of the import's, returning the reloaded import. */
+    suspend fun write(
+        importEngine: ImportEngine,
+        csvImportRepository: CsvImportReadRepository,
+    ): CsvImport {
+        importEngine.restagePdfImport(csvImport.id, staged.headers, staged.rows, rulesHash)
+        logger.i { "Re-staged PDF import ${csvImport.id.id}: ${staged.rows.size} rows from $lineCount lines" }
+        return csvImportRepository.getImport(csvImport.id).first() ?: csvImport
+    }
+}
+
+/**
+ * The rows [strategy]'s line rules assemble from PDF import [csvImport]'s stored lines, or null when they needn't
+ * be staged again: not a PDF, already staged by these rules, or already imported.
+ */
+suspend fun assemblePdfForStrategy(
+    csvImport: CsvImport,
+    strategy: CsvImportStrategy,
+    csvImportRepository: CsvImportReadRepository,
+): PdfRestage? {
+    val pdf = csvImportRepository.getPdfSource(csvImport.id) ?: return null
     val lineConfig = strategy.config.pdfLines
     val rulesHash = lineConfig?.let { PdfRowAssembler.rulesHash(it) }
-    if (pdf.stagedRulesHash == rulesHash) return csvImport
+    if (pdf.stagedRulesHash == rulesHash) return null
     if (csvImport.lastAppliedAt != null) {
         // Its transactions point at the staged rows by index; a re-import unimports it first, and then it's restaged.
         logger.w { "PDF import ${csvImport.id.id} was imported with other line rules; keeping its rows until it's re-imported" }
-        return csvImport
+        return null
     }
-
     val staged = lineConfig?.let { PdfRowAssembler(it).assemble(pdf.lines) } ?: PdfRowAssembler.rawLines(pdf.lines)
-    importEngine.restagePdfImport(csvImport.id, staged.headers, staged.rows, rulesHash)
-    logger.i { "Re-staged PDF import ${csvImport.id.id}: ${staged.rows.size} rows from ${pdf.lines.size} lines" }
-    return csvImportRepository.getImport(csvImport.id).first() ?: csvImport
+    return PdfRestage(csvImport, staged, rulesHash, pdf.lines.size)
 }
 
 /**

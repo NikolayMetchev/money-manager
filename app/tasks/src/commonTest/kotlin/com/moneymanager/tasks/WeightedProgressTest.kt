@@ -38,6 +38,28 @@ class WeightedProgressTest {
         }
 
     @Test
+    fun preparationComesFirstAndCreditsStepsAsTheyFinish() =
+        runTest {
+            val tracker =
+                WeightedProgress(listOf(100, 100), preparation = listOf(100, 300), preparationNoun = "PDFs") { emitted += it }
+
+            // The steps run in parallel, so the second can finish first.
+            tracker.prepared(1, "Staged", "b.pdf")
+            tracker.prepared(0, "Staged", "a.pdf")
+            tracker.itemStarted(0, "a.pdf")
+            tracker.item(0, "a.pdf", Progress("Importing transactions", fraction = 0.5f))
+
+            assertEquals(listOf(0.5f, 4f / 6, 4f / 6, 0.75f), emitted.map { it.fraction })
+            // Preparation takes its share of the bar but isn't counted as rows.
+            assertTrue(emitted.all { it.total == 200 })
+            assertEquals(150, emitted.last().processed)
+            assertEquals(
+                listOf("Staged 1 of 2 PDFs — b.pdf", "Staged 2 of 2 PDFs — a.pdf"),
+                emitted.take(2).map { it.detail },
+            )
+        }
+
+    @Test
     fun clampsMultiPhaseSweepsMonotonic() =
         runTest {
             val tracker = tracker(listOf(10, 10))
