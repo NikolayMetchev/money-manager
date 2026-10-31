@@ -408,7 +408,7 @@
       "sqlite-wasm": "@sqlite.org/sqlite-wasm@3.54.1-build1"
     },
     "npm_forces": {
-      "@js-joda/core": "6.3.1"
+      "@js-joda/core": "6.3.2"
     }
   },
   "names": {
@@ -21226,7 +21226,7 @@
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ],
         "npm": {
-          "@js-joda/core": "6.3.1"
+          "@js-joda/core": "6.3.2"
         }
       },
       "jvm": {
@@ -21336,7 +21336,7 @@
           "org.jetbrains.kotlinx:kotlinx-serialization-core"
         ],
         "npm": {
-          "@js-joda/core": "6.3.1"
+          "@js-joda/core": "6.3.2"
         }
       }
     },
@@ -22394,11 +22394,11 @@
       "url": "https://registry.npmjs.org/@embedpdf/pdfium/-/pdfium-2.15.1.tgz",
       "integrity": "sha512-qDH4gEkGSQT0iM+07Hpm3LyvoB7PEFbW3Qyk6+LPkEYLJYfHagkHM1OzYlDq2EDOhJRguykTkzdMOT3/w27x5Q=="
     },
-    "@js-joda/core@6.3.1": {
+    "@js-joda/core@6.3.2": {
       "name": "@js-joda/core",
-      "version": "6.3.1",
-      "url": "https://registry.npmjs.org/@js-joda/core/-/core-6.3.1.tgz",
-      "integrity": "sha512-HRy+f6+bnhUGzf+yW1rJ5ME94/XrTGyEGhhnDPFj/2wkKa+5UecQYQPUa1WMWuIZ3aFsGKPzK7AHcmUeRJDz+Q=="
+      "version": "6.3.2",
+      "url": "https://registry.npmjs.org/@js-joda/core/-/core-6.3.2.tgz",
+      "integrity": "sha512-BVsYu84Gut8YTNR1v5/PnifmqXv4SVcfA/hVIM/mXADZfIocip/DfNppBtv+4am5hGH1XuH6FSoU8OHkBvZMeA=="
     },
     "@js-joda/timezone@3.2.0": {
       "name": "@js-joda/timezone",
@@ -22406,7 +22406,7 @@
       "url": "https://registry.npmjs.org/@js-joda/timezone/-/timezone-3.2.0.tgz",
       "integrity": "sha512-KReBYz7rW1kkmkpnwjZHUIjT4mXMBYbm1hxuf2mUEWjZzqcccRj8MTKbxH1LYETsxbpWZUwGkC4JwGwuwwEOMQ==",
       "deps": {
-        "@js-joda/core": "6.3.1"
+        "@js-joda/core": "6.3.2"
       }
     },
     "@sqlite.org/sqlite-wasm@3.54.1-build1": {
