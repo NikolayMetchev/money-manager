@@ -244,6 +244,9 @@ exclude:
       - bazel/kmp/native/toolchain.bzl
       - bazel/kmp/sqlite/extensions.bzl
       - bazel/kmp/web.bzl
+      # Android Studio's (ASwB) project view, which reads `derive_targets_from_directories`: the linter checks it
+      # against the JetBrains Bazel plugin's project-view schema, which has no such section.
+      - tools/android-studio/money-manager.bazelproject
 
   # [2] — refreshViews/sourceAccountOverride/engineBatchSize are passed other values by callers in
   # the UI modules (and one Poi-typed test builder the linter can't resolve).
