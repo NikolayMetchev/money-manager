@@ -230,7 +230,7 @@ TURBINE = "1.2.1"  # renovate: app.cash.turbine:turbine
 
 # npm packages the browser programs load, each with a `# renovate-npm:` comment naming the package. kotlinx-datetime
 # names @js-joda/core 3.2.0, and the time-zone database (which the browser has to bring itself) needs a newer core.
-JS_JODA_CORE = "6.3.1"  # renovate-npm: @js-joda/core
+JS_JODA_CORE = "6.3.2"  # renovate-npm: @js-joda/core
 JS_JODA_TIMEZONE = "3.2.0"  # renovate-npm: @js-joda/timezone
 SQLITE_WASM = "3.54.1-build1"  # renovate-npm: @sqlite.org/sqlite-wasm
 EMBEDPDF_PDFIUM = "2.15.1"  # renovate-npm: @embedpdf/pdfium
