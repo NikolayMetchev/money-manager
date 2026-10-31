@@ -213,14 +213,15 @@ fun StrategyCloudCard(
                     onClick = {
                         message = null
                         needsReconnect = false
-                        // Only choices for keys that are still conflicts apply (state may have moved on).
+                        // Only choices for keys that still need one apply (state may have moved on).
                         val conflicts =
                             state.items
                                 .filter { it.status == StrategyItemStatus.CONFLICT }
                                 .map { it.key }
                                 .toSet()
+                        val replaceable = state.items.filter { it.replaceable() }.map { it.key }
                         val pull = selectedToPull.toSet() + conflicts.filter { conflictChoices[it] == ConflictChoice.TAKE_DRIVE }
-                        val force = conflicts.filter { conflictChoices[it] == ConflictChoice.KEEP_MINE }.toSet()
+                        val force = (conflicts + replaceable).filter { conflictChoices[it] == ConflictChoice.KEEP_MINE }.toSet()
                         busyLocal = true
                         scope.launch {
                             runCatching {
@@ -398,6 +399,13 @@ private fun StrategyItemList(
                         onClick = { onConflictChoice(item.key, ConflictChoice.TAKE_DRIVE) },
                         label = { Text("Take Drive") },
                     )
+                } else if (item.replaceable()) {
+                    // Drive's copy can't be read (another app version's format): offer to overwrite it with ours.
+                    FilterChip(
+                        selected = conflictChoices[item.key] == ConflictChoice.KEEP_MINE,
+                        onClick = { onConflictChoice(item.key, ConflictChoice.KEEP_MINE) },
+                        label = { Text("Replace on Drive") },
+                    )
                 } else {
                     Text(
                         text = statusLabel(item.status),
@@ -410,6 +418,8 @@ private fun StrategyItemList(
         }
     }
 }
+
+private fun StrategyItem.replaceable(): Boolean = status == StrategyItemStatus.UNREADABLE && hasLocal
 
 @Composable
 private fun statusColor(status: StrategyItemStatus) =

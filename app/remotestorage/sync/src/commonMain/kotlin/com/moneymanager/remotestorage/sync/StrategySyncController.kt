@@ -58,6 +58,8 @@ data class StrategyItem(
     val key: StrategyKey,
     val status: StrategyItemStatus,
     val error: String? = null,
+    /** Whether this database has its own copy, which can replace a Drive copy it can't read. */
+    val hasLocal: Boolean = false,
 )
 
 /** Reactive snapshot of the whole library relative to the remote (drives the settings card). */
@@ -175,7 +177,12 @@ class StrategySyncController(
         val items =
             (local.keys + remote.keys).map { key ->
                 val status = classify(contents, library, key, local[key]?.contentHash, remote[key])
-                StrategyItem(key, status, error = readFailures[key]?.message?.takeIf { status == StrategyItemStatus.UNREADABLE })
+                StrategyItem(
+                    key,
+                    status,
+                    error = readFailures[key]?.message?.takeIf { status == StrategyItemStatus.UNREADABLE },
+                    hasLocal = key in local,
+                )
             }
         _state.value = StrategyLibraryState(items = items.sortedBy { it.key.name.lowercase() })
     }
@@ -183,7 +190,7 @@ class StrategySyncController(
     /**
      * Two-way sync: uploads every new/locally-changed artifact automatically; pulls the artifacts named
      * in [selectedToPull] (applying [resolutions] for their references); and force-uploads the conflicts
-     * named in [forceUpload] (local wins). Nothing is deleted. Republishes the state and returns a summary.
+     * and unreadable Drive copies named in [forceUpload] (local wins). Nothing is deleted. Republishes the state and returns a summary.
      * [onProgress] is invoked before each per-artifact step so the UI can show a determinate bar.
      */
     @Suppress("LongParameterList")
@@ -365,8 +372,14 @@ class StrategySyncController(
             upload(provider, entry, remoteFileId = null)
             return true
         }
-        // A file this app can't read may be a newer app's work, so never overwrite it automatically.
-        if (knownUnreadable(entry.key, remoteFile)) return false
+        // A file this app can't read may be a newer app's work, or an older one's in a retired format, so it is
+        // only overwritten when the person chose to replace it.
+        if (knownUnreadable(entry.key, remoteFile)) {
+            if (entry.key !in forceUpload) return false
+            upload(provider, entry, remoteFile.id)
+            readFailures.remove(entry.key)
+            return true
+        }
         val baseline = store.baseline(entry.key)
         if (baseline == null) {
             // Present both sides but never synced (e.g. identical built-ins on first connect): compare
