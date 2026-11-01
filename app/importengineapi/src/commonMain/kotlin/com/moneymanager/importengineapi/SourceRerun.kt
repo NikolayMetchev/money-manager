@@ -465,11 +465,13 @@ internal fun manualEditOf(
 
     val valuesAt = mutableMapOf(transfer.revisionId to transfer.values())
     history.forEach { entry ->
-        when (entry.auditType) {
-            AuditType.INSERT -> valuesAt.getOrPut(entry.revisionId) { entry.values() }
-            AuditType.UPDATE -> valuesAt.getOrPut(entry.revisionId - 1) { entry.values() }
-            AuditType.DELETE -> Unit
-        }
+        val revision =
+            when (entry.auditType) {
+                AuditType.INSERT -> entry.revisionId
+                AuditType.UPDATE -> entry.revisionId - 1
+                AuditType.DELETE -> null
+            }
+        if (revision != null && revision !in valuesAt) valuesAt[revision] = entry.values()
     }
     val fields = TransferField.entries
     val lastChange = mutableMapOf<TransferField, Long>()

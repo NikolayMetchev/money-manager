@@ -7,6 +7,6 @@ default_java_toolchain(
     name = "java_toolchain",
     java_runtime = "@bazel_tools//tools/jdk:current_java_runtime",
     # .bazelrc's java_language_version (bazel/renovate/repin_bytecode.py).
-    source_version = "26",
-    target_version = "26",
+    source_version = "27",
+    target_version = "27",
 )

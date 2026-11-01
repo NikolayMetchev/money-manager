@@ -30,6 +30,6 @@ define_kt_toolchain(
     experimental_use_abi_jars = True,
     # .bazelrc's java_language_version, which bazel/renovate/repin_bytecode.py sets: the JDK's, or the newest the
     # Kotlin compiler targets if that is older. rules_kotlin's own values stop at 25 (//bazel/third_party/rules_kotlin).
-    jvm_target = "26",
+    jvm_target = "27",
     kotlinc_options = ":kotlinc_options",
 )
