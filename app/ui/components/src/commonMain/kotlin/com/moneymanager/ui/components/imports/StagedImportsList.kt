@@ -284,6 +284,7 @@ fun ImportSectionHeader(
     onToggleExpanded: () -> Unit,
     actionLabel: String? = null,
     onAction: () -> Unit = {},
+    actionEnabled: Boolean = true,
     isWarning: Boolean = false,
     titleStyle: TextStyle = MaterialTheme.typography.titleSmall,
     indent: Dp = 0.dp,
@@ -337,7 +338,7 @@ fun ImportSectionHeader(
             }
         }
         if (actionLabel != null) {
-            TextButton(onClick = onAction) { Text(actionLabel) }
+            TextButton(onClick = onAction, enabled = actionEnabled) { Text(actionLabel) }
         }
     }
 }

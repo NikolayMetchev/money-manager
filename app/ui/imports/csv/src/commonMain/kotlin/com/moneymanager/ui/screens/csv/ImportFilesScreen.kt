@@ -11,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +40,8 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importdirectory.ImportDirectoryService
+import com.moneymanager.importdirectory.canDownloadAll
+import com.moneymanager.importdirectory.startDownloadAll
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
@@ -60,6 +63,7 @@ import com.moneymanager.ui.components.imports.stagedImportDirectoryOptions
 import com.moneymanager.ui.components.imports.stagedImportKinds
 import com.moneymanager.ui.components.imports.stagedImportPath
 import com.moneymanager.ui.components.imports.stagedImportStrategyOptions
+import com.moneymanager.ui.tasks.LocalTaskManager
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -67,7 +71,8 @@ import kotlin.time.Clock
 /**
  * Every staged file, whatever its format and wherever it came from: the import directories panel ([directories],
  * null leaves it out, for a front end with no import folders), "+ Import files", a search and filters, then the
- * Unimported / Imported / Ignored tabs. [directories] gets what a folder's "Show files" does: filter to that folder.
+ * Unimported / Imported / Ignored tabs. [directories] gets what a folder's "Show files" does (filter to that folder)
+ * and what to call when it starts a download (keep the panel open).
  */
 @Suppress("LongParameterList", "LongMethod")
 @Composable
@@ -89,7 +94,7 @@ fun ImportFilesScreen(
     importEngine: ImportEngine,
     onImportClick: (CsvImportId) -> Unit,
     onStrategiesClick: () -> Unit = {},
-    directories: (@Composable (onShowFiles: (ImportDirectory) -> Unit) -> Unit)? = null,
+    directories: (@Composable (onShowFiles: (ImportDirectory) -> Unit, onRunStarted: () -> Unit) -> Unit)? = null,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val stagedImports by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
@@ -117,7 +122,11 @@ fun ImportFilesScreen(
     var importMessage by remember { mutableStateOf<String?>(null) }
     var importMessageIsError by remember { mutableStateOf(false) }
     var filter by remember { mutableStateOf(StagedImportFilter()) }
-    // Null until the person opens or closes it: then open only while there are no files yet.
+    val taskManager = LocalTaskManager.current
+    val tasks by taskManager.tasks.collectAsState()
+    // Null until the person opens or closes it or starts a download: then open only while there are no files yet.
+    // A download latches the current state, or the files it stages would fold an open panel (its folders, progress
+    // and outcome) away mid-run.
     var directoriesExpanded by rememberSaveable { mutableStateOf<Boolean?>(null) }
 
     val filePicker =
@@ -258,19 +267,29 @@ fun ImportFilesScreen(
                     if (directories != null) {
                         val expanded = directoriesExpanded ?: imports.isEmpty()
                         item(key = "directories-header") {
+                            // In the header, so it's there folded too: the global task panel shows its progress.
                             ImportSectionHeader(
                                 title = "Directories",
                                 count = data.directories.count { it.parentId == null },
                                 expanded = expanded,
                                 onToggleExpanded = { directoriesExpanded = !expanded },
+                                actionLabel = "Download all",
+                                actionEnabled = importDirectoryService.canDownloadAll(data.directories, tasks),
+                                onAction = {
+                                    directoriesExpanded = expanded
+                                    importDirectoryService.startDownloadAll(taskManager)
+                                },
                             )
                         }
                         if (expanded) {
                             item(key = "directories") {
-                                directories { directory ->
-                                    filter = StagedImportFilter(directories = setOf(directory.id))
-                                    directoriesExpanded = false
-                                }
+                                directories(
+                                    { directory ->
+                                        filter = StagedImportFilter(directories = setOf(directory.id))
+                                        directoriesExpanded = false
+                                    },
+                                    { directoriesExpanded = true },
+                                )
                             }
                         }
                     }

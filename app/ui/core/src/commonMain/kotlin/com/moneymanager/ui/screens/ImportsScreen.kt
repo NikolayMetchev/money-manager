@@ -136,7 +136,7 @@ fun ImportsScreen(
                     onStrategiesClick = onCsvStrategiesClick,
                     directories =
                         if (showImportDirectories) {
-                            { onShowFiles ->
+                            { onShowFiles, onRunStarted ->
                                 ImportDirectoriesSection(
                                     importDirectoryService = importDirectoryService,
                                     importDirectoryRepository = importDirectoryRepository,
@@ -162,6 +162,9 @@ fun ImportsScreen(
                                         // import it again.
                                         importEngine.setCsvImportIgnored(id, ignored = false)
                                     },
+                                    onRunStarted = onRunStarted,
+                                    // The Files tab offers "Download all" in the panel's header.
+                                    showDownloadAll = false,
                                 )
                             }
                         } else {
