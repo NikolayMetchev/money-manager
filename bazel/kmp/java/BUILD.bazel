@@ -1,0 +1,11 @@
+load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolchain")
+
+# rules_java's own toolchains run javac on the newest JDK rules_java knows (remotejdk_25), which can't read a newer
+# JDK's class files. This one runs it on the JDK every other tool runs on (MODULE.bazel's JDK, through
+# --tool_java_runtime_version), compiling for .bazelrc's java_language_version.
+default_java_toolchain(
+    name = "java_toolchain",
+    java_runtime = "@bazel_tools//tools/jdk:current_java_runtime",
+    source_version = "25",
+    target_version = "25",
+)

@@ -73,13 +73,13 @@ kt_jvm_library(
     }),
 )
 
-# rules_java's JDK for each desktop OS, as the toolchain's `.bazelrc` picks (remotejdk_25).
+# MODULE.bazel's JDK (JDK_ARCHIVES) for each desktop OS: the one the toolchain runs, so jlink matches its jmods.
 _DESKTOP_JDK = {
-    "linux_arm64": "remotejdk25_linux_aarch64",
-    "linux_x64": "remotejdk25_linux",
-    "macos_arm64": "remotejdk25_macos_aarch64",
-    "macos_x64": "remotejdk25_macos",
-    "windows_x64": "remotejdk25_win",
+    "linux_arm64": "jdk_linux_aarch64",
+    "linux_x64": "jdk_linux_x86_64",
+    "macos_arm64": "jdk_macos_aarch64",
+    "macos_x64": "jdk_macos_x86_64",
+    "windows_x64": "jdk_windows_x86_64",
 }
 
 # The target's JDK modules: ProGuard's library jars (#1019) and what jlink bundles. The runtime toolchain leaves
