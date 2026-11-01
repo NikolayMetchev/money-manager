@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Re-pins everything a version bump leaves stale (#1029), so a Renovate PR needs no hand edits: the Kotlin/Native
-# toolchain when Kotlin moved, Node.js's and pdfium's archive SHA-256s, aapt2's build and checksums when AGP moved,
+# toolchain when Kotlin moved, Node.js's and pdfium's archive SHA-256s, the JDK's archives (and .bazelrc's runtime
+# version), the bytecode version (the JDK's, as far as Kotlin targets), aapt2's build and checksums when AGP moved,
 # Skiko's version (the one Compose was built against), every Maven lockfile (`bazel run @<hub>//:pin`: maven_kmp's and
 # the tools' rules_jvm_external ones), MODULE.bazel.lock, and the BUILD files Gazelle writes (a library's packages can
 # move). renovate-pins.yml runs it on Renovate's branches; run it by hand after editing MODULE.bazel.
@@ -18,6 +19,11 @@ if [ "$module_kotlin" != "$pinned_native" ]; then
 fi
 
 python3 bazel/renovate/repin_node.py MODULE.bazel
+python3 bazel/renovate/repin_jdk.py MODULE.bazel .bazelrc
+# rules_kotlin's compiler, whose JvmTarget says how new the bytecode can be.
+kotlinc_repo=rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin_git
+bazel fetch --repo="@@$kotlinc_repo"
+python3 bazel/renovate/repin_bytecode.py "$(bazel info output_base)/external/$kotlinc_repo"
 python3 bazel/renovate/repin_skiko.py MODULE.bazel
 python3 bazel/renovate/repin_pdfium.py MODULE.bazel
 python3 bazel/renovate/repin_aapt2.py MODULE.bazel bazel/kmp/android/pins.bzl

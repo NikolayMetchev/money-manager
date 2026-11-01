@@ -40,7 +40,7 @@ nothing) and features that only built-ins could configure. Don't recreate that d
 
 ## Technology Stack
 
-- **Language**: Kotlin | **Build**: Bazel | **JVM**: 25
+- **Language**: Kotlin | **Build**: Bazel | **JVM**: 27 (bytecode as new as Kotlin targets)
 - **Database**: SQLite via SQLDelight | **DI**: Metro 
 - **UI**: Compose Multiplatform with Material 3
 - **Object Mapping**: Mappie | **Code Quality**: Detekt, ktlint | **Logging**: Kermit
@@ -738,9 +738,14 @@ set of writes.
 
 ### Common Issues
 
-1. **Java**: JDK 25, which Bazel downloads (`remotejdk_25`). **JVM version sync**: the version is pinned in two places
-   that must move together — `.bazelrc` (`remotejdk_<n>` and the `java_language_version`s) and the Kotlin
-   toolchain's `jvm_target` (`bazel/kmp/BUILD.bazel`)
+1. **Java**: everything runs on, and the desktop app bundles, `MODULE.bazel`'s `JDK` (Azul Zulu 27, which Bazel
+   downloads; Zulu because it ships the `jmods/` jlink and ProGuard read, which Temurin dropped in 24). Renovate bumps
+   it to every release, LTS or not, and `repin.sh` (`repin_jdk.py`) rewrites the archives and `.bazelrc`'s
+   `remotejdk_<n>`. Javac runs on it through `//bazel/kmp/java:java_toolchain`. Code compiles for that JDK, or for the newest
+   Java the Kotlin compiler targets if that is older. `repin_bytecode.py` sets it after every JDK
+   or Kotlin bump in `.bazelrc`'s `java_language_version`s, the Java toolchain's `source_version`/`target_version` and
+   the Kotlin toolchain's `jvm_target` (`bazel/kmp/BUILD.bazel`); `jvm_target.patch` drops rules_kotlin's value lists,
+   which stop at 25. A plugin that can't handle the new bytecode (or Kotlin) fails that Renovate PR's build
 2. **Metro**: Keep the Kotlin version compatible with Metro (`KOTLIN` and `METRO` in `MODULE.bazel`; Renovate bumps
    them together). Graphs must be `interface`; binding containers `object`
 3. **SQLDelight**: write queries are `suspend` and return `Long`, not `Unit`; read with `awaitAs*`, never `executeAs*`

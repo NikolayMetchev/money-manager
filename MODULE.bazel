@@ -27,25 +27,70 @@ bazel_dep(name = "gazelle", version = "0.54.0")
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.download(version = "1.27.3")
 
-# Kotlin Multiplatform fragment support (see bazel/third_party/rules_kotlin/BUILD.bazel).
+# Kotlin Multiplatform fragment support and newer jvm_targets (see bazel/third_party/rules_kotlin/BUILD.bazel).
 single_version_override(
     module_name = "rules_kotlin",
     patch_strip = 1,
-    patches = ["//bazel/third_party/rules_kotlin:fragments.patch"],
+    patches = [
+        "//bazel/third_party/rules_kotlin:fragments.patch",
+        "//bazel/third_party/rules_kotlin:jvm_target.patch",
+    ],
 )
 
 register_toolchains("//bazel/kmp:kotlin_toolchain")
 
-# Each desktop OS's JDK, for its jmods (//bazel/kmp/deps:jdk_jmods).
-jdk = use_extension("@rules_java//java:extensions.bzl", "toolchains")
+# The JDK every Java and Kotlin action runs on (.bazelrc's java_runtime_version), whose jmods each desktop OS's build
+# bundles (//bazel/kmp/deps:jdk_jmods: jlink and ProGuard read them). Azul Zulu, because it ships jmods/: Temurin
+# hasn't since 24. rules_java only knows the LTS releases it was built with, so each platform's archive is listed here.
+# Renovate bumps JDK to every release, LTS or not; bazel/renovate/repin.sh then rewrites the archives, their SHA-256s
+# and .bazelrc's runtime version (bazel/renovate/repin_jdk.py).
+JDK = "27.0.1"
+
+JDK_ARCHIVES = {
+    "linux_aarch64": ["zulu27.30.109-ca-jdk27.0.1.0.3-linux_aarch64.tar.gz", "4b4d2fb4a6bff5fa4d3a1f22ac5933c87d83e41d5f78bcd88df878326342d507"],
+    "linux_x86_64": ["zulu27.30.109-ca-jdk27.0.1.0.3-linux_x64.tar.gz", "c128817926e4eebb30868b6ba082028f493afa716e459e34049bde0ab49a9829"],
+    "macos_aarch64": ["zulu27.30.109-ca-jdk27.0.1.0.3-macosx_aarch64.tar.gz", "88dec2f8609e7c4162778cbaef5437f00febd3c498a7c0e77277d1f4ac8f839d"],
+    "macos_x86_64": ["zulu27.30.109-ca-jdk27.0.1.0.3-macosx_x64.tar.gz", "88cf4b1d04ed677d88e53716fb0c960b89917a0234cea6555ba9aa5d37961b83"],
+    "windows_x86_64": ["zulu27.30.109-ca-jdk27.0.1.0.3-win_x64.zip", "70e0aff2bfc1a9468ef464f97c96b295188c15f5a6f7fec3429a4b924b8b338d"],
+}
+
+java_repository = use_extension("@rules_java//java:extensions.bzl", "java_repository")
+
+[
+    java_repository.remote(
+        name = "jdk_" + platform,
+        prefix = "remotejdk",
+        sha256 = archive[1],
+        # A macOS JDK is a bundle: its home is Contents/Home.
+        strip_prefix = archive[0].removesuffix(".tar.gz").removesuffix(".zip") + ("/Contents/Home" if platform.startswith("macos") else ""),
+        target_compatible_with = [
+            "@platforms//os:" + platform.split("_")[0],
+            "@platforms//cpu:" + platform.split("_", 1)[1],
+        ],
+        urls = ["https://cdn.azul.com/zulu/bin/" + archive[0]],
+        version = JDK.split(".")[0],
+    )
+    for platform, archive in JDK_ARCHIVES.items()
+]
+
 use_repo(
-    jdk,
-    "remotejdk25_linux",
-    "remotejdk25_linux_aarch64",
-    "remotejdk25_macos",
-    "remotejdk25_macos_aarch64",
-    "remotejdk25_win",
+    java_repository,
+    "jdk_linux_aarch64",
+    "jdk_linux_aarch64_toolchain_config_repo",
+    "jdk_linux_x86_64",
+    "jdk_linux_x86_64_toolchain_config_repo",
+    "jdk_macos_aarch64",
+    "jdk_macos_aarch64_toolchain_config_repo",
+    "jdk_macos_x86_64",
+    "jdk_macos_x86_64_toolchain_config_repo",
+    "jdk_windows_x86_64",
+    "jdk_windows_x86_64_toolchain_config_repo",
 )
+
+[register_toolchains("@jdk_%s_toolchain_config_repo//:all" % platform) for platform in JDK_ARCHIVES]
+
+# Its javac (rules_java's toolchains run javac on remotejdk_25).
+register_toolchains("//bazel/kmp/java:all")
 
 # Kotlin/Native for the exec host, at rules_kotlin's Kotlin version, with every konan dependency pinned in
 # bazel/kmp/native/pins.bzl (#998). After a Kotlin bump: bazel run @kotlin_native_repin//:repin
