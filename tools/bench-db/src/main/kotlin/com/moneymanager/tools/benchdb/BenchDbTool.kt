@@ -6,7 +6,6 @@ import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.database.di.toAppServices
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Asset
-import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
