@@ -58,7 +58,8 @@ java_repository = use_extension("@rules_java//java:extensions.bzl", "java_reposi
         name = "jdk_" + platform,
         prefix = "remotejdk",
         sha256 = archive[1],
-        strip_prefix = archive[0].removesuffix(".tar.gz").removesuffix(".zip"),
+        # A macOS JDK is a bundle: its home is Contents/Home.
+        strip_prefix = archive[0].removesuffix(".tar.gz").removesuffix(".zip") + ("/Contents/Home" if platform.startswith("macos") else ""),
         target_compatible_with = [
             "@platforms//os:" + platform.split("_")[0],
             "@platforms//cpu:" + platform.split("_", 1)[1],
