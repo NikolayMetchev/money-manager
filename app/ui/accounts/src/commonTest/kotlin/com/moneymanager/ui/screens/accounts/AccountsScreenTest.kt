@@ -793,7 +793,7 @@ class AccountsScreenTest {
                         reached += milestone
                     }
 
-                    override fun accountToOpen(accounts: List<Account>): Account? {
+                    override fun accountToOpen(accounts: List<Account>): Account {
                         offered += accounts
                         return accounts.first { it.name == "Savings Account" }
                     }
