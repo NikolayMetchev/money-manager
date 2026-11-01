@@ -2,6 +2,7 @@ package com.moneymanager.ui.screens
 
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasParent
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.onNodeWithText
@@ -47,6 +48,24 @@ private object OneFileFolder : ImportFileSourceFactory {
         }
 }
 
+/** The folder "/fake/Bank" with subfolders Savings and Card, whose files a test adds to as it goes. */
+private class BankFolders : ImportFileSourceFactory {
+    val files = mutableMapOf("/fake/Bank/Savings" to mutableListOf("savings-1.csv"), "/fake/Bank/Card" to mutableListOf("card-1.csv"))
+
+    override suspend fun create(directory: ImportDirectory): ImportFileSource =
+        object : ImportFileSource {
+            override suspend fun list(): List<ImportFileEntry> =
+                files[directory.folderRef].orEmpty().map { ImportFileEntry(ref = it, name = it, lastModifiedEpochMs = 1_000) }
+
+            override suspend fun listSubfolders(): List<ImportSubfolder> =
+                files.keys
+                    .filter { it.substringBeforeLast('/') == directory.folderRef }
+                    .map { ImportSubfolder(ref = it, name = it.substringAfterLast('/')) }
+
+            override suspend fun download(fileRef: String): ByteArray = "Date,Amount\n2024-01-01,1.00\n$fileRef\n".encodeToByteArray()
+        }
+}
+
 private class FixedLocationDatabaseManager(
     private val databaseManager: DatabaseManager,
     private val location: DbLocation,
@@ -69,7 +88,10 @@ class ImportDirectoriesPanelTest {
     }
 
     /** Opens the app on a database with one import folder (and, when [stagedFile] is given, one staged file). */
-    private fun ComposeUiTest.openImportsOn(stagedFile: String? = null) {
+    private fun ComposeUiTest.openImportsOn(
+        stagedFile: String? = null,
+        folders: ImportFileSourceFactory = OneFileFolder,
+    ) {
         val location = createTestDatabaseLocation().also { testDbLocation = it }
         val databaseManager = createTestDatabaseManager()
         runBlocking {
@@ -102,7 +124,7 @@ class ImportDirectoriesPanelTest {
             MoneyManagerTestApp(
                 databaseManager = FixedLocationDatabaseManager(databaseManager, location),
                 appVersion = AppVersion("1.0.0-test"),
-                importFileSourceFactory = OneFileFolder,
+                importFileSourceFactory = folders,
             )
         }
 
@@ -142,6 +164,28 @@ class ImportDirectoriesPanelTest {
             // The panel stays folded, and "Download all" is ready to look again.
             onNodeWithText("Add directory").assertDoesNotExist()
             waitUntilExactlyOneExists(hasText("Download all") and isEnabled(), timeoutMillis = 5000)
+        }
+    }
+
+    @Test
+    fun aFolderInTheFilesList_downloadsOnlyItsOwnFolders() {
+        runMoneyManagerComposeUiTest {
+            val folders = BankFolders()
+            openImportsOn(folders = folders)
+            onNodeWithText("Download all").performClick()
+            waitUntilExactlyOneExists(hasText("downloaded 2 file(s)", substring = true), timeoutMillis = 15000)
+            // Fold the directories panel, so the files list's folders are in view.
+            onNodeWithText("Directories (1)").performClick()
+            waitUntilExactlyOneExists(hasText("Card (1)", substring = true), timeoutMillis = 5000)
+
+            folders.files.getValue("/fake/Bank/Savings") += "savings-2.csv"
+            folders.files.getValue("/fake/Bank/Card") += "card-2.csv"
+            onNode(hasText("Download") and hasParent(hasText("Card (1)", substring = true))).performClick()
+
+            waitUntilExactlyOneExists(hasText("Card (2)", substring = true), timeoutMillis = 15000)
+            waitForIdle()
+            // Savings' new file is left for its own Download (or "Download all").
+            onNodeWithText("Unimported (3)").assertExists()
         }
     }
 }

@@ -40,18 +40,21 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importdirectory.ImportDirectoryService
-import com.moneymanager.importdirectory.canDownloadAll
+import com.moneymanager.importdirectory.canDownload
+import com.moneymanager.importdirectory.startDownload
 import com.moneymanager.importdirectory.startDownloadAll
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.components.MultiSelectFilterDropdown
+import com.moneymanager.ui.components.imports.FolderDownload
 import com.moneymanager.ui.components.imports.ImportSectionHeader
 import com.moneymanager.ui.components.imports.ImportStatusMessage
 import com.moneymanager.ui.components.imports.ImportsScreenHeader
 import com.moneymanager.ui.components.imports.ReimportAllDialog
 import com.moneymanager.ui.components.imports.ReimportPickerRepositories
+import com.moneymanager.ui.components.imports.SectionAction
 import com.moneymanager.ui.components.imports.StagedImportCard
 import com.moneymanager.ui.components.imports.StagedImportFilter
 import com.moneymanager.ui.components.imports.StagedImportsData
@@ -262,6 +265,13 @@ fun ImportFilesScreen(
                     scope.launch { files.forEach { importEngine.setCsvImportIgnored(it.id, ignore) } }
                 },
                 onUnimportAll = { unimportAllScope = it },
+                folderDownload =
+                    directories?.let {
+                        FolderDownload(
+                            canDownload = { folders -> importDirectoryService.canDownload(folders, tasks) },
+                            start = { title, folders -> importDirectoryService.startDownload(taskManager, title, folders) },
+                        )
+                    },
                 filter = filter,
                 header = {
                     if (directories != null) {
@@ -273,12 +283,16 @@ fun ImportFilesScreen(
                                 count = data.directories.count { it.parentId == null },
                                 expanded = expanded,
                                 onToggleExpanded = { directoriesExpanded = !expanded },
-                                actionLabel = "Download all",
-                                actionEnabled = importDirectoryService.canDownloadAll(data.directories, tasks),
-                                onAction = {
-                                    directoriesExpanded = expanded
-                                    importDirectoryService.startDownloadAll(taskManager)
-                                },
+                                actions =
+                                    listOf(
+                                        SectionAction(
+                                            "Download all",
+                                            enabled = importDirectoryService.canDownload(data.directories, tasks),
+                                        ) {
+                                            directoriesExpanded = expanded
+                                            importDirectoryService.startDownloadAll(taskManager)
+                                        },
+                                    ),
                             )
                         }
                         if (expanded) {

@@ -81,6 +81,19 @@ class StagedImportGroupsTest {
     }
 
     @Test
+    fun `gives each folder the import directories at and beneath it to download`() {
+        val placement = mapOf(monzoA.id to listOf(monzoFolder), unmatched.id to listOf(archiveFolder))
+
+        val tree = buildUnimportedDirectoryTree(listOf(monzoA, unmatched, manual), placement, allDirectories, matches = null)
+
+        // The root covers itself and every subfolder, even one with no files waiting.
+        assertEquals(setOf(drive, monzoFolder, archiveFolder), tree[0].directories.toSet())
+        assertEquals(listOf(monzoFolder), tree[0].children[0].directories)
+        assertEquals(listOf(archiveFolder), tree[0].children[1].directories)
+        assertEquals(emptyList(), tree[1].directories)
+    }
+
+    @Test
     fun `lists a file shared by several directories once under the first`() {
         val placement = mapOf(monzoA.id to listOf(local, drive), monzoB.id to listOf(drive))
 

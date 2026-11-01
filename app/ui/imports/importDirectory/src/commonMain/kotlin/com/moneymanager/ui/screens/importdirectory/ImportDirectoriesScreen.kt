@@ -49,7 +49,7 @@ import com.moneymanager.importdirectory.DOWNLOAD_ALL_TASK_KEY
 import com.moneymanager.importdirectory.FOLDER_DOWNLOAD_TASK_PREFIX
 import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importdirectory.SUBFOLDER_SEARCH_TASK_PREFIX
-import com.moneymanager.importdirectory.canDownloadAll
+import com.moneymanager.importdirectory.canDownload
 import com.moneymanager.importdirectory.directoryDownloadTaskKey
 import com.moneymanager.importdirectory.directoryRedownloadTaskKey
 import com.moneymanager.importdirectory.folderDownloadTaskKey
@@ -199,7 +199,7 @@ fun ImportDirectoriesSection(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (showDownloadAll) {
                 Button(
-                    enabled = importDirectoryService.canDownloadAll(directories, tasks),
+                    enabled = importDirectoryService.canDownload(directories, tasks),
                     onClick = {
                         statusMessage = null
                         onRunStarted()
