@@ -315,6 +315,16 @@ it is relative, so it runs under any prefix.
   msi by OS (WiX 3.11 is `@wix`), and its action runs locally (dpkg-deb/fakeroot, hdiutil, WiX).
   `--define=bundle_native_cli=true` adds the host's native `mm` under `lib/cli`. `install_smoke_test.sh` installs it
   and starts the app, `mm-jvm` and `mm`.
+- **AOT caches** (#1254): `aot_app_image` trains a JDK AOT cache (JEP 483/514/515) for each launcher of an image, and
+  the installer packages `:app_image_aot`. Each launcher runs once on `//tools/bench-db:bench_db` in a home of its own
+  (the desktop app through its startup probe, as far as an account's transactions), in two steps through the launcher
+  itself (record, then create: the jlinked runtime has no `bin/java`). The `.cfg` then names `$APPDIR/<launcher>.aot`
+  and sends the JVM's warnings to stderr, and a run with `-XX:AOTMode=on` fails the action unless the cache loads. On
+  Linux it trains on the executors under its own Xvfb (`--action_env=DISPLAY=…` uses that display instead), on macOS
+  and Windows on the host. A cache only loads when the jars keep the modification times it was trained against, so
+  every file is pinned to `JPackageRunner.PINNED_MTIME`: the deb keeps it through `SOURCE_DATE_EPOCH`, the dmg is
+  rewritten with it. The smoke test runs with `-XX:AOTMode=on`. Its inputs are the image, so a JDK or classpath change
+  retrains it. `bazel run //app/main/jvm:app` has none: its jars change with every rebuild.
 
 ## Android (`kmp/android`)
 

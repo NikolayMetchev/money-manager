@@ -1,7 +1,7 @@
 load("@rules_java//java:java_binary.bzl", "java_binary")
 load("@rules_java//java:java_test.bzl", "java_test")
 load("//bazel/kmp:defs.bzl", "kmp_library")
-load("//bazel/kmp/jpackage:jpackage.bzl", "jlink_runtime", "jpackage_app_image", "jpackage_installer")
+load("//bazel/kmp/jpackage:jpackage.bzl", "aot_app_image", "jlink_runtime", "jpackage_app_image", "jpackage_installer")
 load("//bazel/kmp/proguard:proguard.bzl", "proguard_jars")
 
 # gazelle:kmp_generate true
@@ -60,7 +60,9 @@ _JVM_FLAGS = [
     "--enable-native-access=ALL-UNNAMED",
 ]
 
-# `bazel run //app/main/jvm:app` is Gradle's `:app:main:jvm:run`; `:app_deploy.jar` is the app in one jar.
+# `bazel run //app/main/jvm:app` is Gradle's `:app:main:jvm:run`; `:app_deploy.jar` is the app in one jar. It has no
+# AOT cache (#1254): a cache holds its jars' modification times, which change with every rebuild, and a dynamic AppCDS
+# archive measured no faster here.
 java_binary(
     name = "app",
     jvm_flags = _JVM_FLAGS,
@@ -165,9 +167,35 @@ jpackage_app_image(
     version_file = "//:VERSION",
 )
 
+# The startup's classes, loaded and linked ahead of time (#1254): each launcher runs once on the benchmark database,
+# the desktop app through its startup probe as far as an account's transactions, mm-jvm as far as them too.
+aot_app_image(
+    name = "app_image_aot",
+    app_image = ":app_image",
+    database = "//tools/bench-db:bench_db",
+    host = select({
+        "@platforms//os:linux": False,
+        "//conditions:default": True,
+    }),
+    tags = ["manual"],
+    trainings = {
+        "MoneyManager": "\n".join([
+            "@env MM_STARTUP_PROBE={probe}",
+            "@env MM_STARTUP_PROBE_ACCOUNT=Alex Current Account",
+        ]),
+        "mm-jvm": "\n".join([
+            "--format",
+            "json",
+            "transactions",
+            "--account",
+            "^Alex Current Account$",
+        ]),
+    },
+)
+
 jpackage_installer(
     name = "installer",
-    app_image = ":app_image",
+    app_image = ":app_image_aot",
     args = select({
         "@platforms//os:windows": [
             "--win-dir-chooser",

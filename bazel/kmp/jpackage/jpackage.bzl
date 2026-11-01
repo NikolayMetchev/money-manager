@@ -1,4 +1,5 @@
-"""Compose Desktop's native distributions in Bazel (#1020): `jlink_runtime`, `jpackage_app_image`, `jpackage_installer`.
+"""Compose Desktop's native distributions in Bazel (#1020): `jlink_runtime`, `jpackage_app_image`, `aot_app_image`,
+`jpackage_installer`.
 
 `jlink_runtime` is `createRuntimeImage` (the target JDK's modules, Compose's flags), `jpackage_app_image` is
 `createReleaseDistributable` and `jpackage_installer` is `package<Format>` over that image. The arguments are the
@@ -14,12 +15,13 @@ JPackageInfo = provider(
     fields = {
         "head": "jpackage arguments before the type's own (`--add-launcher`, `--app-content`): the image's only.",
         "inputs": "depset of the files those arguments name.",
+        "name": "The image's name (`--name`).",
         "options": "JPackageRunner options (`--version-file`, `--name`, `--cli`, `--bundle-id`).",
         "tail": "jpackage arguments after the type (`--name`, `--description`, `--app-version`, `--vendor`).",
     },
 )
 
-def _run(ctx, mode, out, lines, inputs, mnemonic, message, host = False):
+def _run(ctx, mode, out, lines, inputs, mnemonic, message, host = False, shell_env = False):
     params = ctx.actions.declare_file("%s.%s.params" % (ctx.label.name, mode))
     ctx.actions.write(params, "\n".join([mode, out.path] + lines) + "\n")
     ctx.actions.run(
@@ -30,6 +32,7 @@ def _run(ctx, mode, out, lines, inputs, mnemonic, message, host = False):
         mnemonic = mnemonic,
         progress_message = message,
         execution_requirements = {"no-remote-exec": "1", "no-sandbox": "1"} if host else {},
+        use_default_shell_env = shell_env,
     )
 
 def _jlink_impl(ctx):
@@ -80,7 +83,13 @@ def _common(ctx):
         "--vendor",
         ctx.attr.vendor,
     ]
-    return JPackageInfo(options = options, head = head, tail = tail, inputs = depset(inputs))
+    return JPackageInfo(
+        name = ctx.attr.package_name,
+        options = options,
+        head = head,
+        tail = tail,
+        inputs = depset(inputs),
+    )
 
 def _image_impl(ctx):
     out = ctx.actions.declare_directory(ctx.label.name)
@@ -149,6 +158,52 @@ jpackage_app_image = rule(
         "runtime": attr.label(mandatory = True, allow_single_file = True, doc = "A `jlink_runtime`."),
         "vendor": attr.string(mandatory = True),
         "version_file": attr.label(allow_single_file = True, mandatory = True, doc = "`--app-version`'s text."),
+        "_runner": attr.label(default = "//bazel/kmp/jpackage:runner", executable = True, cfg = "exec"),
+    },
+)
+
+def _aot_impl(ctx):
+    out = ctx.actions.declare_directory(ctx.label.name)
+    info = ctx.attr.app_image[JPackageInfo]
+    image = ctx.file.app_image
+    lines = ["--image", image.path, "--name", info.name, "--database", ctx.file.database.path, "--"]
+    for launcher, training in ctx.attr.trainings.items():
+        lines.append("@launcher " + launcher)
+        lines += [line for line in training.split("\n") if line]
+    _run(
+        ctx,
+        "aot",
+        out,
+        lines,
+        depset([image, ctx.file.database]),
+        "AotCache",
+        "Training the AOT caches of %{label}",
+        host = ctx.attr.host,
+        # `--action_env=DISPLAY=…` trains on that display rather than a private Xvfb.
+        shell_env = True,
+    )
+    return [DefaultInfo(files = depset([out])), info]
+
+aot_app_image = rule(
+    implementation = _aot_impl,
+    doc = """A `jpackage_app_image` with an AOT cache (JEP 483/514/515) per launcher (#1254), trained by running each
+    launcher on `database` in a home of its own, and checked to load. Its inputs are the image (runtime and jars),
+    so a JDK or classpath change retrains it. Every file in it has one fixed modification time, which the caches
+    are trained against: an installer must install them at that time (see `JPackageRunner.PINNED_MTIME`).""",
+    attrs = {
+        "app_image": attr.label(
+            mandatory = True,
+            allow_single_file = True,
+            providers = [JPackageInfo],
+            doc = "A `jpackage_app_image`.",
+        ),
+        "database": attr.label(mandatory = True, allow_single_file = True, doc = "The database the training opens."),
+        "host": attr.bool(doc = "Train on the build machine: macOS and Windows, which the executors can't run."),
+        "trainings": attr.string_dict(
+            mandatory = True,
+            doc = """Launcher name → its training run: lines of `@env K=V` and arguments. `{probe}` in an env value is
+            a file in the run's scratch directory.""",
+        ),
         "_runner": attr.label(default = "//bazel/kmp/jpackage:runner", executable = True, cfg = "exec"),
     },
 )
