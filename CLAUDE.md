@@ -93,6 +93,11 @@ The desktop installer packages `:app_image_aot`, the app image with a JDK AOT ca
 each on the benchmark database (`//tools/bench-db:bench_db`); see `bazel/README.md`, "AOT caches". A cache is only
 valid while the installed jars keep their pinned modification times.
 
+**Startup tracking**: on every push to main, the installer smoke tests (Build and Test's deb, Desktop Installer's dmg
+and msi) also time the installed launchers with `bazel/perf/startup_bench.py` on `//tools/bench-db`'s databases, with
+and without the AOT cache, and the `perf-record` job appends the results (`bazel/perf/record.sh`) to `startup.jsonl`
+on the orphan `perf-data` branch, which `webpage/performance.html` graphs. Pull requests don't measure.
+
 Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer`, and `//app/main/cli:mm-linux-x64`,
 `:mm-linux-arm64`, `:mm-windows-x64`, `:mm-macos-arm64` (the Apple one only on macOS). The release smoke test,
 `bazel test //app/main/android-smoketest:smoketest_test`, installs the debug-signed minified APK

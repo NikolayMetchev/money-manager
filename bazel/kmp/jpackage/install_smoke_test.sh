@@ -5,6 +5,10 @@
 # -XX:AOTMode=on, which fails unless the installed AOT cache loads (#1254). CI runs it on fresh runners; it needs root
 # on Linux (apt) and a display (Linux: Xvfb).
 #
+# With STARTUP_BENCH_DBS (a directory holding //tools/bench-db's bench.db and empty.db) and STARTUP_BENCH_OUT (a
+# file), it then times the installed launchers' startup with bazel/perf/startup_bench.py and appends the results
+# there (#1254): CI does this on main, so every commit's startup is recorded on the perf-data branch.
+#
 # Usage: install_smoke_test.sh <installer directory> <expected version>
 set -euo pipefail
 
@@ -115,3 +119,14 @@ if [ -z "$started" ] || [ -z "$alive" ]; then
   exit 1
 fi
 echo "The desktop app started and stayed up."
+
+if [ -n "${STARTUP_BENCH_DBS:-}" ]; then
+  unset JAVA_TOOL_OPTIONS
+  python=$(command -v python3 || command -v python)
+  native() { case "$(uname -s)" in MINGW* | MSYS*) cygpath -w "$1" ;; *) echo "$1" ;; esac; }
+  "$python" -I "$(native "$(dirname "$0")/../../perf/startup_bench.py")" \
+    --bench-db "$(native "$STARTUP_BENCH_DBS/bench.db")" --empty-db "$(native "$STARTUP_BENCH_DBS/empty.db")" \
+    --desktop "$(native "$app")" --mm-jvm "$(native "$mm_jvm")" --mm "$(native "$mm")" \
+    --runs "${STARTUP_BENCH_RUNS:-10}" --label "${STARTUP_BENCH_LABEL:-}" \
+    --commit-date "$(git log -1 --format=%cI 2>/dev/null || true)" --out "$(native "$STARTUP_BENCH_OUT")"
+fi

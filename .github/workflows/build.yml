@@ -180,8 +180,25 @@ jobs:
           disable_search: true
           fail_ci_if_error: false
 
+      # On main (and manual runs) it also times the installed app's startup, which perf-record keeps (#1254).
       - name: Install and start the desktop installer
-        run: bazel/kmp/jpackage/install_smoke_test.sh ci-out/installer "$(cat VERSION)"
+        env:
+          MEASURE: ${{ github.event_name != 'pull_request' }}
+        run: |
+          if [ "$MEASURE" = true ]; then
+            export STARTUP_BENCH_DBS=ci-out/bench-dbs STARTUP_BENCH_OUT=$PWD/startup-Linux.jsonl
+            export STARTUP_BENCH_LABEL="$ImageOS $ImageVersion"
+          fi
+          bazel/kmp/jpackage/install_smoke_test.sh ci-out/installer "$(cat VERSION)"
+
+      - name: Upload the startup times
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: startup-Linux
+          path: startup-Linux.jsonl
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload the installer
         uses: actions/upload-artifact@v7
@@ -550,14 +567,36 @@ jobs:
           cache-name: installer-${{ matrix.name }}
           android-sdk: 'false'
 
+      # On main (and manual runs) it also builds the startup benchmark's databases and times the installed app's
+      # startup, which perf-record keeps (#1254).
       - name: Build the installer
+        env:
+          MEASURE: ${{ github.event_name != 'pull_request' }}
         run: >-
           bazel build --define=proguard_optimize=false --define=bundle_native_cli=true
-          //app/main/jvm:installer 2>&1 | tee build.log
+          //app/main/jvm:installer $([ "$MEASURE" = true ] && echo //tools/bench-db:bench_db //tools/bench-db:empty_db)
+          2>&1 | tee build.log
 
       # This job builds here, not on a BuildBuddy runner, so the installer is in bazel-bin (not ci-out).
       - name: Install and start it
-        run: bazel/kmp/jpackage/install_smoke_test.sh bazel-bin/app/main/jvm/installer "$(cat VERSION)"
+        env:
+          MEASURE: ${{ github.event_name != 'pull_request' }}
+        run: |
+          if [ "$MEASURE" = true ]; then
+            mkdir bench-dbs && cp bazel-bin/tools/bench-db/bench.db bazel-bin/tools/bench-db/empty.db bench-dbs/
+            export STARTUP_BENCH_DBS=$PWD/bench-dbs STARTUP_BENCH_OUT=$PWD/startup-${{ matrix.name }}.jsonl
+            export STARTUP_BENCH_LABEL="$ImageOS $ImageVersion"
+          fi
+          bazel/kmp/jpackage/install_smoke_test.sh bazel-bin/app/main/jvm/installer "$(cat VERSION)"
+
+      - name: Upload the startup times
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: startup-${{ matrix.name }}
+          path: startup-${{ matrix.name }}.jsonl
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload the installer
         uses: actions/upload-artifact@v7
@@ -565,6 +604,32 @@ jobs:
           name: installer-${{ matrix.name }}
           path: bazel-bin/app/main/jvm/installer/*
           retention-days: 7
+
+  # Appends main's startup times to startup.jsonl on the perf-data branch, which webpage/performance.html graphs
+  # (#1254). Whatever the OSes measured is kept, so one failed installer job only leaves a gap.
+  perf-record:
+    name: Record startup times
+    runs-on: ubuntu-latest
+    needs: [ build, desktop-installer ]
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: write
+    concurrency:
+      group: perf-data
+      cancel-in-progress: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Download the startup times
+        uses: actions/download-artifact@v8
+        with:
+          pattern: startup-*
+          path: startup
+          merge-multiple: true
+
+      - name: Record them on perf-data
+        run: bazel/perf/record.sh startup
 
   android-release:
     name: Android Release Build

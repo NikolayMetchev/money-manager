@@ -6,7 +6,7 @@ which otherwise reads the password database rather than HOME) holding a fresh co
 database as its last database, so a run never sees the real ~/.moneymanager and never sees another run's
 changes. Results go to stdout, or --out, as JSON lines, one per (runtime, scenario, variant, metric):
 
-    {"sha", "date", "os", "arch", "label", "runtime", "scenario", "variant", "metric",
+    {"sha", "commit_date", "date", "os", "arch", "label", "runtime", "scenario", "variant", "metric",
      "median_ms", "min_ms", "max_ms", "runs"}
 
 Variants: "cache" runs a launcher as shipped (with its AOT cache, when it has one); "nocache" adds
@@ -131,6 +131,7 @@ def main():
     parser.add_argument("--runs", type=int, default=5, help="measured runs per scenario, after one discarded warm-up")
     parser.add_argument("--variants", default="cache,nocache", help="JVM variants, from: " + ", ".join(VARIANT_FLAGS))
     parser.add_argument("--sha", default=os.environ.get("GITHUB_SHA", ""))
+    parser.add_argument("--commit-date", default="", help="when the commit was made (ISO 8601), to order the history")
     parser.add_argument("--label", default="", help="free text recorded with every result (e.g. the runner)")
     parser.add_argument("--out", help="append the JSON lines here instead of printing them")
     args = parser.parse_args()
@@ -159,6 +160,7 @@ def main():
                 for metric, values in samples.items():
                     record = {
                         "sha": args.sha,
+                        "commit_date": args.commit_date,
                         "date": date,
                         "os": os_name,
                         "arch": arch,
