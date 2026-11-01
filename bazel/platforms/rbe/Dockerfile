@@ -4,7 +4,9 @@ FROM gcr.io/flame-public/rbe-ubuntu24-04@sha256:5f0c01e5f6d79e58d7a996330de33aa3
 
 # libskiko-linux-x64.so links libGL, libX11 and fontconfig; fontconfig needs a font to lay out text. lld: the C
 # toolchain is configured on the machine running Bazel, and one with lld links with `-fuse-ld=lld` (the Go binaries).
-# Xvfb: training the desktop app's AOT cache (#1254) runs the real app, which opens a window.
+# Xvfb, and the X libraries AWT's libawt_xawt links: training the desktop app's AOT cache (#1254) runs the real
+# app, which opens a window.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgl1 libx11-6 libfontconfig1 fonts-dejavu-core lld xvfb xauth \
+        libxext6 libxi6 libxrender1 libxtst6 \
     && rm -rf /var/lib/apt/lists/*
