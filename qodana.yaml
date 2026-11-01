@@ -41,12 +41,15 @@ plugins:
   - id: org.jetbrains.bazel
 # The sync runs Bazel inside the container (the Qodana job mounts the runner's Android SDK and passes the BuildBuddy
 # RBE settings in user.bazelrc). Bazel downloads the JDK, Kotlin and every library itself; it needs only bazelisk and a C
-# compiler for the host toolchain's autodetection. The image can ship a libcrypt1 newer than its apt repositories'
-# libcrypt-dev, which g++ needs (through libc6-dev) at exactly its own version, so libcrypt1 is moved to that version.
+# compiler for the host toolchain's autodetection. The image is a Docker Hardened Image: its dhi.io apt repository
+# serves its index but refuses package downloads (403) without a subscription, so that source is dropped and Debian's
+# own is pinned above the image's `+dhi` builds. The compilers depend on some of those (gcc-14-base, libcrypt1 through
+# libc6-dev) at exactly Debian's version, which the pin lets apt downgrade to.
 bootstrap: >-
+  rm -f /etc/apt/sources.list.d/dhi.sources &&
+  printf 'Package: *\nPin: origin deb.debian.org\nPin-Priority: 1001\n' > /etc/apt/preferences.d/debian &&
   apt-get update -qq &&
-  libcrypt=$(apt-cache policy libcrypt-dev | sed -n 's/ *Candidate: //p') &&
-  apt-get install -y -qq --no-install-recommends --allow-downgrades "libcrypt1=$libcrypt"
+  apt-get install -y -qq --no-install-recommends --allow-downgrades
   ca-certificates curl gcc g++ python3 > /dev/null &&
   mkdir -p /usr/local/bin &&
   curl -fsSL -o /usr/local/bin/bazel
