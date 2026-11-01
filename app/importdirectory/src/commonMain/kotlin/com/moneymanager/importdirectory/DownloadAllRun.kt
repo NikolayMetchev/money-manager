@@ -15,7 +15,7 @@ fun List<TaskState>.importDirectoryRuns(): List<TaskState> =
 fun ImportDirectoryService.canDownload(
     directories: List<ImportDirectory>,
     tasks: List<TaskState>,
-): Boolean = tasks.importDirectoryRuns().none { it.isRunning } && directories.any(::isScannable)
+): Boolean = tasks.importDirectoryRuns().none { it.isRunning } && directories.any(this::isScannable)
 
 /** Starts "Download all" on [taskManager]: every folder's new and changed files, and any new subfolders. */
 fun ImportDirectoryService.startDownloadAll(taskManager: TaskManager) {

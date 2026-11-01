@@ -289,8 +289,8 @@ private fun <F : StagedImport<*>> LazyListScope.directoryTreeItems(
 }
 
 /**
- * A folder's "Download" in the files list: whether its import [directories] can be downloaded now, and starting
- * that, under the folder's [title][start].
+ * A folder's "Download" in the files list: [canDownload] says whether its import directories can be downloaded
+ * now, and [start] downloads them under the folder's title.
  */
 class FolderDownload(
     val canDownload: (directories: List<ImportDirectory>) -> Boolean,
