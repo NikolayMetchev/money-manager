@@ -23,6 +23,10 @@ fun directoryDownloadTaskKey(id: ImportDirectoryId): String = "${IMPORT_DIRECTOR
 /** Key of a folder's "Re-download" run (it and its subfolders). */
 fun directoryRedownloadTaskKey(id: ImportDirectoryId): String = "${IMPORT_DIRECTORIES_TASK_PREFIX}redownload-${id.id}"
 
+/** Key of a download of some folders (a folder of the files list and its subfolders). */
+fun foldersDownloadTaskKey(ids: List<ImportDirectoryId>): String =
+    "${IMPORT_DIRECTORIES_TASK_PREFIX}folders-${ids.map { it.id.toString() }.sorted().joinToString(",")}"
+
 fun folderDownloadTaskKey(id: ImportDirectoryId): String = "$FOLDER_DOWNLOAD_TASK_PREFIX${id.id}"
 
 fun subfolderSearchTaskKey(id: ImportDirectoryId): String = "$SUBFOLDER_SEARCH_TASK_PREFIX${id.id}"

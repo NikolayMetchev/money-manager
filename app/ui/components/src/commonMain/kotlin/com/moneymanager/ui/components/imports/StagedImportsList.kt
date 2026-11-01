@@ -58,6 +58,7 @@ data class StagedImportCardPlacement(
  * Unimported tab is a folder tree split by matched strategy, the Imported tab is grouped by the strategy
  * each file was applied with, and the Ignored tab is flat. Each folder and group offers its scoped bulk
  * action through [onImportAll], [onReimportAll] and (for formats that can unimport) [onUnimportAll];
+ * [folderDownload] (null leaves it out) puts a "Download" beside each import folder's "Import all";
  * [card] draws one file. [data] comes from [rememberStagedImportsData]. Only the files [filter] keeps are
  * counted, listed and acted on. [header] goes first in the same scrolling list, above the tabs.
  */
@@ -70,6 +71,7 @@ fun <K : Any, F : StagedImport<K>> StagedImportsTabs(
     onReimportAll: (List<F>) -> Unit,
     onSetIgnored: (List<F>, Boolean) -> Unit,
     onUnimportAll: ((List<F>) -> Unit)? = null,
+    folderDownload: FolderDownload? = null,
     filter: StagedImportFilter = StagedImportFilter(),
     header: LazyListScope.() -> Unit = {},
     card: @Composable (F, StagedImportCardPlacement) -> Unit,
@@ -165,6 +167,7 @@ fun <K : Any, F : StagedImport<K>> StagedImportsTabs(
                         expandedSections = expandedSections,
                         onImportAll = onImportAll,
                         onIgnoreAll = { onSetIgnored(it, true) },
+                        folderDownload = folderDownload,
                     ) { import, group, indent ->
                         card(
                             import,
@@ -190,11 +193,14 @@ fun <K : Any, F : StagedImport<K>> StagedImportsTabs(
                             count = group.imports.size,
                             expanded = expanded,
                             onToggleExpanded = { expandedSections[sectionKey] = !expanded },
-                            actionLabel = "Re-import all",
-                            onAction = { onReimportAll(group.imports) },
+                            actions =
+                                listOfNotNull(
+                                    onUnimportAll?.let { unimport ->
+                                        SectionAction("Unimport all", destructive = true) { unimport(group.imports) }
+                                    },
+                                    SectionAction("Re-import all") { onReimportAll(group.imports) },
+                                ),
                             isWarning = group.isWarning,
-                            secondaryActionLabel = onUnimportAll?.let { "Unimport all" },
-                            onSecondaryAction = { onUnimportAll?.invoke(group.imports) },
                         )
                     }
                     if (expanded) {
@@ -222,6 +228,7 @@ private fun <F : StagedImport<*>> LazyListScope.directoryTreeItems(
     expandedSections: SnapshotStateMap<String, Boolean>,
     onImportAll: (List<F>) -> Unit,
     onIgnoreAll: (List<F>) -> Unit,
+    folderDownload: FolderDownload?,
     card: @Composable (F, StagedImportStrategyGroup<F>, Dp) -> Unit,
 ) {
     val expanded = expandedSections[node.key] ?: true
@@ -231,8 +238,15 @@ private fun <F : StagedImport<*>> LazyListScope.directoryTreeItems(
             count = node.allImports.size,
             expanded = expanded,
             onToggleExpanded = { expandedSections[node.key] = !expanded },
-            actionLabel = "Import all",
-            onAction = { onImportAll(node.allImports) },
+            actions =
+                listOfNotNull(
+                    folderDownload?.takeIf { node.directories.isNotEmpty() }?.let { download ->
+                        SectionAction("Download", enabled = download.canDownload(node.directories)) {
+                            download.start(node.label, node.directories)
+                        }
+                    },
+                    SectionAction("Import all") { onImportAll(node.allImports) },
+                ),
             titleStyle = if (depth == 0) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
             indent = TREE_INDENT * depth,
             badge = node.provider?.label(),
@@ -240,7 +254,7 @@ private fun <F : StagedImport<*>> LazyListScope.directoryTreeItems(
     }
     if (!expanded) return
     node.children.forEach { child ->
-        directoryTreeItems(child, depth + 1, expandedSections, onImportAll, onIgnoreAll, card)
+        directoryTreeItems(child, depth + 1, expandedSections, onImportAll, onIgnoreAll, folderDownload, card)
     }
     val groupIndent = TREE_INDENT * (depth + 1)
     node.strategyGroups.forEach { group ->
@@ -255,13 +269,12 @@ private fun <F : StagedImport<*>> LazyListScope.directoryTreeItems(
                 count = group.imports.size,
                 expanded = groupExpanded,
                 onToggleExpanded = { expandedSections[sectionKey] = !groupExpanded },
-                actionLabel =
+                actions =
                     when {
-                        !group.actionable -> null
-                        isNoStrategyGroup -> "Ignore all"
-                        else -> "Import all"
+                        !group.actionable -> emptyList()
+                        isNoStrategyGroup -> listOf(SectionAction("Ignore all") { onIgnoreAll(group.imports) })
+                        else -> listOf(SectionAction("Import all") { onImportAll(group.imports) })
                     },
-                onAction = { if (isNoStrategyGroup) onIgnoreAll(group.imports) else onImportAll(group.imports) },
                 isWarning = group.isWarning,
                 titleStyle = MaterialTheme.typography.labelLarge,
                 indent = groupIndent,
@@ -275,23 +288,36 @@ private fun <F : StagedImport<*>> LazyListScope.directoryTreeItems(
     }
 }
 
-/** A collapsible section's title row in an import list, with its count and an optional action. */
+/**
+ * A folder's "Download" in the files list: [canDownload] says whether its import directories can be downloaded
+ * now, and [start] downloads them under the folder's title.
+ */
+class FolderDownload(
+    val canDownload: (directories: List<ImportDirectory>) -> Boolean,
+    val start: (title: String, directories: List<ImportDirectory>) -> Unit,
+)
+
+/** One button on an [ImportSectionHeader]. A [destructive] one (e.g. "Unimport all") is drawn in the error colour. */
+data class SectionAction(
+    val label: String,
+    val enabled: Boolean = true,
+    val destructive: Boolean = false,
+    val onClick: () -> Unit,
+)
+
+/** A collapsible section's title row in an import list, with its count and its [actions], left to right. */
 @Composable
 fun ImportSectionHeader(
     title: String,
     count: Int,
     expanded: Boolean,
     onToggleExpanded: () -> Unit,
-    actionLabel: String? = null,
-    onAction: () -> Unit = {},
+    actions: List<SectionAction> = emptyList(),
     isWarning: Boolean = false,
     titleStyle: TextStyle = MaterialTheme.typography.titleSmall,
     indent: Dp = 0.dp,
     // A small tag after the title, e.g. whether a directory is on Google Drive or local.
     badge: String? = null,
-    // An extra, destructive action drawn before the main one (e.g. "Unimport all" beside "Re-import all").
-    secondaryActionLabel: String? = null,
-    onSecondaryAction: () -> Unit = {},
 ) {
     val titleColor = if (isWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
     Row(
@@ -317,6 +343,8 @@ fun ImportSectionHeader(
                 text = if (isWarning) "⚠ $title ($count)" else "$title ($count)",
                 style = titleStyle,
                 color = titleColor,
+                // A long folder path wraps rather than squeezing the badge.
+                modifier = Modifier.weight(1f, fill = false),
             )
             if (badge != null) {
                 Spacer(modifier = Modifier.width(8.dp))
@@ -331,13 +359,14 @@ fun ImportSectionHeader(
                 )
             }
         }
-        if (secondaryActionLabel != null) {
-            TextButton(onClick = onSecondaryAction) {
-                Text(secondaryActionLabel, color = MaterialTheme.colorScheme.error)
+        actions.forEach { action ->
+            TextButton(onClick = action.onClick, enabled = action.enabled) {
+                if (action.destructive) {
+                    Text(action.label, color = MaterialTheme.colorScheme.error)
+                } else {
+                    Text(action.label)
+                }
             }
-        }
-        if (actionLabel != null) {
-            TextButton(onClick = onAction) { Text(actionLabel) }
         }
     }
 }

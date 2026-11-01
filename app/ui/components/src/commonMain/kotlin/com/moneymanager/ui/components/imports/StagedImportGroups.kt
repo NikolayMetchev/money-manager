@@ -29,7 +29,8 @@ data class StagedImportStrategyGroup<F : StagedImport<*>>(
  * A folder in the Unimported tab's directory tree. Roots are top-level import directories (plus a
  * [MANUALLY_ADDED_LABEL] root, [provider] null, for files added through the file picker); children are
  * subfolders derived from discovered directories' display paths. [strategyGroups] holds the files
- * directly in this folder; [allImports] everything beneath it, for the folder's "Import all".
+ * directly in this folder; [allImports] everything beneath it, for the folder's "Import all". [directories]
+ * are the import directories the folder and its subfolders are, for its "Download" (none for manually added files).
  */
 data class StagedImportDirectoryNode<F : StagedImport<*>>(
     val key: String,
@@ -37,6 +38,7 @@ data class StagedImportDirectoryNode<F : StagedImport<*>>(
     val provider: ImportDirectoryProvider?,
     val strategyGroups: List<StagedImportStrategyGroup<F>>,
     val children: List<StagedImportDirectoryNode<F>>,
+    val directories: List<ImportDirectory> = emptyList(),
 ) {
     val allImports: List<F> = strategyGroups.flatMap { it.imports } + children.flatMap { it.allImports }
 }
@@ -114,7 +116,8 @@ fun <K : Any, F : StagedImport<K>> buildUnimportedDirectoryTree(
                 directory.parentId?.let(byId::get) ?: directory
             }.map { (root, files) ->
                 val entries = files.map { relativeSegments(importDirectories.getValue(it.id).first(), root) to it }
-                buildNode("dir:${root.id}", root.listLabel(), root.provider, entries, matches)
+                val tree = directories.filter { it.id == root.id || it.parentId == root.id }.map { relativeSegments(it, root) to it }
+                buildNode("dir:${root.id}", root.listLabel(), root.provider, entries, matches, tree)
             }.sortedBy { it.label.lowercase() }
     return buildList {
         addAll(roots)
@@ -142,16 +145,20 @@ private fun <K : Any, F : StagedImport<K>> buildNode(
     provider: ImportDirectoryProvider?,
     entries: List<Pair<List<String>, F>>,
     matches: Map<K, CsvImportStrategy?>?,
+    // Every import directory at or beneath this folder, by its path relative to this folder.
+    tree: List<Pair<List<String>, ImportDirectory>> = emptyList(),
 ): StagedImportDirectoryNode<F> {
     val (here, deeper) = entries.partition { it.first.isEmpty() }
     val children =
         deeper
             .groupBy { it.first.first() }
             .map { (segment, items) ->
-                buildNode("$key/$segment", segment, provider, items.map { it.first.drop(1) to it.second }, matches).compacted()
+                val subtree = tree.filter { it.first.firstOrNull() == segment }.map { it.first.drop(1) to it.second }
+                buildNode("$key/$segment", segment, provider, items.map { it.first.drop(1) to it.second }, matches, subtree)
+                    .compacted()
             }.sortedBy { it.label.lowercase() }
     val strategyGroups = if (here.isEmpty()) emptyList() else buildUnimportedStrategyGroups(here.map { it.second }, matches)
-    return StagedImportDirectoryNode(key, label, provider, strategyGroups, children)
+    return StagedImportDirectoryNode(key, label, provider, strategyGroups, children, tree.map { it.second })
 }
 
 private tailrec fun <F : StagedImport<*>> StagedImportDirectoryNode<F>.compacted(): StagedImportDirectoryNode<F> {

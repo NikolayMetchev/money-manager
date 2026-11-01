@@ -47,12 +47,14 @@ import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importdirectory.DOWNLOAD_ALL_TASK_KEY
 import com.moneymanager.importdirectory.FOLDER_DOWNLOAD_TASK_PREFIX
-import com.moneymanager.importdirectory.IMPORT_DIRECTORIES_TASK_PREFIX
 import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importdirectory.SUBFOLDER_SEARCH_TASK_PREFIX
+import com.moneymanager.importdirectory.canDownload
 import com.moneymanager.importdirectory.directoryDownloadTaskKey
 import com.moneymanager.importdirectory.directoryRedownloadTaskKey
 import com.moneymanager.importdirectory.folderDownloadTaskKey
+import com.moneymanager.importdirectory.importDirectoryRuns
+import com.moneymanager.importdirectory.startDownloadAll
 import com.moneymanager.importdirectory.subfolderSearchTaskKey
 import com.moneymanager.importdirectory.summary
 import com.moneymanager.importengineapi.createImportDirectory
@@ -120,7 +122,9 @@ fun ImportDirectoriesScreen(
  * new/changed files for the imports screen's files list. Downloads run through [importDirectoryService] as
  * tasks; other writes go through the import engine. [driveFolderBrowser] powers the Drive folder picker. It
  * doesn't scroll by itself, so it can sit inside the caller's scrolling list. [onShowFiles] (null hides it)
- * shows one folder's files.
+ * shows one folder's files. [onRunStarted] fires whenever a download, re-download or "Download all" starts here,
+ * so a caller that collapses this section can keep it open while the person is using it. [showDownloadAll] false
+ * leaves out this section's own "Download all", for a caller that offers it in its header.
  */
 @Composable
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
@@ -138,6 +142,8 @@ fun ImportDirectoriesSection(
     // Unimports one staged CSV file; offered by re-download for files whose imported rows changed. Null
     // hides that option.
     unimportCsv: (suspend (CsvImportId) -> Unit)? = null,
+    onRunStarted: () -> Unit = {},
+    showDownloadAll: Boolean = true,
 ) {
     val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
@@ -159,7 +165,9 @@ fun ImportDirectoriesSection(
 
     // Every download, re-download and "Download all" runs as a task, so it carries on if this screen is left
     // and its outcome and per-file failures (detail and issues) are still there when the screen comes back.
-    val directoryRuns = tasks.filter { it.parentId == null && it.key.startsWith(IMPORT_DIRECTORIES_TASK_PREFIX) }
+    val directoryRuns = tasks.importDirectoryRuns()
+    // A run started elsewhere (the Files tab's header) supersedes a message about something this screen did.
+    LaunchedEffect(directoryRuns.lastOrNull()?.id) { statusMessage = null }
     val downloadAllTask = directoryRuns.lastOrNull { it.key == DOWNLOAD_ALL_TASK_KEY }
     val downloadAllRunning = downloadAllTask?.isRunning == true
     val scanning = directoryRuns.any { it.isRunning }
@@ -180,6 +188,7 @@ fun ImportDirectoriesSection(
         block: suspend TaskScope.() -> String,
     ) {
         statusMessage = null
+        onRunStarted()
         taskManager.start(key, title, "Connecting…", block)
     }
 
@@ -188,12 +197,16 @@ fun ImportDirectoriesSection(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                enabled = !scanning && directories.any(importDirectoryService::isScannable),
-                onClick = {
-                    startRun(DOWNLOAD_ALL_TASK_KEY, "Download all") { importDirectoryService.downloadAll(this).summary() }
-                },
-            ) { Text("Download all") }
+            if (showDownloadAll) {
+                Button(
+                    enabled = importDirectoryService.canDownload(directories, tasks),
+                    onClick = {
+                        statusMessage = null
+                        onRunStarted()
+                        importDirectoryService.startDownloadAll(taskManager)
+                    },
+                ) { Text("Download all") }
+            }
             Button(onClick = { showAddDialog = true }) { Text("Add directory") }
         }
 
