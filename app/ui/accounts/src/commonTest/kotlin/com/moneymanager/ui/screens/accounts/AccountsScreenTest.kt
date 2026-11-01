@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.screens.accounts
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithText
@@ -29,6 +30,9 @@ import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepos
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
 import com.moneymanager.presenter.error.ProvideSchemaAwareScope
+import com.moneymanager.ui.foundation.LocalStartupProbe
+import com.moneymanager.ui.foundation.StartupMilestone
+import com.moneymanager.ui.foundation.StartupProbe
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.MockMode
 import dev.mokkery.answering.returns
@@ -38,6 +42,7 @@ import dev.mokkery.matcher.any
 import dev.mokkery.mock
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.time.Duration
 
@@ -770,6 +775,54 @@ class AccountsScreenTest {
             // Then - only GBP is shown in the dropdown, USD is filtered out
             onNodeWithText("GBP — British Pound").assertIsDisplayed()
             onNodeWithText("USD — US Dollar").assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun accountsScreen_reportsAccountsReady_andOpensTheProbesAccount() {
+        runMoneyManagerComposeUiTest {
+            val now = Clock.System.now()
+            val checking = Account(id = AccountId(1L), name = "Checking Account", openingDate = now)
+            val savings = Account(id = AccountId(2L), name = "Savings Account", openingDate = now)
+            val reached = mutableListOf<StartupMilestone>()
+            val offered = mutableListOf<List<Account>>()
+            val opened = mutableListOf<Account>()
+            val probe =
+                object : StartupProbe {
+                    override fun reached(milestone: StartupMilestone) {
+                        reached += milestone
+                    }
+
+                    override fun accountToOpen(accounts: List<Account>): Account {
+                        offered += accounts
+                        return accounts.first { it.name == "Savings Account" }
+                    }
+                }
+
+            setContent {
+                CompositionLocalProvider(LocalStartupProbe provides probe) {
+                    ProvideSchemaAwareScope {
+                        AccountsScreen(
+                            accountRepository = createAccountRepository(listOf(checking, savings)),
+                            accountAttributeRepository = createAccountAttributeRepository(),
+                            attributeTypeRepository = createAttributeTypeRepository(),
+                            categoryRepository = createCategoryRepository(),
+                            transactionRepository = createTransactionRepository(),
+                            personRepository = createPersonRepository(),
+                            personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                            maintenance = createMaintenance(),
+                            scrollToAccountId = null,
+                            onAccountClick = { opened += it },
+                        )
+                    }
+                }
+            }
+
+            waitUntil(timeoutMillis = 5_000) { opened.isNotEmpty() }
+            waitForIdle()
+            assertEquals(listOf(StartupMilestone.ACCOUNTS_READY), reached)
+            assertEquals(setOf(checking, savings), offered.single().toSet())
+            assertEquals(listOf(savings), opened)
         }
     }
 

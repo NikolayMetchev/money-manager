@@ -82,6 +82,8 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.components.EditAccountDialog
+import com.moneymanager.ui.foundation.LocalStartupProbe
+import com.moneymanager.ui.foundation.StartupMilestone
 import com.moneymanager.ui.navigation.linuxHorizontalScrollWheel
 import com.moneymanager.ui.util.ScreenSizeClass
 import com.moneymanager.ui.util.formatAmount
@@ -274,6 +276,13 @@ fun AccountTransactionsScreen(
     LaunchedEffect(allAccounts, currencies, accountBalances) {
         if (allAccounts.isNotEmpty() || currencies.isNotEmpty() || accountBalances.isNotEmpty()) {
             hasLoadedMatrix = true
+        }
+    }
+
+    val startupProbe = LocalStartupProbe.current
+    if (startupProbe != null) {
+        LaunchedEffect(hasLoadedFirstPage) {
+            if (hasLoadedFirstPage) startupProbe.reached(StartupMilestone.TRANSACTIONS_READY)
         }
     }
 

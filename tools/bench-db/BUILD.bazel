@@ -1,0 +1,54 @@
+load("@rules_java//java:java_binary.bzl", "java_binary")
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_generate true
+
+kmp_library(
+    name = "bench-db",
+    jvm_deps = [
+        "//app/db/core",
+        "//app/db/di",
+        "//app/importengineapi",
+        "//app/model/core",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+    jvm_srcs = glob(["src/main/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+)
+
+java_binary(
+    name = "tool",
+    main_class = "com.moneymanager.tools.benchdb.BenchDbToolKt",
+    runtime_deps = [":bench-db_jvm"],
+)
+
+# The startup benchmark's database (#1254): bazel/perf/startup_bench.py and the AOT cache's training run open copies.
+genrule(
+    name = "bench_db",
+    outs = ["bench.db"],
+    cmd = "$(location :tool) $@",
+    tools = [":tool"],
+    visibility = ["//visibility:public"],
+)
+
+# The same database with no people, accounts or transfers: the startup benchmark's floor.
+genrule(
+    name = "empty_db",
+    outs = ["empty.db"],
+    cmd = "$(location :tool) --empty $@",
+    tools = [":tool"],
+    visibility = ["//visibility:public"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":bench-db",
+    jvm_deps = [
+        "//app/db/core",
+        "//app/db/di",
+        "//app/model/core",
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+    jvm_srcs = glob(["src/test/kotlin/**/*.kt"]),
+)

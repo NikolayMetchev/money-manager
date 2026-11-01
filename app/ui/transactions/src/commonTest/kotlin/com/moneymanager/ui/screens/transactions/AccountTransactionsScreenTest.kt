@@ -59,6 +59,9 @@ import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.test.database.testSource
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.foundation.LocalStartupProbe
+import com.moneymanager.ui.foundation.StartupMilestone
+import com.moneymanager.ui.foundation.StartupProbe
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import com.moneymanager.ui.util.ScreenSizeClass
 import dev.mokkery.MockMode
@@ -1408,6 +1411,58 @@ class AccountTransactionsScreenTest {
         } finally {
             // Clean up database
             testDbLocation?.let { deleteTestDatabase(it) }
+        }
+    }
+
+    @Test
+    fun accountTransactionsScreen_reportsTransactionsReady_onceTheFirstPageLoads() {
+        runMoneyManagerComposeUiTest {
+            val now = Clock.System.now()
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
+            val own = Account(id = AccountId(1L), name = "Checking", openingDate = now)
+            val shop = Account(id = AccountId(2L), name = "Coffee Shop", openingDate = now)
+            val transfer =
+                Transfer(
+                    id = TransferId(10L),
+                    timestamp = now,
+                    description = "Coffee",
+                    sourceAccountId = own.id,
+                    targetAccountId = shop.id,
+                    amount = Money.fromDisplayValue("3", usd),
+                )
+            val reached = mutableListOf<StartupMilestone>()
+            val probe =
+                object : StartupProbe {
+                    override fun reached(milestone: StartupMilestone) {
+                        reached += milestone
+                    }
+
+                    override fun accountToOpen(accounts: List<Account>): Account? = null
+                }
+
+            setContent {
+                CompositionLocalProvider(LocalStartupProbe provides probe) {
+                    ProvideSchemaAwareScope {
+                        AccountTransactionsScreen(
+                            accountId = own.id,
+                            transactionRepository = createTransactionRepository(listOf(transfer)),
+                            accountRepository = createAccountRepository(listOf(own, shop)),
+                            accountAttributeRepository = createAccountAttributeRepository(),
+                            categoryRepository = createCategoryRepository(),
+                            currencyRepository = createCurrencyRepository(listOf(usd)),
+                            attributeTypeRepository = createAttributeTypeRepository(),
+                            personRepository = createPersonRepository(),
+                            personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                            exchangeOrderRepository = createExchangeOrderRepository(),
+                            maintenance = createMaintenance(),
+                        )
+                    }
+                }
+            }
+
+            waitUntil(timeoutMillis = 5_000) { reached.isNotEmpty() }
+            waitForIdle()
+            assertEquals(listOf(StartupMilestone.TRANSACTIONS_READY), reached)
         }
     }
 

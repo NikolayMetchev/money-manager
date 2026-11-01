@@ -397,6 +397,8 @@ exclude:
       - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/navigation/Screen.kt
   - name: UnusedSymbol
     paths:
+      # [2] — StartupMilestone.FIRST_FRAME is reported only by the desktop entry point (app/main/jvm's Main.kt).
+      - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/foundation/StartupProbe.kt
       # [5] — native and nonJvm actuals, which no JVM module links to their expects, and what only the CLI or
       # another platform's source set calls (connectionPragmas: Android and the browser; the loopback factories:
       # jvmMain and nativeMain actuals; runReadOnlySql: the CLI; PortableRegex and escapeRegex: every importer).
