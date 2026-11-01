@@ -85,6 +85,9 @@ class WeightedProgress(
         if (itemsDone >= itemCount) {
             lastFraction = 1f
             itemUnitsDone = itemUnits.toFloat()
+        } else {
+            // Every started item has ended by now (skipped and failed ones never report reaching their end).
+            advanceTo(unitsBefore[itemsDone.coerceAtLeast(0)].toFloat())
         }
         val item = Progress.Item(minOf(itemsDone, itemCount), itemCount, itemsNoun, name = null, step = "Finishing up")
         onProgress(progress("Finishing up", item))

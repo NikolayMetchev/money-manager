@@ -157,6 +157,19 @@ class WeightedProgressTest {
         }
 
     @Test
+    fun aStoppedRunCreditsTheLastStartedItemEvenIfItNeverReportedItsEnd() =
+        runTest {
+            val tracker = WeightedProgress(listOf(10, 30)) { emitted += it }
+
+            // A skipped or failed file starts and ends without a 100% update.
+            tracker.itemStarted(0, "a.csv")
+            tracker.done(itemsDone = 1)
+
+            assertEquals(10, emitted.last().processed)
+            assertEquals(0.25f, emitted.last().fraction)
+        }
+
+    @Test
     fun theItemNounIsConfigurable() =
         runTest {
             WeightedProgress(listOf(1), itemNoun = "Session") { emitted += it }.itemStarted(0, "#7")

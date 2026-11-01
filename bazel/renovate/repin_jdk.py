@@ -1,6 +1,6 @@
 """Rewrites MODULE.bazel's JDK_ARCHIVES for its JDK version, each platform's newest Azul Zulu build of that release
 with its SHA-256 from Azul's metadata API, .bazelrc's java_runtime_version to the JDK's feature release, and
-.tool-versions' java to the same Zulu build, for SDKMAN and asdf (Renovate's asdf manager doesn't know Zulu, so it
+.tool-versions' java to the same Zulu build, for asdf and mise (Renovate's asdf manager doesn't know Zulu, so it
 never bumps that line itself). repin.sh runs it after Renovate bumps JDK."""
 
 import json
@@ -77,7 +77,11 @@ if updated != bazelrc:
 # asdf-java names a Zulu build by Azul's own version (zulu27.30.109-ca-jdk27.0.1… is zulu-27.30.109).
 zulu = re.search(r'"linux_x86_64": \["zulu([0-9.]+)-', open(module_path, encoding="utf-8").read()).group(1)
 tool_versions = open(tool_versions_path, encoding="utf-8").read()
-updated = re.sub(r"^java \S+$", f"java zulu-{zulu}", tool_versions, flags=re.M)
+updated, count = re.subn(
+    r"^(java[ \t]+)\S+([ \t]*(?:#.*)?)$", lambda m: f"{m.group(1)}zulu-{zulu}{m.group(2)}", tool_versions, flags=re.M
+)
+if count != 1:
+    sys.exit(f"{tool_versions_path} must have exactly one java line, found {count}")
 if updated != tool_versions:
     open(tool_versions_path, "w", encoding="utf-8").write(updated)
     print(f".tool-versions now names Zulu {zulu}")
