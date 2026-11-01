@@ -49,6 +49,8 @@ import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.components.MultiSelectFilterDropdown
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.foundation.LocalStartupProbe
+import com.moneymanager.ui.foundation.StartupMilestone
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.launch
 
@@ -89,6 +91,15 @@ fun AccountsScreen(
         }
     val snapshots = remember(accountQuery) { accountQuery.snapshot() }
     val model = presentAccounts(snapshots)
+    val startupProbe = LocalStartupProbe.current
+    if (startupProbe != null) {
+        LaunchedEffect(model.loaded) {
+            if (model.loaded) {
+                startupProbe.reached(StartupMilestone.ACCOUNTS_READY)
+                startupProbe.accountToOpen(model.all.map { it.account })?.let(onAccountClick)
+            }
+        }
+    }
     val categories by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         categoryRepository.getAllCategories()
     }

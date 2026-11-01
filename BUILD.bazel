@@ -209,6 +209,7 @@ kmp_modules(
         "//app/model/calendar:calendar_module",
         "//app/model/calendar:test_module",
         "//test/app/model/calendar:calendar_module",
+        "//tools/bench-db:bench-db_module",
     ],
     visibility = ["//visibility:public"],
 )

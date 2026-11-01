@@ -1,11 +1,14 @@
 package com.moneymanager
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -29,6 +32,8 @@ import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.CloseDatabaseDialog
 import com.moneymanager.ui.components.DatabaseProgressScreen
 import com.moneymanager.ui.foundation.CredentialVaultPromptHost
+import com.moneymanager.ui.foundation.LocalStartupProbe
+import com.moneymanager.ui.foundation.StartupMilestone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.swing.Swing
@@ -123,6 +128,7 @@ private fun MainWindow(onExit: () -> Unit) {
     var closeProgress by remember { mutableStateOf<Progress?>(null) }
     // Non-null while the close dialog (upload / keep-local tickboxes) is shown for a cloud-backed database.
     var closeDecision by remember { mutableStateOf<CloseDecision?>(null) }
+    val startupProbe = remember { DesktopStartupProbe.fromEnvironment(onDone = onExit) }
 
     Window(
         onCloseRequest = {
@@ -150,6 +156,12 @@ private fun MainWindow(onExit: () -> Unit) {
         title = "Money Manager",
         state = rememberWindowState(width = 1000.dp, height = 900.dp),
     ) {
+        if (startupProbe != null) {
+            LaunchedEffect(Unit) {
+                withFrameNanos { }
+                startupProbe.reached(StartupMilestone.FIRST_FRAME)
+            }
+        }
         val progress = closeProgress
         if (progress != null) {
             DatabaseProgressScreen(progress, title = "Closing Money Manager")
@@ -180,22 +192,24 @@ private fun MainWindow(onExit: () -> Unit) {
                     },
                 )
             }
-            AppStartupHost(
-                databaseManager = databaseManager,
-                appVersion = appVersion,
-                sessions = sessions,
-                onInfoLog = { message -> logger.i { message } },
-                onErrorLog = { message, error -> logger.e(error) { message } },
-                remoteController = remoteController,
-                strategySyncController = component.strategySyncController,
-                strategyCatalogController = component.strategyCatalogController,
-                importFileSourceFactory = importFileSourceFactory,
-                driveFolderBrowser = driveFolderBrowser,
-                cryptoCatalogRefresher = HttpCryptoCatalogRefresher(),
-                credentialVault = component.credentialVault,
-                credentialSyncController = component.credentialSyncController,
-                onDatabaseReady = { database, _ -> openDatabase[0] = database },
-            )
+            CompositionLocalProvider(LocalStartupProbe provides startupProbe) {
+                AppStartupHost(
+                    databaseManager = databaseManager,
+                    appVersion = appVersion,
+                    sessions = sessions,
+                    onInfoLog = { message -> logger.i { message } },
+                    onErrorLog = { message, error -> logger.e(error) { message } },
+                    remoteController = remoteController,
+                    strategySyncController = component.strategySyncController,
+                    strategyCatalogController = component.strategyCatalogController,
+                    importFileSourceFactory = importFileSourceFactory,
+                    driveFolderBrowser = driveFolderBrowser,
+                    cryptoCatalogRefresher = HttpCryptoCatalogRefresher(),
+                    credentialVault = component.credentialVault,
+                    credentialSyncController = component.credentialSyncController,
+                    onDatabaseReady = { database, _ -> openDatabase[0] = database },
+                )
+            }
         }
     }
 }
