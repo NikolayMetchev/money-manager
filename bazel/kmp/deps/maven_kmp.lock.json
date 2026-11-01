@@ -70,8 +70,8 @@
       "junit": "junit:junit:4.13.2",
       "kermit": "co.touchlab:kermit:2.2.0",
       "kermit-core": "co.touchlab:kermit-core:2.2.0",
-      "kotlin-compose-compiler-plugin-embeddable": "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable:2.4.21",
-      "kotlin-serialization-compiler-plugin-embeddable": "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable:2.4.21",
+      "kotlin-compose-compiler-plugin-embeddable": "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable:2.5.0-Beta2",
+      "kotlin-serialization-compiler-plugin-embeddable": "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable:2.5.0-Beta2",
       "kotlinx-browser": "org.jetbrains.kotlinx:kotlinx-browser:0.5.0",
       "kotlinx-coroutines-android": "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0",
       "kotlinx-coroutines-core": "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0",
@@ -20481,12 +20481,12 @@
     },
     "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable": {
       "jvm": {
-        "version": "2.4.21",
+        "version": "2.5.0-Beta2",
         "files": [
           {
-            "name": "kotlin-compose-compiler-plugin-embeddable-2.4.21.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-compose-compiler-plugin-embeddable/2.4.21/kotlin-compose-compiler-plugin-embeddable-2.4.21.jar",
-            "sha256": "634f5c17bed5854548208f2901071f2ead5993ffad25b34fea1668ee9e314b53"
+            "name": "kotlin-compose-compiler-plugin-embeddable-2.5.0-Beta2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-compose-compiler-plugin-embeddable/2.5.0-Beta2/kotlin-compose-compiler-plugin-embeddable-2.5.0-Beta2.jar",
+            "sha256": "a04f39f9605256f819c689da618c7225c26fb9793d38256cc4b01a8798ef7a68"
           }
         ]
       }
@@ -20517,34 +20517,34 @@
     },
     "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable": {
       "jvm": {
-        "version": "2.4.21",
+        "version": "2.5.0-Beta2",
         "files": [
           {
-            "name": "kotlin-serialization-compiler-plugin-embeddable-2.4.21.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-serialization-compiler-plugin-embeddable/2.4.21/kotlin-serialization-compiler-plugin-embeddable-2.4.21.jar",
-            "sha256": "63b381018a7d45221795d18301150fb80a1d00f30aae7be0550ab86f9ddd0ce8"
+            "name": "kotlin-serialization-compiler-plugin-embeddable-2.5.0-Beta2.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-serialization-compiler-plugin-embeddable/2.5.0-Beta2/kotlin-serialization-compiler-plugin-embeddable-2.5.0-Beta2.jar",
+            "sha256": "fe0d8e68d0ad2f5c4757ecd795cd3cc6fae4dfe7dd217d265bc06636f8ff5803"
           }
         ]
       }
     },
     "org.jetbrains.kotlin:kotlin-stdlib": {
       "js": {
-        "version": "2.4.21",
+        "version": "2.5.0-Beta2",
         "files": [
           {
-            "name": "kotlin-stdlib-js-2.4.21.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-js/2.4.21/kotlin-stdlib-js-2.4.21.klib",
-            "sha256": "1c2181c291848fdc00161dce3ab6f886a04a6085fa7beb27e4e436f301e8075c"
+            "name": "kotlin-stdlib-js-2.5.0-Beta2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-js/2.5.0-Beta2/kotlin-stdlib-js-2.5.0-Beta2.klib",
+            "sha256": "a85bd123c02c7f3ebdc7ead4090a2ed98655cdfd8a95989bdfd0fe986321445d"
           }
         ]
       },
       "metadata": {
-        "version": "2.4.21",
+        "version": "2.5.0-Beta2",
         "files": [
           {
-            "name": "kotlin-stdlib-2.4.21-all.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.21/kotlin-stdlib-2.4.21-all.jar",
-            "sha256": "74d9d7cf112bbf3d14612bb9fb867456a0ae36398d330df8178f0de42a61f476"
+            "name": "kotlin-stdlib-2.5.0-Beta2-all.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.5.0-Beta2/kotlin-stdlib-2.5.0-Beta2-all.jar",
+            "sha256": "ad41613f2168638a456ef943ab37586948b7c55eb123929f7ccec5a687862f3e"
           }
         ],
         "source_sets": [
@@ -20552,12 +20552,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "2.4.21",
+        "version": "2.5.0-Beta2",
         "files": [
           {
-            "name": "kotlin-stdlib-2.4.21-all.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.21/kotlin-stdlib-2.4.21-all.jar",
-            "sha256": "74d9d7cf112bbf3d14612bb9fb867456a0ae36398d330df8178f0de42a61f476"
+            "name": "kotlin-stdlib-2.5.0-Beta2-all.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.5.0-Beta2/kotlin-stdlib-2.5.0-Beta2-all.jar",
+            "sha256": "ad41613f2168638a456ef943ab37586948b7c55eb123929f7ccec5a687862f3e"
           }
         ],
         "source_sets": [
@@ -20565,34 +20565,34 @@
         ]
       },
       "wasmJs": {
-        "version": "2.4.21",
+        "version": "2.5.0-Beta2",
         "files": [
           {
-            "name": "kotlin-stdlib-wasm-js-2.4.21.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-wasm-js/2.4.21/kotlin-stdlib-wasm-js-2.4.21.klib",
-            "sha256": "48c2061061d0744487e1dfc1969a0de582b26c0094ea3f2ae986ea2ff2c25693"
+            "name": "kotlin-stdlib-wasm-js-2.5.0-Beta2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-wasm-js/2.5.0-Beta2/kotlin-stdlib-wasm-js-2.5.0-Beta2.klib",
+            "sha256": "ad12698d28acdc0eb17ccf74f9a5735bcafd69f36b87cfb1f2bfac4e719fbc42"
           }
         ]
       }
     },
     "org.jetbrains.kotlin:kotlin-test": {
       "js": {
-        "version": "2.4.21",
+        "version": "2.5.0-Beta2",
         "files": [
           {
-            "name": "kotlin-test-js-2.4.21.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-test-js/2.4.21/kotlin-test-js-2.4.21.klib",
-            "sha256": "e2b2ec0975944fa444b184695369830f2693f0d77be74a7e23d5854d00a269fd"
+            "name": "kotlin-test-js-2.5.0-Beta2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-test-js/2.5.0-Beta2/kotlin-test-js-2.5.0-Beta2.klib",
+            "sha256": "18fccb71d45a8d9dabb027c7b071cd708b834eea8d59cc871e53ec01383186b6"
           }
         ]
       },
       "metadata": {
-        "version": "2.4.21",
+        "version": "2.5.0-Beta2",
         "files": [
           {
-            "name": "kotlin-test-2.4.21-all.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-test/2.4.21/kotlin-test-2.4.21-all.jar",
-            "sha256": "51d2160793bdd145390829a5ba0dceb45f5e02924be4aac671c3912e4afc8c92"
+            "name": "kotlin-test-2.5.0-Beta2-all.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-test/2.5.0-Beta2/kotlin-test-2.5.0-Beta2-all.jar",
+            "sha256": "e330384b6b4d5486e6900f9c410e45e822a27198a30aa7e12f00144fb8bf71a6"
           }
         ],
         "source_sets": [
@@ -20601,12 +20601,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "2.4.21",
+        "version": "2.5.0-Beta2",
         "files": [
           {
-            "name": "kotlin-test-2.4.21-all.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-test/2.4.21/kotlin-test-2.4.21-all.jar",
-            "sha256": "51d2160793bdd145390829a5ba0dceb45f5e02924be4aac671c3912e4afc8c92"
+            "name": "kotlin-test-2.5.0-Beta2-all.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-test/2.5.0-Beta2/kotlin-test-2.5.0-Beta2-all.jar",
+            "sha256": "e330384b6b4d5486e6900f9c410e45e822a27198a30aa7e12f00144fb8bf71a6"
           }
         ],
         "source_sets": [
@@ -20615,12 +20615,12 @@
         ]
       },
       "wasmJs": {
-        "version": "2.4.21",
+        "version": "2.5.0-Beta2",
         "files": [
           {
-            "name": "kotlin-test-wasm-js-2.4.21.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-test-wasm-js/2.4.21/kotlin-test-wasm-js-2.4.21.klib",
-            "sha256": "dfc1df84d34ec052b2454f72ed6de357f644a01ad39e8d80676bacffae541caf"
+            "name": "kotlin-test-wasm-js-2.5.0-Beta2.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-test-wasm-js/2.5.0-Beta2/kotlin-test-wasm-js-2.5.0-Beta2.klib",
+            "sha256": "20aec844c669249be908b2619244ae161a165727c9f4b1e01a0d52f516c2044b"
           }
         ]
       }

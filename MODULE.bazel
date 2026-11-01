@@ -92,11 +92,6 @@ use_repo(
 # Its javac (rules_java's toolchains run javac on remotejdk_25).
 register_toolchains("//bazel/kmp/java:all")
 
-# Kotlin/Native for the exec host, at rules_kotlin's Kotlin version, with every konan dependency pinned in
-# bazel/kmp/native/pins.bzl (#998). After a Kotlin bump: bazel run @kotlin_native_repin//:repin
-kotlin_native = use_extension("//bazel/kmp/native:extensions.bzl", "kotlin_native")
-use_repo(kotlin_native, "kotlin_native_linux_x64", "kotlin_native_macos_arm64", "kotlin_native_mingw_x64", "kotlin_native_repin")
-
 # The SQLite amalgamation utils/sqlite3 builds (#1012). The release number in sqlite.org's download naming
 # (3.54.0 = 3540000), its year directory and the zip's SHA-256 move together.
 sqlite_amalgamation = use_extension("//bazel/kmp/sqlite:extensions.bzl", "sqlite_amalgamation")
@@ -247,7 +242,7 @@ JNA = "5.19.1"  # renovate: net.java.dev.jna:jna
 JSR305 = "3.0.2"  # renovate: com.google.code.findbugs:jsr305
 JUNIT = "4.13.2"  # renovate: junit:junit
 KERMIT = "2.2.0"  # renovate: co.touchlab:kermit
-KOTLIN = "2.4.21"  # renovate: org.jetbrains.kotlin:kotlin-stdlib
+KOTLIN = "2.5.0-Beta2"  # renovate: org.jetbrains.kotlin:kotlin-stdlib
 KOTLINX_BROWSER = "0.5.0"  # renovate: org.jetbrains.kotlinx:kotlinx-browser
 KOTLINX_COROUTINES = "1.11.0"  # renovate: org.jetbrains.kotlinx:kotlinx-coroutines-android
 KOTLINX_DATETIME = "0.8.0"  # renovate: org.jetbrains.kotlinx:kotlinx-datetime
@@ -279,6 +274,37 @@ JS_JODA_CORE = "6.3.2"  # renovate-npm: @js-joda/core
 JS_JODA_TIMEZONE = "3.2.1"  # renovate-npm: @js-joda/timezone
 SQLITE_WASM = "3.54.1-build1"  # renovate-npm: @sqlite.org/sqlite-wasm
 EMBEDPDF_PDFIUM = "2.15.1"  # renovate-npm: @embedpdf/pdfium
+
+# KOTLIN is a release rules_kotlin has none for yet (2.5.0-Beta2: Java 27 bytecode needs 2.5), so rules_kotlin runs it
+# in place of its own compiler: the compiler distribution, and the Build Tools API record (the implementation, the
+# embeddable compiler and its plugins, the libraries) with each jar's SHA-256. Drop both once rules_kotlin releases
+# KOTLIN, along with kotlin_native.compiler below.
+rules_kotlin_extensions = use_extension(
+    "@rules_kotlin//src/main/starlark/core/repositories:bzlmod_setup.bzl",
+    "rules_kotlin_extensions",
+)
+rules_kotlin_extensions.kotlinc_version(
+    sha256 = "715265cd7af26520e78188b1c71c409d4ad7bb1272d41509f57271aae3e46716",
+    version = KOTLIN,
+)
+rules_kotlin_extensions.btapi_impl_version(
+    name = "btapi_impl",
+    annotation_processing_sha256 = "58d6961bddcddd7c201b8dc0b78ae49add83199204be18425646392b2139182c",
+    build_tools_impl_sha256 = "0dc4ce20790f45c307126214987505e101997e87fee25c30b2e3a7a7ceb98fdb",
+    compiler_sha256 = "c81e8259130d2d436cbb50a4c38bef01ece252ca27aca5a23922af5aba4b3c8a",
+    daemon_client_sha256 = "4c60efa18ae2f54b8ae1610cf0242b80271651b4accdb26644c0e0d246eadb9b",
+    jvm_abi_gen_sha256 = "fa0bec420241910896a6a00141f6db0295b14504bc13e76eb0690bee26694535",
+    reflect_sha256 = "0c3d4738b8c6554b51cc3e54e6a9987b076c1a83364b9def219a83d9325f8dfc",
+    script_runtime_sha256 = "fa82da018563caaf986dbd463421e13aee55a630c4b9fa0239c42e511b926ff2",
+    stdlib_sha256 = "bcc8380470f1b4ff3795d9083ce6b9aa299e74e32f655fc9248f1801b63d36ef",
+    version = KOTLIN,
+)
+
+# Kotlin/Native for the exec host, at rules_kotlin's Kotlin version, with every konan dependency pinned in
+# bazel/kmp/native/pins.bzl (#998). After a Kotlin bump: bazel run @kotlin_native_repin//:repin
+kotlin_native = use_extension("//bazel/kmp/native:extensions.bzl", "kotlin_native")
+kotlin_native.compiler(version = KOTLIN)
+use_repo(kotlin_native, "kotlin_native_linux_x64", "kotlin_native_macos_arm64", "kotlin_native_mingw_x64", "kotlin_native_repin")
 
 maven_kmp = use_extension("//bazel/kmp/deps:extensions.bzl", "maven_kmp")
 maven_kmp.install(

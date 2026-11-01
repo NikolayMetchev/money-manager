@@ -128,7 +128,7 @@ internal abstract class AbstractCharClass : SpecialToken() {
         result.alt = this.alt
         result.altSurrogates = this.altSurrogates
         result.mayContainSupplCodepoints = this.mayContainSupplCodepoints
-        surrogates_.compareAndSet(null, result)
+        val _ = surrogates_.compareAndSet(null, result)
         return surrogates_.load()!!
     }
 
@@ -889,7 +889,7 @@ internal abstract class AbstractCharClass : SpecialToken() {
         fun getPredefinedClass(name: String, negative: Boolean): AbstractCharClass {
             val charClass = classCacheMap[name] ?: throw PatternSyntaxException("No such character class")
             val cachedClass = classCache[charClass.ordinal].load() ?: run {
-                classCache[charClass.ordinal].compareAndSet(null, charClass.factory())
+                val _ = classCache[charClass.ordinal].compareAndSet(null, charClass.factory())
                 classCache[charClass.ordinal].load()!!
             }
             return cachedClass.getValue(negative)

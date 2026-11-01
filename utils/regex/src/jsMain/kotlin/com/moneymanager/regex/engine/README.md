@@ -17,8 +17,9 @@ The Apache Harmony headers are kept.
 - `StdlibShims.kt`: the code-point helpers and internals Kotlin/JS's stdlib lacks or hides (`Char.toChars`,
   `Char.toCodePoint`, `digitOf`, …). `assert` is a no-op, as in a Kotlin/Native release build.
 - `CharCategory.value` (internal) became `ordinal`, used on both sides of every comparison.
-- Syntax newer than our language version rewritten: `val [a, b]` destructuring as `val (a, b)`, `val _ =` dropped,
-  `@IgnorableReturnValue` and the native opt-ins removed; deprecated `Char.toInt()` became `Char.code`.
+- Syntax newer than our language version rewritten: `val [a, b]` destructuring as `val (a, b)`,
+  `@IgnorableReturnValue` and the native opt-ins removed; deprecated `Char.toInt()` became `Char.code`. Upstream's
+  `val _ =` is kept where Kotlin 2.5's unused-return-value check needs it.
 - Each file carries `@file:Suppress("ktlint", "detekt:all")`, so the build's linters leave upstream's style alone.
 
 When Kotlin is bumped, nothing here has to move: the engine changes rarely. To pick up a fix, copy the new sources
