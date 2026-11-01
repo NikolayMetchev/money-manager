@@ -38,6 +38,11 @@
       "groupName": "compose multiplatform"
     },
     {
+      "description": "Qodana's linter image and the action that runs it release together, one per IDE release (2026.2, 2026.3, …)",
+      "matchPackageNames": ["/^jetbrains/qodana-/", "JetBrains/qodana-action"],
+      "groupName": "qodana"
+    },
+    {
       "description": "The app's library versions are looked up where maven_kmp.install's repositories resolve them: Maven Central or Google's repository (androidx)",
       "matchManagers": ["custom.regex"],
       "matchDatasources": ["maven"],
@@ -115,6 +120,13 @@
       "managerFilePatterns": ["/^\\.github/workflows/build\\.yml$/"],
       "matchStrings": ["BB_VERSION: (?<currentValue>\\S+)  # renovate: (?<depName>\\S+)"],
       "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "The Qodana linter image (qodana.yaml's image)",
+      "managerFilePatterns": ["/^qodana\\.yaml$/"],
+      "matchStrings": ["image: (?<depName>jetbrains/qodana-[a-z-]+):(?<currentValue>\\S+)"],
+      "datasourceTemplate": "docker"
     }
   ]
 }
