@@ -9,6 +9,8 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
+import com.moneymanager.domain.model.timeline.ImportFileDateRange
+import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
@@ -104,6 +106,39 @@ class StagedImportGroupsTest {
 
     private val allDirectories get() = listOf(drive, monzoFolder, archiveFolder, local)
 
+    @Test
+    fun `sorts files by earliest then latest transaction with range-less files last in their order`() {
+        val march = csvImport("march.csv")
+        val januaryToMarch = csvImport("jan-mar.csv")
+        val januaryToFebruary = csvImport("jan-feb.csv")
+        val notImported = csvImport("new.csv")
+        val empty = csvImport("empty.pdf")
+        val ranges =
+            mapOf(
+                march.id to range(earliestDay = 60, latestDay = 90),
+                januaryToMarch.id to range(earliestDay = 0, latestDay = 90),
+                januaryToFebruary.id to range(earliestDay = 0, latestDay = 45),
+            )
+
+        val sorted =
+            sortedByTransactionDates(listOf(notImported, march, januaryToMarch, empty, januaryToFebruary)) { ranges[it.id] }
+
+        assertEquals(listOf(januaryToFebruary, januaryToMarch, march, notImported, empty), sorted)
+    }
+
+    private fun range(
+        earliestDay: Long,
+        latestDay: Long,
+    ) = ImportFileDateRange(
+        kind = TimelineSourceKind.CSV,
+        fileId = "",
+        fileName = "",
+        strategyName = null,
+        earliest = Instant.fromEpochMilliseconds(earliestDay * DAY_MS),
+        latest = Instant.fromEpochMilliseconds(latestDay * DAY_MS),
+        transactionCount = 1,
+    )
+
     private fun csvImport(fileName: String) =
         CsvImport(
             id = CsvImportId(Uuid.random()),
@@ -134,4 +169,8 @@ class StagedImportGroupsTest {
         createdAt = Instant.fromEpochMilliseconds(0),
         updatedAt = Instant.fromEpochMilliseconds(0),
     )
+
+    private companion object {
+        const val DAY_MS = 86_400_000L
+    }
 }
