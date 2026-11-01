@@ -268,12 +268,16 @@ jobs:
           name: ${{ matrix.target }}-test-binaries
           path: ${{ runner.temp }}/native-tests
 
-      # For the launcher, which Bazel compiles for Java 25.
+      # For the launcher, whose bytecode can be as new as MODULE.bazel's JDK: run it on that JDK.
+      - name: Read the JDK version
+        id: jdk
+        shell: bash
+        run: echo "version=$(sed -n 's/^JDK = "\([^"]*\)".*/\1/p' MODULE.bazel)" >> "$GITHUB_OUTPUT"
       - name: Set up Java
         uses: actions/setup-java@v6
         with:
-          distribution: temurin
-          java-version: '25'
+          distribution: zulu
+          java-version: ${{ steps.jdk.outputs.version }}
 
       # Through Bazel's own launcher (`//bazel/kmp/testing:native_launcher`), so each binary writes the JUnit XML a
       # `bazel test` run would. Java on Windows needs Windows paths.
