@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Money Manager's startup times on every commit to main: the desktop app, mm-jvm and native mm, with and without the AOT cache.">
+  <title>Money Manager · Startup performance</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #ffffff;
+      --fg: #1f2328;
+      --muted: #59636e;
+      --accent: #1a7f37;
+      --border: #d1d9e0;
+      --grid: #eaeef2;
+      --code-bg: #f6f8fa;
+      --series-cache: #2a78d6;
+      --series-nocache: #eb6834;
+      --series-native: #1baf7a;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) {
+        color-scheme: dark;
+        --bg: #0d1117;
+        --fg: #e6edf3;
+        --muted: #9198a1;
+        --accent: #3fb950;
+        --border: #30363d;
+        --grid: #21262d;
+        --code-bg: #161b22;
+        --series-cache: #3987e5;
+        --series-nocache: #d95926;
+        --series-native: #199e70;
+      }
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0d1117;
+      --fg: #e6edf3;
+      --muted: #9198a1;
+      --accent: #3fb950;
+      --border: #30363d;
+      --grid: #21262d;
+      --code-bg: #161b22;
+      --series-cache: #3987e5;
+      --series-nocache: #d95926;
+      --series-native: #199e70;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 2.5rem 1rem 1.5rem;
+      text-align: center;
+    }
+    header h1 { margin: 0 0 0.25rem; font-size: 2rem; }
+    header p { margin: 0; color: var(--muted); }
+    header a { color: var(--accent); }
+    main { max-width: 980px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    a { color: var(--accent); }
+    code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
+    .filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin: 1rem 0 1.5rem; }
+    .filters label { display: flex; flex-direction: column; font-size: 0.85rem; color: var(--muted); gap: 0.2rem; }
+    select {
+      font: inherit; color: var(--fg); background: var(--bg);
+      border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.5rem; min-width: 9rem;
+    }
+    .status { color: var(--muted); }
+    .chart { margin: 0 0 2.5rem; }
+    .chart h2 { font-size: 1.1rem; margin: 0; }
+    .chart .sub { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.5rem; }
+    .legend { display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.85rem; color: var(--muted); margin: 0 0 0.25rem; }
+    .legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+    .key { display: inline-block; width: 16px; height: 2px; border-radius: 1px; }
+    .plot { position: relative; }
+    .plot svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y; }
+    .plot svg:focus { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+    .axis text, .direct { font-size: 11px; fill: var(--muted); }
+    .direct { font-size: 12px; }
+    .tooltip {
+      position: absolute; pointer-events: none; z-index: 1;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12); padding: 0.45rem 0.6rem; font-size: 0.8rem; min-width: 11rem;
+    }
+    .tooltip .head { color: var(--muted); margin-bottom: 0.25rem; }
+    .tooltip .row { display: flex; align-items: center; gap: 0.45rem; }
+    .tooltip strong { min-width: 4.2rem; text-align: right; font-variant-numeric: tabular-nums; }
+    .tooltip .name { color: var(--muted); }
+    details { margin-top: 0.5rem; font-size: 0.85rem; }
+    summary { cursor: pointer; color: var(--muted); }
+    .table-wrap { overflow-x: auto; }
+    table { border-collapse: collapse; margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
+    th, td { border-bottom: 1px solid var(--border); padding: 0.25rem 0.75rem 0.25rem 0; text-align: right; white-space: nowrap; }
+    th:first-child, td:first-child { text-align: left; }
+    th { color: var(--muted); font-weight: 600; }
+    footer { border-top: 1px solid var(--border); padding: 1.5rem 1rem; text-align: center; color: var(--muted); font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Startup performance</h1>
+  <p>How long Money Manager takes to start, on every commit to main. <a href="index.html">Home</a></p>
+</header>
+<main>
+  <p>
+    After each push to main, CI installs that commit's desktop installer on Linux, macOS and Windows and times the
+    installed app opening a benchmark database (3 people, 50 accounts, 20,000 transfers) and an empty one, with
+    <code>bazel/perf/startup_bench.py</code>. Every figure is the median of 10 runs from a clean home directory, in
+    milliseconds from process start. <strong>AOT cache</strong> is the app as shipped; <strong>no cache</strong> is
+    the same app with <code>-XX:AOTMode=off</code>. GitHub's runners are shared machines, so expect noise of
+    10–20%: look for steps that persist, not single points. The data is
+    <a href="https://github.com/NikolayMetchev/money-manager/blob/perf-data/startup.jsonl">startup.jsonl</a> on the
+    <code>perf-data</code> branch.
+  </p>
+  <div class="filters">
+    <label>Operating system <select id="os"></select></label>
+    <label>Database
+      <select id="db">
+        <option value="bench">Benchmark (20,000 transfers)</option>
+        <option value="empty">Empty</option>
+      </select>
+    </label>
+    <label>Commits
+      <select id="range">
+        <option value="30">Last 30</option>
+        <option value="100" selected>Last 100</option>
+        <option value="0">All</option>
+      </select>
+    </label>
+  </div>
+  <p class="status" id="status">Loading…</p>
+  <div id="charts"></div>
+</main>
+<footer>
+  Money Manager · <a href="https://github.com/NikolayMetchev/money-manager/issues/1254">#1254</a>
+</footer>
+<script>
+  "use strict";
+  // ?data=<url> reads another file, to try the page on sample results.
+  const DATA_URL = new URLSearchParams(location.search).get("data") ||
+    "https://raw.githubusercontent.com/NikolayMetchev/money-manager/perf-data/startup.jsonl";
+  const REPO = "https://github.com/NikolayMetchev/money-manager";
+  const SERIES = {
+    cache: { name: "AOT cache", color: "var(--series-cache)" },
+    nocache: { name: "No cache", color: "var(--series-nocache)" },
+    native: { name: "Native mm", color: "var(--series-native)" },
+  };
+  // Each chart: the runtime, a scenario prefix (the database is appended) and the metric, then its series.
+  const CHARTS = [
+    { title: "Desktop: first frame", sub: "Until the window draws its first frame.", scenario: "startup", metric: "first-frame", series: [["desktop", "cache"], ["desktop", "nocache"]] },
+    { title: "Desktop: accounts ready", sub: "Until the Accounts screen has loaded its accounts.", scenario: "startup", metric: "accounts-ready", series: [["desktop", "cache"], ["desktop", "nocache"]] },
+    { title: "Desktop: transactions ready", sub: "Until an account's Transactions screen has loaded its first page.", scenario: "startup", metric: "transactions-ready", benchOnly: true, series: [["desktop", "cache"], ["desktop", "nocache"]] },
+    { title: "CLI: mm accounts", sub: "Wall time of mm accounts --format json.", scenario: "accounts", metric: "wall", series: [["mm-jvm", "cache"], ["mm-jvm", "nocache"], ["mm", "native"]] },
+    { title: "CLI: mm transactions", sub: "Wall time of mm transactions --account … --format json.", scenario: "transactions", metric: "wall", benchOnly: true, series: [["mm-jvm", "cache"], ["mm-jvm", "nocache"], ["mm", "native"]] },
+  ];
+  const OS_NAMES = { linux: "Linux", macos: "macOS", windows: "Windows" };
+  const SVG = "http://www.w3.org/2000/svg";
+
+  let records = [];
+
+  function el(tag, attrs = {}, text) {
+    const node = tag.startsWith("svg:") ? document.createElementNS(SVG, tag.slice(4)) : document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function seriesName(runtime, variant) {
+    return SERIES[variant].name + (runtime === "mm-jvm" ? " (mm-jvm)" : "");
+  }
+
+  function fmt(ms) {
+    return ms >= 10000 ? (ms / 1000).toFixed(1) + " s" : Math.round(ms).toLocaleString("en") + " ms";
+  }
+
+  function niceMax(v) {
+    const p = Math.pow(10, Math.floor(Math.log10(v)));
+    for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p;
+    return 10 * p;
+  }
+
+  /** The commits that have this OS's results, oldest first, each with its records keyed runtime|scenario|variant|metric. */
+  function commitsFor(os) {
+    const bySha = new Map();
+    for (const r of records) {
+      if (r.os !== os) continue;
+      let c = bySha.get(r.sha);
+      if (!c) {
+        c = { sha: r.sha, when: r.commit_date || r.date, values: new Map() };
+        bySha.set(r.sha, c);
+      }
+      // A rerun of the same commit replaces the earlier figures.
+      c.values.set([r.runtime, r.scenario, r.variant, r.metric].join("|"), r);
+    }
+    return [...bySha.values()].sort((a, b) => a.when.localeCompare(b.when));
+  }
+
+  function render() {
+    const os = document.getElementById("os").value;
+    const db = document.getElementById("db").value;
+    const range = Number(document.getElementById("range").value);
+    let commits = commitsFor(os);
+    if (range) commits = commits.slice(-range);
+    const host = document.getElementById("charts");
+    host.replaceChildren();
+    for (const spec of CHARTS) {
+      if (spec.benchOnly && db !== "bench") continue;
+      const scenario = `${spec.scenario}-${db}`;
+      const series = spec.series.map(([runtime, variant]) => ({
+        runtime, variant, name: seriesName(runtime, variant), color: SERIES[variant].color,
+        points: commits.map((c) => c.values.get([runtime, scenario, variant, spec.metric].join("|"))?.median_ms ?? null),
+      })).filter((s) => s.points.some((p) => p !== null));
+      host.append(chart(spec, commits, series));
+    }
+  }
+
+  function chart(spec, commits, series) {
+    const section = el("section", { class: "chart" });
+    section.append(el("h2", {}, spec.title), el("p", { class: "sub" }, spec.sub));
+    if (!series.length || commits.length === 0) {
+      section.append(el("p", { class: "status" }, "No results for this selection yet."));
+      return section;
+    }
+    const legend = el("div", { class: "legend" });
+    for (const s of series) {
+      const item = el("span");
+      const key = el("span", { class: "key" });
+      key.style.background = s.color;
+      item.append(key, document.createTextNode(s.name));
+      legend.append(item);
+    }
+    section.append(legend);
+
+    const plot = el("div", { class: "plot" });
+    const width = Math.max(320, Math.min(948, document.getElementById("charts").clientWidth || 948));
+    const direct = width >= 560;
+    const height = 240;
+    const m = { top: 12, right: direct ? 120 : 12, bottom: 28, left: 56 };
+    const w = width - m.left - m.right;
+    const h = height - m.top - m.bottom;
+    const all = series.flatMap((s) => s.points).filter((p) => p !== null);
+    const yMax = niceMax(Math.max(...all) * 1.05);
+    const n = commits.length;
+    const x = (i) => m.left + (n === 1 ? w / 2 : (i * w) / (n - 1));
+    const y = (v) => m.top + h - (v / yMax) * h;
+
+    const svg = el("svg:svg", {
+      viewBox: `0 0 ${width} ${height}`, role: "img", tabindex: "0",
+      "aria-label": `${spec.title}: ${series.map((s) => s.name).join(", ")} over ${n} commits`,
+    });
+    const axis = el("svg:g", { class: "axis" });
+    for (let t = 0; t <= 4; t++) {
+      const v = (yMax * t) / 4;
+      axis.append(el("svg:line", { x1: m.left, x2: m.left + w, y1: y(v), y2: y(v), stroke: t ? "var(--grid)" : "var(--border)", "stroke-width": 1 }));
+      axis.append(el("svg:text", { x: m.left - 8, y: y(v) + 4, "text-anchor": "end" }, fmt(v)));
+    }
+    const labelEvery = Math.max(1, Math.ceil(n / Math.floor(w / 90)));
+    for (let i = 0; i < n; i += labelEvery) {
+      axis.append(el("svg:text", { x: x(i), y: height - 8, "text-anchor": "middle" }, commits[i].when.slice(0, 10)));
+    }
+    svg.append(axis);
+
+    for (const s of series) {
+      let d = "";
+      let pen = false;
+      s.points.forEach((p, i) => {
+        if (p === null) { pen = false; return; }
+        d += `${pen ? "L" : "M"}${x(i).toFixed(1)},${y(p).toFixed(1)}`;
+        pen = true;
+      });
+      svg.append(el("svg:path", { d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      if (n <= 40) {
+        s.points.forEach((p, i) => {
+          if (p !== null) svg.append(el("svg:circle", { cx: x(i), cy: y(p), r: 4, fill: s.color, stroke: "var(--bg)", "stroke-width": 2 }));
+        });
+      }
+    }
+    if (direct) {
+      // Labels at each line's last point, nudged apart so they never overlap.
+      const ends = series.map((s) => {
+        let i = s.points.length - 1;
+        while (i >= 0 && s.points[i] === null) i--;
+        return { s, y: y(s.points[i]), v: s.points[i] };
+      }).sort((a, b) => a.y - b.y);
+      for (let k = 1; k < ends.length; k++) ends[k].y = Math.max(ends[k].y, ends[k - 1].y + 15);
+      for (const e of ends) {
+        svg.append(el("svg:text", { class: "direct", x: m.left + w + 10, y: e.y + 4 }, `${e.s.name.replace(" (mm-jvm)", "")} ${fmt(e.v)}`));
+      }
+    }
+
+    const hair = el("svg:line", { y1: m.top, y2: m.top + h, stroke: "var(--muted)", "stroke-width": 1, visibility: "hidden" });
+    svg.append(hair);
+    plot.append(svg);
+    const tip = el("div", { class: "tooltip", hidden: "" });
+    plot.append(tip);
+
+    let current = -1;
+    function show(i) {
+      current = i;
+      const c = commits[i];
+      hair.setAttribute("x1", x(i));
+      hair.setAttribute("x2", x(i));
+      hair.setAttribute("visibility", "visible");
+      tip.replaceChildren(el("div", { class: "head" }, `${c.sha.slice(0, 9)} · ${c.when.slice(0, 16).replace("T", " ")}`));
+      for (const s of series) {
+        const row = el("div", { class: "row" });
+        const key = el("span", { class: "key" });
+        key.style.background = s.color;
+        row.append(key, el("strong", {}, s.points[i] === null ? "–" : fmt(s.points[i])), el("span", { class: "name" }, s.name));
+        tip.append(row);
+      }
+      tip.hidden = false;
+      const scale = svg.getBoundingClientRect().width / width;
+      const px = x(i) * scale;
+      const left = px + 12 + tip.offsetWidth > plot.clientWidth ? px - 12 - tip.offsetWidth : px + 12;
+      tip.style.left = `${Math.max(0, left)}px`;
+      tip.style.top = `${m.top * scale}px`;
+    }
+    function hide() {
+      current = -1;
+      hair.setAttribute("visibility", "hidden");
+      tip.hidden = true;
+    }
+    function nearest(evt) {
+      const r = svg.getBoundingClientRect();
+      const px = ((evt.clientX - r.left) / r.width) * width;
+      return n === 1 ? 0 : Math.max(0, Math.min(n - 1, Math.round(((px - m.left) / w) * (n - 1))));
+    }
+    svg.addEventListener("pointermove", (evt) => show(nearest(evt)));
+    svg.addEventListener("pointerleave", hide);
+    svg.addEventListener("blur", hide);
+    svg.addEventListener("click", (evt) => window.open(`${REPO}/commit/${commits[nearest(evt)].sha}`, "_blank", "noopener"));
+    svg.addEventListener("keydown", (evt) => {
+      if (evt.key === "ArrowLeft" || evt.key === "ArrowRight") {
+        show(current < 0 ? n - 1 : Math.max(0, Math.min(n - 1, current + (evt.key === "ArrowLeft" ? -1 : 1))));
+        evt.preventDefault();
+      } else if (evt.key === "Enter" && current >= 0) {
+        window.open(`${REPO}/commit/${commits[current].sha}`, "_blank", "noopener");
+      } else if (evt.key === "Escape") {
+        hide();
+      }
+    });
+    section.append(plot);
+
+    const details = el("details");
+    details.append(el("summary", {}, "Data table"));
+    const wrap = el("div", { class: "table-wrap" });
+    const table = el("table");
+    const head = el("tr");
+    head.append(el("th", {}, "Commit"), el("th", {}, "Date"));
+    for (const s of series) head.append(el("th", {}, s.name));
+    table.append(head);
+    for (let i = n - 1; i >= 0; i--) {
+      const tr = el("tr");
+      const td = el("td");
+      td.append(el("a", { href: `${REPO}/commit/${commits[i].sha}` }, commits[i].sha.slice(0, 9)));
+      tr.append(td, el("td", {}, commits[i].when.slice(0, 10)));
+      for (const s of series) tr.append(el("td", {}, s.points[i] === null ? "–" : fmt(s.points[i])));
+      table.append(tr);
+    }
+    wrap.append(table);
+    details.append(wrap);
+    section.append(details);
+    return section;
+  }
+
+  async function load() {
+    const status = document.getElementById("status");
+    try {
+      const response = await fetch(DATA_URL, { cache: "no-cache" });
+      if (response.status === 404) {
+        status.textContent = "No measurements yet: the first push to main after #1254 records them.";
+        return;
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      records = (await response.text()).split("\n").filter((l) => l.trim()).flatMap((l) => {
+        try { return [JSON.parse(l)]; } catch { return []; }
+      });
+    } catch (e) {
+      status.textContent = `Couldn't load the measurements (${e.message}).`;
+      return;
+    }
+    const oses = [...new Set(records.map((r) => r.os))].sort((a, b) => ["linux", "macos", "windows"].indexOf(a) - ["linux", "macos", "windows"].indexOf(b));
+    if (!oses.length) {
+      status.textContent = "No measurements yet.";
+      return;
+    }
+    const select = document.getElementById("os");
+    for (const os of oses) select.append(el("option", { value: os }, OS_NAMES[os] || os));
+    const shas = new Set(records.map((r) => r.sha)).size;
+    status.textContent = `${shas} commit${shas === 1 ? "" : "s"} measured. Hover or use the arrow keys for a commit's figures; click to open it on GitHub.`;
+    for (const id of ["os", "db", "range"]) document.getElementById(id).addEventListener("change", render);
+    let resize;
+    window.addEventListener("resize", () => { clearTimeout(resize); resize = setTimeout(render, 150); });
+    render();
+  }
+  load();
+</script>
+</body>
+</html>

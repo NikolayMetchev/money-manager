@@ -6,7 +6,7 @@
 #
 # What the job's later steps read goes into $BUILDBUDDY_ARTIFACTS_DIRECTORY (the runner uploads it; build.yml
 # downloads it): the logs, coverage.xml, the test reports (testlogs.tar), the Linux installer (installer/) and the
-# cross-linked native test binaries (native-tests.tar). The exit code is the build's and tests'.
+# cross-linked native test binaries (native-tests.tar), and the startup benchmark's databases (bench-dbs/). The exit code is the build's and tests'.
 #
 # Usage: bazel/ci/build_and_test.sh <bazel flags>
 set -uo pipefail
@@ -79,6 +79,7 @@ bazel/kmp/testing/coverage.sh "$out/coverage.xml" "${flags[@]}" 2>&1 | tee "$out
 
 if [ "$status" -eq 0 ]; then
   mkdir -p "$out/installer" && cp bazel-bin/app/main/jvm/installer/* "$out/installer/"
+  mkdir -p "$out/bench-dbs" && cp bazel-bin/tools/bench-db/bench.db bazel-bin/tools/bench-db/empty.db "$out/bench-dbs/"
   for target in linuxArm64 mingwX64; do
     for binary in $(bazel cquery "${flags[@]}" --output=files "attr(name, \"_${target}_cross\$\", //...)"); do
       dir="native-tests/$target/$(dirname "${binary#bazel-out/*/bin/}")"
