@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Installs the desktop installer `//app/main/jvm:installer` built (deb, dmg or msi, by host) and checks the
 # installed app: `mm-jvm version` and the bundled native `mm version` print the version, `mm-jvm pdf-lines` reads a
-# PDF through the bundled pdfium, and the desktop app starts and stays up (#1020). CI runs it on fresh runners; it needs root on Linux (apt) and a display (Linux: Xvfb).
+# PDF through the bundled pdfium, and the desktop app starts and stays up (#1020). The JVM launchers run with
+# -XX:AOTMode=on, which fails unless the installed AOT cache loads (#1254). CI runs it on fresh runners; it needs root
+# on Linux (apt) and a display (Linux: Xvfb).
 #
 # Usage: install_smoke_test.sh <installer directory> <expected version>
 set -euo pipefail
@@ -19,7 +21,8 @@ case "$(uname -s)" in
     ;;
   Darwin)
     hdiutil attach -nobrowse -mountpoint "$work/dmg" "$dir"/*.dmg
-    cp -R "$work/dmg/MoneyManager.app" "$work/"
+    # ditto keeps modification times, as Finder's copy does: the AOT caches are only valid with them (#1254).
+    ditto "$work/dmg/MoneyManager.app" "$work/MoneyManager.app"
     hdiutil detach "$work/dmg"
     root=$work/MoneyManager.app/Contents
     app=$root/MacOS/MoneyManager
@@ -28,6 +31,13 @@ case "$(uname -s)" in
   MINGW* | MSYS*)
     msi=$(cygpath -w "$(realpath "$dir"/*.msi)")
     log=$(cygpath -w "$work/msi.log")
+    # A cabinet keeps file times as local time, which Windows Installer converts with the machine's time zone, and
+    # the AOT caches need the jars' exact times. The runners are on UTC, where nothing shifts, so install under
+    # another zone (only on CI: it's the machine's setting).
+    if [ -n "${GITHUB_ACTIONS:-}" ]; then
+      tzutil //s "Pacific Standard Time"
+      echo "Time zone: $(tzutil //g)"
+    fi
     code=$(powershell -NoProfile -Command \
       "(Start-Process msiexec -ArgumentList '/i','\"$msi\"','/qn','/l*v','\"$log\"' -Wait -PassThru).ExitCode")
     if [ "${code//[$'\r\n']/}" != 0 ]; then
@@ -56,6 +66,12 @@ if [ -z "$mm" ]; then
   echo "no bundled native mm under $root" >&2
   exit 1
 fi
+
+# The AOT caches were trained against these modification times (JPackageRunner.PINNED_MTIME).
+find "$root" \( -name 'app-main-jvm.jar' -o -name '*.aot' \) -exec ls -l {} +
+
+# AOTMode=on: a JVM launcher whose AOT cache doesn't load fails instead of starting without it.
+export JAVA_TOOL_OPTIONS=-XX:AOTMode=on
 
 for cli in "$mm_jvm" "$mm"; do
   out=$("$cli" version </dev/null)

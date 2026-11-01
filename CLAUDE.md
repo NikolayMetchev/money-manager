@@ -89,6 +89,10 @@ Flags and configs:
   Windows by a transition, so any host cross-links them in an ordinary build; CI's Build and Test adds them to its
   `bazel build //...`.
 
+The desktop installer packages `:app_image_aot`, the app image with a JDK AOT cache per launcher, trained by running
+each on the benchmark database (`//tools/bench-db:bench_db`); see `bazel/README.md`, "AOT caches". A cache is only
+valid while the installed jars keep their pinned modification times.
+
 Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer`, and `//app/main/cli:mm-linux-x64`,
 `:mm-linux-arm64`, `:mm-windows-x64`, `:mm-macos-arm64` (the Apple one only on macOS). The release smoke test,
 `bazel test //app/main/android-smoketest:smoketest_test`, installs the debug-signed minified APK

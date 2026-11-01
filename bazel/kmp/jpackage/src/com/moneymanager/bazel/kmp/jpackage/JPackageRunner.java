@@ -3,11 +3,16 @@ package com.moneymanager.bazel.kmp.jpackage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.net.URI;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermission;
+import java.time.Instant;
 import java.time.Year;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -15,6 +20,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.spi.ToolProvider;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -32,6 +40,8 @@ import java.util.zip.ZipOutputStream;
  *       (skiko's natives unpacked next to the jars, an empty {@code resources} directory), then jpackage
  *       {@code --type app-image}.
  *   <li>{@code installer <out> <options…> -- <jpackage args…>}: jpackage's installer over an app image.
+ *   <li>{@code aot <out> <options…> -- <trainings…>}: an app image with an AOT cache per launcher (#1254); see
+ *       {@link #aot}.
  * </ul>
  *
  * <p>In the jpackage arguments {@code {version}} is the version file's text, {@code {libs}}, {@code {runtime}},
@@ -60,6 +70,7 @@ public final class JPackageRunner {
     switch (mode) {
       case "jlink" -> jlink(out, rest);
       case "image", "installer" -> jpackage(mode, out, rest);
+      case "aot" -> aot(out, rest);
       default -> throw new IllegalArgumentException("unknown mode " + mode);
     }
   }
@@ -93,6 +104,9 @@ public final class JPackageRunner {
       values.put("{entitlements}", composeResource(work, "default-entitlements.plist").toString());
       if (HOST_OS == OS.MAC) {
         writeInfoPlist(resources.resolve("Info.plist"), options, values.get("{version}"));
+      }
+      if (mode.equals("installer") && HOST_OS == OS.WINDOWS) {
+        writeMainWxs(resources.resolve("main.wxs"));
       }
       if (options.containsKey("--jar")) {
         values.put("{libs}", layOutLibs(work.resolve("libs"), options.get("--jar"), work).toString());
@@ -136,6 +150,9 @@ public final class JPackageRunner {
       command.add("--dest");
       command.add(out.toString());
       ProcessBuilder process = new ProcessBuilder(command).inheritIO();
+      // jpackage stamps the files it packages with the time it copies them; dpkg-deb clamps every file's mtime to
+      // SOURCE_DATE_EPOCH, so the deb installs them at the time the AOT caches were trained against.
+      process.environment().put("SOURCE_DATE_EPOCH", Long.toString(PINNED_MTIME.toInstant().getEpochSecond()));
       if (options.containsKey("--wix")) {
         String wix = Path.of(one(options, "--wix")).toAbsolutePath().toString();
         process.environment().merge("PATH", wix, (path, dir) -> dir + ";" + path);
@@ -147,12 +164,335 @@ public final class JPackageRunner {
       if (mode.equals("image") && HOST_OS == OS.MAC) {
         signRuntime(out.resolve(one(options, "--name") + ".app"), Path.of(values.get("{entitlements}")));
       }
+      if (mode.equals("installer") && HOST_OS == OS.MAC) {
+        try (Stream<Path> dmgs = Files.list(out)) {
+          for (Path dmg : dmgs.filter(f -> f.toString().endsWith(".dmg")).toList()) {
+            pinDmgMtimes(dmg, work);
+          }
+        }
+      }
     } finally {
       try {
         deleteRecursively(work);
       } catch (IOException e) {
         // A temp directory left behind mustn't hide what happened.
         System.err.println("warning: couldn't delete " + work + ": " + e);
+      }
+    }
+  }
+
+  /**
+   * Every file in an app image (and, on install, every file the installer puts down) carries this modification
+   * time. The JVM rejects an AOT cache when a jar on the classpath has another mtime than the one it was trained
+   * against, and jpackage, Bazel's remote outputs and copies all restamp files, so the image is trained with its
+   * files at this time and each installer is rewritten to install them at it. Whole seconds, even ones, so a
+   * cabinet's 2-second DOS times hold it too.
+   */
+  static final FileTime PINNED_MTIME = FileTime.from(Instant.parse("2020-01-01T00:00:00Z"));
+
+  private static final long TRAINING_TIMEOUT_MINUTES = 10;
+
+  /**
+   * Trains an AOT cache (JEP 483/514/515) for each of an app image's launchers, into a copy of the image.
+   * Options: {@code --image DIR} (a {@code jpackage_app_image}), {@code --name N} and {@code --database F} (the
+   * database each training run opens, a copy each time). After {@code --}, one block per launcher:
+   * {@code @launcher NAME}, then {@code @env K=V} lines and the launcher's arguments, one per line.
+   * {@code {probe}} in an env value is a file in the run's scratch directory.
+   *
+   * <p>For each launcher, the cache is built in two steps through the launcher itself, since the jlinked runtime
+   * has no {@code bin/java} for {@code -XX:AOTCacheOutput}'s child JVM:
+   *
+   * <ol>
+   *   <li>Record: run the training with {@code -XX:AOTMode=record}, in a home of its own (the JVM's {@code
+   *       user.home} as well as {@code HOME}) holding a copy of the database as the last one opened.
+   *   <li>Create: run the launcher again with {@code -XX:AOTMode=create}, which writes {@code <launcher>.aot}
+   *       next to the jars and exits.
+   *   <li>Point the launcher's {@code .cfg} at the cache, with the JVM's warnings on stderr, so a stale cache
+   *       can't corrupt the CLI's JSON.
+   *   <li>Run the training again with {@code -XX:AOTMode=on}, which fails unless the cache loads.
+   * </ol>
+   *
+   * <p>On Linux without a {@code DISPLAY}, the runs get an Xvfb of their own.
+   */
+  private static void aot(Path out, List<String> args) throws Exception {
+    int separator = args.indexOf("--");
+    Map<String, List<String>> options = new LinkedHashMap<>();
+    for (int i = 0; i < separator; i += 2) {
+      options.computeIfAbsent(args.get(i), k -> new ArrayList<>()).add(args.get(i + 1));
+    }
+    List<Training> trainings = Training.parse(args.subList(separator + 1, args.size()));
+    String name = one(options, "--name");
+    Path database = Path.of(one(options, "--database")).toAbsolutePath();
+    deleteRecursively(out);
+    copyWritable(Path.of(one(options, "--image")).toAbsolutePath(), out);
+    pinMtimes(out);
+    Path app = appDirectory(out, name);
+    Path work = Files.createTempDirectory("aot");
+    Map<String, String> display = new LinkedHashMap<>();
+    // close() waits for the process to end, so it's destroyed first.
+    try (Process xvfb = HOST_OS == OS.LINUX && System.getenv("DISPLAY") == null ? startXvfb(display) : null) {
+      try {
+        for (Training training : trainings) {
+          Path launcher = launcher(out, name, training.launcher);
+          Path config = work.resolve(training.launcher + ".aotconf");
+          Path cache = app.resolve(training.launcher + ".aot");
+          run(training, launcher, database, work, display, "-XX:AOTMode=record -XX:AOTConfiguration=" + config);
+          createCache(launcher, work, config, cache);
+          pointConfigAtCache(app.resolve(training.launcher + ".cfg"), training.launcher);
+          run(training, launcher, database, work, display, "-XX:AOTMode=on");
+          Files.setLastModifiedTime(cache, PINNED_MTIME);
+        }
+        if (HOST_OS == OS.MAC) {
+          // The .cfg files and caches are inside the signed bundle.
+          Path bundle = out.resolve(name + ".app");
+          if (HOST_ARCH.equals("arm64")) {
+            adHocSign(bundle, composeResource(work, "default-entitlements.plist"));
+          }
+        }
+      } finally {
+        if (xvfb != null) {
+          xvfb.destroy();
+        }
+      }
+    } finally {
+      try {
+        deleteRecursively(work);
+      } catch (IOException e) {
+        System.err.println("warning: couldn't delete " + work + ": " + e);
+      }
+    }
+  }
+
+  /** Starts a private Xvfb and puts its {@code DISPLAY} in {@code display}. */
+  private static Process startXvfb(Map<String, String> display) throws IOException {
+    Process xvfb = new ProcessBuilder("Xvfb", "-displayfd", "1", "-nolisten", "tcp", "-screen", "0", "1280x1024x24")
+        .redirectError(ProcessBuilder.Redirect.DISCARD)
+        .start();
+    String number = new String(xvfb.getInputStream().readNBytes(16)).strip().split("\\s+")[0];
+    display.put("DISPLAY", ":" + number);
+    return xvfb;
+  }
+
+  /** One launcher's training run: its name, environment and arguments. */
+  private record Training(String launcher, Map<String, String> env, List<String> args) {
+    static List<Training> parse(List<String> lines) {
+      List<Training> trainings = new ArrayList<>();
+      for (String line : lines) {
+        if (line.startsWith("@launcher ")) {
+          trainings.add(new Training(line.substring("@launcher ".length()), new LinkedHashMap<>(), new ArrayList<>()));
+        } else if (trainings.isEmpty()) {
+          throw new IllegalArgumentException("training line before any @launcher: " + line);
+        } else if (line.startsWith("@env ")) {
+          String[] pair = line.substring("@env ".length()).split("=", 2);
+          trainings.getLast().env.put(pair[0], pair[1]);
+        } else {
+          trainings.getLast().args.add(line);
+        }
+      }
+      return trainings;
+    }
+  }
+
+  /** Runs a launcher's training in a fresh home, with {@code jvmOptions} added; fails unless it exits 0. */
+  private static void run(
+      Training training, Path launcher, Path database, Path work, Map<String, String> display, String jvmOptions)
+      throws Exception {
+    Path run = Files.createTempDirectory(work, training.launcher);
+    Path home = Files.createDirectories(run.resolve("home"));
+    Path data = Files.createDirectories(home.resolve(".moneymanager"));
+    Path copy = data.resolve("training.db");
+    Files.copy(database, copy);
+    makeWritable(copy);
+    Files.writeString(
+        data.resolve("settings.json"), "{\"lastDatabase\":\"" + jsonEscape(copy.toString()) + "\"}\n");
+    List<String> command = new ArrayList<>();
+    command.add(launcher.toString());
+    command.addAll(training.args);
+    ProcessBuilder process = new ProcessBuilder(command)
+        .directory(run.toFile())
+        .redirectErrorStream(true)
+        .redirectOutput(run.resolve("output.txt").toFile());
+    Map<String, String> env = process.environment();
+    isolate(env, home);
+    env.putAll(display);
+    for (Map.Entry<String, String> entry : training.env.entrySet()) {
+      env.put(entry.getKey(), entry.getValue().replace("{probe}", run.resolve("probe.json").toString()));
+    }
+    env.put("JAVA_TOOL_OPTIONS", "-Duser.home=" + home + " " + jvmOptions);
+    waitFor(process.start(), command, run.resolve("output.txt"));
+  }
+
+  /**
+   * {@code -XX:AOTMode=create} reads the recorded configuration and writes the cache; the app doesn't run.
+   *
+   * <p>Without the adapter and stub code: that part records the training machine's CPU features, and a JVM on a CPU
+   * that lacks any of them (no AVX-512, or not a VM) refuses the whole cache under {@code -XX:AOTMode=on} and drops
+   * it otherwise. The classes, linking and profiles that make startup faster are CPU-neutral; measured, leaving the
+   * code out costs nothing.
+   */
+  private static void createCache(Path launcher, Path work, Path config, Path cache) throws Exception {
+    Path output = work.resolve(cache.getFileName() + ".create.txt");
+    ProcessBuilder process = new ProcessBuilder(launcher.toString())
+        .directory(work.toFile())
+        .redirectErrorStream(true)
+        .redirectOutput(output.toFile());
+    isolate(process.environment(), work);
+    process.environment().put(
+        "JAVA_TOOL_OPTIONS", "-XX:AOTMode=create -XX:AOTConfiguration=" + config + " -XX:AOTCache=" + cache
+            + " -XX:+UnlockDiagnosticVMOptions -XX:-AOTAdapterCaching -XX:-AOTStubCaching");
+    waitFor(process.start(), List.of(launcher.toString(), "(AOTMode=create)"), output);
+    if (!Files.isRegularFile(cache)) {
+      throw new IllegalStateException(launcher + " wrote no AOT cache:\n" + Files.readString(output));
+    }
+  }
+
+  /**
+   * Adds the cache to the launcher's {@code [JavaOptions]}, with the JVM's own warnings sent to stderr: by default
+   * they go to stdout, where a stale cache's would land in the middle of the CLI's JSON.
+   */
+  private static void pointConfigAtCache(Path cfg, String launcher) throws IOException {
+    List<String> lines = new ArrayList<>(Files.readAllLines(cfg));
+    int section = lines.indexOf("[JavaOptions]");
+    if (section < 0) {
+      throw new IllegalStateException(cfg + " has no [JavaOptions]");
+    }
+    int at = section + 1;
+    while (at < lines.size() && !lines.get(at).startsWith("[") && !lines.get(at).isBlank()) {
+      at++;
+    }
+    lines.addAll(at, List.of(
+        "java-options=-XX:AOTCache=$APPDIR/" + launcher + ".aot",
+        "java-options=-Xlog:disable",
+        "java-options=-Xlog:all=warning:stderr"));
+    Files.write(cfg, lines);
+    Files.setLastModifiedTime(cfg, PINNED_MTIME);
+  }
+
+  private static void isolate(Map<String, String> env, Path home) {
+    env.put("HOME", home.toString());
+    env.put("USERPROFILE", home.toString());
+    env.put("APPDATA", home.resolve("AppData/Roaming").toString());
+    env.put("LOCALAPPDATA", home.resolve("AppData/Local").toString());
+    for (String name : List.of("MM_STARTUP_PROBE", "MM_STARTUP_PROBE_ACCOUNT", "MM_VAULT_PASSWORD",
+        "MM_REMOTE_PASSWORD", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")) {
+      env.remove(name);
+    }
+  }
+
+  private static void waitFor(Process process, List<String> command, Path output) throws Exception {
+    if (!process.waitFor(TRAINING_TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
+      process.destroyForcibly();
+      throw new IllegalStateException(String.join(" ", command) + " timed out:\n" + tail(output));
+    }
+    if (process.exitValue() != 0) {
+      throw new IllegalStateException(
+          String.join(" ", command) + " exited " + process.exitValue() + ":\n" + tail(output));
+    }
+  }
+
+  private static String tail(Path output) throws IOException {
+    String text = Files.exists(output) ? Files.readString(output) : "";
+    return text.length() > 8000 ? text.substring(text.length() - 8000) : text;
+  }
+
+  private static String jsonEscape(String text) {
+    return text.replace("\\", "\\\\").replace("\"", "\\\"");
+  }
+
+  /** The directory holding the jars and launcher {@code .cfg}s. */
+  private static Path appDirectory(Path image, String name) {
+    return switch (HOST_OS) {
+      case MAC -> image.resolve(name + ".app/Contents/app");
+      case WINDOWS -> image.resolve(name).resolve("app");
+      case LINUX -> image.resolve(name).resolve("lib/app");
+    };
+  }
+
+  private static Path launcher(Path image, String name, String launcher) {
+    return switch (HOST_OS) {
+      case MAC -> image.resolve(name + ".app/Contents/MacOS").resolve(launcher);
+      case WINDOWS -> image.resolve(name).resolve(launcher + ".exe");
+      case LINUX -> image.resolve(name).resolve("bin").resolve(launcher);
+    };
+  }
+
+  /**
+   * jpackage's own {@code main.wxs}, read from this JDK, with one deferred custom action after {@code InstallFiles}
+   * that sets the jars in {@code app\} back to {@link #PINNED_MTIME}. A cabinet keeps file times as local time,
+   * and Windows Installer converts them with the installing machine's time zone, so off UTC every jar lands hours
+   * away from the time its AOT cache was trained against, and the JVM ignores the cache. Only the classpath jars are
+   * checked (not the runtime, the {@code .cfg} or the cache itself).
+   *
+   * <p>The action runs in {@code INSTALLDIR}, so the command names no path ({@code '} in a user's profile directory
+   * would end its string) and no {@code [...]}, which Windows Installer would format as a property. It never fails
+   * the install: without it the app only starts without its cache.
+   */
+  private static void writeMainWxs(Path target) throws IOException {
+    // This JDK's own image (the jpackage that runs): the jrt file system reads a module's resources whether or not
+    // it opens them.
+    FileSystem jrt = FileSystems.getFileSystem(URI.create("jrt:/"));
+    String wxs = Files.readString(jrt.getPath("modules", "jdk.jpackage", "jdk/jpackage/internal/resources/main.wxs"));
+    String command = "&quot;[System64Folder]WindowsPowerShell\\v1.0\\powershell.exe&quot; -NoProfile -NonInteractive"
+        + " -WindowStyle Hidden -Command &quot;Get-ChildItem -LiteralPath app -Filter *.jar | ForEach-Object {"
+        + " $_.LastWriteTimeUtc = (Get-Date '" + PINNED_MTIME.toInstant() + "').ToUniversalTime() }&quot;";
+    wxs = insertBefore(wxs, "    <InstallExecuteSequence>",
+        "    <CustomAction Id=\"MmPinJarTimes\" Directory=\"INSTALLDIR\" Execute=\"deferred\" Impersonate=\"yes\""
+            + " Return=\"ignore\" ExeCommand=\"" + command + "\" />\n\n");
+    wxs = insertBefore(wxs, "    </InstallExecuteSequence>",
+        "      <Custom Action=\"MmPinJarTimes\" After=\"InstallFiles\">NOT REMOVE</Custom>\n");
+    Files.writeString(target, wxs);
+  }
+
+  /** Inserts {@code text} before the one line that is {@code anchor}; jpackage's template changing fails loudly. */
+  private static String insertBefore(String source, String anchor, String text) {
+    Matcher line = Pattern.compile("^" + Pattern.quote(anchor) + "\r?$", Pattern.MULTILINE).matcher(source);
+    if (!line.find()) {
+      throw new IllegalStateException("jpackage's main.wxs no longer has the line \"" + anchor + "\"");
+    }
+    int at = line.start();
+    if (line.find()) {
+      throw new IllegalStateException("jpackage's main.wxs has the line \"" + anchor + "\" more than once");
+    }
+    return source.substring(0, at) + text + source.substring(at);
+  }
+
+  /**
+   * Rewrites a dmg with every file in it at {@link #PINNED_MTIME}: jpackage stamps them with the time it copies
+   * them. A copy that keeps modification times (Finder's, {@code ditto}, {@code cp -p}) then keeps the AOT caches
+   * valid. The modification time isn't part of the code signature.
+   */
+  private static void pinDmgMtimes(Path dmg, Path work) throws Exception {
+    Path writable = work.resolve("writable.dmg");
+    Path mount = Files.createDirectories(work.resolve("dmg"));
+    run(List.of("hdiutil", "convert", dmg.toString(), "-format", "UDRW", "-o", writable.toString()));
+    run(List.of("hdiutil", "attach", "-nobrowse", "-noverify", "-mountpoint", mount.toString(), writable.toString()));
+    try (Stream<Path> apps = Files.list(mount)) {
+      // Only the bundles: the volume's own .fseventsd isn't ours to touch.
+      for (Path app : apps.filter(f -> f.getFileName().toString().endsWith(".app")).toList()) {
+        pinMtimes(app);
+      }
+    } finally {
+      run(List.of("hdiutil", "detach", mount.toString()));
+    }
+    Files.delete(dmg);
+    run(List.of("hdiutil", "convert", writable.toString(), "-format", "UDZO", "-o", dmg.toString()));
+    Files.delete(writable);
+  }
+
+  private static void run(List<String> command) throws Exception {
+    int code = new ProcessBuilder(command).inheritIO().start().waitFor();
+    if (code != 0) {
+      throw new IllegalStateException(String.join(" ", command) + " exited with " + code);
+    }
+  }
+
+  /** Sets every file's modification time to {@link #PINNED_MTIME} (directories too, which nothing checks). */
+  static void pinMtimes(Path root) throws IOException {
+    try (Stream<Path> walk = Files.walk(root)) {
+      for (Path path : walk.toList()) {
+        if (!Files.isSymbolicLink(path)) {
+          Files.setLastModifiedTime(path, PINNED_MTIME);
+        }
       }
     }
   }
@@ -316,12 +656,13 @@ public final class JPackageRunner {
   private static void codesign(String... args) throws Exception {
     List<String> command = new ArrayList<>(List.of("/usr/bin/codesign"));
     command.addAll(List.of(args));
-    Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
-    // codesign -vvvv is chatty: keep its output for a failure only.
-    byte[] output = process.getInputStream().readAllBytes();
-    if (process.waitFor() != 0) {
-      System.err.write(output);
-      throw new IllegalStateException("codesign failed: " + String.join(" ", command));
+    try (Process process = new ProcessBuilder(command).redirectErrorStream(true).start()) {
+      // codesign -vvvv is chatty: keep its output for a failure only.
+      byte[] output = process.getInputStream().readAllBytes();
+      if (process.waitFor() != 0) {
+        System.err.write(output);
+        throw new IllegalStateException("codesign failed: " + String.join(" ", command));
+      }
     }
   }
 
