@@ -55,6 +55,7 @@ import com.moneymanager.ui.components.imports.StagedImportsData
 import com.moneymanager.ui.components.imports.StagedImportsTabs
 import com.moneymanager.ui.components.imports.importPickedFiles
 import com.moneymanager.ui.components.imports.rememberStagedImportsData
+import com.moneymanager.ui.components.imports.sortedByTransactionDates
 import com.moneymanager.ui.components.imports.stagedImportDirectoryOptions
 import com.moneymanager.ui.components.imports.stagedImportKinds
 import com.moneymanager.ui.components.imports.stagedImportStrategyOptions
@@ -90,12 +91,16 @@ fun ImportFilesScreen(
     directories: (@Composable (onShowFiles: (ImportDirectory) -> Unit) -> Unit)? = null,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val imports by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+    val stagedImports by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         csvImportRepository.getAllImports()
     }
     val dateRanges by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyMap()) {
         importTimelineRepository.getCsvImportDateRanges().map { ranges -> ranges.associateBy { it.fileId } }
     }
+    val imports =
+        remember(stagedImports, dateRanges) {
+            sortedByTransactionDates(stagedImports) { dateRanges[it.id.id.toString()] }
+        }
     val data =
         rememberStagedImportsData(
             imports = imports,

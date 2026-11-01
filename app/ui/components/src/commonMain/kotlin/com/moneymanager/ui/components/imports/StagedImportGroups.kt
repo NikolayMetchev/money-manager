@@ -6,6 +6,8 @@ import com.moneymanager.domain.model.StagedImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
+import com.moneymanager.domain.model.timeline.ImportFileDateRange
+import kotlin.time.Instant
 
 internal const val MANUALLY_ADDED_LABEL = "Manually added"
 
@@ -38,6 +40,20 @@ data class StagedImportDirectoryNode<F : StagedImport<*>>(
 ) {
     val allImports: List<F> = strategyGroups.flatMap { it.imports } + children.flatMap { it.allImports }
 }
+
+/**
+ * Orders files by the dates of the transactions they produced: by the earliest, then by the latest. Files
+ * with no transactions (not imported yet, or nothing in them to import) follow in their existing order.
+ * Every tab and group keeps this order, since grouping preserves it.
+ */
+fun <F : StagedImport<*>> sortedByTransactionDates(
+    imports: List<F>,
+    dateRange: (F) -> ImportFileDateRange?,
+): List<F> =
+    imports.sortedWith(
+        compareBy<F, Instant?>(nullsLast()) { dateRange(it)?.earliest }
+            .thenBy(nullsLast()) { dateRange(it)?.latest },
+    )
 
 /** How an import directory is named in the imports lists; matches the import-directories screen. */
 internal fun ImportDirectory.listLabel(): String = displayPath ?: folderRef
