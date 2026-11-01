@@ -3,6 +3,9 @@ package com.moneymanager.bazel.kmp.jpackage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.net.URI;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -18,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.spi.ToolProvider;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -99,6 +104,9 @@ public final class JPackageRunner {
       values.put("{entitlements}", composeResource(work, "default-entitlements.plist").toString());
       if (HOST_OS == OS.MAC) {
         writeInfoPlist(resources.resolve("Info.plist"), options, values.get("{version}"));
+      }
+      if (mode.equals("installer") && HOST_OS == OS.WINDOWS) {
+        writeMainWxs(resources.resolve("main.wxs"));
       }
       if (options.containsKey("--jar")) {
         values.put("{libs}", layOutLibs(work.resolve("libs"), options.get("--jar"), work).toString());
@@ -406,6 +414,46 @@ public final class JPackageRunner {
       case WINDOWS -> image.resolve(name).resolve(launcher + ".exe");
       case LINUX -> image.resolve(name).resolve("bin").resolve(launcher);
     };
+  }
+
+  /**
+   * jpackage's own {@code main.wxs}, read from this JDK, with one deferred custom action after {@code InstallFiles}
+   * that sets the jars in {@code app\} back to {@link #PINNED_MTIME}. A cabinet keeps file times as local time,
+   * and Windows Installer converts them with the installing machine's time zone, so off UTC every jar lands hours
+   * away from the time its AOT cache was trained against, and the JVM ignores the cache. Only the classpath jars are
+   * checked (not the runtime, the {@code .cfg} or the cache itself).
+   *
+   * <p>The action runs in {@code INSTALLDIR}, so the command names no path ({@code '} in a user's profile directory
+   * would end its string) and no {@code [...]}, which Windows Installer would format as a property. It never fails
+   * the install: without it the app only starts without its cache.
+   */
+  private static void writeMainWxs(Path target) throws IOException {
+    // This JDK's own image (the jpackage that runs): the jrt file system reads a module's resources whether or not
+    // it opens them.
+    FileSystem jrt = FileSystems.getFileSystem(URI.create("jrt:/"));
+    String wxs = Files.readString(jrt.getPath("modules", "jdk.jpackage", "jdk/jpackage/internal/resources/main.wxs"));
+    String command = "&quot;[System64Folder]WindowsPowerShell\\v1.0\\powershell.exe&quot; -NoProfile -NonInteractive"
+        + " -WindowStyle Hidden -Command &quot;Get-ChildItem -LiteralPath app -Filter *.jar | ForEach-Object {"
+        + " $_.LastWriteTimeUtc = (Get-Date '" + PINNED_MTIME.toInstant() + "').ToUniversalTime() }&quot;";
+    wxs = insertBefore(wxs, "    <InstallExecuteSequence>",
+        "    <CustomAction Id=\"MmPinJarTimes\" Directory=\"INSTALLDIR\" Execute=\"deferred\" Impersonate=\"yes\""
+            + " Return=\"ignore\" ExeCommand=\"" + command + "\" />\n\n");
+    wxs = insertBefore(wxs, "    </InstallExecuteSequence>",
+        "      <Custom Action=\"MmPinJarTimes\" After=\"InstallFiles\">NOT REMOVE</Custom>\n");
+    Files.writeString(target, wxs);
+  }
+
+  /** Inserts {@code text} before the one line that is {@code anchor}; jpackage's template changing fails loudly. */
+  private static String insertBefore(String source, String anchor, String text) {
+    Matcher line = Pattern.compile("^" + Pattern.quote(anchor) + "\r?$", Pattern.MULTILINE).matcher(source);
+    if (!line.find()) {
+      throw new IllegalStateException("jpackage's main.wxs no longer has the line \"" + anchor + "\"");
+    }
+    int at = line.start();
+    if (line.find()) {
+      throw new IllegalStateException("jpackage's main.wxs has the line \"" + anchor + "\" more than once");
+    }
+    return source.substring(0, at) + text + source.substring(at);
   }
 
   /**
