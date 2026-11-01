@@ -6,8 +6,8 @@
 # Starlark only: the worker forwards --kotlin_passthrough_flags to the compiler unchanged. Rebase it on
 # every rules_kotlin bump, and drop it once upstream supports fragments.
 #
-# jvm_target.patch: lets `jvm_target` (and `x_jdk_release`) name 26 and 27, which rules_kotlin's value lists stop
-# short of. The Kotlin compiler decides what it supports (2.4.21: up to 26). Drop it once upstream lists them.
+# jvm_target.patch: drops the value lists of `jvm_target` (and `x_jdk_release`), which stop at 25, so they take any
+# version the Kotlin compiler does: it rejects the rest itself, and repin_bytecode.py picks the newest it has.
 exports_files([
     "fragments.patch",
     "jvm_target.patch",

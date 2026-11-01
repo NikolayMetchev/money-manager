@@ -6,6 +6,7 @@ load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolcha
 default_java_toolchain(
     name = "java_toolchain",
     java_runtime = "@bazel_tools//tools/jdk:current_java_runtime",
+    # .bazelrc's java_language_version (bazel/renovate/repin_bytecode.py).
     source_version = "26",
     target_version = "26",
 )
