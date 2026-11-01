@@ -1,11 +1,11 @@
 common --enable_bzlmod
 
 # Everything runs on MODULE.bazel's JDK (remotejdk_<its feature release>, which repin_jdk.py keeps in step), but
-# compiles for Java 25, matching jvm_target in bazel/kmp/BUILD.bazel (the Kotlin toolchain): rules_kotlin's jvm_target
-# stops at 25. Move the language versions and jvm_target together.
-common --java_language_version=25
+# compiles for the newest Java the Kotlin compiler targets (2.4.21: 26), matching jvm_target in bazel/kmp/BUILD.bazel
+# (the Kotlin toolchain). Move the language versions and jvm_target together.
+common --java_language_version=26
 common --java_runtime_version=remotejdk_27
-common --tool_java_language_version=25
+common --tool_java_language_version=26
 common --tool_java_runtime_version=remotejdk_27
 
 # Keep the host's PATH and environment out of action keys, so caches hit across machines.

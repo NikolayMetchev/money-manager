@@ -5,4 +5,10 @@
 # -Xfragment-refines and -Xfragment-sources, and an `x_expect_actual_classes` kotlinc option. It touches
 # Starlark only: the worker forwards --kotlin_passthrough_flags to the compiler unchanged. Rebase it on
 # every rules_kotlin bump, and drop it once upstream supports fragments.
-exports_files(["fragments.patch"])
+#
+# jvm_target.patch: lets `jvm_target` (and `x_jdk_release`) name 26 and 27, which rules_kotlin's value lists stop
+# short of. The Kotlin compiler decides what it supports (2.4.21: up to 26). Drop it once upstream lists them.
+exports_files([
+    "fragments.patch",
+    "jvm_target.patch",
+])

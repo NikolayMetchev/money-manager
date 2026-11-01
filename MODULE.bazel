@@ -27,11 +27,14 @@ bazel_dep(name = "gazelle", version = "0.54.0")
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.download(version = "1.27.3")
 
-# Kotlin Multiplatform fragment support (see bazel/third_party/rules_kotlin/BUILD.bazel).
+# Kotlin Multiplatform fragment support and newer jvm_targets (see bazel/third_party/rules_kotlin/BUILD.bazel).
 single_version_override(
     module_name = "rules_kotlin",
     patch_strip = 1,
-    patches = ["//bazel/third_party/rules_kotlin:fragments.patch"],
+    patches = [
+        "//bazel/third_party/rules_kotlin:fragments.patch",
+        "//bazel/third_party/rules_kotlin:jvm_target.patch",
+    ],
 )
 
 register_toolchains("//bazel/kmp:kotlin_toolchain")

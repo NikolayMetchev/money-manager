@@ -1,0 +1,33 @@
+diff --git a/kotlin/internal/toolchains.bzl b/kotlin/internal/toolchains.bzl
+--- a/kotlin/internal/toolchains.bzl
++++ b/kotlin/internal/toolchains.bzl
+@@ -297,6 +297,8 @@ _kt_toolchain = rule(
+                 "23",
+                 "24",
+                 "25",
++                "26",
++                "27",
+             ],
+         ),
+         "kotlin_home": attr.label(
+diff --git a/src/main/starlark/core/options/opts.kotlinc.bzl b/src/main/starlark/core/options/opts.kotlinc.bzl
+--- a/src/main/starlark/core/options/opts.kotlinc.bzl
++++ b/src/main/starlark/core/options/opts.kotlinc.bzl
+@@ -159,7 +159,7 @@ Options:
+         args = dict(
+             default = "",
+             doc = "The target version of the generated JVM bytecode",
+-            values = ["1.6", "1.8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25"],
++            values = ["1.6", "1.8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27"],
+         ),
+         type = attr.string,
+         value_to_flag = None,
+@@ -380,7 +380,7 @@ default: 'first-only-warn' in language version 2.2+, 'first-only' in version 2.1
+             doc = """Compile against the specified JDK API version, similarly to javac's '-release'. This requires JDK 9 or newer.
+                      The supported versions depend on the JDK used; for JDK 25+, the supported versions are 1.8 and 9-25.
+                      This also sets the value of '-jvm-target' to be equal to the selected JDK version.""",
+-            values = ["1.6", "1.8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25"],
++            values = ["1.6", "1.8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27"],
+         ),
+         type = attr.string,
+         value_to_flag = None,

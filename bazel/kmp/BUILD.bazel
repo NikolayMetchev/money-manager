@@ -28,7 +28,8 @@ define_kt_toolchain(
     # Metro's contribution hints (metro/hints) and Compose's $stable fields; a module whose dependents need
     # more opts out with `tags = ["kt_abi_plugin_incompatible"]` on its kmp_library.
     experimental_use_abi_jars = True,
-    # .bazelrc's java_language_version (the JDK the build runs is newer: rules_kotlin's values stop at 25).
-    jvm_target = "25",
+    # .bazelrc's java_language_version: the newest the Kotlin compiler targets (2.4.21: 26), which can be older
+    # than the JDK the build runs on. rules_kotlin's own values stop at 25 (//bazel/third_party/rules_kotlin).
+    jvm_target = "26",
     kotlinc_options = ":kotlinc_options",
 )
