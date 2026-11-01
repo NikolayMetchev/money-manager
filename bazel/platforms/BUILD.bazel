@@ -11,7 +11,7 @@ platform(
     ],
     exec_properties = {
         "OSFamily": "Linux",
-        "container-image": "docker://ghcr.io/nikolaymetchev/money-manager/rbe-ubuntu24-04@sha256:97fd7540143bd834e906f045be92fe1c95c50d0a393a5fd8a514be6ab3e28eea",
+        "container-image": "docker://ghcr.io/nikolaymetchev/money-manager/rbe-ubuntu24-04@sha256:6d86907b07812377ad11f4a27abcc2e331fe459b7ad91e6a290d2119c11bf1fd",
     },
     visibility = ["//visibility:public"],
 )

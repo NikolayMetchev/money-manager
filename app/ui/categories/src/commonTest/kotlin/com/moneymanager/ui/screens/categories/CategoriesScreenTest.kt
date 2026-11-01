@@ -3,13 +3,19 @@
 package com.moneymanager.ui.screens.categories
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasProgressBarRangeInfo
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.waitUntilDoesNotExist
+import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
@@ -30,6 +36,7 @@ import dev.mokkery.matcher.matches
 import dev.mokkery.mock
 import dev.mokkery.verify.VerifyMode
 import dev.mokkery.verifySuspend
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -362,6 +369,38 @@ class CategoriesScreenTest {
             // Then - dialog should be dismissed and category created
             onNodeWithText("Create New Category").assertDoesNotExist()
             verifySuspend { repository.createCategory(matches { it.name == "Entertainment" }, any()) }
+        }
+    }
+
+    @Test
+    fun createCategoryDialog_showsProgressAndLocksTheForm_whileSaving() {
+        runMoneyManagerComposeUiTest {
+            // The save waits on this, so the dialog's saving state stays on screen until the test releases it.
+            val release = CompletableDeferred<Unit>()
+            val repository = createCategoryRepository(emptyList(), beforeCreate = { release.await() })
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
+                }
+            }
+
+            onNodeWithText("Add Category").performClick()
+            onNodeWithText("Category Name").performTextInput("Entertainment")
+            onNodeWithText("Create").performClick()
+
+            waitUntilExactlyOneExists(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate))
+            onNodeWithText("Create").assertDoesNotExist()
+            onNodeWithText("Cancel").assertIsNotEnabled()
+
+            release.complete(Unit)
+            waitUntilDoesNotExist(hasText("Create New Category"))
+            waitForIdle()
         }
     }
 
@@ -985,7 +1024,10 @@ class CategoriesScreenTest {
 
     // endregion
 
-    private fun createCategoryRepository(initialCategories: List<Category>): CategoryWriteRepository {
+    private fun createCategoryRepository(
+        initialCategories: List<Category>,
+        beforeCreate: suspend () -> Unit = {},
+    ): CategoryWriteRepository {
         val flow = MutableStateFlow(initialCategories)
         return mock(MockMode.autoUnit) {
             every { getAllCategories() } returns flow
@@ -995,6 +1037,7 @@ class CategoriesScreenTest {
             every { getCategoriesByParent(any()) } calls
                 { (parentId: Long) -> flow.map { cats -> cats.filter { it.parentId == parentId } } }
             everySuspend { createCategory(any(), any()) } calls { (cat: Category, _: Source) ->
+                beforeCreate()
                 val newId = (flow.value.maxOfOrNull { it.id } ?: 0L) + 1
                 val newCat = cat.copy(id = newId)
                 flow.value += newCat
