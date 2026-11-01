@@ -318,7 +318,9 @@ it is relative, so it runs under any prefix.
 - **AOT caches** (#1254): `aot_app_image` trains a JDK AOT cache (JEP 483/514/515) for each launcher of an image, and
   the installer packages `:app_image_aot`. Each launcher runs once on `//tools/bench-db:bench_db` in a home of its own
   (the desktop app through its startup probe, as far as an account's transactions), in two steps through the launcher
-  itself (record, then create: the jlinked runtime has no `bin/java`). The `.cfg` then names `$APPDIR/<launcher>.aot`
+  itself (record, then create: the jlinked runtime has no `bin/java`). Create leaves out the adapter and stub code
+  (`-XX:-AOTAdapterCaching -XX:-AOTStubCaching`), which records the training CPU's features and would make the whole
+  cache unusable on a CPU without them; it measured no faster. The `.cfg` then names `$APPDIR/<launcher>.aot`
   and sends the JVM's warnings to stderr, and a run with `-XX:AOTMode=on` fails the action unless the cache loads. On
   Linux it trains on the executors under its own Xvfb (`--action_env=DISPLAY=…` uses that display instead), on macOS
   and Windows on the host. A cache only loads when the jars keep the modification times it was trained against, so

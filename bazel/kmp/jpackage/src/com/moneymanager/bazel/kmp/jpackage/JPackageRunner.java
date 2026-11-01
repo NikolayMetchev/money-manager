@@ -220,43 +220,49 @@ public final class JPackageRunner {
     pinMtimes(out);
     Path app = appDirectory(out, name);
     Path work = Files.createTempDirectory("aot");
-    Process xvfb = null;
-    try {
-      Map<String, String> display = new LinkedHashMap<>();
-      if (HOST_OS == OS.LINUX && System.getenv("DISPLAY") == null) {
-        xvfb = new ProcessBuilder("Xvfb", "-displayfd", "1", "-nolisten", "tcp", "-screen", "0", "1280x1024x24")
-            .redirectError(ProcessBuilder.Redirect.DISCARD)
-            .start();
-        String number = new String(xvfb.getInputStream().readNBytes(16)).strip().split("\\s+")[0];
-        display.put("DISPLAY", ":" + number);
-      }
-      for (Training training : trainings) {
-        Path launcher = launcher(out, name, training.launcher);
-        Path config = work.resolve(training.launcher + ".aotconf");
-        Path cache = app.resolve(training.launcher + ".aot");
-        run(training, launcher, database, work, display, "-XX:AOTMode=record -XX:AOTConfiguration=" + config);
-        createCache(launcher, work, config, cache);
-        pointConfigAtCache(app.resolve(training.launcher + ".cfg"), training.launcher);
-        run(training, launcher, database, work, display, "-XX:AOTMode=on");
-        Files.setLastModifiedTime(cache, PINNED_MTIME);
-      }
-      if (HOST_OS == OS.MAC) {
-        // The .cfg files and caches are inside the signed bundle.
-        Path bundle = out.resolve(name + ".app");
-        if (HOST_ARCH.equals("arm64")) {
-          adHocSign(bundle, composeResource(work, "default-entitlements.plist"));
+    Map<String, String> display = new LinkedHashMap<>();
+    // close() waits for the process to end, so it's destroyed first.
+    try (Process xvfb = HOST_OS == OS.LINUX && System.getenv("DISPLAY") == null ? startXvfb(display) : null) {
+      try {
+        for (Training training : trainings) {
+          Path launcher = launcher(out, name, training.launcher);
+          Path config = work.resolve(training.launcher + ".aotconf");
+          Path cache = app.resolve(training.launcher + ".aot");
+          run(training, launcher, database, work, display, "-XX:AOTMode=record -XX:AOTConfiguration=" + config);
+          createCache(launcher, work, config, cache);
+          pointConfigAtCache(app.resolve(training.launcher + ".cfg"), training.launcher);
+          run(training, launcher, database, work, display, "-XX:AOTMode=on");
+          Files.setLastModifiedTime(cache, PINNED_MTIME);
+        }
+        if (HOST_OS == OS.MAC) {
+          // The .cfg files and caches are inside the signed bundle.
+          Path bundle = out.resolve(name + ".app");
+          if (HOST_ARCH.equals("arm64")) {
+            adHocSign(bundle, composeResource(work, "default-entitlements.plist"));
+          }
+        }
+      } finally {
+        if (xvfb != null) {
+          xvfb.destroy();
         }
       }
     } finally {
-      if (xvfb != null) {
-        xvfb.destroy();
-      }
       try {
         deleteRecursively(work);
       } catch (IOException e) {
         System.err.println("warning: couldn't delete " + work + ": " + e);
       }
     }
+  }
+
+  /** Starts a private Xvfb and puts its {@code DISPLAY} in {@code display}. */
+  private static Process startXvfb(Map<String, String> display) throws IOException {
+    Process xvfb = new ProcessBuilder("Xvfb", "-displayfd", "1", "-nolisten", "tcp", "-screen", "0", "1280x1024x24")
+        .redirectError(ProcessBuilder.Redirect.DISCARD)
+        .start();
+    String number = new String(xvfb.getInputStream().readNBytes(16)).strip().split("\\s+")[0];
+    display.put("DISPLAY", ":" + number);
+    return xvfb;
   }
 
   /** One launcher's training run: its name, environment and arguments. */
@@ -308,7 +314,14 @@ public final class JPackageRunner {
     waitFor(process.start(), command, run.resolve("output.txt"));
   }
 
-  /** {@code -XX:AOTMode=create} reads the recorded configuration and writes the cache; the app doesn't run. */
+  /**
+   * {@code -XX:AOTMode=create} reads the recorded configuration and writes the cache; the app doesn't run.
+   *
+   * <p>Without the adapter and stub code: that part records the training machine's CPU features, and a JVM on a CPU
+   * that lacks any of them (no AVX-512, or not a VM) refuses the whole cache under {@code -XX:AOTMode=on} and drops
+   * it otherwise. The classes, linking and profiles that make startup faster are CPU-neutral; measured, leaving the
+   * code out costs nothing.
+   */
   private static void createCache(Path launcher, Path work, Path config, Path cache) throws Exception {
     Path output = work.resolve(cache.getFileName() + ".create.txt");
     ProcessBuilder process = new ProcessBuilder(launcher.toString())
@@ -317,7 +330,8 @@ public final class JPackageRunner {
         .redirectOutput(output.toFile());
     isolate(process.environment(), work);
     process.environment().put(
-        "JAVA_TOOL_OPTIONS", "-XX:AOTMode=create -XX:AOTConfiguration=" + config + " -XX:AOTCache=" + cache);
+        "JAVA_TOOL_OPTIONS", "-XX:AOTMode=create -XX:AOTConfiguration=" + config + " -XX:AOTCache=" + cache
+            + " -XX:+UnlockDiagnosticVMOptions -XX:-AOTAdapterCaching -XX:-AOTStubCaching");
     waitFor(process.start(), List.of(launcher.toString(), "(AOTMode=create)"), output);
     if (!Files.isRegularFile(cache)) {
       throw new IllegalStateException(launcher + " wrote no AOT cache:\n" + Files.readString(output));
@@ -594,12 +608,13 @@ public final class JPackageRunner {
   private static void codesign(String... args) throws Exception {
     List<String> command = new ArrayList<>(List.of("/usr/bin/codesign"));
     command.addAll(List.of(args));
-    Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
-    // codesign -vvvv is chatty: keep its output for a failure only.
-    byte[] output = process.getInputStream().readAllBytes();
-    if (process.waitFor() != 0) {
-      System.err.write(output);
-      throw new IllegalStateException("codesign failed: " + String.join(" ", command));
+    try (Process process = new ProcessBuilder(command).redirectErrorStream(true).start()) {
+      // codesign -vvvv is chatty: keep its output for a failure only.
+      byte[] output = process.getInputStream().readAllBytes();
+      if (process.waitFor() != 0) {
+        System.err.write(output);
+        throw new IllegalStateException("codesign failed: " + String.join(" ", command));
+      }
     }
   }
 

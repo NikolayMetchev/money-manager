@@ -31,6 +31,13 @@ case "$(uname -s)" in
   MINGW* | MSYS*)
     msi=$(cygpath -w "$(realpath "$dir"/*.msi)")
     log=$(cygpath -w "$work/msi.log")
+    # A cabinet keeps file times as local time, which Windows Installer converts with the machine's time zone, and
+    # the AOT caches need the jars' exact times. The runners are on UTC, where nothing shifts, so install under
+    # another zone (only on CI: it's the machine's setting).
+    if [ -n "${GITHUB_ACTIONS:-}" ]; then
+      tzutil //s "Pacific Standard Time"
+      echo "Time zone: $(tzutil //g)"
+    fi
     code=$(powershell -NoProfile -Command \
       "(Start-Process msiexec -ArgumentList '/i','\"$msi\"','/qn','/l*v','\"$log\"' -Wait -PassThru).ExitCode")
     if [ "${code//[$'\r\n']/}" != 0 ]; then
