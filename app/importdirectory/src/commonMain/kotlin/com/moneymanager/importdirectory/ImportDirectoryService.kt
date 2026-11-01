@@ -438,13 +438,16 @@ class ImportDirectoryService(
     /**
      * Applies [plan]. A file from a folder without an account gets one named after the folder; a file from
      * no folder uses [sourceAccountOverride] when its strategy needs one. Files with no matching strategy
-     * are skipped and counted.
+     * are skipped and counted. Progress names each file by [fileLabel], and once [stopRequested] says yes no
+     * further file starts (see [bulkApplyCsv]).
      */
     suspend fun applyCsvImportAll(
         plan: CsvImportAllPlan,
         sourceAccountOverride: AccountId?,
         onProgress: suspend (Progress) -> Unit,
         refreshViews: Boolean = true,
+        fileLabel: (CsvImport) -> String = { it.originalFileName },
+        stopRequested: () -> Boolean = { false },
     ): BulkApplyResult =
         writeLock.withLock {
             bulkApplyCsv(
@@ -464,6 +467,8 @@ class ImportDirectoryService(
                 directoryAccounts = plan.directoryAccounts + folderAccounts(plan.folders),
                 tradeRepository = tradeRepository,
                 refreshViews = refreshViews,
+                fileLabel = fileLabel,
+                stopRequested = stopRequested,
             )
         }
 

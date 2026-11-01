@@ -333,7 +333,9 @@ private suspend fun createCryptoAssets(
  * scanned from, or that directory's parent), else the shared [sourceAccountOverride]; hard-coded and
  * per-row strategies resolve their own regardless. Refreshes materialized views once at the end unless
  * [refreshViews] is false (a caller batching several runs refreshes once itself). Reports row-weighted
- * run-wide progress via [onProgress].
+ * run-wide progress via [onProgress], naming each file by [fileLabel]. [stopRequested] is asked before each file:
+ * once it says yes, no more files start (the one under way finishes) and the rest are counted in
+ * [BulkApplyResult.filesNotStarted].
  */
 @Suppress("LongParameterList")
 suspend fun bulkApplyCsv(
@@ -353,8 +355,11 @@ suspend fun bulkApplyCsv(
     directoryAccounts: Map<CsvImportId, AccountId> = emptyMap(),
     tradeRepository: TradeReadRepository? = null,
     refreshViews: Boolean = true,
+    fileLabel: (CsvImport) -> String = { it.originalFileName },
+    stopRequested: () -> Boolean = { false },
 ): BulkApplyResult {
     val outcomes = mutableListOf<BulkFileOutcome>()
+    var filesNotStarted = 0
 
     // Preparing a file reads every one of its rows (a PDF's lines, until they're assembled), so they weigh it.
     val tracker =
@@ -369,11 +374,17 @@ suspend fun bulkApplyCsv(
     // Stage every file and create every crypto asset the batch needs up front, sized to the batch-wide max precision
     // per ticker, so cross-file ordering never leaves a ticker missing or a scale factor too small.
     prepareImports(imports, strategies, currencies, csvImportRepository, importEngine, cryptoRepository) { index, file ->
-        tracker.prepared(index, "Prepared", file.originalFileName)
+        tracker.prepared(index, "Prepared", fileLabel(file))
     }
 
     imports.forEachIndexed { index, listedImport ->
-        tracker.itemStarted(index, listedImport.originalFileName)
+        // Once stopped, every remaining file is counted rather than started.
+        if (filesNotStarted > 0 || stopRequested()) {
+            filesNotStarted++
+            return@forEachIndexed
+        }
+        val label = fileLabel(listedImport)
+        tracker.itemStarted(index, label)
         // getAllImports() doesn't populate columns, so re-fetch the full import (which loads them)
         // for the strategy match below.
         val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: listedImport
@@ -412,7 +423,7 @@ suspend fun bulkApplyCsv(
                     importEngine = importEngine,
                     refreshViews = false,
                     passThroughAccounts = passThroughAccounts,
-                    onProgress = { tracker.item(index, csvImport.originalFileName, it) },
+                    onProgress = { tracker.item(index, label, it) },
                     engineBatchSize = BULK_ENGINE_BATCH_SIZE,
                     cryptoRepository = cryptoRepository,
                     attributeAccountMatchers = attributeAccountMatchers,
@@ -425,10 +436,10 @@ suspend fun bulkApplyCsv(
         }
     }
 
-    tracker.done()
+    tracker.done(imports.size - filesNotStarted)
     if (refreshViews) maintenance.refreshMaterializedViews()
 
-    return BulkApplyResult(outcomes)
+    return BulkApplyResult(outcomes, filesNotStarted)
 }
 
 /**

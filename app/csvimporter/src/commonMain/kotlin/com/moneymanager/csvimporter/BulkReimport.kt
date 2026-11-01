@@ -28,6 +28,7 @@ data class BulkReimportResult(
     val reappliedEdits: Int = 0,
     /** Hand edits whose transaction the re-import didn't create again, so they were dropped. */
     val unmatchedEdits: List<ManualEdit> = emptyList(),
+    override val filesNotStarted: Int = 0,
 ) : BulkImportResult {
     override fun toSummary(): String =
         buildString {
@@ -43,6 +44,7 @@ data class BulkReimportResult(
             if (duplicatesSkipped > 0) append(" · $duplicatesSkipped duplicates skipped")
             if (filesSkippedNoStrategy > 0) append(" · $filesSkippedNoStrategy skipped (no strategy)")
             if (filesFailed > 0) append(" · $filesFailed failed")
+            append(stoppedSuffix())
         }
 }
 
@@ -73,6 +75,9 @@ sealed interface BulkReimportFileOutcome {
  * [reimportFile] needs. It prepares each file (weighted by its rows, at the start of the bar) and reports each,
  * by its index in [imports], as it's done. [logLabel] names the flow in the
  * per-file failure log ("CSV", "QIF").
+ *
+ * [stopRequested] is asked before each file: once it says yes, the run starts no more files (the one under way
+ * finishes) and counts the rest in [BulkReimportResult.filesNotStarted].
  */
 @Suppress("LongParameterList")
 suspend fun <T, C> runBulkReimport(
@@ -83,6 +88,7 @@ suspend fun <T, C> runBulkReimport(
     maintenance: Maintenance,
     onProgress: suspend (Progress) -> Unit,
     startDetail: String? = null,
+    stopRequested: () -> Boolean = { false },
     prepare: suspend (onPrepared: suspend (index: Int) -> Unit) -> C,
     reimportFile: suspend (index: Int, file: T, context: C, onFileProgress: suspend (Progress) -> Unit) -> BulkReimportFileOutcome,
 ): BulkReimportResult {
@@ -98,7 +104,11 @@ suspend fun <T, C> runBulkReimport(
     tracker.started(detail = startDetail)
     val context = prepare { index -> tracker.prepared(index, "Prepared", fileName(imports[index])) }
 
-    imports.forEachIndexed { index, file ->
+    for ((index, file) in imports.withIndex()) {
+        if (stopRequested()) {
+            result = result.copy(filesNotStarted = imports.size - index)
+            break
+        }
         val name = fileName(file)
         tracker.itemStarted(index, name)
         try {
@@ -132,7 +142,7 @@ suspend fun <T, C> runBulkReimport(
         }
     }
 
-    tracker.done()
+    tracker.done(imports.size - result.filesNotStarted)
     maintenance.refreshMaterializedViews()
     return result
 }

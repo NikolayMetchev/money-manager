@@ -50,9 +50,9 @@ class WeightedProgressTest {
             tracker.item(0, "a.pdf", Progress("Importing transactions", fraction = 0.5f))
 
             assertEquals(listOf(0.5f, 4f / 6, 4f / 6, 0.75f), emitted.map { it.fraction })
-            // Preparation takes its share of the bar but isn't counted as rows.
+            // Preparation takes its share of the bar but isn't counted as rows: only half of a.pdf's 100 are done.
             assertTrue(emitted.all { it.total == 200 })
-            assertEquals(150, emitted.last().processed)
+            assertEquals(listOf(0, 0, 0, 50), emitted.map { it.processed })
             assertEquals(
                 listOf("Staged 1 of 2 PDFs — b.pdf", "Staged 2 of 2 PDFs — a.pdf"),
                 emitted.take(2).map { it.detail },
@@ -114,6 +114,46 @@ class WeightedProgressTest {
             assertTrue(emitted.all { it.fraction!! in 0f..1f })
             assertEquals(1f, emitted.last().fraction)
             assertTrue(emitted.all { it.total == 0 && it.processed == 0 })
+        }
+
+    @Test
+    fun carriesFilesDoneTheFileAndItsStepApart() =
+        runTest {
+            val tracker =
+                WeightedProgress(listOf(10, 10), preparation = listOf(10, 10), preparationNoun = "files") { emitted += it }
+
+            tracker.started("Preparing")
+            tracker.prepared(0, "Prepared", "a.csv")
+            tracker.itemStarted(0, "a.csv")
+            tracker.item(0, "a.csv", Progress("Importing transactions", fraction = 0.5f))
+            tracker.itemStarted(1, "b.csv")
+            tracker.done()
+
+            assertEquals(
+                listOf(
+                    Progress.Item(0, 2, "files", null, "Preparing"),
+                    Progress.Item(1, 2, "files", "a.csv", "Preparing files"),
+                    Progress.Item(0, 2, "files", "a.csv", "Starting"),
+                    Progress.Item(0, 2, "files", "a.csv", "Importing transactions"),
+                    Progress.Item(1, 2, "files", "b.csv", "Starting"),
+                    Progress.Item(2, 2, "files", null, "Finishing up"),
+                ),
+                emitted.map { it.item },
+            )
+        }
+
+    @Test
+    fun aStoppedRunFinishesOnTheCountsItReached() =
+        runTest {
+            val tracker = WeightedProgress(listOf(10, 30)) { emitted += it }
+
+            tracker.item(0, "a.csv", Progress("Importing", fraction = 1f))
+            tracker.done(itemsDone = 1)
+
+            val last = emitted.last()
+            assertEquals(Progress.Item(1, 2, "files", null, "Finishing up"), last.item)
+            assertEquals(10, last.processed)
+            assertEquals(0.25f, last.fraction)
         }
 
     @Test

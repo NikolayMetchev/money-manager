@@ -19,7 +19,7 @@ if [ "$module_kotlin" != "$pinned_native" ]; then
 fi
 
 python3 bazel/renovate/repin_node.py MODULE.bazel
-python3 bazel/renovate/repin_jdk.py MODULE.bazel .bazelrc
+python3 bazel/renovate/repin_jdk.py MODULE.bazel .bazelrc .tool-versions
 # rules_kotlin's compiler, whose JvmTarget says how new the bytecode can be.
 kotlinc_repo=rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin_git
 bazel fetch --repo="@@$kotlinc_repo"

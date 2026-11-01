@@ -190,6 +190,7 @@ fun ReimportDialog(
  * Re-imports every staged file in [files] in one go, each as [ReimportDialog] would, with one
  * confirm and an aggregated summary. Each file keeps the strategy, account and currency it was
  * imported with; the shared pickers only appear for files that created nothing to read them from.
+ * Progress names each file by [fileLabel], and Cancel stops the run once the file under way is done.
  */
 @Suppress("LongMethod")
 @Composable
@@ -199,9 +200,11 @@ fun ReimportAllDialog(
     pickers: ReimportPickerRepositories,
     onDismiss: () -> Unit,
     onComplete: () -> Unit,
+    fileLabel: (CsvImport) -> String = { it.originalFileName },
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val accountName = rememberAccountNamer(pickers.accountRepository)
+    var stopRequested by remember { mutableStateOf(false) }
 
     var accountId by remember { mutableStateOf<AccountId?>(null) }
     var currencyId by remember { mutableStateOf<CurrencyId?>(null) }
@@ -236,10 +239,19 @@ fun ReimportAllDialog(
         onRun = {
             val planned = plan ?: return@BulkImportDialogScaffold
             isRunning = true
+            stopRequested = false
             errorMessage = null
             scope.launch {
                 try {
-                    result = reimports.reimportAll(planned, accountId, currencyId, onProgress = { progress = it })
+                    result =
+                        reimports.reimportAll(
+                            planned,
+                            accountId,
+                            currencyId,
+                            onProgress = { progress = it },
+                            fileLabel = fileLabel,
+                            stopRequested = { stopRequested },
+                        )
                 } catch (expected: CancellationException) {
                     throw expected
                 } catch (expected: Exception) {
@@ -256,6 +268,8 @@ fun ReimportAllDialog(
             Text(finished.toSummary(), style = MaterialTheme.typography.bodyMedium)
             UnmatchedEditsReport(finished.unmatchedEdits, accountName)
         },
+        onStop = { stopRequested = true },
+        stopping = stopRequested,
     ) {
         Text(
             text =

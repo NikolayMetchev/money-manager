@@ -241,25 +241,32 @@ class Reimports(
 
     /**
      * Re-imports every file of [plan], one after another, refreshing materialized views once at the end.
-     * [accountId] and [currencyId] are for the files whose last import didn't record them.
+     * [accountId] and [currencyId] are for the files whose last import didn't record them. Progress names each
+     * file by [fileLabel], and once [stopRequested] says yes no further file starts (see [runBulkReimport]).
      */
     suspend fun reimportAll(
         plan: ReimportAllPlan,
         accountId: AccountId?,
         currencyId: CurrencyId?,
         onProgress: suspend (Progress) -> Unit,
-    ): BulkReimportResult = writeLock.withLock { reimportAllLocked(plan, accountId, currencyId, onProgress) }
+        fileLabel: (CsvImport) -> String = { it.originalFileName },
+        stopRequested: () -> Boolean = { false },
+    ): BulkReimportResult = writeLock.withLock { reimportAllLocked(plan, accountId, currencyId, onProgress, fileLabel, stopRequested) }
 
+    @Suppress("LongParameterList")
     private suspend fun reimportAllLocked(
         plan: ReimportAllPlan,
         accountId: AccountId?,
         currencyId: CurrencyId?,
         onProgress: suspend (Progress) -> Unit,
+        fileLabel: (CsvImport) -> String,
+        stopRequested: () -> Boolean,
     ): BulkReimportResult =
         runBulkReimport(
             imports = plan.files,
             rowCount = { it.rowCount },
-            fileName = { it.originalFileName },
+            fileName = fileLabel,
+            stopRequested = stopRequested,
             logLabel = "file",
             maintenance = maintenance,
             onProgress = onProgress,

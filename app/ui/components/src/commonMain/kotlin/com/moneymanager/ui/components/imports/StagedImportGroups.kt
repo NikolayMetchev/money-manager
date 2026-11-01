@@ -58,6 +58,19 @@ fun <F : StagedImport<*>> sortedByTransactionDates(
 /** How an import directory is named in the imports lists; matches the import-directories screen. */
 internal fun ImportDirectory.listLabel(): String = displayPath ?: folderRef
 
+/**
+ * Where [import] sits: its first source directory's path (from [importDirectories], as
+ * [resolveImportDirectories] builds it) and then its file name, or just the file name for a file added by hand.
+ */
+fun <F : StagedImport<*>> stagedImportPath(
+    import: F,
+    importDirectories: Map<*, List<ImportDirectory>>,
+): String {
+    val directory = importDirectories[import.id]?.firstOrNull() ?: return import.originalFileName
+    return directory.displayPath?.let { "$it$PATH_SEPARATOR${import.originalFileName}" }
+        ?: "${directory.folderRef.trimEnd('/', '\\')}/${import.originalFileName}"
+}
+
 internal fun ImportDirectoryProvider.label(): String =
     when (this) {
         ImportDirectoryProvider.LOCAL -> "Local"
