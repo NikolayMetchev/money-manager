@@ -20,7 +20,7 @@ PLATFORMS = {
 
 
 def fetch(url):
-    with urllib.request.urlopen(url) as response:
+    with urllib.request.urlopen(url, timeout=60) as response:
         return json.load(response)
 
 
@@ -44,14 +44,19 @@ module_path, bazelrc_path = sys.argv[1], sys.argv[2]
 module = open(module_path, encoding="utf-8").read()
 version = re.search(r'^JDK = "([^"]+)"', module, re.M).group(1)
 
-entry = re.compile(r'^(    "([a-z0-9_]+)": \[)"[^"]+", "[0-9a-f]{64}"(\],)$', re.M)
+entry = re.compile(r'^(    "([a-z0-9_]+)": \[)"([^"]+)", "([0-9a-f]{64})"(\],)$', re.M)
+# A pin already for this release (Zulu names it -jdk<version>.<build> or -jdk<version>-<os>) is kept, so repin.sh, which
+# runs for every MODULE.bazel change Renovate makes, only asks Azul when JDK itself moved.
+current = re.compile(rf"-jdk{re.escape(version)}[.-]")
 
 
 def repin(match):
     if match.group(2) not in PLATFORMS:
         sys.exit(f"JDK_ARCHIVES has an unknown platform {match.group(2)}")
-    name, sha256 = archive(version, *PLATFORMS[match.group(2)])
-    return f'{match.group(1)}"{name}", "{sha256}"{match.group(3)}'
+    name, sha256 = match.group(3), match.group(4)
+    if not current.search(name):
+        name, sha256 = archive(version, *PLATFORMS[match.group(2)])
+    return f'{match.group(1)}"{name}", "{sha256}"{match.group(5)}'
 
 
 updated, count = entry.subn(repin, module)
