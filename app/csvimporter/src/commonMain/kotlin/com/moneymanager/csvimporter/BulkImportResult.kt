@@ -11,6 +11,9 @@ interface BulkImportResult {
     val filesSkippedNoStrategy: Int
     val filesFailed: Int
 
+    /** Files the run never started because it was stopped (see [BulkImportResult.stoppedSuffix]). */
+    val filesNotStarted: Int
+
     fun toSummary(): String =
         buildString {
             append("Imported $filesImported file${if (filesImported == 1) "" else "s"}")
@@ -18,7 +21,12 @@ interface BulkImportResult {
             if (duplicatesSkipped > 0) append(" · $duplicatesSkipped duplicates skipped")
             if (filesSkippedNoStrategy > 0) append(" · $filesSkippedNoStrategy skipped (no strategy)")
             if (filesFailed > 0) append(" · $filesFailed failed")
+            append(stoppedSuffix())
         }
+
+    /** Says the run was stopped, and how many files it left, when it was. */
+    fun stoppedSuffix(): String =
+        if (filesNotStarted > 0) " · stopped, $filesNotStarted file${if (filesNotStarted == 1) "" else "s"} not started" else ""
 }
 
 /** What a bulk apply did with one file. */
@@ -47,6 +55,7 @@ data class BulkFileOutcome(
 /** A bulk CSV or QIF apply, file by file; the counts are derived from [files]. */
 data class BulkApplyResult(
     val files: List<BulkFileOutcome>,
+    override val filesNotStarted: Int = 0,
 ) : BulkImportResult {
     override val filesImported: Int get() = files.count { it.status == BulkFileStatus.IMPORTED }
     override val transfersCreated: Int get() = files.sumOf { it.transfersCreated }

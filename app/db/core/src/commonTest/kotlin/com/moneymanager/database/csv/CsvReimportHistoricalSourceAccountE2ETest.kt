@@ -176,4 +176,103 @@ class CsvReimportHistoricalSourceAccountE2ETest : DbTest() {
             val reimported = repositories.csvImportRepository.getImport(imported.id).first()!!
             assertEquals(monzoAccount, reimported.importedSettings.accountId, "The re-import should record the account again")
         }
+
+    private suspend fun stageMonzo(
+        fileName: String,
+        rows: List<List<String>>,
+    ): CsvImport {
+        val id =
+            repositories.csvImportRepository.createImport(
+                fileName = fileName,
+                headers = headers,
+                rows = rows,
+                fileChecksum = "checksum-$fileName",
+                fileLastModified = now,
+            )
+        return repositories.csvImportRepository.getImport(id).first()!!
+    }
+
+    private suspend fun applyAll(
+        imports: List<CsvImport>,
+        sourceAccountOverride: AccountId,
+        progress: MutableList<Progress> = mutableListOf(),
+        stopRequested: () -> Boolean = { false },
+    ) = bulkApplyCsv(
+        imports = imports,
+        sourceAccountOverride = sourceAccountOverride,
+        strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
+        currencies = repositories.currencyRepository.getAllCurrencies().first(),
+        accountMappingRepository = repositories.accountMappingRepository,
+        accountRepository = repositories.accountRepository,
+        csvImportRepository = repositories.csvImportRepository,
+        maintenance = maintenance,
+        importEngine = repositories.importEngine,
+        onProgress = { progress += it },
+        cryptoRepository = repositories.cryptoRepository,
+        attributeAccountMatchers = AttributeAccountMatcher.registry(repositories.accountAttributeRepository.getAll().first()),
+        fileLabel = { "Statements / ${it.originalFileName}" },
+        stopRequested = stopRequested,
+    )
+
+    private suspend fun monzoAccount(): AccountId {
+        repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
+        return repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Monzo", openingDate = now), Source.Manual)
+    }
+
+    @Test
+    fun importAll_stoppedDuringTheFirstFile_finishesItAndStartsNoOther() =
+        runDbTest {
+            val monzo = monzoAccount()
+            val first = stageMonzo("a.csv", listOf(row("tx_a", "Coffee Shop", "-3.50", "Coffee")))
+            val second = stageMonzo("b.csv", listOf(row("tx_b", "Book Store", "-12.00", "Books")))
+            val progress = mutableListOf<Progress>()
+
+            // Asked to stop as soon as the first file is under way.
+            val result =
+                applyAll(listOf(first, second), monzo, progress) {
+                    progress.any { it.detail.startsWith("File 1 of 2") }
+                }
+
+            assertEquals(1, result.filesImported)
+            assertEquals(1, result.filesNotStarted)
+            assertEquals(listOf("a.csv"), result.files.map { it.fileName })
+            assertFalse(progress.any { it.detail.startsWith("File 2 of 2") }, "the second file should never start")
+            assertEquals("Statements / a.csv", progress.first { it.detail.startsWith("File 1 of 2") }.item?.name)
+            val transfers = repositories.transactionRepository.getTransactionsByAccount(monzo).first()
+            assertEquals(listOf("Coffee"), transfers.map { it.description })
+        }
+
+    @Test
+    fun reimportAll_stoppedDuringTheFirstFile_finishesItAndStartsNoOther() =
+        runDbTest {
+            val monzo = monzoAccount()
+            val first = stageMonzo("a.csv", listOf(row("tx_a", "Coffee Shop", "-3.50", "Coffee")))
+            val second = stageMonzo("b.csv", listOf(row("tx_b", "Book Store", "-12.00", "Books")))
+            applyAll(listOf(first, second), monzo)
+            val imported = listOf(first, second).map { repositories.csvImportRepository.getImport(it.id).first()!! }
+            val progress = mutableListOf<Progress>()
+
+            val reimports = repositories.reimports(maintenance)
+            val result =
+                reimports.reimportAll(
+                    reimports.planAll(imported),
+                    accountId = null,
+                    currencyId = null,
+                    onProgress = { progress += it },
+                    fileLabel = { "Statements / ${it.originalFileName}" },
+                    stopRequested = { progress.any { it.detail.startsWith("File 1 of 2") } },
+                )
+
+            assertEquals(1, result.filesImported)
+            assertEquals(1, result.filesNotStarted)
+            assertFalse(progress.any { it.detail.startsWith("File 2 of 2") }, "the second file should never start")
+            assertEquals("Statements / a.csv", progress.first { it.detail.startsWith("File 1 of 2") }.item?.name)
+            assertEquals(
+                2,
+                repositories.transactionRepository
+                    .getTransactionsByAccount(monzo)
+                    .first()
+                    .size,
+            )
+        }
 }

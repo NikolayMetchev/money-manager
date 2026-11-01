@@ -58,6 +58,7 @@ import com.moneymanager.ui.components.imports.rememberStagedImportsData
 import com.moneymanager.ui.components.imports.sortedByTransactionDates
 import com.moneymanager.ui.components.imports.stagedImportDirectoryOptions
 import com.moneymanager.ui.components.imports.stagedImportKinds
+import com.moneymanager.ui.components.imports.stagedImportPath
 import com.moneymanager.ui.components.imports.stagedImportStrategyOptions
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -188,6 +189,7 @@ fun ImportFilesScreen(
                     personRepository = personRepository,
                     onDismiss = { importAllScope = null },
                     onComplete = { importAllScope = null },
+                    fileLabel = { stagedImportPath(it, data.importDirectories) },
                 )
             }
 
@@ -198,6 +200,7 @@ fun ImportFilesScreen(
                     pickers = ReimportPickerRepositories(accountRepository, categoryRepository, currencyRepository, personRepository),
                     onDismiss = { reimportAllScope = null },
                     onComplete = { reimportAllScope = null },
+                    fileLabel = { stagedImportPath(it, data.importDirectories) },
                 )
             }
 

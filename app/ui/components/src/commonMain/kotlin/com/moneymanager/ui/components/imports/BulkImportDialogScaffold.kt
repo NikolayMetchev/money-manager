@@ -28,7 +28,8 @@ import kotlin.time.TimeSource
  * The shell every bulk "Import all"/"Re-import all" dialog wears: a modal that refuses to dismiss
  * mid-run, a title that flips once the run has a result, a body that swaps the input [form] for the
  * finished [report], a confirm button that is a spinner while running and a "Done" afterwards, and a
- * "Cancel" that disappears once there is nothing left to cancel.
+ * "Cancel" that disappears once there is nothing left to cancel. Given [onStop], Cancel stays usable mid-run as
+ * "Stop after this file": the caller lets the file under way finish and starts no more ([stopping] once asked).
  *
  * Only the shell lives here. What the caller collects before the run and what it says afterwards are
  * genuinely per-source (a staged file resolves its strategy and maybe a source account,
@@ -49,6 +50,8 @@ fun <R : Any> BulkImportDialogScaffold(
     onDismiss: () -> Unit,
     onComplete: () -> Unit,
     report: @Composable ColumnScope.(R) -> Unit,
+    onStop: (() -> Unit)? = null,
+    stopping: Boolean = false,
     form: @Composable ColumnScope.() -> Unit,
 ) {
     val elapsed = runTimer(isRunning)
@@ -79,8 +82,18 @@ fun <R : Any> BulkImportDialogScaffold(
             }
         },
         dismissButton = {
-            if (result == null) {
-                TextButton(onClick = onDismiss, enabled = !isRunning) { Text("Cancel") }
+            when {
+                result != null -> {}
+
+                isRunning && onStop != null -> {
+                    TextButton(onClick = onStop, enabled = !stopping) {
+                        Text(if (stopping) "Stopping after this file…" else "Stop after this file")
+                    }
+                }
+
+                else -> {
+                    TextButton(onClick = onDismiss, enabled = !isRunning) { Text("Cancel") }
+                }
             }
         },
     )

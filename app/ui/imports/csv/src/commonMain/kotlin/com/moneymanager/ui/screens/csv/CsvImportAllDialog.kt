@@ -31,7 +31,8 @@ import kotlinx.coroutines.launch
  * auto-matched from its column headers (files with no match are skipped). The shared source account
  * chosen here is used only for files whose strategy needs a user-chosen source; strategies that
  * hard-code or per-row-resolve the source ignore it. Payee accounts auto-create with detected names.
- * CSV has no currency choice here — currency comes from the strategy.
+ * CSV has no currency choice here — currency comes from the strategy. Progress names each file by [fileLabel]
+ * (its path in its import folder), and Cancel stops the run once the file under way is done.
  */
 @Composable
 fun CsvImportAllDialog(
@@ -42,9 +43,11 @@ fun CsvImportAllDialog(
     personRepository: PersonReadRepository,
     onDismiss: () -> Unit,
     onComplete: () -> Unit,
+    fileLabel: (CsvImport) -> String = { it.originalFileName },
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
 
+    var stopRequested by remember { mutableStateOf(false) }
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var isImporting by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<Progress?>(null) }
@@ -72,9 +75,18 @@ fun CsvImportAllDialog(
         onRun = {
             val ready = plan ?: return@BulkImportDialogScaffold
             isImporting = true
+            stopRequested = false
             scope.launch {
                 try {
-                    summary = importDirectoryService.applyCsvImportAll(ready, sourceAccountId, onProgress = { progress = it }).toSummary()
+                    summary =
+                        importDirectoryService
+                            .applyCsvImportAll(
+                                ready,
+                                sourceAccountId,
+                                onProgress = { progress = it },
+                                fileLabel = fileLabel,
+                                stopRequested = { stopRequested },
+                            ).toSummary()
                 } finally {
                     isImporting = false
                 }
@@ -83,6 +95,8 @@ fun CsvImportAllDialog(
         onDismiss = onDismiss,
         onComplete = onComplete,
         report = { Text(it, style = MaterialTheme.typography.bodyMedium) },
+        onStop = { stopRequested = true },
+        stopping = stopRequested,
     ) {
         if (needsSourceAccount) {
             AccountPicker(
