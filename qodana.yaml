@@ -437,6 +437,10 @@ exclude:
       # [5] — native-only sources belong to no module, so the native actual of createPdfTextExtractor looks unused.
       - utils/parsers/pdf/src/nativeMain
       # [5] — FileSettingsText is used by jvmMain's DesktopLocalSettings and the CLI's CreateLocalSettings.native.
+      # Linter defect, full scans only: every private member of ImportDeduper (the constructor's properties, the
+      # ReconcileRule table, the helpers) reads as unused, although each is referenced in the file and detekt's
+      # unused-private checks pass. PR-mode scans of the file (#1245) report nothing; no sanity error explains it.
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/ImportDeduper.kt
       - utils/localsettings/src/commonMain/kotlin/com/moneymanager/localsettings/JsonLocalSettings.kt
       # [5] — actuals of common expects (BigDecimal/BigInteger, Currency, the file pickers, the vault path
       # resolver, the crypto catalog file, the remote cache location, the test database loader) and
