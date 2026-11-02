@@ -86,6 +86,7 @@ exclude:
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/repository/write/AccountWriteRepositoryImpl.kt
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/repository/write/CsvImportReadRepositoryImpl.kt
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/repository/write/CsvImportWriteRepositoryImpl.kt
+      - app/db/write/src/commonMain/kotlin/com/moneymanager/database/repository/write/TradeWriteRepositoryImpl.kt
       # The version check after `json.decodeFromString` (in a try whose catch throws) runs — the vault's
       # "newer version is refused" test exercises it; the linter resolves the reified call to Nothing.
       - utils/credentialvault/src/commonMain/kotlin/com/moneymanager/credentialvault/CredentialVaultImpl.kt

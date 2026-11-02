@@ -464,7 +464,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
                 setOf(newTrade.id.id, newTransfer.id.id, realTransfer.id),
                 rebuilt.members.map { it.transactionId.id }.toSet(),
             )
-            assertTrue(repositories.relationshipRepository.getByTransactions(listOf(realTransfer)).size == 1, "the old one is gone")
+            assertEquals(1, repositories.relationshipRepository.getByTransactions(listOf(realTransfer)).size, "the old one is gone")
         }
 
     @Test
