@@ -76,6 +76,13 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
+/** The schema-aware scope the screen needs, and the task manager an app-level host would provide. */
+@Composable
+private fun ProvideScreenScopes(content: @Composable () -> Unit) {
+    val tasks = remember { TaskManager(CoroutineScope(Dispatchers.Default)) }
+    CompositionLocalProvider(LocalTaskManager provides tasks) { ProvideSchemaAwareScope(content) }
+}
+
 class ReconciliationScreenTest {
     private val epoch = Instant.fromEpochMilliseconds(0)
     private val koinly = ReconciliationSource("Koinly", listOf("Koinly"), linkableAccountPrefix = "Koinly · ")
@@ -109,13 +116,6 @@ class ReconciliationScreenTest {
 
     private val personRepository: PersonReadRepository =
         mock { every { getAllPeople() } returns flowOf(emptyList()) }
-
-    /** The schema-aware scope the screen needs, and the task manager an app-level host would provide. */
-    @Composable
-    private fun ProvideScreenScopes(content: @Composable () -> Unit) {
-        val tasks = remember { TaskManager(CoroutineScope(Dispatchers.Default)) }
-        CompositionLocalProvider(LocalTaskManager provides tasks) { ProvideSchemaAwareScope(content) }
-    }
 
     @Test
     fun explainsHowToStartWhenThereAreNoSources() {
