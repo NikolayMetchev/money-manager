@@ -40,6 +40,8 @@ common:windows --workspace_status_command=bazel/stamp/workspace_status.bat
 common:cache --bes_results_url=https://app.buildbuddy.io/invocation/
 common:cache --bes_backend=grpcs://remote.buildbuddy.io
 common:cache --remote_cache=grpcs://remote.buildbuddy.io
+# Repository downloads (JDK, Kotlin/Native, Maven jars) come from BuildBuddy's cache, so no runner needs them restored.
+common:cache --experimental_remote_downloader=grpcs://remote.buildbuddy.io
 common:cache --remote_timeout=10m
 # Download only what a person asked for; intermediate outputs stay in the cache.
 common:cache --remote_download_toplevel
