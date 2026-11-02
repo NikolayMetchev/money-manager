@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.Account
@@ -393,6 +394,92 @@ class ReconciliationScreenTest {
                     ),
                 ),
                 batches.single().relationshipMutations,
+            )
+        }
+    }
+
+    private fun match(id: Long) = RelationshipMember(TransferId(id), RelationshipRole.MEMBER)
+
+    @Test
+    fun acceptAllAtEveryLevelStoresEveryNearMatchBeneathItInOneBatch() {
+        runMoneyManagerComposeUiTest {
+            val batches =
+                showLegs(
+                    listOf(leg(10, wallet.accountId, "5", t0), leg(11, wallet.accountId, "6", t0 + 1.hours)),
+                    listOf(leg(20, binance, "5", t0 + 1.hours), leg(21, binance, "6", t0 + 2.hours)),
+                )
+            reveal(hasText("Near matches (2)"))
+            // Section, wallet and month headers each offer it, in tree order.
+            onAllNodesWithText("Accept all (2)").assertCountEquals(2)
+            expandAll()
+            onAllNodesWithText("Accept all (2)").assertCountEquals(3)
+
+            onAllNodesWithText("Accept all (2)")[2].performClick()
+            waitForIdle()
+
+            val create = batches.single().relationshipMutations.filterIsInstance<RelationshipMutation.Create>()
+            assertEquals(listOf(listOf(match(10), match(20)), listOf(match(11), match(21))), create.map { it.members })
+        }
+    }
+
+    @Test
+    fun acceptAllStoresTheAutoMatchedRowsToo() {
+        runMoneyManagerComposeUiTest {
+            // 10↔20 agree to the second (auto-matched), 11↔21 are an hour apart (near).
+            val batches =
+                showLegs(
+                    listOf(leg(10, wallet.accountId, "5", t0), leg(11, wallet.accountId, "6", t0 + 1.hours)),
+                    listOf(leg(20, binance, "5", t0), leg(21, binance, "6", t0 + 2.hours)),
+                )
+            reveal(hasText("Near matches (1)"))
+
+            onAllNodesWithText("Accept all (2)")[0].performClick()
+            waitForIdle()
+
+            val create = batches.single().relationshipMutations.filterIsInstance<RelationshipMutation.Create>()
+            assertEquals(setOf(listOf(match(10), match(20)), listOf(match(11), match(21))), create.map { it.members }.toSet())
+        }
+    }
+
+    @Test
+    fun theMatchedTabOffersAcceptAllForAutoMatchedRows() {
+        runMoneyManagerComposeUiTest {
+            val batches = showLegs(listOf(leg(10, wallet.accountId, "5", t0)), listOf(leg(20, binance, "5", t0)))
+            clickText("Matched")
+
+            onAllNodesWithText("Accept all (1)")[0].performClick()
+            waitForIdle()
+
+            assertEquals(
+                listOf(listOf(match(10), match(20))),
+                batches
+                    .single()
+                    .relationshipMutations
+                    .filterIsInstance<RelationshipMutation.Create>()
+                    .map { it.members },
+            )
+        }
+    }
+
+    @Test
+    fun ignoreAllAtTheSectionExcludesEveryMovementBeneathIt() {
+        runMoneyManagerComposeUiTest {
+            val batches =
+                showLegs(
+                    listOf(leg(11, wallet.accountId, "7", t0, trade = true), leg(12, wallet.accountId, "8", t0 + 1.hours, trade = true)),
+                    // ADA is known on the linked account, so the default hide-unknown-assets filter keeps both rows.
+                    listOf(leg(20, binance, "1", t0 + 30.days)),
+                )
+            reveal(hasText("Only in Koinly (2)"))
+
+            onAllNodesWithText("Ignore all (2)")[0].performScrollTo().performClick()
+            waitForIdle()
+
+            assertEquals(
+                listOf(11L, 12L).map {
+                    TradeAttributeMutation.Set(TradeId(it), AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID), IGNORED_IN_RECONCILIATION)
+                },
+                batches.flatMap { it.tradeAttributeMutations },
             )
         }
     }

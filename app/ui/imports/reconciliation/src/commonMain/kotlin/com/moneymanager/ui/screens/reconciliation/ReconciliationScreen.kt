@@ -51,6 +51,7 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.createReconciliationMatch
+import com.moneymanager.importengineapi.createReconciliationMatches
 import com.moneymanager.importengineapi.deleteRelationship
 import com.moneymanager.importengineapi.setReconciliationLinks
 import com.moneymanager.importengineapi.setTradeExcluded
@@ -227,6 +228,9 @@ private fun SourceReconciliation(
     fun storeMatch(legs: List<ReconciliationLeg>) =
         write("Matching") { importEngine.createReconciliationMatch(legs.map { it.transactionRef }.distinct()) }
 
+    fun storeMatches(matches: List<LegMatch>) =
+        write("Matching") { importEngine.createReconciliationMatches(matches.map { it.memberTransactions() }) }
+
     // Ignoring a source row excludes every transaction of its movement (a trade and its fee, say).
     fun setIgnored(
         legs: List<ReconciliationLeg>,
@@ -331,19 +335,27 @@ private fun SourceReconciliation(
         }
         when (tab) {
             ResultTab.UNMATCHED -> {
-                sectionHeading("Near matches (${loaded.nearMatches.size})")
+                // Accept all stores the exact matches under the same header too, not only the near ones listed here.
+                sectionHeading("Near matches (${loaded.nearMatches.size})") {
+                    loaded.unstoredMatches().let { BulkButton("Accept all", it.size) { storeMatches(it) } }
+                }
                 legGroups(
                     prefix = "near",
                     groups = groupByWalletAndMonth(loaded.nearMatches, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
                     expanded = expanded,
                     empty = "No near matches: every match agrees to the second.",
+                    headerAction = { _, wallet, month ->
+                        loaded.unstoredMatches(wallet, month).let { BulkButton("Accept all", it.size) { storeMatches(it) } }
+                    },
                 ) { match ->
                     MatchRow(match, accountNames, onOpenLeg) {
-                        TextButton(onClick = { storeMatch(match.sourceLegs + match.realLegs) }) { Text("Accept") }
+                        TextButton(onClick = { storeMatches(listOf(match)) }) { Text("Accept") }
                     }
                 }
                 val onlyInSource = loaded.missingInMm.filter { !hideUnknownAssets || !it.assetUnknownToMm }
-                sectionHeading("Only in ${source.name} (${onlyInSource.size})")
+                sectionHeading("Only in ${source.name} (${onlyInSource.size})") {
+                    BulkButton("Ignore all", onlyInSource.size) { setIgnored(loaded.movementsOf(onlyInSource), ignored = true) }
+                }
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = hideUnknownAssets, onCheckedChange = { hideUnknownAssets = it })
@@ -355,6 +367,13 @@ private fun SourceReconciliation(
                     groups = groupByWalletAndMonth(onlyInSource, { it.walletAccountId }, { it.leg.timestamp }, walletName),
                     expanded = expanded,
                     empty = "Everything ${source.name} has on the linked wallets is in Money Manager.",
+                    headerAction = {
+                        rows,
+                        _,
+                        _,
+                        ->
+                        BulkButton("Ignore all", rows.size) { setIgnored(loaded.movementsOf(rows), ignored = true) }
+                    },
                 ) { unmatched ->
                     LegRow(unmatched.leg, accountNames, onOpenLeg) {
                         TextButton(onClick = { setIgnored(loaded.movementOf(unmatched), ignored = true) }) { Text("Ignore") }
@@ -371,11 +390,23 @@ private fun SourceReconciliation(
             }
 
             ResultTab.MATCHED -> {
+                sectionHeading("Matched (${loaded.matched.size})") {
+                    loaded.unstoredMatches().filter { it.settled }.let { BulkButton("Accept all", it.size) { storeMatches(it) } }
+                }
                 legGroups(
                     prefix = "matched",
                     groups = groupByWalletAndMonth(loaded.matched, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
                     expanded = expanded,
                     empty = "Nothing matched yet — link the wallets above.",
+                    // Only the rows the matcher found: a stored one is already accepted.
+                    headerAction = { _, wallet, month ->
+                        loaded
+                            .unstoredMatches(
+                                wallet,
+                                month,
+                            ).filter { it.settled }
+                            .let { BulkButton("Accept all", it.size) { storeMatches(it) } }
+                    },
                 ) { match ->
                     val matchId = match.matchId
                     MatchRow(
@@ -430,10 +461,26 @@ private fun SourceReconciliation(
     }
 }
 
-private fun LazyListScope.sectionHeading(text: String) {
+private fun LazyListScope.sectionHeading(
+    text: String,
+    action: (@Composable () -> Unit)? = null,
+) {
     item(key = "heading-$text".substringBefore(" (")) {
-        Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)) {
+            Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            action?.invoke()
+        }
     }
+}
+
+/** A header's bulk button, covering the [count] rows beneath it; absent when there are none. */
+@Composable
+private fun BulkButton(
+    label: String,
+    count: Int,
+    onClick: () -> Unit,
+) {
+    if (count > 0) TextButton(onClick = onClick) { Text("$label ($count)") }
 }
 
 @Composable
@@ -597,6 +644,7 @@ private fun <T> LazyListScope.legGroups(
     groups: List<WalletGroup<T>>,
     expanded: MutableMap<String, Boolean>,
     empty: String,
+    headerAction: (@Composable (items: List<T>, wallet: AccountId, month: String?) -> Unit)? = null,
     row: @Composable (T) -> Unit,
 ) {
     if (groups.isEmpty()) {
@@ -606,29 +654,35 @@ private fun <T> LazyListScope.legGroups(
     groups.forEach { group ->
         val walletKey = "$prefix-${group.walletAccountId.id}"
         item(key = walletKey) {
-            Text(
-                "${if (expanded[walletKey] == true) "▾" else "▸"} ${group.walletName} (${group.count})",
-                style = MaterialTheme.typography.titleSmall,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { expanded[walletKey] = expanded[walletKey] != true }
-                        .padding(vertical = 8.dp),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${if (expanded[walletKey] == true) "▾" else "▸"} ${group.walletName} (${group.count})",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .clickable { expanded[walletKey] = expanded[walletKey] != true }
+                            .padding(vertical = 8.dp),
+                )
+                headerAction?.invoke(group.months.flatMap { it.items }, group.walletAccountId, null)
+            }
         }
         if (expanded[walletKey] != true) return@forEach
         group.months.forEach { month ->
             val monthKey = "$walletKey-${month.month}"
             item(key = monthKey) {
-                Text(
-                    "${if (expanded[monthKey] == true) "▾" else "▸"} ${month.month} (${month.items.size})",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { expanded[monthKey] = expanded[monthKey] != true }
-                            .padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "${if (expanded[monthKey] == true) "▾" else "▸"} ${month.month} (${month.items.size})",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .clickable { expanded[monthKey] = expanded[monthKey] != true }
+                                .padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
+                    )
+                    headerAction?.invoke(month.items, group.walletAccountId, month.month)
+                }
             }
             if (expanded[monthKey] == true) {
                 items(month.items) { Row(modifier = Modifier.padding(start = 32.dp)) { row(it) } }
