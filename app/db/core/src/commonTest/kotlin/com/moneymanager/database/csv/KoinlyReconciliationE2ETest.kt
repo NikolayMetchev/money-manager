@@ -514,6 +514,17 @@ class KoinlyReconciliationE2ETest : DbTest() {
         }
 
     @Test
+    fun anExclusionWithoutAReasonStillReadsAsExcluded() =
+        runDbTest {
+            applyAll(listOf(stage("a.csv", listOf(coinbaseDeposit))))
+            repositories.importEngine.setTransferExcluded(koinlyDeposit(), "")
+
+            val legs = repositories.reconciliationLinkRepository.getLegs(shadowIds())
+
+            assertTrue(legs.isNotEmpty() && legs.all { it.isExcluded && it.excludedReason == "" }, "$legs")
+        }
+
+    @Test
     fun removingAWalletsLastLinkStopsAutoLinkingIt() =
         runDbTest {
             applyAll(listOf(stage("transactions.csv", listOf(binanceReward))))

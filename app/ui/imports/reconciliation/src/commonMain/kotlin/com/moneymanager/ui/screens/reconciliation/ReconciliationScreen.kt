@@ -235,8 +235,10 @@ private fun SourceReconciliation(
         val reason = IGNORED_IN_RECONCILIATION.takeIf { ignored }
         val refs = legs.map { it.transactionRef }.distinct()
         refs.filterIsInstance<TradeId>().forEach { importEngine.setTradeExcluded(it, reason) }
-        val transfers = transactionRepository.getTransactionsByIds(refs.filterIsInstance<TransferId>())
-        transfers.values.forEach { importEngine.setTransferExcluded(it, reason) }
+        val transferIds = refs.filterIsInstance<TransferId>()
+        if (transferIds.isNotEmpty()) {
+            transactionRepository.getTransactionsByIds(transferIds).values.forEach { importEngine.setTransferExcluded(it, reason) }
+        }
     }
 
     fun createAll(plan: Map<AccountId, String>) {

@@ -19,8 +19,9 @@ ORDER BY shadow_account_id, real_account_id;
 -- BalanceLegsSelect.selectAllTransactionLegs but restricted, with the transfer's counterparty and the
 -- asset's details. `sign` is +1 for an inflow to the account, -1 for an outflow. `movement_key` groups
 -- the legs of one movement: the CSV row that produced them (a Koinly trade and its fee transfer), else
--- the transfer a fee leg belongs to, else the transaction itself. `excluded_reason` is the excluded
--- attribute's value (null when counted; NULLIF so SQLDelight types it nullable), and `match_ids` the comma-separated ids of the
+-- the transfer a fee leg belongs to, else the transaction itself. `is_excluded` says whether the
+-- excluded attribute is set and `excluded_reason` is its value (NULLIF so SQLDelight types it nullable; the
+-- mapper reads an excluded row with no reason as ''), and `match_ids` the comma-separated ids of the
 -- 'reconciliation-match' relationships (type 6) the transaction belongs to ('' for none). Unordered: the caller
 -- queries in chunks and sorts the union itself.
 selectLegsForAccounts:
@@ -39,6 +40,7 @@ selectLegsForAccounts:
         ad.scale_factor AS asset_scale_factor,
         ad.fraction_digits AS asset_fraction_digits,
         ad.kind AS asset_kind,
+        EXISTS (SELECT 1 FROM transfer_attribute ta WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1) AS is_excluded,
         NULLIF((SELECT ta.attribute_value FROM transfer_attribute ta
          WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1 LIMIT 1), '') AS excluded_reason,
         COALESCE(
@@ -74,6 +76,7 @@ selectLegsForAccounts:
         ad.scale_factor,
         ad.fraction_digits,
         ad.kind,
+        EXISTS (SELECT 1 FROM transfer_attribute ta WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1),
         NULLIF((SELECT ta.attribute_value FROM transfer_attribute ta
          WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1 LIMIT 1), ''),
         COALESCE(
@@ -109,6 +112,7 @@ selectLegsForAccounts:
         ad.scale_factor,
         ad.fraction_digits,
         ad.kind,
+        EXISTS (SELECT 1 FROM trade_attribute ta WHERE ta.trade_id = td.id AND ta.attribute_type_id = -1),
         NULLIF((SELECT ta.attribute_value FROM trade_attribute ta
          WHERE ta.trade_id = td.id AND ta.attribute_type_id = -1 LIMIT 1), ''),
         COALESCE(
@@ -142,6 +146,7 @@ selectLegsForAccounts:
         ad.scale_factor,
         ad.fraction_digits,
         ad.kind,
+        EXISTS (SELECT 1 FROM trade_attribute ta WHERE ta.trade_id = td.id AND ta.attribute_type_id = -1),
         NULLIF((SELECT ta.attribute_value FROM trade_attribute ta
          WHERE ta.trade_id = td.id AND ta.attribute_type_id = -1 LIMIT 1), ''),
         COALESCE(

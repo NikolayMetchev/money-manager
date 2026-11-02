@@ -5,6 +5,7 @@ package com.moneymanager.ui.screens.reconciliation
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasScrollAction
@@ -405,6 +406,7 @@ class ReconciliationScreenTest {
             expandAll()
 
             clickText("Ignore")
+            onAllNodesWithText("Ignoring failed", substring = true).assertCountEquals(0)
 
             assertEquals(
                 listOf(
