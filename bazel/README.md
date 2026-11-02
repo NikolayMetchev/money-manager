@@ -328,7 +328,9 @@ it is relative, so it runs under any prefix.
   rewritten with it, and the msi resets the jars to it after `InstallFiles` (a custom action injected into jpackage's
   own `main.wxs`), since Windows Installer shifts a cabinet's file times by the machine's time zone. Only the classpath
   jars' times are checked. The smoke test runs with `-XX:AOTMode=on`. Its inputs are the image, so a JDK or classpath change
-  retrains it. `bazel run //app/main/jvm:app` has none: its jars change with every rebuild.
+  retrains it. `bazel run //app/main/jvm:app` has none: its jars change with every rebuild. `--define=aot=false`
+  packages `:app_image` instead (pull requests' macOS and Windows installers, #1273; the smoke test then runs with
+  `INSTALLER_AOT=false`, and `INSTALLER_NATIVE_CLI=false` when the native `mm` isn't bundled either).
 
 ## Android (`kmp/android`)
 

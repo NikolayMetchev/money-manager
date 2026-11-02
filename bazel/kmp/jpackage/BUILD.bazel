@@ -7,6 +7,14 @@ config_setting(
     visibility = ["//visibility:public"],
 )
 
+# `--define=aot=false` packages the app image without the AOT caches (#1273): training runs each launcher and takes
+# minutes, so pull requests skip it on the slow runners. Releases and main keep it.
+config_setting(
+    name = "no_aot",
+    define_values = {"aot": "false"},
+    visibility = ["//visibility:public"],
+)
+
 # jlink and jpackage, with the Compose Gradle plugin's jar for its default icons and entitlements (see
 # JPackageRunner.java).
 java_binary(
