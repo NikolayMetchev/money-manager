@@ -409,12 +409,11 @@ class ReconciliationScreenTest {
                     listOf(leg(20, binance, "5", t0 + 1.hours), leg(21, binance, "6", t0 + 2.hours)),
                 )
             reveal(hasText("Near matches (2)"))
-            // Section, wallet and month headers each offer it, in tree order.
-            onAllNodesWithText("Accept all (2)").assertCountEquals(2)
             expandAll()
-            onAllNodesWithText("Accept all (2)").assertCountEquals(3)
-
-            onAllNodesWithText("Accept all (2)")[2].performClick()
+            // The month header's button sits in the same row, so it is composed once the month is revealed.
+            reveal(hasText("2024-01 (2)"))
+            val buttons = onAllNodesWithText("Accept all (2)")
+            buttons[buttons.fetchSemanticsNodes().size - 1].performClick()
             waitForIdle()
 
             val create = batches.single().relationshipMutations.filterIsInstance<RelationshipMutation.Create>()
