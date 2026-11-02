@@ -554,10 +554,10 @@ class RelationshipDbTest : DbTest() {
             val third = plainTransfer(currency, a, b, 40)
             repositories.importEngine.createReconciliationMatch(listOf(first, second))
 
-            // A write that bypasses insertRelationship's merge.
+            // A write that bypasses insertRelationship's merge; the id is explicit so the test needs no last_insert_rowid().
+            val relationshipId = 9_999_999L
             val raw = RawSql(database.driver)
-            raw.execute("INSERT INTO relationship (relationship_type_id, created_at) VALUES (6, 0)")
-            val relationshipId = raw.query("SELECT last_insert_rowid()", parameters = 0) { it.getLong(0)!! }.awaitAsList().single()
+            raw.execute("INSERT INTO relationship (id, relationship_type_id, created_at) VALUES ($relationshipId, 6, 0)")
             val failure =
                 runCatching {
                     raw.execute(

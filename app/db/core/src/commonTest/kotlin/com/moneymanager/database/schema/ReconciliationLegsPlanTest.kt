@@ -28,7 +28,7 @@ class ReconciliationLegsPlanTest : DbTest() {
         runDbTest {
             val plan =
                 RawSql(database.driver)
-                    .query("EXPLAIN QUERY PLAN $matchIdsSql", parameters = 0) { cursor -> cursor.getString(3)!! }
+                    .query("EXPLAIN QUERY PLAN $matchIdsSql") { cursor -> cursor.getString(3)!! }
                     .awaitAsList()
             assertFalse(
                 plan.any { "idx_relationship_type" in it },
