@@ -411,7 +411,7 @@ class ReconciliationScreenTest {
             reveal(hasText("Near matches (2)"))
             expandAll()
             // The month header's button sits in the same row, so it is composed once the month is revealed.
-            reveal(hasText("2024-01 (2)"))
+            reveal(hasText("2024-01 (2)", substring = true))
             val buttons = onAllNodesWithText("Accept all (2)")
             buttons[buttons.fetchSemanticsNodes().size - 1].performClick()
             waitForIdle()
