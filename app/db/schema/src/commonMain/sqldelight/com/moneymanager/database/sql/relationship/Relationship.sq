@@ -47,6 +47,25 @@ BEGIN
     DELETE FROM relationship WHERE id = old.relationship_id;
 END;
 
+-- A transaction is in at most one reconciliation match (type 6): a trade matched to two real rows is one match
+-- over all three, not two overlapping ones, which the matcher would only honour one of. insertRelationship
+-- merges overlapping matches before it writes, so this only stops a write that bypasses it. A transfer between two
+-- linked wallets is still in a match for each: one relationship holds both wallets' real legs.
+CREATE TRIGGER relationship_member_one_reconciliation_match
+BEFORE INSERT ON relationship_member
+FOR EACH ROW
+WHEN (SELECT relationship_type_id FROM relationship WHERE id = new.relationship_id) = 6
+    AND EXISTS (
+        SELECT 1 FROM relationship_member other
+        CROSS JOIN relationship r ON r.id = other.relationship_id
+        WHERE other.transaction_id = new.transaction_id
+          AND r.relationship_type_id = 6
+          AND other.relationship_id <> new.relationship_id
+    )
+BEGIN
+    SELECT RAISE(ABORT, 'a transaction is in at most one reconciliation match');
+END;
+
 CREATE TRIGGER transfer_relationship_member_delete
 AFTER DELETE ON transfer
 FOR EACH ROW

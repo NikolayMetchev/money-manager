@@ -91,26 +91,6 @@ fun ReconciliationResult.unstoredMatches(
             (month == null || monthKey(it.sourceLeg.timestamp) == month)
     }
 
-/**
- * The members of the relationships [matches] become: rows on one wallet that share a transaction (a trade booked as two
- * legs, each matched to a different real leg) merge into one, because the matcher consumes a transaction's legs once per
- * stored relationship and would skip the second. Wallets stay apart: a transaction may sit in a relationship per wallet.
- */
-fun mergedMatchMembers(matches: List<LegMatch>): List<List<TransactionId>> =
-    matches
-        .groupBy { it.sourceLeg.accountId }
-        .values
-        .flatMap { walletMatches ->
-            val merged = mutableListOf<MutableSet<TransactionId>>()
-            walletMatches.forEach { match ->
-                val members = match.memberTransactions()
-                val overlapping = merged.filter { group -> members.any { it in group } }
-                merged.removeAll(overlapping.toSet())
-                merged += (overlapping.flatten() + members).toMutableSet()
-            }
-            merged.map { it.toList() }
-        }
-
 /** Every transaction a near match spans, each once: the members of its `reconciliation-match` relationship. */
 fun LegMatch.memberTransactions(): List<TransactionId> = (sourceLegs + realLegs).map { it.transactionRef }.distinct()
 

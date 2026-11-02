@@ -118,38 +118,4 @@ class ReconciliationModelTest {
         assertEquals(Money.fromDisplayValue(BigDecimal("-0.5"), ada), totals[0].difference)
         assertEquals(Money.fromDisplayValue(BigDecimal("0.1"), eth), totals[1].difference)
     }
-
-    @Test
-    fun matchesSharingATransactionOnOneWalletMergeIntoOneRelationship() {
-        val w1 = AccountId(1)
-        val w2 = AccountId(2)
-        val trade = leg(w1, "5", t(0))
-        val real1 = leg(AccountId(10), "3", t(0))
-        val real2 = leg(AccountId(10), "2", t(0))
-        val other = leg(w1, "9", t(1))
-        val otherReal = leg(AccountId(10), "9", t(1))
-        // The same trade on another wallet's link group stays a relationship of its own.
-        val elsewhere = trade.copy(accountId = w2)
-        val matches =
-            listOf(
-                LegMatch(listOf(trade), listOf(real1)),
-                LegMatch(listOf(trade), listOf(real2)),
-                LegMatch(listOf(other), listOf(otherReal)),
-                LegMatch(listOf(elsewhere), listOf(real1)),
-            )
-
-        val merged = mergedMatchMembers(matches).map { it.toSet() }
-
-        assertEquals(
-            setOf(
-                setOf(trade.transactionRef, real1.transactionRef, real2.transactionRef),
-                setOf(other.transactionRef, otherReal.transactionRef),
-                setOf(elsewhere.transactionRef, real1.transactionRef),
-            ),
-            merged.toSet(),
-        )
-        assertEquals(3, merged.size)
-    }
-
-    private fun t(hours: Int) = Instant.parse("2024-01-10T00:00:00Z") + hours.hours
 }

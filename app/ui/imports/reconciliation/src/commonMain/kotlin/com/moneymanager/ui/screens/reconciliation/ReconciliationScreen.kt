@@ -288,12 +288,10 @@ private fun SourceReconciliation(
         if (id == null) bulkSubmitted = false
     }
 
-    fun storeMatches(matches: List<LegMatch>) {
-        val relationships = mergedMatchMembers(matches)
-        runBulk("Accepting ${relationships.size} matches", "Accepting matches", relationships) { chunk ->
-            importEngine.createReconciliationMatches(chunk)
+    fun storeMatches(matches: List<LegMatch>) =
+        runBulk("Accepting ${matches.size} matches", "Accepting matches", matches) { chunk ->
+            importEngine.createReconciliationMatches(chunk.map { it.memberTransactions() })
         }
-    }
 
     fun ignoreAll(legs: List<ReconciliationLeg>) =
         runBulk("Ignoring ${legs.size} rows", "Ignoring rows", legs) { chunk -> applyIgnored(chunk, ignored = true) }

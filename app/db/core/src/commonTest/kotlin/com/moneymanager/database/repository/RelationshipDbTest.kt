@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository
 import app.cash.sqldelight.async.coroutines.awaitAsList
+import com.moneymanager.database.rawsql.RawSql
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
@@ -17,6 +18,7 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.repository.write.NewTrade
+import com.moneymanager.importengineapi.createReconciliationMatch
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.read.testReads
@@ -513,5 +515,57 @@ class RelationshipDbTest : DbTest() {
                     .map { it.transactionId }
                     .toSet(),
             )
+        }
+
+    private suspend fun matchesOf(id: TransferId) =
+        repositories.relationshipRepository
+            .getByTransaction(id)
+            .first()
+            .filter { it.relationshipType.id.id == WellKnownIds.RECONCILIATION_MATCH_RELATIONSHIP_TYPE_ID }
+
+    @Test
+    fun aTransactionIsInOneReconciliationMatchWhichGrowsWhenAnotherOverlapsIt() =
+        runDbTest {
+            val currency = gbp()
+            val a = createAccount("A")
+            val b = createAccount("B")
+            val trade = plainTransfer(currency, a, b, 100)
+            val real1 = plainTransfer(currency, a, b, 60)
+            val real2 = plainTransfer(currency, a, b, 40)
+
+            repositories.importEngine.createReconciliationMatch(listOf(trade, real1))
+            repositories.importEngine.createReconciliationMatch(listOf(trade, real2))
+            // Asking again for what a stored match already covers changes nothing.
+            repositories.importEngine.createReconciliationMatch(listOf(trade, real1))
+
+            val match = matchesOf(trade).single()
+            assertEquals(setOf(trade, real1, real2), match.members.map { it.transactionId }.toSet())
+            assertEquals(match, matchesOf(real2).single())
+        }
+
+    @Test
+    fun theDatabaseRefusesASecondReconciliationMatchOverATransaction() =
+        runDbTest {
+            val currency = gbp()
+            val a = createAccount("A")
+            val b = createAccount("B")
+            val first = plainTransfer(currency, a, b, 100)
+            val second = plainTransfer(currency, a, b, 60)
+            val third = plainTransfer(currency, a, b, 40)
+            repositories.importEngine.createReconciliationMatch(listOf(first, second))
+
+            // A write that bypasses insertRelationship's merge.
+            val raw = RawSql(database.driver)
+            raw.execute("INSERT INTO relationship (relationship_type_id, created_at) VALUES (6, 0)")
+            val relationshipId = raw.query("SELECT last_insert_rowid()", parameters = 0) { it.getLong(0)!! }.awaitAsList().single()
+            val failure =
+                runCatching {
+                    raw.execute(
+                        "INSERT INTO relationship_member (relationship_id, transaction_id, role) VALUES ($relationshipId, ${first.id}, 2)",
+                    )
+                }.exceptionOrNull()
+            assertNotNull(failure)
+            // A transaction nothing matches yet is fine.
+            raw.execute("INSERT INTO relationship_member (relationship_id, transaction_id, role) VALUES ($relationshipId, ${third.id}, 2)")
         }
 }

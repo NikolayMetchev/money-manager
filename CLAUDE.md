@@ -497,7 +497,7 @@ source** (built-in: Koinly). Its data never touches real accounts:
   second, then nearest within 24h, then summed per (group, asset, second) so a fee booked separately on
   one side still matches the other side's gross leg. A match a person makes is stored first: a
   `reconciliation-match` relationship (type 6, members of any transaction kind, written by `Source.Manual`), which
-  `reconcile()` honours before computing anything (`LegMatch.matchId`), whatever its amounts and times.
+  `reconcile()` honours before computing anything (`LegMatch.matchId`), whatever its amounts and times. A transaction is in at most one match (a trigger enforces it, and `insertRelationship` merges an overlapping new match with the stored ones into one relationship), so a trade matched to two real rows is one relationship over all three. A transfer between two linked wallets is in the one relationship of both wallets' matches.
 - The External Account Reconciliation screen has two tabs. **Unmatched**: near matches (**Accept** stores one),
   the source's rows Money Manager lacks (**Ignore** excludes them with the reason `"ignored in reconciliation"`,
   outside the source's owned set; **Select matching transactions…** picks real legs from around that time that no
