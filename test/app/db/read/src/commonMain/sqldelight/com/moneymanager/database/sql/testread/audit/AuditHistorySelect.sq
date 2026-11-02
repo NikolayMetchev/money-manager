@@ -1,0 +1,36 @@
+selectAccountAuditHistory:
+SELECT
+    account_audit.id,
+    account_audit.audit_timestamp,
+    audit_type.name AS auditType,
+    account_audit.account_id,
+    account_audit.name
+FROM account_audit
+JOIN audit_type ON account_audit.audit_type_id = audit_type.id
+WHERE account_audit.account_id = :accountId
+ORDER BY account_audit.audit_timestamp DESC, account_audit.id DESC;
+
+selectCurrencyAuditHistory:
+SELECT
+    currency_audit.id,
+    currency_audit.audit_timestamp,
+    audit_type.name AS auditType,
+    currency_audit.currency_id,
+    currency_audit.code,
+    currency_audit.name
+FROM currency_audit
+JOIN audit_type ON currency_audit.audit_type_id = audit_type.id
+WHERE currency_audit.currency_id = :currencyId
+ORDER BY currency_audit.audit_timestamp DESC, currency_audit.id DESC;
+
+selectCategoryAuditHistory:
+SELECT
+    category_audit.id,
+    category_audit.audit_timestamp,
+    audit_type.name AS auditType,
+    category_audit.category_id,
+    category_audit.name
+FROM category_audit
+JOIN audit_type ON category_audit.audit_type_id = audit_type.id
+WHERE category_audit.category_id = :categoryId
+ORDER BY category_audit.audit_timestamp DESC, category_audit.id DESC;

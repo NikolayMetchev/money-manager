@@ -2,6 +2,7 @@ package com.moneymanager.database
 
 import app.cash.sqldelight.db.SqlDriver
 import com.moneymanager.coroutines.ioDispatcher
+import com.moneymanager.database.rawsql.RawSql
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.CurrencyExportEntry
 import com.moneymanager.domain.model.DbLocation
@@ -121,7 +122,7 @@ abstract class FileDatabaseManager(
                     "mm-snapshot-${Random.nextLong().toULong().toString(SNAPSHOT_NAME_RADIX)}.db",
                 )
             try {
-                database.executeWithParams("VACUUM INTO ?", 1, listOf(snapshot.toString()))
+                RawSql(database.driver).executeWithStrings("VACUUM INTO ?", listOf(snapshot.toString()))
                 readBytes(snapshot)
             } finally {
                 SystemFileSystem.delete(snapshot, mustExist = false)

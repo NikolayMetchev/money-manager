@@ -1,7 +1,9 @@
 package com.moneymanager.database.audit
 
-import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.read.getAuditableTables
+import com.moneymanager.test.database.read.getTableColumns
+import com.moneymanager.test.database.read.selectTableNames
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -21,14 +23,7 @@ class AuditTableCoverageTest : DbTest() {
 
                 // Verify audit table exists
                 val auditTableExists =
-                    database
-                        .rawQuery(
-                            """
-                            SELECT name FROM sqlite_master
-                            WHERE type = 'table' AND name = '$auditTableName'
-                            """.trimIndent(),
-                        ) { it.getString(0)!! }
-                        .awaitAsOneOrNull() != null
+                    auditTableName in database.selectTableNames()
 
                 if (!auditTableExists) {
                     fail("Audit table $auditTableName is missing for table $tableName")

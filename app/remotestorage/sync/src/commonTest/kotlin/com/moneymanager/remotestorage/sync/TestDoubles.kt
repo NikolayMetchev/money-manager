@@ -3,23 +3,18 @@ package com.moneymanager.remotestorage.sync
 import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.localsettings.LocalSettings
+import com.moneymanager.test.database.read.testReads
+import com.moneymanager.test.database.write.testWrites
 
-/** Counts rows in [table] (test helper). */
-suspend fun MoneyManagerDatabaseWrapper.countRows(table: String): Long =
-    rawQuery("SELECT COUNT(*) FROM $table") { it.getLong(0)!! }.awaitAsOne()
+/** Counts the currencies (test helper). */
+suspend fun MoneyManagerDatabaseWrapper.countCurrencies(): Long = testReads.rowCountSelectQueries.countCurrencies().awaitAsOne()
 
 /**
  * Appends an audit row so [MoneyManagerDatabaseWrapper.dataChangeToken] advances, simulating a local
  * edit (the controller's "local dirty" signal) without going through the repositories.
  */
 suspend fun MoneyManagerDatabaseWrapper.bumpDataChange() {
-    execute(
-        identifier = null,
-        sql =
-            "INSERT INTO category_audit (audit_timestamp, audit_type_id, category_id, revision_id, name) " +
-                "VALUES (0, (SELECT id FROM audit_type LIMIT 1), 1, 1, 'dirty')",
-        parameters = 0,
-    )
+    testWrites.fixtureWriteQueries.insertDirtyCategoryAudit()
 }
 
 /** In-memory [LocalSettings] for tests. */

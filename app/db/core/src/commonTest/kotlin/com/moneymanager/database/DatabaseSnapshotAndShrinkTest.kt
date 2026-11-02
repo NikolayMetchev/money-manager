@@ -12,6 +12,7 @@ import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.read.testReads
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -25,8 +26,17 @@ import kotlin.time.Clock
  * storage: truncating materialized views and exporting/importing a consistent database file.
  */
 class DatabaseSnapshotAndShrinkTest : DbTest() {
-    private suspend fun MoneyManagerDatabaseWrapper.countRows(table: String): Long =
-        rawQuery("SELECT COUNT(*) FROM $table") { it.getLong(0)!! }.awaitAsOne()
+    private suspend fun MoneyManagerDatabaseWrapper.countRows(table: String): Long {
+        val counts = testReads.rowCountSelectQueries
+        return when (table) {
+            "account_balance_materialized_view" -> counts.countAccountBalanceMaterializedViewRows()
+            "running_balance_materialized_view" -> counts.countRunningBalanceMaterializedViewRows()
+            "pending_materialized_view_changes" -> counts.countPendingMaterializedViewChanges()
+            "account" -> counts.countAccounts()
+            "transfer" -> counts.countTransfers()
+            else -> error("No count query for $table")
+        }.awaitAsOne()
+    }
 
     private suspend fun seedTransfer() {
         val account1 =

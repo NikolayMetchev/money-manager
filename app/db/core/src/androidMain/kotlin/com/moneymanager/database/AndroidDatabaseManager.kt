@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.sqlite.db.SupportSQLiteDatabase
 import app.cash.sqldelight.async.coroutines.synchronous
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
+import com.moneymanager.database.rawsql.RawSql
 import com.moneymanager.database.sql.seed.MoneyManagerDatabase
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.CurrencyExportEntry
@@ -150,7 +151,7 @@ class AndroidDatabaseManager(
             val tempFile = File.createTempFile("mm-snapshot", ".db", context.cacheDir)
             tempFile.delete()
             try {
-                database.executeWithParams("VACUUM INTO ?", 1, listOf(tempFile.absolutePath))
+                RawSql(database.driver).executeWithStrings("VACUUM INTO ?", listOf(tempFile.absolutePath))
                 tempFile.readBytes()
             } finally {
                 tempFile.delete()

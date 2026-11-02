@@ -1,0 +1,30 @@
+load("//bazel/kmp:defs.bzl", "kmp_library")
+
+# gazelle:kmp_generate true
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
+# Hand-written SQL is the exception to "every query is SQLDelight" (CLAUDE.md, "Database"), so only the modules
+# that need it may use this one (and the test-only schema helpers).
+# gazelle:kmp_visibility //app/db/core:__pkg__ //app/db/write:__pkg__ //app/query:__pkg__ //test/app/db/read:__pkg__
+
+kmp_library(
+    name = "rawsql",
+    android = True,
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = [
+        "//app/db/core:__pkg__",
+        "//app/db/write:__pkg__",
+        "//app/query:__pkg__",
+        "//test/app/db/read:__pkg__",
+    ],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+    deps = ["@maven_kmp//:sqldelight_runtime"],
+)

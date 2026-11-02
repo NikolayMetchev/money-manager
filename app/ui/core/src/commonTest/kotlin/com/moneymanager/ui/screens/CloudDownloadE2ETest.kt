@@ -24,6 +24,7 @@ import com.moneymanager.session.DatabaseSessions
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.read.testReads
 import com.moneymanager.test.database.upsertCurrencyByCode
 import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
@@ -127,7 +128,8 @@ class CloudDownloadE2ETest {
     private fun zzzCount(database: MoneyManagerDatabaseWrapper?): Long =
         runBlocking {
             checkNotNull(database)
-                .rawQuery("SELECT COUNT(*) FROM currency WHERE code = 'ZZZ'") { it.getLong(0)!! }
+                .testReads.rowCountSelectQueries
+                .countCurrenciesByCode("ZZZ")
                 .awaitAsOne()
         }
 }

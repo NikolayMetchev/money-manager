@@ -1,0 +1,7 @@
+-- While a row exists, attribute triggers record audit but don't bump the revision (see _creation_mode).
+
+beginCreationMode:
+INSERT INTO _creation_mode (active) VALUES (1);
+
+endCreationMode:
+DELETE FROM _creation_mode;

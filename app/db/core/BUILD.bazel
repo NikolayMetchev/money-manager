@@ -99,6 +99,7 @@ kmp_library(
         "@maven_kmp//:sqldelight_runtime",
     ],
     deps = [
+        "//app/db/rawsql",
         "//app/db/seed",
         "//app/model/calendar",
         "//utils/bigdecimal",
@@ -136,6 +137,8 @@ kmp_test(
         "//app/model/calendar",
         "@maven_kmp//:kotlinx_datetime",
         "//app/model/passthrough",
+        "//test/app/db/read:read_for_tests",
+        "//test/app/db/write:write_for_tests",
     ],
     device_srcs = glob([
         "src/commonTest/kotlin/com/moneymanager/database/repository/**/*.kt",
@@ -167,6 +170,7 @@ kmp_test(
         "//app/apiimporter",
         "//app/csvimporter",
         "//app/db/di",
+        "//app/db/rawsql:rawsql_for_tests",
         "//app/db/read",
         "//app/db/write",
         "//app/importdirectory",
@@ -192,6 +196,8 @@ kmp_test(
         "//app/tasks",
         "//bazel/kmp/deps:kotlin_test",
         "//test/app/db",
+        "//test/app/db/read:read_for_tests",
+        "//test/app/db/write:write_for_tests",
         "//test/app/model/calendar",
         "//test/utils/credentialvault",
         "//utils/bigdecimal",

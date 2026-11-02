@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.write.TransferEdit
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
+import com.moneymanager.test.database.read.testReads
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -40,14 +41,16 @@ private data class BalanceViewRecord(
 class IncrementalMaterializedViewRefreshTest : DbTest() {
     /**
      * Test-only query: countPendingChanges
-     * Counts pending changes using raw SQL.
+     * Counts pending changes.
      */
     private suspend fun countPendingChanges(): Long =
-        database.rawQuery("SELECT COUNT(*) FROM pending_materialized_view_changes") { it.getLong(0)!! }.awaitAsOne()
+        database.testReads.rowCountSelectQueries
+            .countPendingMaterializedViewChanges()
+            .awaitAsOne()
 
     /**
      * Test-only query: selectBalancesFromView
-     * Retrieves balances from AccountBalanceView using raw SQL.
+     * Recomputes the balances from the legs.
      */
     private suspend fun selectBalancesFromView(): List<BalanceViewRecord> {
         // The SQL account_balance_view was removed when amounts became arbitrary-precision TEXT.

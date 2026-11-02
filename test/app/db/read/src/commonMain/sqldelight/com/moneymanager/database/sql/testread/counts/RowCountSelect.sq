@@ -1,0 +1,26 @@
+countCurrencies:
+SELECT COUNT(*) FROM currency;
+
+countAssets:
+SELECT COUNT(*) FROM asset;
+
+countAccounts:
+SELECT COUNT(*) FROM account;
+
+countTransfers:
+SELECT COUNT(*) FROM transfer;
+
+countCurrenciesByCode:
+SELECT COUNT(*) FROM currency WHERE code = :code;
+
+countAccountBalanceMaterializedViewRows:
+SELECT COUNT(*) FROM account_balance_materialized_view;
+
+countRunningBalanceMaterializedViewRows:
+SELECT COUNT(*) FROM running_balance_materialized_view;
+
+countPendingMaterializedViewChanges:
+SELECT COUNT(*) FROM pending_materialized_view_changes;
+
+selectCurrencyCodes:
+SELECT code FROM currency ORDER BY code;

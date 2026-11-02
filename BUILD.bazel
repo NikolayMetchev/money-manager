@@ -211,6 +211,9 @@ kmp_modules(
         "//test/app/model/calendar:calendar_module",
         "//tools/bench-db:bench-db_module",
         "//tools/bench-db:test_module",
+        "//app/db/rawsql:rawsql_module",
+        "//test/app/db/read:read_module",
+        "//test/app/db/write:write_module",
     ],
     visibility = ["//visibility:public"],
 )
