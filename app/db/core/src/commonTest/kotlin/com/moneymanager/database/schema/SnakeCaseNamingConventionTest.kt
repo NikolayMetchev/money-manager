@@ -1,6 +1,5 @@
 package com.moneymanager.database.schema
 
-import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.read.getTableColumns
 import com.moneymanager.test.database.read.selectTableAndViewNames

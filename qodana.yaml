@@ -398,6 +398,8 @@ exclude:
       - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/navigation/Screen.kt
   - name: UnusedSymbol
     paths:
+      # [2] — the test schema helpers are called by app/db/core's tests, another module.
+      - test/app/db/read/src/commonMain/kotlin/com/moneymanager/test/database/read/TestReads.kt
       # [2] — StartupMilestone.FIRST_FRAME is reported only by the desktop entry point (app/main/jvm's Main.kt).
       - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/foundation/StartupProbe.kt
       # [5] — native and nonJvm actuals, which no JVM module links to their expects, and what only the CLI or
