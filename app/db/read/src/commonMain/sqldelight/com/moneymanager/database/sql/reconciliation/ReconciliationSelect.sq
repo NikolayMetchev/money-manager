@@ -24,6 +24,10 @@ ORDER BY shadow_account_id, real_account_id;
 -- mapper reads an excluded row with no reason as ''), and `match_ids` the comma-separated ids of the
 -- 'reconciliation-match' relationships (type 6) the transaction belongs to ('' for none). Unordered: the caller
 -- queries in chunks and sorts the union itself.
+--
+-- `match_ids` uses CROSS JOIN to pin the join order: left to choose, SQLite (with no sqlite_stat1) drives from
+-- relationship's type index and walks every reconciliation-match for each leg. With ~15k matches and ~40k legs
+-- that took minutes (176 s for the wallets' legs); point lookups on idx_relationship_member_transaction take 0.2 s.
 selectLegsForAccounts:
     SELECT
         tr.id,
@@ -53,7 +57,7 @@ selectLegsForAccounts:
             't' || tr.id
         ) AS movement_key,
         COALESCE((SELECT GROUP_CONCAT(rm.relationship_id) FROM relationship_member rm
-         JOIN relationship r ON r.id = rm.relationship_id
+         CROSS JOIN relationship r ON r.id = rm.relationship_id
          WHERE rm.transaction_id = tr.id AND r.relationship_type_id = 6), '') AS match_ids
     FROM transfer tr
     JOIN asset_details ad ON ad.id = tr.asset_id
@@ -89,7 +93,7 @@ selectLegsForAccounts:
             't' || tr.id
         ),
         COALESCE((SELECT GROUP_CONCAT(rm.relationship_id) FROM relationship_member rm
-         JOIN relationship r ON r.id = rm.relationship_id
+         CROSS JOIN relationship r ON r.id = rm.relationship_id
          WHERE rm.transaction_id = tr.id AND r.relationship_type_id = 6), '')
     FROM transfer tr
     JOIN asset_details ad ON ad.id = tr.asset_id
@@ -123,7 +127,7 @@ selectLegsForAccounts:
             'd' || td.id
         ),
         COALESCE((SELECT GROUP_CONCAT(rm.relationship_id) FROM relationship_member rm
-         JOIN relationship r ON r.id = rm.relationship_id
+         CROSS JOIN relationship r ON r.id = rm.relationship_id
          WHERE rm.transaction_id = td.id AND r.relationship_type_id = 6), '')
     FROM trade td
     JOIN asset_details ad ON ad.id = td.to_asset_id
@@ -157,7 +161,7 @@ selectLegsForAccounts:
             'd' || td.id
         ),
         COALESCE((SELECT GROUP_CONCAT(rm.relationship_id) FROM relationship_member rm
-         JOIN relationship r ON r.id = rm.relationship_id
+         CROSS JOIN relationship r ON r.id = rm.relationship_id
          WHERE rm.transaction_id = td.id AND r.relationship_type_id = 6), '')
     FROM trade td
     JOIN asset_details ad ON ad.id = td.from_asset_id
