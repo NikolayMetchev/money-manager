@@ -28,32 +28,10 @@ import java.time.format.DateTimeFormatter
  *         | gh api repos/{owner}/{repo}/dependency-graph/snapshots --input -
  */
 fun dependencySnapshot(paths: List<String>) {
-    fun env(name: String) = System.getenv(name) ?: fail("$name isn't set")
     val module = workspaceFile("MODULE.bazel").readText()
     val manifests = paths.sorted().associateWith { manifest(it, workspaceFile(it).readText(), module) }
-    val snapshot =
-        buildJsonObject {
-            put("version", 0)
-            put("sha", env("GITHUB_SHA"))
-            put("ref", env("GITHUB_REF"))
-            put(
-                "job",
-                buildJsonObject {
-                    put("correlator", "${env("GITHUB_WORKFLOW")}_${env("GITHUB_JOB")}")
-                    put("id", env("GITHUB_RUN_ID"))
-                },
-            )
-            put(
-                "detector",
-                buildJsonObject {
-                    put("name", "money-manager maven_kmp")
-                    put("version", "1")
-                    put("url", "https://github.com/NikolayMetchev/money-manager/tree/main/bazel/kmp/deps")
-                },
-            )
-            put("scanned", DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneOffset.UTC).format(Instant.now()))
-            put("manifests", JsonObject(manifests))
-        }
+    val scanned = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneOffset.UTC).format(Instant.now())
+    val snapshot = snapshot(manifests, scanned) { System.getenv(it) ?: fail("$it isn't set") }
     println(
         Json {
             prettyPrint = true
@@ -61,6 +39,34 @@ fun dependencySnapshot(paths: List<String>) {
         }.encodeToString(JsonObject.serializer(), snapshot),
     )
 }
+
+internal fun snapshot(
+    manifests: Map<String, JsonObject>,
+    scanned: String,
+    env: (String) -> String,
+): JsonObject =
+    buildJsonObject {
+        put("version", 0)
+        put("sha", env("GITHUB_SHA"))
+        put("ref", env("GITHUB_REF"))
+        put(
+            "job",
+            buildJsonObject {
+                put("correlator", "${env("GITHUB_WORKFLOW")}_${env("GITHUB_JOB")}")
+                put("id", env("GITHUB_RUN_ID"))
+            },
+        )
+        put(
+            "detector",
+            buildJsonObject {
+                put("name", "money-manager maven_kmp")
+                put("version", "1")
+                put("url", "https://github.com/NikolayMetchev/money-manager/tree/main/bazel/kmp/deps")
+            },
+        )
+        put("scanned", scanned)
+        put("manifests", JsonObject(manifests))
+    }
 
 private fun purl(
     coordinate: String,
@@ -78,7 +84,7 @@ internal fun mavenInstallArtifacts(
     name: String,
 ): Set<String> {
     val install =
-        Regex("""maven\.install\(\s*name = "${Regex.escape(name)}",\s*artifacts = \[(.*?)\]""", RegexOption.DOT_MATCHES_ALL).find(module)
+        Regex("""maven\.install\(\s*name = "${Regex.escape(name)}",\s*artifacts = \[(.*?)]""", RegexOption.DOT_MATCHES_ALL).find(module)
             ?: return emptySet()
     val listed = install.groupValues[1].substringBefore("# Transitive versions")
     return Regex(""""([^"]+)"""").findAll(listed).map { ga(it.groupValues[1]) }.toSet()

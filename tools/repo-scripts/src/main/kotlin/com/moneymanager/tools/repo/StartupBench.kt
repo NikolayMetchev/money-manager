@@ -12,6 +12,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToLong
 
 /**
  * Startup benchmark for the desktop app, mm-jvm and native mm (#1254).
@@ -198,7 +199,7 @@ internal fun median(values: List<Double>): Double {
     return if (sorted.size % 2 == 1) sorted[mid] else (sorted[mid - 1] + sorted[mid]) / 2
 }
 
-internal fun round1(value: Double): Double = Math.round(value * 10) / 10.0
+internal fun round1(value: Double): Double = (value * 10).roundToLong() / 10.0
 
 private fun osName(): String {
     val name = System.getProperty("os.name")
@@ -210,12 +211,13 @@ private fun osName(): String {
     }
 }
 
-/** The architecture as Python's platform.machine() named it, so the recorded history keeps one spelling. */
+/** The architecture as the history's first recordings spelled it (Python's platform.machine()), so the recorded history keeps one spelling. */
 private fun archName(): String {
     val arch = System.getProperty("os.arch").lowercase()
-    return when {
-        arch == "aarch64" && osName() == "macos" -> "arm64"
-        arch == "amd64" && osName() == "linux" -> "x86_64"
+    val os = osName()
+    return when (arch) {
+        "aarch64" -> if (os == "macos") "arm64" else arch
+        "amd64" -> if (os == "linux") "x86_64" else arch
         else -> arch
     }
 }

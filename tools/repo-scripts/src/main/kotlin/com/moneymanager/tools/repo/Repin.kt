@@ -39,7 +39,7 @@ private fun constant(
 // --- Node.js: the SHA-256 of each archive node.toolchain lists, from nodejs.org's SHASUMS256.txt.
 
 private val NODE_ENTRY =
-    Regex("""(\["node-v" \+ NODE \+ "([^"]+)", "node-v" \+ NODE \+ "[^"]+", ")([0-9a-f]{64})("\])""")
+    Regex("""(\["node-v" \+ NODE \+ "([^"]+)", "node-v" \+ NODE \+ "[^"]+", ")([0-9a-f]{64})("])""")
 
 fun repinNode(
     file: File,
@@ -123,7 +123,7 @@ private fun azulArchive(
     return newest.getValue("name").jsonPrimitive.content to sha.jsonPrimitive.content
 }
 
-private val JDK_ENTRY = Regex("""^(    "([a-z0-9_]+)": \[)"([^"]+)", "([0-9a-f]{64})"(\],)$""", MULTILINE)
+private val JDK_ENTRY = Regex("""^( {4}"([a-z0-9_]+)": \[)"([^"]+)", "([0-9a-f]{64})"(],)$""", MULTILINE)
 
 fun repinJdk(
     moduleFile: File,
@@ -230,6 +230,7 @@ fun repinSkiko(
             .jsonObject
             .getValue("variants")
             .jsonArray
+            .asSequence()
             .flatMap { it.jsonObject["dependencies"]?.jsonArray ?: JsonArray(emptyList()) }
             .map { it.jsonObject }
             .filter {
@@ -257,7 +258,7 @@ fun repinSkiko(
 
 private val PDFIUM_ENTRY =
     Regex(
-        """(sha256 = ")([0-9a-f]{64})(",\n    url = "https://github\.com/bblanchon/pdfium-binaries/[^"]+" \+ PDFIUM \+ "/(pdfium-[^"]+\.tgz)")""",
+        """(sha256 = ")([0-9a-f]{64})(",\n {4}url = "https://github\.com/bblanchon/pdfium-binaries/[^"]+" \+ PDFIUM \+ "/(pdfium-[^"]+\.tgz)")""",
     )
 
 fun repinPdfium(
@@ -297,7 +298,7 @@ fun repinAapt2(
     val withBuild = Regex("""^AAPT2_BUILD = "[^"]*"""", MULTILINE).replace(pins) { """AAPT2_BUILD = "$build"""" }
     val version = "$agp-$build"
     val (updated, count) =
-        Regex("""(    "(linux|osx|windows)": ")[0-9a-f]{64}(",)""").replaceCounting(withBuild) { m ->
+        Regex("""( {4}"(linux|osx|windows)": ")[0-9a-f]{64}(",)""").replaceCounting(withBuild) { m ->
             m.groupValues[1] + sha256Hex(download("$MAVEN/aapt2/$version/aapt2-$version-${m.groupValues[2]}.jar")) + m.groupValues[3]
         }
     if (count != 3) fail("expected 3 aapt2 checksums in $pinsFile, found $count")
