@@ -232,8 +232,8 @@ class BybitCsvApiE2ETest : DbTest() {
     private suspend fun reconciledLinkCount(): Int {
         val bybit = assertNotNull(bybitAccount())
         val transfers = repositories.transactionRepository.getTransactionsByAccount(bybit.id).first()
-        return repositories.transferRelationshipRepository
-            .getByTransfers(transfers.map { it.id })
+        return repositories.relationshipRepository
+            .getByTransactions(transfers.map { it.id })
             .count { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
     }
 

@@ -46,8 +46,8 @@ selectLegsForAccounts:
              FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id AND es.matched = 0
              WHERE es.entity_type_id = 7 AND es.entity_id = tr.id AND ces.csv_row_index IS NOT NULL
              ORDER BY es.revision_id LIMIT 1),
-            (SELECT 't' || rel.id1 FROM transfer_relationship rel
-             WHERE rel.id2 = tr.id AND rel.relationship_type_id = 2 LIMIT 1),
+            (SELECT 't' || rel.primary_id FROM relationship_pair rel
+             WHERE rel.related_id = tr.id AND rel.relationship_type_id = 2 LIMIT 1),
             't' || tr.id
         ) AS movement_key
     FROM transfer tr
@@ -80,8 +80,8 @@ selectLegsForAccounts:
              FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id AND es.matched = 0
              WHERE es.entity_type_id = 7 AND es.entity_id = tr.id AND ces.csv_row_index IS NOT NULL
              ORDER BY es.revision_id LIMIT 1),
-            (SELECT 't' || rel.id1 FROM transfer_relationship rel
-             WHERE rel.id2 = tr.id AND rel.relationship_type_id = 2 LIMIT 1),
+            (SELECT 't' || rel.primary_id FROM relationship_pair rel
+             WHERE rel.related_id = tr.id AND rel.relationship_type_id = 2 LIMIT 1),
             't' || tr.id
         )
     FROM transfer tr

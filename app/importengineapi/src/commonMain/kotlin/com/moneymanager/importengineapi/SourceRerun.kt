@@ -15,9 +15,9 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
@@ -27,7 +27,7 @@ import kotlin.time.Instant
 class RerunReads(
     val transactionRepository: TransactionReadRepository,
     val transferSourceRepository: TransferSourceReadRepository,
-    val transferRelationshipRepository: TransferRelationshipReadRepository,
+    val relationshipRepository: RelationshipReadRepository,
     val auditRepository: AuditReadRepository,
     val accountRepository: AccountReadRepository,
     val csvImportRepository: CsvImportReadRepository,
@@ -236,7 +236,7 @@ private suspend fun rerunPartners(
     reads: RerunReads,
 ): RerunPartners {
     val orphaned =
-        reconciledPartnerUnhides(deletedIds, reads.transferRelationshipRepository, reads.transactionRepository)
+        reconciledPartnerUnhides(deletedIds, reads.relationshipRepository, reads.transactionRepository)
             .filter { it.isOrphanedBy(deletedIds) }
             .mapNotNull { it.update.existingId }
     if (orphaned.isEmpty()) return RerunPartners()
@@ -316,7 +316,7 @@ suspend fun <R> ImportEngine.executeSourceRerun(
     val partners = if (rerunAffected == null) RerunPartners() else plan.partners
     val deletedTransfers = plan.createdTransfers.keys + partners.transfers.keys
     val unhideUpdates =
-        reconciledPartnerUnhideUpdates(deletedTransfers, reads.transferRelationshipRepository, reads.transactionRepository)
+        reconciledPartnerUnhideUpdates(deletedTransfers, reads.relationshipRepository, reads.transactionRepository)
 
     val affected = plan.affected + partners.records
     val rerunAffectedRecords = if (affected.isEmpty) null else rerunAffected?.prepare(affected)

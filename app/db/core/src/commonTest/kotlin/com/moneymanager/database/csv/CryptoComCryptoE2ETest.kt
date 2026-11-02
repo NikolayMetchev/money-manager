@@ -443,11 +443,11 @@ class CryptoComCryptoE2ETest : DbTest() {
             assertEquals(setOf("LUNA2", "DOT", "ALI"), debits.map { it.amount.asset.code }.toSet())
 
             // Each debit links to the credit with a `conversion` relationship (credit is id2).
-            val links = repositories.transferRelationshipRepository.getByTransfer(credit.id).first()
+            val links = repositories.relationshipRepository.getByTransaction(credit.id).first()
             assertEquals(3, links.size)
             assertEquals(setOf("conversion"), links.map { it.relationshipType.name }.toSet())
-            assertEquals(setOf(credit.id), links.map { it.id2 }.toSet())
-            assertEquals(debits.map { it.id }.toSet(), links.map { it.id1 }.toSet())
+            assertEquals(setOf(credit.id), links.map { it.related }.toSet())
+            assertEquals(debits.map { it.id }.toSet(), links.map { it.primary }.toSet())
 
             // The wallet gained the credited CRO; balances stay exact.
             repositories.maintenanceService.refreshMaterializedViews()
@@ -485,11 +485,11 @@ class CryptoComCryptoE2ETest : DbTest() {
             assertEquals(wallet.id, credit.targetAccountId)
             assertEquals(wallet.id, debit.sourceAccountId)
 
-            val links = repositories.transferRelationshipRepository.getByTransfer(credit.id).first()
+            val links = repositories.relationshipRepository.getByTransaction(credit.id).first()
             assertEquals(1, links.size)
             assertEquals("conversion", links.single().relationshipType.name)
-            assertEquals(debit.id, links.single().id1)
-            assertEquals(credit.id, links.single().id2)
+            assertEquals(debit.id, links.single().primary)
+            assertEquals(credit.id, links.single().related)
 
             // Re-import is idempotent: still exactly two legs and one link (re-import may recreate the
             // transfers, so re-fetch the credit leg rather than reuse the stale id).
@@ -499,8 +499,8 @@ class CryptoComCryptoE2ETest : DbTest() {
             val creditAfter = legsAfter.single { it.sourceAccountId == conversions.id }
             assertEquals(
                 1,
-                repositories.transferRelationshipRepository
-                    .getByTransfer(creditAfter.id)
+                repositories.relationshipRepository
+                    .getByTransaction(creditAfter.id)
                     .first()
                     .size,
             )

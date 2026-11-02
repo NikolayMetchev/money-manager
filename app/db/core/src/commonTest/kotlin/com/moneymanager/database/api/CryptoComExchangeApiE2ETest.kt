@@ -350,8 +350,8 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             val attrs = repositories.transferAttributeRepository.getByTransaction(apiDeposit.id).first()
             assertTrue(attrs.any { it.attributeType.id.id == -1L }, "the API leg should be excluded (reconciled)")
             assertTrue(
-                repositories.transferRelationshipRepository
-                    .getByTransfer(apiDeposit.id)
+                repositories.relationshipRepository
+                    .getByTransaction(apiDeposit.id)
                     .first()
                     .isNotEmpty(),
                 "the API leg should be linked to the CSV leg",

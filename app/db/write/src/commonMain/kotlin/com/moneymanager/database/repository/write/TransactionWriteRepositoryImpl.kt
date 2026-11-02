@@ -5,11 +5,13 @@ import app.cash.sqldelight.async.coroutines.awaitAsOne
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.mapper.TransferMapper
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.write.insertRelationship
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
+import com.moneymanager.domain.model.RelationshipRole
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -31,7 +33,6 @@ class TransactionWriteRepositoryImpl(
     private val transactionIdWriteQueries = database.transactionIdWriteQueries
     private val transferAttributeSelectQueries = database.transferAttributeSelectQueries
     private val transferAttributeWriteQueries = database.transferAttributeWriteQueries
-    private val transferRelationshipWriteQueries = database.transferRelationshipWriteQueries
 
     override suspend fun createTransfers(
         transfers: List<Transfer>,
@@ -321,16 +322,18 @@ class TransactionWriteRepositoryImpl(
             database.recordSource(deviceId, EntityType.TRANSFER, realId.id, transfer.revisionId, sources[index])
         }
         // Pass 2: insert relationships now that every in-batch transfer has a real id. The owning transfer
-        // is id1; the related transfer (id2) may be a pre-existing transfer (reconciliation) or a sibling
-        // created in this same batch (a fee transfer), resolved via [idMap].
-        transfers.forEach { transfer ->
-            val id1 = idMap.getValue(transfer.id).id
+        // is the primary member; the related one may be a pre-existing transfer (reconciliation) or a sibling
+        // created in this same batch (a fee transfer), resolved via [idMap]. The relationship's provenance is
+        // its owning transfer's source.
+        transfers.forEachIndexed { index, transfer ->
+            val primaryId = idMap.getValue(transfer.id).id
             newRelationships[transfer.id].orEmpty().forEach { rel ->
-                val id2 = idMap[rel.relatedTransferId]?.id ?: rel.relatedTransferId.id
-                transferRelationshipWriteQueries.insert(
-                    id1 = id1,
-                    id2 = id2,
-                    relationship_type_id = rel.typeId.id,
+                val relatedId = idMap[rel.relatedTransferId]?.id ?: rel.relatedTransferId.id
+                database.insertRelationship(
+                    deviceId = deviceId,
+                    typeId = rel.typeId.id,
+                    members = listOf(primaryId to RelationshipRole.PRIMARY, relatedId to RelationshipRole.RELATED),
+                    source = sources[index],
                 )
             }
         }

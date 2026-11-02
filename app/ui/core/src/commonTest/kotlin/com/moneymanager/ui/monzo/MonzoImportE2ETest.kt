@@ -2044,12 +2044,12 @@ class MonzoImportE2ETest : DbTest() {
 
             // The withdrawal (id1) links to the fee transfer (id2) via a `fee` relationship.
             val relationship =
-                repositories.transferRelationshipRepository
-                    .getByTransfer(withdrawal.id)
+                repositories.relationshipRepository
+                    .getByTransaction(withdrawal.id)
                     .first()
                     .single()
-            assertEquals(withdrawal.id, relationship.id1)
-            assertEquals(feeTransfer.id, relationship.id2)
+            assertEquals(withdrawal.id, relationship.primary)
+            assertEquals(feeTransfer.id, relationship.related)
             assertEquals("fee", relationship.relationshipType.name)
 
             // The fee's audit trail points at the JSON object holding the fee (atm_fees_detailed), not the

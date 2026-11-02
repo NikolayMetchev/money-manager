@@ -1,0 +1,74 @@
+-- A typed relationship between any number of transactions (transfers, trades, or any future transaction
+-- table). Members reference the permanent transaction_id, which every transaction table shares, so a
+-- relationship can join transactions of different kinds (a reconciliation match joins a source's trade to
+-- the real transfers that record it).
+--
+-- Who made a relationship is its provenance: an entity_source row with entity_type_id = 13 (RELATIONSHIP),
+-- entity_id = relationship.id and revision 1, exactly like a transfer's or a trade's. A relationship a
+-- person made has a MANUAL source; one an import made carries that import's source.
+--
+-- Excluded from the audit trail (see EXCLUDED_FROM_AUDIT in MoneyManagerDatabaseWrapper); its rows are
+-- folded into the sync change token instead.
+CREATE TABLE relationship (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    relationship_type_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (relationship_type_id) REFERENCES relationship_type(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_relationship_type ON relationship(relationship_type_id);
+
+-- role: what the member is to the relationship, per type (RelationshipRole):
+--   0 = PRIMARY  the owning transaction of a directed pair (the reconciled duplicate, the main transaction,
+--                the pass-through funding leg, the reversing leg, the conversion debit)
+--   1 = RELATED  the transaction it points at (the original, the fee, the spend leg, the reversed charge,
+--                the conversion credit)
+--   2 = MEMBER   an undirected member (a reconciliation match)
+-- transaction_id rows are never deleted, so the foreign key can't cascade: every transaction table removes
+-- its members with an AFTER DELETE trigger below. A new transaction table must add the same trigger.
+CREATE TABLE relationship_member (
+    relationship_id INTEGER NOT NULL,
+    transaction_id INTEGER NOT NULL,
+    role INTEGER NOT NULL,
+    PRIMARY KEY (relationship_id, transaction_id),
+    FOREIGN KEY (relationship_id) REFERENCES relationship(id) ON DELETE CASCADE,
+    FOREIGN KEY (transaction_id) REFERENCES transaction_id(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_relationship_member_transaction ON relationship_member(transaction_id, role);
+CREATE INDEX idx_relationship_member_role ON relationship_member(relationship_id, role);
+
+-- A relationship needs two members to relate anything: once a deletion leaves fewer, it goes too.
+CREATE TRIGGER relationship_member_prune
+AFTER DELETE ON relationship_member
+FOR EACH ROW
+WHEN (SELECT COUNT(*) FROM relationship_member WHERE relationship_id = old.relationship_id) < 2
+BEGIN
+    DELETE FROM relationship WHERE id = old.relationship_id;
+END;
+
+CREATE TRIGGER transfer_relationship_member_delete
+AFTER DELETE ON transfer
+FOR EACH ROW
+BEGIN
+    DELETE FROM relationship_member WHERE transaction_id = old.id;
+END;
+
+CREATE TRIGGER trade_relationship_member_delete
+AFTER DELETE ON trade
+FOR EACH ROW
+BEGIN
+    DELETE FROM relationship_member WHERE transaction_id = old.id;
+END;
+
+-- The directed pairs (one PRIMARY and one RELATED member) that the pairwise relationship types are made
+-- of, for the queries that follow such a link from one end to the other.
+CREATE VIEW relationship_pair AS
+SELECT
+    relationship.id,
+    relationship.relationship_type_id,
+    primary_member.transaction_id AS primary_id,
+    related_member.transaction_id AS related_id
+FROM relationship
+JOIN relationship_member primary_member ON primary_member.relationship_id = relationship.id AND primary_member.role = 0
+JOIN relationship_member related_member ON related_member.relationship_id = relationship.id AND related_member.role = 1;

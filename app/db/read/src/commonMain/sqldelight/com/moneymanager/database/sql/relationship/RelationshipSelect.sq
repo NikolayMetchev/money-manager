@@ -1,0 +1,41 @@
+-- Relationships as one row per member: every member of every relationship the given transaction belongs
+-- to, with the member's kind resolved from the transaction tables (a member is a transfer or a trade).
+selectByTransaction:
+SELECT
+    relationship.id,
+    relationship_type.id AS relationship_type_id,
+    relationship_type.name AS relationship_type_name,
+    member.transaction_id,
+    member.role,
+    CASE WHEN trade.id IS NOT NULL THEN 'TRADE' ELSE 'TRANSFER' END AS transaction_kind
+FROM relationship
+JOIN relationship_type ON relationship.relationship_type_id = relationship_type.id
+JOIN relationship_member member ON member.relationship_id = relationship.id
+LEFT JOIN trade ON trade.id = member.transaction_id
+WHERE relationship.id IN (SELECT relationship_id FROM relationship_member WHERE transaction_id = :transactionId)
+ORDER BY relationship_type.name, relationship.id, member.role, member.transaction_id;
+
+-- As selectByTransaction, for every relationship any of the given transactions belongs to.
+selectByTransactions:
+SELECT
+    relationship.id,
+    relationship_type.id AS relationship_type_id,
+    relationship_type.name AS relationship_type_name,
+    member.transaction_id,
+    member.role,
+    CASE WHEN trade.id IS NOT NULL THEN 'TRADE' ELSE 'TRANSFER' END AS transaction_kind
+FROM relationship
+JOIN relationship_type ON relationship.relationship_type_id = relationship_type.id
+JOIN relationship_member member ON member.relationship_id = relationship.id
+LEFT JOIN trade ON trade.id = member.transaction_id
+WHERE relationship.id IN (SELECT relationship_id FROM relationship_member WHERE transaction_id IN :transactionIds)
+ORDER BY relationship_type.name, relationship.id, member.role, member.transaction_id;
+
+-- The members of every relationship of :typeId that :transactionId belongs to: the write path's
+-- "does this type already join exactly these members?" check.
+selectMembersOfTypeContaining:
+SELECT member.relationship_id, member.transaction_id, member.role
+FROM relationship_member member
+JOIN relationship ON relationship.id = member.relationship_id
+WHERE relationship.relationship_type_id = :typeId
+  AND member.relationship_id IN (SELECT relationship_id FROM relationship_member WHERE transaction_id = :transactionId);

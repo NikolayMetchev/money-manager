@@ -488,6 +488,6 @@ internal fun AppServices.transactionDetailQuery(): TransactionDetailQuery =
     TransactionDetailQuery(
         transactionRepository = transactions.transactionRepository,
         tradeRepository = transactions.tradeRepository,
-        relationshipRepository = transactions.transferRelationshipRepository,
+        relationshipRepository = transactions.relationshipRepository,
         sourceRepository = transactions.transferSourceRepository,
     )

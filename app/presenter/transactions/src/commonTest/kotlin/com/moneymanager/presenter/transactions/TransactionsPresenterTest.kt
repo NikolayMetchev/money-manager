@@ -69,7 +69,7 @@ class TransactionsPresenterTest {
         TransactionDetailQuery(
             repository,
             mock { },
-            mock { every { getByTransfer(any()) } returns flowOf(emptyList()) },
+            mock { every { getByTransaction(any()) } returns flowOf(emptyList()) },
             mock { everySuspend { getSourcesForTransaction(any()) } returns emptyList() },
         )
 

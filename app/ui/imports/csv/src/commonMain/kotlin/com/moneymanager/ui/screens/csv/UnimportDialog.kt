@@ -32,9 +32,9 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
@@ -58,7 +58,7 @@ fun UnimportDialog(
     transferSourceRepository: TransferSourceReadRepository,
     accountRepository: AccountReadRepository,
     transactionRepository: TransactionReadRepository,
-    transferRelationshipRepository: TransferRelationshipReadRepository,
+    relationshipRepository: RelationshipReadRepository,
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
@@ -135,7 +135,7 @@ fun UnimportDialog(
                                     plan = currentPlan,
                                     accountRepository = accountRepository,
                                     transactionRepository = transactionRepository,
-                                    transferRelationshipRepository = transferRelationshipRepository,
+                                    relationshipRepository = relationshipRepository,
                                     tradeRepository = tradeRepository,
                                     maintenance = maintenance,
                                     importEngine = importEngine,
@@ -180,7 +180,7 @@ fun CsvUnimportAllDialog(
     transferSourceRepository: TransferSourceReadRepository,
     accountRepository: AccountReadRepository,
     transactionRepository: TransactionReadRepository,
-    transferRelationshipRepository: TransferRelationshipReadRepository,
+    relationshipRepository: RelationshipReadRepository,
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
@@ -259,7 +259,7 @@ fun CsvUnimportAllDialog(
                                     transferSourceRepository = transferSourceRepository,
                                     accountRepository = accountRepository,
                                     transactionRepository = transactionRepository,
-                                    transferRelationshipRepository = transferRelationshipRepository,
+                                    relationshipRepository = relationshipRepository,
                                     tradeRepository = tradeRepository,
                                     maintenance = maintenance,
                                     importEngine = importEngine,

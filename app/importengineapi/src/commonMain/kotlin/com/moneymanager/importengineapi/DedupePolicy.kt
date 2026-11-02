@@ -110,7 +110,7 @@ sealed interface DedupePolicy {
      * id/key/exact-fields but does match an existing transfer from a *different* source
      * (same source+target+amount, timestamp within [reconcileWindow]) is still IMPORTED — but tagged
      * with the plain exclusion attribute (so it is kept yet excluded from balance totals) and linked to
-     * the existing transfer via a `reconciled` [com.moneymanager.domain.model.TransferRelationship],
+     * the existing transfer via a `reconciled` [com.moneymanager.domain.model.Relationship],
      * leaving the movement counted once. Restricted to existing transfers this provider cannot itself
      * identify (apiId == null) so genuine repeat transfers from the same provider are never collapsed.
      */

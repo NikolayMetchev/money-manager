@@ -44,7 +44,7 @@ interface TransactionWriteRepository : TransactionReadRepository {
      *
      * @param transfers New transfers to create (with placeholder ids); attributes keyed by placeholder id.
      * @param newRelationships Relationships to create per new transfer, keyed by placeholder id; the new
-     *   transfer becomes id1 and [NewRelationship.relatedTransferId] (an existing transfer) becomes id2.
+     *   transfer becomes the primary member and [NewRelationship.relatedTransferId] (an existing transfer) the related one.
      * @param sources Per-new-transfer [Source]s aligned 1:1 with [transfers].
      * @param updates Existing transfers to update, each with attributes to add.
      * @param updateSources Per-update [Source]s aligned 1:1 with [updates].

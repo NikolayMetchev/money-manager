@@ -224,7 +224,7 @@ class KrakenReimportE2ETest : DbTest() {
                 "the Monzo credit should now be excluded (reconciled) rather than double-counting the withdrawal",
             )
             assertTrue(
-                repositories.transferRelationshipRepository.getByTransfers(setOf(monzoCredit, rewritten.id)).isNotEmpty(),
+                repositories.relationshipRepository.getByTransactions(setOf(monzoCredit, rewritten.id)).isNotEmpty(),
                 "the rewritten withdrawal and the Monzo credit should be linked",
             )
 

@@ -84,14 +84,14 @@ object WellKnownIds {
      */
     const val TIMESTAMP_APPROXIMATE_ATTR_TYPE_NAME: String = "timestamp-approximate"
 
-    /** "reconciled" relationship type: id1 mirrors id2 seen from another source. */
+    /** "reconciled" relationship type: the primary member mirrors the related one seen from another source. */
     const val RECONCILED_RELATIONSHIP_TYPE_ID: Long = 1
 
-    /** "fee" relationship type: id1 is the main transaction, id2 its fee transfer. */
+    /** "fee" relationship type: the primary member is the main transaction, the related one its fee transfer. */
     const val FEE_RELATIONSHIP_TYPE_ID: Long = 2
 
     /**
-     * "pass-through" relationship type: id1 is the funding leg (card → conduit), id2 the spend leg
+     * "pass-through" relationship type: the primary member is the funding leg (card → conduit), the related one the spend leg
      * (conduit → merchant) of a charge routed through a conduit account (e.g. Curve). See
      * `com.moneymanager.domain.model.passthrough.PassThroughAccount`.
      */
@@ -101,15 +101,15 @@ object WellKnownIds {
     const val PASS_THROUGH_RELATIONSHIP_TYPE_NAME: String = "pass-through"
 
     /**
-     * "reversal" relationship type (seeded id 4): id1 is the reversing movement (a refund/cancellation)
-     * and id2 the earlier movement it reverses — for pass-through rows, the two spend legs on the
+     * "reversal" relationship type (seeded id 4): the primary member is the reversing movement (a refund/cancellation)
+     * and the related one the earlier movement it reverses — for pass-through rows, the two spend legs on the
      * merchant account. The engine resolves it by name (get-or-create), so databases seeded before the
      * type existed self-heal on first use.
      */
     const val REVERSAL_RELATIONSHIP_TYPE_NAME: String = "reversal"
 
     /**
-     * "conversion" relationship type: id1 is the debit leg of an asset conversion and id2 the credit
+     * "conversion" relationship type: the primary member is the debit leg of an asset conversion and the related one the credit
      * leg it was paired with — the shape a source books when it cannot say which credit came from
      * which debit (see `com.moneymanager.domain.model.csvstrategy.LegAssembly.ThroughAccount`). Resolved by
      * name (get-or-create), so a database seeded before the type existed self-heals on first use.

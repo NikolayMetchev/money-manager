@@ -126,26 +126,23 @@ SELECT
     -- A pass-through (conduit) leg reads as reconciled when its chain counterpart is: a funding-card
     -- reconcile links the conduit spend to the FUNDING leg, so the sibling SPEND leg (the "Via conduit"
     -- row) — and vice versa — must show reconciled too, since the whole chain is reconciled.
-    -- pass_through_as_funding.id2 is this row's spend leg (when this row is the funding leg);
-    -- pass_through_as_spend.id1 is this row's funding leg (when this row is the spend leg); both are NULL
-    -- for non-conduit rows, so the extra checks are no-ops there.
+    -- pt_spend.transaction_id is this row's spend leg (when this row is the funding leg); pt_funding.transaction_id
+    -- is this row's funding leg (when this row is the spend leg); both are NULL for non-conduit rows, so the extra
+    -- checks are no-ops there.
     CASE WHEN EXISTS (
-        SELECT 1 FROM transfer_relationship tr
-        WHERE tr.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
-          AND (tr.id1 = running_balance_materialized_view.id OR tr.id2 = running_balance_materialized_view.id
-               OR tr.id1 = pass_through_as_funding.id2 OR tr.id2 = pass_through_as_funding.id2
-               OR tr.id1 = pass_through_as_spend.id1 OR tr.id2 = pass_through_as_spend.id1)
+        SELECT 1 FROM relationship_member rm
+        JOIN relationship r ON r.id = rm.relationship_id
+        WHERE r.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
+          AND rm.transaction_id IN (running_balance_materialized_view.id, pt_spend.transaction_id, pt_funding.transaction_id)
     ) THEN 1 ELSE 0 END AS is_reconciled,
-    -- Linked fee transfer when this row is the main transaction (fee_as_main.id2), and the linked main
-    -- transaction when this row is the fee transfer (fee_as_child.id1). LEFT JOINs (rather than scalar
-    -- subqueries) so SQLDelight infers these as NULLABLE; there is at most one fee link per side, so the
-    -- joins never multiply rows. FEE_RELATIONSHIP_TYPE_ID = 2.
-    fee_as_main.id2 AS fee_transfer_id,
-    fee_as_child.id1 AS fee_parent_id,
-    -- Pass-through (conduit) link, e.g. Curve: the spend leg when this row is the funding leg (id1),
-    -- and the funding leg when this row is the spend leg (id2). PASS_THROUGH_RELATIONSHIP_TYPE_ID = 3.
-    pass_through_as_funding.id2 AS pass_through_spend_id,
-    pass_through_as_spend.id1 AS pass_through_funding_id,
+    -- Linked fee transfer when this row is the main transaction, and the linked main transaction when this row
+    -- is the fee transfer. FEE_RELATIONSHIP_TYPE_ID = 2.
+    fee_child.transaction_id AS fee_transfer_id,
+    fee_parent.transaction_id AS fee_parent_id,
+    -- Pass-through (conduit) link, e.g. Curve: the spend leg when this row is the funding leg (primary),
+    -- and the funding leg when this row is the spend leg (related). PASS_THROUGH_RELATIONSHIP_TYPE_ID = 3.
+    pt_spend.transaction_id AS pass_through_spend_id,
+    pt_funding.transaction_id AS pass_through_funding_id,
     -- The exchange order this trade fills, when any (exchange_order_trade.trade_id is UNIQUE, so
     -- the join never multiplies rows and is a point index lookup).
     order_link.order_id AS exchange_order_id,
@@ -155,12 +152,29 @@ FROM running_balance_materialized_view
 JOIN asset_details ON running_balance_materialized_view.asset_id = asset_details.id
 LEFT JOIN transfer ON running_balance_materialized_view.id = transfer.id
 LEFT JOIN trade ON running_balance_materialized_view.id = trade.id
-LEFT JOIN transfer_relationship fee_as_main
-    ON fee_as_main.id1 = running_balance_materialized_view.id AND fee_as_main.relationship_type_id = 2
-LEFT JOIN transfer_relationship fee_as_child
-    ON fee_as_child.id2 = running_balance_materialized_view.id AND fee_as_child.relationship_type_id = 2
-LEFT JOIN transfer_relationship pass_through_as_funding
-    ON pass_through_as_funding.id1 = running_balance_materialized_view.id AND pass_through_as_funding.relationship_type_id = 3
-LEFT JOIN transfer_relationship pass_through_as_spend
-    ON pass_through_as_spend.id2 = running_balance_materialized_view.id AND pass_through_as_spend.relationship_type_id = 3
+-- Each pairwise link is two point lookups on relationship_member: this row's own membership in a relationship of
+-- the type with the given role, then the other end of that relationship. (Not the relationship_pair view: as the
+-- right side of a LEFT JOIN SQLite can't flatten a join, so it would materialize every pair of the type per query.)
+-- A row has at most one link of each type per side, so the joins never multiply rows. LEFT JOINs (rather than
+-- scalar subqueries) so SQLDelight infers the ids as NULLABLE. Roles: 0 = PRIMARY, 1 = RELATED.
+LEFT JOIN relationship_member fee_self_main
+    ON fee_self_main.transaction_id = running_balance_materialized_view.id AND fee_self_main.role = 0
+   AND EXISTS (SELECT 1 FROM relationship r WHERE r.id = fee_self_main.relationship_id AND r.relationship_type_id = 2)
+LEFT JOIN relationship_member fee_child
+    ON fee_child.relationship_id = fee_self_main.relationship_id AND fee_child.role = 1
+LEFT JOIN relationship_member fee_self_child
+    ON fee_self_child.transaction_id = running_balance_materialized_view.id AND fee_self_child.role = 1
+   AND EXISTS (SELECT 1 FROM relationship r WHERE r.id = fee_self_child.relationship_id AND r.relationship_type_id = 2)
+LEFT JOIN relationship_member fee_parent
+    ON fee_parent.relationship_id = fee_self_child.relationship_id AND fee_parent.role = 0
+LEFT JOIN relationship_member pt_self_funding
+    ON pt_self_funding.transaction_id = running_balance_materialized_view.id AND pt_self_funding.role = 0
+   AND EXISTS (SELECT 1 FROM relationship r WHERE r.id = pt_self_funding.relationship_id AND r.relationship_type_id = 3)
+LEFT JOIN relationship_member pt_spend
+    ON pt_spend.relationship_id = pt_self_funding.relationship_id AND pt_spend.role = 1
+LEFT JOIN relationship_member pt_self_spend
+    ON pt_self_spend.transaction_id = running_balance_materialized_view.id AND pt_self_spend.role = 1
+   AND EXISTS (SELECT 1 FROM relationship r WHERE r.id = pt_self_spend.relationship_id AND r.relationship_type_id = 3)
+LEFT JOIN relationship_member pt_funding
+    ON pt_funding.relationship_id = pt_self_spend.relationship_id AND pt_funding.role = 0
 LEFT JOIN exchange_order_trade order_link ON order_link.trade_id = running_balance_materialized_view.id;

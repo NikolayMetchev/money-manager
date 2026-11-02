@@ -26,7 +26,7 @@ fun AppServices.importDirectoryService(
         tradeRepository = transactions.tradeRepository,
         passThroughAccountRepository = imports.passThroughAccountRepository,
         transactionRepository = transactions.transactionRepository,
-        transferRelationshipRepository = transactions.transferRelationshipRepository,
+        relationshipRepository = transactions.relationshipRepository,
         transferSourceRepository = transactions.transferSourceRepository,
         auditRepository = audit.auditRepository,
         maintenance = imports.maintenance,

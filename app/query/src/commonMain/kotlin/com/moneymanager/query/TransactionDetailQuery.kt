@@ -8,9 +8,9 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import kotlinx.coroutines.flow.first
 
@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.first
 class TransactionDetailQuery(
     private val transactionRepository: TransactionReadRepository,
     private val tradeRepository: TradeReadRepository,
-    private val relationshipRepository: TransferRelationshipReadRepository,
+    private val relationshipRepository: RelationshipReadRepository,
     private val sourceRepository: TransferSourceReadRepository,
 ) {
     /** The detail of [row], or null when it no longer exists. */
@@ -33,13 +33,17 @@ class TransactionDetailQuery(
         id: TransferId,
     ): TransactionDetail? {
         val transfer = transactionRepository.getTransactionById(id.id).first() ?: return null
-        val relationships = relationshipRepository.getByTransfer(id).first()
-        val others = transactionRepository.getTransactionsByIds(relationships.map { if (it.id1 == id) it.id2 else it.id1 })
+        val relationships = relationshipRepository.getByTransaction(id).first()
+        val others =
+            transactionRepository.getTransactionsByIds(relationships.flatMap { it.othersThan(id) }.filterIsInstance<TransferId>())
         val links =
-            relationships.mapNotNull { relationship ->
-                val outgoing = relationship.id1 == id
-                others[if (outgoing) relationship.id2 else relationship.id1]
-                    ?.let { LinkedTransfer(relationship.relationshipType.name, outgoing, it) }
+            relationships.flatMap { relationship ->
+                // This transfer owns the link when it is the pair's primary end; an undirected member owns none.
+                val outgoing = relationship.primary?.id == id.id
+                relationship
+                    .othersThan(id)
+                    .filterIsInstance<TransferId>()
+                    .mapNotNull { other -> others[other]?.let { LinkedTransfer(relationship.relationshipType.name, outgoing, it) } }
             }
         return TransactionDetail(
             row = row,

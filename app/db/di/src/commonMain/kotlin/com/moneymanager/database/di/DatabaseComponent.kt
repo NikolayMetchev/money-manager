@@ -32,11 +32,11 @@ import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
+import com.moneymanager.domain.repository.write.RelationshipWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
 import com.moneymanager.domain.repository.write.TradeWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
 import com.moneymanager.domain.repository.write.TransferAttributeWriteRepository
-import com.moneymanager.domain.repository.write.TransferRelationshipWriteRepository
 import com.moneymanager.domain.repository.write.TransferSourceWriteRepository
 import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.importengineapi.ImportEngine
@@ -87,7 +87,7 @@ interface DatabaseComponent {
     val settingsRepository: SettingsWriteRepository
     val transactionRepository: TransactionWriteRepository
     val transferAttributeRepository: TransferAttributeWriteRepository
-    val transferRelationshipRepository: TransferRelationshipWriteRepository
+    val relationshipRepository: RelationshipWriteRepository
     val transferSourceRepository: TransferSourceWriteRepository
     val deviceId: DeviceId
     val importEngine: ImportEngine

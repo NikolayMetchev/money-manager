@@ -3,8 +3,8 @@ package com.moneymanager.importengineapi
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 
 /** Value an internal-transfer reconcile's exclusion attribute always carries (see `ImportDeduper`). */
 private const val RECONCILED_EXCLUSION_VALUE = "reconciled"
@@ -20,10 +20,10 @@ private const val RECONCILED_EXCLUSION_VALUE = "reconciled"
  */
 suspend fun reconciledPartnerUnhideUpdates(
     deletedIds: Set<TransferId>,
-    transferRelationshipRepository: TransferRelationshipReadRepository,
+    relationshipRepository: RelationshipReadRepository,
     transactionRepository: TransactionReadRepository,
 ): List<ImportTransfer> =
-    reconciledPartnerUnhides(deletedIds, transferRelationshipRepository, transactionRepository)
+    reconciledPartnerUnhides(deletedIds, relationshipRepository, transactionRepository)
         .filter { it.isOrphanedBy(deletedIds) }
         .map { it.update }
 
@@ -47,19 +47,19 @@ data class ReconciledPartnerUnhide(
  */
 suspend fun reconciledPartnerUnhides(
     deletedIds: Set<TransferId>,
-    transferRelationshipRepository: TransferRelationshipReadRepository,
+    relationshipRepository: RelationshipReadRepository,
     transactionRepository: TransactionReadRepository,
 ): List<ReconciledPartnerUnhide> {
     if (deletedIds.isEmpty()) return emptyList()
     val partners =
-        reconciledRelationships(deletedIds, transferRelationshipRepository)
-            .flatMap { listOf(it.id1, it.id2) }
+        reconciledRelationships(deletedIds, relationshipRepository)
+            .flatMap { it.toList() }
             .filterNot { it in deletedIds }
             .toSet()
     if (partners.isEmpty()) return emptyList()
     val counterpartsByPartner =
-        reconciledRelationships(partners, transferRelationshipRepository)
-            .flatMap { listOf(it.id1 to it.id2, it.id2 to it.id1) }
+        reconciledRelationships(partners, relationshipRepository)
+            .flatMap { (primary, related) -> listOf(primary to related, related to primary) }
             .filter { (partner, _) -> partner in partners }
             .groupBy({ it.first }, { it.second })
     val partnerTransfers = transactionRepository.getTransactionsByIds(counterpartsByPartner.keys)
@@ -83,7 +83,8 @@ suspend fun reconciledPartnerUnhides(
 
 private suspend fun reconciledRelationships(
     ids: Set<TransferId>,
-    transferRelationshipRepository: TransferRelationshipReadRepository,
-) = transferRelationshipRepository
-    .getByTransfers(ids)
+    relationshipRepository: RelationshipReadRepository,
+) = relationshipRepository
+    .getByTransactions(ids)
     .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
+    .mapNotNull { it.transferPair }

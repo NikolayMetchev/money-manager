@@ -6,11 +6,9 @@ import kotlin.time.Duration
 /**
  * How the engine decides an incoming [ImportTradeIntent] is a trade the database already holds.
  *
- * Unlike a transfer, a matched trade cannot be "imported but tagged excluded and linked as
- * reconciled": `transfer_attribute` and `transfer_relationship` both reference `transfer(id)`, so a
- * trade can carry neither. The only mechanism available — and the one the exact-tuple path already
- * uses — is to suppress the write and report the existing trade's id, which surfaces the source row
- * as a duplicate pointing at the trade it duplicates.
+ * Unlike a transfer, a matched trade is not "imported but tagged excluded and linked as reconciled":
+ * like the exact-tuple path, every policy suppresses the write and reports the existing trade's id,
+ * which surfaces the source row as a duplicate pointing at the trade it duplicates.
  */
 sealed interface TradeDedupePolicy {
     /**
@@ -39,8 +37,8 @@ sealed interface TradeDedupePolicy {
      *                            the legs a through-account leg rule books when it cannot say which
      *                            credit came from which debit. The other source describes the same
      *                            movement as a trade, so without this the two book it twice. The
-     *                            debit leg (`id1`) is compared on account, asset, amount and window;
-     *                            the credit leg (`id2`) only on its asset, because the two sources
+     *                            debit leg (primary) is compared on account, asset, amount and window;
+     *                            the credit leg (related) only on its asset, because the two sources
      *                            disagree about the credited *amount* by the source's service charge.
      *                            Defaults to the name every built-in through-account leg rule uses; name a
      *                            different type for a source that links its legs with one, or null to

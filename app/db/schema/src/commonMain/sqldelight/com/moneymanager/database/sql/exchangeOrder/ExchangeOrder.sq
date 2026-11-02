@@ -28,7 +28,7 @@ CREATE TABLE exchange_order (
 CREATE INDEX IF NOT EXISTS idx_exchange_order_account ON exchange_order(account_id);
 
 -- exchange_order_trade: links an order to its fill trades. A fill belongs to at most one order
--- (trade_id UNIQUE); an order can have many fills. Un-audited join table, like transfer_relationship.
+-- (trade_id UNIQUE); an order can have many fills. Un-audited join table, like relationship_member.
 CREATE TABLE exchange_order_trade (
     order_id INTEGER NOT NULL,
     trade_id INTEGER NOT NULL UNIQUE,

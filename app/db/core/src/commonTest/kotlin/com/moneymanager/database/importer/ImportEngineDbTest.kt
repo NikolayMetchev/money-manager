@@ -1176,11 +1176,11 @@ class ImportEngineDbTest : DbTest() {
             // The funding leg (id1) links to the spend leg (id2) via the pass-through relationship.
             val fundingId = result.createdTransferIds.getValue(ImportRowKey.CsvRow(0))
             val relationship =
-                repositories.transferRelationshipRepository
-                    .getByTransfer(fundingId)
+                repositories.relationshipRepository
+                    .getByTransaction(fundingId)
                     .first()
                     .single()
-            assertEquals(fundingId, relationship.id1)
+            assertEquals(fundingId, relationship.primary)
             assertEquals("pass-through", relationship.relationshipType.name)
         }
 
@@ -1439,11 +1439,11 @@ class ImportEngineDbTest : DbTest() {
             // Each cancellation leg reverses the corresponding original leg (per-hop pairing), and
             // every chain account nets to zero across charge + cancellation.
             val cancelLeg1Reversal = reversalLinksOf(cancelLeg1).single()
-            assertEquals(cancelLeg1, cancelLeg1Reversal.id1)
-            assertEquals(chargeLeg1, cancelLeg1Reversal.id2)
+            assertEquals(cancelLeg1, cancelLeg1Reversal.primary)
+            assertEquals(chargeLeg1, cancelLeg1Reversal.related)
             val cancelLeg2Reversal = reversalLinksOf(cancelLeg2).single()
-            assertEquals(cancelLeg2, cancelLeg2Reversal.id1)
-            assertEquals(chargeLeg2, cancelLeg2Reversal.id2)
+            assertEquals(cancelLeg2, cancelLeg2Reversal.primary)
+            assertEquals(chargeLeg2, cancelLeg2Reversal.related)
 
             val accounts = repositories.accountRepository.getAllAccounts().first()
             for (name in listOf("Curve", "PayPal", "THEPIHUT 0")) {
@@ -1556,15 +1556,15 @@ class ImportEngineDbTest : DbTest() {
 
     /** The next leg linked FROM [fundingId] via its outgoing pass-through relationship (chains walk leg by leg). */
     private suspend fun spendLegOf(fundingId: TransferId): TransferId =
-        repositories.transferRelationshipRepository
-            .getByTransfer(fundingId)
+        repositories.relationshipRepository
+            .getByTransaction(fundingId)
             .first()
-            .single { it.relationshipType.name == "pass-through" && it.id1 == fundingId }
-            .id2
+            .single { it.relationshipType.name == "pass-through" && it.primary == fundingId }
+            .related as TransferId
 
     private suspend fun reversalLinksOf(transferId: TransferId) =
-        repositories.transferRelationshipRepository
-            .getByTransfer(transferId)
+        repositories.relationshipRepository
+            .getByTransaction(transferId)
             .first()
             .filter { it.relationshipType.name == WellKnownIds.REVERSAL_RELATIONSHIP_TYPE_NAME }
 
@@ -1638,8 +1638,8 @@ class ImportEngineDbTest : DbTest() {
             // seeded reversal relationship type.
             val chargeSpendId = spendLegOf(result.createdTransferIds.getValue(ImportRowKey.CsvRow(0)))
             val reversal = reversalLinksOf(refundSpendId).single()
-            assertEquals(refundSpendId, reversal.id1)
-            assertEquals(chargeSpendId, reversal.id2)
+            assertEquals(refundSpendId, reversal.primary)
+            assertEquals(chargeSpendId, reversal.related)
             // The seeded reversal relationship type carries id 4 (see StaticSeed.sq).
             assertEquals(RelationshipTypeId(4), reversal.relationshipType.id)
         }
@@ -1686,8 +1686,8 @@ class ImportEngineDbTest : DbTest() {
             val chargeSpendId = spendLegOf(first.createdTransferIds.getValue(ImportRowKey.CsvRow(0)))
             val refundSpendId = spendLegOf(second.createdTransferIds.getValue(ImportRowKey.CsvRow(0)))
             val reversal = reversalLinksOf(refundSpendId).single()
-            assertEquals(refundSpendId, reversal.id1)
-            assertEquals(chargeSpendId, reversal.id2)
+            assertEquals(refundSpendId, reversal.primary)
+            assertEquals(chargeSpendId, reversal.related)
         }
 
     @Test
@@ -1746,13 +1746,13 @@ class ImportEngineDbTest : DbTest() {
                 (0L..3L).map { spendLegOf(result.createdTransferIds.getValue(ImportRowKey.CsvRow(it))) }
             // Pairwise: refund -> charge, reversal -> refund, second refund -> reversal.
             (1..3).forEach { i ->
-                val reversal = reversalLinksOf(spendIds[i]).single { it.id1 == spendIds[i] }
-                assertEquals(spendIds[i - 1], reversal.id2, "row $i should reverse row ${i - 1}")
+                val reversal = reversalLinksOf(spendIds[i]).single { it.primary == spendIds[i] }
+                assertEquals(spendIds[i - 1], reversal.related, "row $i should reverse row ${i - 1}")
             }
             // Each leg is consumed at most once: exactly 3 links, all id2s distinct.
             val allLinks = spendIds.flatMap { reversalLinksOf(it) }.distinct()
             assertEquals(3, allLinks.size)
-            assertEquals(3, allLinks.map { it.id2 }.toSet().size)
+            assertEquals(3, allLinks.map { it.related }.toSet().size)
         }
 
     @Test
@@ -1793,8 +1793,8 @@ class ImportEngineDbTest : DbTest() {
             val chargeSpendId = spendLegOf(result.createdTransferIds.getValue(ImportRowKey.CsvRow(0)))
             val refundSpendId = spendLegOf(result.createdTransferIds.getValue(ImportRowKey.CsvRow(1)))
             val reversal = reversalLinksOf(refundSpendId).single()
-            assertEquals(refundSpendId, reversal.id1)
-            assertEquals(chargeSpendId, reversal.id2)
+            assertEquals(refundSpendId, reversal.primary)
+            assertEquals(chargeSpendId, reversal.related)
         }
 
     @Test

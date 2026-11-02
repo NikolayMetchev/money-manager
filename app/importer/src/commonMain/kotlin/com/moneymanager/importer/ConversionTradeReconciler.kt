@@ -13,11 +13,11 @@ import kotlin.time.Instant
  * One conversion the database already holds: the debit leg of an asset conversion, plus the asset the
  * credit leg it is linked to received.
  *
- * @property debitTransferId The debit leg — `id1` of the conversion relationship.
+ * @property debitTransferId The debit leg — the primary end of the conversion relationship.
  * @property accountId The account the asset left (the debit leg's source account).
  * @property amount The asset and amount given up.
  * @property timestamp When the source stamped the debit leg.
- * @property creditAssetId The asset the paired credit leg (`id2`) received. Its *amount* is
+ * @property creditAssetId The asset the paired credit leg (its related end) received. Its *amount* is
  *                         deliberately not carried: it cannot be compared (see
  *                         [ConversionTradeReconciler]).
  */

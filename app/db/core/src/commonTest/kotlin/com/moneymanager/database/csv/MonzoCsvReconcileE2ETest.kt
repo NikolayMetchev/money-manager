@@ -184,12 +184,12 @@ class MonzoCsvReconcileE2ETest : DbTest() {
             val original = legs.single { it.id != excluded.single().id }
 
             val reconciledLink =
-                repositories.transferRelationshipRepository
-                    .getByTransfer(excluded.single().id)
+                repositories.relationshipRepository
+                    .getByTransaction(excluded.single().id)
                     .first()
                     .single { it.relationshipType.name == "reconciled" }
-            assertEquals(excluded.single().id, reconciledLink.id1)
-            assertEquals(original.id, reconciledLink.id2)
+            assertEquals(excluded.single().id, reconciledLink.primary)
+            assertEquals(original.id, reconciledLink.related)
 
             // Each leg keeps its own Transaction ID attribute — the reconcile never merges the two rows.
             val txnIds =
