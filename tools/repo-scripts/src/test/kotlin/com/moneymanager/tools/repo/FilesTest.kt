@@ -64,8 +64,8 @@ class FilesTest {
         try {
             assertContentEquals("ok".toByteArray(), httpGet("http://127.0.0.1:${server.localPort}/start"))
         } finally {
-            serving.join()
             server.close()
+            serving.join()
         }
     }
 

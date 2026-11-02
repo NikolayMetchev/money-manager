@@ -14,7 +14,7 @@ call() {
 
 mkdir -p "$dir"
 call GetInvocation "{\"selector\": {\"invocation_id\": \"$invocation\"}, \"include_artifacts\": true}" |
-  jq -r '.invocation[0].artifacts[]? | "\(.name) \(.uri)"' |
+  jq -r '.invocation[0] // error("invocation not found") | (.artifacts // [])[] | "\(.name) \(.uri)"' |
   while read -r name uri; do
     mkdir -p "$(dirname "$dir/$name")"
     call GetFile "{\"uri\": \"$uri\"}" -o "$dir/$name"

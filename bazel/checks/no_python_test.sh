@@ -6,27 +6,38 @@ set -euo pipefail
 root=$(dirname "$(readlink -f "$1")")
 cd "$root"
 self=bazel/checks/no_python_test.sh
-
-files=$(git ls-files)
 bad=0
 
-py=$(grep -E '\.pyi?$' <<<"$files" || true)
+py=$(git ls-files '*.py' '*.pyi')
 if [ -n "$py" ]; then
   echo "Python files are committed:" >&2
   echo "$py" >&2
   bad=1
 fi
 
-scripts=$(grep -E '(\.(sh|yml|yaml|bzl)|BUILD\.bazel)$' <<<"$files" | grep -vxF "$self" || true)
-# python as a command (first word, after a pipe, &&, ;, $( or command -v), a shebang, or a Python rule.
-command_pattern='(^|[|;&(]|\$\()[[:space:]]*(command -v )?python[0-9.]*([[:space:]]|$)|^#!.*python|py_(binary|library|test)\(|rules_python'
-if [ -n "$scripts" ]; then
-  hits=$(xargs grep -nE "$command_pattern" <<<"$scripts" || true)
-  if [ -n "$hits" ]; then
-    echo "Python is run or built by:" >&2
-    echo "$hits" >&2
-    bad=1
+# git grep reads the tracked files (names with spaces included) and skips binaries; it exits 1 for no match, and 2 or
+# more for an error, which fails the test (set -e) instead of passing it.
+search() {
+  local status=0
+  git grep -nIE "$1" -- "${@:2}" ":!$self" || status=$?
+  if [ "$status" -gt 1 ]; then
+    exit "$status"
   fi
+  [ "$status" -eq 0 ]
+}
+
+# A python shebang in any tracked file, whatever its name.
+if search '^#!.*python' .; then
+  echo "A script starts with a python shebang (above)." >&2
+  bad=1
+fi
+
+# python as a command (first word, after a pipe, &&, ;, $(, a YAML key such as `run:`, env or command -v), or a Bazel
+# Python rule, in the files that run or build things.
+command_pattern='(^|[|;&(:]|\$\()[[:space:]]*(env |command -v )?python[0-9.]*([[:space:]]|$)|py_(binary|library|test)\(|rules_python'
+if search "$command_pattern" '*.sh' '*.yml' '*.yaml' '*.bzl' '*.bazel' '*BUILD' '*.bazelrc'; then
+  echo "Python is run or built by the lines above." >&2
+  bad=1
 fi
 
 if [ "$bad" -ne 0 ]; then

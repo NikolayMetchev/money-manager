@@ -18,7 +18,12 @@ if [ "$module_kotlin" != "$pinned_native" ]; then
   bazel run @kotlin_native_repin//:repin
 fi
 
-repo_script() { bazel run //tools/repo-scripts:repo-scripts-tool -- "$@"; }
+# The tool runs on the JDK MODULE.bazel names now, which .bazelrc may not yet (repin jdk is what moves it).
+jdk_feature=$(sed -n 's/^JDK = "\([0-9]*\).*/\1/p' MODULE.bazel)
+repo_script() {
+  bazel run --java_runtime_version="remotejdk_$jdk_feature" --tool_java_runtime_version="remotejdk_$jdk_feature" \
+    //tools/repo-scripts:repo-scripts-tool -- "$@"
+}
 
 repo_script repin node MODULE.bazel
 repo_script repin jdk MODULE.bazel .bazelrc .tool-versions
