@@ -14,4 +14,10 @@ interface RelationshipReadRepository {
      * conduit chains of thousands of pass-through rows. Each relationship appears once, with all its members.
      */
     suspend fun getByTransactions(transactionIds: Collection<TransactionId>): List<Relationship>
+
+    /**
+     * As [getByTransactions], only the relationships a person made (their provenance is `Source.Manual`),
+     * which a re-import rebuilds on the transactions it re-creates.
+     */
+    suspend fun getHandMadeByTransactions(transactionIds: Collection<TransactionId>): List<Relationship>
 }

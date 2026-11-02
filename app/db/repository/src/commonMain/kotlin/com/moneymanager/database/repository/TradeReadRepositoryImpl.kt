@@ -40,6 +40,20 @@ class TradeReadRepositoryImpl(
                 }
             }
 
+    override suspend fun getHandSetAttributes(ids: Collection<TradeId>): Map<TradeId, Map<AttributeTypeId, String?>> =
+        withContext(Dispatchers.Default) {
+            // A loop, not a chain: the query suspends, which a Sequence's lambdas can't.
+            val rows =
+                buildList {
+                    for (chunk in ids.map { it.id }.distinct().chunked(MAX_IDS_PER_QUERY)) {
+                        addAll(selectQueries.selectHandSetAttributes(chunk).awaitAsList())
+                    }
+                }
+            rows
+                .groupBy({ TradeId(it.trade_id) }, { AttributeTypeId(it.attribute_type_id) to it.attribute_value })
+                .mapValues { (_, values) -> values.toMap() }
+        }
+
     override fun getTradeById(id: TradeId): Flow<Trade?> =
         selectQueries
             .selectById(id.id, TradeMapper::mapRaw)

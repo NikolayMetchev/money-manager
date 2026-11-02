@@ -58,6 +58,7 @@ class AuditSourceCoverageTest : DbTest() {
         private val ATTRIBUTE_AUDIT_TABLES =
             setOf(
                 "transfer_attribute_audit",
+                "trade_attribute_audit",
                 "account_attribute_audit",
                 "person_attribute_audit",
             )

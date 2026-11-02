@@ -24,6 +24,7 @@ import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
 import com.moneymanager.ui.components.imports.UnmatchedEditsReport
+import com.moneymanager.ui.components.imports.UnmatchedLinksReport
 import com.moneymanager.ui.components.imports.rememberAccountNamer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -103,7 +104,14 @@ fun ApiReimportAllDialog(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
+            if (finished.reappliedLinks.reapplied > 0) {
+                Text(
+                    text = "${finished.reappliedLinks.reapplied} manual link(s) or trade edit(s) re-applied.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             UnmatchedEditsReport(finished.unmatchedEdits, accountName)
+            UnmatchedLinksReport(finished.reappliedLinks)
             if (finished.failures.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(

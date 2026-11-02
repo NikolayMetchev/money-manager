@@ -159,6 +159,29 @@ WHERE api_entity_source.api_session_id = ?
   AND entity_source.entity_type_id = 7
   AND entity_source.revision_id = 1;
 
+-- The trade analogues of the two queries above. A trade assembled from several rows was created by each of
+-- them; ordered so a caller can take the first row as the trade's record, the same one on every run.
+selectCreatedTradeRowsByCsvImport:
+SELECT entity_source.entity_id, csv_entity_source.csv_row_index
+FROM csv_entity_source
+CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
+JOIN trade ON trade.id = entity_source.entity_id
+WHERE csv_entity_source.csv_import_id = ?
+  AND entity_source.entity_type_id = 11
+  AND entity_source.revision_id = 1
+  AND entity_source.matched = 0
+ORDER BY entity_source.id;
+
+selectCreatedTradeNodesByApiSession:
+SELECT entity_source.entity_id, api_entity_source.api_request_id, api_entity_source.json_path
+FROM api_entity_source
+CROSS JOIN entity_source ON entity_source.id = api_entity_source.id
+JOIN trade ON trade.id = entity_source.entity_id
+WHERE api_entity_source.api_session_id = ?
+  AND entity_source.entity_type_id = 11
+  AND entity_source.revision_id = 1
+ORDER BY entity_source.id;
+
 -- Transfers among the given ids that a person has edited by hand since they were created: a later
 -- revision recorded with the MANUAL source (source_type_id = 1).
 selectHandEditedTransferIds:

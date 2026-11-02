@@ -45,6 +45,18 @@ class RelationshipReadRepositoryImpl(
             toRelationships(rows.distinct())
         }
 
+    override suspend fun getHandMadeByTransactions(transactionIds: Collection<TransactionId>): List<Relationship> =
+        withContext(Dispatchers.Default) {
+            val rows =
+                queryInChunks(transactionIds.map { it.id }.distinct(), MAX_IDS_PER_QUERY) { chunk ->
+                    selectQueries
+                        .selectHandMadeByTransactions(chunk) { id, typeId, typeName, memberId, role, kind ->
+                            MemberRow(id, typeId, typeName, memberId, role, kind)
+                        }.awaitAsList()
+                }
+            toRelationships(rows.distinct())
+        }
+
     private data class MemberRow(
         val id: Long,
         val typeId: Long,

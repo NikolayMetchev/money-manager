@@ -613,6 +613,8 @@ data class ImportBatch(
     val tradeAttributeMutations: List<TradeAttributeMutation> = emptyList(),
     /** Replaces the real-account links of shadow accounts (see `reconciliation_account_link`). */
     val reconciliationLinkMutations: List<ReconciliationLinkMutation> = emptyList(),
+    /** Relationships written or deleted directly, in order, after the batch's transfers and trades. */
+    val relationshipMutations: List<RelationshipMutation> = emptyList(),
 ) {
     companion object {
         /**

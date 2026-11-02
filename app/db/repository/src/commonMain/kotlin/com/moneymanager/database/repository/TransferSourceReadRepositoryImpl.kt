@@ -67,6 +67,35 @@ class TransferSourceReadRepositoryImpl(
             }
         }
 
+    override suspend fun getTradesCreatedBy(importSource: Source): Map<TradeId, Source> =
+        withContext(Dispatchers.Default) {
+            val records =
+                when (importSource) {
+                    is Source.Csv -> {
+                        queries
+                            .selectCreatedTradeRowsByCsvImport(importSource.importId.id.toString())
+                            .awaitAsList()
+                            .map { TradeId(it.entity_id) to Source.Csv(importSource.importId, it.csv_row_index) }
+                    }
+
+                    is Source.Api -> {
+                        queries
+                            .selectCreatedTradeNodesByApiSession(importSource.sessionId.id)
+                            .awaitAsList()
+                            .map {
+                                TradeId(it.entity_id) to
+                                    Source.Api(importSource.sessionId, ApiRequestId(it.api_request_id), JsonPath(it.json_path))
+                            }
+                    }
+
+                    else -> {
+                        emptyList()
+                    }
+                }
+            // The first record of each trade: the rows are in creation order.
+            records.groupBy({ it.first }, { it.second }).mapValues { (_, sources) -> sources.first() }
+        }
+
     override suspend fun getImportRecordsMatchedTo(
         transferIds: Set<TransferId>,
         tradeIds: Set<TradeId>,

@@ -3,12 +3,18 @@ package com.moneymanager.importengineapi
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.RelationshipId
+import com.moneymanager.domain.model.RelationshipMember
+import com.moneymanager.domain.model.RelationshipRole
+import com.moneymanager.domain.model.RelationshipType
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
@@ -142,6 +148,64 @@ data class ManualEdit(
 }
 
 /**
+ * Trade attributes a person set or removed by hand on a trade an import created. A re-import puts them
+ * back on the trade the re-run creates from the same [record].
+ */
+data class ManualTradeEdit(
+    val tradeId: TradeId,
+    val record: Source,
+    /** Each hand-edited type with the trade's value of it (null: removed by hand). */
+    val attributes: Map<AttributeTypeId, String?>,
+) {
+    fun describe(): String = "Hand-set attributes of trade ${tradeId.id}"
+}
+
+/**
+ * A relationship a person made (its provenance is [Source.Manual]) with a member a re-import deletes. The
+ * re-import rebuilds it over the transactions the re-run creates from the deleted members' records.
+ */
+data class ManualRelationship(
+    val id: RelationshipId,
+    val type: RelationshipType,
+    val members: List<Member>,
+) {
+    /**
+     * [transactionId] as it is before the re-import. A member the re-import deletes is found again by the
+     * [record] that created it; a transfer by the one closest to [values] when the record made several.
+     */
+    data class Member(
+        val transactionId: TransactionId,
+        val role: RelationshipRole,
+        val record: Source? = null,
+        val values: TransferValues? = null,
+    )
+
+    fun describe(): String = "\"${type.name}\" link between ${members.size} transactions"
+}
+
+/** The hand-made links and trade attributes a re-import put back, and those it couldn't. */
+data class ReappliedLinks(
+    val reapplied: Int = 0,
+    /** One line per link or trade edit whose transaction the re-run didn't create again. */
+    val notReapplied: List<String> = emptyList(),
+) {
+    operator fun plus(other: ReappliedLinks) = ReappliedLinks(reapplied + other.reapplied, notReapplied + other.notReapplied)
+
+    /** The counts for a one-line re-import summary, each clause starting with [separator]; empty when there are none. */
+    fun summary(separator: String): String =
+        buildString {
+            if (reapplied >
+                0
+            ) {
+                append(
+                    "$separator$reapplied manual link${if (reapplied == 1) "" else "s"} or trade edit${if (reapplied == 1) "" else "s"} re-applied",
+                )
+            }
+            if (notReapplied.isNotEmpty()) append("$separator${notReapplied.size} manual links or trade edits not re-applied")
+        }
+}
+
+/**
  * What re-importing [source] does: delete what it created, return its records to never-imported, run
  * the normal import over them again and put the hand edits back. A preview for the confirmation dialog,
  * executed by [executeSourceRerun].
@@ -157,6 +221,9 @@ data class SourceRerunPlan(
     val affected: AffectedRecords,
     val manualEdits: List<ManualEdit>,
     val partners: RerunPartners = RerunPartners(),
+    val manualTradeEdits: List<ManualTradeEdit> = emptyList(),
+    /** Hand-made relationships with a member among what the re-import deletes (partners' transfers included). */
+    val manualRelationships: List<ManualRelationship> = emptyList(),
 )
 
 /**
@@ -196,6 +263,8 @@ data class SourceRerunResult<R>(
     /** Hand edits whose transfer the re-run didn't create again (its record is now a duplicate, or skipped). */
     val unmatchedEdits: List<ManualEdit>,
     val deletedEmptyAccounts: List<String>,
+    /** Hand-made relationships and hand-set trade attributes put back on the re-created transactions. */
+    val reappliedLinks: ReappliedLinks = ReappliedLinks(),
 )
 
 /**
@@ -217,6 +286,12 @@ suspend fun planSourceRerun(
         AffectedRecords.of(reads.transferSourceRepository.getImportRecordsMatchedTo(created.keys, tradeIds), excluding = source)
     val partners = rerunPartners(source, created.keys, reads)
     val manualEditsBase = PLAN_CREATED_SPAN + PLAN_OTHER_FILES_SPAN
+    val createdTrades = reads.transferSourceRepository.getTradesCreatedBy(source).filterKeys { it in tradeIds }
+    val manualTradeEdits =
+        reads.tradeRepository
+            ?.getHandSetAttributes(createdTrades.keys)
+            .orEmpty()
+            .map { (id, attributes) -> ManualTradeEdit(id, createdTrades.getValue(id), attributes) }
     return SourceRerunPlan(
         source = source,
         createdTransfers = created,
@@ -226,7 +301,38 @@ suspend fun planSourceRerun(
         manualEdits =
             captureManualEdits(created, reads, progress.sink(base = manualEditsBase, span = 1f - manualEditsBase)),
         partners = partners,
+        manualTradeEdits = manualTradeEdits,
+        manualRelationships = captureManualRelationships(created + partners.transfers, createdTrades, reads),
     )
+}
+
+/** The hand-made relationships over any of [transfers] or [trades] (what a re-import may delete), with each member's record. */
+private suspend fun captureManualRelationships(
+    transfers: Map<TransferId, Source>,
+    trades: Map<TradeId, Source>,
+    reads: RerunReads,
+): List<ManualRelationship> {
+    val relationships = reads.relationshipRepository.getHandMadeByTransactions(transfers.keys + trades.keys)
+    if (relationships.isEmpty()) return emptyList()
+    val recordOf = transfers.mapKeys { it.key.id } + trades.mapKeys { it.key.id }
+    val deletedTransferMembers =
+        relationships.flatMap { it.members }.mapNotNull { (it.transactionId as? TransferId)?.takeIf { id -> id in transfers } }
+    val current = reads.transactionRepository.getTransactionsByIds(deletedTransferMembers.distinct())
+    return relationships.map { relationship ->
+        ManualRelationship(
+            id = relationship.id,
+            type = relationship.relationshipType,
+            members =
+                relationship.members.map { member ->
+                    ManualRelationship.Member(
+                        transactionId = member.transactionId,
+                        role = member.role,
+                        record = recordOf[member.transactionId.id],
+                        values = (member.transactionId as? TransferId)?.let { current[it]?.values() },
+                    )
+                },
+        )
+    }
 }
 
 /** The [RerunPartners] of deleting [deletedIds], which [source] created. */
@@ -367,7 +473,16 @@ suspend fun <R> ImportEngine.executeSourceRerun(
         }
 
     onProgress?.invoke(Progress("Re-applying manual edits"))
-    val (reapplied, unmatched) = reapplyManualEdits(plan.manualEdits + partners.manualEdits, reads)
+    val deletedIds = deletedTransfers.mapTo(mutableSetOf()) { it.id } + plan.tradeIds.map { it.id }
+    val reapplication =
+        reapplyManualEdits(
+            manualEdits = plan.manualEdits + partners.manualEdits,
+            tradeEdits = plan.manualTradeEdits,
+            // A relationship none of whose members is deleted (its only deleted one was a partner the re-run keeps) is untouched.
+            relationships = plan.manualRelationships.filter { r -> r.members.any { it.transactionId.id in deletedIds } },
+            deletedIds = deletedIds,
+            reads = reads,
+        )
 
     onProgress?.invoke(Progress("Cleaning up empty accounts"))
     val deletedEmptyAccounts =
@@ -390,9 +505,10 @@ suspend fun <R> ImportEngine.executeSourceRerun(
         unhiddenTransfers = unhideUpdates.size,
         affected = AffectedRecords(affected.byFile - notRerun.byFile.keys),
         notRerun = notRerun,
-        reappliedEdits = reapplied,
-        unmatchedEdits = unmatched,
+        reappliedEdits = reapplication.reapplied,
+        unmatchedEdits = reapplication.unmatched,
         deletedEmptyAccounts = deletedEmptyAccounts,
+        reappliedLinks = reapplication.links,
     )
 }
 
@@ -527,44 +643,176 @@ private enum class TransferField(
     AMOUNT({ it.amount }, { to, from -> to.copy(amount = from.amount) }),
 }
 
+private class Reapplication(
+    val reapplied: List<ManualEdit>,
+    val unmatched: List<ManualEdit>,
+    val links: ReappliedLinks,
+)
+
 /**
- * Finds each edited transfer's replacement, the transfer the re-run created from the same record, and
- * applies the edit there as a MANUAL update, so a later re-import keeps it too. A record that produced
- * several transfers (fee and pass-through legs) picks the one closest to [ManualEdit.imported].
+ * The transactions a re-run created, by the record that created them, and which deleted transaction each
+ * one replaces. A record that produced several transfers (fee and pass-through legs) gives each deleted one
+ * the replacement closest to its values; each replacement replaces at most one.
+ */
+private class Replacements(
+    private val transfersByRecord: Map<Source, List<TransferId>>,
+    private val tradesByRecord: Map<Source, List<TradeId>>,
+    val transfers: Map<TransferId, Transfer>,
+) {
+    private val newTransfer = mutableMapOf<TransferId, Transfer>()
+    private val newTrade = mutableMapOf<TradeId, TradeId>()
+    private val claimed = mutableSetOf<Long>()
+
+    fun transfer(
+        old: TransferId,
+        record: Source,
+        values: TransferValues,
+    ): Transfer? =
+        newTransfer[old] ?: transfersByRecord[record]
+            .orEmpty()
+            .filter { it.id !in claimed }
+            .mapNotNull { transfers[it] }
+            .maxByOrNull { matchScore(values, it.values()) }
+            ?.also {
+                claimed += it.id.id
+                newTransfer[old] = it
+            }
+
+    fun trade(
+        old: TradeId,
+        record: Source,
+    ): TradeId? =
+        newTrade[old] ?: tradesByRecord[record]
+            .orEmpty()
+            .firstOrNull { it.id !in claimed }
+            ?.also {
+                claimed += it.id
+                newTrade[old] = it
+            }
+
+    companion object {
+        suspend fun of(
+            records: Collection<Source>,
+            reads: RerunReads,
+        ): Replacements {
+            val imports = records.map { it.wholeImport() }.distinct()
+            val transfers =
+                imports
+                    .flatMap {
+                        reads.transferSourceRepository
+                            .getTransfersCreatedBy(
+                                it,
+                            ).entries
+                    }.groupBy({ it.value }, { it.key })
+            val trades = imports.flatMap { reads.transferSourceRepository.getTradesCreatedBy(it).entries }.groupBy({ it.value }, { it.key })
+            val current =
+                if (transfers.isEmpty()) {
+                    emptyMap()
+                } else {
+                    reads.transactionRepository.getTransactionsByIds(
+                        transfers.values.flatten(),
+                    )
+                }
+            return Replacements(transfers, trades, current)
+        }
+    }
+}
+
+/**
+ * Applies the hand edits to the transactions the re-run created from the same records, as MANUAL writes so
+ * a later re-import keeps them too: each edited transfer's fields and attributes, each edited trade's
+ * attributes, and each hand-made relationship rebuilt over its members' replacements ([deletedIds] are the
+ * members that need one). A relationship is rebuilt only when every deleted member was created again.
  */
 private suspend fun ImportEngine.reapplyManualEdits(
     manualEdits: List<ManualEdit>,
+    tradeEdits: List<ManualTradeEdit>,
+    relationships: List<ManualRelationship>,
+    deletedIds: Set<Long>,
     reads: RerunReads,
-): Pair<List<ManualEdit>, List<ManualEdit>> {
-    if (manualEdits.isEmpty()) return emptyList<ManualEdit>() to emptyList()
-    val byRecord =
-        manualEdits
-            .map { it.record.wholeImport() }
-            .distinct()
-            .flatMap { reads.transferSourceRepository.getTransfersCreatedBy(it).entries }
-            .groupBy({ it.value }, { it.key })
-    val candidates = reads.transactionRepository.getTransactionsByIds(byRecord.values.flatten())
-    val claimed = mutableSetOf<TransferId>()
+): Reapplication {
+    if (manualEdits.isEmpty() && tradeEdits.isEmpty() && relationships.isEmpty()) {
+        return Reapplication(emptyList(), emptyList(), ReappliedLinks())
+    }
+    val replacements =
+        Replacements.of(
+            manualEdits.map { it.record } + tradeEdits.map { it.record } +
+                relationships.flatMap { r ->
+                    r.members.mapNotNull { it.record }
+                },
+            reads,
+        )
+
     val reapplied = mutableListOf<ManualEdit>()
     val unmatched = mutableListOf<ManualEdit>()
     val updates = mutableListOf<ImportTransfer>()
+    // Transfer edits first: a relationship member that was also edited is matched on its imported values.
     manualEdits.forEach { edit ->
-        val replacement =
-            byRecord[edit.record]
-                .orEmpty()
-                .filter { it !in claimed }
-                .mapNotNull { candidates[it] }
-                .maxByOrNull { matchScore(edit.imported, it.values()) }
+        val replacement = replacements.transfer(edit.transferId, edit.record, edit.imported)
         if (replacement == null) {
             unmatched += edit
         } else {
-            claimed += replacement.id
             reapplied += edit
             updates += edit.updateOf(replacement)
         }
     }
-    if (updates.isNotEmpty()) import(ImportBatch.manualEdits(transfers = updates))
-    return reapplied to unmatched
+
+    var linksReapplied = 0
+    val linksNotReapplied = mutableListOf<String>()
+    val tradeMutations = mutableListOf<TradeAttributeMutation>()
+    tradeEdits.forEach { edit ->
+        val replacement = replacements.trade(edit.tradeId, edit.record)
+        if (replacement == null) {
+            linksNotReapplied += edit.describe()
+        } else {
+            linksReapplied++
+            edit.attributes.forEach { (typeId, value) ->
+                tradeMutations +=
+                    if (value ==
+                        null
+                    ) {
+                        TradeAttributeMutation.Remove(replacement, typeId)
+                    } else {
+                        TradeAttributeMutation.Set(replacement, typeId, value)
+                    }
+            }
+        }
+    }
+
+    val relationshipMutations = mutableListOf<RelationshipMutation>()
+    relationships.forEach { relationship ->
+        val members =
+            relationship.members.map { member ->
+                val id = member.transactionId
+                val record = member.record
+                val replacement: TransactionId? =
+                    when {
+                        id.id !in deletedIds -> id
+                        record == null -> null
+                        id is TransferId -> member.values?.let { replacements.transfer(id, record, it)?.id }
+                        id is TradeId -> replacements.trade(id, record)
+                        else -> null
+                    }
+                replacement?.let { RelationshipMember(it, member.role) }
+            }
+        if (members.any { it == null }) {
+            linksNotReapplied += relationship.describe()
+        } else {
+            linksReapplied++
+            // What's left of the old one (a member the re-import kept) goes, so the rebuilt one is the only copy.
+            relationshipMutations += RelationshipMutation.Delete(relationship.id)
+            relationshipMutations += RelationshipMutation.Create(relationship.type.id, members.filterNotNull(), Source.Manual)
+        }
+    }
+
+    if (updates.isNotEmpty() || tradeMutations.isNotEmpty() || relationshipMutations.isNotEmpty()) {
+        import(
+            ImportBatch
+                .manualEdits(transfers = updates)
+                .copy(tradeAttributeMutations = tradeMutations, relationshipMutations = relationshipMutations),
+        )
+    }
+    return Reapplication(reapplied, unmatched, ReappliedLinks(linksReapplied, linksNotReapplied))
 }
 
 // The whole import or session a record belongs to.

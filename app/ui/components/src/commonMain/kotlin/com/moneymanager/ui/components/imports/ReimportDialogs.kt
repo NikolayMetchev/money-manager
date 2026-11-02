@@ -267,6 +267,7 @@ fun ReimportAllDialog(
         report = { finished ->
             Text(finished.toSummary(), style = MaterialTheme.typography.bodyMedium)
             UnmatchedEditsReport(finished.unmatchedEdits, accountName)
+            UnmatchedLinksReport(finished.reappliedLinks)
         },
         onStop = { stopRequested = true },
         stopping = stopRequested,
