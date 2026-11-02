@@ -124,7 +124,7 @@ class ImportDirectoryServiceTest : DbTest() {
         tradeRepository = repositories.tradeRepository,
         passThroughAccountRepository = repositories.passThroughAccountRepository,
         transactionRepository = repositories.transactionRepository,
-        transferRelationshipRepository = repositories.transferRelationshipRepository,
+        relationshipRepository = repositories.relationshipRepository,
         transferSourceRepository = repositories.transferSourceRepository,
         auditRepository = repositories.auditRepository,
         maintenance = maintenance,

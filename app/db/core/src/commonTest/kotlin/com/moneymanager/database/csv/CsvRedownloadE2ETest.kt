@@ -132,7 +132,7 @@ class CsvRedownloadE2ETest : DbTest() {
                         plan = planCsvUnimport(importId, repositories.csvImportRepository, repositories.transferSourceRepository),
                         accountRepository = repositories.accountRepository,
                         transactionRepository = repositories.transactionRepository,
-                        transferRelationshipRepository = repositories.transferRelationshipRepository,
+                        relationshipRepository = repositories.relationshipRepository,
                         tradeRepository = repositories.tradeRepository,
                         maintenance = maintenance,
                         importEngine = repositories.importEngine,

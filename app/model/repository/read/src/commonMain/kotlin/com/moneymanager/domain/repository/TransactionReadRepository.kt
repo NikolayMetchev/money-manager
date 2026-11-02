@@ -67,7 +67,7 @@ interface TransactionReadRepository {
 
     /**
      * Transfers touching any of [accountIds] (as source or target) whose amount is one of [amounts]
-     * at or before [maxTimestamp] and not yet the target (id2) of a [reversalTypeId] relationship,
+     * at or before [maxTimestamp] and not yet the related end of a [reversalTypeId] relationship,
      * newest first. Loaded once per import batch by the import engine, which pairs
      * refunds/cancellations with the movements they reverse in memory.
      */

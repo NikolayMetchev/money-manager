@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
@@ -273,10 +274,10 @@ class PayPalCsvE2ETest : DbTest() {
                     .id,
             ).first()
             .sumOf { t ->
-                repositories.transferRelationshipRepository
-                    .getByTransfer(t.id)
+                repositories.relationshipRepository
+                    .getByTransaction(t.id)
                     .first()
-                    .count { it.relationshipType.name == "reconciled" && it.id1 == t.id }
+                    .count { it.relationshipType.name == "reconciled" && it.primary == t.id }
             }
 
     @Test
@@ -320,11 +321,11 @@ class PayPalCsvE2ETest : DbTest() {
         fun Transfer.otherEnd() = names.getValue(if (sourceAccountId == payPal) targetAccountId else sourceAccountId)
         return transfers
             .flatMap { t ->
-                repositories.transferRelationshipRepository
-                    .getByTransfer(t.id)
+                repositories.relationshipRepository
+                    .getByTransaction(t.id)
                     .first()
-                    .filter { it.relationshipType.name == "pass-through" && it.id1 == t.id }
-                    .mapNotNull { link -> byId[link.id2]?.let { t.otherEnd() to it.otherEnd() } }
+                    .filter { it.relationshipType.name == "pass-through" && it.primary == t.id }
+                    .mapNotNull { link -> byId[link.related as TransferId]?.let { t.otherEnd() to it.otherEnd() } }
             }.sortedWith(compareBy({ it.first }, { it.second }))
     }
 

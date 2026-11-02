@@ -55,7 +55,7 @@ class MoneyManagerDatabaseWrapper(
     val tradeWriteQueries get() = writeDb.tradeWriteQueries
     val transactionIdWriteQueries get() = writeDb.transactionIdWriteQueries
     val transferAttributeWriteQueries get() = writeDb.transferAttributeWriteQueries
-    val transferRelationshipWriteQueries get() = writeDb.transferRelationshipWriteQueries
+    val relationshipWriteQueries get() = writeDb.relationshipWriteQueries
     val transferWriteQueries get() = writeDb.transferWriteQueries
 
     data class DbObjectSize(
@@ -115,8 +115,9 @@ class MoneyManagerDatabaseWrapper(
             .mixInto(base)
 
     /**
-     * Mixes the non-audited `reconciliation_account_link` and `trade_attribute` tables into [base], like
-     * [foldAccountMappingsInto]: their edits must register as unsynced.
+     * Mixes the non-audited `reconciliation_account_link`, `trade_attribute` and relationship tables into
+     * [base], like [foldAccountMappingsInto]: their edits must register as unsynced. A relationship made by
+     * hand touches no audited table.
      */
     private suspend fun foldReconciliationTablesInto(base: Long): Long {
         val links =
@@ -131,7 +132,13 @@ class MoneyManagerDatabaseWrapper(
                 "SELECT trade_id, attribute_type_id, attribute_value FROM trade_attribute ORDER BY trade_id, attribute_type_id",
             ) { cursor -> listOf(cursor.getLong(0)!!, cursor.getLong(1)!!, cursor.getString(2)!!.hashCode().toLong()) }
                 .awaitAsList()
-        return tradeAttributes.fold(links.mixInto(base)) { token, row -> row.mixInto(token) }
+        // Relationships are never edited in place, only created and deleted, so ids catch every change.
+        val relationships =
+            rawQuery(
+                "SELECT COUNT(*), COALESCE(SUM(relationship_id * 31 + transaction_id), 0), COALESCE(SUM(role), 0) " +
+                    "FROM relationship_member",
+            ) { cursor -> List(3) { cursor.getLong(it)!! } }.awaitAsOneOrNull()
+        return tradeAttributes.fold(relationships.mixInto(links.mixInto(base))) { token, row -> row.mixInto(token) }
     }
 
     /**
@@ -346,7 +353,8 @@ class MoneyManagerDatabaseWrapper(
             "holiday_calendar_weekend_day",
             "holiday_calendar_day",
             "holiday_calendar_audit",
-            "transfer_relationship",
+            "relationship",
+            "relationship_member",
             "account_attribute",
             "person_attribute",
             "_import_batch",

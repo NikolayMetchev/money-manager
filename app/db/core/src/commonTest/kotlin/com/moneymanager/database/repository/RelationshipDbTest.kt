@@ -1,29 +1,37 @@
 package com.moneymanager.database.repository
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
+import com.moneymanager.domain.model.RelationshipMember
+import com.moneymanager.domain.model.RelationshipRole
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.repository.write.NewTrade
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.time.Instant
 
 /**
  * Verifies that an import which reconciles a cross-source duplicate persists the link as a
- * `reconciled` transfer_relationship row (not as an id embedded in the excluded attribute), while
+ * `reconciled` relationship (not as an id embedded in the excluded attribute), while
  * the duplicate still carries the plain `excluded` attribute so it stays out of balances.
  */
-class TransferRelationshipReconciliationTest : DbTest() {
+class RelationshipDbTest : DbTest() {
     private val baseTime = Instant.fromEpochMilliseconds(1_700_000_000_000)
 
     private suspend fun gbp(): Currency =
@@ -97,16 +105,16 @@ class TransferRelationshipReconciliationTest : DbTest() {
 
             val (originalId, duplicateId) = importReconciledPair(currency, sourceId, targetId)
 
-            // The link lives in the relationship table: duplicate (id1) -> original (id2), type reconciled.
-            val relationships = repositories.transferRelationshipRepository.getByTransfer(duplicateId).first()
+            // The link lives in the relationship table: duplicate (primary) -> original (related), type reconciled.
+            val relationships = repositories.relationshipRepository.getByTransaction(duplicateId).first()
             assertEquals(1, relationships.size)
             val relationship = relationships.single()
-            assertEquals(duplicateId, relationship.id1)
-            assertEquals(originalId, relationship.id2)
+            assertEquals(duplicateId, relationship.primary)
+            assertEquals(originalId, relationship.related)
             assertEquals("reconciled", relationship.relationshipType.name)
 
             // Looking it up from the original side finds the same row.
-            assertEquals(relationships, repositories.transferRelationshipRepository.getByTransfer(originalId).first())
+            assertEquals(relationships, repositories.relationshipRepository.getByTransaction(originalId).first())
 
             // The duplicate keeps the plain excluded attribute so balances still leave it out.
             val attributes = repositories.transferAttributeRepository.getByTransaction(duplicateId).first()
@@ -123,18 +131,18 @@ class TransferRelationshipReconciliationTest : DbTest() {
             val (originalId, duplicateId) = importReconciledPair(currency, sourceId, targetId)
             assertEquals(
                 1,
-                repositories.transferRelationshipRepository
-                    .getByTransfer(originalId)
+                repositories.relationshipRepository
+                    .getByTransaction(originalId)
                     .first()
                     .size,
             )
 
-            // Deleting one side of the pair must remove the relationship (FK transfer(id) ON DELETE CASCADE),
+            // Deleting one side of the pair must remove the relationship (the transfer delete trigger),
             // leaving no stale reconciliation link on the surviving transfer.
             repositories.transactionRepository.deleteTransactions(listOf(duplicateId))
 
-            assertEquals(emptyList(), repositories.transferRelationshipRepository.getByTransfer(originalId).first())
-            assertEquals(emptyList(), repositories.transferRelationshipRepository.getByTransfer(duplicateId).first())
+            assertEquals(emptyList(), repositories.relationshipRepository.getByTransaction(originalId).first())
+            assertEquals(emptyList(), repositories.relationshipRepository.getByTransaction(duplicateId).first())
         }
 
     @Test
@@ -145,7 +153,7 @@ class TransferRelationshipReconciliationTest : DbTest() {
             val conduitId = createAccount("Curve")
             val merchantId = createAccount("National Lottery")
             val passThroughTypeId = RelationshipTypeId(WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID)
-            // Funding leg (card -> conduit) is id1; spend leg (conduit -> merchant) is id2, linked via the
+            // Funding leg (card -> conduit) is primary; spend leg (conduit -> merchant) is related, linked via the
             // pass-through relationship. Both created in one batch with temp ids resolved by the engine.
             val funding =
                 Transfer(
@@ -289,8 +297,8 @@ class TransferRelationshipReconciliationTest : DbTest() {
             val feeAccountId = createAccount("Monzo Fees")
             val feeTypeId = RelationshipTypeId(WellKnownIds.FEE_RELATIONSHIP_TYPE_ID)
             // Both the main transfer and its fee are created in the same batch with temp ids; the fee
-            // relationship on the main (id1) references the fee's temp id (-2), which the two-pass insert
-            // must resolve to the fee's real generated id (id2).
+            // relationship on the main (primary) references the fee's temp id (-2), which the two-pass insert
+            // must resolve to the fee's real generated id (related).
             val main =
                 Transfer(
                     id = TransferId(-1),
@@ -324,14 +332,14 @@ class TransferRelationshipReconciliationTest : DbTest() {
             val mainId = createdIds[0]
             val feeId = createdIds[1]
 
-            // The link is main (id1) -> fee (id2), type fee, with the temp id resolved to the real fee id.
+            // The link is main (primary) -> fee (related), type fee, with the temp id resolved to the real fee id.
             val relationship =
-                repositories.transferRelationshipRepository
-                    .getByTransfer(mainId)
+                repositories.relationshipRepository
+                    .getByTransaction(mainId)
                     .first()
                     .single()
-            assertEquals(mainId, relationship.id1)
-            assertEquals(feeId, relationship.id2)
+            assertEquals(mainId, relationship.primary)
+            assertEquals(feeId, relationship.related)
             assertEquals("fee", relationship.relationshipType.name)
 
             // The fee transfer is a real movement: it carries no excluded attribute, so it counts in balances.
@@ -383,10 +391,129 @@ class TransferRelationshipReconciliationTest : DbTest() {
                     .items
                     .associateBy { it.transactionId }
 
-            // Both sides of the reconciled pair (original id2 and duplicate id1) are flagged reconciled.
+            // Both sides of the reconciled pair (original related and duplicate primary) are flagged reconciled.
             assertEquals(true, rows.getValue(originalId).isReconciled)
             assertEquals(true, rows.getValue(duplicateId).isReconciled)
             // The unrelated transfer is not.
             assertEquals(false, rows.getValue(plain.id).isReconciled)
+        }
+
+    private suspend fun plainTransfer(
+        currency: Currency,
+        from: AccountId,
+        to: AccountId,
+        amount: Long,
+    ): TransferId =
+        createTransfer(
+            Transfer(
+                id = TransferId(-1),
+                timestamp = baseTime,
+                description = "Leg $amount",
+                sourceAccountId = from,
+                targetAccountId = to,
+                amount = Money(amount, currency),
+            ),
+        ).id
+
+    private suspend fun relationshipSources(relationshipId: Long): List<Long> =
+        database
+            .rawQuery(
+                "SELECT source_type_id FROM entity_source WHERE entity_type_id = ${EntityType.RELATIONSHIP.id} " +
+                    "AND entity_id = $relationshipId AND matched = 0",
+            ) { it.getLong(0)!! }
+            .awaitAsList()
+
+    @Test
+    fun oneRelationship_joinsTransfersAndTrades_andTriggersPruneIt() =
+        runDbTest {
+            val gbp = gbp()
+            val usd =
+                repositories.currencyRepository
+                    .getAllCurrencies()
+                    .first()
+                    .first { it.code == "USD" }
+            val wallet = createAccount("Wallet")
+            val bank = createAccount("Bank")
+            val first = plainTransfer(gbp, bank, wallet, 100)
+            val second = plainTransfer(gbp, bank, wallet, 200)
+            val trade =
+                repositories.tradeRepository
+                    .createTrades(
+                        listOf(
+                            NewTrade(
+                                timestamp = baseTime,
+                                description = "Buy USD",
+                                fromAccountId = wallet,
+                                fromAmount = Money(300, gbp),
+                                toAccountId = wallet,
+                                toAmount = Money(400, usd),
+                                source = Source.SampleGenerator,
+                            ),
+                        ),
+                    ).single()
+                    .id
+            val typeId = RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID)
+            val members = listOf(trade, first, second).map { RelationshipMember(it, RelationshipRole.MEMBER) }
+
+            val id = assertNotNull(repositories.relationshipRepository.create(typeId, members, Source.Manual))
+            assertNull(repositories.relationshipRepository.create(typeId, members, Source.Manual), "the same relationship twice")
+
+            val read =
+                repositories.relationshipRepository
+                    .getByTransaction(trade)
+                    .first()
+                    .single()
+            assertEquals(id, read.id)
+            assertEquals(members.toSet(), read.members.toSet(), "members keep their kind: a TradeId and two TransferIds")
+            assertEquals(listOf(SourceType.MANUAL.id.toLong()), relationshipSources(id.id))
+
+            // Deleting the trade drops only its membership; two members still relate.
+            repositories.tradeRepository.deleteTrades(listOf(trade))
+            assertEquals(
+                setOf<Any>(first, second),
+                repositories.relationshipRepository
+                    .getByTransaction(first)
+                    .first()
+                    .single()
+                    .members
+                    .map { it.transactionId }
+                    .toSet(),
+            )
+
+            // One member alone relates nothing, so the relationship goes with the second deletion.
+            repositories.transactionRepository.deleteTransactions(listOf(first))
+            assertEquals(emptyList(), repositories.relationshipRepository.getByTransaction(second).first())
+        }
+
+    @Test
+    fun importedRelationship_recordsItsOwningTransfersSource() =
+        runDbTest {
+            val (originalId, duplicateId) = importReconciledPair(gbp(), createAccount("Checking"), createAccount("Coffee Shop"))
+
+            val relationship =
+                repositories.relationshipRepository
+                    .getByTransaction(originalId)
+                    .first()
+                    .single()
+            assertEquals(duplicateId, relationship.primary)
+            assertEquals(listOf(SourceType.SAMPLE_GENERATOR.id.toLong()), relationshipSources(relationship.id.id))
+        }
+
+    @Test
+    fun getByTransactions_returnsEachRelationshipOnceWithAllItsMembers() =
+        runDbTest {
+            val (originalId, duplicateId) = importReconciledPair(gbp(), createAccount("Checking"), createAccount("Coffee Shop"))
+
+            val relationships = repositories.relationshipRepository.getByTransactions(listOf(originalId, duplicateId))
+
+            assertEquals(1, relationships.size)
+            assertEquals(
+                setOf<Any>(originalId, duplicateId),
+                relationships
+                    .single()
+                    .members
+                    .map { it.transactionId }
+                    .toSet(),
+            )
         }
 }

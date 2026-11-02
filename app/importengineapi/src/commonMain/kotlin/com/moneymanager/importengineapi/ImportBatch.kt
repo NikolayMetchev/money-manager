@@ -344,7 +344,7 @@ data class AccountMergeRequest(
 
 /**
  * A fee charged on a transaction, modelled as its own movement linked to the main transfer via a
- * `fee` [NewRelationship] (main = id1, fee = id2). The engine expands this into a second [Transfer]
+ * `fee` [NewRelationship] (main = primary, fee = related). The engine expands this into a second [Transfer]
  * created in the same batch; producers don't allocate ids. The fee is a real movement and counts in
  * balances unless the main transfer is itself excluded (declined/reconciled), in which case it inherits
  * the exclusion so a duplicate's fee isn't double-counted.
@@ -352,7 +352,7 @@ data class AccountMergeRequest(
  * @property source Where the fee money leaves (typically the main transfer's own account).
  * @property target The consolidated per-provider fee account.
  * @property relationshipTypeId The `fee` relationship type id (supplied by the producer, mirroring how
- *   reconciliation passes its type id via [DedupePolicy]), used to link the fee (id2) to its main (id1).
+ *   reconciliation passes its type id via [DedupePolicy]), used to link the fee (related) to its main (primary).
  * @property rowKey Provenance key for the fee movement; when null the engine falls back to the main
  *   transfer's row key. Producers set this to point the audit trail at the fee's own source node (e.g.
  *   the `atm_fees_detailed.fee_amount` JSON node) rather than the whole transaction.
@@ -402,8 +402,8 @@ data class ImportConversion(
  * @property amount The charge amount; identical on every leg.
  * @property spendDescriptions One description per spend leg (the remainder after each conduit's prefix
  *   was peeled; the last is the cleaned merchant). The funding leg keeps the main transfer's description.
- * @property relationshipTypeId The `pass-through` relationship type linking each movement (id1) to the
- *   next leg (id2).
+ * @property relationshipTypeId The `pass-through` relationship type linking each movement (primary) to the
+ *   next leg (related).
  * @property rowKey Provenance key for the spend legs; when null the engine falls back to the main row key.
  * @property incoming True for a refund/cancellation arriving back on the card: the funding leg (the main
  *   transfer, built by the producer) is `conduits.first()` → card and each engine spend leg runs
@@ -430,7 +430,7 @@ data class ImportPassThrough(
 }
 
 /**
- * A relationship from the owning [ImportTransfer] (id1) to another transfer **created in the SAME
+ * A relationship from the owning [ImportTransfer] (primary) to another transfer **created in the SAME
  * batch**, referenced by its [ImportRowKey] rather than a persisted id. Unlike [NewRelationship]
  * (whose `relatedTransferId` must already exist), this lets a producer link two co-created transfers
  * before either has an id; the engine resolves [relatedRowKey] to the related transfer's real id
@@ -460,7 +460,7 @@ data class BatchRelationship(
  * @property batchRelationships Relationships to OTHER transfers created in the same batch, referenced
  *   by their [ImportRowKey]; the engine resolves each related row key to its newly-created id (in this
  *   chunk or an earlier chunk of this batch) and the type name get-or-create. This transfer becomes
- *   id1, the related transfer id2. A link whose target was not newly created (deduped/errored) is
+ *   the primary member, the related transfer the related one. A link whose target was not newly created (deduped/errored) is
  *   skipped — see [BatchRelationship].
  * @property uniqueKey Unique-identifier dedupe key (attribute name -> value), or null for fuzzy dedupe.
  * @property fee An optional fee charged on this transaction, expanded by the engine into a linked transfer.

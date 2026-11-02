@@ -34,9 +34,9 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
+import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.RerunReads
@@ -88,7 +88,7 @@ class ImportDirectoryService(
     private val tradeRepository: TradeReadRepository,
     private val passThroughAccountRepository: PassThroughAccountReadRepository,
     private val transactionRepository: TransactionReadRepository,
-    private val transferRelationshipRepository: TransferRelationshipReadRepository,
+    private val relationshipRepository: RelationshipReadRepository,
     private val transferSourceRepository: TransferSourceReadRepository,
     auditRepository: AuditReadRepository,
     private val maintenance: Maintenance,
@@ -104,7 +104,7 @@ class ImportDirectoryService(
                 RerunReads(
                     transactionRepository = transactionRepository,
                     transferSourceRepository = transferSourceRepository,
-                    transferRelationshipRepository = transferRelationshipRepository,
+                    relationshipRepository = relationshipRepository,
                     auditRepository = auditRepository,
                     accountRepository = accountRepository,
                     csvImportRepository = csvImportRepository,

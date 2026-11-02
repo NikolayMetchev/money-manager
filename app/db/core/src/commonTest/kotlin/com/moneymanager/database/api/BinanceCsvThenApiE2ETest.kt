@@ -323,7 +323,7 @@ class BinanceCsvThenApiE2ETest : DbTest() {
                 repositories.transactionRepository
                     .getTransactionsByAccount(binance.id)
                     .first()
-            val links = repositories.transferRelationshipRepository.getByTransfers(transfers.map { it.id })
+            val links = repositories.relationshipRepository.getByTransactions(transfers.map { it.id })
             val reconciled = links.filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
             // Deposit, Earn subscription, two trade fees and the two gross-vs-net withdrawals.
             assertEquals(6, reconciled.size, "every duplicated transfer is kept and linked to its twin")

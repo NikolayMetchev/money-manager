@@ -4,6 +4,7 @@ import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.stageQifImport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInCsvStrategies
@@ -86,11 +87,11 @@ class AmexQifPassThroughE2ETest : DbTest() {
         return transfers
             .map { t ->
                 val linked =
-                    repositories.transferRelationshipRepository
-                        .getByTransfer(t.id)
+                    repositories.relationshipRepository
+                        .getByTransaction(t.id)
                         .first()
-                        .filter { it.relationshipType.name == "pass-through" && it.id1 == t.id }
-                        .firstNotNullOfOrNull { byId[it.id2]?.label() }
+                        .filter { it.relationshipType.name == "pass-through" && it.primary == t.id }
+                        .firstNotNullOfOrNull { byId[it.related as TransferId]?.label() }
                 Triple(names.getValue(t.sourceAccountId), names.getValue(t.targetAccountId), linked)
             }.sortedWith(compareBy({ it.first }, { it.second }))
     }

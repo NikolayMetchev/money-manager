@@ -11,6 +11,7 @@
 -- 6 = API_IMPORT_STRATEGY
 -- 7 = TRANSFER
 -- 8 = CSV_IMPORT_STRATEGY
+-- 13 = RELATIONSHIP
 
 CREATE TABLE entity_type (
     id INTEGER PRIMARY KEY NOT NULL,
@@ -28,6 +29,7 @@ INSERT OR IGNORE INTO entity_type (id, name) VALUES (8, 'CSV_IMPORT_STRATEGY');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (10, 'CRYPTO');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (11, 'TRADE');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (12, 'EXCHANGE_ORDER');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (13, 'RELATIONSHIP');
 
 -- matched: 0 = the source wrote this revision (one per revision, enforced by idx_entity_source_writer);
 -- 1 = an import record reported the transfer or trade without changing it (a duplicate row), so a
