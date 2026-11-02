@@ -1,6 +1,5 @@
 package com.moneymanager.database.repository
 import app.cash.sqldelight.async.coroutines.awaitAsList
-import com.moneymanager.database.rawsql.RawSql
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
@@ -22,6 +21,7 @@ import com.moneymanager.importengineapi.createReconciliationMatch
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.read.testReads
+import com.moneymanager.test.database.write.testWrites
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -554,18 +554,16 @@ class RelationshipDbTest : DbTest() {
             val third = plainTransfer(currency, a, b, 40)
             repositories.importEngine.createReconciliationMatch(listOf(first, second))
 
-            // A write that bypasses insertRelationship's merge; the id is explicit so the test needs no last_insert_rowid().
+            // Writes that bypass insertRelationship's merge, so only the schema can refuse them.
             val relationshipId = 9_999_999L
-            val raw = RawSql(database.driver)
-            raw.execute("INSERT INTO relationship (id, relationship_type_id, created_at) VALUES ($relationshipId, 6, 0)")
+            val writes = database.testWrites.fixtureWriteQueries
+            writes.insertRelationshipWithId(relationshipId, WellKnownIds.RECONCILIATION_MATCH_RELATIONSHIP_TYPE_ID)
             val failure =
                 runCatching {
-                    raw.execute(
-                        "INSERT INTO relationship_member (relationship_id, transaction_id, role) VALUES ($relationshipId, ${first.id}, 2)",
-                    )
+                    writes.insertRelationshipMemberUnchecked(relationshipId, first.id, RelationshipRole.MEMBER.id)
                 }.exceptionOrNull()
             assertNotNull(failure)
             // A transaction nothing matches yet is fine.
-            raw.execute("INSERT INTO relationship_member (relationship_id, transaction_id, role) VALUES ($relationshipId, ${third.id}, 2)")
+            writes.insertRelationshipMemberUnchecked(relationshipId, third.id, RelationshipRole.MEMBER.id)
         }
 }

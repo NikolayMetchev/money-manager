@@ -139,7 +139,6 @@ kmp_test(
         "//app/model/passthrough",
         "//test/app/db/read:read_for_tests",
         "//test/app/db/write:write_for_tests",
-        "//app/db/rawsql:rawsql_for_tests",
     ],
     device_srcs = glob([
         "src/commonTest/kotlin/com/moneymanager/database/repository/**/*.kt",

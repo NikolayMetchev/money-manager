@@ -244,7 +244,7 @@ takes `Schema.synchronous()`. **Never `withContext` inside a `transaction {}`**:
 open transaction per thread, so a body that hops threads runs on another connection, outside it
 (`SuspendingTransactionTest`).
 
-**No raw SQL**: every query is a SQLDelight `.sq` query. The only hand-written SQL runs through `RawSql`
+**No raw SQL, avoid it at all costs**: reach for `RawSql` only when SQLDelight can't express the statement, and never for convenience (a test fixture write, a `last_insert_rowid()`, a one-off lookup are all `.sq` queries: `testWrites`/`testReads` for the ones only tests need). Every query is a SQLDelight `.sq` query. The only hand-written SQL runs through `RawSql`
 (`app/db/rawsql`, visible to `app/db/core`, `app/db/write` and `app/query` only), and only for what SQLDelight can't
 express: `mm sql`'s user-supplied SQL (`runReadOnlySql`), the per-import CSV staging tables (`CsvTableManager`: their
 name and column count are chosen at runtime), `VACUUM INTO ?`, the driver's connection PRAGMAs and the size breakdown's
