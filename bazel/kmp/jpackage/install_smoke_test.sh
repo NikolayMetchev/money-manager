@@ -106,6 +106,11 @@ grep -Eq '"text": "Jan 2 +PAYMENT RECEIVED - THANK YOU {2,}[^"]*2,609.36"' <<<"$
 if [ "$(uname -s)" = Linux ]; then
   Xvfb :99 -screen 0 1600x1000x24 &
   export DISPLAY=:99
+  # The app connects as soon as it starts, so wait for Xvfb's socket instead of racing it.
+  for _ in $(seq 50); do
+    [ -S /tmp/.X11-unix/X99 ] && break
+    sleep 0.2
+  done
 fi
 "$app" >"$work/app.log" 2>&1 &
 pid=$!
