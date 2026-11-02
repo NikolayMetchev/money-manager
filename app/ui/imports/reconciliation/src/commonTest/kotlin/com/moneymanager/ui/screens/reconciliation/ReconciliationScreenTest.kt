@@ -2,7 +2,9 @@
 
 package com.moneymanager.ui.screens.reconciliation
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
@@ -51,7 +53,9 @@ import com.moneymanager.importengineapi.ReconciliationLinkMutation
 import com.moneymanager.importengineapi.RelationshipMutation
 import com.moneymanager.importengineapi.TradeAttributeMutation
 import com.moneymanager.presenter.error.ProvideSchemaAwareScope
+import com.moneymanager.tasks.TaskManager
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.tasks.LocalTaskManager
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.answering.calls
 import dev.mokkery.answering.returns
@@ -59,6 +63,8 @@ import dev.mokkery.every
 import dev.mokkery.everySuspend
 import dev.mokkery.matcher.any
 import dev.mokkery.mock
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -103,11 +109,18 @@ class ReconciliationScreenTest {
     private val personRepository: PersonReadRepository =
         mock { every { getAllPeople() } returns flowOf(emptyList()) }
 
+    /** The schema-aware scope the screen needs, and the task manager an app-level host would provide. */
+    @Composable
+    private fun ProvideScreenScopes(content: @Composable () -> Unit) {
+        val tasks = remember { TaskManager(CoroutineScope(Dispatchers.Default)) }
+        CompositionLocalProvider(LocalTaskManager provides tasks) { ProvideSchemaAwareScope(content) }
+    }
+
     @Test
     fun explainsHowToStartWhenThereAreNoSources() {
         runMoneyManagerComposeUiTest {
             setContent {
-                ProvideSchemaAwareScope {
+                ProvideScreenScopes {
                     ReconciliationScreen(
                         reconciliationRepository = reconciliationRepository(emptyList()),
                         accountRepository = accountRepository(emptyList()),
@@ -133,7 +146,7 @@ class ReconciliationScreenTest {
                     Account(id = wallet.accountId, name = wallet.name, openingDate = epoch),
                 )
             setContent {
-                ProvideSchemaAwareScope {
+                ProvideScreenScopes {
                     ReconciliationScreen(
                         reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(wallet)),
                         accountRepository = accountRepository(accounts),
@@ -171,8 +184,11 @@ class ReconciliationScreenTest {
                 }
             // The links flow is static, so the Binance wallet stays unlinked despite its exact match.
             setContent {
-                CompositionLocalProvider(LocalImportEngine provides engine) {
-                    ProvideSchemaAwareScope {
+                CompositionLocalProvider(
+                    LocalImportEngine provides engine,
+                    LocalTaskManager provides TaskManager(CoroutineScope(Dispatchers.Default)),
+                ) {
+                    ProvideScreenScopes {
                         ReconciliationScreen(
                             reconciliationRepository = reconciliationRepository(listOf(koinly), wallets),
                             accountRepository = accountRepository(accounts),
@@ -203,7 +219,7 @@ class ReconciliationScreenTest {
         runMoneyManagerComposeUiTest {
             val wallet = ShadowAccount(AccountId(100), "Koinly · Ledger", "Koinly")
             setContent {
-                ProvideSchemaAwareScope {
+                ProvideScreenScopes {
                     ReconciliationScreen(
                         reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(wallet)),
                         accountRepository =
@@ -244,7 +260,7 @@ class ReconciliationScreenTest {
                 }
             setContent {
                 CompositionLocalProvider(LocalImportEngine provides engine) {
-                    ProvideSchemaAwareScope {
+                    ProvideScreenScopes {
                         ReconciliationScreen(
                             reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(wallet), links),
                             accountRepository = accountRepository(accounts),
@@ -268,7 +284,7 @@ class ReconciliationScreenTest {
             val wallet = ShadowAccount(AccountId(100), "Koinly · Ledger", "Koinly")
             setContent {
                 CompositionLocalProvider(LocalImportEngine provides importEngine { awaitCancellation() }) {
-                    ProvideSchemaAwareScope {
+                    ProvideScreenScopes {
                         ReconciliationScreen(
                             reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(wallet)),
                             accountRepository =
@@ -331,7 +347,7 @@ class ReconciliationScreenTest {
             )
         setContent {
             CompositionLocalProvider(LocalImportEngine provides engine) {
-                ProvideSchemaAwareScope {
+                ProvideScreenScopes {
                     ReconciliationScreen(
                         reconciliationRepository =
                             reconciliationRepository(
@@ -414,7 +430,8 @@ class ReconciliationScreenTest {
             reveal(hasText("2024-01 (2)", substring = true))
             val buttons = onAllNodesWithText("Accept all (2)")
             buttons[buttons.fetchSemanticsNodes().size - 1].performClick()
-            waitForIdle()
+            // A bulk run is a background task, so wait for its writes.
+            waitUntil(timeoutMillis = 10_000) { batches.isNotEmpty() }
 
             val create = batches.single().relationshipMutations.filterIsInstance<RelationshipMutation.Create>()
             assertEquals(listOf(listOf(match(10), match(20)), listOf(match(11), match(21))), create.map { it.members })
@@ -433,7 +450,8 @@ class ReconciliationScreenTest {
             reveal(hasText("Near matches (1)"))
 
             onAllNodesWithText("Accept all (2)")[0].performClick()
-            waitForIdle()
+            // A bulk run is a background task, so wait for its writes.
+            waitUntil(timeoutMillis = 10_000) { batches.isNotEmpty() }
 
             val create = batches.single().relationshipMutations.filterIsInstance<RelationshipMutation.Create>()
             assertEquals(setOf(listOf(match(10), match(20)), listOf(match(11), match(21))), create.map { it.members }.toSet())
@@ -447,7 +465,8 @@ class ReconciliationScreenTest {
             clickText("Matched")
 
             onAllNodesWithText("Accept all (1)")[0].performClick()
-            waitForIdle()
+            // A bulk run is a background task, so wait for its writes.
+            waitUntil(timeoutMillis = 10_000) { batches.isNotEmpty() }
 
             assertEquals(
                 listOf(listOf(match(10), match(20))),
@@ -472,7 +491,8 @@ class ReconciliationScreenTest {
             reveal(hasText("Only in Koinly (2)"))
 
             onAllNodesWithText("Ignore all (2)")[0].performScrollTo().performClick()
-            waitForIdle()
+            // A bulk run is a background task, so wait for its writes.
+            waitUntil(timeoutMillis = 10_000) { batches.size >= 2 }
 
             assertEquals(
                 listOf(11L, 12L).map {

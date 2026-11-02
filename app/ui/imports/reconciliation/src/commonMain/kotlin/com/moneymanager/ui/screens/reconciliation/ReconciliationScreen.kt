@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -69,9 +70,11 @@ import com.moneymanager.reconciliation.planAutoLinks
 import com.moneymanager.reconciliation.realAccounts
 import com.moneymanager.reconciliation.reconcile
 import com.moneymanager.reconciliation.unlinkedWallets
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.tasks.LocalTaskManager
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.CancellationException
@@ -80,6 +83,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 import kotlin.time.Duration
+
+/** Rows a bulk run writes per engine call: one transaction each, with the progress bar moving between them. */
+private const val BULK_CHUNK = 50
 
 private enum class ResultTab(
     val label: String,
@@ -228,14 +234,11 @@ private fun SourceReconciliation(
     fun storeMatch(legs: List<ReconciliationLeg>) =
         write("Matching") { importEngine.createReconciliationMatch(legs.map { it.transactionRef }.distinct()) }
 
-    fun storeMatches(matches: List<LegMatch>) =
-        write("Matching") { importEngine.createReconciliationMatches(matches.map { it.memberTransactions() }) }
-
     // Ignoring a source row excludes every transaction of its movement (a trade and its fee, say).
-    fun setIgnored(
+    suspend fun applyIgnored(
         legs: List<ReconciliationLeg>,
         ignored: Boolean,
-    ) = write(if (ignored) "Ignoring" else "Un-ignoring") {
+    ) {
         val reason = IGNORED_IN_RECONCILIATION.takeIf { ignored }
         val refs = legs.map { it.transactionRef }.distinct()
         refs.filterIsInstance<TradeId>().forEach { importEngine.setTradeExcluded(it, reason) }
@@ -244,6 +247,49 @@ private fun SourceReconciliation(
             transactionRepository.getTransactionsByIds(transferIds).values.forEach { importEngine.setTransferExcluded(it, reason) }
         }
     }
+
+    fun setIgnored(
+        legs: List<ReconciliationLeg>,
+        ignored: Boolean,
+    ) = write(if (ignored) "Ignoring" else "Un-ignoring") { applyIgnored(legs, ignored) }
+
+    // A bulk run is a background task: it shows in the task panel with a progress bar, and the legs reload when it ends.
+    val taskManager = LocalTaskManager.current
+    val tasks by taskManager.tasks.collectAsState()
+    val bulkKey = "reconciliation-bulk-${source.name}"
+    val bulkRunning = tasks.any { it.key == bulkKey && it.isRunning }
+
+    fun <T> runBulk(
+        title: String,
+        what: String,
+        items: List<T>,
+        apply: suspend (List<T>) -> Unit,
+    ) {
+        taskManager.start(bulkKey, title, "Starting") {
+            try {
+                var done = 0
+                items.chunked(BULK_CHUNK).forEach { chunk ->
+                    report(Progress.counted(what, done, items.size))
+                    apply(chunk)
+                    done += chunk.size
+                }
+                report(Progress.counted(what, done, items.size))
+                "$done done"
+            } finally {
+                refreshKey++
+            }
+        }
+    }
+
+    fun storeMatches(matches: List<LegMatch>) {
+        val relationships = mergedMatchMembers(matches)
+        runBulk("Accepting ${relationships.size} matches", "Accepting matches", relationships) { chunk ->
+            importEngine.createReconciliationMatches(chunk)
+        }
+    }
+
+    fun ignoreAll(legs: List<ReconciliationLeg>) =
+        runBulk("Ignoring ${legs.size} rows", "Ignoring rows", legs) { chunk -> applyIgnored(chunk, ignored = true) }
 
     fun createAll(plan: Map<AccountId, String>) {
         creatingAll = true
@@ -337,7 +383,7 @@ private fun SourceReconciliation(
             ResultTab.UNMATCHED -> {
                 // Accept all stores the exact matches under the same header too, not only the near ones listed here.
                 sectionHeading("Near matches (${loaded.nearMatches.size})") {
-                    loaded.unstoredMatches().let { BulkButton("Accept all", it.size) { storeMatches(it) } }
+                    loaded.unstoredMatches().let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
                 }
                 legGroups(
                     prefix = "near",
@@ -345,16 +391,22 @@ private fun SourceReconciliation(
                     expanded = expanded,
                     empty = "No near matches: every match agrees to the second.",
                     headerAction = { _, wallet, month ->
-                        loaded.unstoredMatches(wallet, month).let { BulkButton("Accept all", it.size) { storeMatches(it) } }
+                        loaded
+                            .unstoredMatches(
+                                wallet,
+                                month,
+                            ).let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
                     },
                 ) { match ->
                     MatchRow(match, accountNames, onOpenLeg) {
-                        TextButton(onClick = { storeMatches(listOf(match)) }) { Text("Accept") }
+                        TextButton(onClick = {
+                            write("Matching") { importEngine.createReconciliationMatches(listOf(match.memberTransactions())) }
+                        }) { Text("Accept") }
                     }
                 }
                 val onlyInSource = loaded.missingInMm.filter { !hideUnknownAssets || !it.assetUnknownToMm }
                 sectionHeading("Only in ${source.name} (${onlyInSource.size})") {
-                    BulkButton("Ignore all", onlyInSource.size) { setIgnored(loaded.movementsOf(onlyInSource), ignored = true) }
+                    BulkButton("Ignore all", onlyInSource.size, enabled = !bulkRunning) { ignoreAll(loaded.movementsOf(onlyInSource)) }
                 }
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -372,7 +424,7 @@ private fun SourceReconciliation(
                         _,
                         _,
                         ->
-                        BulkButton("Ignore all", rows.size) { setIgnored(loaded.movementsOf(rows), ignored = true) }
+                        BulkButton("Ignore all", rows.size, enabled = !bulkRunning) { ignoreAll(loaded.movementsOf(rows)) }
                     },
                 ) { unmatched ->
                     LegRow(unmatched.leg, accountNames, onOpenLeg) {
@@ -391,7 +443,13 @@ private fun SourceReconciliation(
 
             ResultTab.MATCHED -> {
                 sectionHeading("Matched (${loaded.matched.size})") {
-                    loaded.unstoredMatches().filter { it.settled }.let { BulkButton("Accept all", it.size) { storeMatches(it) } }
+                    loaded.unstoredMatches().filter { it.settled }.let {
+                        BulkButton(
+                            "Accept all",
+                            it.size,
+                            enabled = !bulkRunning,
+                        ) { storeMatches(it) }
+                    }
                 }
                 legGroups(
                     prefix = "matched",
@@ -405,7 +463,7 @@ private fun SourceReconciliation(
                                 wallet,
                                 month,
                             ).filter { it.settled }
-                            .let { BulkButton("Accept all", it.size) { storeMatches(it) } }
+                            .let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
                     },
                 ) { match ->
                     val matchId = match.matchId
@@ -478,9 +536,10 @@ private fun LazyListScope.sectionHeading(
 private fun BulkButton(
     label: String,
     count: Int,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    if (count > 0) TextButton(onClick = onClick) { Text("$label ($count)") }
+    if (count > 0) TextButton(onClick = onClick, enabled = enabled) { Text("$label ($count)") }
 }
 
 @Composable

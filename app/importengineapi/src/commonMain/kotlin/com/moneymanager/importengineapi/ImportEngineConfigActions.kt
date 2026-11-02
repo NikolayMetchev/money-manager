@@ -92,10 +92,11 @@ suspend fun ImportEngine.createReconciliationMatches(matches: Collection<Collect
     val typeId = RelationshipTypeId(WellKnownIds.RECONCILIATION_MATCH_RELATIONSHIP_TYPE_ID)
     val mutations =
         matches.map { members ->
-            require(members.size >= 2) { "A match needs at least two transactions" }
+            val distinct = members.distinct()
+            require(distinct.size >= 2) { "A match needs at least two distinct transactions" }
             RelationshipMutation.Create(
                 typeId = typeId,
-                members = members.distinct().map { RelationshipMember(it, RelationshipRole.MEMBER) },
+                members = distinct.map { RelationshipMember(it, RelationshipRole.MEMBER) },
                 source = Source.Manual,
             )
         }
