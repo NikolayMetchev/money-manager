@@ -28,8 +28,8 @@ class StartupBenchTest {
         val db = File(dir, "bench.db").also { it.writeText("db") }
         val out = File(dir, "out.jsonl")
         // The desktop stand-in reports a milestone through the probe, as the app does; the CLI ones check their home.
-        val desktop = launcher(dir, "desktop", "echo '{\"window\": 12.5}' > \"\$MM_STARTUP_PROBE\"")
-        val cli = launcher(dir, "cli", "test -f \"\$HOME/.moneymanager/settings.json\"")
+        val desktop = launcher(dir, "desktop", $$"echo '{\"window\": 12.5}' > \"$MM_STARTUP_PROBE\"")
+        val cli = launcher(dir, "cli", $$"test -f \"$HOME/.moneymanager/settings.json\"")
         startupBench(
             listOf(
                 "--bench-db",
