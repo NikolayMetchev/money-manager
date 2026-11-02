@@ -6,6 +6,7 @@ import com.moneymanager.database.SqliteException
 import com.moneymanager.database.WebDatabaseManager
 import com.moneymanager.database.rawsql.RawSql
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
+import com.moneymanager.test.database.read.testReads
 import com.moneymanager.test.database.write.testWrites
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -70,7 +71,10 @@ class WebDatabaseManagerTest {
     @Test
     fun `a new database is created with its schema and currencies`() =
         withDatabase { database ->
-            val codes = RawSql(database.driver).query("SELECT code FROM currency ORDER BY code") { it.getString(0)!! }.awaitAsList()
+            val codes =
+                database.testReads.rowCountSelectQueries
+                    .selectCurrencyCodes()
+                    .awaitAsList()
             assertTrue("USD" in codes && "EUR" in codes, "currencies: $codes")
         }
 
@@ -178,5 +182,7 @@ class WebDatabaseManagerTest {
         }
 
     private suspend fun assetCount(database: MoneyManagerDatabaseWrapper): Long =
-        RawSql(database.driver).query("SELECT COUNT(*) FROM asset") { it.getLong(0)!! }.awaitAsOne()
+        database.testReads.rowCountSelectQueries
+            .countAssets()
+            .awaitAsOne()
 }

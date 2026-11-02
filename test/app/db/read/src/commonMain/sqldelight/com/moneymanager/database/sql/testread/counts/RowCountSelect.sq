@@ -21,3 +21,6 @@ SELECT COUNT(*) FROM running_balance_materialized_view;
 
 countPendingMaterializedViewChanges:
 SELECT COUNT(*) FROM pending_materialized_view_changes;
+
+selectCurrencyCodes:
+SELECT code FROM currency ORDER BY code;

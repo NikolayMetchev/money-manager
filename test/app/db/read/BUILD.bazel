@@ -14,7 +14,7 @@ sqldelight_library(
     srcs = glob(["src/commonMain/sqldelight/**/*.sq"]),
     module_name = "read",
     package = "com.moneymanager.database.sql.testread",
-    visibility = ["//visibility:public"],
+    visibility = ["//test/app/db:__pkg__"],
     deps = ["//app/db/schema:sqldelight"],
 )
 
