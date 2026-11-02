@@ -34,7 +34,7 @@ fun DatabaseComponent.createImportEngine(editGate: EditGate): ImportEngine =
         importDirectoryRepository = importDirectoryRepository,
         passThroughAccountRepository = passThroughAccountRepository,
         holidayCalendarRepository = holidayCalendarRepository,
-        transferRelationshipRepository = transferRelationshipRepository,
+        relationshipRepository = relationshipRepository,
         editGate = editGate,
         reconciliationLinkRepository = reconciliationLinkRepository,
     )

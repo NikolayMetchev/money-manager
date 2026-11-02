@@ -245,11 +245,11 @@ class CurveCsvE2ETest : DbTest() {
             val fundingLeg = transfersBetween("Crypto.com Card", "Curve").single()
             assertTrue(!fundingLeg.isExcluded())
             val link =
-                repositories.transferRelationshipRepository
-                    .getByTransfer(placeholderLeg.id)
+                repositories.relationshipRepository
+                    .getByTransaction(placeholderLeg.id)
                     .first()
                     .filter { it.relationshipType.name == "reconciled" }
-            assertTrue(link.any { it.id2 == fundingLeg.id }, "the placeholder leg is linked to the card's funding leg")
+            assertTrue(link.any { it.related == fundingLeg.id }, "the placeholder leg is linked to the card's funding leg")
             assertTrue(!transfersBetween("Curve", "AMZN Mktp UK").single().isExcluded(), "Curve's merchant leg is counted")
             assertTrue(transfersBetween("Curve", "Amazon").single().isExcluded(), "the card's guessed merchant leg is superseded")
             assertCurveNetsToZero()
@@ -299,11 +299,11 @@ class CurveCsvE2ETest : DbTest() {
             assertTrue(placeholderLeg.isExcluded(), "the 7721 row's funding is the card's funding leg")
             val fundingLeg = transfersBetween("Crypto.com Card", "Curve").single()
             val link =
-                repositories.transferRelationshipRepository
-                    .getByTransfer(placeholderLeg.id)
+                repositories.relationshipRepository
+                    .getByTransaction(placeholderLeg.id)
                     .first()
-                    .first { it.relationshipType.name == "reconciled" && it.id2 == fundingLeg.id }
-            assertEquals(placeholderLeg.id, link.id1)
+                    .first { it.relationshipType.name == "reconciled" && it.related == fundingLeg.id }
+            assertEquals(placeholderLeg.id, link.primary)
             assertTrue(!transfersBetween("Curve", "SAINSBURYS").single().isExcluded())
             assertTrue(transfersBetween("Curve", "Sainsburys London").single().isExcluded())
 

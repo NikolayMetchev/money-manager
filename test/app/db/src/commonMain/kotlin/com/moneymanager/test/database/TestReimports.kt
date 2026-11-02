@@ -12,7 +12,7 @@ fun DatabaseComponent.reimports(maintenance: Maintenance = maintenanceService): 
             RerunReads(
                 transactionRepository = transactionRepository,
                 transferSourceRepository = transferSourceRepository,
-                transferRelationshipRepository = transferRelationshipRepository,
+                relationshipRepository = relationshipRepository,
                 auditRepository = auditRepository,
                 accountRepository = accountRepository,
                 csvImportRepository = csvImportRepository,

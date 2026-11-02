@@ -96,8 +96,8 @@ data class ExcludeExistingLeg(
 )
 
 /**
- * A `reversal` relationship to create from a new pass-through spend leg (id1) to the spend leg it
- * reverses (id2).
+ * A `reversal` relationship to create from a new pass-through spend leg (primary) to the spend leg it
+ * reverses (related).
  *
  * @property target The reversed spend leg: an existing (persisted) transfer, or a spend leg of an
  *   earlier row in the same to-import list (index into that list + leg index within that row's chain),
@@ -136,15 +136,15 @@ class ImportDeduper(
     private val policy: DedupePolicy,
     existing: List<ExistingTransferInfo>,
     /**
-     * Existing legs another record has already reconciled against (they are the `id2` of a `reconciled`
+     * Existing legs another record has already reconciled against (they are the related end of a `reconciled`
      * relationship). Consumption within one batch is tracked in memory; this is the same claim made
      * durable, so a later import — or a re-import of the same file — cannot excuse a second row against
      * one leg and erase a genuine movement.
      */
     private val claimedReconcileTargets: Set<TransferId> = emptySet(),
     /**
-     * Existing legs excluded because another record keeps their movement (the `id1` of a `reconciled`
-     * relationship), each mapped to that record (its `id2`).
+     * Existing legs excluded because another record keeps their movement (the primary end of a `reconciled`
+     * relationship), each mapped to that record (its related end).
      */
     private val reconciledInto: Map<TransferId, TransferId> = emptyMap(),
     /**

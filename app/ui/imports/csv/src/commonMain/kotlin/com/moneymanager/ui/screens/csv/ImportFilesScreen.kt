@@ -35,9 +35,9 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importdirectory.canDownload
@@ -91,7 +91,7 @@ fun ImportFilesScreen(
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
     transactionRepository: TransactionReadRepository,
-    transferRelationshipRepository: TransferRelationshipReadRepository,
+    relationshipRepository: RelationshipReadRepository,
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
@@ -223,7 +223,7 @@ fun ImportFilesScreen(
                     transferSourceRepository = transferSourceRepository,
                     accountRepository = accountRepository,
                     transactionRepository = transactionRepository,
-                    transferRelationshipRepository = transferRelationshipRepository,
+                    relationshipRepository = relationshipRepository,
                     tradeRepository = tradeRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
@@ -243,7 +243,7 @@ fun ImportFilesScreen(
                     transferSourceRepository = transferSourceRepository,
                     accountRepository = accountRepository,
                     transactionRepository = transactionRepository,
-                    transferRelationshipRepository = transferRelationshipRepository,
+                    relationshipRepository = relationshipRepository,
                     tradeRepository = tradeRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,

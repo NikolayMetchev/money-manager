@@ -25,10 +25,10 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
+import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.domain.strategy.CsvStrategyImportExport
 import com.moneymanager.domain.strategy.StrategyLibrary
@@ -78,7 +78,7 @@ data class TransactionsDomain(
     val transactionRepository: TransactionReadRepository,
     val transferSourceRepository: TransferSourceReadRepository,
     val attributeTypeRepository: AttributeTypeReadRepository,
-    val transferRelationshipRepository: TransferRelationshipReadRepository,
+    val relationshipRepository: RelationshipReadRepository,
     val tradeRepository: TradeReadRepository,
     val exchangeOrderRepository: ExchangeOrderReadRepository,
     val importEngine: ImportEngine,
@@ -135,7 +135,7 @@ fun DatabaseComponent.toAppServices(importEngine: ImportEngine) =
                 transactionRepository = transactionRepository,
                 transferSourceRepository = transferSourceRepository,
                 attributeTypeRepository = attributeTypeRepository,
-                transferRelationshipRepository = transferRelationshipRepository,
+                relationshipRepository = relationshipRepository,
                 tradeRepository = tradeRepository,
                 exchangeOrderRepository = exchangeOrderRepository,
                 importEngine = importEngine,

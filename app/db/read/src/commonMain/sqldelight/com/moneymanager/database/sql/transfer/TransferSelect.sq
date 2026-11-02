@@ -134,7 +134,7 @@ WHERE (source_account_id = :accountA AND target_account_id = :accountB)
 ORDER BY timestamp DESC;
 
 -- Candidate originals for reversal (refund/cancellation) links: transfers touching any of the given
--- accounts with one of the given amounts, not yet reversed (never id2 of a :reversalTypeId
+-- accounts with one of the given amounts, not yet reversed (never the related end of a :reversalTypeId
 -- relationship), newest first. The import engine loads these once per batch (every pass-through
 -- spend leg has a conduit endpoint) and pairs legs with charges in memory.
 selectUnreversedTransfersTouchingAccounts:
@@ -143,9 +143,9 @@ WHERE (source_account_id IN :accountIds OR target_account_id IN :accountIds)
   AND amount IN :amounts
   AND timestamp <= :maxTimestamp
   AND NOT EXISTS (
-      SELECT 1 FROM transfer_relationship
-      WHERE transfer_relationship.id2 = transfer_with_asset.id
-        AND transfer_relationship.relationship_type_id = :reversalTypeId
+      SELECT 1 FROM relationship_pair
+      WHERE relationship_pair.related_id = transfer_with_asset.id
+        AND relationship_pair.relationship_type_id = :reversalTypeId
   )
 ORDER BY timestamp DESC, id DESC;
 

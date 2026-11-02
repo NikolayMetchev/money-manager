@@ -1,0 +1,13 @@
+insertRelationship:
+INSERT INTO relationship (relationship_type_id, created_at)
+VALUES (?, ?);
+
+lastInsertedId:
+SELECT last_insert_rowid();
+
+insertMember:
+INSERT INTO relationship_member (relationship_id, transaction_id, role)
+VALUES (?, ?, ?);
+
+deleteById:
+DELETE FROM relationship WHERE id = ?;

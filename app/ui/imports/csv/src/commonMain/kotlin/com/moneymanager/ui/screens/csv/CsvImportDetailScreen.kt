@@ -49,9 +49,9 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.deleteCsvImport
@@ -82,7 +82,7 @@ fun CsvImportDetailScreen(
     maintenance: Maintenance,
     transactionRepository: TransactionReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
-    transferRelationshipRepository: TransferRelationshipReadRepository,
+    relationshipRepository: RelationshipReadRepository,
     tradeRepository: TradeReadRepository,
     auditRepository: AuditReadRepository,
     importEngine: ImportEngine,
@@ -479,7 +479,7 @@ fun CsvImportDetailScreen(
             transferSourceRepository = transferSourceRepository,
             accountRepository = accountRepository,
             transactionRepository = transactionRepository,
-            transferRelationshipRepository = transferRelationshipRepository,
+            relationshipRepository = relationshipRepository,
             tradeRepository = tradeRepository,
             maintenance = maintenance,
             importEngine = importEngine,

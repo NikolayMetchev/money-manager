@@ -244,10 +244,10 @@ class CryptoComCsvE2ETest : DbTest() {
                 fiatRecord.attributes.none { it.attributeType.name == "excluded" },
                 "the record naming both ends stays counted",
             )
-            val relationships = repositories.transferRelationshipRepository.getByTransfer(fiatRecord.id).first()
+            val relationships = repositories.relationshipRepository.getByTransaction(fiatRecord.id).first()
             val reconciledLink = relationships.single { it.relationshipType.name == "reconciled" }
-            assertEquals(fiatRecord.id, reconciledLink.id1)
-            assertEquals(cardRecord.id, reconciledLink.id2)
+            assertEquals(fiatRecord.id, reconciledLink.primary)
+            assertEquals(cardRecord.id, reconciledLink.related)
         }
 
     /** Re-imports an already-imported Crypto.com Fiat file with its built-in strategy. */
@@ -389,12 +389,12 @@ class CryptoComCsvE2ETest : DbTest() {
             )
             assertTrue(bankRecord.attributes.none { it.attributeType.name == "excluded" }, "the bank's record stays counted")
             val reconciledLink =
-                repositories.transferRelationshipRepository
-                    .getByTransfer(walletRecord.id)
+                repositories.relationshipRepository
+                    .getByTransaction(walletRecord.id)
                     .first()
                     .single { it.relationshipType.name == "reconciled" }
-            assertEquals(walletRecord.id, reconciledLink.id1)
-            assertEquals(bankRecord.id, reconciledLink.id2)
+            assertEquals(walletRecord.id, reconciledLink.primary)
+            assertEquals(bankRecord.id, reconciledLink.related)
 
             // The wallet balance reflects one deposit: +2000 in, -400 to the card, -5055.89 withdrawn,
             // -5000 converted to TGBP and +5009.86 converted back.

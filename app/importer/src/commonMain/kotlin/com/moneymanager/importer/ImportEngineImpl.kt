@@ -20,18 +20,17 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.Relationship
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.TransferRelationship
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.widen
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.write.AccountAttributeWriteRepository
 import com.moneymanager.domain.repository.write.AccountMappingWriteRepository
 import com.moneymanager.domain.repository.write.AccountWriteRepository
@@ -53,6 +52,7 @@ import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
+import com.moneymanager.domain.repository.write.RelationshipWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
 import com.moneymanager.domain.repository.write.TradeWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
@@ -155,7 +155,7 @@ class ImportEngineImpl(
     private val importDirectoryRepository: ImportDirectoryWriteRepository,
     private val passThroughAccountRepository: PassThroughAccountWriteRepository,
     /**
-     * The locations business-day reconcile windows count on. Optional like [transferRelationshipRepository]: without
+     * The locations business-day reconcile windows count on. Optional like [relationshipRepository]: without
      * it every account is on a weekends-only calendar. DI supplies it.
      */
     private val holidayCalendarRepository: HolidayCalendarWriteRepository? = null,
@@ -164,9 +164,9 @@ class ImportEngineImpl(
      * already claims (see [ImportDeduper.claimedReconcileTargets]). Optional so the hand-built engines in
      * tests need not wire it; the DI-built engine always supplies it.
      */
-    private val transferRelationshipRepository: TransferRelationshipReadRepository? = null,
+    private val relationshipRepository: RelationshipWriteRepository? = null,
     private val editGate: EditGate = EditGate.AlwaysWritable,
-    /** Writes shadow→real reconciliation links. Optional like [transferRelationshipRepository]; DI supplies it. */
+    /** Writes shadow→real reconciliation links. Optional like [relationshipRepository]; DI supplies it. */
     private val reconciliationLinkRepository: ReconciliationLinkWriteRepository? = null,
 ) : ImportEngine {
     override suspend fun import(
@@ -630,11 +630,12 @@ class ImportEngineImpl(
                 existing,
                 existingRelationships
                     .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
-                    .mapTo(mutableSetOf()) { it.id2 },
+                    .mapNotNullTo(mutableSetOf()) { it.transferPair?.second },
                 reconciledInto =
                     existingRelationships
                         .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
-                        .associate { it.id1 to it.id2 },
+                        .mapNotNull { it.transferPair }
+                        .toMap(),
                 ownBatchAccounts = resolvedTransfers.flatMapTo(mutableSetOf()) { listOf(it.fromAccount, it.toAccount).map(::requireId) },
                 passThroughOnward = passThroughOnward(existing, existingRelationships),
                 ownSourceLegs = ownSourceLegs(resolvedTransfers, existing),
@@ -1443,14 +1444,14 @@ class ImportEngineImpl(
 
     /**
      * The relationships touching [existing], loaded once for the deduper. Among them: the `reconciled`
-     * links whose `id2` another record already reconciled against (a leg only ever stands for one movement,
+     * links whose related end another record already reconciled against (a leg only ever stands for one movement,
      * so a second row must not be excused against it — that would drop a genuine movement from the
      * balances), and the `pass-through` links that chain a conduit's legs together.
      */
-    private suspend fun existingRelationships(existing: List<ExistingTransferInfo>): List<TransferRelationship> {
-        val repository = transferRelationshipRepository ?: return emptyList()
+    private suspend fun existingRelationships(existing: List<ExistingTransferInfo>): List<Relationship> {
+        val repository = relationshipRepository ?: return emptyList()
         if (existing.isEmpty()) return emptyList()
-        return repository.getByTransfers(existing.map { it.transferId })
+        return repository.getByTransactions(existing.map { it.transferId })
     }
 
     /**
@@ -1461,12 +1462,13 @@ class ImportEngineImpl(
      */
     private suspend fun passThroughOnward(
         existing: List<ExistingTransferInfo>,
-        relationships: List<TransferRelationship>,
+        relationships: List<Relationship>,
     ): Map<TransferId, List<Transfer>> {
         val next =
             relationships
                 .filter { it.relationshipType.id.id == WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID }
-                .associate { it.id1 to it.id2 }
+                .mapNotNull { it.transferPair }
+                .toMap()
         if (next.isEmpty()) return emptyMap()
         val known = existing.associate { it.transferId to it.transfer }
         val missing = next.values.filterNot { it in known }
@@ -1507,7 +1509,7 @@ class ImportEngineImpl(
      * conversion relationship type, has no trades an order does not claim, or nothing links up.
      *
      * Every step is a narrowing: the window is the policy's, the accounts are the ones the batch's
-     * trades debit, and only a transfer that leaves one of those accounts *and* is the `id1` of a
+     * trades debit, and only a transfer that leaves one of those accounts *and* is the primary end of a
      * relationship of the named type is a conversion debit leg. The paired credit legs are loaded
      * only for the asset they received - their amount is not comparable (see
      * [ConversionTradeReconciler]).
@@ -1518,7 +1520,7 @@ class ImportEngineImpl(
     ): ConversionTradeReconciler? {
         val policy = batch.tradeDedupePolicy as? TradeDedupePolicy.Fuzzy ?: return null
         val typeName = policy.conversionRelationshipTypeName ?: return null
-        val relationships = transferRelationshipRepository ?: return null
+        val relationships = relationshipRepository ?: return null
         val creates =
             batch.trades
                 .creates()
@@ -1540,9 +1542,10 @@ class ImportEngineImpl(
 
         val creditIdByDebitId =
             relationships
-                .getByTransfers(candidates.map { it.id })
+                .getByTransactions(candidates.map { it.id })
                 .filter { it.relationshipType.id == typeId }
-                .associate { it.id1 to it.id2 }
+                .mapNotNull { it.transferPair }
+                .toMap()
         if (creditIdByDebitId.isEmpty()) return null
         val creditLegs = transactionRepository.getTransactionsByIds(creditIdByDebitId.values.toSet())
 
@@ -2021,7 +2024,7 @@ class ImportEngineImpl(
                     if (conduitStatement != null && legIndex >= conduitStatement.conduitIndex - 1) {
                         legRelationships += NewRelationship(conduitStatement.statementLegId, conduitStatement.relationshipTypeId)
                     }
-                    // Reversal pairing: this spend leg (id1) reverses an earlier one (id2) — an existing
+                    // Reversal pairing: this spend leg (primary) reverses an earlier one (related) — an existing
                     // transfer, an earlier row's spend leg in this chunk (temp id), or an earlier
                     // chunk's spend leg (already-created real id).
                     val reversalLink = classified.reversalLinks[legIndex]
@@ -2122,26 +2125,27 @@ class ImportEngineImpl(
      * The legs derived from a main transfer — its fee and its pass-through spend legs (C1→C2, …, Cn→merchant,
      * each linked to the next) — follow its exclusion when a re-import changes it, as they do on creation
      * (see buildCreatePayload): a row the source deleted mustn't move balances through them, and one it
-     * un-deleted must again. Needs [transferRelationshipRepository]; skipped without it.
+     * un-deleted must again. Needs [relationshipRepository]; skipped without it.
      */
     private suspend fun derivedLegExclusionUpdates(
         exclusionChanges: Map<TransferId, ExclusionChange>,
         excludedTypeId: AttributeTypeId,
         alreadyUpdated: Set<TransferId>,
     ): List<Pair<TransferUpdate, Source>> {
-        val relationships = transferRelationshipRepository ?: return emptyList()
+        val relationships = relationshipRepository ?: return emptyList()
         if (exclusionChanges.isEmpty()) return emptyList()
         val derivedTypes = setOf(WellKnownIds.FEE_RELATIONSHIP_TYPE_ID, WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID)
-        // Derived leg -> the main transfer it hangs off, walking fee/pass-through links outwards (id1 -> id2).
+        // Derived leg -> the main transfer it hangs off, walking fee/pass-through links outwards (primary -> related).
         val mainOf = mutableMapOf<TransferId, TransferId>()
         var frontier: Map<TransferId, TransferId> = exclusionChanges.keys.associateWith { it }
         while (frontier.isNotEmpty()) {
             val next =
                 relationships
-                    .getByTransfers(frontier.keys)
-                    .filter { it.relationshipType.id.id in derivedTypes && it.id1 in frontier }
-                    .filter { it.id2 !in mainOf && it.id2 !in exclusionChanges }
-                    .associate { it.id2 to frontier.getValue(it.id1) }
+                    .getByTransactions(frontier.keys)
+                    .filter { it.relationshipType.id.id in derivedTypes }
+                    .mapNotNull { it.transferPair }
+                    .filter { (main, leg) -> main in frontier && leg !in mainOf && leg !in exclusionChanges }
+                    .associate { (main, leg) -> leg to frontier.getValue(main) }
             mainOf += next
             frontier = next
         }

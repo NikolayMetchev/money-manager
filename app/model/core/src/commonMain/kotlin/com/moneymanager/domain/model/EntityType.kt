@@ -47,4 +47,11 @@ enum class EntityType(
      * store, like [TRADE]: provenance is an `entity_source` row with `entity_type_id = 12`.
      */
     EXCHANGE_ORDER(12),
+
+    /**
+     * A relationship between transactions. Shares the unified `entity_source` store, like [TRADE]:
+     * provenance is an `entity_source` row with `entity_type_id = 13`, at revision 1 (a relationship is
+     * never revised).
+     */
+    RELATIONSHIP(13),
 }

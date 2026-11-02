@@ -8,9 +8,9 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferRelationshipReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.AffectedRecords
 import com.moneymanager.importengineapi.CsvImportMutation
@@ -110,7 +110,7 @@ suspend fun executeCsvUnimport(
     plan: CsvUnimportPlan,
     accountRepository: AccountReadRepository,
     transactionRepository: TransactionReadRepository,
-    transferRelationshipRepository: TransferRelationshipReadRepository,
+    relationshipRepository: RelationshipReadRepository,
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
@@ -118,7 +118,7 @@ suspend fun executeCsvUnimport(
     refreshViews: Boolean = true,
 ): CsvUnimportResult {
     val source = Source.Csv(plan.importId)
-    val unhideUpdates = reconciledPartnerUnhideUpdates(plan.transferIds, transferRelationshipRepository, transactionRepository)
+    val unhideUpdates = reconciledPartnerUnhideUpdates(plan.transferIds, relationshipRepository, transactionRepository)
 
     // Every step before the final file reset can be re-derived from entity_source, so each batch leaves
     // a state a repeated unimport recovers from; the file only reads as unimported once all of them
@@ -213,7 +213,7 @@ suspend fun executeCsvBulkUnimport(
     transferSourceRepository: TransferSourceReadRepository,
     accountRepository: AccountReadRepository,
     transactionRepository: TransactionReadRepository,
-    transferRelationshipRepository: TransferRelationshipReadRepository,
+    relationshipRepository: RelationshipReadRepository,
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
@@ -228,7 +228,7 @@ suspend fun executeCsvBulkUnimport(
                 plan = planCsvUnimport(id, csvImportRepository, transferSourceRepository),
                 accountRepository = accountRepository,
                 transactionRepository = transactionRepository,
-                transferRelationshipRepository = transferRelationshipRepository,
+                relationshipRepository = relationshipRepository,
                 tradeRepository = tradeRepository,
                 maintenance = maintenance,
                 importEngine = importEngine,
