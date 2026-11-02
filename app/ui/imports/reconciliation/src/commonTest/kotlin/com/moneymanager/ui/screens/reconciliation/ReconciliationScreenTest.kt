@@ -78,7 +78,7 @@ import kotlin.time.Instant
 
 /** The schema-aware scope the screen needs, and the task manager an app-level host would provide. */
 @Composable
-private fun ProvideScreenScopes(content: @Composable () -> Unit) {
+private fun provideScreenScopes(content: @Composable () -> Unit) {
     val tasks = remember { TaskManager(CoroutineScope(Dispatchers.Default)) }
     CompositionLocalProvider(LocalTaskManager provides tasks) { ProvideSchemaAwareScope(content) }
 }
@@ -121,7 +121,7 @@ class ReconciliationScreenTest {
     fun explainsHowToStartWhenThereAreNoSources() {
         runMoneyManagerComposeUiTest {
             setContent {
-                ProvideScreenScopes {
+                provideScreenScopes {
                     ReconciliationScreen(
                         reconciliationRepository = reconciliationRepository(emptyList()),
                         accountRepository = accountRepository(emptyList()),
@@ -147,7 +147,7 @@ class ReconciliationScreenTest {
                     Account(id = wallet.accountId, name = wallet.name, openingDate = epoch),
                 )
             setContent {
-                ProvideScreenScopes {
+                provideScreenScopes {
                     ReconciliationScreen(
                         reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(wallet)),
                         accountRepository = accountRepository(accounts),
@@ -189,7 +189,7 @@ class ReconciliationScreenTest {
                     LocalImportEngine provides engine,
                     LocalTaskManager provides TaskManager(CoroutineScope(Dispatchers.Default)),
                 ) {
-                    ProvideScreenScopes {
+                    provideScreenScopes {
                         ReconciliationScreen(
                             reconciliationRepository = reconciliationRepository(listOf(koinly), wallets),
                             accountRepository = accountRepository(accounts),
@@ -220,7 +220,7 @@ class ReconciliationScreenTest {
         runMoneyManagerComposeUiTest {
             val wallet = ShadowAccount(AccountId(100), "Koinly · Ledger", "Koinly")
             setContent {
-                ProvideScreenScopes {
+                provideScreenScopes {
                     ReconciliationScreen(
                         reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(wallet)),
                         accountRepository =
@@ -261,7 +261,7 @@ class ReconciliationScreenTest {
                 }
             setContent {
                 CompositionLocalProvider(LocalImportEngine provides engine) {
-                    ProvideScreenScopes {
+                    provideScreenScopes {
                         ReconciliationScreen(
                             reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(wallet), links),
                             accountRepository = accountRepository(accounts),
@@ -285,7 +285,7 @@ class ReconciliationScreenTest {
             val wallet = ShadowAccount(AccountId(100), "Koinly · Ledger", "Koinly")
             setContent {
                 CompositionLocalProvider(LocalImportEngine provides importEngine { awaitCancellation() }) {
-                    ProvideScreenScopes {
+                    provideScreenScopes {
                         ReconciliationScreen(
                             reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(wallet)),
                             accountRepository =
@@ -357,7 +357,7 @@ class ReconciliationScreenTest {
             )
         setContent {
             CompositionLocalProvider(LocalImportEngine provides engine) {
-                ProvideScreenScopes {
+                provideScreenScopes {
                     ReconciliationScreen(
                         reconciliationRepository =
                             reconciliationRepository(
