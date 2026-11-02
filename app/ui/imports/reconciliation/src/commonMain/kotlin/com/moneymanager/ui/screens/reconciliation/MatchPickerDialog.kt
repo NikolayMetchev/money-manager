@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -25,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.AccountId
@@ -34,6 +34,8 @@ import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.formatAmount
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
+
+internal const val PICKER_CANDIDATES_TAG = "match-picker-candidates"
 
 /** How far either side of the source movement the picker looks. */
 internal val PICKER_WINDOWS: List<Duration> = listOf(1.days, 3.days, 7.days, 30.days)
@@ -78,8 +80,9 @@ fun MatchPickerDialog(
                 if (candidates.isEmpty()) {
                     Text("No unmatched transactions on the linked accounts within ± $window.")
                 }
-                LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
-                    items(candidates, key = { "${it.leg.transactionId}-${it.leg.accountId.id}-${it.leg.amount.asset.id}" }) { candidate ->
+                LazyColumn(modifier = Modifier.heightIn(max = 360.dp).testTag(PICKER_CANDIDATES_TAG)) {
+                    items(candidates.size, key = { candidates[it].key }) { index ->
+                        val candidate = candidates[index]
                         val checked = candidate.leg in selected
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -156,3 +159,5 @@ private fun PickerLegLine(
         Text(leg.description, style = MaterialTheme.typography.bodySmall, color = color)
     }
 }
+
+private val PickerCandidate.key: String get() = "${leg.transactionId}-${leg.accountId.id}-${leg.amount.asset.id}"

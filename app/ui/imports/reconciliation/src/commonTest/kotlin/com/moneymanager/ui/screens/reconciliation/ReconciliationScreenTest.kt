@@ -12,6 +12,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -426,8 +427,11 @@ class ReconciliationScreenTest {
 
             clickText("Select matching transactions…")
             // Leg 20 is the near match for leg 10, so it's listed but can't be picked.
+            val picker = onNodeWithTag(PICKER_CANDIDATES_TAG)
+            picker.performScrollToNode(isToggleable() and hasText("leg 20", substring = true))
             onNode(isToggleable() and hasText("leg 20", substring = true)).assertIsNotEnabled()
-            onNodeWithText("Near match for", substring = true).assertIsDisplayed()
+            onNodeWithText("Near match for", substring = true).assertExists()
+            picker.performScrollToNode(isToggleable() and hasText("leg 21", substring = true))
             onNode(isToggleable() and hasText("leg 21", substring = true)).performClick()
             waitForIdle()
             onNodeWithText("Match (1)").performClick()

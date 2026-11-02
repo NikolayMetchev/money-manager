@@ -33,9 +33,6 @@ data class LegMatch(
     /** Settled: a person stored it, or it agrees to the second. Anything else is a near match to accept. */
     val settled: Boolean get() = matchId != null || exact
 
-    /** Every transaction on either side, as a stored match's members. */
-    val transactionIds: Set<Long> get() = (sourceLegs + realLegs).mapTo(mutableSetOf()) { it.transactionId }
-
     val timeDelta: Duration get() = realLeg.timestamp - sourceLeg.timestamp
 }
 
