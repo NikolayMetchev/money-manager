@@ -597,7 +597,7 @@ maven.install(
         # Transitive versions held at the newest (see version_conflict_policy).
         "com.google.errorprone:error_prone_annotations:2.52.0",
         "dev.drewhamilton.poko:poko-annotations-jvm:0.23.2",
-        "org.checkerframework:checker-qual:4.3.1",
+        "org.checkerframework:checker-qual:4.4.0",
         "org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21",
         "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.4.21",
         "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.4.21",
@@ -720,7 +720,7 @@ maven.install(
         "com.squareup:javawriter:2.5.1",
         "commons-io:commons-io:2.22.0",
         "org.apache.httpcomponents:httpclient:4.5.14",
-        "org.checkerframework:checker-qual:4.3.1",
+        "org.checkerframework:checker-qual:4.4.0",
         "org.ow2.asm:asm-analysis:9.11.1",
         "org.ow2.asm:asm-commons:9.11.1",
         "org.ow2.asm:asm-tree:9.11.1",

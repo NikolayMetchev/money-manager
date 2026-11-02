@@ -16,7 +16,7 @@
     "com.squareup:javawriter": -1918113173,
     "commons-io:commons-io": 1226199767,
     "org.apache.httpcomponents:httpclient": -214613560,
-    "org.checkerframework:checker-qual": 1948233067,
+    "org.checkerframework:checker-qual": 1958736171,
     "org.ow2.asm:asm": 485102723,
     "org.ow2.asm:asm-analysis": 892053804,
     "org.ow2.asm:asm-commons": -1014527714,
@@ -43,7 +43,7 @@
     "com.android.tools.build:builder-model": 1008534550,
     "com.android.tools.build:builder-test-api": 951698314,
     "com.android.tools.build:bundletool": -1379093443,
-    "com.android.tools.build:gradle": 1990186058,
+    "com.android.tools.build:gradle": -1021964052,
     "com.android.tools.build:gradle-api": -14999270,
     "com.android.tools.build:gradle-common-api": 1804530715,
     "com.android.tools.build:gradle-settings-api": -720759889,
@@ -99,7 +99,7 @@
     "org.bouncycastle:bcpkix-jdk18on": 1667777654,
     "org.bouncycastle:bcprov-jdk18on": 80772800,
     "org.bouncycastle:bcutil-jdk18on": 525659397,
-    "org.checkerframework:checker-qual": -1543380368,
+    "org.checkerframework:checker-qual": -863272591,
     "org.glassfish.jaxb:jaxb-runtime": -1363105419,
     "org.glassfish.jaxb:txw2": 1008506230,
     "org.jdom:jdom2": 2016421531,
@@ -136,7 +136,7 @@
     "org.ow2.asm:asm-tree": -1950755079,
     "org.ow2.asm:asm-util": 450118060,
     "org.slf4j:slf4j-api": -736053657,
-    "org.tensorflow:tensorflow-lite-metadata": 410429157
+    "org.tensorflow:tensorflow-lite-metadata": 1215341501
   },
   "artifacts": {
     "androidx.databinding:databinding-common": {
@@ -579,9 +579,9 @@
     },
     "org.checkerframework:checker-qual": {
       "shasums": {
-        "jar": "66c061a19e20fb005c173169534aba7bf78e904a8a6da6fe8c6e97d277f6d347"
+        "jar": "5fcfce0ac50f42b17b7d75023d5afd64211f1bc8ee9a1dea3b4d9e637ae97e9e"
       },
-      "version": "4.3.1"
+      "version": "4.4.0"
     },
     "org.glassfish.jaxb:jaxb-runtime": {
       "shasums": {
