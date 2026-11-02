@@ -1,0 +1,59 @@
+-- Inputs to RemoteDatabaseController's data-change token (see MoneyManagerDatabaseWrapper.dataChangeToken).
+-- AuditTableCoverageTest fails if an *_audit table is missing from auditRowCount.
+
+auditRowCount:
+SELECT SUM(n) FROM (
+    SELECT COUNT(*) AS n FROM account_attribute_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM account_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM api_import_strategy_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM category_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM crypto_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM csv_import_application_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM csv_import_strategy_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM currency_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM exchange_order_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM holiday_calendar_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM import_directory_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM pass_through_account_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM person_account_ownership_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM person_attribute_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM person_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM trade_attribute_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM trade_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM transfer_attribute_audit
+    UNION ALL
+    SELECT COUNT(*) AS n FROM transfer_audit
+);
+
+accountMappingFingerprint:
+SELECT COUNT(*), COALESCE(SUM(id), 0), COALESCE(SUM(updated_at), 0) FROM account_mapping;
+
+reconciliationLinkFingerprint:
+SELECT COUNT(*), COALESCE(SUM(shadow_account_id * 31 + real_account_id), 0), COALESCE(SUM(created_at), 0)
+FROM reconciliation_account_link;
+
+tradeAttributeRows:
+SELECT trade_id, attribute_type_id, attribute_value FROM trade_attribute ORDER BY trade_id, attribute_type_id;
+
+relationshipMemberFingerprint:
+SELECT COUNT(*), COALESCE(SUM(relationship_id * 31 + transaction_id), 0), COALESCE(SUM(role), 0) FROM relationship_member;
+
+settingsFingerprint:
+SELECT COALESCE(default_currency_id, 0), default_location FROM settings WHERE id = 1;

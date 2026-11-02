@@ -1,6 +1,7 @@
 package com.moneymanager.database.schema
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
+import com.moneymanager.database.rawsql.RawSql
 import com.moneymanager.test.database.DbTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -48,8 +49,8 @@ class AccountRowSourcePlanTest : DbTest() {
         }
 
     private suspend fun queryPlan(): List<String> =
-        database
-            .rawQuery("EXPLAIN QUERY PLAN $offsetPageSql", parameters = 5, binders = {
+        RawSql(database.driver)
+            .query("EXPLAIN QUERY PLAN $offsetPageSql", parameters = 5, binders = {
                 bindLong(0, 1L)
                 bindLong(1, null)
                 bindLong(2, null)

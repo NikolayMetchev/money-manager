@@ -2,6 +2,8 @@ package com.moneymanager.database.schema
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.read.getTableColumns
+import com.moneymanager.test.database.read.selectTableAndViewNames
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -79,14 +81,6 @@ class SnakeCaseNamingConventionTest : DbTest() {
 
     private suspend fun getTablesAndViews(): List<String> =
         database
-            .rawQuery(
-                """
-                SELECT name FROM sqlite_master
-                WHERE type IN ('table', 'view')
-                AND name NOT LIKE 'sqlite_%'
-                ORDER BY type, name
-                """.trimIndent(),
-            ) { it.getString(0)!! }
-            .awaitAsList()
+            .selectTableAndViewNames()
             .filter { name -> name !in excludedNames && !name.startsWith(dynamicTablePrefix) }
 }

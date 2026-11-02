@@ -4,6 +4,8 @@ import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.read.testReads
+import com.moneymanager.test.database.write.testWrites
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -20,13 +22,12 @@ private data class PlatformRecord(
 class DeviceRepositoryImplTest : DbTest() {
     /**
      * Test-only query: selectAllPlatforms
-     * Retrieves all platforms using raw SQL.
+     * Retrieves all platforms.
      */
     private suspend fun selectAllPlatforms(): List<PlatformRecord> =
-        database
-            .rawQuery("SELECT id, name FROM platform") { cursor ->
-                PlatformRecord(id = cursor.getLong(0)!!, name = cursor.getString(1)!!)
-            }.awaitAsList()
+        database.testReads.lookupSelectQueries
+            .selectPlatforms { id, name -> PlatformRecord(id = id, name = name) }
+            .awaitAsList()
 
     @Test
     fun `getOrCreateDevice should create device and return valid id`() =
@@ -100,8 +101,8 @@ class DeviceRepositoryImplTest : DbTest() {
     fun `a database created before the NATIVE platform gains its row on first CLI use`() =
         runDbTest {
             // Opening the database records the host device, which on native is a NATIVE one.
-            database.execute(null, "DELETE FROM device WHERE platform_id = 3", 0)
-            database.execute(null, "DELETE FROM platform WHERE id = 3", 0)
+            database.testWrites.fixtureWriteQueries.deleteDevicesOnPlatform(3)
+            database.testWrites.fixtureWriteQueries.deletePlatform(3)
 
             val cli = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Native("Linux", "box"))
 

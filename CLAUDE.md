@@ -157,6 +157,7 @@ workflow because label events start it: any other label's run skips, without can
 | `app/model/repository/read/`, `app/model/repository/write/` | `*ReadRepository` / `*WriteRepository` interfaces. `write` depends on `read` (each write interface extends its read) |
 | `app/db/schema/`, `app/db/read/`, `app/db/repository/`, `app/db/write/`, `app/db/core/` | SQLDelight schema; generated read SQL + Mappie mappers + JSON codecs; read repository impls; write SQL + impls; `DatabaseManager` and services |
 | `app/db/worker/` | The browser's database worker, in JavaScript: sqlite-wasm (the npm `@sqlite.org/sqlite-wasm`) behind one message per request (`handler.mjs`), over OPFS in the app (`worker.mjs`) and over memory in the browser targets' tests (`memory.mjs`) |
+| `app/db/rawsql/` | `RawSql`: the one place hand-written SQL runs (see **Database**); visibility-restricted to `app/db/core`, `app/db/write` and `app/query` |
 | `app/db/seed/`, `app/db/schemaspy/` | Static seed SQL; SchemaSpy docs generator for the Pages site |
 | `app/cryptodata/` | Bundled crypto asset catalog plus its refresher/installer (built by `tools/crypto-dataset`) |
 | `app/tasks/` | The one progress type `Progress` (every import, download, DB open and cloud sync reports it), its `PhasedProgress`/`WeightedProgress` folding helpers, and `TaskManager`: background tasks as a `StateFlow`, deduped by key, with child tasks and cancellation. Pure coroutines, so the UI, CLI and TUI share it; the Compose `TaskPanel` (`app/ui/foundation`) only collects it |
@@ -186,6 +187,7 @@ workflow because label events start it: any other label's run skips, without can
 | `app/ui/{foundation,components}/` | Platform UI helpers; shared widgets and editors (pickers, `ConditionsEditor`, `StrategyRulesEditor`, …) |
 | `app/ui/{accounts,audit,categories,currencies,people,settings,transactions}/`, `app/ui/imports/{api,csv,importDirectory,reconciliation,timeline}/` | One module per feature screen |
 | `tools/{strategy-catalog,crypto-dataset}/` | Build-time tools: catalog site renderer; crypto dataset builder |
+| `test/app/db/read/`, `test/app/db/write/` | SQLDelight queries only tests need (row counts, audit history, schema introspection; fixture writes): `testReads`/`testWrites` on `MoneyManagerDatabaseWrapper`. Kept apart from `app/db/{read,write}` so production code can't reach them |
 | `test/{app/db,app/ui,app/remotestorage,utils/credentialvault}/` | Test fixtures only (see **Testing**); `app/remotestorage` is the in-memory cloud store (`InMemoryStorageProvider`, `SingleProviderFactory`) |
 | `app/main/jvm/` | JVM Desktop entry point |
 | `app/main/web/` | Browser entry point (wasmJs and js) and `:dist`, the site: a loader that picks wasmJs where the browser has WasmGC, else js, with the database worker and npm packages beside it (see `bazel/README.md`, "Browser"), published by Pages at `<pages-url>/app/`. No import folders; the API screens show `LocalApiDownloadNotice` (most providers refuse requests from a web page, CORS), so downloads are for the desktop app and `mm` |
@@ -237,11 +239,17 @@ like its strategies: installing one replaces that location's copy, keyed by code
 
 **Async queries**: the queries are generated with `generateAsync`, because the browser's worker driver can't block, so
 every query and transaction suspends on every platform. Read with `awaitAsList`/`awaitAsOne`/`awaitAsOneOrNull`
-(`app.cash.sqldelight.async.coroutines`), never `executeAs*`, which compiles but throws on an async result. Hand-written
-SQL goes through `MoneyManagerDatabaseWrapper.rawQuery`/`execute`. A sync driver (Android's `AndroidSqliteDriver`)
+(`app.cash.sqldelight.async.coroutines`), never `executeAs*`, which compiles but throws on an async result. A sync driver (Android's `AndroidSqliteDriver`)
 takes `Schema.synchronous()`. **Never `withContext` inside a `transaction {}`**: the JVM and native drivers keep the
 open transaction per thread, so a body that hops threads runs on another connection, outside it
 (`SuspendingTransactionTest`).
+
+**No raw SQL**: every query is a SQLDelight `.sq` query. The only hand-written SQL runs through `RawSql`
+(`app/db/rawsql`, visible to `app/db/core`, `app/db/write` and `app/query` only), and only for what SQLDelight can't
+express: `mm sql`'s user-supplied SQL (`runReadOnlySql`), the per-import CSV staging tables (`CsvTableManager`: their
+name and column count are chosen at runtime), `VACUUM INTO ?`, the driver's connection PRAGMAs and the size breakdown's
+`dbstat`. SQL that only tests need lives in `test/app/db/read` and `test/app/db/write` (`testReads`/`testWrites` on the
+wrapper), whose targets only tests can depend on.
 
 **BETA — no DB versioning yet**: The app is in BETA and database versioning/migrations are not
 implemented (tracked in [issue #426](https://github.com/NikolayMetchev/money-manager/issues/426)).

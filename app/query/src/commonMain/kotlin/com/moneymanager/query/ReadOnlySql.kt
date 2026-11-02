@@ -1,6 +1,7 @@
 package com.moneymanager.query
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
+import com.moneymanager.database.rawsql.RawSql
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
@@ -40,14 +41,14 @@ suspend fun MoneyManagerDatabaseWrapper.runReadOnlySql(
     val statement = singleStatement(sql)
     return try {
         transactionWithResult {
-            val result = queryThroughView(statement, limit)
+            val result = RawSql(driver).queryThroughView(statement, limit)
             rollback(result)
         }
     } catch (expectedFailure: Exception) {
         if (expectedFailure is CancellationException) throw expectedFailure
         // The drivers' own SQLite exceptions (JDBC's, SQLiter's) have no common type.
         val message = expectedFailure.message ?: expectedFailure.toString()
-        throw InvalidSqlException(message + tableHint(message), expectedFailure)
+        throw InvalidSqlException(message + RawSql(driver).tableHint(message), expectedFailure)
     }
 }
 
@@ -55,7 +56,7 @@ suspend fun MoneyManagerDatabaseWrapper.runReadOnlySql(
  * A guessed table name is the commonest mistake (`transfers` for `transfer`), so name the real ones: the close
  * matches when there are any, else every table but the per-file CSV staging tables, which run to hundreds.
  */
-private suspend fun MoneyManagerDatabaseWrapper.tableHint(message: String): String {
+private suspend fun RawSql.tableHint(message: String): String {
     val wanted =
         NO_SUCH_TABLE
             .find(message)
@@ -64,7 +65,7 @@ private suspend fun MoneyManagerDatabaseWrapper.tableHint(message: String): Stri
             ?.substringAfterLast('.')
             ?.lowercase() ?: return ""
     val tables =
-        rawQuery(
+        query(
             "SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY name",
         ) { checkNotNull(it.getString(0)) }
             .awaitAsList()
@@ -76,12 +77,12 @@ private suspend fun MoneyManagerDatabaseWrapper.tableHint(message: String): Stri
 private val NO_SUCH_TABLE = Regex("no such table: (\\S+)", RegexOption.IGNORE_CASE)
 private val CSV_STAGING_TABLE = Regex("csv_import_[0-9a-f]{8}")
 
-private suspend fun MoneyManagerDatabaseWrapper.queryThroughView(
+private suspend fun RawSql.queryThroughView(
     statement: String,
     limit: Int?,
 ): SqlResultJson {
     try {
-        execute(null, "CREATE TEMP VIEW $VIEW AS $statement", 0)
+        execute("CREATE TEMP VIEW $VIEW AS $statement")
     } catch (expectedRejection: Exception) {
         throw InvalidSqlException(
             "SQLite refused the statement (only a single SELECT is allowed): ${expectedRejection.message}",
@@ -89,7 +90,7 @@ private suspend fun MoneyManagerDatabaseWrapper.queryThroughView(
         )
     }
     val columns =
-        rawQuery("SELECT name FROM pragma_table_info('$VIEW', 'temp') ORDER BY cid") { checkNotNull(it.getString(0)) }
+        query("SELECT name FROM pragma_table_info('$VIEW', 'temp') ORDER BY cid") { checkNotNull(it.getString(0)) }
             .awaitAsList()
     // Each value comes with its storage class, so it's read as what it is rather than as the column's affinity.
     val cells =
@@ -99,7 +100,7 @@ private suspend fun MoneyManagerDatabaseWrapper.queryThroughView(
         }
     val bound = limit?.let { " LIMIT ${it + 1}" }.orEmpty()
     val rows =
-        rawQuery("SELECT $cells FROM temp.$VIEW$bound") { cursor ->
+        query("SELECT $cells FROM temp.$VIEW$bound") { cursor ->
             List(columns.size) { index ->
                 val value = 2 * index + 1
                 when (cursor.getString(value - 1)) {

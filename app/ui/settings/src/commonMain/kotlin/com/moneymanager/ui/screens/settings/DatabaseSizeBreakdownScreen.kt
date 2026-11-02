@@ -54,7 +54,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.database.write.DbObjectSize
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.write.getDbSizeBreakdown
 import com.moneymanager.humanreadable.HumanReadable
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.ScreenSizeClass
@@ -117,7 +119,7 @@ fun DatabaseSizeBreakdownScreen(
     onBack: () -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    var breakdown by remember(database) { mutableStateOf<List<MoneyManagerDatabaseWrapper.DbObjectSize>>(emptyList()) }
+    var breakdown by remember(database) { mutableStateOf<List<DbObjectSize>>(emptyList()) }
     var isLoading by remember(database) { mutableStateOf(false) }
     var errorMessage by remember(database) { mutableStateOf<String?>(null) }
 
@@ -238,7 +240,7 @@ fun DatabaseSizeBreakdownScreen(
     }
 }
 
-private fun buildPieSlices(breakdown: List<MoneyManagerDatabaseWrapper.DbObjectSize>): List<PieSlice> {
+private fun buildPieSlices(breakdown: List<DbObjectSize>): List<PieSlice> {
     // breakdown arrives sorted by size descending; take the largest objects individually.
     val top = breakdown.take(MAX_PIE_SLICES)
     val rest = breakdown.drop(MAX_PIE_SLICES)
@@ -258,7 +260,7 @@ private fun buildPieSlices(breakdown: List<MoneyManagerDatabaseWrapper.DbObjectS
  * up with the chart. The largest [MAX_PIE_SLICES] objects get their own palette colour; everything
  * else falls into the grey "Other" slice (the default returned by lookups that miss this map).
  */
-private fun sliceColors(breakdown: List<MoneyManagerDatabaseWrapper.DbObjectSize>): Map<String, Color> =
+private fun sliceColors(breakdown: List<DbObjectSize>): Map<String, Color> =
     breakdown
         .take(MAX_PIE_SLICES)
         .mapIndexed { index, item -> item.objectName to PIE_PALETTE[index % PIE_PALETTE.size] }
@@ -275,7 +277,7 @@ private fun sliceColors(breakdown: List<MoneyManagerDatabaseWrapper.DbObjectSize
  */
 @Composable
 private fun DatabaseSizePieChart(
-    breakdown: List<MoneyManagerDatabaseWrapper.DbObjectSize>,
+    breakdown: List<DbObjectSize>,
     totalBytes: Long,
     modifier: Modifier = Modifier,
 ) {
@@ -410,7 +412,7 @@ private fun PieTooltip(
 
 @Composable
 private fun SizeBreakdownTable(
-    breakdown: List<MoneyManagerDatabaseWrapper.DbObjectSize>,
+    breakdown: List<DbObjectSize>,
     totalBytes: Long,
     compact: Boolean,
     modifier: Modifier = Modifier,
@@ -431,7 +433,7 @@ private fun SizeBreakdownTable(
 
     val sortedRows =
         remember(breakdown, activeSortKey, sortDirection) {
-            val comparator: Comparator<MoneyManagerDatabaseWrapper.DbObjectSize> =
+            val comparator: Comparator<DbObjectSize> =
                 when (activeSortKey) {
                     SizeSortKey.NAME -> compareBy { it.objectName.lowercase() }
                     SizeSortKey.TYPE -> compareBy { it.objectType }
@@ -528,7 +530,7 @@ private fun SizeHeaderTrailingCells(
 /** Body equivalent of [SizeHeaderTrailingCells] for a single [item] row. */
 @Composable
 private fun SizeBodyTrailingCells(
-    item: MoneyManagerDatabaseWrapper.DbObjectSize,
+    item: DbObjectSize,
     totalBytes: Long,
 ) {
     SizeBodyCell(item.objectType, Modifier.width(90.dp))

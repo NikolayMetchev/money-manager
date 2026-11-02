@@ -2,6 +2,8 @@ package com.moneymanager.database
 
 import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.read.testReads
+import com.moneymanager.test.database.write.testWrites
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -11,7 +13,10 @@ import kotlin.test.assertFailsWith
  * transaction per thread, so these pin down that a nested transaction joins its enclosing one.
  */
 class SuspendingTransactionTest : DbTest() {
-    private suspend fun assetCount(): Long = database.rawQuery("SELECT COUNT(*) FROM asset") { it.getLong(0)!! }.awaitAsOne()
+    private suspend fun assetCount(): Long =
+        database.testReads.rowCountSelectQueries
+            .countAssets()
+            .awaitAsOne()
 
     @Test
     fun `a nested transaction sees its enclosing transaction's writes`() =
@@ -19,9 +24,9 @@ class SuspendingTransactionTest : DbTest() {
             val before = assetCount()
 
             database.transaction {
-                database.execute(null, "INSERT INTO asset DEFAULT VALUES", 0)
+                database.testWrites.fixtureWriteQueries.insertEmptyAsset()
                 database.transaction {
-                    database.execute(null, "INSERT INTO asset DEFAULT VALUES", 0)
+                    database.testWrites.fixtureWriteQueries.insertEmptyAsset()
                     assertEquals(before + 2, assetCount())
                 }
             }
@@ -36,7 +41,7 @@ class SuspendingTransactionTest : DbTest() {
 
             assertFailsWith<IllegalStateException> {
                 database.transaction {
-                    database.execute(null, "INSERT INTO asset DEFAULT VALUES", 0)
+                    database.testWrites.fixtureWriteQueries.insertEmptyAsset()
                     database.transaction { error("fails") }
                 }
             }

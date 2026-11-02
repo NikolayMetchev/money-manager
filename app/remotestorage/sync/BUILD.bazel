@@ -66,6 +66,8 @@ kmp_test(
         "//app/remotestorage/core",
         "//bazel/kmp/deps:kotlin_test",
         "//test/app/db",
+        "//test/app/db/read:read_for_tests",
+        "//test/app/db/write:write_for_tests",
         "//test/app/remotestorage",
         "//test/utils/credentialvault",
         "//utils/archive",

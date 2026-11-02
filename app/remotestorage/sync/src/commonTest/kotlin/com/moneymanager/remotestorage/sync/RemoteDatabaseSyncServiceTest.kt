@@ -22,7 +22,7 @@ class RemoteDatabaseSyncServiceTest {
             try {
                 val database = manager.openDatabase(sourceLocation)
                 // A freshly created database is seeded with default currencies.
-                val originalCurrencies = database.countRows("currency")
+                val originalCurrencies = database.countCurrencies()
                 assertTrue(originalCurrencies > 0, "seeded database should have currencies")
 
                 val provider = InMemoryStorageProvider()
@@ -45,7 +45,7 @@ class RemoteDatabaseSyncServiceTest {
                 )
                 val restored = manager.openDatabase(hydrated.location)
                 try {
-                    assertEquals(originalCurrencies, restored.countRows("currency"), "data should survive the round trip")
+                    assertEquals(originalCurrencies, restored.countCurrencies(), "data should survive the round trip")
                 } finally {
                     restored.close()
                 }

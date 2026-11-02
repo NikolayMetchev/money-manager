@@ -45,6 +45,7 @@ kmp_library(
         "@maven_kmp//:kotlinx_serialization_core",
     ],
     deps = [
+        "//app/db/rawsql",
         "//app/db/write",
         "//utils/regex",
         "@maven_kmp//:kotlinx_serialization_json",

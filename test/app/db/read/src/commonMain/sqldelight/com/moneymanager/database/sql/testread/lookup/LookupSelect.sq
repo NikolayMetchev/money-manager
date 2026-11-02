@@ -1,0 +1,5 @@
+selectPlatforms:
+SELECT id, name FROM platform;
+
+selectEntitySourceTypeIds:
+SELECT source_type_id FROM entity_source WHERE entity_type_id = :entityTypeId AND entity_id = :entityId AND matched = 0;

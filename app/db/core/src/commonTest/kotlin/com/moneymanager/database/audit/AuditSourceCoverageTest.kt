@@ -26,6 +26,7 @@ import com.moneymanager.test.database.createCategory
 import com.moneymanager.test.database.createOwnership
 import com.moneymanager.test.database.createPerson
 import com.moneymanager.test.database.installBuiltInApiStrategies
+import com.moneymanager.test.database.read.selectAuditTableNames
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -330,9 +331,5 @@ class AuditSourceCoverageTest : DbTest() {
         }
     }
 
-    private suspend fun discoverAuditTables(): Set<String> =
-        database
-            .rawQuery("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%_audit'") { it.getString(0)!! }
-            .awaitAsList()
-            .toSet()
+    private suspend fun discoverAuditTables(): Set<String> = database.selectAuditTableNames().toSet()
 }

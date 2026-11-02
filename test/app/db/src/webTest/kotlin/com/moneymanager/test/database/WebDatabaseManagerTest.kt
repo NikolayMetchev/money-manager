@@ -4,7 +4,9 @@ import app.cash.sqldelight.async.coroutines.awaitAsList
 import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.SqliteException
 import com.moneymanager.database.WebDatabaseManager
+import com.moneymanager.database.rawsql.RawSql
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
+import com.moneymanager.test.database.write.testWrites
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -41,7 +43,7 @@ class WebDatabaseManagerTest {
         withDatabase { database ->
             // 1e18-scale amounts pass 2^53, where a JavaScript number starts rounding.
             for (value in listOf(Long.MAX_VALUE, Long.MIN_VALUE, 9_007_199_254_740_993L, 1_000_000_000_000_000_001L)) {
-                val read = database.rawQuery("SELECT ?", 1, { bindLong(0, value) }) { it.getLong(0)!! }.awaitAsOne()
+                val read = RawSql(database.driver).query("SELECT ?", 1, { bindLong(0, value) }) { it.getLong(0)!! }.awaitAsOne()
                 assertEquals(value, read)
             }
         }
@@ -51,8 +53,8 @@ class WebDatabaseManagerTest {
         withDatabase { database ->
             val bytes = byteArrayOf(0, -1, 127, -128, 42)
             val row =
-                database
-                    .rawQuery("SELECT ?, ?, ?, ?", 4, {
+                RawSql(database.driver)
+                    .query("SELECT ?, ?, ?, ?", 4, {
                         bindString(0, "ünïcødé ✓")
                         bindDouble(1, 0.1)
                         bindBytes(2, bytes)
@@ -68,14 +70,14 @@ class WebDatabaseManagerTest {
     @Test
     fun `a new database is created with its schema and currencies`() =
         withDatabase { database ->
-            val codes = database.rawQuery("SELECT code FROM currency ORDER BY code") { it.getString(0)!! }.awaitAsList()
+            val codes = RawSql(database.driver).query("SELECT code FROM currency ORDER BY code") { it.getString(0)!! }.awaitAsList()
             assertTrue("USD" in codes && "EUR" in codes, "currencies: $codes")
         }
 
     @Test
     fun `a failing statement reports SQLite's error`() =
         withDatabase { database ->
-            val failure = assertFailsWith<SqliteException> { database.execute(null, "INSERT INTO no_such_table VALUES (1)", 0) }
+            val failure = assertFailsWith<SqliteException> { RawSql(database.driver).execute("INSERT INTO no_such_table VALUES (1)") }
             assertTrue("no_such_table" in failure.message.orEmpty(), failure.message)
         }
 
@@ -85,7 +87,7 @@ class WebDatabaseManagerTest {
             val before = assetCount(database)
             assertFailsWith<IllegalStateException> {
                 database.transaction {
-                    database.execute(null, "INSERT INTO asset DEFAULT VALUES", 0)
+                    database.testWrites.fixtureWriteQueries.insertEmptyAsset()
                     database.transaction { error("fails") }
                 }
             }
@@ -101,8 +103,8 @@ class WebDatabaseManagerTest {
                 repeat(2) {
                     launch {
                         database.transaction {
-                            database.execute(null, "INSERT INTO asset DEFAULT VALUES", 0)
-                            database.execute(null, "INSERT INTO asset DEFAULT VALUES", 0)
+                            database.testWrites.fixtureWriteQueries.insertEmptyAsset()
+                            database.testWrites.fixtureWriteQueries.insertEmptyAsset()
                         }
                     }
                 }
@@ -116,7 +118,7 @@ class WebDatabaseManagerTest {
             val location = createTestDatabaseLocation()
             try {
                 val created = manager.openDatabase(location)
-                created.execute(null, "INSERT INTO asset DEFAULT VALUES", 0)
+                created.testWrites.fixtureWriteQueries.insertEmptyAsset()
                 val count = assetCount(created)
                 created.close()
 
@@ -136,7 +138,7 @@ class WebDatabaseManagerTest {
             val copy = createTestDatabaseLocation()
             try {
                 val database = manager.openDatabase(source)
-                database.execute(null, "INSERT INTO asset DEFAULT VALUES", 0)
+                database.testWrites.fixtureWriteQueries.insertEmptyAsset()
                 val count = assetCount(database)
                 val bytes = manager.snapshot(database)
                 database.close()
@@ -176,5 +178,5 @@ class WebDatabaseManagerTest {
         }
 
     private suspend fun assetCount(database: MoneyManagerDatabaseWrapper): Long =
-        database.rawQuery("SELECT COUNT(*) FROM asset") { it.getLong(0)!! }.awaitAsOne()
+        RawSql(database.driver).query("SELECT COUNT(*) FROM asset") { it.getLong(0)!! }.awaitAsOne()
 }

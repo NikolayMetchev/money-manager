@@ -1,6 +1,7 @@
 package com.moneymanager.database.csv
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
+import com.moneymanager.database.rawsql.RawSql
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvRow
@@ -8,11 +9,14 @@ import com.moneymanager.domain.model.csv.ImportStatus
 
 /**
  * Manages dynamic CSV tables in the database.
- * These tables are created at runtime to store imported CSV data.
+ * These tables are created at runtime to store imported CSV data, one per import with as many columns as the
+ * file has, so their SQL can't be a SQLDelight query: this is a sanctioned user of [RawSql].
  */
 class CsvTableManager(
-    private val database: MoneyManagerDatabaseWrapper,
+    database: MoneyManagerDatabaseWrapper,
 ) {
+    private val database = RawSql(database.driver)
+
     /**
      * Creates a new table to store CSV data.
      *
@@ -28,11 +32,7 @@ class CsvTableManager(
         val sql =
             "CREATE TABLE IF NOT EXISTS $tableName " +
                 "(row_index INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, import_status TEXT$columns)"
-        database.execute(
-            null,
-            sql,
-            0,
-        )
+        database.execute(sql)
     }
 
     /**
@@ -52,7 +52,7 @@ class CsvTableManager(
         // A zero-column file has no col_ values; insert bare rows (row_index autoincrements) rather than
         // emitting the invalid `INSERT INTO t () VALUES ()`.
         if (columnCount == 0) {
-            repeat(rows.size) { database.execute(null, "INSERT INTO $tableName DEFAULT VALUES", 0) }
+            repeat(rows.size) { database.execute("INSERT INTO $tableName DEFAULT VALUES") }
             return
         }
 
@@ -69,11 +69,7 @@ class CsvTableManager(
                     row.take(columnCount)
                 }
 
-            database.executeWithParams(
-                insertSql,
-                columnCount,
-                paddedRow,
-            )
+            database.executeWithStrings(insertSql, paddedRow)
         }
     }
 
@@ -127,7 +123,7 @@ class CsvTableManager(
             """.trimIndent()
 
         return database
-            .rawQuery(sql) { cursor ->
+            .query(sql) { cursor ->
                 val importStatusStr = cursor.getString(2)
                 CsvRow(
                     rowIndex = cursor.getLong(0)!!,
@@ -145,11 +141,7 @@ class CsvTableManager(
      * @param tableName The name of the table to drop
      */
     suspend fun dropCsvTable(tableName: String) {
-        database.execute(
-            null,
-            "DROP TABLE IF EXISTS $tableName",
-            0,
-        )
+        database.execute("DROP TABLE IF EXISTS $tableName")
     }
 
     /**
@@ -167,11 +159,7 @@ class CsvTableManager(
         transferId: TransferId? = null,
     ) {
         val transferIdClause = transferId?.let { ", transaction_id = '${it.id}'" }.orEmpty()
-        database.execute(
-            null,
-            "UPDATE $tableName SET import_status = '$status'$transferIdClause WHERE row_index = $rowIndex",
-            0,
-        )
+        database.execute("UPDATE $tableName SET import_status = '$status'$transferIdClause WHERE row_index = $rowIndex")
     }
 
     /**
@@ -187,15 +175,13 @@ class CsvTableManager(
     ) {
         if (rowIndexes.isEmpty()) return
         database.execute(
-            null,
             "UPDATE $tableName SET import_status = NULL, transaction_id = NULL " +
                 "WHERE row_index IN (${rowIndexes.joinToString(",")})",
-            0,
         )
     }
 
     /** Returns every row of [tableName] to the never-imported state (see [resetRowStatuses]). */
     suspend fun resetAllRowStatuses(tableName: String) {
-        database.execute(null, "UPDATE $tableName SET import_status = NULL, transaction_id = NULL", 0)
+        database.execute("UPDATE $tableName SET import_status = NULL, transaction_id = NULL")
     }
 }

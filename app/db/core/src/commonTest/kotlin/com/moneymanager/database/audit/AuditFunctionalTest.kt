@@ -12,6 +12,7 @@ import com.moneymanager.domain.repository.write.TransferEdit
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createCategory
+import com.moneymanager.test.database.read.testReads
 import com.moneymanager.test.database.updateAccount
 import com.moneymanager.test.database.updateCategory
 import com.moneymanager.test.database.upsertCurrencyByCode
@@ -59,98 +60,40 @@ private data class CategoryAuditRecord(
 class AuditFunctionalTest : DbTest() {
     /**
      * Test-only query: selectAuditHistoryForAccount
-     * Retrieves audit history for a specific account using raw SQL.
+     * Retrieves audit history for a specific account
      */
-    private suspend fun selectAuditHistoryForAccount(accountId: Long): List<AccountAuditRecord> {
-        val sql =
-            """
-            SELECT
-                account_audit.id,
-                account_audit.audit_timestamp,
-                audit_type.name AS auditType,
-                account_audit.account_id,
-                account_audit.name
-            FROM account_audit
-            JOIN audit_type ON account_audit.audit_type_id = audit_type.id
-            WHERE account_audit.account_id = $accountId
-            ORDER BY account_audit.audit_timestamp DESC, account_audit.id DESC
-            """.trimIndent()
-
-        return database
-            .rawQuery(sql) { cursor ->
-                AccountAuditRecord(
-                    auditId = cursor.getLong(0)!!,
-                    auditTimestamp = cursor.getLong(1)!!,
-                    auditType = cursor.getString(2)!!,
-                    id = cursor.getLong(3)!!,
-                    name = cursor.getString(4)!!,
-                )
+    private suspend fun selectAuditHistoryForAccount(accountId: Long): List<AccountAuditRecord> =
+        database.testReads.auditHistorySelectQueries
+            .selectAccountAuditHistory(accountId) { auditId, auditTimestamp, auditType, id, name ->
+                AccountAuditRecord(auditId = auditId, auditTimestamp = auditTimestamp, auditType = auditType, id = id, name = name)
             }.awaitAsList()
-    }
 
     /**
      * Test-only query: selectAuditHistoryForCurrency
-     * Retrieves audit history for a specific currency using raw SQL.
+     * Retrieves audit history for a specific currency
      */
-    private suspend fun selectAuditHistoryForCurrency(currencyId: Long): List<CurrencyAuditRecord> {
-        val sql =
-            """
-            SELECT
-                currency_audit.id,
-                currency_audit.audit_timestamp,
-                audit_type.name AS auditType,
-                currency_audit.currency_id,
-                currency_audit.code,
-                currency_audit.name
-            FROM currency_audit
-            JOIN audit_type ON currency_audit.audit_type_id = audit_type.id
-            WHERE currency_audit.currency_id = $currencyId
-            ORDER BY currency_audit.audit_timestamp DESC, currency_audit.id DESC
-            """.trimIndent()
-
-        return database
-            .rawQuery(sql) { cursor ->
+    private suspend fun selectAuditHistoryForCurrency(currencyId: Long): List<CurrencyAuditRecord> =
+        database.testReads.auditHistorySelectQueries
+            .selectCurrencyAuditHistory(currencyId) { auditId, auditTimestamp, auditType, id, code, name ->
                 CurrencyAuditRecord(
-                    auditId = cursor.getLong(0)!!,
-                    auditTimestamp = cursor.getLong(1)!!,
-                    auditType = cursor.getString(2)!!,
-                    id = cursor.getLong(3)!!,
-                    code = cursor.getString(4)!!,
-                    name = cursor.getString(5)!!,
+                    auditId = auditId,
+                    auditTimestamp = auditTimestamp,
+                    auditType = auditType,
+                    id = id,
+                    code = code,
+                    name = name,
                 )
             }.awaitAsList()
-    }
 
     /**
      * Test-only query: selectAuditHistoryForCategory
-     * Retrieves audit history for a specific category using raw SQL.
+     * Retrieves audit history for a specific category
      */
-    private suspend fun selectAuditHistoryForCategory(categoryId: Long): List<CategoryAuditRecord> {
-        val sql =
-            """
-            SELECT
-                category_audit.id,
-                category_audit.audit_timestamp,
-                audit_type.name AS auditType,
-                category_audit.category_id,
-                category_audit.name
-            FROM category_audit
-            JOIN audit_type ON category_audit.audit_type_id = audit_type.id
-            WHERE category_audit.category_id = $categoryId
-            ORDER BY category_audit.audit_timestamp DESC, category_audit.id DESC
-            """.trimIndent()
-
-        return database
-            .rawQuery(sql) { cursor ->
-                CategoryAuditRecord(
-                    auditId = cursor.getLong(0)!!,
-                    auditTimestamp = cursor.getLong(1)!!,
-                    auditType = cursor.getString(2)!!,
-                    id = cursor.getLong(3)!!,
-                    name = cursor.getString(4)!!,
-                )
+    private suspend fun selectAuditHistoryForCategory(categoryId: Long): List<CategoryAuditRecord> =
+        database.testReads.auditHistorySelectQueries
+            .selectCategoryAuditHistory(categoryId) { auditId, auditTimestamp, auditType, id, name ->
+                CategoryAuditRecord(auditId = auditId, auditTimestamp = auditTimestamp, auditType = auditType, id = id, name = name)
             }.awaitAsList()
-    }
 
     @Test
     fun `account INSERT creates audit record with auditTypeId 1`() =

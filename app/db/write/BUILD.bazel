@@ -68,6 +68,7 @@ kmp_library(
         "@maven_kmp//:sqldelight_runtime",
     ],
     deps = [
+        "//app/db/rawsql",
         "//app/model/calendar",
         "//utils/coroutines",
         "//utils/regex",

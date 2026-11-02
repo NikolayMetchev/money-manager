@@ -1,0 +1,12 @@
+insertEmptyAsset:
+INSERT INTO asset DEFAULT VALUES;
+
+deleteDevicesOnPlatform:
+DELETE FROM device WHERE platform_id = :platformId;
+
+deletePlatform:
+DELETE FROM platform WHERE id = :platformId;
+
+insertDirtyCategoryAudit:
+INSERT INTO category_audit (audit_timestamp, audit_type_id, category_id, revision_id, name)
+VALUES (0, (SELECT id FROM audit_type LIMIT 1), 1, 1, 'dirty');

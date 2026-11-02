@@ -19,6 +19,7 @@ import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.repository.write.NewTrade
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
+import com.moneymanager.test.database.read.testReads
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -416,11 +417,8 @@ class RelationshipDbTest : DbTest() {
         ).id
 
     private suspend fun relationshipSources(relationshipId: Long): List<Long> =
-        database
-            .rawQuery(
-                "SELECT source_type_id FROM entity_source WHERE entity_type_id = ${EntityType.RELATIONSHIP.id} " +
-                    "AND entity_id = $relationshipId AND matched = 0",
-            ) { it.getLong(0)!! }
+        database.testReads.lookupSelectQueries
+            .selectEntitySourceTypeIds(EntityType.RELATIONSHIP.id, relationshipId)
             .awaitAsList()
 
     @Test
