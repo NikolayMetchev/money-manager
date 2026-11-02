@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -65,65 +64,72 @@ fun MatchPickerDialog(
         onDismissRequest = onDismiss,
         title = { Text("Select matching transactions") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("In $sourceName", style = MaterialTheme.typography.labelLarge)
-                movement.forEach { leg -> PickerLegLine(leg, accountNames) }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
-                    PICKER_WINDOWS.forEach { option ->
-                        FilterChip(selected = window == option, onClick = { window = option }, label = { Text("± $option") })
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = sameAssetOnly, onCheckedChange = { sameAssetOnly = it })
-                        Text("Same asset only")
+            // One list for the whole body, so a phone-sized dialog scrolls rather than squeezing the candidates out.
+            LazyColumn(modifier = Modifier.testTag(PICKER_CANDIDATES_TAG), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                item(key = "header") { Text("In $sourceName", style = MaterialTheme.typography.labelLarge) }
+                items(movement.size, key = { "movement-${movement[it].key}" }) { PickerLegLine(movement[it], accountNames) }
+                item(key = "filters") {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
+                        PICKER_WINDOWS.forEach { option ->
+                            FilterChip(selected = window == option, onClick = { window = option }, label = { Text("± $option") })
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = sameAssetOnly, onCheckedChange = { sameAssetOnly = it })
+                            Text("Same asset only")
+                        }
                     }
                 }
                 if (candidates.isEmpty()) {
-                    Text("No unmatched transactions on the linked accounts within ± $window.")
+                    item(key = "empty") { Text("No unmatched transactions on the linked accounts within ± $window.") }
                 }
-                LazyColumn(modifier = Modifier.heightIn(max = 360.dp).testTag(PICKER_CANDIDATES_TAG)) {
-                    items(candidates.size, key = { candidates[it].key }) { index ->
-                        val candidate = candidates[index]
-                        val checked = candidate.leg in selected
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier =
-                                Modifier.fillMaxWidth().toggleable(
-                                    value = checked,
-                                    enabled = candidate.selectable,
-                                    role = Role.Checkbox,
-                                    onValueChange = { if (it) selected += candidate.leg else selected -= candidate.leg },
-                                ),
-                        ) {
-                            Checkbox(checked = checked, onCheckedChange = null, enabled = candidate.selectable)
-                            Column {
-                                PickerLegLine(candidate.leg, accountNames, delta = candidate.delta, enabled = candidate.selectable)
-                                candidate.nearMatchFor?.let { match ->
-                                    Text(
-                                        "Near match for $sourceName's ${formatAmount(match.sourceLeg.amount)} on " +
-                                            match.sourceLeg.timestamp.displayDateTime(),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
+                items(candidates.size, key = { "candidate-${candidates[it].leg.key}" }) { index ->
+                    val candidate = candidates[index]
+                    val checked = candidate.leg in selected
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier =
+                            Modifier.fillMaxWidth().toggleable(
+                                value = checked,
+                                enabled = candidate.selectable,
+                                role = Role.Checkbox,
+                                onValueChange = { if (it) selected += candidate.leg else selected -= candidate.leg },
+                            ),
+                    ) {
+                        Checkbox(checked = checked, onCheckedChange = null, enabled = candidate.selectable)
+                        Column {
+                            PickerLegLine(candidate.leg, accountNames, delta = candidate.delta, enabled = candidate.selectable)
+                            candidate.nearMatchFor?.let { match ->
+                                Text(
+                                    "Near match for $sourceName's ${formatAmount(match.sourceLeg.amount)} on " +
+                                        match.sourceLeg.timestamp.displayDateTime(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
                     }
                 }
-                selectionTotals(movement, selected).forEach { total ->
-                    val off = !total.balanced
-                    Text(
-                        "${total.asset.code}: $sourceName ${formatAmount(total.source)} · selected ${formatAmount(total.selected)}" +
-                            " · difference ${formatAmount(total.difference)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (off) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                if (selected.isNotEmpty() && selectionTotals(movement, selected).any { !it.balanced }) {
-                    Text(
-                        "The totals differ. Match anyway if the two sides book fees differently.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
+                item(key = "totals") {
+                    val totals = selectionTotals(movement, selected)
+                    Column {
+                        totals.forEach { total ->
+                            Text(
+                                "${total.asset.code}: $sourceName ${formatAmount(
+                                    total.source,
+                                )} · selected ${formatAmount(total.selected)}" +
+                                    " · difference ${formatAmount(total.difference)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (total.balanced) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
+                            )
+                        }
+                        if (selected.isNotEmpty() && totals.any { !it.balanced }) {
+                            Text(
+                                "The totals differ. Match anyway if the two sides book fees differently.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -160,4 +166,4 @@ private fun PickerLegLine(
     }
 }
 
-private val PickerCandidate.key: String get() = "${leg.transactionId}-${leg.accountId.id}-${leg.amount.asset.id}"
+private val ReconciliationLeg.key: String get() = "$transactionId-${accountId.id}-${amount.asset.id}"

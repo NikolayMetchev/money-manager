@@ -642,19 +642,23 @@ private fun LegRow(
     onOpenLeg: (ReconciliationLeg) -> Unit,
     actions: (@Composable () -> Unit)? = null,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable { onOpenLeg(leg) }.padding(vertical = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(leg.timestamp.displayDateTime(), modifier = Modifier.width(140.dp), style = MaterialTheme.typography.bodySmall)
-        Text(formatAmount(leg.amount), modifier = Modifier.width(180.dp), style = MaterialTheme.typography.bodySmall)
-        Text(
-            leg.description + (leg.counterpartyAccountId?.let { "  ·  ${accountNames[it].orEmpty()}" } ?: "  ·  trade"),
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.weight(1f),
-        )
-        actions?.invoke()
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable { onOpenLeg(leg) }.padding(vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(leg.timestamp.displayDateTime(), modifier = Modifier.width(140.dp), style = MaterialTheme.typography.bodySmall)
+            Text(formatAmount(leg.amount), modifier = Modifier.width(180.dp), style = MaterialTheme.typography.bodySmall)
+            Text(
+                leg.description + (leg.counterpartyAccountId?.let { "  ·  ${accountNames[it].orEmpty()}" } ?: "  ·  trade"),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        // On a line of their own, so a phone-width row still has room for them.
+        if (actions != null) {
+            Row(modifier = Modifier.align(Alignment.End)) { actions() }
+        }
     }
 }
 
