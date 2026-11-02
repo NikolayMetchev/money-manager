@@ -85,8 +85,13 @@ class ReconciliationReadRepositoryImpl(
                         accountId = AccountId(row.account_id),
                         counterpartyAccountId = row.counterparty_account_id?.let(::AccountId),
                         amount = Money(if (row.sign < 0) -magnitude else magnitude, asset),
-                        isExcluded = row.is_excluded == 1L,
+                        excludedReason = row.excluded_reason,
                         movementKey = row.movement_key,
+                        matchIds =
+                            row.match_ids
+                                .split(',')
+                                .filter { it.isNotEmpty() }
+                                .mapTo(mutableSetOf()) { it.toLong() },
                     )
                 }.toList()
         }

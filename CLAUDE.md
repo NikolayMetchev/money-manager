@@ -484,7 +484,14 @@ source** (built-in: Koinly). Its data never touches real accounts:
   lists the rest as "needs attention" (link to an existing account or create one).
 - `reconcile()` (`app/reconciliation`) matches legs per link group on (asset, signed amount): exact
   second, then nearest within 24h, then summed per (group, asset, second) so a fee booked separately on
-  one side still matches the other side's gross leg.
+  one side still matches the other side's gross leg. A match a person makes is stored first: a
+  `reconciliation-match` relationship (type 6, members of any transaction kind, written by `Source.Manual`), which
+  `reconcile()` honours before computing anything (`LegMatch.matchId`), whatever its amounts and times.
+- The External Account Reconciliation screen has two tabs. **Unmatched**: near matches (**Accept** stores one),
+  the source's rows Money Manager lacks (**Ignore** excludes them with the reason `"ignored in reconciliation"`,
+  outside the source's owned set; **Select matching transactions…** picks real legs from around that time that no
+  match claims, `pickerCandidates`), and real legs the source lacks (read-only). **Matched**: exact and stored
+  matches (**Unmatch** deletes a stored one) and the ignored rows (**Un-ignore**).
 - Rows the source marks deleted are imported **excluded** (an `Exclude` rule), like
   declined card payments. Trades can be excluded too (`trade_attribute`, honoured by
   `BalanceLegsSelect`, toggled by hand in `TradeExclusionDialog`), and a transfer's fee/pass-through
@@ -509,7 +516,8 @@ never reconciles them again), deletes every transfer and trade the source create
 records that had matched against the deleted ones (found from provenance: a staged row linked to a
 transaction it didn't create is a `matched = 1` `entity_source` entry, kept in step with the row's link; readers
 asking who wrote a revision filter on `matched = 0`), re-applies hand edits (from the audit log) to the
-re-created transfers (reporting those it can't match), and deletes accounts the source created that are now
+re-created transfers, hand-set trade attributes to the re-created trades and hand-made (`Source.Manual`)
+relationships to their re-created members (reporting those it can't match), and deletes accounts the source created that are now
 empty. There is no separate re-import logic: no merges, no in-place updates, no detectors.
 
 ## Dependency Injection

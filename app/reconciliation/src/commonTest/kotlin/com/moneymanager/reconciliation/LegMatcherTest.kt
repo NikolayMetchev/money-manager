@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
 import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.reconciliation.ReconciliationLink
@@ -38,7 +39,10 @@ class LegMatcherTest {
         asset: CryptoAsset = ada,
         excluded: Boolean = false,
         movement: String? = null,
-    ) = (nextId++).let { id ->
+        reason: String? = if (excluded) "deleted" else null,
+        matchIds: Set<Long> = emptySet(),
+        transactionId: Long? = null,
+    ) = (transactionId ?: nextId++).let { id ->
         ReconciliationLeg(
             transactionId = id,
             kind = if (counterparty == null) LegTransactionKind.TRADE else LegTransactionKind.TRANSFER,
@@ -47,8 +51,9 @@ class LegMatcherTest {
             accountId = account,
             counterpartyAccountId = counterparty,
             amount = Money.fromDisplayValue(BigDecimal(amount), asset),
-            isExcluded = excluded,
+            excludedReason = reason,
             movementKey = movement ?: "m$id",
+            matchIds = matchIds,
         )
     }
 
@@ -61,7 +66,7 @@ class LegMatcherTest {
 
         val result = reconcile(source, links, real)
 
-        assertEquals(1, result.exactMatches.size)
+        assertEquals(1, result.matched.size)
         assertEquals(listOf(ada("1")), result.missingInMm.map { it.leg.amount })
         assertEquals(listOf(ada("2")), result.missingInSource.map { it.leg.amount })
     }
@@ -73,10 +78,10 @@ class LegMatcherTest {
 
         val result = reconcile(source, links, real)
 
-        assertEquals(1, result.fuzzyMatches.size)
+        assertEquals(1, result.nearMatches.size)
         assertEquals(
             t0 + 1.hours,
-            result.fuzzyMatches
+            result.nearMatches
                 .single()
                 .sourceLeg.timestamp,
         )
@@ -92,7 +97,7 @@ class LegMatcherTest {
 
         val result = reconcile(source, links, real)
 
-        assertEquals(2, result.exactMatches.size)
+        assertEquals(2, result.matched.size)
         assertEquals(1, result.missingInMm.size)
     }
 
@@ -108,7 +113,7 @@ class LegMatcherTest {
 
         val result = reconcile(source, links, real)
 
-        assertEquals(1, result.exactMatches.size)
+        assertEquals(1, result.matched.size)
         assertTrue(result.missingInSource.isEmpty())
     }
 
@@ -201,7 +206,90 @@ class LegMatcherTest {
 
         val result = reconcile(source, links, real)
 
-        assertEquals(1, result.exactMatches.size)
+        assertEquals(1, result.matched.size)
         assertTrue(result.missingInSource.isEmpty())
+    }
+
+    @Test
+    fun `a stored match pairs legs whose amounts and times disagree`() {
+        val source = listOf(leg(wallet, sourceRewards, "5", t0, matchIds = setOf(7)))
+        val real =
+            listOf(
+                leg(binance, stakingRewards, "4.9", t0 + 3.hours, matchIds = setOf(7)),
+                leg(binanceEarn, stakingRewards, "0.1", t0 + 40.hours, matchIds = setOf(7)),
+            )
+
+        val result = reconcile(source, links, real)
+
+        val match = result.matched.single()
+        assertEquals(7L, match.matchId)
+        assertEquals(2, match.realLegs.size)
+        assertTrue(result.nearMatches.isEmpty() && result.missingInMm.isEmpty() && result.missingInSource.isEmpty())
+        assertTrue(result.unclaimedReal.isEmpty())
+    }
+
+    @Test
+    fun `a stored match with one side gone falls back to normal matching`() {
+        val source = listOf(leg(wallet, sourceRewards, "5", t0, matchIds = setOf(7)))
+        val real = listOf(leg(binance, stakingRewards, "5", t0 + 1.hours))
+
+        val result = reconcile(source, links, real)
+
+        assertEquals(null, result.nearMatches.single().matchId)
+    }
+
+    @Test
+    fun `a source transfer between two linked wallets can be in a stored match on each`() {
+        val otherWallet = AccountId(200)
+        val coinbase = AccountId(20)
+        val twoWallets = links + ReconciliationLink(otherWallet, coinbase)
+        val transferId = 500L
+        val source =
+            listOf(
+                leg(wallet, otherWallet, "-5", t0, matchIds = setOf(1, 2), transactionId = transferId),
+                leg(otherWallet, wallet, "5", t0, matchIds = setOf(1, 2), transactionId = transferId),
+            )
+        val real =
+            listOf(
+                leg(binance, stakingRewards, "-5", t0 + 2.hours, matchIds = setOf(1)),
+                leg(coinbase, stakingRewards, "5", t0 + 5.hours, matchIds = setOf(2)),
+            )
+
+        val result = reconcile(source, twoWallets, real)
+
+        assertEquals(setOf(1L, 2L), result.matched.map { it.matchId }.toSet())
+        assertTrue(result.missingInMm.isEmpty() && result.missingInSource.isEmpty())
+    }
+
+    @Test
+    fun `ignored source legs are collected and never matched`() {
+        val source =
+            listOf(
+                leg(wallet, sourceRewards, "5", t0, reason = IGNORED_IN_RECONCILIATION),
+                leg(wallet, sourceRewards, "6", t0 + 1.hours),
+            )
+        val real = listOf(leg(binance, stakingRewards, "5", t0))
+
+        val result = reconcile(source, links, real)
+
+        assertEquals(listOf(ada("5")), result.ignored.map { it.leg.amount })
+        assertTrue(result.matches.isEmpty())
+        assertEquals(listOf(ada("6")), result.missingInMm.map { it.leg.amount })
+    }
+
+    @Test
+    fun `unclaimed real legs exclude matched ones but reach past the source's range`() {
+        val source = listOf(leg(wallet, sourceRewards, "5", t0), leg(wallet, sourceRewards, "6", t0 + 20.hours))
+        val real =
+            listOf(
+                leg(binance, stakingRewards, "5", t0),
+                leg(binance, stakingRewards, "7", t0 + 10.hours),
+                leg(binance, stakingRewards, "8", t0 + 100.hours),
+            )
+
+        val result = reconcile(source, links, real)
+
+        assertEquals(listOf(ada("7"), ada("8")), result.unclaimedReal.map { it.leg.amount })
+        assertEquals(listOf(ada("7")), result.missingInSource.map { it.leg.amount })
     }
 }

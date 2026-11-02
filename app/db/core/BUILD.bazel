@@ -182,6 +182,7 @@ kmp_test(
         "//app/model/importdirectory",
         "//app/model/passthrough",
         "//app/model/qif",
+        "//app/model/reconciliation",
         "//app/model/repository/read",
         "//app/model/repository/write:write_for_tests",
         "//app/model/rules",

@@ -225,6 +225,7 @@ fun ImportsScreen(
                             accountRepository = accountRepository,
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
+                            transactionRepository = transactionRepository,
                             onOpenLeg = onReconciliationLegClick,
                         )
                     },

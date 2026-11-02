@@ -37,6 +37,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.RelationshipId
+import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.reconciliation.ReconciliationLink
 import com.moneymanager.domain.model.reconciliation.ReconciliationSource
@@ -45,12 +49,18 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
+import com.moneymanager.importengineapi.createReconciliationMatch
+import com.moneymanager.importengineapi.deleteRelationship
 import com.moneymanager.importengineapi.setReconciliationLinks
+import com.moneymanager.importengineapi.setTradeExcluded
+import com.moneymanager.importengineapi.setTransferExcluded
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.reconciliation.LegMatch
 import com.moneymanager.reconciliation.ReconciliationResult
 import com.moneymanager.reconciliation.UnlinkedWallet
+import com.moneymanager.reconciliation.UnmatchedSourceLeg
 import com.moneymanager.reconciliation.applyAutoLinks
 import com.moneymanager.reconciliation.createAndLinkAccounts
 import com.moneymanager.reconciliation.planAccountCreation
@@ -71,20 +81,20 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 
 private enum class ResultTab(
-    val label: (String) -> String,
+    val label: String,
 ) {
-    MISSING_IN_MM({ "Import into Money Manager" }),
-    MISSING_IN_SOURCE({ source -> "Import into $source" }),
-    FUZZY({ "Near matches" }),
-    MATCHED({ "Matched" }),
+    UNMATCHED("Unmatched"),
+    MATCHED("Matched"),
 }
 
 /**
  * Compares each reconciliation source (a CSV strategy with a `ReconciliationConfig`, e.g. Koinly)
  * against the real accounts its wallets are linked to. Wallets whose name matches a real account are
  * linked automatically; the rest are listed first as something to fix — link to an existing account or
- * create one. Below that, the unmatched movements on each side, grouped by wallet and month, tell the
- * user what to import where.
+ * create one. Below that, two tabs. **Unmatched**: near matches to accept, the source's movements Money Manager
+ * lacks (to ignore or match by hand to real transactions picked from around that time), and real movements the
+ * source lacks. **Matched**: exact matches, the matches a person stored (to unmatch), and ignored source rows (to bring
+ * back). Every list is grouped by wallet and month.
  */
 @Composable
 fun ReconciliationScreen(
@@ -92,6 +102,7 @@ fun ReconciliationScreen(
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
+    transactionRepository: TransactionReadRepository,
     onOpenLeg: (ReconciliationLeg) -> Unit,
 ) {
     val sources by rememberFlowAsStateWithSchemaErrorHandling(initial = null) { reconciliationRepository.getSources() }
@@ -125,6 +136,7 @@ fun ReconciliationScreen(
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             personRepository = personRepository,
+            transactionRepository = transactionRepository,
             onOpenLeg = onOpenLeg,
         )
     }
@@ -137,6 +149,7 @@ private fun SourceReconciliation(
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
+    transactionRepository: TransactionReadRepository,
     onOpenLeg: (ReconciliationLeg) -> Unit,
 ) {
     val importEngine = LocalImportEngine.current
@@ -180,7 +193,8 @@ private fun SourceReconciliation(
             planAccountCreation(source, unlinked.filterNot { it.wallet.autoLinkDeclined }.map { it.wallet }, accounts)
         }
     var hideUnknownAssets by remember { mutableStateOf(true) }
-    var tab by remember { mutableStateOf(ResultTab.MISSING_IN_MM) }
+    var tab by remember { mutableStateOf(ResultTab.UNMATCHED) }
+    var picking by remember { mutableStateOf<UnmatchedSourceLeg?>(null) }
     val expanded = remember(source) { mutableStateMapOf<String, Boolean>() }
 
     fun setLinks(
@@ -195,6 +209,35 @@ private fun SourceReconciliation(
     }
 
     var creatingAll by remember { mutableStateOf(false) }
+
+    // Legs aren't a Flow, so every write reloads them.
+    fun write(
+        what: String,
+        block: suspend () -> Unit,
+    ) {
+        scope.launch {
+            runCatchingUnlessCancelled { block() }
+                .onSuccess {
+                    error = null
+                    refreshKey++
+                }.onFailure { error = "$what failed: ${it.message}" }
+        }
+    }
+
+    fun storeMatch(legs: List<ReconciliationLeg>) =
+        write("Matching") { importEngine.createReconciliationMatch(legs.map { it.transactionRef }.distinct()) }
+
+    // Ignoring a source row excludes every transaction of its movement (a trade and its fee, say).
+    fun setIgnored(
+        legs: List<ReconciliationLeg>,
+        ignored: Boolean,
+    ) = write(if (ignored) "Ignoring" else "Un-ignoring") {
+        val reason = IGNORED_IN_RECONCILIATION.takeIf { ignored }
+        val refs = legs.map { it.transactionRef }.distinct()
+        refs.filterIsInstance<TradeId>().forEach { importEngine.setTradeExcluded(it, reason) }
+        val transfers = transactionRepository.getTransactionsByIds(refs.filterIsInstance<TransferId>())
+        transfers.values.forEach { importEngine.setTransferExcluded(it, reason) }
+    }
 
     fun createAll(plan: Map<AccountId, String>) {
         creatingAll = true
@@ -277,7 +320,7 @@ private fun SourceReconciliation(
         item {
             SecondaryTabRow(selectedTabIndex = tab.ordinal, modifier = Modifier.padding(top = 12.dp)) {
                 ResultTab.entries.forEach { entry ->
-                    Tab(selected = tab == entry, onClick = { tab = entry }, text = { Text(entry.label(source.name)) })
+                    Tab(selected = tab == entry, onClick = { tab = entry }, text = { Text(entry.label) })
                 }
             }
         }
@@ -285,51 +328,109 @@ private fun SourceReconciliation(
             shadowAccounts.firstOrNull { it.accountId == id }?.let(source::walletName) ?: accountNames[id].orEmpty()
         }
         when (tab) {
-            ResultTab.MISSING_IN_MM -> {
+            ResultTab.UNMATCHED -> {
+                sectionHeading("Near matches (${loaded.nearMatches.size})")
+                legGroups(
+                    prefix = "near",
+                    groups = groupByWalletAndMonth(loaded.nearMatches, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
+                    expanded = expanded,
+                    empty = "No near matches: every match agrees to the second.",
+                ) { match ->
+                    MatchRow(match, accountNames, onOpenLeg) {
+                        TextButton(onClick = { storeMatch(match.sourceLegs + match.realLegs) }) { Text("Accept") }
+                    }
+                }
+                val onlyInSource = loaded.missingInMm.filter { !hideUnknownAssets || !it.assetUnknownToMm }
+                sectionHeading("Only in ${source.name} (${onlyInSource.size})")
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = hideUnknownAssets, onCheckedChange = { hideUnknownAssets = it })
                         Text("Hide assets Money Manager has never seen on the linked accounts (e.g. spam airdrops)")
                     }
                 }
-                val legs = loaded.missingInMm.filter { !hideUnknownAssets || !it.assetUnknownToMm }
                 legGroups(
-                    prefix = "mm",
-                    groups = groupByWalletAndMonth(legs, { it.walletAccountId }, { it.leg.timestamp }, walletName),
+                    prefix = "source-only",
+                    groups = groupByWalletAndMonth(onlyInSource, { it.walletAccountId }, { it.leg.timestamp }, walletName),
                     expanded = expanded,
                     empty = "Everything ${source.name} has on the linked wallets is in Money Manager.",
-                ) { LegRow(it.leg, accountNames, onOpenLeg) }
-            }
-
-            ResultTab.MISSING_IN_SOURCE -> {
+                ) { unmatched ->
+                    LegRow(unmatched.leg, accountNames, onOpenLeg) {
+                        TextButton(onClick = { setIgnored(loaded.movementOf(unmatched), ignored = true) }) { Text("Ignore") }
+                        TextButton(onClick = { picking = unmatched }) { Text("Select matching transactions…") }
+                    }
+                }
+                sectionHeading("Only in Money Manager (${loaded.missingInSource.size})")
                 legGroups(
-                    prefix = "src",
+                    prefix = "mm-only",
                     groups = groupByWalletAndMonth(loaded.missingInSource, { it.walletAccountId }, { it.leg.timestamp }, walletName),
                     expanded = expanded,
                     empty = "Everything on the linked accounts in ${source.name}'s date range is in ${source.name}.",
                 ) { LegRow(it.leg, accountNames, onOpenLeg) }
             }
 
-            ResultTab.FUZZY -> {
-                legGroups(
-                    prefix = "fuzzy",
-                    groups =
-                        groupByWalletAndMonth(loaded.fuzzyMatches, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
-                    expanded = expanded,
-                    empty = "No near matches: every match agrees to the second.",
-                ) { MatchRow(it, accountNames, onOpenLeg) }
-            }
-
             ResultTab.MATCHED -> {
                 legGroups(
                     prefix = "matched",
-                    groups =
-                        groupByWalletAndMonth(loaded.exactMatches, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
+                    groups = groupByWalletAndMonth(loaded.matched, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
                     expanded = expanded,
                     empty = "Nothing matched yet — link the wallets above.",
-                ) { MatchRow(it, accountNames, onOpenLeg) }
+                ) { match ->
+                    val matchId = match.matchId
+                    MatchRow(
+                        match,
+                        accountNames,
+                        onOpenLeg,
+                        action =
+                            if (matchId == null) {
+                                null
+                            } else {
+                                {
+                                    TextButton(
+                                        onClick = { write("Unmatching") { importEngine.deleteRelationship(RelationshipId(matchId)) } },
+                                    ) {
+                                        Text("Unmatch")
+                                    }
+                                }
+                            },
+                    )
+                }
+                sectionHeading("Ignored (${loaded.ignored.size})")
+                legGroups(
+                    prefix = "ignored",
+                    groups = groupByWalletAndMonth(loaded.ignored, { it.walletAccountId }, { it.leg.timestamp }, walletName),
+                    expanded = expanded,
+                    empty = "No ${source.name} rows ignored.",
+                ) { ignored ->
+                    LegRow(ignored.leg, accountNames, onOpenLeg) {
+                        TextButton(onClick = { setIgnored(listOf(ignored.leg), ignored = false) }) { Text("Un-ignore") }
+                    }
+                }
             }
         }
+    }
+
+    val loaded = result
+    val picked = picking
+    if (loaded != null && picked != null) {
+        val movement = remember(loaded, picked) { loaded.movementOf(picked) }
+        MatchPickerDialog(
+            sourceName = source.name,
+            movement = movement,
+            wallet = picked.walletAccountId,
+            result = loaded,
+            accountNames = accountNames,
+            onDismiss = { picking = null },
+            onConfirm = { selected ->
+                picking = null
+                storeMatch(movement + selected)
+            },
+        )
+    }
+}
+
+private fun LazyListScope.sectionHeading(text: String) {
+    item(key = "heading-$text".substringBefore(" (")) {
+        Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
     }
 }
 
@@ -354,10 +455,11 @@ private fun SummaryHeader(
         if (result != null) {
             val missingInMm = result.missingInMm.count { !hideUnknownAssets || !it.assetUnknownToMm }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                AssistChip(onClick = {}, label = { Text("Matched: ${result.exactMatches.size}") })
-                AssistChip(onClick = {}, label = { Text("Near matches: ${result.fuzzyMatches.size}") })
-                AssistChip(onClick = {}, label = { Text("Import into Money Manager: $missingInMm") })
-                AssistChip(onClick = {}, label = { Text("Import into ${source.name}: ${result.missingInSource.size}") })
+                AssistChip(onClick = {}, label = { Text("Matched: ${result.matched.size}") })
+                AssistChip(onClick = {}, label = { Text("Near matches: ${result.nearMatches.size}") })
+                AssistChip(onClick = {}, label = { Text("Only in ${source.name}: $missingInMm") })
+                AssistChip(onClick = {}, label = { Text("Only in Money Manager: ${result.missingInSource.size}") })
+                AssistChip(onClick = {}, label = { Text("Ignored: ${result.ignored.size}") })
             }
         }
     }
@@ -538,17 +640,21 @@ private fun LegRow(
     leg: ReconciliationLeg,
     accountNames: Map<AccountId, String>,
     onOpenLeg: (ReconciliationLeg) -> Unit,
+    actions: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable { onOpenLeg(leg) }.padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(leg.timestamp.displayDateTime(), modifier = Modifier.width(140.dp), style = MaterialTheme.typography.bodySmall)
         Text(formatAmount(leg.amount), modifier = Modifier.width(180.dp), style = MaterialTheme.typography.bodySmall)
         Text(
             leg.description + (leg.counterpartyAccountId?.let { "  ·  ${accountNames[it].orEmpty()}" } ?: "  ·  trade"),
             style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f),
         )
+        actions?.invoke()
     }
 }
 
@@ -557,6 +663,7 @@ private fun MatchRow(
     match: LegMatch,
     accountNames: Map<AccountId, String>,
     onOpenLeg: (ReconciliationLeg) -> Unit,
+    action: (@Composable () -> Unit)? = null,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         match.sourceLegs.forEach { LegRow(it, accountNames, onOpenLeg) }
@@ -566,12 +673,15 @@ private fun MatchRow(
                 LegRow(real, accountNames, onOpenLeg)
             }
         }
-        if (!match.exact) {
-            Text(
-                "Δt ${formatDelta(match.timeDelta)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.tertiary,
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            when {
+                match.matchId != null -> "Matched by hand"
+                !match.exact -> "Δt ${formatDelta(match.timeDelta)}"
+                else -> null
+            }?.let {
+                Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
+            }
+            action?.invoke()
         }
     }
 }
@@ -583,4 +693,4 @@ private fun MatchRow(
 internal inline fun <T> runCatchingUnlessCancelled(block: () -> T): Result<T> =
     runCatching(block).onFailure { if (it is CancellationException) throw it }
 
-private fun formatDelta(delta: Duration): String = delta.absoluteValue.toString().let { if (delta.isNegative()) "-$it" else "+$it" }
+internal fun formatDelta(delta: Duration): String = delta.absoluteValue.toString().let { if (delta.isNegative()) "-$it" else "+$it" }
