@@ -53,7 +53,9 @@ CREATE TABLE running_balance_materialized_view (
 
 CREATE INDEX IF NOT EXISTS idx_running_balance_mv_account ON running_balance_materialized_view(account_id);
 CREATE INDEX IF NOT EXISTS idx_running_balance_mv_timestamp ON running_balance_materialized_view(timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_running_balance_mv_account_timestamp ON running_balance_materialized_view(account_id, timestamp DESC);
+-- id is the paging queries' tie-breaker (ORDER BY timestamp DESC, id DESC): with it in the index they need no
+-- sort, so an OFFSET skips rows without computing account_row_source's columns for them.
+CREATE INDEX IF NOT EXISTS idx_running_balance_mv_account_timestamp ON running_balance_materialized_view(account_id, timestamp DESC, id DESC);
 
 -- NOTE: The old `account_balance_view` / `running_balance_view` (SQL SUM aggregations) were removed
 -- when amounts became arbitrary-precision TEXT: SQLite cannot SUM decimal strings without losing
@@ -129,9 +131,12 @@ SELECT
     -- pt_spend.transaction_id is this row's spend leg (when this row is the funding leg); pt_funding.transaction_id
     -- is this row's funding leg (when this row is the spend leg); both are NULL for non-conduit rows, so the extra
     -- checks are no-ops there.
+    -- CROSS JOIN pins the join order: left to choose, SQLite (with no sqlite_stat1) drives from relationship's
+    -- type index, walking every reconciled relationship for each row (~5 ms a row; a deep OFFSET page took a
+    -- minute), instead of three point lookups on idx_relationship_member_transaction.
     CASE WHEN EXISTS (
         SELECT 1 FROM relationship_member rm
-        JOIN relationship r ON r.id = rm.relationship_id
+        CROSS JOIN relationship r ON r.id = rm.relationship_id
         WHERE r.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
           AND rm.transaction_id IN (running_balance_materialized_view.id, pt_spend.transaction_id, pt_funding.transaction_id)
     ) THEN 1 ELSE 0 END AS is_reconciled,
