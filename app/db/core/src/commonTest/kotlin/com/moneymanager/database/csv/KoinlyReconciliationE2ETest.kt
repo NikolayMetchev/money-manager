@@ -13,14 +13,17 @@ import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.RelationshipMutation
 import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.createAccount
+import com.moneymanager.importengineapi.createReconciliationMatch
 import com.moneymanager.importengineapi.setReconciliationLinks
 import com.moneymanager.importengineapi.setTradeExcluded
+import com.moneymanager.importengineapi.setTransferExcluded
 import com.moneymanager.reconciliation.planAutoLinks
 import com.moneymanager.reconciliation.realAccounts
 import com.moneymanager.reconciliation.reconcile
@@ -468,6 +471,60 @@ class KoinlyReconciliationE2ETest : DbTest() {
         }
 
     @Test
+    fun aStoredMatchAndAnIgnoredRowSurviveReimportingTheSource() =
+        runDbTest {
+            val file = stage("a.csv", listOf(coinbaseDeposit, coinbaseTrade))
+            applyAll(listOf(file))
+            val real = repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now), Source.Manual)
+            val other = repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Shop", openingDate = now), Source.Manual)
+            val gbp = assertNotNull(repositories.currencyRepository.getCurrencyByCode("GBP").first())
+            repositories.importEngine.import(
+                ImportBatch(
+                    transfers =
+                        listOf(
+                            ImportTransfer(
+                                source = Source.Manual,
+                                timestamp = Instant.parse("2020-07-03T08:22:32Z"),
+                                description = "Card payment",
+                                fromAccount = AccountRef.Existing(real),
+                                toAccount = AccountRef.Existing(other),
+                                amount = Money.fromDisplayValue(BigDecimal("500"), gbp),
+                            ),
+                        ),
+                ),
+            )
+            val realTransfer = transfersOn(real).single().id
+            repositories.importEngine.createReconciliationMatch(listOf(koinlyTrade().id, realTransfer))
+            repositories.importEngine.setTransferExcluded(koinlyDeposit(), IGNORED_IN_RECONCILIATION)
+
+            reimport(file)
+
+            val legs = repositories.reconciliationLinkRepository.getLegs(shadowIds())
+            val tradeLegs = legs.filter { it.transactionId == koinlyTrade().id.id }
+            val depositLegs = legs.filter { it.transactionId == koinlyDeposit().id.id }
+            val matchId = tradeLegs.flatMap { it.matchIds }.toSet().single()
+            assertEquals(
+                setOf(matchId),
+                repositories.reconciliationLinkRepository
+                    .getLegs(setOf(real))
+                    .single()
+                    .matchIds,
+            )
+            assertTrue(depositLegs.isNotEmpty() && depositLegs.all { it.isIgnored }, "$depositLegs")
+        }
+
+    @Test
+    fun anExclusionWithoutAReasonStillReadsAsExcluded() =
+        runDbTest {
+            applyAll(listOf(stage("a.csv", listOf(coinbaseDeposit))))
+            repositories.importEngine.setTransferExcluded(koinlyDeposit(), "")
+
+            val legs = repositories.reconciliationLinkRepository.getLegs(shadowIds())
+
+            assertTrue(legs.isNotEmpty() && legs.all { it.isExcluded && it.excludedReason == "" }, "$legs")
+        }
+
+    @Test
     fun removingAWalletsLastLinkStopsAutoLinkingIt() =
         runDbTest {
             applyAll(listOf(stage("transactions.csv", listOf(binanceReward))))
@@ -629,7 +686,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
                     links = links,
                     realLegs = reconciliation.getLegs(links.map { it.realAccountId }.toSet()),
                 )
-            assertEquals(1, result.exactMatches.size)
+            assertEquals(1, result.matched.size)
             // The Coinbase wallet is unlinked, so its deposit is out of scope rather than "missing".
             assertTrue(result.missingInMm.isEmpty())
             assertTrue(result.missingInSource.isEmpty())

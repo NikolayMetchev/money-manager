@@ -12,8 +12,15 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.ImportDirectoryId
+import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.RelationshipId
+import com.moneymanager.domain.model.RelationshipMember
+import com.moneymanager.domain.model.RelationshipRole
+import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
+import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
@@ -44,6 +51,52 @@ suspend fun ImportEngine.setTradeExcluded(
     val mutation =
         if (reason == null) TradeAttributeMutation.Remove(tradeId, typeId) else TradeAttributeMutation.Set(tradeId, typeId, reason)
     import(ImportBatch(tradeAttributeMutations = listOf(mutation)))
+}
+
+/**
+ * Excludes [transfer] from balances with [reason], or brings it back when [reason] is null: a hand edit
+ * ([Source.Manual]), so it's audited and a re-import of the transfer's source puts it back.
+ */
+suspend fun ImportEngine.setTransferExcluded(
+    transfer: Transfer,
+    reason: String?,
+) {
+    val typeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
+    val current = transfer.attributes.filter { it.attributeType.id == typeId }
+    if (current.map { it.value } == listOfNotNull(reason)) return
+    val update =
+        ImportTransfer(
+            source = Source.Manual,
+            operation = ImportOperation.UPDATE,
+            existingId = transfer.id,
+            description = transfer.description,
+            deletedAttributeIds = current.mapTo(mutableSetOf()) { it.id },
+            attributes = listOfNotNull(reason?.let { NewAttribute(typeId, it) }),
+        )
+    import(ImportBatch.manualEdits(transfers = listOf(update)))
+}
+
+// endregion
+
+// region Relationships
+
+/**
+ * Stores a person's statement that [members] (transfers and trades) record one movement: a "reconciliation-match"
+ * relationship, every member a MEMBER, written by hand so a re-import rebuilds it.
+ */
+suspend fun ImportEngine.createReconciliationMatch(members: Collection<TransactionId>) {
+    require(members.size >= 2) { "A match needs at least two transactions" }
+    val mutation =
+        RelationshipMutation.Create(
+            typeId = RelationshipTypeId(WellKnownIds.RECONCILIATION_MATCH_RELATIONSHIP_TYPE_ID),
+            members = members.distinct().map { RelationshipMember(it, RelationshipRole.MEMBER) },
+            source = Source.Manual,
+        )
+    import(ImportBatch(relationshipMutations = listOf(mutation)))
+}
+
+suspend fun ImportEngine.deleteRelationship(id: RelationshipId) {
+    import(ImportBatch(relationshipMutations = listOf(RelationshipMutation.Delete(id))))
 }
 
 // endregion

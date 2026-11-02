@@ -18,6 +18,8 @@ import kotlin.time.Instant
 data class LegMatch(
     val sourceLegs: List<ReconciliationLeg>,
     val realLegs: List<ReconciliationLeg>,
+    /** The "reconciliation-match" relationship a person stored this match as; null when the matcher found it. */
+    val matchId: Long? = null,
 ) {
     constructor(sourceLeg: ReconciliationLeg, realLeg: ReconciliationLeg) : this(listOf(sourceLeg), listOf(realLeg))
 
@@ -27,6 +29,9 @@ data class LegMatch(
     /** Exact = one leg each at the same second; otherwise found by a later pass. */
     val exact: Boolean
         get() = sourceLegs.size == 1 && realLegs.size == 1 && sourceLeg.timestamp.epochSeconds == realLeg.timestamp.epochSeconds
+
+    /** Settled: a person stored it, or it agrees to the second. Anything else is a near match to accept. */
+    val settled: Boolean get() = matchId != null || exact
 
     val timeDelta: Duration get() = realLeg.timestamp - sourceLeg.timestamp
 }
@@ -58,9 +63,20 @@ data class ReconciliationResult(
     val missingInMm: List<UnmatchedSourceLeg>,
     /** Real legs to import into the source. */
     val missingInSource: List<UnmatchedRealLeg>,
+    /** Source legs on the linked wallets that a person ignored (see `ReconciliationLeg.isIgnored`). */
+    val ignored: List<UnmatchedSourceLeg> = emptyList(),
+    /**
+     * Every in-scope real leg no match claims, whatever its date: what a source leg may be matched to by hand. Unlike
+     * [missingInSource] it isn't limited to the source's date range, so a leg near the range's edge still has its
+     * candidates on the other side of it.
+     */
+    val unclaimedReal: List<UnmatchedRealLeg> = emptyList(),
 ) {
-    val exactMatches: List<LegMatch> get() = matches.filter { it.exact }
-    val fuzzyMatches: List<LegMatch> get() = matches.filterNot { it.exact }
+    /** Stored matches and those that agree to the second. */
+    val matched: List<LegMatch> get() = matches.filter { it.settled }
+
+    /** Matches found only by the later passes, for a person to accept. */
+    val nearMatches: List<LegMatch> get() = matches.filterNot { it.settled }
 }
 
 /** How far apart a fuzzy match may be: sources often stamp a movement at a different point of its life. */
@@ -68,6 +84,10 @@ val DEFAULT_FUZZY_WINDOW: Duration = 24.hours
 
 /**
  * Matches a reconciliation source's legs against the real legs of the accounts linked to its wallets.
+ *
+ * A person's stored matches come first: legs whose transactions share a "reconciliation-match" relationship
+ * (see [ReconciliationLeg.matchIds]) pair up within a link group whatever their times and amounts. A stored match
+ * left with legs on one side only (its partner was deleted) is ignored, so those legs are matched as usual.
  *
  * Legs are compared per **link group** — a wallet (shadow account) plus every real account linked to it
  * — so a source that books one "Binance" wallet can be compared against several real Binance accounts. A
@@ -117,15 +137,24 @@ fun reconcile(
             val group = groupOfSource(leg.accountId)
             group != null && !leg.isExcluded && groupOfSource(leg.counterpartyAccountId) != group
         }
-    val inScopeReal =
+    val linkedReal =
         realLegs.filter { leg ->
             val group = groupOfReal(leg.accountId)
-            group != null &&
-                !leg.isExcluded &&
-                sourceRange != null &&
-                // Widened by the window so a source leg near the range's edge can still find its match.
-                leg.timestamp in (sourceRange.start - fuzzyWindow)..(sourceRange.endInclusive + fuzzyWindow) &&
-                groupOfReal(leg.counterpartyAccountId) != group
+            group != null && !leg.isExcluded && groupOfReal(leg.counterpartyAccountId) != group
+        }
+    // Stored matches may pair legs any distance apart, so their real legs are in scope wherever they fall.
+    val storedRealIds =
+        linkedReal
+            .filter { it.matchIds.isNotEmpty() }
+            .mapTo(mutableSetOf()) { it.transactionId }
+    val inScopeReal =
+        linkedReal.filter { leg ->
+            sourceRange != null &&
+                (
+                    leg.transactionId in storedRealIds ||
+                        // Widened by the window so a source leg near the range's edge can still find its match.
+                        leg.timestamp in (sourceRange.start - fuzzyWindow)..(sourceRange.endInclusive + fuzzyWindow)
+                )
         }
 
     val realAssetsByGroup: Map<AccountId, Set<AssetId>> =
@@ -141,6 +170,24 @@ fun reconcile(
     val matches = mutableListOf<LegMatch>()
 
     fun keyOf(leg: ReconciliationLeg) = MatchKey(groupOfSource(leg.accountId)!!, leg.amount.asset.id, leg.amount.amount)
+
+    // Pass 0: a person's stored matches, per (group, match). A transaction between two linked wallets can be in a
+    // match on each, so a leg joins only its own group's.
+    val storedSource = inScopeSource.flatMap { leg -> leg.matchIds.map { (groupOfSource(leg.accountId)!! to it) to leg } }
+    val storedReal = inScopeReal.flatMap { leg -> leg.matchIds.map { (groupOfReal(leg.accountId)!! to it) to leg } }
+    val storedRealByKey = storedReal.groupBy({ it.first }, { it.second })
+    storedSource
+        .groupBy({ it.first }, { it.second })
+        .toList()
+        .sortedBy { it.first.second }
+        .forEach { (key, sourceSide) ->
+            val sourceLegs = sourceSide.filter { it !in matchedSource }
+            val realLegs = storedRealByKey[key].orEmpty().filter { it !in consumed }
+            if (sourceLegs.isEmpty() || realLegs.isEmpty()) return@forEach
+            matchedSource += sourceLegs
+            consumed += realLegs
+            matches += LegMatch(sourceLegs, realLegs, matchId = key.second)
+        }
 
     // Pass 1: the same second, first come first served (the legs are indistinguishable anyway).
     for (leg in inScopeSource) {
@@ -230,6 +277,13 @@ fun reconcile(
         matches += LegMatch(bundle.legs, real.legs)
     }
 
+    val ignored =
+        sourceLegs
+            .filter { leg ->
+                val group = groupOfSource(leg.accountId)
+                group != null && leg.isIgnored && groupOfSource(leg.counterpartyAccountId) != group
+            }.map { UnmatchedSourceLeg(it, groupOfSource(it.accountId)!!, assetUnknownToMm = false) }
+
     return ReconciliationResult(
         sourceRange = sourceRange,
         matches = matches.sortedBy { it.sourceLeg.timestamp },
@@ -246,6 +300,8 @@ fun reconcile(
             inScopeReal
                 .filter { it !in consumed && it.timestamp in sourceRange!! }
                 .map { UnmatchedRealLeg(it, groupOfReal(it.accountId)!!) },
+        ignored = ignored,
+        unclaimedReal = linkedReal.filter { it !in consumed }.map { UnmatchedRealLeg(it, groupOfReal(it.accountId)!!) },
     )
 }
 

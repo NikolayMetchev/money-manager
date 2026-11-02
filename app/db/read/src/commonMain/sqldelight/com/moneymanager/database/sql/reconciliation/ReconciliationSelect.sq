@@ -19,7 +19,10 @@ ORDER BY shadow_account_id, real_account_id;
 -- BalanceLegsSelect.selectAllTransactionLegs but restricted, with the transfer's counterparty and the
 -- asset's details. `sign` is +1 for an inflow to the account, -1 for an outflow. `movement_key` groups
 -- the legs of one movement: the CSV row that produced them (a Koinly trade and its fee transfer), else
--- the transfer a fee leg belongs to, else the transaction itself. Unordered: the caller
+-- the transfer a fee leg belongs to, else the transaction itself. `is_excluded` says whether the
+-- excluded attribute is set and `excluded_reason` is its value (NULLIF so SQLDelight types it nullable; the
+-- mapper reads an excluded row with no reason as ''), and `match_ids` the comma-separated ids of the
+-- 'reconciliation-match' relationships (type 6) the transaction belongs to ('' for none). Unordered: the caller
 -- queries in chunks and sorts the union itself.
 selectLegsForAccounts:
     SELECT
@@ -37,10 +40,9 @@ selectLegsForAccounts:
         ad.scale_factor AS asset_scale_factor,
         ad.fraction_digits AS asset_fraction_digits,
         ad.kind AS asset_kind,
-        CASE WHEN EXISTS (
-            SELECT 1 FROM transfer_attribute ta
-            WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
-        ) THEN 1 ELSE 0 END AS is_excluded,
+        EXISTS (SELECT 1 FROM transfer_attribute ta WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1) AS is_excluded,
+        NULLIF((SELECT ta.attribute_value FROM transfer_attribute ta
+         WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1 LIMIT 1), '') AS excluded_reason,
         COALESCE(
             (SELECT 'c' || ces.csv_import_id || ':' || ces.csv_row_index
              FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id AND es.matched = 0
@@ -49,7 +51,10 @@ selectLegsForAccounts:
             (SELECT 't' || rel.primary_id FROM relationship_pair rel
              WHERE rel.related_id = tr.id AND rel.relationship_type_id = 2 LIMIT 1),
             't' || tr.id
-        ) AS movement_key
+        ) AS movement_key,
+        COALESCE((SELECT GROUP_CONCAT(rm.relationship_id) FROM relationship_member rm
+         JOIN relationship r ON r.id = rm.relationship_id
+         WHERE rm.transaction_id = tr.id AND r.relationship_type_id = 6), '') AS match_ids
     FROM transfer tr
     JOIN asset_details ad ON ad.id = tr.asset_id
     WHERE tr.target_account_id IN :accountIds
@@ -71,10 +76,9 @@ selectLegsForAccounts:
         ad.scale_factor,
         ad.fraction_digits,
         ad.kind,
-        CASE WHEN EXISTS (
-            SELECT 1 FROM transfer_attribute ta
-            WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
-        ) THEN 1 ELSE 0 END,
+        EXISTS (SELECT 1 FROM transfer_attribute ta WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1),
+        NULLIF((SELECT ta.attribute_value FROM transfer_attribute ta
+         WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1 LIMIT 1), ''),
         COALESCE(
             (SELECT 'c' || ces.csv_import_id || ':' || ces.csv_row_index
              FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id AND es.matched = 0
@@ -83,7 +87,10 @@ selectLegsForAccounts:
             (SELECT 't' || rel.primary_id FROM relationship_pair rel
              WHERE rel.related_id = tr.id AND rel.relationship_type_id = 2 LIMIT 1),
             't' || tr.id
-        )
+        ),
+        COALESCE((SELECT GROUP_CONCAT(rm.relationship_id) FROM relationship_member rm
+         JOIN relationship r ON r.id = rm.relationship_id
+         WHERE rm.transaction_id = tr.id AND r.relationship_type_id = 6), '')
     FROM transfer tr
     JOIN asset_details ad ON ad.id = tr.asset_id
     WHERE tr.source_account_id IN :accountIds
@@ -105,17 +112,19 @@ selectLegsForAccounts:
         ad.scale_factor,
         ad.fraction_digits,
         ad.kind,
-        CASE WHEN EXISTS (
-            SELECT 1 FROM trade_attribute ta
-            WHERE ta.trade_id = td.id AND ta.attribute_type_id = -1
-        ) THEN 1 ELSE 0 END,
+        EXISTS (SELECT 1 FROM trade_attribute ta WHERE ta.trade_id = td.id AND ta.attribute_type_id = -1),
+        NULLIF((SELECT ta.attribute_value FROM trade_attribute ta
+         WHERE ta.trade_id = td.id AND ta.attribute_type_id = -1 LIMIT 1), ''),
         COALESCE(
             (SELECT 'c' || ces.csv_import_id || ':' || ces.csv_row_index
              FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id AND es.matched = 0
              WHERE es.entity_type_id = 11 AND es.entity_id = td.id AND ces.csv_row_index IS NOT NULL
              ORDER BY es.revision_id LIMIT 1),
             'd' || td.id
-        )
+        ),
+        COALESCE((SELECT GROUP_CONCAT(rm.relationship_id) FROM relationship_member rm
+         JOIN relationship r ON r.id = rm.relationship_id
+         WHERE rm.transaction_id = td.id AND r.relationship_type_id = 6), '')
     FROM trade td
     JOIN asset_details ad ON ad.id = td.to_asset_id
     WHERE td.to_account_id IN :accountIds
@@ -137,17 +146,19 @@ selectLegsForAccounts:
         ad.scale_factor,
         ad.fraction_digits,
         ad.kind,
-        CASE WHEN EXISTS (
-            SELECT 1 FROM trade_attribute ta
-            WHERE ta.trade_id = td.id AND ta.attribute_type_id = -1
-        ) THEN 1 ELSE 0 END,
+        EXISTS (SELECT 1 FROM trade_attribute ta WHERE ta.trade_id = td.id AND ta.attribute_type_id = -1),
+        NULLIF((SELECT ta.attribute_value FROM trade_attribute ta
+         WHERE ta.trade_id = td.id AND ta.attribute_type_id = -1 LIMIT 1), ''),
         COALESCE(
             (SELECT 'c' || ces.csv_import_id || ':' || ces.csv_row_index
              FROM entity_source es JOIN csv_entity_source ces ON ces.id = es.id AND es.matched = 0
              WHERE es.entity_type_id = 11 AND es.entity_id = td.id AND ces.csv_row_index IS NOT NULL
              ORDER BY es.revision_id LIMIT 1),
             'd' || td.id
-        )
+        ),
+        COALESCE((SELECT GROUP_CONCAT(rm.relationship_id) FROM relationship_member rm
+         JOIN relationship r ON r.id = rm.relationship_id
+         WHERE rm.transaction_id = td.id AND r.relationship_type_id = 6), '')
     FROM trade td
     JOIN asset_details ad ON ad.id = td.from_asset_id
     WHERE td.from_account_id IN :accountIds;

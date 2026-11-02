@@ -87,6 +87,14 @@ object WellKnownIds {
     /** "reconciled" relationship type: the primary member mirrors the related one seen from another source. */
     const val RECONCILED_RELATIONSHIP_TYPE_ID: Long = 1
 
+    /**
+     * "reconciliation-match" relationship type: a person's statement, made on the reconciliation screen, that its
+     * members (a reconciliation source's legs and the real legs they mirror, transfers or trades) record one movement.
+     * Every member is a MEMBER; the members needn't agree on time or amount. A re-import rebuilds it over the
+     * re-created transactions, as it does every hand-made relationship.
+     */
+    const val RECONCILIATION_MATCH_RELATIONSHIP_TYPE_ID: Long = 6
+
     /** "fee" relationship type: the primary member is the main transaction, the related one its fee transfer. */
     const val FEE_RELATIONSHIP_TYPE_ID: Long = 2
 

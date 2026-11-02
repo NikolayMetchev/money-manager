@@ -2,6 +2,9 @@ package com.moneymanager.domain.model.reconciliation
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
+import com.moneymanager.domain.model.TransferId
 import kotlin.time.Instant
 
 /**
@@ -57,11 +60,29 @@ data class ReconciliationLeg(
     val accountId: AccountId,
     val counterpartyAccountId: AccountId?,
     val amount: Money,
-    val isExcluded: Boolean,
+    /** The excluded attribute's value (its reason) when the leg's transaction is excluded from balances. */
+    val excludedReason: String? = null,
     /**
      * Shared by the legs of one movement (e.g. a trade and the fee its source booked as a separate
      * transfer), so they can be summed against the other side's single gross leg without pulling in
      * unrelated movements that happen to share a second.
      */
     val movementKey: String = "$kind:$transactionId",
-)
+    /** The "reconciliation-match" relationships the leg's transaction belongs to: a person's stored matches. */
+    val matchIds: Set<Long> = emptySet(),
+) {
+    val isExcluded: Boolean get() = excludedReason != null
+
+    /** The leg's transaction, typed by its table. */
+    val transactionRef: TransactionId
+        get() = if (kind == LegTransactionKind.TRADE) TradeId(transactionId) else TransferId(transactionId)
+
+    /** Whether a person ignored this source leg on the reconciliation screen (see [IGNORED_IN_RECONCILIATION]). */
+    val isIgnored: Boolean get() = excludedReason == IGNORED_IN_RECONCILIATION
+}
+
+/**
+ * The excluded attribute's value on a source row a person ignored on the reconciliation screen. A source's re-import
+ * only removes exclusions it owns (Koinly's "deleted in Koinly"), so it leaves this one in place.
+ */
+const val IGNORED_IN_RECONCILIATION: String = "ignored in reconciliation"
