@@ -257,7 +257,9 @@ private fun SourceReconciliation(
     val taskManager = LocalTaskManager.current
     val tasks by taskManager.tasks.collectAsState()
     val bulkKey = "reconciliation-bulk-${source.name}"
-    val bulkRunning = tasks.any { it.key == bulkKey && it.isRunning }
+    // Set on the click itself: the task list only shows the run a recomposition later.
+    var bulkSubmitted by remember { mutableStateOf(false) }
+    val bulkRunning = bulkSubmitted || tasks.any { it.key == bulkKey && it.isRunning }
 
     fun <T> runBulk(
         title: String,
@@ -265,20 +267,25 @@ private fun SourceReconciliation(
         items: List<T>,
         apply: suspend (List<T>) -> Unit,
     ) {
-        taskManager.start(bulkKey, title, "Starting") {
-            try {
-                var done = 0
-                items.chunked(BULK_CHUNK).forEach { chunk ->
+        if (bulkRunning) return
+        bulkSubmitted = true
+        val id =
+            taskManager.start(bulkKey, title, "Starting") {
+                try {
+                    var done = 0
+                    items.chunked(BULK_CHUNK).forEach { chunk ->
+                        report(Progress.counted(what, done, items.size))
+                        apply(chunk)
+                        done += chunk.size
+                    }
                     report(Progress.counted(what, done, items.size))
-                    apply(chunk)
-                    done += chunk.size
+                    "$done done"
+                } finally {
+                    refreshKey++
+                    bulkSubmitted = false
                 }
-                report(Progress.counted(what, done, items.size))
-                "$done done"
-            } finally {
-                refreshKey++
             }
-        }
+        if (id == null) bulkSubmitted = false
     }
 
     fun storeMatches(matches: List<LegMatch>) {
@@ -399,9 +406,14 @@ private fun SourceReconciliation(
                     },
                 ) { match ->
                     MatchRow(match, accountNames, onOpenLeg) {
-                        TextButton(onClick = {
-                            write("Matching") { importEngine.createReconciliationMatches(listOf(match.memberTransactions())) }
-                        }) { Text("Accept") }
+                        TextButton(
+                            onClick = {
+                                write(
+                                    "Matching",
+                                ) { importEngine.createReconciliationMatches(listOf(match.memberTransactions())) }
+                            },
+                            enabled = !bulkRunning,
+                        ) { Text("Accept") }
                     }
                 }
                 val onlyInSource = loaded.missingInMm.filter { !hideUnknownAssets || !it.assetUnknownToMm }
@@ -428,8 +440,11 @@ private fun SourceReconciliation(
                     },
                 ) { unmatched ->
                     LegRow(unmatched.leg, accountNames, onOpenLeg) {
-                        TextButton(onClick = { setIgnored(loaded.movementOf(unmatched), ignored = true) }) { Text("Ignore") }
-                        TextButton(onClick = { picking = unmatched }) { Text("Select matching transactions…") }
+                        TextButton(
+                            onClick = { setIgnored(loaded.movementOf(unmatched), ignored = true) },
+                            enabled = !bulkRunning,
+                        ) { Text("Ignore") }
+                        TextButton(onClick = { picking = unmatched }, enabled = !bulkRunning) { Text("Select matching transactions…") }
                     }
                 }
                 sectionHeading("Only in Money Manager (${loaded.missingInSource.size})")
@@ -478,6 +493,7 @@ private fun SourceReconciliation(
                                 {
                                     TextButton(
                                         onClick = { write("Unmatching") { importEngine.deleteRelationship(RelationshipId(matchId)) } },
+                                        enabled = !bulkRunning,
                                     ) {
                                         Text("Unmatch")
                                     }
@@ -493,7 +509,10 @@ private fun SourceReconciliation(
                     empty = "No ${source.name} rows ignored.",
                 ) { ignored ->
                     LegRow(ignored.leg, accountNames, onOpenLeg) {
-                        TextButton(onClick = { setIgnored(listOf(ignored.leg), ignored = false) }) { Text("Un-ignore") }
+                        TextButton(
+                            onClick = { setIgnored(listOf(ignored.leg), ignored = false) },
+                            enabled = !bulkRunning,
+                        ) { Text("Un-ignore") }
                     }
                 }
             }

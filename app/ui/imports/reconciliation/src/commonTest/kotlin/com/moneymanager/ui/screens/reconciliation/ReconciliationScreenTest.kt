@@ -63,6 +63,7 @@ import dev.mokkery.every
 import dev.mokkery.everySuspend
 import dev.mokkery.matcher.any
 import dev.mokkery.mock
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
@@ -340,6 +341,15 @@ class ReconciliationScreenTest {
                 batches += batch
                 ImportResult()
             }
+        showLegsWith(engine, sourceLegs, realLegs)
+        return batches
+    }
+
+    private fun ComposeUiTest.showLegsWith(
+        engine: ImportEngine,
+        sourceLegs: List<ReconciliationLeg>,
+        realLegs: List<ReconciliationLeg>,
+    ) {
         val accounts =
             listOf(
                 Account(id = binance, name = "Binance", openingDate = epoch),
@@ -365,7 +375,6 @@ class ReconciliationScreenTest {
             }
         }
         waitForIdle()
-        return batches
     }
 
     /** Opens every collapsed wallet and month group of the visible tab. */
@@ -476,6 +485,29 @@ class ReconciliationScreenTest {
                     .filterIsInstance<RelationshipMutation.Create>()
                     .map { it.members },
             )
+        }
+    }
+
+    @Test
+    fun theBulkButtonsAreDisabledWhileABulkRunIsInProgress() {
+        runMoneyManagerComposeUiTest {
+            val gate = CompletableDeferred<Unit>()
+            val batches = mutableListOf<ImportBatch>()
+            val engine =
+                importEngine { batch ->
+                    gate.await()
+                    batches += batch
+                    ImportResult()
+                }
+            showLegsWith(engine, listOf(leg(10, wallet.accountId, "5", t0)), listOf(leg(20, binance, "5", t0 + 1.hours)))
+            reveal(hasText("Near matches (1)"))
+
+            onAllNodesWithText("Accept all (1)")[0].performClick()
+            waitForIdle()
+
+            onAllNodesWithText("Accept all (1)")[0].assertIsNotEnabled()
+            gate.complete(Unit)
+            waitUntil(timeoutMillis = 10_000) { batches.isNotEmpty() }
         }
     }
 
