@@ -43,7 +43,7 @@ register_toolchains("//bazel/kmp:kotlin_toolchain")
 # bundles (//bazel/kmp/deps:jdk_jmods: jlink and ProGuard read them). Azul Zulu, because it ships jmods/: Temurin
 # hasn't since 24. rules_java only knows the LTS releases it was built with, so each platform's archive is listed here.
 # Renovate bumps JDK to every release, LTS or not; bazel/renovate/repin.sh then rewrites the archives, their SHA-256s
-# and .bazelrc's runtime version (bazel/renovate/repin_jdk.py).
+# and .bazelrc's runtime version (repo-scripts repin jdk).
 JDK = "27.0.1"
 
 JDK_ARCHIVES = {
@@ -266,7 +266,7 @@ POI = "6.0.0"  # renovate: org.apache.poi:poi
 POKO = "0.23.2"  # renovate: dev.drewhamilton.poko:poko-annotations
 # Skiko's web klibs and the runtime they load (skiko.mjs and skiko.wasm, which the browser app ships beside its program)
 # must be one release, as the Compose Gradle plugin keeps them: the version is forced on the klibs too. It is the one
-# COMPOSE_PLUGIN was built against (Compose's klibs link against no other), which bazel/renovate/repin_skiko.py writes.
+# COMPOSE_PLUGIN was built against (Compose's klibs link against no other), which repo-scripts repin skiko writes.
 SKIKO = "0.150.2"
 SLF4J = "2.0.20"  # renovate: org.slf4j:slf4j-api
 SQLDELIGHT = "2.4.1"  # renovate: app.cash.sqldelight:android-driver

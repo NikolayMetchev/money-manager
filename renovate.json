@@ -51,7 +51,7 @@
   ],
   "customDatasources": {
     "zulu-jdk": {
-      "description": "Azul Zulu JDK releases (Linux x64 stands for every platform; repin_jdk.py fails if one lacks the release), as major.minor.patch",
+      "description": "Azul Zulu JDK releases (Linux x64 stands for every platform; repo-scripts repin jdk fails if one lacks the release), as major.minor.patch",
       "defaultRegistryUrlTemplate": "https://api.azul.com/metadata/v1/zulu/packages/?os=linux&arch=x64&archive_type=tar.gz&java_package_type=jdk&javafx_bundled=false&crac_supported=false&release_status=ga&availability_types=CA&page_size=1000",
       "transformTemplates": ["{\"releases\": [$map($, function($p) { {\"version\": $join($map($p.java_version[[0..2]], $string), \".\")} })]}"]
     }

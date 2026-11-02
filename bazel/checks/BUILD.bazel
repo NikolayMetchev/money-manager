@@ -1,0 +1,16 @@
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+
+# No Python is committed (#1264): scripts are Kotlin (//tools/repo-scripts), Starlark or shell.
+sh_test(
+    name = "no_python_test",
+    size = "small",
+    srcs = ["no_python_test.sh"],
+    args = ["$(rootpath //:VERSION)"],
+    data = ["//:VERSION"],
+    # It reads the working tree (git ls-files), which a sandbox or a remote executor doesn't have.
+    tags = [
+        "external",
+        "local",
+        "no-sandbox",
+    ],
+)

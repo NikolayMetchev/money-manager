@@ -22,7 +22,7 @@ java_binary(
     runtime_deps = [":bench-db_jvm"],
 )
 
-# The startup benchmark's database (#1254): bazel/perf/startup_bench.py and the AOT cache's training run open copies.
+# The startup benchmark's database (#1254): the startup benchmark (tools/repo-scripts) and the AOT cache's training run open copies.
 genrule(
     name = "bench_db",
     outs = ["bench.db"],

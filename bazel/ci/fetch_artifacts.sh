@@ -14,11 +14,7 @@ call() {
 
 mkdir -p "$dir"
 call GetInvocation "{\"selector\": {\"invocation_id\": \"$invocation\"}, \"include_artifacts\": true}" |
-  python3 -c '
-import json, sys
-for artifact in json.load(sys.stdin)["invocation"][0].get("artifacts", []):
-    print(artifact["name"], artifact["uri"])
-' |
+  jq -r '.invocation[0] // error("invocation not found") | (.artifacts // [])[] | "\(.name) \(.uri)"' |
   while read -r name uri; do
     mkdir -p "$(dirname "$dir/$name")"
     call GetFile "{\"uri\": \"$uri\"}" -o "$dir/$name"

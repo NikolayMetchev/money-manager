@@ -1,7 +1,7 @@
 common --enable_bzlmod
 
-# Everything runs on MODULE.bazel's JDK (remotejdk_<its feature release>, which repin_jdk.py keeps in step), and
-# compiles for it, or for the newest Java the Kotlin compiler targets if that is older. repin_bytecode.py sets the
+# Everything runs on MODULE.bazel's JDK (remotejdk_<its feature release>, which repo-scripts repin jdk keeps in step), and
+# compiles for it, or for the newest Java the Kotlin compiler targets if that is older. repo-scripts repin bytecode sets the
 # language versions, with jvm_target in bazel/kmp/BUILD.bazel and the Java toolchain's versions.
 common --java_language_version=26
 common --java_runtime_version=remotejdk_27

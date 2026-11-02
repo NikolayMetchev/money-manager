@@ -6,7 +6,7 @@
 #
 # What the job's later steps read goes into $BUILDBUDDY_ARTIFACTS_DIRECTORY (the runner uploads it; build.yml
 # downloads it): the logs, coverage.xml, the test reports (testlogs.tar), the Linux installer (installer/) and the
-# cross-linked native test binaries (native-tests.tar), and the startup benchmark's databases (bench-dbs/). The exit code is the build's and tests'.
+# cross-linked native test binaries (native-tests.tar), and the startup benchmark (bench-dbs/: its databases and the tool that times it). The exit code is the build's and tests'.
 #
 # Usage: bazel/ci/build_and_test.sh <bazel flags>
 set -uo pipefail
@@ -31,11 +31,11 @@ if [ -n "${BUILDBUDDY_CI_RUNNER_ROOT_DIR:-}" ]; then
   if [ ! -f "$sdk/platforms/android-$level.0/package.xml" ]; then
     sdkmanager=$sdk/cmdline-tools/latest/bin/sdkmanager
     if [ ! -x "$sdkmanager" ]; then
-      read -r zip sha1 < <(curl -fsSL https://dl.google.com/android/repository/repository2-3.xml | python3 -c '
-import re, sys
-package = re.search(r"<remotePackage path=\"cmdline-tools;latest\">(.*?)</remotePackage>", sys.stdin.read(), re.S).group(1)
-print(*re.search(r"<checksum[^>]*>([^<]*)</checksum>\s*<url>(commandlinetools-linux-[^<]*)</url>", package).groups()[::-1])
-') || exit 1
+      read -r zip sha1 < <(curl -fsSL https://dl.google.com/android/repository/repository2-3.xml | awk '
+        /<remotePackage path="cmdline-tools;latest">/ { inside = 1 }
+        inside && /<checksum/ { checksum = $0; sub(/.*<checksum[^>]*>/, "", checksum); sub(/<\/checksum>.*/, "", checksum) }
+        inside && /<url>commandlinetools-linux-/ { url = $0; sub(/.*<url>/, "", url); sub(/<\/url>.*/, "", url); print url, checksum; exit }
+      ') || exit 1
       tmp=$(mktemp -d)
       curl -fsSL -o "$tmp/tools.zip" "https://dl.google.com/android/repository/$zip" &&
         echo "$sha1  $tmp/tools.zip" | sha1sum -c --quiet &&
@@ -67,7 +67,7 @@ fi
 #   into JUnit XML, for Native Tests to run on their own runners.
 cross=$(bazel query "${flags[@]}" 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') || exit 1
 bazel test "${flags[@]}" -- //... //app/main/jvm:release_service_providers_test //app/main/jvm:installer \
-  //bazel/kmp/testing:native_launcher_deploy.jar $cross 2>&1 | tee "$out/test.log"
+  //bazel/kmp/testing:native_launcher_deploy.jar //tools/repo-scripts:repo-scripts-tool_deploy.jar $cross 2>&1 | tee "$out/test.log"
 status=${PIPESTATUS[0]}
 
 # The JVM and Android host tests' coverage reports, merged into one XML report. It credits code to every test that
@@ -79,7 +79,8 @@ bazel/kmp/testing/coverage.sh "$out/coverage.xml" "${flags[@]}" 2>&1 | tee "$out
 
 if [ "$status" -eq 0 ]; then
   mkdir -p "$out/installer" && cp bazel-bin/app/main/jvm/installer/* "$out/installer/"
-  mkdir -p "$out/bench-dbs" && cp bazel-bin/tools/bench-db/bench.db bazel-bin/tools/bench-db/empty.db "$out/bench-dbs/"
+  mkdir -p "$out/bench-dbs" && cp bazel-bin/tools/bench-db/bench.db bazel-bin/tools/bench-db/empty.db \
+    bazel-bin/tools/repo-scripts/repo-scripts-tool_deploy.jar "$out/bench-dbs/"
   for target in linuxArm64 mingwX64; do
     for binary in $(bazel cquery "${flags[@]}" --output=files "attr(name, \"_${target}_cross\$\", //...)"); do
       dir="native-tests/$target/$(dirname "${binary#bazel-out/*/bin/}")"
