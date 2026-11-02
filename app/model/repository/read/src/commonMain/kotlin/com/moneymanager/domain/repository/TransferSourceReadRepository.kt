@@ -38,6 +38,12 @@ interface TransferSourceReadRepository {
     suspend fun getTransfersCreatedBy(importSource: Source): Map<TransferId, Source>
 
     /**
+     * As [getTransfersCreatedBy], for trades. A trade several records made up is keyed by the first of them,
+     * the same one whenever the source is imported again.
+     */
+    suspend fun getTradesCreatedBy(importSource: Source): Map<TradeId, Source>
+
+    /**
      * The staged rows currently linked to any of [transferIds] or
      * [tradeIds] without having created it: those that matched it as a duplicate or updated it. Read from
      * their provenance, so no import's staged rows are read.

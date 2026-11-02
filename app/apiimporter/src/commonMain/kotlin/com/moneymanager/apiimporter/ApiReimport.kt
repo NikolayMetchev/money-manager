@@ -14,6 +14,7 @@ import com.moneymanager.importengineapi.ApiSessionMutation
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ManualEdit
+import com.moneymanager.importengineapi.ReappliedLinks
 import com.moneymanager.importengineapi.RerunReads
 import com.moneymanager.importengineapi.SourceRerunPlan
 import com.moneymanager.importengineapi.SourceRerunResult
@@ -119,6 +120,7 @@ data class ApiBulkReimportResult(
     val reappliedEdits: Int = 0,
     /** Hand edits whose transaction the re-import didn't create again, so they were dropped. */
     val unmatchedEdits: List<ManualEdit> = emptyList(),
+    val reappliedLinks: ReappliedLinks = ReappliedLinks(),
 )
 
 /**
@@ -158,6 +160,7 @@ suspend fun bulkReimportApiSessions(
 
     var reapplied = 0
     val unmatched = mutableListOf<ManualEdit>()
+    var links = ReappliedLinks()
     return reimportSessionsResiliently(sessions, maintenance, onProgress) { session, sessionProgress ->
         val result =
             executeApiReimport(
@@ -176,7 +179,8 @@ suspend fun bulkReimportApiSessions(
             )
         reapplied += result.reappliedEdits.size
         unmatched += result.unmatchedEdits
-    }.copy(reappliedEdits = reapplied, unmatchedEdits = unmatched)
+        links += result.reappliedLinks
+    }.copy(reappliedEdits = reapplied, unmatchedEdits = unmatched, reappliedLinks = links)
 }
 
 /**

@@ -13,3 +13,11 @@ ON CONFLICT(trade_id, attribute_type_id) DO UPDATE SET attribute_value = exclude
 
 deleteAttribute:
 DELETE FROM trade_attribute WHERE trade_id = ? AND attribute_type_id = ?;
+
+-- A hand edit's new trade revision; see trade_attribute_audit.
+bumpRevision:
+UPDATE trade SET revision_id = revision_id + 1 WHERE id = ?;
+
+insertAttributeAudit:
+INSERT INTO trade_attribute_audit(audit_timestamp, audit_type_id, trade_id, revision_id, attribute_type_id, attribute_value)
+VALUES (?, ?, ?, ?, ?, ?);

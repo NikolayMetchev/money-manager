@@ -126,3 +126,22 @@ FROM trade_attribute ta
 JOIN attribute_type at ON at.id = ta.attribute_type_id
 WHERE ta.trade_id = ?
 ORDER BY at.name;
+
+selectRevision:
+SELECT revision_id FROM trade WHERE id = ?;
+
+selectAttributeValue:
+SELECT attribute_value FROM trade_attribute WHERE trade_id = ? AND attribute_type_id = ?;
+
+-- Every attribute type a person set or removed by hand on any of the given trades (a trade_attribute_audit
+-- row at a revision whose source is MANUAL, source_type_id = 1), with the trade's value of it now (NULL when
+-- the type is absent): the state a re-import puts back on the re-created trade.
+selectHandSetAttributes:
+SELECT DISTINCT audit.trade_id, audit.attribute_type_id, current.attribute_value
+FROM trade_attribute_audit audit
+JOIN entity_source ON entity_source.entity_type_id = 11
+    AND entity_source.entity_id = audit.trade_id
+    AND entity_source.revision_id = audit.revision_id
+    AND entity_source.source_type_id = 1
+LEFT JOIN trade_attribute current ON current.trade_id = audit.trade_id AND current.attribute_type_id = audit.attribute_type_id
+WHERE audit.trade_id IN ?;

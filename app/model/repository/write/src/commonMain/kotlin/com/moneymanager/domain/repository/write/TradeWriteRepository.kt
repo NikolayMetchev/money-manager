@@ -54,13 +54,20 @@ interface TradeWriteRepository : TradeReadRepository {
     /** Deletes [ids] in one database transaction: one commit for the lot rather than one per trade. */
     suspend fun deleteTrades(ids: Collection<TradeId>)
 
-    /** Sets each of [attributes] on trade [id], replacing an existing value of the same type. */
-    suspend fun upsertAttributes(
+    /**
+     * A person's edit of trade [id]'s attribute of type [typeId]: sets it to [value], or removes it when
+     * [value] is null. A change gives the trade a new revision recorded with [source] and a
+     * `trade_attribute_audit` row, so a re-import knows to put it back (see [getHandSetAttributes]); setting
+     * the value it already has writes nothing.
+     */
+    suspend fun setAttributeByHand(
         id: TradeId,
-        attributes: List<NewAttribute>,
+        typeId: AttributeTypeId,
+        value: String?,
+        source: Source,
     )
 
-    /** Removes trade [id]'s attribute of type [typeId], if any. */
+    /** Removes trade [id]'s attribute of type [typeId], if any, as an import's own change (no revision). */
     suspend fun removeAttribute(
         id: TradeId,
         typeId: AttributeTypeId,

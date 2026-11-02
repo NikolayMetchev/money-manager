@@ -3,6 +3,7 @@ package com.moneymanager.csvimporter
 import co.touchlab.kermit.Logger
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.importengineapi.ManualEdit
+import com.moneymanager.importengineapi.ReappliedLinks
 import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.tasks.Progress
 import com.moneymanager.tasks.WeightedProgress
@@ -28,6 +29,7 @@ data class BulkReimportResult(
     val reappliedEdits: Int = 0,
     /** Hand edits whose transaction the re-import didn't create again, so they were dropped. */
     val unmatchedEdits: List<ManualEdit> = emptyList(),
+    val reappliedLinks: ReappliedLinks = ReappliedLinks(),
     override val filesNotStarted: Int = 0,
 ) : BulkImportResult {
     override fun toSummary(): String =
@@ -36,6 +38,7 @@ data class BulkReimportResult(
             append(" · $transfersCreated imported")
             if (reappliedEdits > 0) append(" · $reappliedEdits manual edit${if (reappliedEdits == 1) "" else "s"} re-applied")
             if (unmatchedEdits.isNotEmpty()) append(" · ${unmatchedEdits.size} manual edits not re-applied")
+            append(reappliedLinks.summary(" · "))
             if (affectedRecords > 0) append(" · $affectedRecords rows of other files re-linked")
             if (affectedRecordsNotRerun > 0) {
                 append(" · $affectedRecordsNotRerun rows of other files left for those files' own re-import")
@@ -131,6 +134,7 @@ suspend fun <T, C> runBulkReimport(
                             affectedRecordsNotRerun = result.affectedRecordsNotRerun + rerun.notRerun.count,
                             reappliedEdits = result.reappliedEdits + rerun.reappliedEdits.size,
                             unmatchedEdits = result.unmatchedEdits + rerun.unmatchedEdits,
+                            reappliedLinks = result.reappliedLinks + rerun.reappliedLinks,
                         )
                 }
             }

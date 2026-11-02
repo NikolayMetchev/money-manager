@@ -303,6 +303,7 @@ class MoneyManagerDatabaseWrapper(
             "person_attribute_audit",
             "person_account_ownership_audit",
             "transfer_attribute_audit",
+            "trade_attribute_audit",
             "account_attribute_audit",
             "api_import_strategy_audit",
             "api_import_strategy_source",

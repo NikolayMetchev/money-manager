@@ -88,6 +88,7 @@ import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.ReconciliationLinkMutation
+import com.moneymanager.importengineapi.RelationshipMutation
 import com.moneymanager.importengineapi.RowOutcome
 import com.moneymanager.importengineapi.TradeAttributeMutation
 import com.moneymanager.importengineapi.TradeDedupePolicy
@@ -389,6 +390,17 @@ class ImportEngineImpl(
                 newAttributes = intent.attributes,
                 source = intent.source,
             )
+        }
+
+        // ----- RELATIONSHIPS between existing transactions (after the writes, so a batch can relate what it made) -----
+        if (batch.relationshipMutations.isNotEmpty()) {
+            val relationships = checkNotNull(relationshipRepository) { "This engine has no relationship repository" }
+            batch.relationshipMutations.forEach { m ->
+                when (m) {
+                    is RelationshipMutation.Create -> relationships.create(m.typeId, m.members, m.source)
+                    is RelationshipMutation.Delete -> relationships.delete(m.id)
+                }
+            }
         }
 
         // ----- MERGE / UNMERGE (before deletes: a merge already removes the absorbed account) -----
@@ -2340,8 +2352,8 @@ class ImportEngineImpl(
         if (batch.reconciliationLinkMutations.isNotEmpty()) applyReconciliationLinkMutations(batch.reconciliationLinkMutations)
         for (m in batch.tradeAttributeMutations) {
             when (m) {
-                is TradeAttributeMutation.Set -> tradeRepository.upsertAttributes(m.tradeId, listOf(NewAttribute(m.typeId, m.value)))
-                is TradeAttributeMutation.Remove -> tradeRepository.removeAttribute(m.tradeId, m.typeId)
+                is TradeAttributeMutation.Set -> tradeRepository.setAttributeByHand(m.tradeId, m.typeId, m.value, Source.Manual)
+                is TradeAttributeMutation.Remove -> tradeRepository.setAttributeByHand(m.tradeId, m.typeId, null, Source.Manual)
             }
         }
         for (m in batch.passThroughMutations) {
