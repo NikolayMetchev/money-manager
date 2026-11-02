@@ -93,6 +93,9 @@ The desktop installer packages `:app_image_aot`, the app image with a JDK AOT ca
 each on the benchmark database (`//tools/bench-db:bench_db`); see `bazel/README.md`, "AOT caches". A cache is only
 valid while the installed jars keep their pinned modification times.
 
+On pull requests the macOS and Windows installer jobs pass `--define=aot=false` and leave out `bundle_native_cli`
+(the native `mm` link and the AOT training are most of their ~18 minutes); main, releases and Build and Test's deb keep both.
+
 **Startup tracking**: on every push to main, the installer smoke tests (Build and Test's deb, Desktop Installer's dmg
 and msi) also time the installed launchers with `bazel/perf/startup_bench.py` on `//tools/bench-db`'s databases, with
 and without the AOT cache, and the `perf-record` job appends the results (`bazel/perf/record.sh`) to `startup.jsonl`

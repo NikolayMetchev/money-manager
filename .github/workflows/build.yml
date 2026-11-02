@@ -201,6 +201,7 @@ jobs:
           retention-days: 7
 
       - name: Upload the installer
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
           name: installer-Linux
@@ -568,14 +569,21 @@ jobs:
           android-sdk: 'false'
 
       # On main (and manual runs) it also builds the startup benchmark's databases and times the installed app's
-      # startup, which perf-record keeps (#1254).
+      # startup, which perf-record keeps (#1254). A pull request skips what is slow here (#1273): the native mm's link
+      # (Build and Test and Native Tests cover it) and the AOT caches' training (main, releases and the Linux deb have it).
       - name: Build the installer
         env:
           MEASURE: ${{ github.event_name != 'pull_request' }}
-        run: >-
-          bazel build --define=proguard_optimize=false --define=bundle_native_cli=true
-          //app/main/jvm:installer $([ "$MEASURE" = true ] && echo //tools/bench-db:bench_db //tools/bench-db:empty_db)
-          2>&1 | tee build.log
+        run: |
+          if [ "$MEASURE" = true ]; then
+            flags=(--define=bundle_native_cli=true)
+            targets=(//tools/bench-db:bench_db //tools/bench-db:empty_db)
+          else
+            flags=(--define=aot=false)
+            targets=()
+          fi
+          bazel build --define=proguard_optimize=false "${flags[@]}" //app/main/jvm:installer "${targets[@]}" \
+            2>&1 | tee build.log
 
       # This job builds here, not on a BuildBuddy runner, so the installer is in bazel-bin (not ci-out).
       - name: Install and start it
@@ -586,6 +594,8 @@ jobs:
             mkdir bench-dbs && cp bazel-bin/tools/bench-db/bench.db bazel-bin/tools/bench-db/empty.db bench-dbs/
             export STARTUP_BENCH_DBS=$PWD/bench-dbs STARTUP_BENCH_OUT=$PWD/startup-${{ matrix.name }}.jsonl
             export STARTUP_BENCH_LABEL="$ImageOS $ImageVersion"
+          else
+            export INSTALLER_AOT=false INSTALLER_NATIVE_CLI=false
           fi
           bazel/kmp/jpackage/install_smoke_test.sh bazel-bin/app/main/jvm/installer "$(cat VERSION)"
 
@@ -598,7 +608,9 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      # Nothing downloads it, and a PR's is stripped (no AOT caches, no native mm), so only main and manual runs keep it.
       - name: Upload the installer
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
           name: installer-${{ matrix.name }}

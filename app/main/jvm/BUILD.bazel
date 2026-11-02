@@ -195,7 +195,10 @@ aot_app_image(
 
 jpackage_installer(
     name = "installer",
-    app_image = ":app_image_aot",
+    app_image = select({
+        "//bazel/kmp/jpackage:no_aot": ":app_image",
+        "//conditions:default": ":app_image_aot",
+    }),
     args = select({
         "@platforms//os:windows": [
             "--win-dir-chooser",

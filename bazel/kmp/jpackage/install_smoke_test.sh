@@ -5,6 +5,10 @@
 # -XX:AOTMode=on, which fails unless the installed AOT cache loads (#1254). CI runs it on fresh runners; it needs root
 # on Linux (apt) and a display (Linux: Xvfb).
 #
+# A pull request's macOS and Windows installers are built without the AOT caches (--define=aot=false) and the native
+# mm (#1273): INSTALLER_AOT=false drops AOTMode=on, INSTALLER_NATIVE_CLI=false skips checking mm. Both default to true,
+# so main, releases and the Linux deb check everything.
+#
 # With STARTUP_BENCH_DBS (a directory holding //tools/bench-db's bench.db and empty.db) and STARTUP_BENCH_OUT (a
 # file), it then times the installed launchers' startup with bazel/perf/startup_bench.py and appends the results
 # there (#1254): CI does this on main, so every commit's startup is recorded on the perf-data branch.
@@ -65,19 +69,26 @@ echo "Installed into $root:"
 find "$root" -maxdepth 2 | sort | sed -n 1,40p
 
 # --app-content puts cli/ in lib/ on Linux, Contents/ on macOS and the app's root on Windows.
-mm=$(find "$root" -path '*/cli/mm' -o -path '*/cli/mm.exe' | head -1)
-if [ -z "$mm" ]; then
-  echo "no bundled native mm under $root" >&2
-  exit 1
+mm=
+clis=("$mm_jvm")
+if [ "${INSTALLER_NATIVE_CLI:-true}" = true ]; then
+  mm=$(find "$root" -path '*/cli/mm' -o -path '*/cli/mm.exe' | head -1)
+  if [ -z "$mm" ]; then
+    echo "no bundled native mm under $root" >&2
+    exit 1
+  fi
+  clis+=("$mm")
 fi
 
 # The AOT caches were trained against these modification times (JPackageRunner.PINNED_MTIME).
 find "$root" \( -name 'app-main-jvm.jar' -o -name '*.aot' \) -exec ls -l {} +
 
 # AOTMode=on: a JVM launcher whose AOT cache doesn't load fails instead of starting without it.
-export JAVA_TOOL_OPTIONS=-XX:AOTMode=on
+if [ "${INSTALLER_AOT:-true}" = true ]; then
+  export JAVA_TOOL_OPTIONS=-XX:AOTMode=on
+fi
 
-for cli in "$mm_jvm" "$mm"; do
+for cli in "${clis[@]}"; do
   out=$("$cli" version </dev/null)
   echo "$cli version: $out"
   grep -q "\"version\": \"$version\"" <<<"$out"
@@ -95,6 +106,11 @@ grep -Eq '"text": "Jan 2 +PAYMENT RECEIVED - THANK YOU {2,}[^"]*2,609.36"' <<<"$
 if [ "$(uname -s)" = Linux ]; then
   Xvfb :99 -screen 0 1600x1000x24 &
   export DISPLAY=:99
+  # The app connects as soon as it starts, so wait for Xvfb's socket instead of racing it.
+  for _ in $(seq 50); do
+    [ -S /tmp/.X11-unix/X99 ] && break
+    sleep 0.2
+  done
 fi
 "$app" >"$work/app.log" 2>&1 &
 pid=$!
