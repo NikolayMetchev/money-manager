@@ -112,7 +112,7 @@
   <p>
     After each push to main, CI installs that commit's desktop installer on Linux, macOS and Windows and times the
     installed app opening a benchmark database (3 people, 50 accounts, 20,000 transfers) and an empty one, with
-    <code>bazel/perf/startup_bench.py</code>. Every figure is the median of 10 runs from a clean home directory, in
+    <code>repo-scripts startup-bench</code>. Every figure is the median of 10 runs from a clean home directory, in
     milliseconds from process start. <strong>AOT cache</strong> is the app as shipped; <strong>no cache</strong> is
     the same app with <code>-XX:AOTMode=off</code>. GitHub's runners are shared machines, so expect noise of
     10–20%: look for steps that persist, not single points. The data is

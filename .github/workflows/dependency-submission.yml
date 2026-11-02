@@ -6,7 +6,7 @@ on:
     paths:
       - 'bazel/kmp/deps/*.lock.json'
       - 'bazel/maven/*_install.json'
-      - 'bazel/kmp/deps/dependency_snapshot.py'
+      - 'tools/repo-scripts/**'
       - '.github/workflows/dependency-submission.yml'
   workflow_dispatch:
 
@@ -27,11 +27,18 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
+        with:
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          cache-name: dependency-submission
+          android-sdk: 'false'
+
       # Bazel's resolution is the Maven lockfiles (`bazel run @<hub>//:pin`), so the graph is read from
       # them; nothing needs building. The Kotlin stdlib comes from the Kotlin toolchain, not a lockfile.
       - name: Submit the lockfiles' dependency graph
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python3 bazel/kmp/deps/dependency_snapshot.py bazel/kmp/deps/*.lock.json bazel/maven/*_install.json \
+          bazel run //tools/repo-scripts:repo-scripts-tool -- dependency-snapshot bazel/kmp/deps/maven_kmp.lock.json bazel/maven/*_install.json \
             | gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/snapshots" --input -

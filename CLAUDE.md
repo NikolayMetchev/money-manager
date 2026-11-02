@@ -97,7 +97,7 @@ On pull requests the macOS and Windows installer jobs pass `--define=aot=false` 
 (the native `mm` link and the AOT training are most of their ~18 minutes); main, releases and Build and Test's deb keep both.
 
 **Startup tracking**: on every push to main, the installer smoke tests (Build and Test's deb, Desktop Installer's dmg
-and msi) also time the installed launchers with `bazel/perf/startup_bench.py` on `//tools/bench-db`'s databases, with
+and msi) also time the installed launchers with `repo-scripts startup-bench` on `//tools/bench-db`'s databases, with
 and without the AOT cache, and the `perf-record` job appends the results (`bazel/perf/record.sh`) to `startup.jsonl`
 on the orphan `perf-data` branch, which `webpage/performance.html` graphs. Pull requests don't measure.
 
@@ -117,7 +117,7 @@ GitHub runner. The job then installs the deb and starts the app, `mm-jvm` and `m
 the cross-linked binaries on an arm64 and a Windows runner, and build and test macOS on its own runner (with the
 cache); Android Instrumented Tests (an API 36 emulator) and Desktop Installer (macOS and Windows, smoke-tested the same
 way) are their own jobs. Auto-format PR runs `//:format` on every PR and pushes the fixes, so a stale BUILD file is
-regenerated, not reported. Dependency submission reads the lockfiles (`bazel/kmp/deps/dependency_snapshot.py`), and
+regenerated, not reported. Dependency submission reads the lockfiles (`repo-scripts dependency-snapshot`), and
 `renovate-pins.yml` re-pins Renovate's PRs.
 
 **Qodana** (`qodana.yml`, inspections in `qodana.yaml`) scans a PR in PR mode: it reports only problems in the files the
@@ -187,6 +187,7 @@ workflow because label events start it: any other label's run skips, without can
 | `app/ui/{foundation,components}/` | Platform UI helpers; shared widgets and editors (pickers, `ConditionsEditor`, `StrategyRulesEditor`, …) |
 | `app/ui/{accounts,audit,categories,currencies,people,settings,transactions}/`, `app/ui/imports/{api,csv,importDirectory,reconciliation,timeline}/` | One module per feature screen |
 | `tools/{strategy-catalog,crypto-dataset}/` | Build-time tools: catalog site renderer; crypto dataset builder |
+| `tools/repo-scripts/` | The repository's scripts, in Kotlin: `repin` (what a version bump leaves stale, run by `bazel/renovate/repin.sh`), `dependency-snapshot` (GitHub's dependency graph from the lockfiles) and `startup-bench` (the installed launchers' startup times). Run with `bazel run //tools/repo-scripts:repo-scripts-tool -- <script> <args>` |
 | `test/app/db/read/`, `test/app/db/write/` | SQLDelight queries only tests need (row counts, audit history, schema introspection; fixture writes): `testReads`/`testWrites` on `MoneyManagerDatabaseWrapper`. Kept apart from `app/db/{read,write}` so production code can't reach them |
 | `test/{app/db,app/ui,app/remotestorage,utils/credentialvault}/` | Test fixtures only (see **Testing**); `app/remotestorage` is the in-memory cloud store (`InMemoryStorageProvider`, `SingleProviderFactory`) |
 | `app/main/jvm/` | JVM Desktop entry point |
@@ -699,6 +700,7 @@ set of writes.
 
 ### Code Style
 
+- **No Python in the repo** (#1264): write a script as a subcommand of `tools/repo-scripts` (Kotlin), Starlark or small shell. Don't commit `.py` files or call `python`; `bazel test //bazel/checks:no_python_test` fails on it. The test reads the working tree, so it runs locally even with `--config=rbe`
 - Run `bazel run //:format` before committing
 - Import types explicitly, never use fully qualified names in code
 - Comments should explain "why", not "what" - prefer self-documenting code
@@ -768,9 +770,9 @@ set of writes.
 
 1. **Java**: everything runs on, and the desktop app bundles, `MODULE.bazel`'s `JDK` (Azul Zulu 27, which Bazel
    downloads; Zulu because it ships the `jmods/` jlink and ProGuard read, which Temurin dropped in 24). Renovate bumps
-   it to every release, LTS or not, and `repin.sh` (`repin_jdk.py`) rewrites the archives and `.bazelrc`'s
+   it to every release, LTS or not, and `repin.sh` (`repo-scripts repin jdk`) rewrites the archives and `.bazelrc`'s
    `remotejdk_<n>`, and `.tool-versions` (for asdf/mise) to the same Zulu build. Javac runs on it through `//bazel/kmp/java:java_toolchain`. Code compiles for that JDK, or for the newest
-   Java the Kotlin compiler targets if that is older. `repin_bytecode.py` sets it after every JDK
+   Java the Kotlin compiler targets if that is older. `repo-scripts repin bytecode` sets it after every JDK
    or Kotlin bump in `.bazelrc`'s `java_language_version`s, the Java toolchain's `source_version`/`target_version` and
    the Kotlin toolchain's `jvm_target` (`bazel/kmp/BUILD.bazel`); `jvm_target.patch` drops rules_kotlin's value lists,
    which stop at 25. A plugin that can't handle the new bytecode (or Kotlin) fails that Renovate PR's build

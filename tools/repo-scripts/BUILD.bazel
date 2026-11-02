@@ -1,0 +1,29 @@
+load("@rules_java//java:java_binary.bzl", "java_binary")
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_generate true
+
+kmp_library(
+    name = "repo-scripts",
+    jvm_deps = ["@maven_kmp//:kotlinx_serialization_json"],
+    jvm_srcs = glob(["src/main/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+)
+
+# The repository's scripts (no Python is committed): repin, dependency-snapshot, startup-bench.
+java_binary(
+    name = "repo-scripts-tool",
+    main_class = "com.moneymanager.tools.repo.MainKt",
+    visibility = ["//visibility:public"],
+    runtime_deps = [":repo-scripts_jvm"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":repo-scripts",
+    jvm_deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:kotlinx_serialization_json",
+    ],
+    jvm_srcs = glob(["src/test/kotlin/**/*.kt"]),
+)

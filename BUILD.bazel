@@ -214,6 +214,8 @@ kmp_modules(
         "//app/db/rawsql:rawsql_module",
         "//test/app/db/read:read_module",
         "//test/app/db/write:write_module",
+        "//tools/repo-scripts:repo-scripts_module",
+        "//tools/repo-scripts:test_module",
     ],
     visibility = ["//visibility:public"],
 )

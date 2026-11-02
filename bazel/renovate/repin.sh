@@ -18,15 +18,17 @@ if [ "$module_kotlin" != "$pinned_native" ]; then
   bazel run @kotlin_native_repin//:repin
 fi
 
-python3 bazel/renovate/repin_node.py MODULE.bazel
-python3 bazel/renovate/repin_jdk.py MODULE.bazel .bazelrc .tool-versions
+repo_script() { bazel run //tools/repo-scripts:repo-scripts-tool -- "$@"; }
+
+repo_script repin node MODULE.bazel
+repo_script repin jdk MODULE.bazel .bazelrc .tool-versions
 # rules_kotlin's compiler, whose JvmTarget says how new the bytecode can be.
 kotlinc_repo=rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin_git
 bazel fetch --repo="@@$kotlinc_repo"
-python3 bazel/renovate/repin_bytecode.py "$(bazel info output_base)/external/$kotlinc_repo"
-python3 bazel/renovate/repin_skiko.py MODULE.bazel
-python3 bazel/renovate/repin_pdfium.py MODULE.bazel
-python3 bazel/renovate/repin_aapt2.py MODULE.bazel bazel/kmp/android/pins.bzl
+repo_script repin bytecode "$(bazel info output_base)/external/$kotlinc_repo"
+repo_script repin skiko MODULE.bazel
+repo_script repin pdfium MODULE.bazel
+repo_script repin aapt2 MODULE.bazel bazel/kmp/android/pins.bzl
 
 for hub in $(sed -n 's|.*lock_file = "//bazel/kmp/deps:\(.*\)\.lock\.json".*|\1|p' MODULE.bazel); do
   bazel run "@$hub//:pin"

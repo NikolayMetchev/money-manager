@@ -577,7 +577,7 @@ jobs:
         run: |
           if [ "$MEASURE" = true ]; then
             flags=(--define=bundle_native_cli=true)
-            targets=(//tools/bench-db:bench_db //tools/bench-db:empty_db)
+            targets=(//tools/bench-db:bench_db //tools/bench-db:empty_db //tools/repo-scripts:repo-scripts-tool_deploy.jar)
           else
             flags=(--define=aot=false)
             targets=()
@@ -591,7 +591,7 @@ jobs:
           MEASURE: ${{ github.event_name != 'pull_request' }}
         run: |
           if [ "$MEASURE" = true ]; then
-            mkdir bench-dbs && cp bazel-bin/tools/bench-db/bench.db bazel-bin/tools/bench-db/empty.db bench-dbs/
+            mkdir bench-dbs && cp bazel-bin/tools/bench-db/bench.db bazel-bin/tools/bench-db/empty.db bazel-bin/tools/repo-scripts/repo-scripts-tool_deploy.jar bench-dbs/
             export STARTUP_BENCH_DBS=$PWD/bench-dbs STARTUP_BENCH_OUT=$PWD/startup-${{ matrix.name }}.jsonl
             export STARTUP_BENCH_LABEL="$ImageOS $ImageVersion"
           else

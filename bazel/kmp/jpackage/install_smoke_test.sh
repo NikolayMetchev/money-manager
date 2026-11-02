@@ -9,8 +9,9 @@
 # mm (#1273): INSTALLER_AOT=false drops AOTMode=on, INSTALLER_NATIVE_CLI=false skips checking mm. Both default to true,
 # so main, releases and the Linux deb check everything.
 #
-# With STARTUP_BENCH_DBS (a directory holding //tools/bench-db's bench.db and empty.db) and STARTUP_BENCH_OUT (a
-# file), it then times the installed launchers' startup with bazel/perf/startup_bench.py and appends the results
+# With STARTUP_BENCH_DBS (a directory holding //tools/bench-db's bench.db and empty.db, and the tool that times them,
+# repo-scripts-tool_deploy.jar) and STARTUP_BENCH_OUT (a file), it then times the installed launchers' startup with the tool,
+# on the installed runtime, and appends the results
 # there (#1254): CI does this on main, so every commit's startup is recorded on the perf-data branch.
 #
 # Usage: install_smoke_test.sh <installer directory> <expected version>
@@ -138,9 +139,10 @@ echo "The desktop app started and stayed up."
 
 if [ -n "${STARTUP_BENCH_DBS:-}" ]; then
   unset JAVA_TOOL_OPTIONS
-  python=$(command -v python3 || command -v python)
+  # The installed app's own runtime runs the timing tool (compiled for it), so the runner needs no JDK.
+  java=$(find "$root" \( -path '*/bin/java' -o -path '*/bin/java.exe' \) | head -1)
   native() { case "$(uname -s)" in MINGW* | MSYS*) cygpath -w "$1" ;; *) echo "$1" ;; esac; }
-  "$python" -I "$(native "$(dirname "$0")/../../perf/startup_bench.py")" \
+  "$java" -jar "$(native "$STARTUP_BENCH_DBS/repo-scripts-tool_deploy.jar")" startup-bench \
     --bench-db "$(native "$STARTUP_BENCH_DBS/bench.db")" --empty-db "$(native "$STARTUP_BENCH_DBS/empty.db")" \
     --desktop "$(native "$app")" --mm-jvm "$(native "$mm_jvm")" --mm "$(native "$mm")" \
     --runs "${STARTUP_BENCH_RUNS:-10}" --label "${STARTUP_BENCH_LABEL:-}" \

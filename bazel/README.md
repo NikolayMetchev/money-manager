@@ -194,7 +194,7 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
 - Each install writes `bazel/kmp/deps/<name>.lock.json` (every file with its sha256); after changing an install, run `bazel run @<name>//:pin`, or `bazel/renovate/repin.sh` for all of them. `//bazel/kmp/deps:maven_kmp_lock_test`
   fails while any lock is stale. Modules name a library by its alias, `@maven_kmp//:kotlinx_io_core` (the
   `_jvm`/`_<target>` suffix is added per platform); `//bazel/kmp/deps` only holds `kotlin_test` and the compiler
-  plugins. `dependency_snapshot.py` turns the lockfiles into GitHub's dependency graph.
+  plugins. `repo-scripts dependency-snapshot` turns the lockfiles into GitHub's dependency graph.
 - `aliases` adds a hub target under a name some tool expects instead of ours: Android Studio builds
   `@maven_kmp//:androidx_compose_ui_ui_tooling` (rules_jvm_external's name) after every sync of a Compose project.
 
@@ -267,7 +267,7 @@ only so its dependents can, and the browser app never calls it).
 `kmp_test`'s `web_targets` link the test klib (unoptimised) into `:<name>_<target>_bin/test.mjs`, and `:<name>_wasmJs`
 / `:<name>_js` run it in Node on every host. Node is rules_nodejs' toolchain only, pinned in `MODULE.bazel` with each
 platform's SHA-256 (no npm): Renovate bumps `NODE`, and `bazel/renovate/repin.sh` rewrites the SHA-256s from
-nodejs.org's `SHASUMS256.txt` (`repin_node.py`). A test program's npm packages are laid out as npm installs them, in
+nodejs.org's `SHASUMS256.txt` (`repo-scripts repin node`). A test program's npm packages are laid out as npm installs them, in
 `:<name>_<target>_bin_node_modules/node_modules` (symlinks), and the runner resolves the program's bare imports from
 there (`module.registerHooks`). It also gives the program a global `require`, which kotlinx-io's js file system loads
 Node's modules with. `testing/web/runner.mjs` defines the `describe`/`it` globals kotlin-test's adapter
@@ -283,7 +283,7 @@ kotlinx-browser redeclares `kotlin-dom-api-compat`'s DOM classes with the overlo
 `kt_web_executable` links it once per target. `kt_web_dist` lays out the site (`:dist`): `index.html` and `loader.mjs`
 (`site/`) at the root, each program in `wasmJs/` or `js/` with Compose's `skiko-js-wasm-runtime` jar unpacked beside it
 (`skiko.mjs`, `skiko.wasm`; the jar is a `jvm`-only library in `@maven_kmp`, and Skiko's klibs are forced to the same
-`SKIKO` version, which `bazel/renovate/repin_skiko.py` sets to the one Compose was built against: Compose's klibs link
+`SKIKO` version, which `repo-scripts repin skiko` sets to the one Compose was built against: Compose's klibs link
 against no other), and the programs' npm packages under `node_modules/`. Browsers don't resolve bare imports and a
 worker can't use an import map, so `web/dist.mjs` rewrites each bare import to a relative path, resolved as a bundler would
 for the browser (`exports` with the `browser` condition, else `module`, else `main`). The loader picks wasmJs when the
