@@ -3,6 +3,7 @@ package com.moneymanager.ui.screens.reconciliation
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.reconciliation.LegMatch
 import com.moneymanager.reconciliation.ReconciliationResult
@@ -72,6 +73,26 @@ fun ReconciliationResult.movementOf(leg: UnmatchedSourceLeg): List<Reconciliatio
         .filter { it.walletAccountId == leg.walletAccountId && it.leg.movementKey == leg.leg.movementKey }
         .map { it.leg }
         .ifEmpty { listOf(leg.leg) }
+
+/** The source legs of every movement in [legs], each movement once: what a bulk ignore covers. */
+fun ReconciliationResult.movementsOf(legs: List<UnmatchedSourceLeg>): List<ReconciliationLeg> = legs.flatMap { movementOf(it) }.distinct()
+
+/**
+ * The matches the matcher found that nobody has stored yet (exact and near alike), on [wallet] and in [month] when
+ * given: what an "Accept all" stores, so a re-import can't change them.
+ */
+fun ReconciliationResult.unstoredMatches(
+    wallet: AccountId? = null,
+    month: String? = null,
+): List<LegMatch> =
+    matches.filter {
+        it.matchId == null &&
+            (wallet == null || it.sourceLeg.accountId == wallet) &&
+            (month == null || monthKey(it.sourceLeg.timestamp) == month)
+    }
+
+/** Every transaction a near match spans, each once: the members of its `reconciliation-match` relationship. */
+fun LegMatch.memberTransactions(): List<TransactionId> = (sourceLegs + realLegs).map { it.transactionRef }.distinct()
 
 /** A real leg the match picker lists: selectable, or shown greyed because a near match already claims it. */
 data class PickerCandidate(

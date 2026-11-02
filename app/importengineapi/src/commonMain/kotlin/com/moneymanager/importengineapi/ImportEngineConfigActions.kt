@@ -84,15 +84,23 @@ suspend fun ImportEngine.setTransferExcluded(
  * Stores a person's statement that [members] (transfers and trades) record one movement: a "reconciliation-match"
  * relationship, every member a MEMBER, written by hand so a re-import rebuilds it.
  */
-suspend fun ImportEngine.createReconciliationMatch(members: Collection<TransactionId>) {
-    require(members.size >= 2) { "A match needs at least two transactions" }
-    val mutation =
-        RelationshipMutation.Create(
-            typeId = RelationshipTypeId(WellKnownIds.RECONCILIATION_MATCH_RELATIONSHIP_TYPE_ID),
-            members = members.distinct().map { RelationshipMember(it, RelationshipRole.MEMBER) },
-            source = Source.Manual,
-        )
-    import(ImportBatch(relationshipMutations = listOf(mutation)))
+suspend fun ImportEngine.createReconciliationMatch(members: Collection<TransactionId>) = createReconciliationMatches(listOf(members))
+
+/** [createReconciliationMatch] for several movements at once, in one batch. */
+suspend fun ImportEngine.createReconciliationMatches(matches: Collection<Collection<TransactionId>>) {
+    if (matches.isEmpty()) return
+    val typeId = RelationshipTypeId(WellKnownIds.RECONCILIATION_MATCH_RELATIONSHIP_TYPE_ID)
+    val mutations =
+        matches.map { members ->
+            val distinct = members.distinct()
+            require(distinct.size >= 2) { "A match needs at least two distinct transactions" }
+            RelationshipMutation.Create(
+                typeId = typeId,
+                members = distinct.map { RelationshipMember(it, RelationshipRole.MEMBER) },
+                source = Source.Manual,
+            )
+        }
+    import(ImportBatch(relationshipMutations = mutations))
 }
 
 suspend fun ImportEngine.deleteRelationship(id: RelationshipId) {

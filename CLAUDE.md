@@ -244,7 +244,7 @@ takes `Schema.synchronous()`. **Never `withContext` inside a `transaction {}`**:
 open transaction per thread, so a body that hops threads runs on another connection, outside it
 (`SuspendingTransactionTest`).
 
-**No raw SQL**: every query is a SQLDelight `.sq` query. The only hand-written SQL runs through `RawSql`
+**No raw SQL, avoid it at all costs**: reach for `RawSql` only when SQLDelight can't express the statement, and never for convenience (a test fixture write, a `last_insert_rowid()`, a one-off lookup are all `.sq` queries: `testWrites`/`testReads` for the ones only tests need). Every query is a SQLDelight `.sq` query. The only hand-written SQL runs through `RawSql`
 (`app/db/rawsql`, visible to `app/db/core`, `app/db/write` and `app/query` only), and only for what SQLDelight can't
 express: `mm sql`'s user-supplied SQL (`runReadOnlySql`), the per-import CSV staging tables (`CsvTableManager`: their
 name and column count are chosen at runtime), `VACUUM INTO ?`, the driver's connection PRAGMAs and the size breakdown's
@@ -497,7 +497,7 @@ source** (built-in: Koinly). Its data never touches real accounts:
   second, then nearest within 24h, then summed per (group, asset, second) so a fee booked separately on
   one side still matches the other side's gross leg. A match a person makes is stored first: a
   `reconciliation-match` relationship (type 6, members of any transaction kind, written by `Source.Manual`), which
-  `reconcile()` honours before computing anything (`LegMatch.matchId`), whatever its amounts and times.
+  `reconcile()` honours before computing anything (`LegMatch.matchId`), whatever its amounts and times. A transaction is in at most one match (a trigger enforces it, and `insertRelationship` merges an overlapping new match with the stored ones into one relationship), so a trade matched to two real rows is one relationship over all three. A transfer between two linked wallets is in the one relationship of both wallets' matches.
 - The External Account Reconciliation screen has two tabs. **Unmatched**: near matches (**Accept** stores one),
   the source's rows Money Manager lacks (**Ignore** excludes them with the reason `"ignored in reconciliation"`,
   outside the source's owned set; **Select matching transactions…** picks real legs from around that time that no

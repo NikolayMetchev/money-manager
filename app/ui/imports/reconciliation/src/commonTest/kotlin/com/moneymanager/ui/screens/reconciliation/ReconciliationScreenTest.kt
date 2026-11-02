@@ -2,7 +2,9 @@
 
 package com.moneymanager.ui.screens.reconciliation
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
@@ -16,6 +18,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.Account
@@ -50,7 +53,9 @@ import com.moneymanager.importengineapi.ReconciliationLinkMutation
 import com.moneymanager.importengineapi.RelationshipMutation
 import com.moneymanager.importengineapi.TradeAttributeMutation
 import com.moneymanager.presenter.error.ProvideSchemaAwareScope
+import com.moneymanager.tasks.TaskManager
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.tasks.LocalTaskManager
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.answering.calls
 import dev.mokkery.answering.returns
@@ -58,6 +63,9 @@ import dev.mokkery.every
 import dev.mokkery.everySuspend
 import dev.mokkery.matcher.any
 import dev.mokkery.mock
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,6 +75,13 @@ import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
+
+/** The schema-aware scope the screen needs, and the task manager an app-level host would provide. */
+@Composable
+private fun provideScreenScopes(content: @Composable () -> Unit) {
+    val tasks = remember { TaskManager(CoroutineScope(Dispatchers.Default)) }
+    CompositionLocalProvider(LocalTaskManager provides tasks) { ProvideSchemaAwareScope(content) }
+}
 
 class ReconciliationScreenTest {
     private val epoch = Instant.fromEpochMilliseconds(0)
@@ -106,7 +121,7 @@ class ReconciliationScreenTest {
     fun explainsHowToStartWhenThereAreNoSources() {
         runMoneyManagerComposeUiTest {
             setContent {
-                ProvideSchemaAwareScope {
+                provideScreenScopes {
                     ReconciliationScreen(
                         reconciliationRepository = reconciliationRepository(emptyList()),
                         accountRepository = accountRepository(emptyList()),
@@ -132,7 +147,7 @@ class ReconciliationScreenTest {
                     Account(id = wallet.accountId, name = wallet.name, openingDate = epoch),
                 )
             setContent {
-                ProvideSchemaAwareScope {
+                provideScreenScopes {
                     ReconciliationScreen(
                         reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(wallet)),
                         accountRepository = accountRepository(accounts),
@@ -170,8 +185,11 @@ class ReconciliationScreenTest {
                 }
             // The links flow is static, so the Binance wallet stays unlinked despite its exact match.
             setContent {
-                CompositionLocalProvider(LocalImportEngine provides engine) {
-                    ProvideSchemaAwareScope {
+                CompositionLocalProvider(
+                    LocalImportEngine provides engine,
+                    LocalTaskManager provides TaskManager(CoroutineScope(Dispatchers.Default)),
+                ) {
+                    provideScreenScopes {
                         ReconciliationScreen(
                             reconciliationRepository = reconciliationRepository(listOf(koinly), wallets),
                             accountRepository = accountRepository(accounts),
@@ -202,7 +220,7 @@ class ReconciliationScreenTest {
         runMoneyManagerComposeUiTest {
             val wallet = ShadowAccount(AccountId(100), "Koinly · Ledger", "Koinly")
             setContent {
-                ProvideSchemaAwareScope {
+                provideScreenScopes {
                     ReconciliationScreen(
                         reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(wallet)),
                         accountRepository =
@@ -243,7 +261,7 @@ class ReconciliationScreenTest {
                 }
             setContent {
                 CompositionLocalProvider(LocalImportEngine provides engine) {
-                    ProvideSchemaAwareScope {
+                    provideScreenScopes {
                         ReconciliationScreen(
                             reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(wallet), links),
                             accountRepository = accountRepository(accounts),
@@ -267,7 +285,7 @@ class ReconciliationScreenTest {
             val wallet = ShadowAccount(AccountId(100), "Koinly · Ledger", "Koinly")
             setContent {
                 CompositionLocalProvider(LocalImportEngine provides importEngine { awaitCancellation() }) {
-                    ProvideSchemaAwareScope {
+                    provideScreenScopes {
                         ReconciliationScreen(
                             reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(wallet)),
                             accountRepository =
@@ -323,6 +341,15 @@ class ReconciliationScreenTest {
                 batches += batch
                 ImportResult()
             }
+        showLegsWith(engine, sourceLegs, realLegs)
+        return batches
+    }
+
+    private fun ComposeUiTest.showLegsWith(
+        engine: ImportEngine,
+        sourceLegs: List<ReconciliationLeg>,
+        realLegs: List<ReconciliationLeg>,
+    ) {
         val accounts =
             listOf(
                 Account(id = binance, name = "Binance", openingDate = epoch),
@@ -330,7 +357,7 @@ class ReconciliationScreenTest {
             )
         setContent {
             CompositionLocalProvider(LocalImportEngine provides engine) {
-                ProvideSchemaAwareScope {
+                provideScreenScopes {
                     ReconciliationScreen(
                         reconciliationRepository =
                             reconciliationRepository(
@@ -348,7 +375,6 @@ class ReconciliationScreenTest {
             }
         }
         waitForIdle()
-        return batches
     }
 
     /** Opens every collapsed wallet and month group of the visible tab. */
@@ -393,6 +419,118 @@ class ReconciliationScreenTest {
                     ),
                 ),
                 batches.single().relationshipMutations,
+            )
+        }
+    }
+
+    private fun match(id: Long) = RelationshipMember(TransferId(id), RelationshipRole.MEMBER)
+
+    @Test
+    fun acceptAllAtEveryLevelStoresEveryNearMatchBeneathItInOneBatch() {
+        runMoneyManagerComposeUiTest {
+            val batches =
+                showLegs(
+                    listOf(leg(10, wallet.accountId, "5", t0), leg(11, wallet.accountId, "6", t0 + 1.hours)),
+                    listOf(leg(20, binance, "5", t0 + 1.hours), leg(21, binance, "6", t0 + 2.hours)),
+                )
+            reveal(hasText("Near matches (2)"))
+            expandAll()
+            // The month header's button sits in the same row, so it is composed once the month is revealed.
+            reveal(hasText("2024-01 (2)", substring = true))
+            val buttons = onAllNodesWithText("Accept all (2)")
+            buttons[buttons.fetchSemanticsNodes().size - 1].performClick()
+            // A bulk run is a background task, so wait for its writes.
+            waitUntil(timeoutMillis = 10_000) { batches.isNotEmpty() }
+
+            val create = batches.single().relationshipMutations.filterIsInstance<RelationshipMutation.Create>()
+            assertEquals(listOf(listOf(match(10), match(20)), listOf(match(11), match(21))), create.map { it.members })
+        }
+    }
+
+    @Test
+    fun acceptAllStoresTheAutoMatchedRowsToo() {
+        runMoneyManagerComposeUiTest {
+            // 10↔20 agree to the second (auto-matched), 11↔21 are an hour apart (near).
+            val batches =
+                showLegs(
+                    listOf(leg(10, wallet.accountId, "5", t0), leg(11, wallet.accountId, "6", t0 + 1.hours)),
+                    listOf(leg(20, binance, "5", t0), leg(21, binance, "6", t0 + 2.hours)),
+                )
+            reveal(hasText("Near matches (1)"))
+
+            onAllNodesWithText("Accept all (2)")[0].performClick()
+            // A bulk run is a background task, so wait for its writes.
+            waitUntil(timeoutMillis = 10_000) { batches.isNotEmpty() }
+
+            val create = batches.single().relationshipMutations.filterIsInstance<RelationshipMutation.Create>()
+            assertEquals(setOf(listOf(match(10), match(20)), listOf(match(11), match(21))), create.map { it.members }.toSet())
+        }
+    }
+
+    @Test
+    fun theMatchedTabOffersAcceptAllForAutoMatchedRows() {
+        runMoneyManagerComposeUiTest {
+            val batches = showLegs(listOf(leg(10, wallet.accountId, "5", t0)), listOf(leg(20, binance, "5", t0)))
+            clickText("Matched")
+
+            onAllNodesWithText("Accept all (1)")[0].performClick()
+            // A bulk run is a background task, so wait for its writes.
+            waitUntil(timeoutMillis = 10_000) { batches.isNotEmpty() }
+
+            assertEquals(
+                listOf(listOf(match(10), match(20))),
+                batches
+                    .single()
+                    .relationshipMutations
+                    .filterIsInstance<RelationshipMutation.Create>()
+                    .map { it.members },
+            )
+        }
+    }
+
+    @Test
+    fun theBulkButtonsAreDisabledWhileABulkRunIsInProgress() {
+        runMoneyManagerComposeUiTest {
+            val gate = CompletableDeferred<Unit>()
+            val batches = mutableListOf<ImportBatch>()
+            val engine =
+                importEngine { batch ->
+                    gate.await()
+                    batches += batch
+                    ImportResult()
+                }
+            showLegsWith(engine, listOf(leg(10, wallet.accountId, "5", t0)), listOf(leg(20, binance, "5", t0 + 1.hours)))
+            reveal(hasText("Near matches (1)"))
+
+            onAllNodesWithText("Accept all (1)")[0].performClick()
+            waitForIdle()
+
+            onAllNodesWithText("Accept all (1)")[0].assertIsNotEnabled()
+            gate.complete(Unit)
+            waitUntil(timeoutMillis = 10_000) { batches.isNotEmpty() }
+        }
+    }
+
+    @Test
+    fun ignoreAllAtTheSectionExcludesEveryMovementBeneathIt() {
+        runMoneyManagerComposeUiTest {
+            val batches =
+                showLegs(
+                    listOf(leg(11, wallet.accountId, "7", t0, trade = true), leg(12, wallet.accountId, "8", t0 + 1.hours, trade = true)),
+                    // ADA is known on the linked account, so the default hide-unknown-assets filter keeps both rows.
+                    listOf(leg(20, binance, "1", t0 + 30.days)),
+                )
+            reveal(hasText("Only in Koinly (2)"))
+
+            onAllNodesWithText("Ignore all (2)")[0].performScrollTo().performClick()
+            // A bulk run is a background task, so wait for its writes.
+            waitUntil(timeoutMillis = 10_000) { batches.size >= 2 }
+
+            assertEquals(
+                listOf(11L, 12L).map {
+                    TradeAttributeMutation.Set(TradeId(it), AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID), IGNORED_IN_RECONCILIATION)
+                },
+                batches.flatMap { it.tradeAttributeMutations },
             )
         }
     }

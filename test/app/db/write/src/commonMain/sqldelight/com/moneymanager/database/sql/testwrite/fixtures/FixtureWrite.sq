@@ -10,3 +10,10 @@ DELETE FROM platform WHERE id = :platformId;
 insertDirtyCategoryAudit:
 INSERT INTO category_audit (audit_timestamp, audit_type_id, category_id, revision_id, name)
 VALUES (0, (SELECT id FROM audit_type LIMIT 1), 1, 1, 'dirty');
+
+-- A relationship and its members written without insertRelationship's merge, to check what the schema alone refuses.
+insertRelationshipWithId:
+INSERT INTO relationship (id, relationship_type_id, created_at) VALUES (:id, :typeId, 0);
+
+insertRelationshipMemberUnchecked:
+INSERT INTO relationship_member (relationship_id, transaction_id, role) VALUES (:relationshipId, :transactionId, :role);

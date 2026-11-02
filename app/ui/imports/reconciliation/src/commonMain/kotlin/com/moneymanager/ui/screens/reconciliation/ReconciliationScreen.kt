@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +52,7 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.createReconciliationMatch
+import com.moneymanager.importengineapi.createReconciliationMatches
 import com.moneymanager.importengineapi.deleteRelationship
 import com.moneymanager.importengineapi.setReconciliationLinks
 import com.moneymanager.importengineapi.setTradeExcluded
@@ -68,9 +70,11 @@ import com.moneymanager.reconciliation.planAutoLinks
 import com.moneymanager.reconciliation.realAccounts
 import com.moneymanager.reconciliation.reconcile
 import com.moneymanager.reconciliation.unlinkedWallets
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.tasks.LocalTaskManager
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.CancellationException
@@ -79,6 +83,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 import kotlin.time.Duration
+
+/** Rows a bulk run writes per engine call: one transaction each, with the progress bar moving between them. */
+private const val BULK_CHUNK = 50
 
 private enum class ResultTab(
     val label: String,
@@ -228,10 +235,10 @@ private fun SourceReconciliation(
         write("Matching") { importEngine.createReconciliationMatch(legs.map { it.transactionRef }.distinct()) }
 
     // Ignoring a source row excludes every transaction of its movement (a trade and its fee, say).
-    fun setIgnored(
+    suspend fun applyIgnored(
         legs: List<ReconciliationLeg>,
         ignored: Boolean,
-    ) = write(if (ignored) "Ignoring" else "Un-ignoring") {
+    ) {
         val reason = IGNORED_IN_RECONCILIATION.takeIf { ignored }
         val refs = legs.map { it.transactionRef }.distinct()
         refs.filterIsInstance<TradeId>().forEach { importEngine.setTradeExcluded(it, reason) }
@@ -240,6 +247,54 @@ private fun SourceReconciliation(
             transactionRepository.getTransactionsByIds(transferIds).values.forEach { importEngine.setTransferExcluded(it, reason) }
         }
     }
+
+    fun setIgnored(
+        legs: List<ReconciliationLeg>,
+        ignored: Boolean,
+    ) = write(if (ignored) "Ignoring" else "Un-ignoring") { applyIgnored(legs, ignored) }
+
+    // A bulk run is a background task: it shows in the task panel with a progress bar, and the legs reload when it ends.
+    val taskManager = LocalTaskManager.current
+    val tasks by taskManager.tasks.collectAsState()
+    val bulkKey = "reconciliation-bulk-${source.name}"
+    // Set on the click itself: the task list only shows the run a recomposition later.
+    var bulkSubmitted by remember { mutableStateOf(false) }
+    val bulkRunning = bulkSubmitted || tasks.any { it.key == bulkKey && it.isRunning }
+
+    fun <T> runBulk(
+        title: String,
+        what: String,
+        items: List<T>,
+        apply: suspend (List<T>) -> Unit,
+    ) {
+        if (bulkRunning) return
+        bulkSubmitted = true
+        val id =
+            taskManager.start(bulkKey, title, "Starting") {
+                try {
+                    var done = 0
+                    items.chunked(BULK_CHUNK).forEach { chunk ->
+                        report(Progress.counted(what, done, items.size))
+                        apply(chunk)
+                        done += chunk.size
+                    }
+                    report(Progress.counted(what, done, items.size))
+                    "$done done"
+                } finally {
+                    refreshKey++
+                    bulkSubmitted = false
+                }
+            }
+        if (id == null) bulkSubmitted = false
+    }
+
+    fun storeMatches(matches: List<LegMatch>) =
+        runBulk("Accepting ${matches.size} matches", "Accepting matches", matches) { chunk ->
+            importEngine.createReconciliationMatches(chunk.map { it.memberTransactions() })
+        }
+
+    fun ignoreAll(legs: List<ReconciliationLeg>) =
+        runBulk("Ignoring ${legs.size} rows", "Ignoring rows", legs) { chunk -> applyIgnored(chunk, ignored = true) }
 
     fun createAll(plan: Map<AccountId, String>) {
         creatingAll = true
@@ -331,19 +386,38 @@ private fun SourceReconciliation(
         }
         when (tab) {
             ResultTab.UNMATCHED -> {
-                sectionHeading("Near matches (${loaded.nearMatches.size})")
+                // Accept all stores the exact matches under the same header too, not only the near ones listed here.
+                sectionHeading("Near matches (${loaded.nearMatches.size})") {
+                    loaded.unstoredMatches().let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
+                }
                 legGroups(
                     prefix = "near",
                     groups = groupByWalletAndMonth(loaded.nearMatches, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
                     expanded = expanded,
                     empty = "No near matches: every match agrees to the second.",
+                    headerAction = { _, wallet, month ->
+                        loaded
+                            .unstoredMatches(
+                                wallet,
+                                month,
+                            ).let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
+                    },
                 ) { match ->
                     MatchRow(match, accountNames, onOpenLeg) {
-                        TextButton(onClick = { storeMatch(match.sourceLegs + match.realLegs) }) { Text("Accept") }
+                        TextButton(
+                            onClick = {
+                                write(
+                                    "Matching",
+                                ) { importEngine.createReconciliationMatches(listOf(match.memberTransactions())) }
+                            },
+                            enabled = !bulkRunning,
+                        ) { Text("Accept") }
                     }
                 }
                 val onlyInSource = loaded.missingInMm.filter { !hideUnknownAssets || !it.assetUnknownToMm }
-                sectionHeading("Only in ${source.name} (${onlyInSource.size})")
+                sectionHeading("Only in ${source.name} (${onlyInSource.size})") {
+                    BulkButton("Ignore all", onlyInSource.size, enabled = !bulkRunning) { ignoreAll(loaded.movementsOf(onlyInSource)) }
+                }
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = hideUnknownAssets, onCheckedChange = { hideUnknownAssets = it })
@@ -355,10 +429,20 @@ private fun SourceReconciliation(
                     groups = groupByWalletAndMonth(onlyInSource, { it.walletAccountId }, { it.leg.timestamp }, walletName),
                     expanded = expanded,
                     empty = "Everything ${source.name} has on the linked wallets is in Money Manager.",
+                    headerAction = {
+                        rows,
+                        _,
+                        _,
+                        ->
+                        BulkButton("Ignore all", rows.size, enabled = !bulkRunning) { ignoreAll(loaded.movementsOf(rows)) }
+                    },
                 ) { unmatched ->
                     LegRow(unmatched.leg, accountNames, onOpenLeg) {
-                        TextButton(onClick = { setIgnored(loaded.movementOf(unmatched), ignored = true) }) { Text("Ignore") }
-                        TextButton(onClick = { picking = unmatched }) { Text("Select matching transactions…") }
+                        TextButton(
+                            onClick = { setIgnored(loaded.movementOf(unmatched), ignored = true) },
+                            enabled = !bulkRunning,
+                        ) { Text("Ignore") }
+                        TextButton(onClick = { picking = unmatched }, enabled = !bulkRunning) { Text("Select matching transactions…") }
                     }
                 }
                 sectionHeading("Only in Money Manager (${loaded.missingInSource.size})")
@@ -371,11 +455,29 @@ private fun SourceReconciliation(
             }
 
             ResultTab.MATCHED -> {
+                sectionHeading("Matched (${loaded.matched.size})") {
+                    loaded.unstoredMatches().filter { it.settled }.let {
+                        BulkButton(
+                            "Accept all",
+                            it.size,
+                            enabled = !bulkRunning,
+                        ) { storeMatches(it) }
+                    }
+                }
                 legGroups(
                     prefix = "matched",
                     groups = groupByWalletAndMonth(loaded.matched, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
                     expanded = expanded,
                     empty = "Nothing matched yet — link the wallets above.",
+                    // Only the rows the matcher found: a stored one is already accepted.
+                    headerAction = { _, wallet, month ->
+                        loaded
+                            .unstoredMatches(
+                                wallet,
+                                month,
+                            ).filter { it.settled }
+                            .let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
+                    },
                 ) { match ->
                     val matchId = match.matchId
                     MatchRow(
@@ -389,6 +491,7 @@ private fun SourceReconciliation(
                                 {
                                     TextButton(
                                         onClick = { write("Unmatching") { importEngine.deleteRelationship(RelationshipId(matchId)) } },
+                                        enabled = !bulkRunning,
                                     ) {
                                         Text("Unmatch")
                                     }
@@ -404,7 +507,10 @@ private fun SourceReconciliation(
                     empty = "No ${source.name} rows ignored.",
                 ) { ignored ->
                     LegRow(ignored.leg, accountNames, onOpenLeg) {
-                        TextButton(onClick = { setIgnored(listOf(ignored.leg), ignored = false) }) { Text("Un-ignore") }
+                        TextButton(
+                            onClick = { setIgnored(listOf(ignored.leg), ignored = false) },
+                            enabled = !bulkRunning,
+                        ) { Text("Un-ignore") }
                     }
                 }
             }
@@ -430,10 +536,27 @@ private fun SourceReconciliation(
     }
 }
 
-private fun LazyListScope.sectionHeading(text: String) {
+private fun LazyListScope.sectionHeading(
+    text: String,
+    action: (@Composable () -> Unit)? = null,
+) {
     item(key = "heading-$text".substringBefore(" (")) {
-        Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)) {
+            Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            action?.invoke()
+        }
     }
+}
+
+/** A header's bulk button, covering the [count] rows beneath it; absent when there are none. */
+@Composable
+private fun BulkButton(
+    label: String,
+    count: Int,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    if (count > 0) TextButton(onClick = onClick, enabled = enabled) { Text("$label ($count)") }
 }
 
 @Composable
@@ -597,6 +720,7 @@ private fun <T> LazyListScope.legGroups(
     groups: List<WalletGroup<T>>,
     expanded: MutableMap<String, Boolean>,
     empty: String,
+    headerAction: (@Composable (items: List<T>, wallet: AccountId, month: String?) -> Unit)? = null,
     row: @Composable (T) -> Unit,
 ) {
     if (groups.isEmpty()) {
@@ -606,29 +730,35 @@ private fun <T> LazyListScope.legGroups(
     groups.forEach { group ->
         val walletKey = "$prefix-${group.walletAccountId.id}"
         item(key = walletKey) {
-            Text(
-                "${if (expanded[walletKey] == true) "▾" else "▸"} ${group.walletName} (${group.count})",
-                style = MaterialTheme.typography.titleSmall,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { expanded[walletKey] = expanded[walletKey] != true }
-                        .padding(vertical = 8.dp),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${if (expanded[walletKey] == true) "▾" else "▸"} ${group.walletName} (${group.count})",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .clickable { expanded[walletKey] = expanded[walletKey] != true }
+                            .padding(vertical = 8.dp),
+                )
+                headerAction?.invoke(group.months.flatMap { it.items }, group.walletAccountId, null)
+            }
         }
         if (expanded[walletKey] != true) return@forEach
         group.months.forEach { month ->
             val monthKey = "$walletKey-${month.month}"
             item(key = monthKey) {
-                Text(
-                    "${if (expanded[monthKey] == true) "▾" else "▸"} ${month.month} (${month.items.size})",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { expanded[monthKey] = expanded[monthKey] != true }
-                            .padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "${if (expanded[monthKey] == true) "▾" else "▸"} ${month.month} (${month.items.size})",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .clickable { expanded[monthKey] = expanded[monthKey] != true }
+                                .padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
+                    )
+                    headerAction?.invoke(month.items, group.walletAccountId, month.month)
+                }
             }
             if (expanded[monthKey] == true) {
                 items(month.items) { Row(modifier = Modifier.padding(start = 32.dp)) { row(it) } }
