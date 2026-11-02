@@ -538,6 +538,7 @@ fun CsvImportDetailScreen(
                 importSuccessMessage = result.toSummary(imported?.successCount ?: 0)
                 importFailedRows =
                     result.unmatchedEdits.map { edit -> "Manual edit not re-applied: ${edit.imported.description}" } +
+                    result.reappliedLinks.notReapplied.map { "Not re-applied: $it" } +
                     imported?.failedRows.orEmpty().map { failed ->
                         "Row ${failed.rowIndex}: ${failed.errorMessage}"
                     }

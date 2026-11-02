@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.importengineapi.ManualEdit
+import com.moneymanager.importengineapi.ReappliedLinks
 import com.moneymanager.importengineapi.SourceRerunPlan
 import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
@@ -184,6 +185,19 @@ fun UnmatchedEditsReport(
     )
 }
 
+/** The hand-made links and trade edits a finished re-import could not put back; nothing when there are none. */
+@Composable
+fun UnmatchedLinksReport(links: ReappliedLinks) {
+    if (links.notReapplied.isEmpty()) return
+    ReimportPlanSection(
+        title = "Manual links and trade edits not re-applied (${links.notReapplied.size}):",
+        lines = links.notReapplied,
+        note = "The re-import no longer creates the transactions these were on, so redo them by hand if still needed.",
+        limit = REIMPORT_PREVIEW_LIMIT,
+        isError = true,
+    )
+}
+
 private fun plural(count: Int) = if (count == 1) "" else "s"
 
 /** Names accounts for [ManualEdit.describeChanges], falling back to the id while the list loads. */
@@ -210,6 +224,7 @@ fun SourceRerunResult<*>.toSummary(imported: Int): String =
         if (unmatchedEdits.isNotEmpty()) {
             append(", ${unmatchedEdits.size} manual edit${plural(unmatchedEdits.size)} not re-applied")
         }
+        append(reappliedLinks.summary(", "))
         if (deletedEmptyAccounts.isNotEmpty()) {
             append(", ${deletedEmptyAccounts.size} empty account${plural(deletedEmptyAccounts.size)} deleted")
         }

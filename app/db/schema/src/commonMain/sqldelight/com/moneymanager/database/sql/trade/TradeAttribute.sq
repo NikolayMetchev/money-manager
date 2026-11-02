@@ -1,7 +1,10 @@
 -- Attributes on a trade, mirroring transfer_attribute. The well-known 'excluded' type (-1) keeps the
 -- trade out of balances (see BalanceLegsSelect), e.g. a trade the source reports as deleted/cancelled.
--- One value per (trade, type). Excluded from the audit trail (EXCLUDED_FROM_AUDIT in
--- MoneyManagerDatabaseWrapper); its edits are folded into the sync change token instead.
+-- One value per (trade, type). Excluded from the generic audit trail (EXCLUDED_FROM_AUDIT in
+-- MoneyManagerDatabaseWrapper); its edits are folded into the sync change token instead. A hand edit
+-- (TradeWriteRepository.setAttributeByHand) is the one change recorded: it bumps the trade's revision,
+-- writes that revision's entity_source (MANUAL) and a trade_attribute_audit row, so a re-import can tell
+-- which types a person set and put them back on the re-created trade, as it does for transfers.
 CREATE TABLE trade_attribute (
     trade_id INTEGER NOT NULL,
     attribute_type_id INTEGER NOT NULL,
@@ -12,3 +15,21 @@ CREATE TABLE trade_attribute (
 );
 
 CREATE INDEX idx_trade_attribute_type ON trade_attribute(attribute_type_id);
+
+-- One row per hand edit of a trade attribute, at the trade revision the edit created (whose entity_source
+-- names who made it). Like transfer_attribute_audit: audit_type_id 1 = set where there was no value
+-- (attribute_value is the new value), 2 = changed, 3 = removed (both hold the value before). Import writes
+-- record none, so the trade's rows say which types a person last touched.
+CREATE TABLE trade_attribute_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    trade_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    attribute_value TEXT NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id),
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_trade_attribute_audit_trade ON trade_attribute_audit(trade_id, revision_id);

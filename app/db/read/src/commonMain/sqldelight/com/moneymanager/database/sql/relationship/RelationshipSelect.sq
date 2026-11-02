@@ -39,3 +39,27 @@ FROM relationship_member member
 JOIN relationship ON relationship.id = member.relationship_id
 WHERE relationship.relationship_type_id = :typeId
   AND member.relationship_id IN (SELECT relationship_id FROM relationship_member WHERE transaction_id = :transactionId);
+
+-- As selectByTransactions, only the relationships a person made: their provenance (entity_type_id 13) names
+-- the MANUAL source (source_type_id 1). A re-import rebuilds these on the transactions it re-creates.
+selectHandMadeByTransactions:
+SELECT
+    relationship.id,
+    relationship_type.id AS relationship_type_id,
+    relationship_type.name AS relationship_type_name,
+    member.transaction_id,
+    member.role,
+    CASE WHEN trade.id IS NOT NULL THEN 'TRADE' ELSE 'TRANSFER' END AS transaction_kind
+FROM relationship
+JOIN relationship_type ON relationship.relationship_type_id = relationship_type.id
+JOIN relationship_member member ON member.relationship_id = relationship.id
+LEFT JOIN trade ON trade.id = member.transaction_id
+WHERE relationship.id IN (SELECT relationship_id FROM relationship_member WHERE transaction_id IN :transactionIds)
+  AND EXISTS (
+      SELECT 1 FROM entity_source
+      WHERE entity_source.entity_type_id = 13
+        AND entity_source.entity_id = relationship.id
+        AND entity_source.source_type_id = 1
+        AND entity_source.matched = 0
+  )
+ORDER BY relationship_type.name, relationship.id, member.role, member.transaction_id;

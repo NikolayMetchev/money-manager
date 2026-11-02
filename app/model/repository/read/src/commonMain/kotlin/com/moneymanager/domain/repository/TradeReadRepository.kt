@@ -1,6 +1,7 @@
 package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeAttribute
 import com.moneymanager.domain.model.TradeId
@@ -12,6 +13,12 @@ interface TradeReadRepository {
 
     /** The attributes set on trade [id] (e.g. `excluded` with its reason), ordered by type name. */
     fun getAttributes(id: TradeId): Flow<List<TradeAttribute>>
+
+    /**
+     * The attribute types a person set or removed by hand on any of [ids], each with the trade's value of it
+     * now (null when it is absent): what a re-import puts back on the trade it re-creates.
+     */
+    suspend fun getHandSetAttributes(ids: Collection<TradeId>): Map<TradeId, Map<AttributeTypeId, String?>>
 
     fun getTradesByAccount(accountId: AccountId): Flow<List<Trade>>
 

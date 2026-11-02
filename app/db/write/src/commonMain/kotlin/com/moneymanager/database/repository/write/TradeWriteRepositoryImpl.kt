@@ -7,7 +7,7 @@ import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
-import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.write.NewTrade
@@ -15,6 +15,7 @@ import com.moneymanager.domain.repository.write.TradeCreateResult
 import com.moneymanager.domain.repository.write.TradeWriteRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.time.Clock
 
 class TradeWriteRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
@@ -91,13 +92,39 @@ class TradeWriteRepositoryImpl(
             }
         }
 
-    override suspend fun upsertAttributes(
+    override suspend fun setAttributeByHand(
         id: TradeId,
-        attributes: List<NewAttribute>,
+        typeId: AttributeTypeId,
+        value: String?,
+        source: Source,
     ): Unit =
         withContext(Dispatchers.Default) {
             writeQueries.transaction {
-                attributes.forEach { writeQueries.upsertAttribute(id.id, it.typeId.id, it.value) }
+                val before = selectQueries.selectAttributeValue(id.id, typeId.id).awaitAsOneOrNull()
+                if (before == value) return@transaction
+                writeQueries.bumpRevision(id.id)
+                val revision = selectQueries.selectRevision(id.id).awaitAsOneOrNull() ?: return@transaction
+                if (value == null) {
+                    writeQueries.deleteAttribute(id.id, typeId.id)
+                } else {
+                    writeQueries.upsertAttribute(id.id, typeId.id, value)
+                }
+                // audit_type ids: 1 INSERT (the new value), 2 UPDATE and 3 DELETE (the value before).
+                val (auditType, auditValue) =
+                    when {
+                        before == null -> AUDIT_INSERT to checkNotNull(value)
+                        value == null -> AUDIT_DELETE to before
+                        else -> AUDIT_UPDATE to before
+                    }
+                writeQueries.insertAttributeAudit(
+                    audit_timestamp = Clock.System.now().toEpochMilliseconds(),
+                    audit_type_id = auditType,
+                    trade_id = id.id,
+                    revision_id = revision,
+                    attribute_type_id = typeId.id,
+                    attribute_value = auditValue,
+                )
+                database.recordSource(deviceId, EntityType.TRADE, id.id, revision, source)
             }
         }
 
@@ -109,3 +136,7 @@ class TradeWriteRepositoryImpl(
             writeQueries.deleteAttribute(id.id, typeId.id)
         }
 }
+
+private const val AUDIT_INSERT = 1L
+private const val AUDIT_UPDATE = 2L
+private const val AUDIT_DELETE = 3L

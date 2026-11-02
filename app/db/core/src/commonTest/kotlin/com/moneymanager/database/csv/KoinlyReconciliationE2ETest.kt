@@ -6,12 +6,18 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.RelationshipMember
+import com.moneymanager.domain.model.RelationshipRole
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.Trade
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.RelationshipMutation
+import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.setReconciliationLinks
 import com.moneymanager.importengineapi.setTradeExcluded
@@ -19,10 +25,12 @@ import com.moneymanager.reconciliation.planAutoLinks
 import com.moneymanager.reconciliation.realAccounts
 import com.moneymanager.reconciliation.reconcile
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -332,6 +340,131 @@ class KoinlyReconciliationE2ETest : DbTest() {
             applyAll(listOf(stage("b.csv", listOf(coinbaseDeposit, coinbaseTrade))))
 
             assertNull(balanceOf("Koinly · Coinbase", "KNC"))
+        }
+
+    private suspend fun koinlyTrade(): Trade {
+        val coinbase = assertNotNull(accountByName("Koinly · Coinbase")).id
+        return repositories.tradeRepository
+            .getTradesByAccount(coinbase)
+            .first()
+            .single()
+    }
+
+    private suspend fun transfersOn(account: AccountId) = repositories.transactionRepository.getTransactionsByAccount(account).first()
+
+    // The 1000 GBP deposit into Koinly's Coinbase wallet (the wallet's other transfer is the trade's fee).
+    private suspend fun koinlyDeposit() =
+        transfersOn(assertNotNull(accountByName("Koinly · Coinbase")).id).single {
+            it.amount.toDisplayValue().compareTo(BigDecimal("1000")) ==
+                0
+        }
+
+    private suspend fun reimport(file: CsvImport): SourceRerunResult<*> {
+        val reimports = repositories.reimports(maintenance)
+        val reloaded = assertNotNull(repositories.csvImportRepository.getImport(file.id).first())
+        return reimports.reimport(reimports.plan(reloaded), accountId = null, currencyId = null)
+    }
+
+    private suspend fun excludedReason(trade: TradeId): String? =
+        repositories.tradeRepository
+            .getAttributes(trade)
+            .first()
+            .singleOrNull { it.attributeType.id.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
+            ?.value
+
+    @Test
+    fun aHandExclusionOfATradeSurvivesReimportingItsFile() =
+        runDbTest {
+            val file = stage("a.csv", listOf(coinbaseDeposit, coinbaseTrade))
+            applyAll(listOf(file))
+            val trade = koinlyTrade()
+            repositories.importEngine.setTradeExcluded(trade.id, "duplicate of another wallet")
+
+            val result = reimport(file)
+
+            assertEquals(1, result.deletedTrades)
+            assertEquals(1, result.reappliedLinks.reapplied)
+            val recreated = koinlyTrade()
+            assertNotEquals(trade.id, recreated.id, "the re-import made the trade again")
+            assertEquals("duplicate of another wallet", excludedReason(recreated.id))
+            assertNull(balanceOf("Koinly · Coinbase", "KNC"))
+
+            // Kept by hand again, so a second re-import keeps it too.
+            reimport(file)
+            assertEquals("duplicate of another wallet", excludedReason(koinlyTrade().id))
+        }
+
+    @Test
+    fun anExclusionRemovedByHandStaysRemovedAfterReimport() =
+        runDbTest {
+            val file = stage("a.csv", listOf(coinbaseDeposit, coinbaseTrade.deleted()))
+            applyAll(listOf(file))
+            assertEquals("deleted in Koinly", excludedReason(koinlyTrade().id))
+            repositories.importEngine.setTradeExcluded(koinlyTrade().id, null)
+
+            reimport(file)
+
+            assertNull(excludedReason(koinlyTrade().id), "the import's exclusion is lifted again")
+            assertEquals("358.32414347", balanceOf("Koinly · Coinbase", "KNC"))
+        }
+
+    @Test
+    fun aHandMadeLinkIsRebuiltOverTheReimportedTransactions() =
+        runDbTest {
+            val file = stage("a.csv", listOf(coinbaseDeposit, coinbaseTrade))
+            applyAll(listOf(file))
+            val real = repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now), Source.Manual)
+            val other = repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Shop", openingDate = now), Source.Manual)
+            val gbp = assertNotNull(repositories.currencyRepository.getCurrencyByCode("GBP").first())
+            repositories.importEngine.import(
+                ImportBatch(
+                    transfers =
+                        listOf(
+                            ImportTransfer(
+                                source = Source.Manual,
+                                timestamp = Instant.parse("2020-07-03T08:22:32Z"),
+                                description = "Card payment",
+                                fromAccount = AccountRef.Existing(real),
+                                toAccount = AccountRef.Existing(other),
+                                amount = Money.fromDisplayValue(BigDecimal("500"), gbp),
+                            ),
+                        ),
+                ),
+            )
+            val realTransfer = transfersOn(real).single().id
+            val koinlyTransfer = koinlyDeposit()
+            val trade = koinlyTrade()
+            val typeId = repositories.relationshipTypeRepository.getOrCreate("hand-match")
+            repositories.importEngine.import(
+                ImportBatch(
+                    relationshipMutations =
+                        listOf(
+                            RelationshipMutation.Create(
+                                typeId,
+                                listOf(
+                                    RelationshipMember(trade.id, RelationshipRole.MEMBER),
+                                    RelationshipMember(koinlyTransfer.id, RelationshipRole.MEMBER),
+                                    RelationshipMember(realTransfer, RelationshipRole.MEMBER),
+                                ),
+                                Source.Manual,
+                            ),
+                        ),
+                ),
+            )
+
+            val result = reimport(file)
+
+            assertEquals(1, result.reappliedLinks.reapplied, "${result.reappliedLinks}")
+            val newTrade = koinlyTrade()
+            val newTransfer = koinlyDeposit()
+            assertNotEquals(koinlyTransfer.id, newTransfer.id)
+            val rebuilt = repositories.relationshipRepository.getHandMadeByTransactions(listOf(realTransfer)).single()
+            assertEquals(typeId, rebuilt.relationshipType.id)
+            assertEquals(
+                setOf(newTrade.id.id, newTransfer.id.id, realTransfer.id),
+                rebuilt.members.map { it.transactionId.id }.toSet(),
+            )
+            assertTrue(repositories.relationshipRepository.getByTransactions(listOf(realTransfer)).size == 1, "the old one is gone")
         }
 
     @Test

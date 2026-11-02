@@ -7,6 +7,9 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ImportDirectoryId
+import com.moneymanager.domain.model.RelationshipId
+import com.moneymanager.domain.model.RelationshipMember
+import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
@@ -56,7 +59,10 @@ sealed interface HolidayCalendarMutation {
     ) : HolidayCalendarMutation
 }
 
-/** A direct edit of one attribute on an existing trade. */
+/**
+ * A person's edit of one attribute on an existing trade. The engine records it as a MANUAL revision of the
+ * trade, so a re-import of the trade's source puts it back on the re-created trade.
+ */
 sealed interface TradeAttributeMutation {
     val tradeId: TradeId
     val typeId: AttributeTypeId
@@ -71,6 +77,24 @@ sealed interface TradeAttributeMutation {
         override val tradeId: TradeId,
         override val typeId: AttributeTypeId,
     ) : TradeAttributeMutation
+}
+
+/** A write of a relationship between existing transactions, outside any one transfer's import. */
+sealed interface RelationshipMutation {
+    /**
+     * A relationship of [typeId] over [members], recorded with [source] as its provenance (a person's is
+     * [Source.Manual], which a re-import of any member's source rebuilds on the re-created transactions).
+     * Skipped when [typeId] already relates exactly these members.
+     */
+    data class Create(
+        val typeId: RelationshipTypeId,
+        val members: List<RelationshipMember>,
+        val source: Source,
+    ) : RelationshipMutation
+
+    data class Delete(
+        val id: RelationshipId,
+    ) : RelationshipMutation
 }
 
 /** A write on the shadow→real reconciliation account links. */
