@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -44,6 +45,9 @@ internal const val PICKER_CANDIDATES_TAG = "match-picker-candidates"
 
 /** How far either side of the source movement the picker looks. */
 internal val PICKER_WINDOWS: List<Duration> = listOf(1.days, 3.days, 7.days, 30.days)
+
+/** A generous width per character of bodySmall text, so the widest description fits unclipped. */
+private const val DESCRIPTION_DP_PER_CHAR = 7
 
 /**
  * Picks the real transactions a source movement ([movement], on [wallet]) records, for a source row the matcher
@@ -68,13 +72,18 @@ fun MatchPickerDialog(
         remember(result, movement, wallet, window, sameAssetOnly) { result.pickerCandidates(movement, wallet, window, sameAssetOnly) }
 
     val rowScroll = rememberScrollState()
+    // Rows sharing one scroll state need one content width, or a short row would clamp the range a long one needs.
+    val descriptionWidth =
+        remember(movement, candidates) {
+            ((movement + candidates.map { it.leg }).maxOfOrNull { it.description.length } ?: 0).times(DESCRIPTION_DP_PER_CHAR).dp
+        }
 
     // A full-screen page rather than an AlertDialog: a dialog is too narrow to show a leg line, whose description got squeezed out.
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Select matching transactions", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                Text("Select matching transactions", style = MaterialTheme.typography.titleLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
                     TextButton(onClick = onIgnore) { Text("Ignore") }
                     TextButton(onClick = { onConfirm(selected.toList()) }, enabled = selected.isNotEmpty()) {
@@ -87,7 +96,7 @@ fun MatchPickerDialog(
                 ) {
                     item(key = "header") { Text("In $sourceName", style = MaterialTheme.typography.labelLarge) }
                     items(movement.size, key = { "movement-${movement[it].key}" }) {
-                        PickerLegLine(movement[it], accountNames, rowScroll)
+                        PickerLegLine(movement[it], accountNames, rowScroll, descriptionWidth)
                     }
                     item(key = "filters") {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
@@ -122,6 +131,7 @@ fun MatchPickerDialog(
                                     candidate.leg,
                                     accountNames,
                                     rowScroll,
+                                    descriptionWidth,
                                     delta = candidate.delta,
                                     enabled = candidate.selectable,
                                 )
@@ -170,6 +180,7 @@ private fun PickerLegLine(
     leg: ReconciliationLeg,
     accountNames: Map<AccountId, String>,
     scroll: ScrollState,
+    descriptionWidth: Dp,
     delta: Duration? = null,
     enabled: Boolean = true,
 ) {
@@ -189,7 +200,13 @@ private fun PickerLegLine(
             modifier = Modifier.width(120.dp),
         )
         Text(formatAmount(leg.amount), style = MaterialTheme.typography.bodySmall, color = color, modifier = Modifier.width(150.dp))
-        Text(leg.description, style = MaterialTheme.typography.bodySmall, color = color, softWrap = false)
+        Text(
+            leg.description,
+            style = MaterialTheme.typography.bodySmall,
+            color = color,
+            softWrap = false,
+            modifier = Modifier.width(descriptionWidth),
+        )
     }
 }
 
