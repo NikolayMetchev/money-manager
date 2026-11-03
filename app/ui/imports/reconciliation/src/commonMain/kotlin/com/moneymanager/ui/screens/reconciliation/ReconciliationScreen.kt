@@ -528,6 +528,10 @@ private fun SourceReconciliation(
             result = loaded,
             accountNames = accountNames,
             onDismiss = { picking = null },
+            onIgnore = {
+                picking = null
+                setIgnored(movement, ignored = true)
+            },
             onConfirm = { selected ->
                 picking = null
                 storeMatch(movement + selected)
