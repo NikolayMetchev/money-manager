@@ -15,7 +15,9 @@ import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 class AdvancedTabTest {
@@ -47,7 +49,7 @@ class AdvancedTabTest {
     }
 
     @Test
-    fun `the duplicate tolerance field edits the strategy and a blank field clears it`() {
+    fun `the duplicate tolerance field edits the strategy and invalid text blocks saving`() {
         runMoneyManagerComposeUiTest {
             val state = CsvStrategyEditorState(strategy, emptySet())
             assertEquals(SettlementWindow.Elapsed(0), state.duplicateDateTolerance)
@@ -60,10 +62,13 @@ class AdvancedTabTest {
             onNodeWithText("Duplicate date tolerance (seconds)").performTextReplacement("")
             waitForIdle()
             assertNull(state.duplicateDateTolerance)
+            assertTrue(state.duplicateDateToleranceValid)
 
             onNodeWithText("Duplicate date tolerance (seconds)").performTextReplacement("-5")
             waitForIdle()
             assertNull(state.duplicateDateTolerance)
+            assertFalse(state.duplicateDateToleranceValid)
+            assertFalse(state.isValid)
         }
     }
 }

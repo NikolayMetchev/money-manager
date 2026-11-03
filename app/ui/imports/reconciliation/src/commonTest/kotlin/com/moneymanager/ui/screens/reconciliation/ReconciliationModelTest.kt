@@ -66,7 +66,7 @@ class ReconciliationModelTest {
     }
 
     @Test
-    fun pickerListsUnclaimedLegsOfTheWalletWithinTheWindowNearestFirst() {
+    fun pickerListsUnclaimedLegsOfTheWalletWithinTheWindowOldestFirst() {
         val koinly = leg(wallet, "5", t0)
         val near = leg(binance, "5", t0 + 1.hours)
         val nearSource = leg(wallet, "5", t0 - 1.hours)

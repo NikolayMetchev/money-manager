@@ -305,7 +305,7 @@ fun reconcile(
         if (index % PROGRESS_EVERY == 0) report(index.toFloat() / splitSources.size)
         val pool =
             splitRealByKey[SplitKey(groupOfSource(leg.accountId)!!, leg.amount.asset.id, leg.amount.amount.sign(), leg.kind)]
-                ?.filter { it !in consumed && (it.timestamp - leg.timestamp).absoluteValue <= splitWindow }
+                ?.filter { (it.timestamp - leg.timestamp).absoluteValue <= splitWindow && it !in consumed }
                 ?: return@forEachIndexed
         val parts = pool.takeIf { it.size >= 2 }?.let { findSplit(it, leg.amount.amount) } ?: return@forEachIndexed
         consumed += parts

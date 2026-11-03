@@ -158,19 +158,9 @@ internal fun AdvancedTab(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(
-            value =
-                state.duplicateDateTolerance
-                    ?.seconds
-                    ?.toString()
-                    .orEmpty(),
-            onValueChange = { text ->
-                state.duplicateDateTolerance =
-                    text
-                        .trim()
-                        .toLongOrNull()
-                        ?.takeIf { it >= 0 }
-                        ?.let { SettlementWindow.Elapsed(it) }
-            },
+            value = state.duplicateDateToleranceText,
+            onValueChange = { state.duplicateDateToleranceText = it },
+            isError = !state.duplicateDateToleranceValid,
             label = { Text("Duplicate date tolerance (seconds)") },
             singleLine = true,
             enabled = enabled,

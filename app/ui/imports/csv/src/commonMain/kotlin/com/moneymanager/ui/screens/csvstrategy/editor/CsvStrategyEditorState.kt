@@ -22,6 +22,7 @@ import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.isComplete
 import com.moneymanager.ui.components.rules.isComplete
@@ -171,7 +172,27 @@ internal class CsvStrategyEditorState(
     var contentMatchRules by mutableStateOf(config?.contentMatchRules.orEmpty())
     var crossSourceReconcileWindow by mutableStateOf(config?.crossSourceReconcileWindow)
     var placeholderReconcileWindow by mutableStateOf(config?.placeholderReconcileWindow)
-    var duplicateDateTolerance by mutableStateOf(config?.duplicateDateTolerance)
+
+    // The typed text is kept apart from the parsed value, so a half-typed or invalid entry blocks saving instead of
+    // silently becoming "blank" (which means the 3-day default).
+    var duplicateDateToleranceText by mutableStateOf(
+        config
+            ?.duplicateDateTolerance
+            ?.seconds
+            ?.toString()
+            .orEmpty(),
+    )
+
+    val duplicateDateTolerance: SettlementWindow.Elapsed?
+        get() =
+            duplicateDateToleranceText
+                .trim()
+                .toLongOrNull()
+                ?.takeIf { it >= 0 }
+                ?.let { SettlementWindow.Elapsed(it) }
+
+    val duplicateDateToleranceValid: Boolean
+        get() = duplicateDateToleranceText.isBlank() || duplicateDateTolerance != null
 
     // Carried through verbatim (like content-match/companion rules): its column references may name
     // columns absent from the uploaded sample, but dropping them would corrupt the strategy.
@@ -314,6 +335,7 @@ internal class CsvStrategyEditorState(
                 fundingMatchValid &&
                 contentMatchValid &&
                 legGroupsValid &&
+                duplicateDateToleranceValid &&
                 currencyValid &&
                 timezoneValid
 }
