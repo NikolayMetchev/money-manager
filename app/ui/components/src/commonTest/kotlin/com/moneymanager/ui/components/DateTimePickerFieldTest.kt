@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -128,6 +129,29 @@ class DateTimePickerFieldTest {
             onNodeWithText("OK").performClick()
             waitForIdle()
             assertEquals(upper.date, result?.date)
+        }
+    }
+
+    @Test
+    fun anEmptyEndBound_keepsTheEndOfTheDayDownToTheNanosecond() {
+        runMoneyManagerComposeUiTest {
+            var result: LocalDateTime? = null
+            val endOfDay = LocalTime(23, 59, 59, 999_999_999)
+            setContent {
+                MaterialTheme {
+                    DateTimePickerField(
+                        value = null,
+                        onValueChange = { result = it },
+                        defaultTime = endOfDay,
+                        maxValue = LocalDateTime(2024, 3, 12, 23, 59, 59, 999_999_999),
+                    )
+                }
+            }
+            onNodeWithText(CALENDAR).performClick()
+            waitForIdle()
+            onNodeWithText("OK").performClick()
+            waitForIdle()
+            assertEquals(endOfDay, result?.time)
         }
     }
 }

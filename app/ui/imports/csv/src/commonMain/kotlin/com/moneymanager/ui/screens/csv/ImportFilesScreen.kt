@@ -263,6 +263,7 @@ fun ImportFilesScreen(
                 )
             }
 
+            val dateRangeOf = remember(dateRanges) { { import: CsvImport -> dateRanges[import.id.id.toString()] } }
             StagedImportsTabs(
                 imports = imports,
                 data = data,
@@ -280,7 +281,7 @@ fun ImportFilesScreen(
                         )
                     },
                 filter = filter,
-                dateRange = { dateRanges[it.id.id.toString()] },
+                dateRange = dateRangeOf,
                 header = {
                     if (directories != null) {
                         val expanded = directoriesExpanded ?: imports.isEmpty()
@@ -452,7 +453,7 @@ private fun DateRangeFields(
         minValue = from ?: earliest,
         maxValue = latest,
         dateLabel = "Transactions to (date)",
-        defaultTime = LocalTime(23, 59),
+        defaultTime = LocalTime(23, 59, 59, 999_999_999),
         onClear = { onFilterChange(filter.copy(to = null)) },
     )
 }

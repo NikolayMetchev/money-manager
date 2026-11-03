@@ -118,7 +118,7 @@ fun DateTimePickerField(
                                 clamp(
                                     LocalDateTime(
                                         date,
-                                        LocalTime(shownTime.hour, shownTime.minute, value?.second ?: 0, value?.nanosecond ?: 0),
+                                        LocalTime(shownTime.hour, shownTime.minute, shownTime.second, shownTime.nanosecond),
                                     ),
                                 ),
                             )
