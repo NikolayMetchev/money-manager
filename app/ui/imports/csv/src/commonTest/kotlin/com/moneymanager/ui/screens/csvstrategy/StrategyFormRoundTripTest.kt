@@ -242,6 +242,7 @@ class StrategyFormRoundTripTest {
                             ),
                         crossSourceReconcileWindow = SettlementWindow.Elapsed(120),
                         placeholderReconcileWindow = SettlementWindow.BusinessDays(3),
+                        duplicateDateTolerance = SettlementWindow.Elapsed(0),
                         legGroups =
                             listOf(
                                 LegGroupRule(
@@ -293,6 +294,7 @@ class StrategyFormRoundTripTest {
         assertEquals(original.config.contentMatchRules, rebuilt.config.contentMatchRules)
         assertEquals(original.config.crossSourceReconcileWindow, rebuilt.config.crossSourceReconcileWindow)
         assertEquals(original.config.placeholderReconcileWindow, rebuilt.config.placeholderReconcileWindow)
+        assertEquals(original.config.duplicateDateTolerance, rebuilt.config.duplicateDateTolerance)
         assertEquals(original.config.legGroups, rebuilt.config.legGroups)
     }
 

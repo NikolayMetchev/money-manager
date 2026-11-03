@@ -68,6 +68,7 @@ private fun flattenConfig(config: CsvStrategyConfig<FieldMapping>): Map<String, 
         config.fileNamePattern?.let { put("File name pattern", it) }
         config.crossSourceReconcileWindow?.let { put("Cross-source reconcile window", it.summary()) }
         config.placeholderReconcileWindow?.let { put("Placeholder reconcile window", it.summary()) }
+        config.duplicateDateTolerance?.let { put("Duplicate date tolerance", it.summary()) }
         putIfNotEmpty("Leg groups", config.legGroups)
         config.fundingAttributeMatch?.let { put("Funding attribute match", it.toString()) }
     }

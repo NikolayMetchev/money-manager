@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
 import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.reconciliation.ReconciliationLink
+import com.moneymanager.tasks.Progress
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -170,6 +171,108 @@ class LegMatcherTest {
         assertTrue(result.matches.isEmpty())
         assertEquals(2, result.missingInMm.size)
         assertEquals(1, result.missingInSource.size)
+    }
+
+    @Test
+    fun `several real transfers in one second match a single source leg that is their sum`() {
+        // Binance books each dust conversion as its own row; Koinly books one deposit.
+        val source = listOf(leg(wallet, sourceRewards, "0.00521788", t0))
+        val real =
+            listOf(
+                leg(binance, stakingRewards, "0.00509731", t0, movement = "row1"),
+                leg(binance, stakingRewards, "0.00012057", t0, movement = "row2"),
+            )
+
+        val result = reconcile(source, links, real)
+
+        assertEquals(1, result.matches.size)
+        val match = result.matches.single()
+        assertEquals(2, match.realLegs.size)
+        assertTrue(result.missingInMm.isEmpty())
+        assertTrue(result.missingInSource.isEmpty())
+    }
+
+    @Test
+    fun `trade fills a second apart match the single source trade they sum to`() {
+        val usdt = CryptoAsset(id = CryptoId(3), code = "USDT", name = "Tether")
+        val source = listOf(leg(wallet, null, "0.48119", t0), leg(wallet, null, "-6582.6792", t0, asset = usdt))
+        val real =
+            listOf(
+                leg(binance, null, "0.210824", t0, movement = "fill1"),
+                leg(binance, null, "-2884.07232", t0, asset = usdt, movement = "fill1"),
+                leg(binance, null, "0.270366", t0 + 1.seconds, movement = "fill2"),
+                leg(binance, null, "-3698.60688", t0 + 1.seconds, asset = usdt, movement = "fill2"),
+            )
+
+        val result = reconcile(source, links, real)
+
+        assertEquals(2, result.matches.size)
+        assertTrue(result.matches.all { it.realLegs.size == 2 })
+        assertTrue(result.missingInMm.isEmpty())
+        assertTrue(result.missingInSource.isEmpty())
+    }
+
+    @Test
+    fun `any number of real legs within the window sum to one source leg`() {
+        // Binance books each commission payout as its own row over a quarter hour; Koinly books the day's total once.
+        val amounts = listOf("0.00110501", "0.0000679", "0.00080743", "0.00140668", "0.00028541", "0.0008962", "0.00015352")
+        val source = listOf(leg(wallet, sourceRewards, "0.00472215", t0))
+        val real = amounts.mapIndexed { i, a -> leg(binance, stakingRewards, a, t0 + (if (i == 0) 0 else 690).seconds) }
+
+        val result = reconcile(source, links, real)
+
+        assertEquals(1, result.matches.size)
+        assertEquals(
+            7,
+            result.matches
+                .single()
+                .realLegs.size,
+        )
+        assertTrue(result.missingInMm.isEmpty())
+        assertTrue(result.missingInSource.isEmpty())
+    }
+
+    @Test
+    fun `a subset of the legs in the window is enough and the rest stay unmatched`() {
+        val source = listOf(leg(wallet, sourceRewards, "6", t0))
+        val real = listOf("1", "2", "3", "10").map { leg(binance, stakingRewards, it, t0 + 5.minutes) }
+
+        val result = reconcile(source, links, real)
+
+        assertEquals(
+            3,
+            result.matches
+                .single()
+                .realLegs.size,
+        )
+        assertEquals(1, result.unclaimedReal.size)
+    }
+
+    @Test
+    fun `real legs that do not sum to the source leg are left alone and no leg is reused`() {
+        val source = listOf(leg(wallet, sourceRewards, "3", t0), leg(wallet, sourceRewards, "3", t0))
+        val real = listOf(leg(binance, stakingRewards, "1", t0), leg(binance, stakingRewards, "2", t0))
+
+        val result = reconcile(source, links, real)
+
+        assertEquals(1, result.matches.size)
+        assertEquals(1, result.missingInMm.size)
+        assertTrue(result.missingInSource.isEmpty())
+    }
+
+    @Test
+    fun `progress names every step in order and never goes backwards`() {
+        val reports = mutableListOf<Progress>()
+        val source = listOf(leg(wallet, sourceRewards, "1", t0))
+        val real = listOf(leg(binance, stakingRewards, "1", t0))
+
+        val withSink = reconcile(source, links, real, onProgress = { reports += it })
+        val without = reconcile(source, links, real)
+
+        assertEquals(without.matches.size, withSink.matches.size)
+        assertEquals(reports.map { it.fraction }.sortedBy { it }, reports.map { it.fraction })
+        assertTrue(reports.first().detail.startsWith("Applying"))
+        assertEquals(1f, reports.last().fraction)
     }
 
     @Test

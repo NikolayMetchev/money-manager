@@ -171,6 +171,7 @@ internal class CsvStrategyEditorState(
     var contentMatchRules by mutableStateOf(config?.contentMatchRules.orEmpty())
     var crossSourceReconcileWindow by mutableStateOf(config?.crossSourceReconcileWindow)
     var placeholderReconcileWindow by mutableStateOf(config?.placeholderReconcileWindow)
+    var duplicateDateTolerance by mutableStateOf(config?.duplicateDateTolerance)
 
     // Carried through verbatim (like content-match/companion rules): its column references may name
     // columns absent from the uploaded sample, but dropping them would corrupt the strategy.

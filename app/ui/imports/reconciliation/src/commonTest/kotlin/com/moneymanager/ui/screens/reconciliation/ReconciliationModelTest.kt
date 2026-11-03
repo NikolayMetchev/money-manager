@@ -90,10 +90,10 @@ class ReconciliationModelTest {
             )
 
         val sameAsset = result.pickerCandidates(listOf(koinly), wallet, window = 3.days, sameAssetOnly = true)
-        assertEquals(listOf(near to false, close to true), sameAsset.map { it.leg to it.selectable })
+        assertEquals(listOf(close to true, near to false), sameAsset.map { it.leg to it.selectable })
 
         val anyAsset = result.pickerCandidates(listOf(koinly), wallet, window = 7.days, sameAssetOnly = false)
-        assertEquals(listOf(near, close, otherAsset, far), anyAsset.map { it.leg })
+        assertEquals(listOf(close, near, otherAsset, far), anyAsset.map { it.leg })
     }
 
     @Test

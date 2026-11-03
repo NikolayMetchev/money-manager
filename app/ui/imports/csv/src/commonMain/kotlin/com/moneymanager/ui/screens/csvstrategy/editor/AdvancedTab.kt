@@ -149,6 +149,35 @@ internal fun AdvancedTab(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        Text("Duplicate detection", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "A row with the same amount, a shared account and a similar description is skipped as a duplicate " +
+                "when the existing transfer is within this many seconds. Leave blank for 3 days (a bank re-export drifts " +
+                "by a day or two); use 0 for a source that repeats identical rows day after day.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value =
+                state.duplicateDateTolerance
+                    ?.seconds
+                    ?.toString()
+                    .orEmpty(),
+            onValueChange = { text ->
+                state.duplicateDateTolerance =
+                    text
+                        .trim()
+                        .toLongOrNull()
+                        ?.takeIf { it >= 0 }
+                        ?.let { SettlementWindow.Elapsed(it) }
+            },
+            label = { Text("Duplicate date tolerance (seconds)") },
+            singleLine = true,
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
         Text("Reconciliation Source (Optional)", style = MaterialTheme.typography.titleSmall)
         Text(
             "Import this data only into shadow accounts (e.g. a Koinly export) so it never affects real " +

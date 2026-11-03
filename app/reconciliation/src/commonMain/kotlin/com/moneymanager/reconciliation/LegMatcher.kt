@@ -6,8 +6,10 @@ import com.moneymanager.domain.model.AssetId
 import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.reconciliation.ReconciliationLink
+import com.moneymanager.tasks.Progress
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 /**
@@ -83,6 +85,28 @@ data class ReconciliationResult(
 val DEFAULT_FUZZY_WINDOW: Duration = 24.hours
 
 /**
+ * How far from a source leg the real legs it was split into may lie: an exchange books each fill of an order, or each
+ * payout of a batch, as its own transaction, while the source books one leg for the lot, stamped at one point of it
+ * (Koinly's daily Binance commission is the first payout; the rest follow over the next quarter hour).
+ */
+val DEFAULT_SPLIT_WINDOW: Duration = 15.minutes
+
+/** The most search steps spent on one source leg; there is no limit on how many legs it may be split into. */
+private const val MAX_SPLIT_STEPS = 200_000
+
+/** Named steps of [reconcile], in the order they run, as reported to its progress sink. */
+private val STEPS =
+    listOf(
+        "Applying stored matches",
+        "Matching legs at the same second",
+        "Matching the nearest legs",
+        "Summing the legs of each movement",
+        "Summing legs split across transactions",
+        "Summing the fees of matched trades",
+        "Collecting what is left",
+    )
+
+/**
  * Matches a reconciliation source's legs against the real legs of the accounts linked to its wallets.
  *
  * A person's stored matches come first: legs whose transactions share a "reconciliation-match" relationship
@@ -112,7 +136,28 @@ fun reconcile(
     links: List<ReconciliationLink>,
     realLegs: List<ReconciliationLeg>,
     fuzzyWindow: Duration = DEFAULT_FUZZY_WINDOW,
+    splitWindow: Duration = DEFAULT_SPLIT_WINDOW,
+    onProgress: ((Progress) -> Unit)? = null,
 ): ReconciliationResult {
+    var step = 0
+
+    fun report(inner: Float = 0f) {
+        val done = step.coerceAtMost(STEPS.size)
+        onProgress?.invoke(
+            Progress(
+                detail = STEPS[step.coerceAtMost(STEPS.lastIndex)],
+                fraction = ((done + inner.coerceIn(0f, 1f)) / STEPS.size).coerceIn(0f, 1f),
+                processed = done,
+                total = STEPS.size,
+            ),
+        )
+    }
+
+    fun nextStep() {
+        step++
+        report()
+    }
+    report()
     // Excluded legs (e.g. rows the source deleted) are out of scope, so they don't widen the range either:
     // a real leg only a deleted row covered mustn't be reported as missing from the source.
     val sourceRange =
@@ -189,6 +234,7 @@ fun reconcile(
             matches += LegMatch(sourceLegs, realLegs, matchId = key.second)
         }
 
+    nextStep()
     // Pass 1: the same second, first come first served (the legs are indistinguishable anyway).
     for (leg in inScopeSource) {
         val best =
@@ -200,6 +246,7 @@ fun reconcile(
         matches += LegMatch(leg, best)
     }
 
+    nextStep()
     // Pass 2: nearest first across each bucket, so an early leg can't claim a later leg's closer partner.
     inScopeSource
         .filter { it !in matchedSource }
@@ -221,6 +268,7 @@ fun reconcile(
                 }
         }
 
+    nextStep()
     // Pass 3: the leftovers of one movement, summed per side (group, asset, movement), nearest first.
     val sourceBundles = bundles(inScopeSource.filter { it !in matchedSource }) { groupOfSource(it.accountId)!! }
     val realBundles = bundles(inScopeReal.filter { it !in consumed }) { groupOfReal(it.accountId)!! }
@@ -242,7 +290,31 @@ fun reconcile(
             }
         }
 
-    // Pass 4: the fees of a trade both sides already matched, summed per side (group, asset, second). A
+    nextStep()
+
+    // Pass 4: one source leg whose real side is several transactions a moment apart (an order's fills, a batch of
+    // dust conversions): leftover real legs, however many, of its group, asset, direction and kind within
+    // [splitWindow] that sum to it exactly. Only this direction: several source legs summing to one real leg is
+    // what pass 3 allows within a movement, and unrelated source legs must never be summed (see the tests).
+    val splitRealByKey =
+        inScopeReal
+            .filter { it !in consumed }
+            .groupBy { SplitKey(groupOfReal(it.accountId)!!, it.amount.asset.id, it.amount.amount.sign(), it.kind) }
+    val splitSources = inScopeSource.filter { it !in matchedSource && it.amount.amount.sign() != 0 }
+    splitSources.forEachIndexed { index, leg ->
+        if (index % PROGRESS_EVERY == 0) report(index.toFloat() / splitSources.size)
+        val pool =
+            splitRealByKey[SplitKey(groupOfSource(leg.accountId)!!, leg.amount.asset.id, leg.amount.amount.sign(), leg.kind)]
+                ?.filter { it !in consumed && (it.timestamp - leg.timestamp).absoluteValue <= splitWindow }
+                ?: return@forEachIndexed
+        val parts = pool.takeIf { it.size >= 2 }?.let { findSplit(it, leg.amount.amount) } ?: return@forEachIndexed
+        consumed += parts
+        matchedSource += leg
+        matches += LegMatch(listOf(leg), parts)
+    }
+    nextStep()
+
+    // Pass 5: the fees of a trade both sides already matched, summed per side (group, asset, second). A
     // source can book one fee for an order whose every fill the exchange charged separately (Koinly's
     // single trade fee against Bybit's per-fill tradingFee rows): separate transactions, so pass 3 never
     // bundles them. Only seconds holding a matched trade qualify — two unrelated rewards that happen to
@@ -276,6 +348,9 @@ fun reconcile(
         matchedSource += bundle.legs
         matches += LegMatch(bundle.legs, real.legs)
     }
+
+    step = STEPS.size
+    report()
 
     val ignored =
         sourceLegs
@@ -332,6 +407,61 @@ private fun secondBundles(
         .map { (key, bundleLegs) ->
             LegBundle(bundleLegs, MatchKey(key.first, key.second, bundleLegs.map { it.amount.amount }.reduce { a, b -> a + b }))
         }
+
+/** Real legs that can be parts of one source leg: same group, asset, direction and kind. */
+private data class SplitKey(
+    val group: AccountId,
+    val assetId: AssetId,
+    val sign: Int,
+    val kind: LegTransactionKind,
+)
+
+private const val PROGRESS_EVERY = 200
+
+private fun BigInteger.sign(): Int = compareTo(BigInteger.ZERO)
+
+/**
+ * Some subset of [pool] (two legs or more) whose amounts sum to [target], if any. Every leg has the target's sign,
+ * so the search runs largest first and prunes a branch as soon as a leg overshoots what remains or what is left can
+ * no longer reach it. The whole pool is tried first, as the source usually folds everything in the window into one
+ * leg. The number of legs is unbounded; only [MAX_SPLIT_STEPS] bounds the work, so a pathological pool can't hang
+ * the screen: past it the leg is left for a person to match.
+ */
+private fun findSplit(
+    pool: List<ReconciliationLeg>,
+    target: BigInteger,
+): List<ReconciliationLeg>? {
+    val sorted = pool.sortedByDescending { it.amount.amount.abs() }
+    val amounts = sorted.map { it.amount.amount.abs() }
+    val goal = target.abs()
+    // suffix[i] = what legs i.. add up to, the most they could contribute.
+    val suffix = ArrayList<BigInteger>(amounts.size + 1)
+    var running = BigInteger.ZERO
+    for (i in amounts.indices.reversed()) {
+        running += amounts[i]
+        suffix += running
+    }
+    suffix.reverse()
+    suffix += BigInteger.ZERO
+    if (suffix[0] == goal) return sorted
+    val chosen = ArrayList<ReconciliationLeg>()
+    var steps = 0
+
+    fun search(
+        from: Int,
+        remaining: BigInteger,
+    ): Boolean {
+        if (remaining.sign() == 0) return chosen.size >= 2
+        if (from >= amounts.size || steps++ > MAX_SPLIT_STEPS || suffix[from] < remaining) return false
+        if (amounts[from] <= remaining) {
+            chosen += sorted[from]
+            if (search(from + 1, remaining - amounts[from])) return true
+            chosen.removeAt(chosen.lastIndex)
+        }
+        return search(from + 1, remaining)
+    }
+    return if (search(0, goal)) chosen.toList() else null
+}
 
 private data class MatchKey(
     val group: AccountId,

@@ -703,6 +703,7 @@ fun effectiveSourceFor(
 fun CsvImportStrategy.fuzzyDedupePolicy(unidentifiedCounterpartyTypeId: AttributeTypeId?): DedupePolicy.FuzzyAllFields {
     val reconcileWindow = config.crossSourceReconcileWindow
     return DedupePolicy.FuzzyAllFields(
+        dateTolerance = config.duplicateDateTolerance?.duration ?: DedupePolicy.FuzzyAllFields().dateTolerance,
         reconcileWindow = reconcileWindow,
         reconciledExclusionAttributeTypeId = reconcileWindow?.let { AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID) },
         reconciledRelationshipTypeId = reconcileWindow?.let { RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID) },

@@ -29,6 +29,7 @@ import kotlinx.datetime.toInstant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -251,6 +252,14 @@ class ImportDeduperTest {
         val incoming = importTransfer(0, description = "BRITISH GAS REF 9981112223")
         val result = deduper.classify(listOf(incoming)).single()
         assertEquals(ImportStatus.IMPORTED, result.status)
+    }
+
+    @Test
+    fun fuzzy_zeroToleranceImportsTheSameRowOnALaterDay() {
+        val deduper =
+            ImportDeduper(DedupePolicy.FuzzyAllFields(dateTolerance = Duration.ZERO), existing = listOf(existing(3)))
+        val incoming = importTransfer(0, timestamp = baseTime + 1.days)
+        assertEquals(ImportStatus.IMPORTED, deduper.classify(listOf(incoming)).single().status)
     }
 
     @Test

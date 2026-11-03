@@ -46,6 +46,11 @@ import kotlinx.serialization.encoding.Encoder
  *                                      different source (same accounts and amount, within this window)
  *                                      is imported but tagged excluded and linked as reconciled instead
  *                                      of counting twice. Null disables reconciliation.
+ * @property duplicateDateTolerance How far apart in time a row and an existing transfer of the same amount, a shared
+ *                                  account and a similar description may be and still be skipped as a duplicate
+ *                                  (a bank re-export drifts by a day or two). Null: three days. A source that
+ *                                  repeats identical rows day after day (a daily interest payout) sets it to zero, so
+ *                                  only the same instant is a duplicate. Applies to strategies without unique-id columns.
  * @property placeholderReconcileWindow How far apart a placeholder leg (a counterparty the row can only
  *                                      describe, such as a card statement's "PAYMENT RECEIVED") and the
  *                                      record naming the far end may be. Null: three days, as clock time.
@@ -88,6 +93,9 @@ data class CsvStrategyConfig<out M>(
     // NEVER-encoded when null, so only a strategy that sets it rehashes.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val placeholderReconcileWindow: SettlementWindow? = null,
+    // NEVER-encoded when null, for the same reason: only a strategy that sets it rehashes.
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val duplicateDateTolerance: SettlementWindow.Elapsed? = null,
     // Omitted from JSON when null (unlike the fields above, which encode their null under the export
     // codec's encodeDefaults=true) so ADDING this field did not change the canonical hash of every
     // existing strategy — only a strategy that actually sets it (Curve) rehashed. Prevents a spurious
@@ -119,6 +127,7 @@ data class CsvStrategyConfig<out M>(
             fileNamePattern = fileNamePattern,
             crossSourceReconcileWindow = crossSourceReconcileWindow,
             placeholderReconcileWindow = placeholderReconcileWindow,
+            duplicateDateTolerance = duplicateDateTolerance,
             fundingAttributeMatch = fundingAttributeMatch,
             legGroups = legGroups,
             reconciliation = reconciliation,

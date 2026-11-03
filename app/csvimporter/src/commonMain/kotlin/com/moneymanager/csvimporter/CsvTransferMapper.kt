@@ -1412,13 +1412,14 @@ class CsvTransferMapper(
         transfer: Transfer,
         existing: Transfer,
     ): Boolean {
+        val dateTolerance = strategy.config.duplicateDateTolerance?.duration ?: DUPLICATE_DATE_TOLERANCE
         if (transfer.amount != existing.amount) return false
         val sharesAccount =
             transfer.sourceAccountId == existing.sourceAccountId ||
                 transfer.targetAccountId == existing.targetAccountId
         if (!sharesAccount) return false
         val withinDateTolerance =
-            (transfer.timestamp - existing.timestamp).absoluteValue <= DUPLICATE_DATE_TOLERANCE
+            (transfer.timestamp - existing.timestamp).absoluteValue <= dateTolerance
         return withinDateTolerance &&
             StringSimilarity.similarity(transfer.description, existing.description) >=
             DESCRIPTION_SIMILARITY_THRESHOLD

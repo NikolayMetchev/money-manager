@@ -107,7 +107,7 @@ data class PickerCandidate(
 
 /**
  * The real legs a person may match [movement] (on [wallet]) to by hand: the linked accounts' legs no match claims,
- * within [window] of the movement, nearest first. Legs a near match claims are listed too, unselectable, so a missing
+ * within [window] of the movement, oldest first. Legs a near match claims are listed too, unselectable, so a missing
  * likely candidate is explained; legs in a stored or exact match never are.
  */
 fun ReconciliationResult.pickerCandidates(
@@ -129,7 +129,7 @@ fun ReconciliationResult.pickerCandidates(
         nearMatches
             .filter { match -> match.sourceLeg.accountId == wallet }
             .flatMap { match -> match.realLegs.filter(::eligible).map { PickerCandidate(it, it.timestamp - at, match) } }
-    return (free + claimed).sortedWith(compareBy({ it.delta.absoluteValue }, { it.leg.transactionId }))
+    return (free + claimed).sortedWith(compareBy({ it.leg.timestamp }, { it.leg.transactionId }))
 }
 
 /** One asset's totals in a hand match: the source movement's, the selected real legs', and how far apart they are. */
