@@ -2,7 +2,6 @@ package com.moneymanager.ui.screens.csv
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,7 +11,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -446,7 +444,6 @@ private fun DateRangeFields(
         minValue = earliest,
         maxValue = to ?: latest,
         dateLabel = "Transactions from (date)",
-        timeLabel = "Time",
         onClear = { onFilterChange(filter.copy(from = null)) },
     )
     DateTimePickerField(
@@ -455,7 +452,6 @@ private fun DateRangeFields(
         minValue = from ?: earliest,
         maxValue = latest,
         dateLabel = "Transactions to (date)",
-        timeLabel = "Time",
         defaultTime = LocalTime(23, 59),
         onClear = { onFilterChange(filter.copy(to = null)) },
     )
