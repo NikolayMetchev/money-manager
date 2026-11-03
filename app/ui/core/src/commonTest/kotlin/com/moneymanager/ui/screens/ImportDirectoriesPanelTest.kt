@@ -168,6 +168,18 @@ class ImportDirectoriesPanelTest {
     }
 
     @Test
+    fun theCalendarIcon_opensTheTransactionDateFilter() {
+        runMoneyManagerComposeUiTest {
+            openImportsOn(stagedFile = "earlier.csv")
+            waitUntilAtLeastOneExists(hasText("earlier.csv"), timeoutMillis = 15000)
+            onNodeWithText("Transactions from (date)").assertDoesNotExist()
+            onNodeWithText("\uD83D\uDCC5").performClick()
+            waitUntilAtLeastOneExists(hasText("Transactions from (date)"), timeoutMillis = 5000)
+            onNodeWithText("Transactions to (date)").assertExists()
+        }
+    }
+
+    @Test
     fun aFolderInTheFilesList_downloadsOnlyItsOwnFolders() {
         runMoneyManagerComposeUiTest {
             val folders = BankFolders()

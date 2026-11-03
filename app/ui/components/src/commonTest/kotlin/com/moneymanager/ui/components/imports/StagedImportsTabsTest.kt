@@ -17,6 +17,8 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
+import com.moneymanager.domain.model.timeline.ImportFileDateRange
+import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -84,6 +86,7 @@ private fun tabsContent(
     onImportAll: (List<CsvImport>) -> Unit = {},
     onReimportAll: (List<CsvImport>) -> Unit = {},
     filter: StagedImportFilter = StagedImportFilter(),
+    dateRange: (CsvImport) -> ImportFileDateRange? = { null },
 ): @Composable () -> Unit =
     {
         MaterialTheme {
@@ -103,6 +106,7 @@ private fun tabsContent(
                     onReimportAll = onReimportAll,
                     onSetIgnored = { _, _ -> },
                     filter = filter,
+                    dateRange = dateRange,
                     header = { item { Text("Header") } },
                 ) { import, placement ->
                     Text(if (placement.noMatchingStrategy) "${import.originalFileName} unmatched" else import.originalFileName)
@@ -165,6 +169,30 @@ class StagedImportsTabsTest {
             onNodeWithText("Import all (1)").performClick()
             waitForIdle()
             assertEquals(listOf(santanderFile), importAll)
+        }
+    }
+
+    @Test
+    fun aDateFilter_keepsImportedFilesWhoseRangeOverlapsAndLeavesUnimportedOnes() {
+        val range =
+            ImportFileDateRange(
+                kind = TimelineSourceKind.CSV,
+                fileId = importedFile.id.id.toString(),
+                fileName = "old.qif",
+                strategyName = null,
+                earliest = Instant.fromEpochMilliseconds(1_000),
+                latest = Instant.fromEpochMilliseconds(2_000),
+                transactionCount = 1,
+            )
+        runMoneyManagerComposeUiTest {
+            setContent(
+                tabsContent(
+                    filter = StagedImportFilter(from = Instant.fromEpochMilliseconds(5_000)),
+                    dateRange = { range },
+                ),
+            )
+            onNodeWithText("Unimported (2)").assertExists()
+            onNodeWithText("Imported (0)").assertExists()
         }
     }
 
