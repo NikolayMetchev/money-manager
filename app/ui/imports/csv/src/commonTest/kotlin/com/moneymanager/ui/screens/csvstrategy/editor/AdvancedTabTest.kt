@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextReplacement
 import com.moneymanager.builtin.BuiltInCsvStrategies
@@ -20,8 +21,11 @@ import kotlin.time.Instant
 class AdvancedTabTest {
     private val strategy = BuiltInCsvStrategies.buildBinanceCsvStrategy(Instant.fromEpochMilliseconds(1_000))
 
-    private fun androidx.compose.ui.test.ComposeUiTest.showAdvancedTab(state: CsvStrategyEditorState) {
-        setContent {
+    private fun showAdvancedTab(
+        test: ComposeUiTest,
+        state: CsvStrategyEditorState,
+    ) {
+        test.setContent {
             MaterialTheme {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     AdvancedTab(
@@ -47,7 +51,7 @@ class AdvancedTabTest {
         runMoneyManagerComposeUiTest {
             val state = CsvStrategyEditorState(strategy, emptySet())
             assertEquals(SettlementWindow.Elapsed(0), state.duplicateDateTolerance)
-            showAdvancedTab(state)
+            showAdvancedTab(this, state)
 
             onNodeWithText("Duplicate date tolerance (seconds)").performTextReplacement("90")
             waitForIdle()
