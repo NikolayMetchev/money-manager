@@ -249,6 +249,44 @@ class LegMatcherTest {
     }
 
     @Test
+    fun `outgoing real legs sum to one outgoing source leg`() {
+        val source = listOf(leg(wallet, sourceRewards, "-6", t0))
+        val real = listOf("-1", "-2", "-3").map { leg(binance, stakingRewards, it, t0 + 4.minutes) }
+
+        val result = reconcile(source, links, real)
+
+        assertEquals(
+            3,
+            result.matches
+                .single()
+                .realLegs.size,
+        )
+        assertTrue(result.missingInMm.isEmpty())
+    }
+
+    @Test
+    fun `a crowded window with no exact sum gives up and leaves the leg unmatched`() {
+        // Forty even amounts can never reach an odd total; the search must stop rather than try every subset.
+        val source = listOf(leg(wallet, sourceRewards, "1001", t0))
+        val real = (1..40).map { leg(binance, stakingRewards, (it * 2).toString(), t0 + 1.minutes) }
+
+        val result = reconcile(source, links, real)
+
+        assertTrue(result.matches.isEmpty())
+        assertEquals(1, result.missingInMm.size)
+    }
+
+    @Test
+    fun `real legs outside the split window are not combined`() {
+        val source = listOf(leg(wallet, sourceRewards, "3", t0))
+        val real = listOf(leg(binance, stakingRewards, "1", t0 + 1.minutes), leg(binance, stakingRewards, "2", t0 + 2.hours))
+
+        val result = reconcile(source, links, real)
+
+        assertTrue(result.matches.isEmpty())
+    }
+
+    @Test
     fun `real legs that do not sum to the source leg are left alone and no leg is reused`() {
         val source = listOf(leg(wallet, sourceRewards, "3", t0), leg(wallet, sourceRewards, "3", t0))
         val real = listOf(leg(binance, stakingRewards, "1", t0), leg(binance, stakingRewards, "2", t0))
