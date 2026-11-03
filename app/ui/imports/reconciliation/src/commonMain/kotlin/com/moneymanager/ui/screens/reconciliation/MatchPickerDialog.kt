@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -48,6 +49,9 @@ internal val PICKER_WINDOWS: List<Duration> = listOf(1.days, 3.days, 7.days, 30.
 
 /** A generous width per character of bodySmall text, so the widest description fits unclipped. */
 private const val DESCRIPTION_DP_PER_CHAR = 7
+
+/** The width Checkbox takes in a candidate row (its 48dp minimum touch target). */
+private val CHECKBOX_SLOT = 48.dp
 
 /**
  * Picks the real transactions a source movement ([movement], on [wallet]) records, for a source row the matcher
@@ -96,7 +100,11 @@ fun MatchPickerDialog(
                 ) {
                     item(key = "header") { Text("In $sourceName", style = MaterialTheme.typography.labelLarge) }
                     items(movement.size, key = { "movement-${movement[it].key}" }) {
-                        PickerLegLine(movement[it], accountNames, rowScroll, descriptionWidth)
+                        // Indented by a checkbox, so the viewport matches the candidates' and the shared scroll range does too.
+                        Row {
+                            Spacer(Modifier.width(CHECKBOX_SLOT))
+                            PickerLegLine(movement[it], accountNames, rowScroll, descriptionWidth)
+                        }
                     }
                     item(key = "filters") {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
@@ -190,9 +198,13 @@ private fun PickerLegLine(
         modifier = Modifier.horizontalScroll(scroll).padding(vertical = 2.dp),
     ) {
         Text(leg.timestamp.displayDateTime(), style = MaterialTheme.typography.bodySmall, color = color, modifier = Modifier.width(130.dp))
-        if (delta != null) {
-            Text(formatDelta(delta), style = MaterialTheme.typography.bodySmall, color = color, modifier = Modifier.width(80.dp))
-        }
+        // Always reserve the delta column, so source and candidate rows have the same content width.
+        Text(
+            delta?.let(::formatDelta).orEmpty(),
+            style = MaterialTheme.typography.bodySmall,
+            color = color,
+            modifier = Modifier.width(80.dp),
+        )
         Text(
             accountNames[leg.accountId].orEmpty(),
             style = MaterialTheme.typography.bodySmall,
