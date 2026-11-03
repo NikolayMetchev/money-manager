@@ -87,6 +87,7 @@ kmp_test(
         "//app/model/importdirectory",
         "//app/model/timeline",
         "//app/tasks",
+        "@maven_kmp//:kotlinx_datetime",
     ],
     device_manifest = "src/androidDeviceTest/AndroidManifest.xml",
     device_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
@@ -114,5 +115,6 @@ kmp_test(
         "@maven_kmp//:compose_material3_desktop",
         "@maven_kmp//:compose_ui_desktop",
         "@maven_kmp//:compose_ui_test_desktop",
+        "@maven_kmp//:kotlinx_datetime",
     ],
 )
