@@ -19,6 +19,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.InputChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
@@ -186,11 +187,14 @@ private fun SourceReconciliation(
 
     var refreshKey by remember { mutableStateOf(0) }
     var result by remember { mutableStateOf<ReconciliationResult?>(null) }
+    var progress by remember { mutableStateOf<Progress?>(null) }
     LaunchedEffect(source, shadowIds, links, refreshKey) {
         result = null
+        progress = Progress("Loading ${source.name} transactions")
         val sourceLegs = reconciliationRepository.getLegs(shadowIds)
+        progress = Progress("Loading Money Manager transactions")
         val realLegs = reconciliationRepository.getLegs(links.map { it.realAccountId }.toSet())
-        result = withContext(Dispatchers.Default) { reconcile(sourceLegs, links, realLegs) }
+        result = withContext(Dispatchers.Default) { reconcile(sourceLegs, links, realLegs, onProgress = { progress = it }) }
     }
 
     val unlinked = remember(source, shadowAccounts, links, real) { unlinkedWallets(source, shadowAccounts, links, real) }
@@ -371,7 +375,7 @@ private fun SourceReconciliation(
         }
         val loaded = result
         if (loaded == null) {
-            item { CircularProgressIndicator(modifier = Modifier.padding(16.dp)) }
+            item { ReconciliationProgress(progress) }
             return@LazyColumn
         }
         item {
@@ -834,3 +838,21 @@ internal inline fun <T> runCatchingUnlessCancelled(block: () -> T): Result<T> =
     runCatching(block).onFailure { if (it is CancellationException) throw it }
 
 internal fun formatDelta(delta: Duration): String = delta.absoluteValue.toString().let { if (delta.isNegative()) "-$it" else "+$it" }
+
+/** The bar and step shown while the legs load and [reconcile] runs through its passes. */
+@Composable
+private fun ReconciliationProgress(progress: Progress?) {
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val fraction = progress?.fraction
+        if (fraction != null) {
+            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+        } else {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+        Text(
+            progress?.detail.orEmpty(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}

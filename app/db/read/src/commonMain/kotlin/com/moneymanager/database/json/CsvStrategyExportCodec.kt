@@ -55,6 +55,7 @@ private object FlatCsvStrategyExportSerializer : JsonTransformingSerializer<CsvS
             "fileNamePattern",
             "crossSourceReconcileWindow",
             "placeholderReconcileWindow",
+            "duplicateDateTolerance",
             "legGroups",
             "fundingAttributeMatch",
             "worksheetName",

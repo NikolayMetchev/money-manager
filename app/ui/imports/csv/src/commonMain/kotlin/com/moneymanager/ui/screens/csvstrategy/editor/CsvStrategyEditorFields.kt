@@ -173,6 +173,7 @@ internal fun buildStrategyFromEditorState(
                 fileNamePattern = state.fileNamePattern.takeIf { it.isNotBlank() },
                 crossSourceReconcileWindow = state.crossSourceReconcileWindow,
                 placeholderReconcileWindow = state.placeholderReconcileWindow,
+                duplicateDateTolerance = state.duplicateDateTolerance,
                 // A funding match is saved only once a column is chosen; the attribute type always has a value.
                 fundingAttributeMatch =
                     state.fundingMatchColumn

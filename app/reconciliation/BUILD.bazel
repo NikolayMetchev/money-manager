@@ -32,7 +32,10 @@ kmp_library(
         "//app/model/core",
         "//app/model/reconciliation",
     ],
-    deps = ["//utils/bigdecimal"],
+    deps = [
+        "//app/tasks",
+        "//utils/bigdecimal",
+    ],
 )
 
 kmp_test(

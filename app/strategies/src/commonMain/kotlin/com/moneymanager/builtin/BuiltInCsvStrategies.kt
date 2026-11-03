@@ -2215,6 +2215,9 @@ object BuiltInCsvStrategies {
                     // filename match would win outright over content scoring and let a legacy file through.
                     contentMatchRules = listOf(Condition("User_ID", ConditionOp.MATCHES, "^\\s*\\d+\\s*$")),
                     crossSourceReconcileWindow = SettlementWindow.Elapsed(BINANCE_RECONCILE_WINDOW_SECONDS),
+                    // The export has no unique id and repeats identical rows day after day (a flat daily Simple Earn
+                    // interest), so the default 3-day fuzzy match swallowed a later day as a duplicate of an earlier one.
+                    duplicateDateTolerance = SettlementWindow.Elapsed(0),
                     legGroups =
                         listOf(
                             LegGroupRule(
