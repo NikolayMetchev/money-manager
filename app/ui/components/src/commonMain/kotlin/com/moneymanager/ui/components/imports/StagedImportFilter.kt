@@ -7,6 +7,8 @@ import com.moneymanager.domain.model.StagedImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.fileKind
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.domain.model.timeline.ImportFileDateRange
+import kotlin.time.Instant
 
 internal const val NO_STRATEGY_LABEL = "No strategy"
 
@@ -20,9 +22,13 @@ data class StagedImportFilter(
     val kinds: Set<ImportFileKind> = emptySet(),
     val strategies: Set<CsvImportStrategyId?> = emptySet(),
     val directories: Set<ImportDirectoryId?> = emptySet(),
+    val from: Instant? = null,
+    val to: Instant? = null,
 ) {
     val isActive: Boolean
-        get() = text.isNotBlank() || kinds.isNotEmpty() || strategies.isNotEmpty() || directories.isNotEmpty()
+        get() =
+            text.isNotBlank() || kinds.isNotEmpty() || strategies.isNotEmpty() || directories.isNotEmpty() ||
+                from != null || to != null
 }
 
 /** A strategy the files list can be filtered by; [id] null is the files with no strategy. */
@@ -47,6 +53,7 @@ fun <K : Any, F : StagedImport<K>> filterStagedImports(
     importDirectories: Map<K, List<ImportDirectory>>,
     directories: List<ImportDirectory>,
     matchedStrategies: Map<K, CsvImportStrategy?>?,
+    dateRanges: (F) -> ImportFileDateRange? = { null },
 ): List<F> {
     if (!filter.isActive) return imports
     val text = filter.text.trim()
@@ -64,8 +71,25 @@ fun <K : Any, F : StagedImport<K>> filterStagedImports(
                 filter.directories.isEmpty() ||
                     (fileDirectories.isEmpty() && null in filter.directories) ||
                     fileDirectories.any { it.id in chosenDirectories }
-            )
+            ) &&
+            matchesDates(import, filter, dateRanges(import))
     }
+}
+
+/**
+ * Only imported files are dated: their transaction range must overlap [from, to]. Unimported files have no
+ * transactions yet, and an imported file with no range (nothing imported) can not be placed in the period.
+ */
+private fun matchesDates(
+    import: StagedImport<*>,
+    filter: StagedImportFilter,
+    range: ImportFileDateRange?,
+): Boolean {
+    if (filter.from == null && filter.to == null) return true
+    if (import.lastAppliedAt == null) return true
+    if (range == null) return false
+    return (filter.from == null || range.latest >= filter.from) &&
+        (filter.to == null || range.earliest <= filter.to)
 }
 
 private fun ImportDirectory.isBeneath(folder: ImportDirectory): Boolean =

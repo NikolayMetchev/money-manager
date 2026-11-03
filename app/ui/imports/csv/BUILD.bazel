@@ -53,6 +53,7 @@ kmp_library(
         "//app/model/importdirectory",
         "//app/model/repository/read",
         "//app/model/rules",
+        "//app/model/timeline",
         "//app/presenter/core",
         "//app/tasks",
         "//app/ui/audit",

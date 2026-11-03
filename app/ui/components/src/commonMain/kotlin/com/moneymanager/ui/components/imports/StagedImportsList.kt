@@ -73,12 +73,13 @@ fun <K : Any, F : StagedImport<K>> StagedImportsTabs(
     onUnimportAll: ((List<F>) -> Unit)? = null,
     folderDownload: FolderDownload? = null,
     filter: StagedImportFilter = StagedImportFilter(),
+    dateRange: (F) -> ImportFileDateRange? = { null },
     header: LazyListScope.() -> Unit = {},
     card: @Composable (F, StagedImportCardPlacement) -> Unit,
 ) {
     val kept =
-        remember(imports, filter, data.importDirectories, data.directories, data.matchedStrategies) {
-            filterStagedImports(imports, filter, data.importDirectories, data.directories, data.matchedStrategies)
+        remember(imports, filter, dateRange, data.importDirectories, data.directories, data.matchedStrategies) {
+            filterStagedImports(imports, filter, data.importDirectories, data.directories, data.matchedStrategies, dateRange)
         }
     // Split files into those still needing a strategy applied vs. already imported, so a large set of
     // files is easy to work through. The Unimported tab is the default/actionable one. Ignored files

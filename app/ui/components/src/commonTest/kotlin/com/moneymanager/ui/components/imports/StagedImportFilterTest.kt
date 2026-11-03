@@ -10,6 +10,8 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
+import com.moneymanager.domain.model.timeline.ImportFileDateRange
+import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
@@ -94,6 +96,44 @@ class StagedImportFilterTest {
             listOf(bankingQif),
             filtered(StagedImportFilter(text = "bank", directories = setOf(banking.id), strategies = setOf(null))),
         )
+    }
+
+    @Test
+    fun `dates keep imported files whose range overlaps and leave unimported ones`() {
+        fun range(
+            from: Long,
+            to: Long,
+        ) = ImportFileDateRange(
+            kind = TimelineSourceKind.CSV,
+            fileId = amexPdf.id.id.toString(),
+            fileName = amexPdf.originalFileName,
+            strategyName = null,
+            earliest = Instant.fromEpochMilliseconds(from),
+            latest = Instant.fromEpochMilliseconds(to),
+            transactionCount = 1,
+        )
+
+        fun keeps(
+            filter: StagedImportFilter,
+            range: ImportFileDateRange?,
+        ) = filterStagedImports(files, filter, importDirectories, listOf(banking, monzo, amex), matched) { range }
+            .contains(amexPdf)
+        val during =
+            StagedImportFilter(from = Instant.fromEpochMilliseconds(100), to = Instant.fromEpochMilliseconds(200))
+        assertEquals(true, keeps(during, range(150, 160)))
+        assertEquals(true, keeps(during, range(50, 100)))
+        assertEquals(true, keeps(during, range(200, 300)))
+        assertEquals(false, keeps(during, range(201, 300)))
+        val onlyFrom = StagedImportFilter(from = Instant.fromEpochMilliseconds(100))
+        assertEquals(true, keeps(onlyFrom, range(500, 600)))
+        assertEquals(false, keeps(onlyFrom, range(0, 99)))
+        val onlyTo = StagedImportFilter(to = Instant.fromEpochMilliseconds(100))
+        assertEquals(true, keeps(onlyTo, range(0, 600)))
+        assertEquals(false, keeps(onlyTo, range(101, 600)))
+        assertEquals(false, keeps(during, range(0, 99)))
+        assertEquals(false, keeps(during, null))
+        val unimported = filterStagedImports(files, during, importDirectories, listOf(banking, monzo, amex), matched) { null }
+        assertEquals(listOf(monzoCsv, bankingQif, pickedXlsx), unimported)
     }
 
     @Test

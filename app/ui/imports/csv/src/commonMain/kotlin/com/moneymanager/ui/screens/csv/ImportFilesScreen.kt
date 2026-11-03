@@ -2,14 +2,17 @@ package com.moneymanager.ui.screens.csv
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,6 +30,7 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
@@ -47,6 +51,7 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.components.DateTimePickerField
 import com.moneymanager.ui.components.MultiSelectFilterDropdown
 import com.moneymanager.ui.components.imports.FolderDownload
 import com.moneymanager.ui.components.imports.ImportSectionHeader
@@ -69,6 +74,10 @@ import com.moneymanager.ui.components.imports.stagedImportStrategyOptions
 import com.moneymanager.ui.tasks.LocalTaskManager
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 
 /**
@@ -273,6 +282,7 @@ fun ImportFilesScreen(
                         )
                     },
                 filter = filter,
+                dateRange = { dateRanges[it.id.id.toString()] },
                 header = {
                     if (directories != null) {
                         val expanded = directoriesExpanded ?: imports.isEmpty()
@@ -318,7 +328,7 @@ fun ImportFilesScreen(
                         }
                     } else {
                         item(key = "filters") {
-                            StagedImportFilters(imports, data, filter, onFilterChange = { filter = it })
+                            StagedImportFilters(imports, data, filter, dateRanges.values, onFilterChange = { filter = it })
                         }
                     }
                 },
@@ -359,6 +369,7 @@ private fun StagedImportFilters(
     imports: List<CsvImport>,
     data: StagedImportsData<CsvImportId>,
     filter: StagedImportFilter,
+    ranges: Collection<ImportFileDateRange>,
     onFilterChange: (StagedImportFilter) -> Unit,
 ) {
     val kinds = remember(imports) { stagedImportKinds(imports) }
@@ -367,11 +378,15 @@ private fun StagedImportFilters(
         remember(imports, data.importDirectories, data.directories) {
             stagedImportDirectoryOptions(imports, data.importDirectories, data.directories)
         }
+    var showDates by rememberSaveable { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
             value = filter.text,
             onValueChange = { onFilterChange(filter.copy(text = it)) },
             label = { Text("Search files") },
+            trailingIcon = {
+                IconButton(onClick = { showDates = !showDates }) { Text("\uD83D\uDCC5", style = MaterialTheme.typography.bodyLarge) }
+            },
             placeholder = { Text("Type to search...") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
@@ -408,5 +423,40 @@ private fun StagedImportFilters(
                 onSelectionChange = { onFilterChange(filter.copy(directories = it)) },
             )
         }
+        if (showDates || filter.from != null || filter.to != null) DateRangeFields(filter, ranges, onFilterChange)
     }
+}
+
+/** From / To date and time pickers, each clearable and each usable alone, for the Imported files' transactions. */
+@Composable
+private fun DateRangeFields(
+    filter: StagedImportFilter,
+    ranges: Collection<ImportFileDateRange>,
+    onFilterChange: (StagedImportFilter) -> Unit,
+) {
+    val zone = remember { TimeZone.currentSystemDefault() }
+    // Nothing outside the files' transactions can match, so neither end can be picked beyond them.
+    val earliest = remember(ranges) { ranges.minOfOrNull { it.earliest }?.toLocalDateTime(zone) }
+    val latest = remember(ranges) { ranges.maxOfOrNull { it.latest }?.toLocalDateTime(zone) }
+    val from = filter.from?.toLocalDateTime(zone)
+    val to = filter.to?.toLocalDateTime(zone)
+    DateTimePickerField(
+        value = filter.from?.toLocalDateTime(zone),
+        onValueChange = { onFilterChange(filter.copy(from = it.toInstant(zone))) },
+        minValue = earliest,
+        maxValue = to ?: latest,
+        dateLabel = "Transactions from (date)",
+        timeLabel = "Time",
+        onClear = { onFilterChange(filter.copy(from = null)) },
+    )
+    DateTimePickerField(
+        value = filter.to?.toLocalDateTime(zone),
+        onValueChange = { onFilterChange(filter.copy(to = it.toInstant(zone))) },
+        minValue = from ?: earliest,
+        maxValue = latest,
+        dateLabel = "Transactions to (date)",
+        timeLabel = "Time",
+        defaultTime = LocalTime(23, 59),
+        onClear = { onFilterChange(filter.copy(to = null)) },
+    )
 }

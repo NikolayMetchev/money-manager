@@ -60,6 +60,7 @@ import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
+import com.moneymanager.ui.components.DateTimePickerField
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.components.transactions.EditableAttribute
 import com.moneymanager.ui.components.transactions.EditableAttributesSection
@@ -67,6 +68,7 @@ import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atTime
@@ -121,8 +123,6 @@ fun TransactionEditDialog(
     var selectedMinute by remember { mutableStateOf(transactionDateTime?.minute ?: defaultDateTime.minute) }
     val originalSecond = remember { transactionDateTime?.second ?: 0 }
     val originalNanosecond = remember { transactionDateTime?.nanosecond ?: 0 }
-    var showDatePicker by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
 
     val scope = rememberSchemaAwareCoroutineScope()
     val importEngine = LocalImportEngine.current
@@ -499,29 +499,15 @@ fun TransactionEditDialog(
                     onSubmit = submit,
                 )
 
-                // Date and Time Pickers
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    PickerReadonlyField(
-                        value = selectedDate.toString(),
-                        label = "Date",
-                        icon = "\uD83D\uDCC5",
-                        onIconClick = { showDatePicker = true },
-                        iconEnabled = !isSaving,
-                        modifier = Modifier.weight(1.5f),
-                    )
-
-                    PickerReadonlyField(
-                        value = LocalTime(selectedHour, selectedMinute).toString(),
-                        label = "Time",
-                        icon = "\uD83D\uDD54",
-                        onIconClick = { showTimePicker = true },
-                        iconEnabled = !isSaving,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+                DateTimePickerField(
+                    value = LocalDateTime(selectedDate, LocalTime(selectedHour, selectedMinute)),
+                    onValueChange = {
+                        selectedDate = it.date
+                        selectedHour = it.hour
+                        selectedMinute = it.minute
+                    },
+                    enabled = !isSaving,
+                )
 
                 // Amount Input
                 OutlinedTextField(
@@ -621,111 +607,5 @@ fun TransactionEditDialog(
                 Text("Cancel")
             }
         },
-    )
-
-    if (showDatePicker) {
-        val datePickerState =
-            rememberDatePickerState(
-                initialSelectedDateMillis =
-                    selectedDate
-                        .atTime(0, 0)
-                        .toInstant(TimeZone.UTC)
-                        .toEpochMilliseconds(),
-            )
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        datePickerState.selectedDateMillis?.let { millis ->
-                            selectedDate =
-                                Instant
-                                    .fromEpochMilliseconds(millis)
-                                    .toLocalDateTime(TimeZone.UTC)
-                                    .date
-                        }
-                        showDatePicker = false
-                    },
-                ) {
-                    Text("OK")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancel")
-                }
-            },
-        ) {
-            DatePicker(state = datePickerState)
-        }
-    }
-
-    if (showTimePicker) {
-        val timePickerState =
-            rememberTimePickerState(
-                initialHour = selectedHour,
-                initialMinute = selectedMinute,
-                is24Hour = false,
-            )
-        AlertDialog(
-            onDismissRequest = { showTimePicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        selectedHour = timePickerState.hour
-                        selectedMinute = timePickerState.minute
-                        showTimePicker = false
-                    },
-                ) {
-                    Text("OK")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) {
-                    Text("Cancel")
-                }
-            },
-            text = {
-                TimePicker(state = timePickerState)
-            },
-        )
-    }
-}
-
-@Composable
-private fun PickerReadonlyField(
-    value: String,
-    label: String,
-    icon: String,
-    onIconClick: () -> Unit,
-    iconEnabled: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = {},
-        readOnly = true,
-        label = { Text(label) },
-        textStyle = MaterialTheme.typography.bodySmall,
-        trailingIcon = {
-            IconButton(
-                onClick = onIconClick,
-                enabled = iconEnabled,
-            ) {
-                Text(
-                    text = icon,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-        },
-        modifier = modifier,
-        enabled = false,
-        singleLine = true,
-        colors =
-            OutlinedTextFieldDefaults.colors(
-                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
     )
 }
