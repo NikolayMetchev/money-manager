@@ -118,4 +118,26 @@ class ReconciliationModelTest {
         assertEquals(Money.fromDisplayValue(BigDecimal("-0.5"), ada), totals[0].difference)
         assertEquals(Money.fromDisplayValue(BigDecimal("0.1"), eth), totals[1].difference)
     }
+
+    @Test
+    fun missingFeeIsTheOutflowTheSourceTookOnTopOfTheSelection() {
+        val movement = listOf(leg(wallet, "-100", t0))
+        val selected = listOf(leg(binance, "-99.9", t0 + 1.hours))
+
+        val fee = missingFee(movement, selected)
+
+        assertEquals(Money.fromDisplayValue(BigDecimal("0.1"), ada), fee?.fee)
+        assertEquals(binance, fee?.account)
+        assertEquals(t0 + 1.hours, fee?.timestamp)
+    }
+
+    @Test
+    fun noMissingFeeWhenBalancedOrSelectionIsLarger() {
+        val movement = listOf(leg(wallet, "-100", t0))
+
+        assertEquals(null, missingFee(movement, listOf(leg(binance, "-100", t0))))
+        assertEquals(null, missingFee(movement, listOf(leg(binance, "-100.5", t0))))
+        assertEquals(null, missingFee(movement, emptyList()))
+        assertEquals(null, missingFee(listOf(leg(wallet, "100", t0)), listOf(leg(binance, "99.9", t0))))
+    }
 }

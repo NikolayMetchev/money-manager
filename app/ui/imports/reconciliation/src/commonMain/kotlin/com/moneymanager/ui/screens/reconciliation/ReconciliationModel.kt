@@ -156,3 +156,29 @@ fun selectionTotals(
                 legs.filter { it.amount.asset.id == asset.id }.fold(Money.zero(asset)) { total, leg -> total + leg.amount }
             SelectionTotal(asset, sum(movement), sum(selected))
         }
+
+/** A fee a person never entered: [fee] left [account] at [timestamp], which is what keeps the selection from balancing. */
+data class MissingFee(
+    val account: AccountId,
+    val fee: Money,
+    val timestamp: Instant,
+)
+
+/**
+ * The fee that would make [selected] balance [movement], when that is the only thing wrong: one asset's outflow on
+ * the source side is larger than the selected legs' (the source books gross, the person entered the net), and the
+ * selection has an outflow of that asset to attach the fee to.
+ */
+fun missingFee(
+    movement: List<ReconciliationLeg>,
+    selected: List<ReconciliationLeg>,
+): MissingFee? {
+    val unbalanced = selectionTotals(movement, selected).filter { !it.balanced }
+    val total = unbalanced.singleOrNull() ?: return null
+    val shortfall = total.difference
+    // selected - source > 0 for outflows means the source left more than the person booked.
+    if (!shortfall.isPositive() || !total.source.isNegative()) return null
+    val anchor =
+        selected.filter { it.amount.asset.id == total.asset.id && it.amount.isNegative() }.maxByOrNull { it.timestamp } ?: return null
+    return MissingFee(anchor.accountId, shortfall, anchor.timestamp)
+}
