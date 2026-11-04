@@ -20,9 +20,9 @@
       "androidx-compose-ui-text": "androidx.compose.ui:ui-text:1.12.1",
       "androidx-compose-ui-tooling": "androidx.compose.ui:ui-tooling:1.12.1",
       "androidx-compose-ui-unit": "androidx.compose.ui:ui-unit:1.12.1",
-      "androidx-navigation3-runtime": "androidx.navigation3:navigation3-runtime:1.2.0",
-      "androidx-navigation3-runtime-desktop": "androidx.navigation3:navigation3-runtime-desktop:1.2.0",
-      "androidx-navigation3-ui": "androidx.navigation3:navigation3-ui:1.2.0",
+      "androidx-navigation3-runtime": "androidx.navigation3:navigation3-runtime:1.2.1",
+      "androidx-navigation3-runtime-desktop": "androidx.navigation3:navigation3-runtime-desktop:1.2.1",
+      "androidx-navigation3-ui": "androidx.navigation3:navigation3-ui:1.2.1",
       "androidx-savedstate": "androidx.savedstate:savedstate:1.5.0",
       "androidx-savedstate-desktop": "androidx.savedstate:savedstate-desktop:1.5.0",
       "androidx-sqlite": "androidx.sqlite:sqlite:2.7.1",
@@ -7054,12 +7054,12 @@
     },
     "androidx.navigation3:navigation3-runtime": {
       "android": {
-        "version": "1.2.0",
+        "version": "1.2.1",
         "files": [
           {
             "name": "navigation3-runtime.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-android/1.2.0/navigation3-runtime-android-1.2.0.aar",
-            "sha256": "f48515e309202935758c709ae9bfbb09c26922d70cea77123683497ed6a833b9"
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-android/1.2.1/navigation3-runtime-android-1.2.1.aar",
+            "sha256": "56e2e45a43e89216ceb9ee2c49132fc0e4c08f0ea68ef39c2e8793e6a9dc2f0f"
           }
         ],
         "deps": [
@@ -7077,11 +7077,11 @@
         ]
       },
       "js": {
-        "version": "1.2.0",
+        "version": "1.2.1",
         "files": [
           {
-            "name": "navigation3-runtime-js-1.2.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-js/1.2.0/navigation3-runtime-js-1.2.0.klib",
+            "name": "navigation3-runtime-js-1.2.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-js/1.2.1/navigation3-runtime-js-1.2.1.klib",
             "sha256": "f726e946262c499915a1cceed6f42b670f841669dcc3995be1368d686be104f6"
           }
         ],
@@ -7100,11 +7100,11 @@
         ]
       },
       "jvm": {
-        "version": "1.2.0",
+        "version": "1.2.1",
         "files": [
           {
-            "name": "navigation3-runtime-desktop-1.2.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-desktop/1.2.0/navigation3-runtime-desktop-1.2.0.jar",
+            "name": "navigation3-runtime-desktop-1.2.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-desktop/1.2.1/navigation3-runtime-desktop-1.2.1.jar",
             "sha256": "430fc8ccfd959f5079009921ad5052320fac9d93e7eb52af9cdc21562a6fc442"
           }
         ],
@@ -7122,11 +7122,11 @@
         ]
       },
       "linuxArm64": {
-        "version": "1.2.0",
+        "version": "1.2.1",
         "files": [
           {
-            "name": "navigation3-runtime-linuxArm64Main-1.2.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-linuxarm64/1.2.0/navigation3-runtime-linuxarm64-1.2.0.klib",
+            "name": "navigation3-runtime-linuxArm64Main-1.2.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-linuxarm64/1.2.1/navigation3-runtime-linuxarm64-1.2.1.klib",
             "sha256": "107e636a5f352b0493952a1afb0bd30c4cb087f398574a2e17717db1bf11703e"
           }
         ],
@@ -7142,11 +7142,11 @@
         ]
       },
       "linuxX64": {
-        "version": "1.2.0",
+        "version": "1.2.1",
         "files": [
           {
-            "name": "navigation3-runtime-linuxX64Main-1.2.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-linuxx64/1.2.0/navigation3-runtime-linuxx64-1.2.0.klib",
+            "name": "navigation3-runtime-linuxX64Main-1.2.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-linuxx64/1.2.1/navigation3-runtime-linuxx64-1.2.1.klib",
             "sha256": "960099b1bb276e83b68a4610cc006be2802c8c458fdd55333ad3547231896acb"
           }
         ],
@@ -7162,11 +7162,11 @@
         ]
       },
       "macosArm64": {
-        "version": "1.2.0",
+        "version": "1.2.1",
         "files": [
           {
-            "name": "navigation3-runtime-macosArm64Main-1.2.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-macosarm64/1.2.0/navigation3-runtime-macosarm64-1.2.0.klib",
+            "name": "navigation3-runtime-macosArm64Main-1.2.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-macosarm64/1.2.1/navigation3-runtime-macosarm64-1.2.1.klib",
             "sha256": "1e911edd0d0a6cc2c94e70d1f92f3296d8fbdcc006c062ee539d5e26fc7ea1aa"
           }
         ],
@@ -7182,11 +7182,11 @@
         ]
       },
       "metadata": {
-        "version": "1.2.0",
+        "version": "1.2.1",
         "files": [
           {
-            "name": "navigation3-runtime-metadata-1.2.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime/1.2.0/navigation3-runtime-1.2.0.jar",
+            "name": "navigation3-runtime-metadata-1.2.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime/1.2.1/navigation3-runtime-1.2.1.jar",
             "sha256": "7083749cf5bfb33ede0f9da4102c9b4a0e820752656bda680434fcda166532a8"
           }
         ],
@@ -7205,11 +7205,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "1.2.0",
+        "version": "1.2.1",
         "files": [
           {
-            "name": "navigation3-runtime-metadata-1.2.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime/1.2.0/navigation3-runtime-1.2.0.jar",
+            "name": "navigation3-runtime-metadata-1.2.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime/1.2.1/navigation3-runtime-1.2.1.jar",
             "sha256": "7083749cf5bfb33ede0f9da4102c9b4a0e820752656bda680434fcda166532a8"
           }
         ],
@@ -7228,11 +7228,11 @@
         ]
       },
       "mingwX64": {
-        "version": "1.2.0",
+        "version": "1.2.1",
         "files": [
           {
-            "name": "navigation3-runtime-mingwX64Main-1.2.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-mingwx64/1.2.0/navigation3-runtime-mingwx64-1.2.0.klib",
+            "name": "navigation3-runtime-mingwX64Main-1.2.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-mingwx64/1.2.1/navigation3-runtime-mingwx64-1.2.1.klib",
             "sha256": "299407d69639fdd08fb45214d2a962cd0c595e14d5acccbda9f2ee9d7a3250c0"
           }
         ],
@@ -7248,11 +7248,11 @@
         ]
       },
       "wasmJs": {
-        "version": "1.2.0",
+        "version": "1.2.1",
         "files": [
           {
-            "name": "navigation3-runtime-wasm-js-1.2.0.klib",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-wasm-js/1.2.0/navigation3-runtime-wasm-js-1.2.0.klib",
+            "name": "navigation3-runtime-wasm-js-1.2.1.klib",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-wasm-js/1.2.1/navigation3-runtime-wasm-js-1.2.1.klib",
             "sha256": "21fb2e36a63d3e0b69ed8ed220bca51d35cf16f0f45de611fe8f0456bd6a9202"
           }
         ],
@@ -7272,11 +7272,11 @@
     },
     "androidx.navigation3:navigation3-runtime-desktop": {
       "jvm": {
-        "version": "1.2.0",
+        "version": "1.2.1",
         "files": [
           {
-            "name": "navigation3-runtime-desktop-1.2.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-desktop/1.2.0/navigation3-runtime-desktop-1.2.0.jar",
+            "name": "navigation3-runtime-desktop-1.2.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-runtime-desktop/1.2.1/navigation3-runtime-desktop-1.2.1.jar",
             "sha256": "430fc8ccfd959f5079009921ad5052320fac9d93e7eb52af9cdc21562a6fc442"
           }
         ],
@@ -7296,12 +7296,12 @@
     },
     "androidx.navigation3:navigation3-ui": {
       "android": {
-        "version": "1.2.0",
+        "version": "1.2.1",
         "files": [
           {
             "name": "navigation3-ui.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-ui-android/1.2.0/navigation3-ui-android-1.2.0.aar",
-            "sha256": "ce00086ea93af85e1adc332afae5b260707b8c6c75faa05f0fdc22995bad3173"
+            "url": "https://dl.google.com/dl/android/maven2/androidx/navigation3/navigation3-ui-android/1.2.1/navigation3-ui-android-1.2.1.aar",
+            "sha256": "f35e2a6b3d9b29137a3f45f7bb75c7885f4f2a5d7a0523a5088afa77ff3f5bde"
           }
         ],
         "deps": [
