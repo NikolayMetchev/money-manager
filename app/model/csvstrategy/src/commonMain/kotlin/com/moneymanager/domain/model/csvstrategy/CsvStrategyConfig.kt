@@ -31,8 +31,6 @@ import kotlinx.serialization.encoding.Encoder
  *                 parse it (see [StrategyRule]): they rewrite cells, name the accounts, set the direction,
  *                 tag attributes, exclude rows, book fees and foreign amounts, route rows through a
  *                 conduit and mark the legs of [legGroups].
- * @property companionTransactionRules Rules flagging imported transfers that require a manually
- *                                     entered companion transaction (see [CompanionTransactionRule])
  * @property contentMatchRules Conditions that auto-detect this strategy from row content when the column
  *                             set is fixed and cannot distinguish formats (e.g. QIF, where every file has
  *                             the same columns): a sampled row content-matches when ANY of them holds. A
@@ -84,8 +82,6 @@ data class CsvStrategyConfig<out M>(
     // first claim - order is semantic, keeps insertion-order serialization. NEVER-encoded when empty.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val rules: List<StrategyRule> = emptyList(),
-    @Serializable(with = SortedCompanionTransactionRuleListSerializer::class)
-    val companionTransactionRules: List<CompanionTransactionRule> = emptyList(),
     @Serializable(with = SortedConditionListSerializer::class)
     val contentMatchRules: List<Condition> = emptyList(),
     val fileNamePattern: String? = null,
@@ -122,7 +118,6 @@ data class CsvStrategyConfig<out M>(
             identificationColumns = identificationColumns,
             fieldMappings = fieldMappings.mapValues { (_, mapping) -> transform(mapping) },
             rules = rules,
-            companionTransactionRules = companionTransactionRules,
             contentMatchRules = contentMatchRules,
             fileNamePattern = fileNamePattern,
             crossSourceReconcileWindow = crossSourceReconcileWindow,

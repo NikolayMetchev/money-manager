@@ -199,7 +199,7 @@ class ImportEngineImpl(
 
         // ----- Lookup-table resolution (first: ids feed attributes/relationships built by callers) -----
         val attributeTypeIds = batch.attributeTypeNames.associateWith { attributeTypeRepository.getOrCreate(it) }
-        batch.relationshipTypeNames.forEach { relationshipTypeRepository.getOrCreate(it) }
+        val relationshipTypeIds = batch.relationshipTypeNames.associateWith { relationshipTypeRepository.getOrCreate(it) }
 
         // ----- Config / staging / session / settings / device mutations -----
         val config = applyConfigMutations(batch)
@@ -479,6 +479,7 @@ class ImportEngineImpl(
             createdTradeIds = createdTradeIds,
             dedupedTradeKeys = dedupedTradeKeys,
             attributeTypeIds = attributeTypeIds,
+            relationshipTypeIds = relationshipTypeIds,
             createdCsvStrategyIds = config.csvStrategyIds,
             createdApiStrategyIds = config.apiStrategyIds,
             createdAccountMappingIds = config.accountMappingIds,

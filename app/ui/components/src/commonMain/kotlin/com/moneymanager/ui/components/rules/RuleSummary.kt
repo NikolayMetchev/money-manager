@@ -112,6 +112,10 @@ fun RuleAction.summary(): String =
             "ignore the counterparty id"
         }
 
+        is RuleAction.ManualEntry -> {
+            "ask for \"${name.orMissing()}\"" + if (excludedFromBalances) " (already in the amount)" else ""
+        }
+
         is RuleAction.Fee -> {
             "fee ${fee.amount.summary()}"
         }

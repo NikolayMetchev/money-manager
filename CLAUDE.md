@@ -416,6 +416,7 @@ exchange pipelines read the same `RuleOutcome`, so an action means the same thin
 | `TradeSide` | a trade or order buys or sells its base asset | `sideField`/`buyValues`/`fixedSideBuy` |
 | `Leg(group, role)` | the row is a debit/credit/by-sign leg of the named `LegGroupRule` | `legWhen`, `LegSide` |
 | `LedgerTradeLeg` | a ledger row feeds `ApiLedgerTrades` instead of booking a transfer | Kraken/Coinbase `excludeWhen` |
+| `ManualEntry(name, description, relationshipType, counterpartyAccount, excludedFromBalances)` | the record needs an amount only a person has (Wise's interest on an accrual charge, a Binance withdrawal whose fee is included): it is tagged with the `manual-entry` attribute, and Manual Entries asks for the amount and books a `Source.Manual` transfer linked to it by a `relationshipType` relationship (the record is the primary, so it stops being pending). `excludedFromBalances` books the entry excluded, because the record's own amount already contains it | `CompanionTransactionRule` |
 | `Capture(path, pattern, target)` | a PDF line's named regex groups become columns; the line starts a row (`NEW_ROW`), continues it (`ROW`) or holds a value for every row (`DOCUMENT`) | — |
 
 `ConditionOp` has `POSITIVE`/`NEGATIVE` for amount signs, plus `EXISTS`/`MISSING` for paths. Built-ins write
@@ -515,8 +516,8 @@ source** (built-in: Koinly). Its data never touches real accounts:
 - Keep it source-agnostic: no Koinly-specific code outside the built-in strategy's config.
 
 **The Reconciliation tab** (Imports → Reconciliation) holds everything an import leaves for a person to
-resolve, as sub-tabs: External Account Reconciliation (the sources above), Manual Entries (companion
-transaction rules), and Card Last-4. Card Last-4 lists funding references that no account owns: values in
+resolve, as sub-tabs: External Account Reconciliation (the sources above), Manual Entries (the
+`ManualEntry` rule action: records waiting for an amount a person types), and Card Last-4. Card Last-4 lists funding references that no account owns: values in
 any CSV strategy's `fundingAttributeMatch` column that its attribute type doesn't resolve. Assigning one
 adds the value to the account's token set (`addAttributeToken`, so an account can own several cards) and
 re-imports the files that reference it.

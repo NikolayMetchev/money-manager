@@ -154,7 +154,6 @@ internal class CsvStrategyEditorState(
     // lacks, and dropping it would silently change what the strategy imports.
     var rules by mutableStateOf(config?.rules.orEmpty())
 
-    var companionTransactionRules by mutableStateOf(config?.companionTransactionRules.orEmpty())
     var fileNamePattern by mutableStateOf(config?.fileNamePattern.orEmpty())
 
     // Set only on Excel strategies, which target a worksheet instead of a file. Carried verbatim:
@@ -194,7 +193,7 @@ internal class CsvStrategyEditorState(
     val duplicateDateToleranceValid: Boolean
         get() = duplicateDateToleranceText.isBlank() || duplicateDateTolerance != null
 
-    // Carried through verbatim (like content-match/companion rules): its column references may name
+    // Carried through verbatim (like content-match rules): its column references may name
     // columns absent from the uploaded sample, but dropping them would corrupt the strategy.
     // Edited via LegGroupsEditor (Advanced tab).
     var legGroups by mutableStateOf(config?.legGroups.orEmpty())
@@ -249,12 +248,6 @@ internal class CsvStrategyEditorState(
     private val fundingMatchValid: Boolean
         get() = fundingMatchColumn.isNullOrBlank() || fundingMatchAttributeTypeName.isNotBlank()
 
-    private val companionRulesValid: Boolean
-        get() =
-            companionTransactionRules.all {
-                it.name.isNotBlank() && it.matchAttributeName.isNotBlank() && it.matchValuePattern.isNotBlank()
-            }
-
     private val contentMatchValid: Boolean
         get() = contentMatchRules.all { it.isComplete() }
 
@@ -305,8 +298,7 @@ internal class CsvStrategyEditorState(
     /** Whether the Advanced tab has an unsatisfied required field. */
     val advancedHasError: Boolean
         get() =
-            !companionRulesValid ||
-                !fundingMatchValid ||
+            !fundingMatchValid ||
                 !contentMatchValid ||
                 !legGroupsValid
 
@@ -331,7 +323,6 @@ internal class CsvStrategyEditorState(
                 descriptionColumnName != null &&
                 amountValid &&
                 rulesValid &&
-                companionRulesValid &&
                 fundingMatchValid &&
                 contentMatchValid &&
                 legGroupsValid &&

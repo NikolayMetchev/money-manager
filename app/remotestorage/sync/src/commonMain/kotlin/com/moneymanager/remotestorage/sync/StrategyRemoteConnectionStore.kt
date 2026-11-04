@@ -73,7 +73,7 @@ class StrategyRemoteConnectionStore(
         const val KEY_PROVIDER_CONFIG = "strategySync.providerConfig"
 
         // "h" since the canonical-hash algorithm gained MORE collection-order canonicalization (API
-        // strategies' Sets/Maps/Lists, plus CSV's RowCondition/ContentMatchRule/CompanionTransactionRule
+        // strategies' Sets/Maps/Lists, plus CSV's RowCondition/ContentMatchRule
         // lists, none of which were sorted under "g"): baselines holding old-algorithm hashes must not be
         // read back (they'd misreport artifacts as locally changed/conflicting), so the prefix bump
         // orphans them and the never-synced content-compare path adopts fresh baselines without spurious

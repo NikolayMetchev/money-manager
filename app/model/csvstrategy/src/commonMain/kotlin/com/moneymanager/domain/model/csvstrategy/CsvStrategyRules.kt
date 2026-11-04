@@ -1,5 +1,6 @@
 package com.moneymanager.domain.model.csvstrategy
 
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
 
@@ -27,6 +28,7 @@ fun CsvStrategyConfig<*>.ownedAttributeValues(): Map<String, Set<String>?> {
             when (action) {
                 is RuleAction.Attribute -> action.typeName to action.value.constantOrNull()
                 is RuleAction.Exclude -> EXCLUDED_ATTRIBUTE_TYPE_NAME to action.excludedValueOrNull()
+                is RuleAction.ManualEntry -> WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME to action.name
                 else -> continue
             }
         owned.getOrPut(typeName) { mutableListOf() } += value

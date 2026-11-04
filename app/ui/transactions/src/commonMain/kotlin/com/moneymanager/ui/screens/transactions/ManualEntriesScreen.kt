@@ -29,18 +29,14 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.NewAttribute
-import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.PendingManualEntry
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.TransferMissingCompanion
-import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
+import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.importengineapi.AccountRef
-import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ImportTransfer
-import com.moneymanager.importengineapi.getOrCreateAttributeType
+import com.moneymanager.importengineapi.ManualEntryInput
+import com.moneymanager.importengineapi.createManualEntries
 import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
@@ -55,18 +51,17 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
- * Transfers matched by one strategy's companion rule that still need their companion entered.
+ * Transfers one strategy's manual-entry rule asked about, still waiting for the amount.
  */
-private data class PendingCompanionGroup(
+private data class PendingEntryGroup(
     val strategyName: String,
-    val rule: CompanionTransactionRule,
-    val pending: List<TransferMissingCompanion>,
+    val entry: RuleAction.ManualEntry,
+    val pending: List<PendingManualEntry>,
 )
 
 /**
- * Lists imported transfers flagged by companion transaction rules as requiring a manually
- * entered companion (e.g. Wise assets fees needing their interest payment) and bulk-creates
- * the companions: mirrored accounts, same timestamp and currency, user-entered amount.
+ * Lists the imported transfers a `ManualEntry` rule action asked a person about (a Wise accrual charge's interest,
+ * a Binance withdrawal's included fee) and creates the entries they type: one transfer each, linked to its original.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @Composable
@@ -83,14 +78,15 @@ fun ManualEntriesScreen(
             csvImportStrategyRepository.getAllStrategies().flatMapLatest { strategies ->
                 val ruleFlows =
                     strategies.flatMap { strategy ->
-                        strategy.config.companionTransactionRules.map { rule ->
-                            transactionRepository
-                                .getTransfersMissingCompanion(
-                                    matchAttributeName = rule.matchAttributeName,
-                                    matchValuePattern = rule.matchValuePattern,
-                                    linkAttributeName = rule.linkAttributeName,
-                                ).map { pending -> PendingCompanionGroup(strategy.name, rule, pending) }
-                        }
+                        strategy.config.rules
+                            .flatMap { it.actions }
+                            .filterIsInstance<RuleAction.ManualEntry>()
+                            .distinct()
+                            .map { entry ->
+                                transactionRepository
+                                    .getPendingManualEntries(entry.name, entry.relationshipType)
+                                    .map { pending -> PendingEntryGroup(strategy.name, entry, pending) }
+                            }
                     }
                 // combine() over an empty list never emits, so short-circuit instead.
                 if (ruleFlows.isEmpty()) flowOf(emptyList()) else combine(ruleFlows) { it.toList() }
@@ -142,7 +138,7 @@ fun ManualEntriesScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 visibleGroups.forEach { group ->
-                    item(key = "${group.strategyName}/${group.rule.name}") {
+                    item(key = "${group.strategyName}/${group.entry.name}") {
                         PendingGroupHeader(
                             group = group,
                             amounts = amounts,
@@ -152,8 +148,8 @@ fun ManualEntriesScreen(
                                 errorMessage = null
                                 scope.launch {
                                     try {
-                                        createCompanionTransfers(
-                                            rule = group.rule,
+                                        createEntries(
+                                            entry = group.entry,
                                             entries = entries,
                                             importEngine = importEngine,
                                         )
@@ -172,8 +168,9 @@ fun ManualEntriesScreen(
                         )
                     }
                     items(group.pending, key = { it.transferId.id }) { matched ->
-                        PendingCompanionCard(
+                        PendingEntryCard(
                             matched = matched,
+                            entry = group.entry,
                             amountText = amounts[matched.transferId].orEmpty(),
                             onAmountChange = { amounts[matched.transferId] = it },
                         )
@@ -184,30 +181,17 @@ fun ManualEntriesScreen(
     }
 }
 
-/**
- * Creates one mirror transfer per entry, each linked to its matched transfer via the
- * rule's link attribute so the pair is no longer reported as missing.
- */
-private suspend fun createCompanionTransfers(
-    rule: CompanionTransactionRule,
-    entries: List<Pair<TransferMissingCompanion, BigDecimal>>,
+private suspend fun createEntries(
+    entry: RuleAction.ManualEntry,
+    entries: List<Pair<PendingManualEntry, BigDecimal>>,
     importEngine: ImportEngine,
-) {
-    val linkTypeId = importEngine.getOrCreateAttributeType(rule.linkAttributeName)
-    val transfers =
-        entries.map { (matched, amount) ->
-            ImportTransfer(
-                source = Source.Manual,
-                fromAccount = AccountRef.Existing(matched.targetAccountId),
-                toAccount = AccountRef.Existing(matched.sourceAccountId),
-                timestamp = matched.timestamp,
-                description = rule.companionDescription,
-                amount = Money.fromDisplayValue(amount, matched.amount.asset),
-                attributes = listOf(NewAttribute(linkTypeId, matched.matchValue)),
-            )
-        }
-    importEngine.import(ImportBatch.manualEdits(transfers = transfers))
-}
+) = importEngine.createManualEntries(
+    inputs = entries.map { (original, amount) -> ManualEntryInput(original, Money.fromDisplayValue(amount, original.amount.asset)) },
+    description = entry.description,
+    relationshipType = entry.relationshipType,
+    counterpartyAccount = entry.counterpartyAccount,
+    excludedFromBalances = entry.excludedFromBalances,
+)
 
 private fun parseAmount(text: String): BigDecimal? {
     if (text.isBlank()) return null
@@ -217,10 +201,10 @@ private fun parseAmount(text: String): BigDecimal? {
 
 @Composable
 private fun PendingGroupHeader(
-    group: PendingCompanionGroup,
+    group: PendingEntryGroup,
     amounts: Map<TransferId, String>,
     isSaving: Boolean,
-    onCreate: (List<Pair<TransferMissingCompanion, BigDecimal>>) -> Unit,
+    onCreate: (List<Pair<PendingManualEntry, BigDecimal>>) -> Unit,
 ) {
     val entries =
         group.pending.mapNotNull { matched ->
@@ -240,7 +224,7 @@ private fun PendingGroupHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "${group.strategyName} — ${group.rule.name}",
+            text = "${group.strategyName} — ${group.entry.name}",
             style = MaterialTheme.typography.titleLarge,
         )
         Button(
@@ -253,8 +237,9 @@ private fun PendingGroupHeader(
 }
 
 @Composable
-private fun PendingCompanionCard(
-    matched: TransferMissingCompanion,
+private fun PendingEntryCard(
+    matched: PendingManualEntry,
+    entry: RuleAction.ManualEntry,
     amountText: String,
     onAmountChange: (String) -> Unit,
 ) {
@@ -283,7 +268,12 @@ private fun PendingCompanionCard(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Companion: ${matched.targetAccountName} → ${matched.sourceAccountName}",
+                    text =
+                        if (entry.counterpartyAccount != null) {
+                            "Entry: ${matched.sourceAccountName} → ${entry.counterpartyAccount}"
+                        } else {
+                            "Entry: ${matched.targetAccountName} → ${matched.sourceAccountName}"
+                        },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

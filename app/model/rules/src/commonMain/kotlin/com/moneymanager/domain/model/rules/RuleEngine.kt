@@ -1,5 +1,6 @@
 package com.moneymanager.domain.model.rules
 
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.regex.firstMatch
 
 /** A [RuleAction.Attribute] claim, its value already computed. */
@@ -162,6 +163,10 @@ class RuleEngine(
             is RuleAction.Attribute -> {
                 val value = compute(action.value, state.current)
                 if (value.isNotBlank()) state.attributes += RuleAttribute(action.typeName, value, action.uniqueIdentifier)
+            }
+
+            is RuleAction.ManualEntry -> {
+                state.attributes += RuleAttribute(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME, action.name, uniqueIdentifier = false)
             }
 
             is RuleAction.Fee -> {

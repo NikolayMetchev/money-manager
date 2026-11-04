@@ -160,15 +160,14 @@ SELECT id FROM transfer WHERE source_account_id = ?;
 selectTransferIdsByTargetAccount:
 SELECT id FROM transfer WHERE target_account_id = ?;
 
--- Transfers whose match attribute fits the LIKE pattern but for which no transfer
--- carries the link attribute with the same value (companion transaction missing).
-selectTransfersMissingCompanion:
+-- Transfers a manual-entry rule tagged (manual-entry = :entryName) that have no :relationshipTypeName
+-- relationship yet with them as the primary: the entry nobody has typed in.
+selectPendingManualEntries:
 SELECT
     transfer.id,
     transfer.timestamp,
     transfer.description,
     transfer.amount,
-    match_attr.attribute_value AS match_value,
     source_account.id AS source_account_id,
     source_account.name AS source_account_name,
     target_account.id AS target_account_id,
@@ -180,18 +179,18 @@ SELECT
     asset_details.fraction_digits AS asset_fraction_digits,
     asset_details.kind AS asset_kind
 FROM transfer
-JOIN transfer_attribute match_attr ON match_attr.transaction_id = transfer.id
-JOIN attribute_type match_type ON match_attr.attribute_type_id = match_type.id
+JOIN transfer_attribute entry_attr ON entry_attr.transaction_id = transfer.id
+JOIN attribute_type entry_type ON entry_attr.attribute_type_id = entry_type.id
 JOIN account source_account ON transfer.source_account_id = source_account.id
 JOIN account target_account ON transfer.target_account_id = target_account.id
 JOIN asset_details ON transfer.asset_id = asset_details.id
-WHERE match_type.name = :matchAttributeName
-  AND match_attr.attribute_value LIKE :matchValuePattern
+WHERE entry_type.name = :entryAttributeTypeName
+  AND entry_attr.attribute_value = :entryName
   AND NOT EXISTS (
     SELECT 1
-    FROM transfer_attribute link_attr
-    JOIN attribute_type link_type ON link_attr.attribute_type_id = link_type.id
-    WHERE link_type.name = :linkAttributeName
-      AND link_attr.attribute_value = match_attr.attribute_value
+    FROM relationship_pair pair
+    JOIN relationship_type pair_type ON pair.relationship_type_id = pair_type.id
+    WHERE pair.primary_id = transfer.id
+      AND pair_type.name = :relationshipTypeName
   )
 ORDER BY transfer.timestamp DESC, transfer.id DESC;

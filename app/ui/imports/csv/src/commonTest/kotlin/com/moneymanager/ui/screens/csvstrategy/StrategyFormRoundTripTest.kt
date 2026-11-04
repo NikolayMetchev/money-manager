@@ -8,7 +8,6 @@ import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
-import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -131,16 +130,6 @@ class StrategyFormRoundTripTest {
                                 HardCodedTimezoneMapping(TransferField.TIMEZONE, "Europe/London"),
                         ),
                     rules = advancedRules,
-                    companionTransactionRules =
-                        listOf(
-                            CompanionTransactionRule(
-                                name = "Interest earned",
-                                matchAttributeName = "wise-id",
-                                matchValuePattern = "ACCRUAL_CHARGE-%",
-                                linkAttributeName = "wise-interest-for",
-                                companionDescription = "Interest earned",
-                            ),
-                        ),
                 ),
             createdAt = timestamp,
             updatedAt = timestamp,
@@ -157,7 +146,6 @@ class StrategyFormRoundTripTest {
         assertEquals(original.config.fieldMappings, rebuilt.config.fieldMappings)
         assertEquals(original.config.identificationColumns, rebuilt.config.identificationColumns)
         assertEquals(original.config.rules, rebuilt.config.rules, "rules keep their order and content")
-        assertEquals(original.config.companionTransactionRules, rebuilt.config.companionTransactionRules)
     }
 
     @Test

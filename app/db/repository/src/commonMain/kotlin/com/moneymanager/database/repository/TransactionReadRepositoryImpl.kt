@@ -8,8 +8,8 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.AccountBalanceMapper
 import com.moneymanager.database.mapper.AccountRowMapper
+import com.moneymanager.database.mapper.PendingManualEntryMapper
 import com.moneymanager.database.mapper.TransferMapper
-import com.moneymanager.database.mapper.TransferMissingCompanionMapper
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
@@ -21,12 +21,13 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
+import com.moneymanager.domain.model.PendingManualEntry
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.TransferMissingCompanion
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.repository.TransactionReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -168,17 +169,16 @@ class TransactionReadRepositoryImpl(
                 ).awaitAsList()
         }
 
-    override fun getTransfersMissingCompanion(
-        matchAttributeName: String,
-        matchValuePattern: String,
-        linkAttributeName: String,
-    ): Flow<List<TransferMissingCompanion>> =
+    override fun getPendingManualEntries(
+        entryName: String,
+        relationshipTypeName: String,
+    ): Flow<List<PendingManualEntry>> =
         transferSelectQueries
-            .selectTransfersMissingCompanion(
-                matchAttributeName,
-                matchValuePattern,
-                linkAttributeName,
-                TransferMissingCompanionMapper::mapRaw,
+            .selectPendingManualEntries(
+                WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME,
+                entryName,
+                relationshipTypeName,
+                PendingManualEntryMapper::mapRaw,
             ).asFlow()
             .mapToList(Dispatchers.Default)
 
