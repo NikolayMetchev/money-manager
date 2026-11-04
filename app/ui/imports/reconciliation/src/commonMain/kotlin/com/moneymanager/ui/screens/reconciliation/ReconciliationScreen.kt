@@ -63,7 +63,6 @@ import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.reconciliation.LegMatch
 import com.moneymanager.reconciliation.ReconciliationResult
 import com.moneymanager.reconciliation.UnlinkedWallet
-import com.moneymanager.reconciliation.UnmatchedSourceLeg
 import com.moneymanager.reconciliation.applyAutoLinks
 import com.moneymanager.reconciliation.createAndLinkAccounts
 import com.moneymanager.reconciliation.planAccountCreation
