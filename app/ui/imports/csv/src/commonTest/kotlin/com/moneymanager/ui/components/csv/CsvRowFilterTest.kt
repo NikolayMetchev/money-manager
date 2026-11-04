@@ -5,7 +5,6 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class CsvRowFilterTest {
     private val rows =
@@ -50,6 +49,6 @@ class CsvRowFilterTest {
     @Test
     fun `distinct values are sorted and include blank`() {
         assertEquals(listOf("", "Coffee", "Rent"), distinctColumnValues(rows, 0))
-        assertTrue(distinctColumnValues(rows, 5) == listOf(""))
+        assertEquals(listOf(""), distinctColumnValues(rows, 5))
     }
 }

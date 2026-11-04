@@ -33,15 +33,13 @@ class TransactionDateRangeTest {
         targetAccountId = AccountId(2L),
     )
 
-    private fun page(
-        items: List<AccountRow>,
-        hasMore: Boolean,
-    ) = PagingResult(items, PagingInfo(items.lastOrNull()?.timestamp, items.lastOrNull()?.transactionId, hasMore))
+    private fun page(items: List<AccountRow>) =
+        PagingResult(items, PagingInfo(items.lastOrNull()?.timestamp, items.lastOrNull()?.transactionId, hasMore = true))
 
     @Test
     fun `no range is inactive and changes nothing`() {
         val range = TransactionDateRange()
-        val loaded = page(listOf(row(3, 30), row(2, 20)), hasMore = true)
+        val loaded = page(listOf(row(3, 30), row(2, 20)))
         assertFalse(range.isActive)
         assertNull(range.firstPageCursor())
         assertEquals(loaded, range.clipOlder(loaded))
@@ -60,7 +58,7 @@ class TransactionDateRangeTest {
     @Test
     fun `rows older than from are cut and end the paging`() {
         val range = TransactionDateRange(from = Instant.fromEpochSeconds(20))
-        val clipped = range.clipOlder(page(listOf(row(3, 30), row(2, 20), row(1, 10)), hasMore = true))
+        val clipped = range.clipOlder(page(listOf(row(3, 30), row(2, 20), row(1, 10))))
         assertEquals(listOf(row(3, 30), row(2, 20)), clipped.items)
         assertFalse(clipped.pagingInfo.hasMore)
     }
@@ -68,7 +66,7 @@ class TransactionDateRangeTest {
     @Test
     fun `a page wholly inside from keeps its paging`() {
         val range = TransactionDateRange(from = Instant.fromEpochSeconds(5))
-        val loaded = page(listOf(row(3, 30), row(2, 20)), hasMore = true)
+        val loaded = page(listOf(row(3, 30), row(2, 20)))
         assertEquals(loaded, range.clipOlder(loaded))
     }
 
