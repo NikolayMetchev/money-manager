@@ -180,6 +180,19 @@ jobs:
           disable_search: true
           fail_ci_if_error: false
 
+      # The startup timing tool (main only) is compiled for MODULE.bazel's JDK, and the installed runtime has no java.
+      - name: Read the JDK version
+        if: github.event_name != 'pull_request'
+        id: jdk
+        shell: bash
+        run: echo "version=$(sed -n 's/^JDK = "\([^"]*\)".*/\1/p' MODULE.bazel)" >> "$GITHUB_OUTPUT"
+      - name: Set up Java
+        if: github.event_name != 'pull_request'
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: ${{ steps.jdk.outputs.version }}
+
       # On main (and manual runs) it also times the installed app's startup, which perf-record keeps (#1254).
       - name: Install and start the desktop installer
         env:
@@ -567,6 +580,19 @@ jobs:
           config: ${{ matrix.config }}
           cache-name: installer-${{ matrix.name }}
           android-sdk: 'false'
+
+      # The startup timing tool (main only) is compiled for MODULE.bazel's JDK, and the installed runtime has no java.
+      - name: Read the JDK version
+        if: github.event_name != 'pull_request'
+        id: jdk
+        shell: bash
+        run: echo "version=$(sed -n 's/^JDK = "\([^"]*\)".*/\1/p' MODULE.bazel)" >> "$GITHUB_OUTPUT"
+      - name: Set up Java
+        if: github.event_name != 'pull_request'
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: ${{ steps.jdk.outputs.version }}
 
       # On main (and manual runs) it also builds the startup benchmark's databases and times the installed app's
       # startup, which perf-record keeps (#1254). A pull request skips what is slow here (#1273): the native mm's link
