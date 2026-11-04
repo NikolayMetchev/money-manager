@@ -1,5 +1,6 @@
 package com.moneymanager.domain.model.rules
 
+import com.moneymanager.domain.model.WellKnownIds
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -250,6 +251,26 @@ sealed interface RuleAction {
         val value: RuleValue,
         @EncodeDefault(EncodeDefault.Mode.NEVER)
         val uniqueIdentifier: Boolean = false,
+    ) : RuleAction
+
+    /**
+     * The record needs a person to supply an amount (Manual Entries): the engine tags it with the
+     * [WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME] attribute = [name], and the entry the person types becomes a transfer
+     * described [description] and linked to the record by a [relationshipType] relationship (the record is the
+     * primary). It runs from the record's source to [counterpartyAccount], or, when that is null, between the
+     * record's accounts reversed. [excludedFromBalances] says the record's own amount already contains the
+     * entry (a withdrawal whose fee is included), so the entry must not be counted a second time.
+     */
+    @Serializable
+    @SerialName("manualEntry")
+    data class ManualEntry(
+        val name: String,
+        val description: String,
+        val relationshipType: String,
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        val counterpartyAccount: String? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        val excludedFromBalances: Boolean = false,
     ) : RuleAction
 
     /** A fee the record reports (see [FeeRule]). */

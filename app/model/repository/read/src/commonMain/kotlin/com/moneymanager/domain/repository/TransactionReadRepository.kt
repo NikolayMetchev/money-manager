@@ -8,11 +8,11 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
+import com.moneymanager.domain.model.PendingManualEntry
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.TransferMissingCompanion
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 
@@ -54,16 +54,13 @@ interface TransactionReadRepository {
     fun getAccountBalances(): Flow<List<AccountBalance>>
 
     /**
-     * Finds transfers matched by a companion transaction rule that have no companion yet:
-     * transfers carrying an attribute named [matchAttributeName] whose value matches the
-     * SQL LIKE [matchValuePattern], where no transfer carries an attribute named
-     * [linkAttributeName] with that same value.
+     * Transfers a manual-entry rule tagged [entryName] (the `manual-entry` attribute) that have no
+     * [relationshipTypeName] relationship with them as the primary yet: the entries still to be typed in.
      */
-    fun getTransfersMissingCompanion(
-        matchAttributeName: String,
-        matchValuePattern: String,
-        linkAttributeName: String,
-    ): Flow<List<TransferMissingCompanion>>
+    fun getPendingManualEntries(
+        entryName: String,
+        relationshipTypeName: String,
+    ): Flow<List<PendingManualEntry>>
 
     /**
      * Transfers touching any of [accountIds] (as source or target) whose amount is one of [amounts]

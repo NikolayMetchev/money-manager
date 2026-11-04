@@ -94,14 +94,9 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
             assertTrue(rules.idAttribute("wise-id").uniqueIdentifier)
             assertEquals(RuleValue.read("ID"), rules.idAttribute("wise-id").value)
 
-            // Assets fees require a manually entered interest transfer (companion rule
-            // survives the JSON round trip through the database)
-            val companionRule = strategy.config.companionTransactionRules.single()
-            assertEquals("Interest earned", companionRule.name)
-            assertEquals("wise-id", companionRule.matchAttributeName)
-            assertEquals("ACCRUAL_CHARGE-%", companionRule.matchValuePattern)
-            assertEquals("wise-interest-for", companionRule.linkAttributeName)
-            assertEquals("Interest earned", companionRule.companionDescription)
+            // Assets fees ask for a manually entered interest transfer (the rule survives the JSON round trip)
+            val entryRule = rules.flatMap { it.actions }.filterIsInstance<RuleAction.ManualEntry>().single()
+            assertEquals(RuleAction.ManualEntry("Interest earned", "Interest earned", "interest"), entryRule)
         }
 
     @Test

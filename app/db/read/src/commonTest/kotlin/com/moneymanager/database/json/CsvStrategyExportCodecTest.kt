@@ -1,7 +1,6 @@
 package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.csvstrategy.AmountMode
-import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.export.AccountFromRulesExport
@@ -249,53 +248,41 @@ class CsvStrategyExportCodecTest {
     }
 
     @Test
-    fun `encode and decode export with companion transaction rules`() {
+    fun `encode and decode export with a manual entry rule`() {
+        val entry =
+            RuleAction.ManualEntry(
+                name = "Withdrawal fee",
+                description = "Withdrawal fee",
+                relationshipType = "fee",
+                counterpartyAccount = "Binance Fees",
+                excludedFromBalances = true,
+            )
         val export =
             CsvStrategyExport(
                 version = "1.0.0",
-                name = "With companion rules",
+                name = "With a manual entry",
                 config =
                     CsvStrategyConfig(
                         identificationColumns = setOf("ID"),
                         fieldMappings = emptyMap(),
-                        companionTransactionRules =
+                        rules =
                             listOf(
-                                CompanionTransactionRule(
-                                    name = "Interest earned",
-                                    matchAttributeName = "wise-id",
-                                    matchValuePattern = "ACCRUAL_CHARGE-%",
-                                    linkAttributeName = "wise-interest-for",
-                                    companionDescription = "Interest earned",
+                                StrategyRule(
+                                    conditions = listOf(Condition("Remark", ConditionOp.MATCHES, "fee is included")),
+                                    actions = listOf(entry),
                                 ),
                             ),
                     ),
             )
 
-        val json = CsvStrategyExportCodec.encode(export)
-        val decoded = CsvStrategyExportCodec.decode(json)
+        val decoded = CsvStrategyExportCodec.decode(CsvStrategyExportCodec.encode(export))
 
-        val rule = decoded.config.companionTransactionRules.single()
-        assertEquals("Interest earned", rule.name)
-        assertEquals("wise-id", rule.matchAttributeName)
-        assertEquals("ACCRUAL_CHARGE-%", rule.matchValuePattern)
-        assertEquals("wise-interest-for", rule.linkAttributeName)
-        assertEquals("Interest earned", rule.companionDescription)
-    }
-
-    @Test
-    fun `decode legacy export without companion rules defaults to empty list`() {
-        val legacyJson =
-            """
-            {
-                "version": "1.0.0",
-                "name": "Legacy",
-                "identificationColumns": ["Date"],
-                "fieldMappings": {}
-            }
-            """.trimIndent()
-
-        val decoded = CsvStrategyExportCodec.decode(legacyJson)
-
-        assertTrue(decoded.config.companionTransactionRules.isEmpty())
+        assertEquals(
+            entry,
+            decoded.config.rules
+                .single()
+                .actions
+                .single(),
+        )
     }
 }

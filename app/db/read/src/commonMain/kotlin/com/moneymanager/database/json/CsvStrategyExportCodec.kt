@@ -49,7 +49,6 @@ private object FlatCsvStrategyExportSerializer : JsonTransformingSerializer<CsvS
             "identificationColumns",
             "fieldMappings",
             "rules",
-            "companionTransactionRules",
             "contentMatchRules",
             "accountMappings",
             "fileNamePattern",

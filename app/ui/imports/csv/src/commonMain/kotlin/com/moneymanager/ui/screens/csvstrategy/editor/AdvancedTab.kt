@@ -25,7 +25,7 @@ import com.moneymanager.ui.screens.accountmapping.AccountMappingsSection
 import com.moneymanager.ui.screens.csvstrategy.getSampleValue
 
 /**
- * Advanced tab: reconciliation, companion transaction rules, content matching, leg groups, and (in edit mode)
+ * Advanced tab: reconciliation, content matching, leg groups, and (in edit mode)
  * the account mappings scoped to this strategy. Global mappings are managed on the Account Mappings
  * screen instead.
  */
@@ -211,20 +211,6 @@ internal fun AdvancedTab(
             singleLine = true,
             enabled = enabled,
             modifier = Modifier.fillMaxWidth(),
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("Companion Transaction Rules (Optional)", style = MaterialTheme.typography.titleSmall)
-        Text(
-            "Flag imported transfers that imply a manually entered companion transaction",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        CompanionTransactionRulesEditor(
-            rules = state.companionTransactionRules,
-            onRulesChanged = { state.companionTransactionRules = it },
-            enabled = enabled,
         )
 
         Spacer(modifier = Modifier.height(16.dp))

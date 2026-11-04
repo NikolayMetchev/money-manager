@@ -43,8 +43,8 @@ kmp_library(
     deps = [
         "//app/importengineapi",
         "//app/model/core",
-        "//app/model/csvstrategy",
         "//app/model/repository/read",
+        "//app/model/rules",
         "//app/presenter/core",
         "//app/ui/audit",
         "//app/ui/components",

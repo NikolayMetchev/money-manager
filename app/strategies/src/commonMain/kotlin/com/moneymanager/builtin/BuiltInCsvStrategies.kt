@@ -6,7 +6,6 @@ import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeAccountMatch
-import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -1319,8 +1318,8 @@ object BuiltInCsvStrategies {
      * target to the other Wise balance instead of a counterparty account.
      *
      * Wise's export omits interest-earned rows, but each monthly "Assets fee" (wise-id like
-     * `ACCRUAL_CHARGE-…`) implies one, so a companion transaction rule flags those transfers
-     * for manual entry of the mirroring interest transfer.
+     * `ACCRUAL_CHARGE-…`) implies one, so a manual-entry rule asks for the mirroring interest
+     * transfer.
      */
     fun buildWiseCsvStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
@@ -1397,15 +1396,13 @@ object BuiltInCsvStrategies {
                     FeeRule(amount = ValueExpr(listOf("Source fee amount"))),
                     conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "OUT")),
                 ),
-            )
-        val companionRules =
-            listOf(
-                CompanionTransactionRule(
-                    name = "Interest earned",
-                    matchAttributeName = "wise-id",
-                    matchValuePattern = "ACCRUAL_CHARGE-%",
-                    linkAttributeName = "wise-interest-for",
-                    companionDescription = "Interest earned",
+                rule(
+                    RuleAction.ManualEntry(
+                        name = "Interest earned",
+                        description = "Interest earned",
+                        relationshipType = "interest",
+                    ),
+                    conditions = listOf(Condition("ID", ConditionOp.STARTS_WITH, value = "ACCRUAL_CHARGE-")),
                 ),
             )
         val identificationColumns =
@@ -1440,7 +1437,6 @@ object BuiltInCsvStrategies {
                     identificationColumns = identificationColumns,
                     fieldMappings = fieldMappings,
                     rules = rules,
-                    companionTransactionRules = companionRules,
                 ),
             createdAt = now,
             updatedAt = now,
@@ -2041,7 +2037,8 @@ object BuiltInCsvStrategies {
      * folds each such group into one `trade`. Fee rows stay out of the group on purpose — a `trade` row
      * has no fee field — and route to [BINANCE_FEES_ACCOUNT] as their own transfers, as the API does.
      *
-     * A `Withdraw` row remarked "Withdraw fee is included" (and every `Fiat Withdrawal`) is the
+     * A `Withdraw` row remarked "Withdraw fee is included" asks (a `ManualEntry` rule) for its fee in Manual Entries.
+     * Such a row (and every `Fiat Withdrawal`) is the
      * **gross** amount, while the API records the withdrawal net and books the fee as its own transfer.
      * Amount equality can never pair those, so the engine reconciles the gross row against the net +
      * fee pair instead, in either import order.
@@ -2171,6 +2168,18 @@ object BuiltInCsvStrategies {
                 attribute("User_ID", "binance-user-id"),
                 attribute("Operation", "binance-operation"),
                 attribute("Remark", "binance-remark"),
+                // The gross row has no fee figure, so a person types it in (Manual Entries); it is booked excluded because
+                // the withdrawal already contains it, and it exists so the withdrawal reconciles against net + fee.
+                rule(
+                    RuleAction.ManualEntry(
+                        name = "Withdrawal fee",
+                        description = "Withdrawal fee",
+                        relationshipType = "fee",
+                        counterpartyAccount = BINANCE_FEES_ACCOUNT,
+                        excludedFromBalances = true,
+                    ),
+                    conditions = listOf(Condition("Remark", ConditionOp.MATCHES, "fee is included")),
+                ),
                 // Change carries the direction: negative leaves the Binance account, positive arrives.
                 incomingWhenPositive("Change"),
                 // Account is "Spot" on every row; keying the naming off it rather than hard-coding an id keeps

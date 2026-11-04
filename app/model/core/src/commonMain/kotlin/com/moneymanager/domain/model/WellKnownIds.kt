@@ -77,6 +77,12 @@ object WellKnownIds {
     const val UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME: String = "unidentified-counterparty"
 
     /**
+     * Attribute type (get-or-create by name) that marks a transfer a manual-entry rule asked for an amount on;
+     * its value is the entry's name.
+     */
+    const val MANUAL_ENTRY_ATTR_TYPE_NAME: String = "manual-entry"
+
+    /**
      * "timestamp-approximate" transfer attribute: the provider gave no real instant for this leg, so its
      * timestamp is only the earliest it can have happened, and the value (epoch milliseconds) is the
      * latest. Cross-source reconciliation matches such a leg anywhere in that span and prefers the other

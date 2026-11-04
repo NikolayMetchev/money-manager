@@ -96,6 +96,9 @@ enum class RuleActionKind(
     FEE("Book a fee", setOf(RuleContext.CSV_ROW, RuleContext.API_TRANSACTION, RuleContext.API_TRADE), {
         RuleAction.Fee(FeeRule(amount = ValueExpr(listOf(""))))
     }),
+    MANUAL_ENTRY("Ask for a manual entry", setOf(RuleContext.CSV_ROW), {
+        RuleAction.ManualEntry(name = "", description = "", relationshipType = "")
+    }),
     FOREIGN("Foreign amount", setOf(RuleContext.CSV_ROW, RuleContext.API_TRANSACTION), {
         RuleAction.Foreign(ForeignAmount(ValueExpr(listOf("")), ValueExpr(listOf(""))))
     }),
@@ -121,6 +124,7 @@ enum class RuleActionKind(
                 RuleAction.CounterpartyIsPerson -> PERSON
                 RuleAction.IgnoreCounterpartyId -> IGNORE_ID
                 is RuleAction.Fee -> FEE
+                is RuleAction.ManualEntry -> MANUAL_ENTRY
                 is RuleAction.Foreign -> FOREIGN
                 is RuleAction.ThroughConduit -> CONDUIT
                 is RuleAction.TradeSide -> TRADE_SIDE
@@ -171,6 +175,8 @@ private fun RuleAction.isComplete(): Boolean =
         is RuleAction.Fee -> fee.amount.primaryPath.isNotBlank()
 
         is RuleAction.Foreign -> foreignAmount.amount.primaryPath.isNotBlank() && foreignAmount.currency.primaryPath.isNotBlank()
+
+        is RuleAction.ManualEntry -> name.isNotBlank() && description.isNotBlank() && relationshipType.isNotBlank()
 
         is RuleAction.ThroughConduit -> accountName.isNotBlank()
 
@@ -488,6 +494,27 @@ private fun ActionFields(
                 onForeignAmountChanged = { foreign -> foreign?.let { onActionChanged(action.copy(foreignAmount = it)) } },
                 pathField = pathField,
             )
+        }
+
+        is RuleAction.ManualEntry -> {
+            TextField("Entry name", action.name, enabled, isError = action.name.isBlank()) { onActionChanged(action.copy(name = it)) }
+            TextField("Description of the transfer", action.description, enabled, isError = action.description.isBlank()) {
+                onActionChanged(action.copy(description = it))
+            }
+            TextField(
+                "Relationship to the record (e.g. fee)",
+                action.relationshipType,
+                enabled,
+                isError = action.relationshipType.isBlank(),
+            ) {
+                onActionChanged(action.copy(relationshipType = it))
+            }
+            TextField("To account (blank = reverse the record)", action.counterpartyAccount.orEmpty(), enabled) {
+                onActionChanged(action.copy(counterpartyAccount = it.ifBlank { null }))
+            }
+            CheckRow("The record's amount already includes it", action.excludedFromBalances, enabled) {
+                onActionChanged(action.copy(excludedFromBalances = it))
+            }
         }
 
         is RuleAction.ThroughConduit -> {

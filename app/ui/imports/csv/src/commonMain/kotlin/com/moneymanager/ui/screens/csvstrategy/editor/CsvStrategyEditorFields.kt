@@ -168,7 +168,6 @@ internal fun buildStrategyFromEditorState(
                 identificationColumns = state.identificationColumns,
                 fieldMappings = fieldMappings,
                 rules = state.rules,
-                companionTransactionRules = state.companionTransactionRules,
                 contentMatchRules = state.contentMatchRules,
                 fileNamePattern = state.fileNamePattern.takeIf { it.isNotBlank() },
                 crossSourceReconcileWindow = state.crossSourceReconcileWindow,

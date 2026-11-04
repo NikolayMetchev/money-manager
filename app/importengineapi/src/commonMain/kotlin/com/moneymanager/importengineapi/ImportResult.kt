@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -64,6 +65,8 @@ data class ImportResult(
     val dedupedTradeKeys: Set<LocalTradeKey> = emptySet(),
     /** Resolved (get-or-create) attribute-type ids for each name in [ImportBatch.attributeTypeNames]. */
     val attributeTypeIds: Map<String, AttributeTypeId> = emptyMap(),
+    /** Resolved (get-or-create) relationship-type ids for each name in [ImportBatch.relationshipTypeNames]. */
+    val relationshipTypeIds: Map<String, RelationshipTypeId> = emptyMap(),
     // Generated ids for config/staging/session Create mutations, keyed by the mutation's `key`.
     val createdCsvStrategyIds: Map<String, CsvImportStrategyId> = emptyMap(),
     val createdApiStrategyIds: Map<String, ApiImportStrategyId> = emptyMap(),

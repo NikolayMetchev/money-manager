@@ -19,6 +19,7 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
@@ -39,8 +40,8 @@ import kotlin.time.Instant
 
 /**
  * End-to-end test for the Manual Entries tab: a Wise assets fee (matched by the seeded
- * companion transaction rule) is listed as missing its interest transfer, and entering
- * an amount creates the mirrored companion linked via the wise-interest-for attribute.
+ * manual-entry rule) is listed as missing its interest transfer, and entering
+ * an amount creates the mirrored interest transfer, linked to the fee by an "interest" relationship.
  */
 @OptIn(ExperimentalTestApi::class)
 class ManualEntriesE2ETest {
@@ -91,10 +92,10 @@ class ManualEntriesE2ETest {
                         targetAccountId = transferwise,
                         amount = Money.fromDisplayValue("0.06", currency),
                     )
-                val wiseIdType = databaseComponent.attributeTypeRepository.getOrCreate("wise-id")
+                val entryType = databaseComponent.attributeTypeRepository.getOrCreate(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME)
                 databaseComponent.transactionRepository.createTransfers(
                     transfers = listOf(fee),
-                    newAttributes = mapOf(fee.id to listOf(NewAttribute(wiseIdType, "ACCRUAL_CHARGE-18326272"))),
+                    newAttributes = mapOf(fee.id to listOf(NewAttribute(entryType, "Interest earned"))),
                     sources = listOf(Source.SampleGenerator),
                 )
             }
@@ -127,7 +128,7 @@ class ManualEntriesE2ETest {
             onNodeWithText("Manual Entries", useUnmergedTree = true).performClick()
             waitForIdle()
 
-            // The assets fee is listed under the seeded Wise companion rule
+            // The assets fee is listed under the seeded Wise manual-entry rule
             waitUntilAtLeastOneExists(hasText("Wise CSV — Interest earned"), timeoutMillis = 15000)
             waitUntilAtLeastOneExists(hasText("Assets fee 18326272"), timeoutMillis = 10000)
 
@@ -156,12 +157,9 @@ class ManualEntriesE2ETest {
                 assertEquals(feeTimestamp.toEpochMilliseconds(), companion.timestamp.toEpochMilliseconds())
                 assertEquals("EUR", companion.amount.asset.code)
                 assertTrue(companion.amount.hasDisplayValue("1.23"))
-                val link = companion.attributes.single { it.attributeType.name == "wise-interest-for" }
-                assertEquals("ACCRUAL_CHARGE-18326272", link.value)
-
                 assertTrue(
                     databaseComponent.transactionRepository
-                        .getTransfersMissingCompanion("wise-id", "ACCRUAL_CHARGE-%", "wise-interest-for")
+                        .getPendingManualEntries("Interest earned", "interest")
                         .first()
                         .isEmpty(),
                     "No assets fee is missing its companion any more",

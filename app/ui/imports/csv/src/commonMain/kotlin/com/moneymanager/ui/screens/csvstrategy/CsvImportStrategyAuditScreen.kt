@@ -63,7 +63,6 @@ private fun flattenConfig(config: CsvStrategyConfig<FieldMapping>): Map<String, 
             .sortedBy { it.key.name }
             .forEach { (field, mapping) -> put("Field: ${field.name}", mapping.toString()) }
         putIfNotEmpty("Rules", config.rules)
-        putIfNotEmpty("Companion rules", config.companionTransactionRules)
         putIfNotEmpty("Content match rules", config.contentMatchRules)
         config.fileNamePattern?.let { put("File name pattern", it) }
         config.crossSourceReconcileWindow?.let { put("Cross-source reconcile window", it.summary()) }
