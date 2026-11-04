@@ -52,6 +52,7 @@ import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
+import com.moneymanager.domain.repository.write.RelationshipWrite
 import com.moneymanager.domain.repository.write.RelationshipWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
 import com.moneymanager.domain.repository.write.TradeWriteRepository
@@ -413,12 +414,14 @@ class ImportEngineImpl(
         // ----- RELATIONSHIPS between existing transactions (after the writes, so a batch can relate what it made) -----
         if (batch.relationshipMutations.isNotEmpty()) {
             val relationships = checkNotNull(relationshipRepository) { "This engine has no relationship repository" }
-            batch.relationshipMutations.forEach { m ->
-                when (m) {
-                    is RelationshipMutation.Create -> relationships.create(m.typeId, m.members, m.source)
-                    is RelationshipMutation.Delete -> relationships.delete(m.id)
-                }
-            }
+            relationships.apply(
+                batch.relationshipMutations.map { m ->
+                    when (m) {
+                        is RelationshipMutation.Create -> RelationshipWrite.Create(m.typeId, m.members, m.source)
+                        is RelationshipMutation.Delete -> RelationshipWrite.Delete(m.id)
+                    }
+                },
+            )
         }
 
         // ----- MERGE / UNMERGE (before deletes: a merge already removes the absorbed account) -----

@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.RelationshipMember
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.RelationshipReadRepository
+import com.moneymanager.domain.repository.write.RelationshipWrite
 import com.moneymanager.domain.repository.write.RelationshipWriteRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -30,6 +31,28 @@ class RelationshipWriteRepositoryImpl(
                 database
                     .insertRelationship(deviceId, typeId.id, members.map { it.transactionId.id to it.role }, source)
                     ?.let(::RelationshipId)
+            }
+        }
+
+    override suspend fun apply(writes: List<RelationshipWrite>): Unit =
+        withContext(Dispatchers.Default) {
+            writeQueries.transaction {
+                writes.forEach { write ->
+                    when (write) {
+                        is RelationshipWrite.Create -> {
+                            database.insertRelationship(
+                                deviceId,
+                                write.typeId.id,
+                                write.members.map { it.transactionId.id to it.role },
+                                write.source,
+                            )
+                        }
+
+                        is RelationshipWrite.Delete -> {
+                            writeQueries.deleteById(write.id.id)
+                        }
+                    }
+                }
             }
         }
 

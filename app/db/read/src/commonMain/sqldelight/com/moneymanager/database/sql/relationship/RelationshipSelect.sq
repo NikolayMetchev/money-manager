@@ -59,6 +59,9 @@ WHERE relationship.id IN (SELECT relationship_id FROM relationship_member WHERE 
       SELECT 1 FROM entity_source
       WHERE entity_source.entity_type_id = 13
         AND entity_source.entity_id = relationship.id
+        -- Revision 1 (relationships are never revised) lets SQLite use the writer index; without it the
+        -- check scans every MANUAL source row once per candidate relationship.
+        AND entity_source.revision_id = 1
         AND entity_source.source_type_id = 1
         AND entity_source.matched = 0
   )

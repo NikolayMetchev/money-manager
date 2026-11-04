@@ -19,4 +19,23 @@ interface RelationshipWriteRepository : RelationshipReadRepository {
 
     /** Deletes the relationship; its members are untouched. */
     suspend fun delete(id: RelationshipId)
+
+    /**
+     * Applies [writes] in order in one database transaction, as [create] and [delete] would one by one. A
+     * re-import rebuilds thousands of links, and a commit per link made that the slowest step.
+     */
+    suspend fun apply(writes: List<RelationshipWrite>)
+}
+
+/** One step of [RelationshipWriteRepository.apply]. */
+sealed interface RelationshipWrite {
+    data class Create(
+        val typeId: RelationshipTypeId,
+        val members: List<RelationshipMember>,
+        val source: Source,
+    ) : RelationshipWrite
+
+    data class Delete(
+        val id: RelationshipId,
+    ) : RelationshipWrite
 }
