@@ -52,6 +52,7 @@ import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
+import com.moneymanager.importengineapi.createManualFee
 import com.moneymanager.importengineapi.createReconciliationMatch
 import com.moneymanager.importengineapi.createReconciliationMatches
 import com.moneymanager.importengineapi.deleteRelationship
@@ -569,6 +570,13 @@ private fun SourceReconciliation(
             onConfirm = { selected ->
                 pickerState.close()
                 storeMatch(movement + selected)
+            },
+            onBookFee = { fee, selected ->
+                pickerState.close()
+                write("Adding the fee") {
+                    val feeId = importEngine.createManualFee(fee.account, fee.fee, fee.timestamp)
+                    importEngine.createReconciliationMatch((movement + selected).map { it.transactionRef } + feeId)
+                }
             },
             onOpenLeg = onOpenLeg,
             onOpenSource = onOpenSource,
