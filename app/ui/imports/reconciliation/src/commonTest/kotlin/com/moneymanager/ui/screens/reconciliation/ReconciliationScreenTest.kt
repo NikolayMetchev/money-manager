@@ -47,6 +47,7 @@ import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
+import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportResult
@@ -593,6 +594,47 @@ class ReconciliationScreenTest {
                 listOf(TradeId(11), TransferId(21)),
                 batches
                     .single()
+                    .relationshipMutations
+                    .filterIsInstance<RelationshipMutation.Create>()
+                    .single()
+                    .members
+                    .map { it.transactionId },
+            )
+        }
+    }
+
+    @Test
+    fun thePickerBooksTheMissingFeeAndMatchesItWithTheSelection() {
+        runMoneyManagerComposeUiTest {
+            val batches = mutableListOf<ImportBatch>()
+            val engine =
+                importEngine { batch ->
+                    batches += batch
+                    ImportResult(createdTransferIds = batch.transfers.mapNotNull { it.rowKey }.associateWith { TransferId(99) })
+                }
+            showLegsWith(
+                engine,
+                listOf(leg(10, wallet.accountId, "-5", t0)),
+                listOf(leg(21, binance, "-4.7", t0 + 1.hours)),
+            )
+            expandAll()
+
+            clickText("Select matching transactions…")
+            val picker = onNodeWithTag(PICKER_CANDIDATES_TAG)
+            onNodeWithText("Add missing fee", substring = true).assertDoesNotExist()
+            picker.performScrollToNode(isToggleable() and hasText("leg 21", substring = true))
+            onNode(isToggleable() and hasText("leg 21", substring = true)).performClick()
+            waitForIdle()
+            onNodeWithText("Add missing fee", substring = true).performClick()
+            waitForIdle()
+
+            val fee = batches.first().transfers.single()
+            assertEquals(Money.fromDisplayValue(BigDecimal("0.3"), ada), fee.amount)
+            assertEquals(AccountRef.Existing(binance), fee.fromAccount)
+            assertEquals(
+                listOf(TransferId(10), TransferId(21), TransferId(99)),
+                batches
+                    .last()
                     .relationshipMutations
                     .filterIsInstance<RelationshipMutation.Create>()
                     .single()
