@@ -37,8 +37,15 @@ class ReconciliationCache {
         entries[sourceName] = Entry(shadowIds, links, writeVersion, result)
     }
 
-    /** The last result stored for [sourceName] whatever its inputs, to show while they load. */
-    fun peek(sourceName: String): ReconciliationResult? = entries[sourceName]?.result
+    /**
+     * The last result stored for [sourceName] whatever its inputs, to show while they load, provided nothing has been
+     * written since: a write may have changed what those inputs are (a deleted wallet), which loaded-empty inputs
+     * would otherwise be mistaken for.
+     */
+    fun peek(
+        sourceName: String,
+        writeVersion: Long,
+    ): ReconciliationResult? = entries[sourceName]?.takeIf { it.writeVersion == writeVersion }?.result
 
     fun invalidate(sourceName: String) {
         entries.remove(sourceName)

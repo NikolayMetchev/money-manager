@@ -21,6 +21,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,6 +77,20 @@ fun MatchPickerDialog(
     val selected = state.selected
     val candidates =
         remember(result, movement, wallet, window, sameAssetOnly) { result.pickerCandidates(movement, wallet, window, sameAssetOnly) }
+
+    // A selection kept across a followed link may name a leg the result no longer offers (edited or claimed meanwhile).
+    LaunchedEffect(result, movement, wallet) {
+        val offered =
+            result
+                .pickerCandidates(
+                    movement,
+                    wallet,
+                    Duration.INFINITE,
+                    sameAssetOnly = false,
+                ).filter { it.selectable }
+                .map { it.leg }
+        selected.retainAll(offered.toSet())
+    }
 
     val rowScroll = rememberScrollState()
     // Rows sharing one scroll state need one content width, or a short row would clamp the range a long one needs.

@@ -200,7 +200,7 @@ private fun SourceReconciliation(
         cache.invalidate(source.name)
         refreshKey++
     }
-    var result by remember { mutableStateOf(cache.peek(source.name)) }
+    var result by remember { mutableStateOf(cache.peek(source.name, writeVersion)) }
     var progress by remember { mutableStateOf<Progress?>(null) }
     LaunchedEffect(source, shadowIds, links, refreshKey, writeVersion) {
         cache.get(source.name, shadowIds, links, writeVersion)?.let {
@@ -209,7 +209,7 @@ private fun SourceReconciliation(
         }
         // The flows above start empty, so these inputs may just not have loaded; keep what was shown until they do.
         if (shadowIds.isEmpty() && links.isEmpty()) {
-            cache.peek(source.name)?.let {
+            cache.peek(source.name, writeVersion)?.let {
                 result = it
                 return@LaunchedEffect
             }

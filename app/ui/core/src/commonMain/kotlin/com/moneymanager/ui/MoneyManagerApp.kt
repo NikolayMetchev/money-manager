@@ -690,7 +690,12 @@ fun MoneyManagerApp(
                                                         val apiRequestId = api?.requestId
                                                         when {
                                                             csv != null -> {
-                                                                onCsvSourceClick(csv.importId, csv.rowIndex ?: 0L)
+                                                                val rowIndex = csv.rowIndex
+                                                                if (rowIndex != null) {
+                                                                    onCsvSourceClick(csv.importId, rowIndex)
+                                                                } else {
+                                                                    navigationHistory.navigateTo(Screen.CsvImportDetail(csv.importId))
+                                                                }
                                                             }
 
                                                             api != null && apiRequestId != null -> {
