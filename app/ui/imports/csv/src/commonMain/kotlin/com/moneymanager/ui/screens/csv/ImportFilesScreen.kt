@@ -49,7 +49,7 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.components.DateTimePickerField
+import com.moneymanager.ui.components.DateRangeFilterFields
 import com.moneymanager.ui.components.MultiSelectFilterDropdown
 import com.moneymanager.ui.components.imports.FolderDownload
 import com.moneymanager.ui.components.imports.ImportSectionHeader
@@ -72,10 +72,6 @@ import com.moneymanager.ui.components.imports.stagedImportStrategyOptions
 import com.moneymanager.ui.tasks.LocalTaskManager
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.datetime.LocalTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toInstant
-import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 
 /**
@@ -433,27 +429,15 @@ private fun DateRangeFields(
     ranges: Collection<ImportFileDateRange>,
     onFilterChange: (StagedImportFilter) -> Unit,
 ) {
-    val zone = remember { TimeZone.currentSystemDefault() }
     // Nothing outside the files' transactions can match, so neither end can be picked beyond them.
-    val earliest = remember(ranges) { ranges.minOfOrNull { it.earliest }?.toLocalDateTime(zone) }
-    val latest = remember(ranges) { ranges.maxOfOrNull { it.latest }?.toLocalDateTime(zone) }
-    val from = filter.from?.toLocalDateTime(zone)
-    val to = filter.to?.toLocalDateTime(zone)
-    DateTimePickerField(
-        value = filter.from?.toLocalDateTime(zone),
-        onValueChange = { onFilterChange(filter.copy(from = it.toInstant(zone))) },
-        minValue = earliest,
-        maxValue = to ?: latest,
-        dateLabel = "Transactions from (date)",
-        onClear = { onFilterChange(filter.copy(from = null)) },
-    )
-    DateTimePickerField(
-        value = filter.to?.toLocalDateTime(zone),
-        onValueChange = { onFilterChange(filter.copy(to = it.toInstant(zone))) },
-        minValue = from ?: earliest,
-        maxValue = latest,
-        dateLabel = "Transactions to (date)",
-        defaultTime = LocalTime(23, 59, 59, 999_999_999),
-        onClear = { onFilterChange(filter.copy(to = null)) },
+    DateRangeFilterFields(
+        from = filter.from,
+        to = filter.to,
+        onFromChange = { onFilterChange(filter.copy(from = it)) },
+        onToChange = { onFilterChange(filter.copy(to = it)) },
+        fromLabel = "Transactions from (date)",
+        toLabel = "Transactions to (date)",
+        earliest = ranges.minOfOrNull { it.earliest },
+        latest = ranges.maxOfOrNull { it.latest },
     )
 }

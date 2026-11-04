@@ -42,6 +42,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -81,6 +82,7 @@ import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.components.DateRangeFilterFields
 import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.foundation.LocalStartupProbe
 import com.moneymanager.ui.foundation.StartupMilestone
@@ -297,6 +299,14 @@ fun AccountTransactionsScreen(
             .map { it.balance.asset.id }
             .distinct()
     val accountCurrencies = currencies.filter { it.id in accountCurrencyIds }
+    val accountAssets =
+        remember(accountBalances, selectedAccountId) {
+            accountBalances
+                .filter { it.accountId == selectedAccountId }
+                .map { it.balance.asset }
+                .distinctBy { it.id.id }
+                .sortedBy { it.code }
+        }
 
     // Selected currency state - initialized from parameter
     var selectedCurrencyId by remember { mutableStateOf(initialCurrencyId) }
@@ -328,6 +338,13 @@ fun AccountTransactionsScreen(
     // Pages are already filtered to the selected currency by the repository queries.
     // Whether to show transactions marked as excluded
     var showExcluded by remember { mutableStateOf(false) }
+    var dateRange by remember { mutableStateOf(TransactionDateRange()) }
+    var showDates by rememberSaveable { mutableStateOf(false) }
+
+    // Jumping to a particular transfer shows it in full context, so it drops the date range.
+    LaunchedEffect(scrollToTransferId) {
+        if (scrollToTransferId != null) dateRange = TransactionDateRange()
+    }
     val displayedRunningBalances =
         if (showExcluded) runningBalances else runningBalances.filter { !it.isExcluded }
 
@@ -393,7 +410,15 @@ fun AccountTransactionsScreen(
 
         // Load first page when account changes or after edits (via refreshTrigger or externalRefreshTrigger)
         // If scrollToTransferId is provided, load the page containing that transaction
-        LaunchedEffect(selectedAccountId, selectedCurrencyId, pageSize, scrollToTransferId, refreshTrigger, externalRefreshTrigger) {
+        LaunchedEffect(
+            selectedAccountId,
+            selectedCurrencyId,
+            pageSize,
+            scrollToTransferId,
+            dateRange,
+            refreshTrigger,
+            externalRefreshTrigger,
+        ) {
             runningBalances = emptyList()
             currentPagingInfo = null
             hasLoadedFirstPage = false
@@ -417,11 +442,13 @@ fun AccountTransactionsScreen(
                 } else {
                     // Normal first page load - no previous items
                     val result =
-                        transactionRepository.getRunningBalanceByAccountPaginated(
-                            accountId = selectedAccountId,
-                            pageSize = pageSize,
-                            pagingInfo = null,
-                            currencyId = selectedCurrencyId,
+                        dateRange.clipOlder(
+                            transactionRepository.getRunningBalanceByAccountPaginated(
+                                accountId = selectedAccountId,
+                                pageSize = pageSize,
+                                pagingInfo = dateRange.firstPageCursor(),
+                                currencyId = selectedCurrencyId,
+                            ),
                         )
                     runningBalances = result.items
                     currentPagingInfo = result.pagingInfo
@@ -446,11 +473,13 @@ fun AccountTransactionsScreen(
             isLoadingPage = true
             try {
                 val result =
-                    transactionRepository.getRunningBalanceByAccountPaginated(
-                        accountId = selectedAccountId,
-                        pageSize = pageSize,
-                        pagingInfo = currentPagingInfo,
-                        currencyId = selectedCurrencyId,
+                    dateRange.clipOlder(
+                        transactionRepository.getRunningBalanceByAccountPaginated(
+                            accountId = selectedAccountId,
+                            pageSize = pageSize,
+                            pagingInfo = currentPagingInfo,
+                            currencyId = selectedCurrencyId,
+                        ),
                     )
                 runningBalances = runningBalances + result.items
                 currentPagingInfo = result.pagingInfo
@@ -480,10 +509,11 @@ fun AccountTransactionsScreen(
                         firstId = firstItem.transactionId,
                         currencyId = selectedCurrencyId,
                     )
-                if (result.items.isNotEmpty()) {
-                    runningBalances = result.items + runningBalances
+                val newer = dateRange.clipNewer(result.items)
+                if (newer.isNotEmpty()) {
+                    runningBalances = newer + runningBalances
                 }
-                hasPreviousPage = result.pagingInfo.hasMore
+                hasPreviousPage = dateRange.hasNewer(result.items, newer, result.pagingInfo.hasMore)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (expected: Exception) {
@@ -821,6 +851,30 @@ fun AccountTransactionsScreen(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.clickable { showExcluded = !showExcluded },
                 )
+                IconButton(onClick = { showDates = !showDates }) {
+                    Text("\uD83D\uDCC5", style = MaterialTheme.typography.bodyLarge)
+                }
+                AssetFilterDropdown(
+                    assets = accountAssets,
+                    selectedAssetId = selectedCurrencyId?.id,
+                    onSelected = { selectedCurrencyId = it?.let { asset -> CurrencyId(asset.id.id) } },
+                )
+            }
+
+            if (showDates || dateRange.isActive) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    DateRangeFilterFields(
+                        from = dateRange.from,
+                        to = dateRange.to,
+                        onFromChange = { dateRange = dateRange.copy(from = it) },
+                        onToChange = { dateRange = dateRange.copy(to = it) },
+                        fromLabel = "Transactions from (date)",
+                        toLabel = "Transactions to (date)",
+                    )
+                }
             }
 
             // Transactions Section (70% of screen) - with independent loading
@@ -842,7 +896,9 @@ fun AccountTransactionsScreen(
                 ) {
                     Text(
                         text =
-                            if (selectedCurrencyId != null) {
+                            if (dateRange.isActive) {
+                                "No transactions in this period."
+                            } else if (selectedCurrencyId != null) {
                                 "No transactions for selected currency."
                             } else {
                                 "No transactions yet for this account."
