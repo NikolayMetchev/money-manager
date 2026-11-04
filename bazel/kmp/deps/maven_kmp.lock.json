@@ -28,7 +28,7 @@
       "androidx-sqlite": "androidx.sqlite:sqlite:2.7.1",
       "androidx-test-monitor": "androidx.test:monitor:1.8.0",
       "androidx-test-runner": "androidx.test:runner:1.7.0",
-      "androidx-test-uiautomator": "androidx.test.uiautomator:uiautomator:2.4.0",
+      "androidx-test-uiautomator": "androidx.test.uiautomator:uiautomator:2.4.1",
       "atomicfu": "org.jetbrains.kotlinx:atomicfu:0.33.0",
       "bignum": "com.ionspin.kotlin:bignum:0.3.10",
       "clikt": "com.github.ajalt.clikt:clikt:5.1.0",
@@ -8102,12 +8102,12 @@
     },
     "androidx.test.uiautomator:uiautomator": {
       "android": {
-        "version": "2.4.0",
+        "version": "2.4.1",
         "files": [
           {
-            "name": "uiautomator-2.4.0.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator/2.4.0/uiautomator-2.4.0.aar",
-            "sha256": "e7c57391d8baa1435c242334f605c4a282d03695442032622438b23bf2c6c904"
+            "name": "uiautomator-2.4.1.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator/2.4.1/uiautomator-2.4.1.aar",
+            "sha256": "549858cf5b51b81576e1d2f3e7fbd4ce40bd6db2fe4954b7c3a62605165d0f25"
           }
         ],
         "deps": [
@@ -8124,12 +8124,12 @@
     },
     "androidx.test.uiautomator:uiautomator-shell": {
       "android": {
-        "version": "2.4.0",
+        "version": "2.4.1",
         "files": [
           {
             "name": "uiautomator-shell.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator-shell-android/2.4.0/uiautomator-shell-android-2.4.0.aar",
-            "sha256": "aa97c53f034c7ffed41975b2c37b82b02b23b3cd28be61a1281edd29014bbcc4"
+            "url": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator-shell-android/2.4.1/uiautomator-shell-android-2.4.1.aar",
+            "sha256": "f1ad18e269ae7a22f95d5f91d73e8ba68e4aa4dcae520e1ab3876cc1b017fbe0"
           }
         ],
         "runtime_deps": [
