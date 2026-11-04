@@ -178,7 +178,9 @@ fun missingFee(
     val shortfall = total.difference
     // selected - source > 0 for outflows means the source left more than the person booked.
     if (!shortfall.isPositive() || !total.source.isNegative()) return null
-    val anchor =
-        selected.filter { it.amount.asset.id == total.asset.id && it.amount.isNegative() }.maxByOrNull { it.timestamp } ?: return null
+    val outflows = selected.filter { it.amount.asset.id == total.asset.id && it.amount.isNegative() }
+    // Outflows from several accounts leave no telling which one paid the fee.
+    if (outflows.mapTo(mutableSetOf()) { it.accountId }.size != 1) return null
+    val anchor = outflows.maxBy { it.timestamp }
     return MissingFee(anchor.accountId, shortfall, anchor.timestamp)
 }

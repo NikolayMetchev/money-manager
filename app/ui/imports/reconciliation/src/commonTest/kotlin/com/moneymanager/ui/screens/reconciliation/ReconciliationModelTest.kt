@@ -140,4 +140,13 @@ class ReconciliationModelTest {
         assertEquals(null, missingFee(movement, emptyList()))
         assertEquals(null, missingFee(listOf(leg(wallet, "100", t0)), listOf(leg(binance, "99.9", t0))))
     }
+
+    @Test
+    fun noMissingFeeWhenTheOutflowsSpanSeveralAccounts() {
+        val movement = listOf(leg(wallet, "-10", t0))
+        val selected = listOf(leg(binance, "-6", t0), leg(AccountId(2), "-3", t0 + 1.hours))
+
+        assertEquals(null, missingFee(movement, selected))
+        assertEquals(binance, missingFee(movement, listOf(leg(binance, "-6", t0), leg(binance, "-3", t0 + 1.hours)))?.account)
+    }
 }
