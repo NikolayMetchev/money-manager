@@ -63,7 +63,6 @@ import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.reconciliation.LegMatch
 import com.moneymanager.reconciliation.ReconciliationResult
 import com.moneymanager.reconciliation.UnlinkedWallet
-import com.moneymanager.reconciliation.UnmatchedSourceLeg
 import com.moneymanager.reconciliation.applyAutoLinks
 import com.moneymanager.reconciliation.createAndLinkAccounts
 import com.moneymanager.reconciliation.planAccountCreation
@@ -112,6 +111,9 @@ fun ReconciliationScreen(
     personRepository: PersonReadRepository,
     transactionRepository: TransactionReadRepository,
     onOpenLeg: (ReconciliationLeg) -> Unit,
+    onOpenSource: (ReconciliationLeg) -> Unit = {},
+    pickerState: MatchPickerState = remember { MatchPickerState() },
+    cache: ReconciliationCache = remember { ReconciliationCache() },
 ) {
     val sources by rememberFlowAsStateWithSchemaErrorHandling(initial = null) { reconciliationRepository.getSources() }
     val loadedSources = sources
@@ -146,6 +148,9 @@ fun ReconciliationScreen(
             personRepository = personRepository,
             transactionRepository = transactionRepository,
             onOpenLeg = onOpenLeg,
+            onOpenSource = onOpenSource,
+            pickerState = pickerState,
+            cache = cache,
         )
     }
 }
@@ -159,8 +164,12 @@ private fun SourceReconciliation(
     personRepository: PersonReadRepository,
     transactionRepository: TransactionReadRepository,
     onOpenLeg: (ReconciliationLeg) -> Unit,
+    onOpenSource: (ReconciliationLeg) -> Unit,
+    pickerState: MatchPickerState,
+    cache: ReconciliationCache,
 ) {
     val importEngine = LocalImportEngine.current
+    val writeVersion by importEngine.writeVersion.collectAsState()
     val scope = rememberSchemaAwareCoroutineScope()
     val allShadowAccounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         reconciliationRepository.getShadowAccounts()
@@ -186,15 +195,33 @@ private fun SourceReconciliation(
     }
 
     var refreshKey by remember { mutableStateOf(0) }
-    var result by remember { mutableStateOf<ReconciliationResult?>(null) }
+
+    fun refresh() {
+        cache.invalidate(source.name)
+        refreshKey++
+    }
+    var result by remember { mutableStateOf(cache.peek(source.name, writeVersion)) }
     var progress by remember { mutableStateOf<Progress?>(null) }
-    LaunchedEffect(source, shadowIds, links, refreshKey) {
+    LaunchedEffect(source, shadowIds, links, refreshKey, writeVersion) {
+        cache.get(source.name, shadowIds, links, writeVersion)?.let {
+            result = it
+            return@LaunchedEffect
+        }
+        // The flows above start empty, so these inputs may just not have loaded; keep what was shown until they do.
+        if (shadowIds.isEmpty() && links.isEmpty()) {
+            cache.peek(source.name, writeVersion)?.let {
+                result = it
+                return@LaunchedEffect
+            }
+        }
         result = null
         progress = Progress("Loading ${source.name} transactions")
         val sourceLegs = reconciliationRepository.getLegs(shadowIds)
         progress = Progress("Loading Money Manager transactions")
         val realLegs = reconciliationRepository.getLegs(links.map { it.realAccountId }.toSet())
-        result = withContext(Dispatchers.Default) { reconcile(sourceLegs, links, realLegs, onProgress = { progress = it }) }
+        val computed = withContext(Dispatchers.Default) { reconcile(sourceLegs, links, realLegs, onProgress = { progress = it }) }
+        cache.put(source.name, shadowIds, links, writeVersion, computed)
+        result = computed
     }
 
     val unlinked = remember(source, shadowAccounts, links, real) { unlinkedWallets(source, shadowAccounts, links, real) }
@@ -205,7 +232,6 @@ private fun SourceReconciliation(
         }
     var hideUnknownAssets by remember { mutableStateOf(true) }
     var tab by remember { mutableStateOf(ResultTab.UNMATCHED) }
-    var picking by remember { mutableStateOf<UnmatchedSourceLeg?>(null) }
     val expanded = remember(source) { mutableStateMapOf<String, Boolean>() }
 
     fun setLinks(
@@ -230,7 +256,7 @@ private fun SourceReconciliation(
             runCatchingUnlessCancelled { block() }
                 .onSuccess {
                     error = null
-                    refreshKey++
+                    refresh()
                 }.onFailure { error = "$what failed: ${it.message}" }
         }
     }
@@ -285,7 +311,7 @@ private fun SourceReconciliation(
                     report(Progress.counted(what, done, items.size))
                     "$done done"
                 } finally {
-                    refreshKey++
+                    refresh()
                     bulkSubmitted = false
                 }
             }
@@ -311,7 +337,7 @@ private fun SourceReconciliation(
     }
 
     LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        item { SummaryHeader(source, result, hideUnknownAssets, onRefresh = { refreshKey++ }) }
+        item { SummaryHeader(source, result, hideUnknownAssets, onRefresh = { refresh() }) }
         error?.let { message ->
             item { Text(message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 4.dp)) }
         }
@@ -446,7 +472,10 @@ private fun SourceReconciliation(
                             onClick = { setIgnored(loaded.movementOf(unmatched), ignored = true) },
                             enabled = !bulkRunning,
                         ) { Text("Ignore") }
-                        TextButton(onClick = { picking = unmatched }, enabled = !bulkRunning) { Text("Select matching transactions…") }
+                        TextButton(
+                            onClick = { pickerState.open(unmatched.pickerKey) },
+                            enabled = !bulkRunning,
+                        ) { Text("Select matching transactions…") }
                     }
                 }
                 sectionHeading("Only in Money Manager (${loaded.missingInSource.size})")
@@ -522,7 +551,7 @@ private fun SourceReconciliation(
     }
 
     val loaded = result
-    val picked = picking
+    val picked = pickerState.pickedKey?.let { key -> loaded?.missingInMm?.firstOrNull { it.pickerKey == key } }
     if (loaded != null && picked != null) {
         val movement = remember(loaded, picked) { loaded.movementOf(picked) }
         MatchPickerDialog(
@@ -531,15 +560,18 @@ private fun SourceReconciliation(
             wallet = picked.walletAccountId,
             result = loaded,
             accountNames = accountNames,
-            onDismiss = { picking = null },
+            state = pickerState,
+            onDismiss = pickerState::close,
             onIgnore = {
-                picking = null
+                pickerState.close()
                 setIgnored(movement, ignored = true)
             },
             onConfirm = { selected ->
-                picking = null
+                pickerState.close()
                 storeMatch(movement + selected)
             },
+            onOpenLeg = onOpenLeg,
+            onOpenSource = onOpenSource,
         )
     }
 }

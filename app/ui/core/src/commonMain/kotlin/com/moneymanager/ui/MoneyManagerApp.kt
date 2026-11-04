@@ -49,6 +49,7 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
@@ -96,6 +97,8 @@ import com.moneymanager.ui.screens.orders.OrderDetailScreen
 import com.moneymanager.ui.screens.orders.OrdersScreen
 import com.moneymanager.ui.screens.people.PeopleScreen
 import com.moneymanager.ui.screens.people.PersonAuditScreen
+import com.moneymanager.ui.screens.reconciliation.MatchPickerState
+import com.moneymanager.ui.screens.reconciliation.ReconciliationCache
 import com.moneymanager.ui.screens.settings.DatabaseReplacement
 import com.moneymanager.ui.screens.settings.DatabaseSizeBreakdownScreen
 import com.moneymanager.ui.screens.settings.SettingsScreen
@@ -133,6 +136,8 @@ fun MoneyManagerApp(
 ) {
     ProvideSchemaAwareScope {
         val scope = rememberSchemaAwareCoroutineScope()
+        val matchPicker = remember { MatchPickerState() }
+        val reconciliationCache = remember { ReconciliationCache() }
         val taskManager = rememberTaskManager(scope)
         // One per database: its two services share a write lock, since directory and API runs (which outlive any
         // screen) can run at once and the engine doesn't serialize their writes itself.
@@ -313,6 +318,8 @@ fun MoneyManagerApp(
                                         currentScreen is Screen.ApiSessionTraffic ||
                                         currentScreen is Screen.ConnectApi,
                                 onClick = {
+                                    // A fresh visit to Imports must not reopen a picker left open behind a followed link.
+                                    matchPicker.close()
                                     navigationHistory.navigateTo(
                                         Screen.Imports(
                                             when (currentScreen) {
@@ -669,6 +676,41 @@ fun MoneyManagerApp(
                                                                 },
                                                         ),
                                                     )
+                                                },
+                                                matchPickerState = matchPicker,
+                                                reconciliationCache = reconciliationCache,
+                                                onReconciliationSourceClick = { leg ->
+                                                    scope.launch {
+                                                        val sources =
+                                                            services.transactions.transferSourceRepository
+                                                                .getSourcesForTransaction(TransferId(leg.transactionId))
+                                                                .sortedBy { it.revisionId }
+                                                        val csv = sources.map { it.source }.filterIsInstance<Source.Csv>().firstOrNull()
+                                                        val api = sources.map { it.source }.filterIsInstance<Source.Api>().firstOrNull()
+                                                        val apiRequestId = api?.requestId
+                                                        when {
+                                                            csv != null -> {
+                                                                val rowIndex = csv.rowIndex
+                                                                if (rowIndex != null) {
+                                                                    onCsvSourceClick(csv.importId, rowIndex)
+                                                                } else {
+                                                                    navigationHistory.navigateTo(Screen.CsvImportDetail(csv.importId))
+                                                                }
+                                                            }
+
+                                                            api != null && apiRequestId != null -> {
+                                                                onApiSourceClick(
+                                                                    api.sessionId,
+                                                                    apiRequestId,
+                                                                    api.jsonPath?.value.orEmpty(),
+                                                                )
+                                                            }
+
+                                                            api != null -> {
+                                                                navigationHistory.navigateTo(Screen.ApiSessionTraffic(api.sessionId))
+                                                            }
+                                                        }
+                                                    }
                                                 },
                                                 // Folders need an import file source, which the browser doesn't have yet.
                                                 showImportDirectories = importFileSourceFactory != null,

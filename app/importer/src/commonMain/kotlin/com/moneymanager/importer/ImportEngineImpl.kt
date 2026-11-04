@@ -98,7 +98,11 @@ import com.moneymanager.importengineapi.bankKeysFrom
 import com.moneymanager.importengineapi.forRow
 import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.tasks.Progress
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -170,7 +174,21 @@ class ImportEngineImpl(
     /** Writes shadow→real reconciliation links. Optional like [relationshipRepository]; DI supplies it. */
     private val reconciliationLinkRepository: ReconciliationLinkWriteRepository? = null,
 ) : ImportEngine {
+    private val writes = MutableStateFlow(0L)
+    override val writeVersion: StateFlow<Long> = writes.asStateFlow()
+
     override suspend fun import(
+        batch: ImportBatch,
+        onProgress: (suspend (Progress) -> Unit)?,
+        batchSize: Int,
+    ): ImportResult =
+        try {
+            applyBatch(batch, onProgress, batchSize)
+        } finally {
+            writes.update { it + 1 }
+        }
+
+    private suspend fun applyBatch(
         batch: ImportBatch,
         onProgress: (suspend (Progress) -> Unit)?,
         batchSize: Int,

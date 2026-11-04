@@ -21,11 +21,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -35,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.reconciliation.ReconciliationResult
 import com.moneymanager.ui.util.displayDateTime
@@ -43,6 +41,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 
 internal const val PICKER_CANDIDATES_TAG = "match-picker-candidates"
+internal const val PICKER_OPEN_TRANSACTION_TAG = "match-picker-open-transaction"
+internal const val PICKER_OPEN_SOURCE_TAG = "match-picker-open-source"
 
 /** How far either side of the source movement the picker looks. */
 internal val PICKER_WINDOWS: List<Duration> = listOf(1.days, 3.days, 7.days, 30.days)
@@ -67,13 +67,30 @@ fun MatchPickerDialog(
     accountNames: Map<AccountId, String>,
     onDismiss: () -> Unit,
     onIgnore: () -> Unit,
+    state: MatchPickerState,
     onConfirm: (List<ReconciliationLeg>) -> Unit,
+    onOpenLeg: (ReconciliationLeg) -> Unit = {},
+    onOpenSource: (ReconciliationLeg) -> Unit = {},
 ) {
-    var window by remember { mutableStateOf(3.days) }
-    var sameAssetOnly by remember { mutableStateOf(true) }
-    val selected = remember { mutableStateListOf<ReconciliationLeg>() }
+    val window = state.window
+    val sameAssetOnly = state.sameAssetOnly
+    val selected = state.selected
     val candidates =
         remember(result, movement, wallet, window, sameAssetOnly) { result.pickerCandidates(movement, wallet, window, sameAssetOnly) }
+
+    // A selection kept across a followed link may name a leg the result no longer offers (edited or claimed meanwhile).
+    LaunchedEffect(result, movement, wallet) {
+        val offered =
+            result
+                .pickerCandidates(
+                    movement,
+                    wallet,
+                    Duration.INFINITE,
+                    sameAssetOnly = false,
+                ).filter { it.selectable }
+                .map { it.leg }
+        selected.retainAll(offered.toSet())
+    }
 
     val rowScroll = rememberScrollState()
     // Rows sharing one scroll state need one content width, or a short row would clamp the range a long one needs.
@@ -109,10 +126,10 @@ fun MatchPickerDialog(
                     item(key = "filters") {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
                             PICKER_WINDOWS.forEach { option ->
-                                FilterChip(selected = window == option, onClick = { window = option }, label = { Text("± $option") })
+                                FilterChip(selected = window == option, onClick = { state.window = option }, label = { Text("± $option") })
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = sameAssetOnly, onCheckedChange = { sameAssetOnly = it })
+                                Checkbox(checked = sameAssetOnly, onCheckedChange = { state.sameAssetOnly = it })
                                 Text("Same asset only")
                             }
                         }
@@ -150,6 +167,20 @@ fun MatchPickerDialog(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
+                                }
+                            }
+                            TextButton(
+                                onClick = { onOpenLeg(candidate.leg) },
+                                modifier = Modifier.testTag("$PICKER_OPEN_TRANSACTION_TAG-${candidate.leg.key}"),
+                            ) {
+                                Text("Transaction")
+                            }
+                            if (candidate.leg.kind == LegTransactionKind.TRANSFER) {
+                                TextButton(
+                                    onClick = { onOpenSource(candidate.leg) },
+                                    modifier = Modifier.testTag("$PICKER_OPEN_SOURCE_TAG-${candidate.leg.key}"),
+                                ) {
+                                    Text("Source")
                                 }
                             }
                         }
@@ -222,4 +253,4 @@ private fun PickerLegLine(
     }
 }
 
-private val ReconciliationLeg.key: String get() = "$transactionId-${accountId.id}-${amount.asset.id}"
+internal val ReconciliationLeg.key: String get() = "$transactionId-${accountId.id}-${amount.asset.id}"

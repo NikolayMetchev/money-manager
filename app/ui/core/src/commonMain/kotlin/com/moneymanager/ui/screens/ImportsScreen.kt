@@ -54,6 +54,8 @@ import com.moneymanager.ui.screens.apistrategy.ApiSessionsScreen
 import com.moneymanager.ui.screens.csv.ImportFilesScreen
 import com.moneymanager.ui.screens.importdirectory.ImportDirectoriesSection
 import com.moneymanager.ui.screens.reconciliation.CardLast4Screen
+import com.moneymanager.ui.screens.reconciliation.MatchPickerState
+import com.moneymanager.ui.screens.reconciliation.ReconciliationCache
 import com.moneymanager.ui.screens.reconciliation.ReconciliationScreen
 import com.moneymanager.ui.screens.timeline.ImportTimelineScreen
 import com.moneymanager.ui.screens.transactions.ManualEntriesScreen
@@ -101,6 +103,9 @@ fun ImportsScreen(
     onTransactionsImported: () -> Unit,
     onBrowsePassThroughCatalog: () -> Unit = {},
     onReconciliationLegClick: (ReconciliationLeg) -> Unit = {},
+    onReconciliationSourceClick: (ReconciliationLeg) -> Unit = {},
+    matchPickerState: MatchPickerState = remember { MatchPickerState() },
+    reconciliationCache: ReconciliationCache = remember { ReconciliationCache() },
     showImportDirectories: Boolean = true,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -227,6 +232,9 @@ fun ImportsScreen(
                             personRepository = personRepository,
                             transactionRepository = transactionRepository,
                             onOpenLeg = onReconciliationLegClick,
+                            onOpenSource = onReconciliationSourceClick,
+                            pickerState = matchPickerState,
+                            cache = reconciliationCache,
                         )
                     },
                     manualEntries = {
