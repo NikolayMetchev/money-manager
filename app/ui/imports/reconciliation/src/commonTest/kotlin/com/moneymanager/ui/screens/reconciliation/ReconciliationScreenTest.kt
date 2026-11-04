@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onAllNodesWithText
@@ -109,7 +110,13 @@ class ReconciliationScreenTest {
         }
 
     private fun importEngine(onImport: suspend (ImportBatch) -> ImportResult): ImportEngine =
-        mock { everySuspend { import(any(), any(), any()) } calls { (batch: ImportBatch) -> onImport(batch) } }
+        mock {
+            val writes = MutableStateFlow(0L)
+            every { writeVersion } returns writes
+            everySuspend { import(any(), any(), any()) } calls { (batch: ImportBatch) ->
+                onImport(batch).also { writes.value += 1 }
+            }
+        }
 
     private val categoryRepository: CategoryReadRepository =
         mock { every { getAllCategories() } returns flowOf(emptyList()) }
@@ -334,6 +341,8 @@ class ReconciliationScreenTest {
     private fun ComposeUiTest.showLegs(
         sourceLegs: List<ReconciliationLeg>,
         realLegs: List<ReconciliationLeg>,
+        opened: MutableList<ReconciliationLeg> = mutableListOf(),
+        openedSources: MutableList<ReconciliationLeg> = mutableListOf(),
     ): List<ImportBatch> {
         val batches = mutableListOf<ImportBatch>()
         val engine =
@@ -341,7 +350,7 @@ class ReconciliationScreenTest {
                 batches += batch
                 ImportResult()
             }
-        showLegsWith(engine, sourceLegs, realLegs)
+        showLegsWith(engine, sourceLegs, realLegs, opened, openedSources)
         return batches
     }
 
@@ -349,6 +358,8 @@ class ReconciliationScreenTest {
         engine: ImportEngine,
         sourceLegs: List<ReconciliationLeg>,
         realLegs: List<ReconciliationLeg>,
+        opened: MutableList<ReconciliationLeg> = mutableListOf(),
+        openedSources: MutableList<ReconciliationLeg> = mutableListOf(),
     ) {
         val accounts =
             listOf(
@@ -369,7 +380,8 @@ class ReconciliationScreenTest {
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                         transactionRepository = transactionRepository,
-                        onOpenLeg = {},
+                        onOpenLeg = { opened += it },
+                        onOpenSource = { openedSources += it },
                     )
                 }
             }
@@ -587,6 +599,34 @@ class ReconciliationScreenTest {
                     .members
                     .map { it.transactionId },
             )
+        }
+    }
+
+    @Test
+    fun thePickerLinksACandidateToItsTransactionAndSource() {
+        runMoneyManagerComposeUiTest {
+            val opened = mutableListOf<ReconciliationLeg>()
+            val openedSources = mutableListOf<ReconciliationLeg>()
+            showLegs(
+                listOf(leg(10, wallet.accountId, "5", t0)),
+                listOf(leg(21, binance, "6.9", t0 + 1.hours)),
+                opened,
+                openedSources,
+            )
+            expandAll()
+
+            clickText("Select matching transactions…")
+            val picker = onNodeWithTag(PICKER_CANDIDATES_TAG)
+            picker.performScrollToNode(
+                hasTestTag("$PICKER_OPEN_SOURCE_TAG-21-${binance.id}-${leg(21, binance, "6.9", t0).amount.asset.id}"),
+            )
+            onNode(hasTestTag("$PICKER_OPEN_SOURCE_TAG-21-${binance.id}-${leg(21, binance, "6.9", t0).amount.asset.id}")).performClick()
+            waitForIdle()
+
+            assertEquals(listOf(21L), openedSources.map { it.transactionId })
+            assertEquals(emptyList(), opened)
+            // The picker stays open in its state, so back from the followed link finds it as it was left.
+            onNodeWithText("Select matching transactions").assertExists()
         }
     }
 

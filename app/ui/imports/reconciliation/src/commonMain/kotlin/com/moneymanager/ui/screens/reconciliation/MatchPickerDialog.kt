@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.reconciliation.ReconciliationResult
 import com.moneymanager.ui.util.displayDateTime
@@ -43,6 +44,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 
 internal const val PICKER_CANDIDATES_TAG = "match-picker-candidates"
+internal const val PICKER_OPEN_TRANSACTION_TAG = "match-picker-open-transaction"
+internal const val PICKER_OPEN_SOURCE_TAG = "match-picker-open-source"
 
 /** How far either side of the source movement the picker looks. */
 internal val PICKER_WINDOWS: List<Duration> = listOf(1.days, 3.days, 7.days, 30.days)
@@ -67,11 +70,14 @@ fun MatchPickerDialog(
     accountNames: Map<AccountId, String>,
     onDismiss: () -> Unit,
     onIgnore: () -> Unit,
+    state: MatchPickerState,
     onConfirm: (List<ReconciliationLeg>) -> Unit,
+    onOpenLeg: (ReconciliationLeg) -> Unit = {},
+    onOpenSource: (ReconciliationLeg) -> Unit = {},
 ) {
-    var window by remember { mutableStateOf(3.days) }
-    var sameAssetOnly by remember { mutableStateOf(true) }
-    val selected = remember { mutableStateListOf<ReconciliationLeg>() }
+    val window = state.window
+    val sameAssetOnly = state.sameAssetOnly
+    val selected = state.selected
     val candidates =
         remember(result, movement, wallet, window, sameAssetOnly) { result.pickerCandidates(movement, wallet, window, sameAssetOnly) }
 
@@ -109,10 +115,10 @@ fun MatchPickerDialog(
                     item(key = "filters") {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
                             PICKER_WINDOWS.forEach { option ->
-                                FilterChip(selected = window == option, onClick = { window = option }, label = { Text("± $option") })
+                                FilterChip(selected = window == option, onClick = { state.window = option }, label = { Text("± $option") })
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = sameAssetOnly, onCheckedChange = { sameAssetOnly = it })
+                                Checkbox(checked = sameAssetOnly, onCheckedChange = { state.sameAssetOnly = it })
                                 Text("Same asset only")
                             }
                         }
@@ -150,6 +156,20 @@ fun MatchPickerDialog(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
+                                }
+                            }
+                            TextButton(
+                                onClick = { onOpenLeg(candidate.leg) },
+                                modifier = Modifier.testTag("$PICKER_OPEN_TRANSACTION_TAG-${candidate.leg.key}"),
+                            ) {
+                                Text("Transaction")
+                            }
+                            if (candidate.leg.kind == LegTransactionKind.TRANSFER) {
+                                TextButton(
+                                    onClick = { onOpenSource(candidate.leg) },
+                                    modifier = Modifier.testTag("$PICKER_OPEN_SOURCE_TAG-${candidate.leg.key}"),
+                                ) {
+                                    Text("Source")
                                 }
                             }
                         }
@@ -222,4 +242,4 @@ private fun PickerLegLine(
     }
 }
 
-private val ReconciliationLeg.key: String get() = "$transactionId-${accountId.id}-${amount.asset.id}"
+internal val ReconciliationLeg.key: String get() = "$transactionId-${accountId.id}-${amount.asset.id}"
