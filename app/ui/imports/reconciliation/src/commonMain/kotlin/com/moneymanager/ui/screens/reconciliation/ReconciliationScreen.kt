@@ -574,7 +574,7 @@ private fun SourceReconciliation(
             onBookFee = { fee, selected ->
                 pickerState.close()
                 write("Adding the fee") {
-                    val feeId = importEngine.createManualFee(fee.account, fee.fee, fee.timestamp, "Fee (added in reconciliation)")
+                    val feeId = importEngine.createManualFee(fee.account, fee.fee, fee.timestamp)
                     importEngine.createReconciliationMatch((movement + selected).map { it.transactionRef } + feeId)
                 }
             },
