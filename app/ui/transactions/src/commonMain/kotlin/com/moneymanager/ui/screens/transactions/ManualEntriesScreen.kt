@@ -54,6 +54,8 @@ import kotlinx.coroutines.launch
  * Transfers one strategy's manual-entry rule asked about, still waiting for the amount.
  */
 private data class PendingEntryGroup(
+    /** Unique per strategy and action, so two actions never share a list key even when they name the same transfers. */
+    val key: String,
     val strategyName: String,
     val entry: RuleAction.ManualEntry,
     val pending: List<PendingManualEntry>,
@@ -82,10 +84,17 @@ fun ManualEntriesScreen(
                             .flatMap { it.actions }
                             .filterIsInstance<RuleAction.ManualEntry>()
                             .distinct()
-                            .map { entry ->
+                            .mapIndexed { index, entry ->
                                 transactionRepository
                                     .getPendingManualEntries(entry.name, entry.relationshipType)
-                                    .map { pending -> PendingEntryGroup(strategy.name, entry, pending) }
+                                    .map { pending ->
+                                        PendingEntryGroup(
+                                            "${strategy.id.id}/$index/${entry.name}/${entry.relationshipType}",
+                                            strategy.name,
+                                            entry,
+                                            pending,
+                                        )
+                                    }
                             }
                     }
                 // combine() over an empty list never emits, so short-circuit instead.
@@ -138,7 +147,7 @@ fun ManualEntriesScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 visibleGroups.forEach { group ->
-                    item(key = "${group.strategyName}/${group.entry.name}") {
+                    item(key = group.key) {
                         PendingGroupHeader(
                             group = group,
                             amounts = amounts,
@@ -167,7 +176,7 @@ fun ManualEntriesScreen(
                             },
                         )
                     }
-                    items(group.pending, key = { it.transferId.id }) { matched ->
+                    items(group.pending, key = { "${group.key}/${it.transferId.id}" }) { matched ->
                         PendingEntryCard(
                             matched = matched,
                             entry = group.entry,

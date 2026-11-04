@@ -20,6 +20,7 @@ import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -197,5 +198,43 @@ class PendingManualEntriesTest : DbTest() {
                     .toDisplayValue()
                     .toString(),
             )
+        }
+
+    @Test
+    fun `a failed link leaves no entry behind for a retry to duplicate`() =
+        runDbTest {
+            val now = Clock.System.now()
+            val binance = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Binance", openingDate = now))
+            val funding =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Binance Funding", openingDate = now),
+                )
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("EUR", "Euro")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
+            createTransfer(transfer(now, "Withdraw", binance, funding, currency, "5.00"), "Withdrawal fee")
+            val original =
+                repositories.transactionRepository
+                    .getPendingManualEntries("Withdrawal fee", "fee")
+                    .first()
+                    .single()
+
+            // An original that no longer exists makes the link fail after the entry was written.
+            val vanished = original.copy(transferId = TransferId(987_654_321L))
+            assertFailsWith<Exception> {
+                repositories.importEngine.createManualEntries(
+                    inputs = listOf(ManualEntryInput(vanished, Money.fromDisplayValue("0.10", currency))),
+                    description = "Withdrawal fee",
+                    relationshipType = "fee",
+                    counterpartyAccount = null,
+                    excludedFromBalances = false,
+                )
+            }
+
+            val entries =
+                repositories.transactionRepository.getTransactionsByAccount(binance).first().filter {
+                    it.description ==
+                        "Withdrawal fee"
+                }
+            assertTrue(entries.isEmpty(), "the entry written before the failed link was removed")
         }
 }

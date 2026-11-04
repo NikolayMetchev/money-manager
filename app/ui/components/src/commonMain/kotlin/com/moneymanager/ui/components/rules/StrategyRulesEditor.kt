@@ -96,7 +96,7 @@ enum class RuleActionKind(
     FEE("Book a fee", setOf(RuleContext.CSV_ROW, RuleContext.API_TRANSACTION, RuleContext.API_TRADE), {
         RuleAction.Fee(FeeRule(amount = ValueExpr(listOf(""))))
     }),
-    MANUAL_ENTRY("Ask for a manual entry", setOf(RuleContext.CSV_ROW, RuleContext.API_TRANSACTION), {
+    MANUAL_ENTRY("Ask for a manual entry", setOf(RuleContext.CSV_ROW), {
         RuleAction.ManualEntry(name = "", description = "", relationshipType = "")
     }),
     FOREIGN("Foreign amount", setOf(RuleContext.CSV_ROW, RuleContext.API_TRANSACTION), {

@@ -7,7 +7,10 @@ import com.moneymanager.domain.model.PendingManualEntry
 import com.moneymanager.domain.model.RelationshipMember
 import com.moneymanager.domain.model.RelationshipRole
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 /** An amount a person typed for one [PendingManualEntry]. */
 data class ManualEntryInput(
@@ -75,19 +78,39 @@ suspend fun ImportEngine.createManualEntries(
                 relationshipTypeNames = listOf(relationshipType),
             ),
         )
-    val typeId = requireNotNull(created.relationshipTypeIds[relationshipType]) { "Relationship type $relationshipType was not resolved" }
-    val links =
-        inputs.mapIndexed { index, input ->
-            val entryId = requireNotNull(created.createdTransferIds[ImportRowKey.Manual(index.toLong())]) { "Entry $index was not created" }
-            RelationshipMutation.Create(
-                typeId = typeId,
-                members =
-                    listOf(
-                        RelationshipMember(input.original.transferId, RelationshipRole.PRIMARY),
-                        RelationshipMember(entryId, RelationshipRole.RELATED),
-                    ),
-                source = Source.Manual,
-            )
-        }
-    import(ImportBatch(relationshipMutations = links))
+    // The links need the entries' ids, so they are a second write. If it fails, the entries must not stay: their
+    // originals would still be pending and a retry would book every entry twice.
+    var linked = false
+    try {
+        val typeId =
+            requireNotNull(created.relationshipTypeIds[relationshipType]) { "Relationship type $relationshipType was not resolved" }
+        val links =
+            inputs.mapIndexed { index, input ->
+                val entryId =
+                    requireNotNull(created.createdTransferIds[ImportRowKey.Manual(index.toLong())]) { "Entry $index was not created" }
+                RelationshipMutation.Create(
+                    typeId = typeId,
+                    members =
+                        listOf(
+                            RelationshipMember(input.original.transferId, RelationshipRole.PRIMARY),
+                            RelationshipMember(entryId, RelationshipRole.RELATED),
+                        ),
+                    source = Source.Manual,
+                )
+            }
+        import(ImportBatch(relationshipMutations = links))
+        linked = true
+    } finally {
+        if (!linked) withContext(NonCancellable) { deleteCreatedEntries(created.createdTransferIds.values) }
+    }
+}
+
+private suspend fun ImportEngine.deleteCreatedEntries(entries: Collection<TransferId>) {
+    if (entries.isEmpty()) return
+    import(
+        ImportBatch(
+            transfers = entries.map { ImportTransfer(source = Source.Manual, operation = ImportOperation.DELETE, existingId = it) },
+            dedupePolicy = DedupePolicy.None,
+        ),
+    )
 }
