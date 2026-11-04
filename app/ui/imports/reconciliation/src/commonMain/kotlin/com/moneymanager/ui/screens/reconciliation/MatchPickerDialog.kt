@@ -34,6 +34,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
+import com.moneymanager.importengineapi.MANUAL_FEE_ACCOUNT_NAME
 import com.moneymanager.reconciliation.ReconciliationResult
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.formatAmount
@@ -56,7 +57,8 @@ private val CHECKBOX_SLOT = 48.dp
 /**
  * Picks the real transactions a source movement ([movement], on [wallet]) records, for a source row the matcher
  * couldn't pair. Only legs no match claims can be picked (see [pickerCandidates]); the totals show how far the
- * selection is from the source's, which may differ when the two sides book fees differently.
+ * selection is from the source's, which may differ when the two sides book fees differently. When the only gap is a fee
+ * the source took on top of what was entered, "Add missing fee" books it and matches in one go.
  */
 @Composable
 fun MatchPickerDialog(
@@ -70,6 +72,7 @@ fun MatchPickerDialog(
     state: MatchPickerState,
     onConfirm: (List<ReconciliationLeg>) -> Unit,
     onOpenLeg: (ReconciliationLeg) -> Unit = {},
+    onBookFee: (MissingFee, List<ReconciliationLeg>) -> Unit = { _, _ -> },
     onOpenSource: (ReconciliationLeg) -> Unit = {},
 ) {
     val window = state.window
@@ -109,6 +112,15 @@ fun MatchPickerDialog(
                     TextButton(onClick = onIgnore) { Text("Ignore") }
                     TextButton(onClick = { onConfirm(selected.toList()) }, enabled = selected.isNotEmpty()) {
                         Text("Match (${selected.size})")
+                    }
+                    // A selected account named like the fee account would make the fee a transfer to itself.
+                    val fee =
+                        missingFee(movement, selected.toList())
+                            ?.takeIf { !accountNames[it.account].equals(MANUAL_FEE_ACCOUNT_NAME, ignoreCase = true) }
+                    if (fee != null) {
+                        TextButton(onClick = { onBookFee(fee, selected.toList()) }) {
+                            Text("Add missing fee (${formatAmount(fee.fee)}) and match")
+                        }
                     }
                 }
                 LazyColumn(
