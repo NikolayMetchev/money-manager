@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
  * @param selectedLabel the collapsed summary when exactly one item is selected — defaults to
  *   [itemLabel], and differs where the row carries more than the name (e.g. "GBP — Pound" vs "GBP").
  * @param searchText the text the typed query is matched against — defaults to [itemLabel].
+ * @param fieldLabel the text field's label, for a call site too narrow for "Filter by …".
+ * @param maxVisibleItems the most rows the menu lists at once, for a long list; typing narrows it.
  */
 @Composable
 fun <T, K> MultiSelectFilterDropdown(
@@ -50,6 +52,8 @@ fun <T, K> MultiSelectFilterDropdown(
     itemNounPlural: String = "${itemNoun}s",
     selectedLabel: (T) -> String = itemLabel,
     searchText: (T) -> String = itemLabel,
+    fieldLabel: String = "Filter by $itemNoun",
+    maxVisibleItems: Int = Int.MAX_VALUE,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -81,7 +85,7 @@ fun <T, K> MultiSelectFilterDropdown(
             // shows the current selection summary when collapsed.
             value = if (expanded) searchQuery else selectionLabel,
             onValueChange = { searchQuery = it },
-            label = { Text("Filter by $itemNoun") },
+            label = { Text(fieldLabel) },
             placeholder = { Text("Type to search...") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
@@ -98,7 +102,7 @@ fun <T, K> MultiSelectFilterDropdown(
                 text = { Text(allLabel) },
                 onClick = { onSelectionChange(emptySet()) },
             )
-            filteredItems.forEach { item ->
+            filteredItems.take(maxVisibleItems).forEach { item ->
                 val key = itemKey(item)
                 DropdownMenuItem(
                     text = {

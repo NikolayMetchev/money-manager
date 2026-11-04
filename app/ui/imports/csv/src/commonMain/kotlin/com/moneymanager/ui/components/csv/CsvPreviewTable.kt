@@ -7,6 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -44,11 +45,15 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.ui.components.MultiSelectFilterDropdown
 import com.moneymanager.ui.navigation.linuxHorizontalScrollWheel
 
 private val TRANSFER_COLUMN_WIDTH = 120.dp
 private val ROW_INDEX_COLUMN_WIDTH = 60.dp
 private val STATUS_COLUMN_WIDTH = 90.dp
+
+// A menu lists this many values at once; typing narrows a longer column.
+private const val MAX_FILTER_VALUES = 200
 
 private enum class SortDirection { ASC, DESC }
 
@@ -111,11 +116,17 @@ fun CsvPreviewTable(
             }
         }
 
+    var filter by remember { mutableStateOf(CsvRowFilter()) }
+    val filteredRows = remember(rows, filter) { filter.apply(rows) }
+    val distinctValues =
+        remember(rows, columns) { columns.associate { it.columnIndex to distinctColumnValues(rows, it.columnIndex) } }
+    val statuses = remember(rows) { rows.mapNotNull { it.importStatus }.distinct().sorted() }
+
     val sortedColumns = remember(columns) { columns.sortedBy { it.columnIndex } }
 
     val sortedRows =
-        remember(rows, activeSortKey, sortDirection) {
-            val key = activeSortKey ?: return@remember rows
+        remember(filteredRows, activeSortKey, sortDirection) {
+            val key = activeSortKey ?: return@remember filteredRows
             val comparator: Comparator<CsvRow> =
                 when (key) {
                     SortKey.Row -> compareBy { it.rowIndex }
@@ -123,13 +134,51 @@ fun CsvPreviewTable(
                     is SortKey.CsvData -> compareBy { it.values.getOrElse(key.columnIndex) { "" } }
                 }
             if (sortDirection == SortDirection.ASC) {
-                rows.sortedWith(comparator)
+                filteredRows.sortedWith(comparator)
             } else {
-                rows.sortedWith(comparator.reversed())
+                filteredRows.sortedWith(comparator.reversed())
             }
         }
 
     Column(modifier = modifier.linuxHorizontalScrollWheel(horizontalScrollState)) {
+        // Filter row: one value menu above each filterable column
+        Row(modifier = Modifier.fillMaxWidth().horizontalScroll(horizontalScrollState)) {
+            Spacer(Modifier.width(ROW_INDEX_COLUMN_WIDTH))
+            MultiSelectFilterDropdown(
+                items = statuses,
+                selectedKeys = filter.statuses,
+                itemKey = { it },
+                itemLabel = { it.label() },
+                itemNoun = "status",
+                itemNounPlural = "statuses",
+                fieldLabel = "Status",
+                onSelectionChange = { filter = filter.copy(statuses = it) },
+                modifier = Modifier.width(STATUS_COLUMN_WIDTH),
+            )
+            Spacer(Modifier.width(TRANSFER_COLUMN_WIDTH))
+            sortedColumns.forEach { column ->
+                MultiSelectFilterDropdown(
+                    items = distinctValues[column.columnIndex].orEmpty(),
+                    selectedKeys = filter.columns[column.columnIndex].orEmpty(),
+                    itemKey = { it },
+                    itemLabel = { it.ifEmpty { "(blank)" } },
+                    searchText = { it },
+                    itemNoun = "value",
+                    fieldLabel = "Filter",
+                    maxVisibleItems = MAX_FILTER_VALUES,
+                    onSelectionChange = { filter = filter.withColumn(column.columnIndex, it) },
+                    modifier = Modifier.width(columnWidth),
+                )
+            }
+        }
+        if (filter.isActive) {
+            Text(
+                text = "Showing ${filteredRows.size} of ${rows.size} rows",
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            )
+        }
+
         // Header row
         Row(
             modifier =
@@ -248,13 +297,14 @@ fun CsvPreviewTable(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 row.importStatus?.let { status ->
-                                    val (statusText, statusColor) =
+                                    val statusText = status.label()
+                                    val statusColor =
                                         when (status) {
-                                            ImportStatus.IMPORTED -> "New" to MaterialTheme.colorScheme.primary
-                                            ImportStatus.DUPLICATE -> "Duplicate" to MaterialTheme.colorScheme.secondary
-                                            ImportStatus.UPDATED -> "Updated" to MaterialTheme.colorScheme.tertiary
-                                            ImportStatus.ERROR -> "Error" to MaterialTheme.colorScheme.error
-                                            ImportStatus.SKIPPED -> "Skipped" to MaterialTheme.colorScheme.outline
+                                            ImportStatus.IMPORTED -> MaterialTheme.colorScheme.primary
+                                            ImportStatus.DUPLICATE -> MaterialTheme.colorScheme.secondary
+                                            ImportStatus.UPDATED -> MaterialTheme.colorScheme.tertiary
+                                            ImportStatus.ERROR -> MaterialTheme.colorScheme.error
+                                            ImportStatus.SKIPPED -> MaterialTheme.colorScheme.outline
                                         }
                                     SelectableText(
                                         text = statusText,

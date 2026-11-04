@@ -53,6 +53,7 @@ kmp_library(
         "//utils/compose/scrollbar",
         "//utils/humanreadable",
         "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:androidx_compose_runtime_runtime_saveable",
         "@maven_kmp//:compose_foundation",
         "@maven_kmp//:compose_ui",
         "@maven_kmp//:kermit",
