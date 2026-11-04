@@ -100,7 +100,7 @@
       "mokkery-plugin": "dev.mokkery:mokkery-plugin:3.6.0",
       "mokkery-runtime": "dev.mokkery:mokkery-runtime:3.6.0",
       "molecule-runtime": "app.cash.molecule:molecule-runtime:2.2.0",
-      "mordant-core": "com.github.ajalt.mordant:mordant-core:3.1.0",
+      "mordant-core": "com.github.ajalt.mordant:mordant-core:3.1.1",
       "mosaic-runtime": "com.jakewharton.mosaic:mosaic-runtime:0.18.0",
       "mosaic-terminal": "com.jakewharton.mosaic:mosaic-terminal:0.18.0",
       "mosaic-testing": "com.jakewharton.mosaic:mosaic-testing:0.18.0",
@@ -10331,12 +10331,12 @@
     },
     "com.github.ajalt.mordant:mordant-core": {
       "android": {
-        "version": "3.1.0",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-jvm/3.1.0/mordant-core-jvm-3.1.0.jar",
-            "sha256": "5843731621b1f88f47cda4d7a4eb8ed8f35a66188bad845c34578dc0d925db47"
+            "name": "mordant-jvm-3.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-jvm/3.1.1/mordant-core-jvm-3.1.1.jar",
+            "sha256": "720a717bec41c955fa775efd557a79606386d024c359e15f0c0a9946db4134a6"
           }
         ],
         "deps": [
@@ -10344,12 +10344,12 @@
         ]
       },
       "js": {
-        "version": "3.1.0",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-js.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-js/3.1.0/mordant-core-js-3.1.0.klib",
-            "sha256": "d60bec5d0ec6ff722d70516e572347557559d66a7228f39e421cd145719d8dcd"
+            "name": "mordant-js-3.1.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-js/3.1.1/mordant-core-js-3.1.1.klib",
+            "sha256": "132517bd4641d027341ee9654da7c949f837ddd78be704f63b076efe50786053"
           }
         ],
         "deps": [
@@ -10358,12 +10358,12 @@
         ]
       },
       "jvm": {
-        "version": "3.1.0",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-jvm/3.1.0/mordant-core-jvm-3.1.0.jar",
-            "sha256": "5843731621b1f88f47cda4d7a4eb8ed8f35a66188bad845c34578dc0d925db47"
+            "name": "mordant-jvm-3.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-jvm/3.1.1/mordant-core-jvm-3.1.1.jar",
+            "sha256": "720a717bec41c955fa775efd557a79606386d024c359e15f0c0a9946db4134a6"
           }
         ],
         "deps": [
@@ -10371,12 +10371,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.1.0",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-linuxArm64Main.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-linuxarm64/3.1.0/mordant-core-linuxarm64-3.1.0.klib",
-            "sha256": "cc63026fdda2a67106819ba92cf985aacf4d9610bf1e0a3b91747eeab216b0bc"
+            "name": "mordant-linuxArm64Main-3.1.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-linuxarm64/3.1.1/mordant-core-linuxarm64-3.1.1.klib",
+            "sha256": "f691a6582b194797fa9030fdf16fe20a5498276fc9c8f456dadbd31198dcb4f9"
           }
         ],
         "deps": [
@@ -10384,12 +10384,12 @@
         ]
       },
       "linuxX64": {
-        "version": "3.1.0",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-linuxX64Main.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-linuxx64/3.1.0/mordant-core-linuxx64-3.1.0.klib",
-            "sha256": "5e62b523049d1fe239ce2f46ad1eeab39a0a2e7b9ca2a407d991e51359896b1b"
+            "name": "mordant-linuxX64Main-3.1.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-linuxx64/3.1.1/mordant-core-linuxx64-3.1.1.klib",
+            "sha256": "525d8d206edbb15e338bc9c379faffd544ecfb1c00c09f295a51dd87eb2ef59c"
           }
         ],
         "deps": [
@@ -10397,12 +10397,12 @@
         ]
       },
       "macosArm64": {
-        "version": "3.1.0",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-macosArm64Main.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-macosarm64/3.1.0/mordant-core-macosarm64-3.1.0.klib",
-            "sha256": "c7b16d353a33fca1ee29134b7b92472d5886b5e23c56397e7343e5c2942e164c"
+            "name": "mordant-macosArm64Main-3.1.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-macosarm64/3.1.1/mordant-core-macosarm64-3.1.1.klib",
+            "sha256": "4105f6401245ff1232814f40cf16251db134ff5a7ececeeb9d349747d15e848f"
           }
         ],
         "deps": [
@@ -10410,12 +10410,12 @@
         ]
       },
       "metadata": {
-        "version": "3.1.0",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-metadata.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core/3.1.0/mordant-core-3.1.0.jar",
-            "sha256": "ee696ca6ebe46957d407bcc6c87856c444f80e6faf7e3f0e4bdcdf7d8b9db7bd"
+            "name": "mordant-metadata-3.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core/3.1.1/mordant-core-3.1.1.jar",
+            "sha256": "dd04e7d7a1732d22f724ca5155e57ce5bd989ad615606e13465f52d308f2c492"
           }
         ],
         "deps": [
@@ -10426,12 +10426,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.1.0",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-metadata.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core/3.1.0/mordant-core-3.1.0.jar",
-            "sha256": "ee696ca6ebe46957d407bcc6c87856c444f80e6faf7e3f0e4bdcdf7d8b9db7bd"
+            "name": "mordant-metadata-3.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core/3.1.1/mordant-core-3.1.1.jar",
+            "sha256": "dd04e7d7a1732d22f724ca5155e57ce5bd989ad615606e13465f52d308f2c492"
           }
         ],
         "deps": [
@@ -10442,12 +10442,12 @@
         ]
       },
       "mingwX64": {
-        "version": "3.1.0",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-mingwX64Main.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-mingwx64/3.1.0/mordant-core-mingwx64-3.1.0.klib",
-            "sha256": "1bf39714effcb068c0a8bb47ab22ef43ef8610245e15849ed2527a90edaa17d3"
+            "name": "mordant-mingwX64Main-3.1.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-mingwx64/3.1.1/mordant-core-mingwx64-3.1.1.klib",
+            "sha256": "42627daa3782960b9aeae5ee46e80f095415c9be6da8b5ddff00093d4dabf988"
           }
         ],
         "deps": [
@@ -10455,12 +10455,12 @@
         ]
       },
       "wasmJs": {
-        "version": "3.1.0",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-wasm-js.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-wasm-js/3.1.0/mordant-core-wasm-js-3.1.0.klib",
-            "sha256": "f4406505dc54fd3ada09940c52f52de9be3f9e8550def9a7c2b6b317f6a23f57"
+            "name": "mordant-wasm-js-3.1.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-core-wasm-js/3.1.1/mordant-core-wasm-js-3.1.1.klib",
+            "sha256": "f9832e40a2f843701d0cd384833296324114aba7d74208d1d3ec1eef7a11ff73"
           }
         ],
         "deps": [
