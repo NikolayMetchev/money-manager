@@ -158,4 +158,5 @@ private fun LegRole.summary(): String =
         LegRole.Debit -> "debit"
         LegRole.Credit -> "credit"
         is LegRole.BySign -> "by-sign (${path.orMissing()})"
+        LegRole.Member -> "member"
     }

@@ -258,6 +258,25 @@ class KoinlyReconciliationE2ETest : DbTest() {
             assertNull(repositories.cryptoRepository.getCryptoAssetByCode("KNCL").first())
         }
 
+    @Test
+    fun `an export without Parent ID links no rows`() =
+        runDbTest {
+            applyAll(listOf(stage("transactions.csv", listOf(binanceReward, coinbaseDeposit, coinbaseTrade, walletTransfer, withdrawal))))
+
+            val transfers =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .flatMap { repositories.transactionRepository.getTransactionsByAccount(it.id).first() }
+            // Only the transfer's fee is related to anything: the optional Parent ID column isn't there, so no row joins a family.
+            val parentLinks =
+                repositories.relationshipRepository.getByTransactions(transfers.map { it.id }).filter {
+                    it.relationshipType.name ==
+                        "parent"
+                }
+            assertEquals(emptyList(), parentLinks)
+        }
+
     private fun List<String>.deleted(): List<String> = headers.zip(this).map { (name, value) -> if (name == "Deleted") "true" else value }
 
     @Test

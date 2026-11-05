@@ -2594,6 +2594,18 @@ object BuiltInCsvStrategies {
                 CsvStrategyConfig(
                     identificationColumns = KOINLY_COLUMNS,
                     optionalColumns = KOINLY_OPTIONAL_COLUMNS,
+                    legGroups =
+                        listOf(
+                            LegGroupRule(
+                                name = KOINLY_FAMILY_GROUP,
+                                key = listOf(ValueExpr(listOf("Parent ID (read-only)", "ID (read-only)"))),
+                                assembly =
+                                    LegAssembly.Linked(
+                                        relationshipTypeName = KOINLY_PARENT_RELATIONSHIP,
+                                        anchorWhen = listOf(Condition("Parent ID (read-only)", ConditionOp.BLANK)),
+                                    ),
+                            ),
+                        ),
                     fieldMappings = fieldMappings,
                     rules =
                         listOf(
@@ -2611,6 +2623,11 @@ object BuiltInCsvStrategies {
                                 "Method Name (read-only)",
                                 "koinly-method",
                                 conditions = listOf(Condition("Method Name (read-only)", ConditionOp.EXISTS)),
+                            ),
+                            // A child row (a staking reward) is in its parent's group by its Parent ID, a parent by its own ID.
+                            rule(
+                                RuleAction.Leg(KOINLY_FAMILY_GROUP, LegRole.Member),
+                                conditions = listOf(Condition("Parent ID (read-only)", ConditionOp.EXISTS)),
                             ),
                             // A row deleted in Koinly is kept but excluded, like a declined card payment.
                             excludeWhen("Deleted", "^true$", "deleted in Koinly"),
@@ -2638,6 +2655,11 @@ object BuiltInCsvStrategies {
             updatedAt = now,
         )
     }
+
+    private const val KOINLY_FAMILY_GROUP = "family"
+
+    /** A row's relationship to the row it came from: the row is the primary member, its parent the related one. */
+    private const val KOINLY_PARENT_RELATIONSHIP = "parent"
 
     /** Columns only Koinly's newer export has: a row's parent row, and the on-chain method behind it. */
     private val KOINLY_OPTIONAL_COLUMNS = setOf("Parent ID (read-only)", "Method Name (read-only)")

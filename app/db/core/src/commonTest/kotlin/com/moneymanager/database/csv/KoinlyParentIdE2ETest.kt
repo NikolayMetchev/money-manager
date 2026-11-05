@@ -2,11 +2,13 @@ package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.time.Clock
 import kotlin.time.Duration
 
@@ -142,13 +144,14 @@ class KoinlyParentIdE2ETest : DbTest() {
             tradeRepository = repositories.tradeRepository,
         )
 
-    private suspend fun descriptions(): Set<String> =
+    private suspend fun transfers(): List<Transfer> =
         repositories.accountRepository
             .getAllAccounts()
             .first()
             .flatMap { repositories.transactionRepository.getTransactionsByAccount(it.id).first() }
-            .map { it.description }
-            .toSet()
+            .distinctBy { it.id }
+
+    private suspend fun descriptions(): Set<String> = transfers().map { it.description }.toSet()
 
     @Test
     fun `a row's method names it when it has no description`() =
@@ -158,5 +161,36 @@ class KoinlyParentIdE2ETest : DbTest() {
 
             // The method beats the tag and type; a row with its own description keeps it.
             assertEquals(setOf("MsgWithdrawDelegatorReward", "Staking"), descriptions())
+        }
+
+    private fun List<Transfer>.byAmount(amount: String) = single { it.amount.toDisplayValue().toString() == amount }
+
+    @Test
+    fun `every child row links to its parent whichever way it moves`() =
+        runDbTest {
+            applyAll(listOf(stage("transactions.csv", listOf(claimFee, rewardOne, rewardTwo, plainDeposit))))
+
+            val all = transfers()
+            val parent = all.byAmount("0.003819")
+            val links = repositories.relationshipRepository.getByTransactions(all.map { it.id })
+
+            // Both children are the primary member of a `parent` relationship to the claim fee; the parent and the
+            // deposit that names no parent link to nothing.
+            assertEquals(setOf("parent"), links.map { it.relationshipType.name }.toSet())
+            assertEquals(
+                setOf(all.byAmount("0.000232").id to parent.id, all.byAmount("0.000292").id to parent.id),
+                links.map { assertNotNull(it.transferPair) }.toSet(),
+            )
+        }
+
+    @Test
+    fun `a re-import of the same file links nothing twice`() =
+        runDbTest {
+            val file = listOf(claimFee, rewardOne, rewardTwo)
+            applyAll(listOf(stage("first.csv", file)))
+            applyAll(listOf(stage("second.csv", file)))
+
+            val all = transfers()
+            assertEquals(2, repositories.relationshipRepository.getByTransactions(all.map { it.id }).size)
         }
 }

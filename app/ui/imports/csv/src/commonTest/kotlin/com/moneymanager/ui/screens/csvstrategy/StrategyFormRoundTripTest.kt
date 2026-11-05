@@ -245,6 +245,15 @@ class StrategyFormRoundTripTest {
                                     reconcileWindowSeconds = 5,
                                 ),
                                 LegGroupRule(name = "trade", windowSeconds = 1, assembly = LegAssembly.Trade("Swap {from} for {to}")),
+                                LegGroupRule(
+                                    name = "family",
+                                    key = listOf(ValueExpr(listOf("Parent ID", "ID"))),
+                                    assembly =
+                                        LegAssembly.Linked(
+                                            relationshipTypeName = "parent",
+                                            anchorWhen = listOf(Condition("Parent ID", ConditionOp.BLANK)),
+                                        ),
+                                ),
                             ),
                         rules =
                             advancedStrategy().config.rules +
@@ -269,6 +278,10 @@ class StrategyFormRoundTripTest {
                                     StrategyRule(
                                         conditions = listOf(Condition("Direction", ConditionOp.EQUALS, "TRADE")),
                                         actions = listOf(RuleAction.Leg("trade", LegRole.BySign("Source amount (after fees)"))),
+                                    ),
+                                    StrategyRule(
+                                        conditions = listOf(Condition("Parent ID", ConditionOp.EXISTS)),
+                                        actions = listOf(RuleAction.Leg("family", LegRole.Member)),
                                     ),
                                 ),
                     ),
