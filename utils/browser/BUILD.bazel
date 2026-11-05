@@ -23,9 +23,10 @@ kmp_library(
 
 kmp_test(
     name = "test",
+    android = True,
     associate = ":browser",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     linux_deps = [
-        "//bazel/kmp/deps:kotlin_test",
         "//utils/files",
         "@maven_kmp//:kotlinx_io_core",
     ],
@@ -36,4 +37,5 @@ kmp_test(
         "macosArm64",
         "mingwX64",
     ],
+    deps = ["//bazel/kmp/deps:kotlin_test"],
 )
