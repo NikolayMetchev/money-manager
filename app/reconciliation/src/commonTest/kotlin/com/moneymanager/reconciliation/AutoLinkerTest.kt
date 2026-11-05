@@ -85,6 +85,20 @@ class AutoLinkerTest {
     }
 
     @Test
+    fun `a wallet is never suggested an account another wallet already mirrors`() {
+        val exchange = real(7, "Crypto.com Exchange")
+        val accounts = reals + exchange
+        val shadows = listOf(shadow(100, "Koinly · Crypto.com Exchange"), shadow(101, "Koinly · Crypto.com Exchange [Pool]"))
+        val links = listOf(ReconciliationLink(AccountId(100), exchange.id))
+
+        val unlinked = unlinkedWallets(source, shadows, links, accounts)
+
+        // The pool wallet would be offered "Crypto.com Exchange" by its name, but the plain wallet has it.
+        assertEquals(listOf(AccountId(101)), unlinked.map { it.wallet.accountId })
+        assertEquals("Crypto.com", unlinked.single().suggestion?.name)
+    }
+
+    @Test
     fun `suggestion prefers the shortest account extending the wallet name`() {
         assertEquals("Binance Earn", suggestRealAccount("Bin", listOf(real(2, "Binance Earn"), real(6, "Binance Earn Rewards")))?.name)
     }

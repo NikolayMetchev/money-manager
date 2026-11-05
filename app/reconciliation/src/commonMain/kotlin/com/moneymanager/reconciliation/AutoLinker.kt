@@ -70,7 +70,11 @@ fun planAutoLinks(
         .toMap()
 }
 
-/** Wallets of [source] that still need the user: no link, with a best-guess real account to offer. */
+/**
+ * Wallets of [source] that still need the user: no link, with a best-guess real account to offer. An account another
+ * wallet of the source already mirrors is never offered: the engine allows one wallet per real account, so the link
+ * would be refused.
+ */
 fun unlinkedWallets(
     source: ReconciliationSource,
     shadowAccounts: List<ShadowAccount>,
@@ -78,9 +82,12 @@ fun unlinkedWallets(
     realAccounts: List<Account>,
 ): List<UnlinkedWallet> {
     val linkedWallets = links.mapTo(mutableSetOf()) { it.shadowAccountId }
+    val walletIds = shadowAccounts.filter(source::isLinkable).mapTo(mutableSetOf()) { it.accountId }
+    val takenReal = links.filter { it.shadowAccountId in walletIds }.mapTo(mutableSetOf()) { it.realAccountId }
+    val offerable = realAccounts.filter { it.id !in takenReal }
     return shadowAccounts
         .filter { source.isLinkable(it) && it.accountId !in linkedWallets }
-        .map { wallet -> UnlinkedWallet(wallet, suggestRealAccount(source.walletName(wallet), realAccounts)) }
+        .map { wallet -> UnlinkedWallet(wallet, suggestRealAccount(source.walletName(wallet), offerable)) }
 }
 
 /**
