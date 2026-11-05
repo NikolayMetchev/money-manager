@@ -18,11 +18,11 @@ internal actual fun openInSystemBrowser(url: String): Boolean {
         }
     }
     val osName = System.getProperty("os.name").orEmpty().lowercase()
-    val os =
+    val command =
         when {
-            "win" in osName -> DesktopOs.WINDOWS
-            "mac" in osName -> DesktopOs.MAC
-            else -> DesktopOs.LINUX
+            "win" in osName -> listOf("rundll32", "url.dll,FileProtocolHandler", url)
+            "mac" in osName -> listOf("open", url)
+            else -> linuxBrowserOpenCommand(hyprland, url)
         }
-    return runCatching { ProcessBuilder(browserOpenCommand(os, hyprland, url)).start() }.isSuccess
+    return runCatching { ProcessBuilder(command).start() }.isSuccess
 }

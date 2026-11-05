@@ -24,7 +24,7 @@ import platform.posix.waitpid
 import platform.posix.write
 
 /**
- * Starts the open-a-URL command (`xdg-open`, see `browserOpenCommand`) without waiting for it: depending on the desktop, it can run for as long as the browser
+ * Starts the open-a-URL command (`xdg-open`, see `linuxBrowserOpenCommand`) without waiting for it: depending on the desktop, it can run for as long as the browser
  * it launched, and the sign-in must go on to read the loopback callback meanwhile. A double fork hands the
  * opener to init (so it never lingers as a zombie), and a close-on-exec pipe still reports a failed exec:
  * EOF means it started, a byte means it couldn't be run.
@@ -36,7 +36,7 @@ import platform.posix.write
 internal actual fun openInSystemBrowser(url: String): Boolean =
     memScoped {
         // Everything the children touch is allocated before forking: they may only exec, write and exit.
-        val command = browserOpenCommand(DesktopOs.LINUX, getenv("HYPRLAND_INSTANCE_SIGNATURE") != null, url)
+        val command = linuxBrowserOpenCommand(getenv("HYPRLAND_INSTANCE_SIGNATURE") != null, url)
         val argv = allocArrayOf(*command.map { it.cstr.ptr }.toTypedArray(), null)
         val failure = alloc<ByteVar>()
         val fds = allocArray<IntVar>(2)
