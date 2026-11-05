@@ -17,6 +17,7 @@ import platform.posix.close
 import platform.posix.execvp
 import platform.posix.fcntl
 import platform.posix.fork
+import platform.posix.getenv
 import platform.posix.pipe
 import platform.posix.read
 import platform.posix.waitpid
@@ -35,7 +36,14 @@ import platform.posix.write
 internal actual fun openInSystemBrowser(url: String): Boolean =
     memScoped {
         // Everything the children touch is allocated before forking: they may only exec, write and exit.
-        val argv = allocArrayOf("xdg-open".cstr.ptr, url.cstr.ptr, null)
+        val focusBrowser = getenv("HYPRLAND_INSTANCE_SIGNATURE") != null
+        val opener = if (focusBrowser) "sh" else "xdg-open"
+        val argv =
+            if (focusBrowser) {
+                allocArrayOf("sh".cstr.ptr, "-c".cstr.ptr, LINUX_OPEN_URL_SCRIPT.cstr.ptr, "sh".cstr.ptr, url.cstr.ptr, null)
+            } else {
+                allocArrayOf("xdg-open".cstr.ptr, url.cstr.ptr, null)
+            }
         val failure = alloc<ByteVar>()
         val fds = allocArray<IntVar>(2)
         if (pipe(fds) != 0) return@memScoped false
@@ -53,7 +61,7 @@ internal actual fun openInSystemBrowser(url: String): Boolean =
                 close(readEnd)
                 when (fork()) {
                     0 -> {
-                        execvp("xdg-open", argv)
+                        execvp(opener, argv)
                         write(writeEnd, failure.ptr, 1u)
                     }
 

@@ -12,8 +12,9 @@ import java.net.URI
 class DesktopBrowserLauncher : BrowserLauncher {
     override fun open(url: String) {
         val uri = URI(url)
+        val isHyprland = System.getenv("HYPRLAND_INSTANCE_SIGNATURE") != null
         runCatching {
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+            if (!isHyprland && Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                 Desktop.getDesktop().browse(uri)
                 return
             }
@@ -24,6 +25,7 @@ class DesktopBrowserLauncher : BrowserLauncher {
             when {
                 "win" in osName -> listOf("rundll32", "url.dll,FileProtocolHandler", url)
                 "mac" in osName -> listOf("open", url)
+                isHyprland -> listOf("sh", "-c", LINUX_OPEN_URL_SCRIPT, "sh", url)
                 else -> listOf("xdg-open", url)
             }
         runCatching {
