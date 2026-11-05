@@ -59,6 +59,7 @@ private fun CsvImportStrategyAuditEntry.toRevision() =
 private fun flattenConfig(config: CsvStrategyConfig<FieldMapping>): Map<String, String> =
     buildMap {
         put("Identification columns", config.identificationColumns.sorted().joinToString(", "))
+        put("Optional columns", config.optionalColumns.sorted().joinToString(", "))
         config.fieldMappings.entries
             .sortedBy { it.key.name }
             .forEach { (field, mapping) -> put("Field: ${field.name}", mapping.toString()) }

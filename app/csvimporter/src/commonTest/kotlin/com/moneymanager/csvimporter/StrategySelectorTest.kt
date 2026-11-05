@@ -354,6 +354,27 @@ class StrategySelectorTest {
     }
 
     @Test
+    fun `one Koinly strategy selects both export formats`() {
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
+        val koinly = builtIns.single { it.name == "Koinly" }
+        assertEquals(setOf("Parent ID (read-only)", "Method Name (read-only)"), koinly.config.optionalColumns)
+
+        fun select(headings: Set<String>): String? {
+            val names = headings.toList()
+            val csvColumns = names.mapIndexed { i, name -> CsvColumn(CsvColumnId(Uuid.random()), i, name) }
+            val row = CsvRow(rowIndex = 1L, values = names.map { "" })
+            return builtIns.selectForCsv("transactions.csv", csvColumns, listOf(row))?.name
+        }
+        val required = koinly.config.identificationColumns
+        // The older export, the newer one, and one with only one of the added columns.
+        assertEquals("Koinly", select(required))
+        assertEquals("Koinly", select(required + koinly.config.optionalColumns))
+        assertEquals("Koinly", select(required + "Method Name (read-only)"))
+        // A column the strategy knows nothing of makes it a different export.
+        assertNull(select(required + "Something Else"))
+    }
+
+    @Test
     fun `a Monzo export still selects the Monzo CSV strategy alongside Binance`() {
         val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
         val monzo = builtIns.single { it.name == "Monzo CSV" }

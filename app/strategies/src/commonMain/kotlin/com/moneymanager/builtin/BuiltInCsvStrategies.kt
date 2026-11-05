@@ -2557,7 +2557,11 @@ object BuiltInCsvStrategies {
                         dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
                     ),
                 TransferField.DESCRIPTION to
-                    DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description", "Tag", "Type"))),
+                    // A row with a method (an approval, a claim, a swap) rarely has a Description, so the method says what happened.
+                    DirectColumnMapping(
+                        fieldType = TransferField.DESCRIPTION,
+                        value = ValueExpr(listOf("Description", "Method Name (read-only)", "Tag", "Type")),
+                    ),
                 TransferField.AMOUNT to
                     AmountParsingMapping(
                         fieldType = TransferField.AMOUNT,
@@ -2589,6 +2593,7 @@ object BuiltInCsvStrategies {
             config =
                 CsvStrategyConfig(
                     identificationColumns = KOINLY_COLUMNS,
+                    optionalColumns = KOINLY_OPTIONAL_COLUMNS,
                     fieldMappings = fieldMappings,
                     rules =
                         listOf(
@@ -2596,6 +2601,17 @@ object BuiltInCsvStrategies {
                             attribute("Type", "koinly-type"),
                             attribute("Tag", "koinly-tag"),
                             attribute("TxHash", "koinly-tx-hash"),
+                            // Only Koinly's newer export has these two columns.
+                            attribute(
+                                "Parent ID (read-only)",
+                                "koinly-parent-id",
+                                conditions = listOf(Condition("Parent ID (read-only)", ConditionOp.EXISTS)),
+                            ),
+                            attribute(
+                                "Method Name (read-only)",
+                                "koinly-method",
+                                conditions = listOf(Condition("Method Name (read-only)", ConditionOp.EXISTS)),
+                            ),
                             // A row deleted in Koinly is kept but excluded, like a declined card payment.
                             excludeWhen("Deleted", "^true$", "deleted in Koinly"),
                             // From always holds the primary leg: a deposit's amount and asset move there, so the To
@@ -2622,6 +2638,9 @@ object BuiltInCsvStrategies {
             updatedAt = now,
         )
     }
+
+    /** Columns only Koinly's newer export has: a row's parent row, and the on-chain method behind it. */
+    private val KOINLY_OPTIONAL_COLUMNS = setOf("Parent ID (read-only)", "Method Name (read-only)")
 
     private val KOINLY_COLUMNS =
         setOf(

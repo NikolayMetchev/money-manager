@@ -1305,9 +1305,16 @@ class CsvTransferMapper(
         columnName: String,
         values: List<String>,
     ): String {
+        // A column the strategy lists as optional is simply blank in a file without it.
         val index =
             columnIndexByName[columnName]
-                ?: throw IllegalArgumentException("Column not found: $columnName")
+                ?: if (columnName in
+                    strategy.config.optionalColumns
+                ) {
+                    return ""
+                } else {
+                    throw IllegalArgumentException("Column not found: $columnName")
+                }
         return values.getOrNull(index).orEmpty()
     }
 

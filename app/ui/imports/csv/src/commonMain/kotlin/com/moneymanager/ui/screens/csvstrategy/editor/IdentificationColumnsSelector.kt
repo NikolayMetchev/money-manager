@@ -37,6 +37,7 @@ internal fun IdentificationColumnsSelector(
     selectedColumns: Set<String>,
     onSelectionChanged: (Set<String>) -> Unit,
     enabled: Boolean,
+    required: Boolean = true,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val allSelected = selectedColumns.size == columns.size
@@ -60,7 +61,7 @@ internal fun IdentificationColumnsSelector(
                     },
                 style = MaterialTheme.typography.bodyMedium,
                 color =
-                    if (selectedColumns.isEmpty()) {
+                    if (required && selectedColumns.isEmpty()) {
                         MaterialTheme.colorScheme.error
                     } else {
                         MaterialTheme.colorScheme.onSurface

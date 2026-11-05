@@ -53,6 +53,26 @@ internal fun GeneralTab(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+        Text("Optional Columns", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "Columns some exports have and others lack, so one strategy covers every version. " +
+                "Rules read them with an \"exists\" condition.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        val optionalChoices = csvColumns.filter { it.originalName !in state.identificationColumns }
+        val choiceNames = optionalChoices.map { it.originalName }.toSet()
+        IdentificationColumnsSelector(
+            columns = optionalChoices,
+            selectedColumns = state.optionalColumns.filterTo(mutableSetOf()) { it in choiceNames },
+            // Columns this file lacks stay as they were: the picker can only show the ones it has.
+            onSelectionChanged = { picked -> state.optionalColumns = picked + state.optionalColumns.filter { it !in choiceNames } },
+            enabled = enabled,
+            required = false,
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
         OutlinedTextField(
             value = state.fileNamePattern,
             onValueChange = { state.fileNamePattern = it },

@@ -166,6 +166,7 @@ internal fun buildStrategyFromEditorState(
         config =
             CsvStrategyConfig(
                 identificationColumns = state.identificationColumns,
+                optionalColumns = state.optionalColumns - state.identificationColumns,
                 fieldMappings = fieldMappings,
                 rules = state.rules,
                 contentMatchRules = state.contentMatchRules,

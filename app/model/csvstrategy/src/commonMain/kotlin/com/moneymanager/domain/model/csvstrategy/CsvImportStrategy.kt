@@ -44,8 +44,10 @@ data class CsvImportStrategy(
     val updatedAt: Instant,
 ) {
     /**
-     * Returns true if the given CSV column headings match this strategy's identification columns.
-     * Matching is exact and order-independent.
+     * Returns true if the given CSV column headings are this strategy's identification columns, plus any of its
+     * optional columns. Matching is order-independent; with no optional columns it is exact.
      */
-    fun matchesColumns(csvHeadings: Set<String>): Boolean = config.identificationColumns == csvHeadings
+    fun matchesColumns(csvHeadings: Set<String>): Boolean =
+        csvHeadings.containsAll(config.identificationColumns) &&
+            (config.identificationColumns + config.optionalColumns).containsAll(csvHeadings)
 }

@@ -473,6 +473,13 @@ guessed ones, in either import order, so a conduit always nets to zero.
 use genuinely different assignment rules, and `app/reconciliation`'s `LegMatcher` is a read-only report.
 Merging any of them would change built-in outcomes.
 
+**One strategy covers every version of an export:** `CsvStrategyConfig.optionalColumns` lists columns a later export
+added. A file matches when it has every identification column and no column outside identification + optional
+(`CsvImportStrategy.matchesColumns`), so an old and a new export select the same strategy rather than a copy of it. A
+rule reads an optional column with `Condition(column, EXISTS)`; any other read of one a file lacks is blank, and the
+editor keeps optional columns (and description fallbacks naming them) when saved against a file without them. Koinly's
+`Parent ID`/`Method Name` are the example.
+
 **Strategy configs aren't versioned either:** like the database, they carry no version and have no
 migrations. A reshaped config simply stops decoding its old fields (`ignoreUnknownKeys`), so a database,
 Drive library or catalog install from before the change is reinstalled rather than upgraded.
