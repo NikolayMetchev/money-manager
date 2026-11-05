@@ -26,4 +26,10 @@ class SystemBrowserLauncherTest {
 
         assertTrue(url in failure.message.orEmpty())
     }
+
+    @Test
+    fun theDefaultLauncherIsBuiltOverTheSystemOpener() {
+        // Not opened: that would start a real browser. Constructing it must not.
+        SystemBrowserLauncher()
+    }
 }

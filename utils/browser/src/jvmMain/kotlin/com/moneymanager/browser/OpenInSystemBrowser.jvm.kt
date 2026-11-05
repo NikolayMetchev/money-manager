@@ -1,40 +1,14 @@
 package com.moneymanager.browser
 
-import java.awt.Desktop
-import java.net.URI
-
 private const val HYPRLAND_ENV = "HYPRLAND_INSTANCE_SIGNATURE"
 
 /**
- * Tries AWT [Desktop] first, then the OS "open a URL" command: `Desktop.browse` is frequently unsupported on
- * Linux, and under Hyprland it can't raise the browser, so there the command's focus step is what's wanted.
+ * Starts the OS "open a URL" command. AWT's `Desktop.browse` isn't used: it is frequently unsupported on Linux
+ * (where it ends in `xdg-open` anyway) and can't raise the browser under Hyprland, which the command's focus
+ * step does.
  */
 internal actual fun openInSystemBrowser(url: String): Boolean =
-    openOnJvm(
-        url = url,
-        osName = System.getProperty("os.name").orEmpty(),
-        hyprland = System.getenv(HYPRLAND_ENV) != null,
-        browse = ::browseWithDesktop,
-        start = ::startWithoutWaiting,
-    )
-
-internal fun openOnJvm(
-    url: String,
-    osName: String,
-    hyprland: Boolean,
-    browse: (String) -> Boolean,
-    start: (List<String>) -> Boolean,
-): Boolean = (!hyprland && browse(url)) || start(jvmBrowserOpenCommand(osName, hyprland, url))
-
-private fun browseWithDesktop(url: String): Boolean =
-    runCatching {
-        Desktop.isDesktopSupported() &&
-            Desktop.getDesktop().isSupported(Desktop.Action.BROWSE) &&
-            run {
-                Desktop.getDesktop().browse(URI(url))
-                true
-            }
-    }.getOrDefault(false)
+    startWithoutWaiting(jvmBrowserOpenCommand(System.getProperty("os.name").orEmpty(), System.getenv(HYPRLAND_ENV) != null, url))
 
 /** The JVM runs on every desktop OS, so unlike the native targets it picks the command at run time. */
 internal fun jvmBrowserOpenCommand(

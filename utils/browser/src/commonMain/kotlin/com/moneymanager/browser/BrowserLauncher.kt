@@ -3,7 +3,7 @@ package com.moneymanager.browser
 /**
  * Opens a URL in the user's system browser. The OAuth consent step runs from a coroutine (not Compose),
  * so it can't use Compose's `LocalUriHandler`; the platform supplies an implementation instead —
- * `Desktop.browse` on JVM, an `ACTION_VIEW` intent on Android, `SystemBrowserLauncher` on native, or
+ * `SystemBrowserLauncher` on the JVM and native, an `ACTION_VIEW` intent on Android, or
  * [PrintUrlBrowserLauncher] where there is no browser to open (headless or over SSH).
  */
 fun interface BrowserLauncher {
