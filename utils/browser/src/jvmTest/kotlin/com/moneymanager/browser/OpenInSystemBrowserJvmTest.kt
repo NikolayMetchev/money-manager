@@ -10,17 +10,27 @@ class OpenInSystemBrowserJvmTest {
 
     @Test
     fun usesTheShellOpenerOnWindows() {
-        assertEquals(listOf("rundll32", "url.dll,FileProtocolHandler", url), jvmBrowserOpenCommand("Windows 11", url))
+        assertEquals(
+            listOf(listOf("rundll32", "url.dll,FileProtocolHandler", url)),
+            jvmBrowserCommands("Windows 11", hyprland = true, url = url),
+        )
     }
 
     @Test
     fun usesOpenOnMac() {
-        assertEquals(listOf("open", url), jvmBrowserOpenCommand("Mac OS X", url))
+        assertEquals(listOf(listOf("open", url)), jvmBrowserCommands("Mac OS X", hyprland = true, url = url))
     }
 
     @Test
-    fun usesTheLinuxCommandElsewhere() {
-        assertEquals(linuxBrowserOpenCommand(url), jvmBrowserOpenCommand("Linux", url))
+    fun opensWithXdgOpenOnLinux() {
+        assertEquals(listOf(linuxBrowserOpenCommand(url)), jvmBrowserCommands("Linux", hyprland = false, url = url))
+    }
+
+    @Test
+    fun underHyprlandTheFocusCommandComesBeforeTheOpener() {
+        val commands = jvmBrowserCommands("Linux", hyprland = true, url = url)
+
+        assertEquals(listOf(hyprlandFocusCommand(true), linuxBrowserOpenCommand(url)), commands)
     }
 
     @Test

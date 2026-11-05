@@ -7,24 +7,25 @@ private const val HYPRLAND_ENV = "HYPRLAND_INSTANCE_SIGNATURE"
  * (where it ends in `xdg-open` anyway) and can't raise the browser under Hyprland, which the command's focus
  * step does.
  */
-internal actual fun openInSystemBrowser(url: String): Boolean {
-    val osName = System.getProperty("os.name").orEmpty()
-    hyprlandFocusCommand(System.getenv(HYPRLAND_ENV) != null)?.takeIf { isLinux(osName) }?.let(::startWithoutWaiting)
-    return startWithoutWaiting(jvmBrowserOpenCommand(osName, url))
-}
+internal actual fun openInSystemBrowser(url: String): Boolean =
+    jvmBrowserCommands(System.getProperty("os.name").orEmpty(), System.getenv(HYPRLAND_ENV) != null, url)
+        .map(::startWithoutWaiting)
+        .last()
 
-private fun isLinux(osName: String): Boolean = osName.lowercase().let { "win" !in it && "mac" !in it }
-
-/** The JVM runs on every desktop OS, so unlike the native targets it picks the command at run time. */
-internal fun jvmBrowserOpenCommand(
+/**
+ * The commands to start, the opener last. The JVM runs on every desktop OS, so unlike the native targets it
+ * picks them at run time; the Hyprland focus step is Linux's.
+ */
+internal fun jvmBrowserCommands(
     osName: String,
+    hyprland: Boolean,
     url: String,
-): List<String> {
+): List<List<String>> {
     val os = osName.lowercase()
     return when {
-        "win" in os -> listOf("rundll32", "url.dll,FileProtocolHandler", url)
-        "mac" in os -> listOf("open", url)
-        else -> linuxBrowserOpenCommand(url)
+        "win" in os -> listOf(listOf("rundll32", "url.dll,FileProtocolHandler", url))
+        "mac" in os -> listOf(listOf("open", url))
+        else -> listOfNotNull(hyprlandFocusCommand(hyprland), linuxBrowserOpenCommand(url))
     }
 }
 
