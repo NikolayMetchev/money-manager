@@ -16,7 +16,7 @@ import com.moneymanager.tasks.Progress
 
 /**
  * One determinate bar for a whole bulk import run, driven by the row-weighted fraction so it advances within large
- * files instead of jumping once per file, over four lines of one line each: files done, rows done, the current file
+ * files instead of jumping once per file, over five lines of one line each: files done, rows done, the its folder, the current file name
  * and what is being done to it. Every line is always there and long text is cut off rather than wrapped, so nothing
  * moves as the run goes on. Shared by the staged-file "Import all"/"Re-import all" dialogs.
  */
@@ -26,13 +26,13 @@ fun BulkImportProgressIndicator(progress: Progress) {
         LinearProgressIndicator(progress = { progress.fraction ?: 0f }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(8.dp))
         bulkProgressLines(progress).forEachIndexed { line, text ->
-            // A long path keeps its end: the file name matters more than the folders above it.
-            ProgressLine(text, if (line == FILE_LINE) TextOverflow.StartEllipsis else TextOverflow.Ellipsis)
+            // A long folder path loses its front: the folders nearest the file say the most.
+            ProgressLine(text, if (line == PATH_LINE) TextOverflow.StartEllipsis else TextOverflow.Ellipsis)
         }
     }
 }
 
-/** The indicator's four lines: files, rows, current file, current step (blank where unknown). */
+/** The indicator's five lines: files, rows, its folder, current file name, current step (blank where unknown). */
 fun bulkProgressLines(progress: Progress): List<String> {
     val item = progress.item
     val files = item?.let { "${it.done} of ${it.count} ${it.noun} (${percent(it.done, it.count)}%)" }.orEmpty()
@@ -45,7 +45,12 @@ fun bulkProgressLines(progress: Progress): List<String> {
         } else {
             ""
         }
-    return listOf(files, rows, item?.name.orEmpty(), item?.step ?: progress.detail)
+    val path = item?.name.orEmpty()
+    val separator = path.lastIndexOfAny(charArrayOf('/', '\\'))
+    // Trimmed because a Drive path joins its parts with " / ", so the name would otherwise start with a space.
+    val fileName = path.substring(separator + 1).trim()
+    val folder = if (separator >= 0) path.substring(0, separator).trim() else ""
+    return listOf(files, rows, folder, fileName, item?.step ?: progress.detail)
 }
 
 @Composable
@@ -70,4 +75,4 @@ private fun percent(
 
 private const val PERCENT = 100
 
-private const val FILE_LINE = 2
+private const val PATH_LINE = 2

@@ -17,13 +17,30 @@ class BulkImportProgressIndicatorTest {
             )
 
         assertEquals(
-            listOf("2 of 8 files (25%)", "127.5K of 300K rows (42%)", "statement.csv", "Importing transactions"),
+            listOf("2 of 8 files (25%)", "127.5K of 300K rows (42%)", "", "statement.csv", "Importing transactions"),
             bulkProgressLines(progress),
         )
     }
 
     @Test
+    fun theFolderIsItsOwnLineSeparateFromTheFileName() {
+        val progress = Progress("x", item = Progress.Item(0, 1, "files", "/home/me/bank/statement.csv", "Reading"))
+
+        assertEquals(
+            listOf("0 of 1 files (0%)", "", "/home/me/bank", "statement.csv", "Reading"),
+            bulkProgressLines(progress),
+        )
+    }
+
+    @Test
+    fun aSpacedSeparatorLeavesNoSpaceBeforeTheFileName() {
+        val progress = Progress("x", item = Progress.Item(0, 1, "files", "Drive / Bank / statement.csv", "Reading"))
+
+        assertEquals(listOf("Drive / Bank", "statement.csv"), bulkProgressLines(progress).slice(2..3))
+    }
+
+    @Test
     fun withoutCountsTheLinesStayButAreBlank() {
-        assertEquals(listOf("", "", "", "Starting"), bulkProgressLines(Progress("Starting")))
+        assertEquals(listOf("", "", "", "", "Starting"), bulkProgressLines(Progress("Starting")))
     }
 }
