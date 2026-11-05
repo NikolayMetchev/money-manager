@@ -1,31 +1,60 @@
 ---
-description: Create a draft PR, wait for green CI, mark ready, address all CodeRabbit comments, and get the final PR green
+description: Create draft PR(s), wait for green CI, mark ready, address all CodeRabbit comments, and get the final PR(s) green. Handles a single branch or a whole `gh stack`, bottom up
 ---
 
 Drive the current branch's changes all the way through the PR lifecycle. Work autonomously through
 every phase; only stop if you hit something that genuinely needs a human decision (e.g. a CodeRabbit
 comment that asks for a product-level choice). PR title/context hint (optional): $ARGUMENTS
 
-## Phase 0 — Branch, commit, push
+## Phase 0 — Find the stack, branch, commit, push
+
+**Find what to ship.** Run `gh stack view`. If the current branch is in a stack, the stack is the unit of
+work: list its branches **bottom to top** (closest to `main` first). Otherwise the "stack" is the one
+current branch, and every phase below applies to that single PR (use plain `git push -u` and `gh pr create`
+instead of `gh stack`). Never ship a stack by hand-rolling `--base` PRs: a PR on another PR's branch is
+made with `gh stack` (`init`/`add`/`submit`).
+
+**Order rule for the whole command:** every phase runs on the stack **bottom up**. A PR is only worked on
+(waited for, marked ready, reviewed) after every PR below it is done with that phase, because a change in a
+lower PR restacks and re-runs CI on everything above it.
 
 1. If on `main`, create a feature branch named after the change first.
-2. Run `bazel build //... && bazel test //...` locally and make sure it passes (pre-push rule from
-   CLAUDE.md). If it fails, fix before continuing.
-3. Commit all pending work (end the message with the attribution trailer Claude Code gives for this
-   session, which names the model actually in use) and push with `-u`.
+2. Commit all pending work on the branch it belongs to, not blindly on the current one (end each message
+   with the attribution trailer Claude Code gives for this session, which names the model actually in use).
+3. Run `bazel build //... && bazel test //...` locally **on the top branch** (it contains every branch
+   below it) and make sure it passes (pre-push rule from CLAUDE.md). If it fails, fix on the branch that owns
+   the failure, restack (below), and run it again.
+4. Before pushing a stack, make local refs match origin: `git fetch origin`, then for each branch check
+   `git rev-list --count origin/<b>..<b>` and `<b>..origin/<b>`. `gh stack push` and `submit` force-push the
+   **whole** stack, so a branch with commits on origin that you don't have would be rolled back: stop and
+   reconcile first.
+5. Push: `gh stack push` (stack) or `git push -u` (single branch).
 
-## Phase 1 — Draft PR
+**Restacking.** Whenever you commit to a branch that has branches above it: `gh stack rebase` (cascades the
+change upward; resolve conflicts, taking the lower branch's side unless the upper change is the point),
+re-run step 3 on the top, then `gh stack push`.
 
-Create a draft PR against `main` with `gh pr create --draft`, with a body summarising what/why
-(end the body with the "🤖 Generated with [Claude Code](https://claude.com/claude-code)" line).
+## Phase 1 — Draft PR(s)
+
+Stack: `gh stack submit --auto` creates a draft PR for every branch without one and links them into a stack.
+Single branch: `gh pr create --draft` against `main`.
+
+Then give every PR its own title and body with `gh pr edit <num> --title … --body-file …` (submit's titles
+are auto-generated): what/why for that PR alone, and for a stacked PR a line saying what it builds on
+("Stacked on #<below>") and, for the PRs below, what stacks on them. End each body with the "🤖 Generated
+with [Claude Code](https://claude.com/claude-code)" line followed by the session link from the attribution
+reminder.
 
 ## Phase 2 — Wait for green
 
-Poll `gh pr checks <num> --json name,bucket,link` every ~4 minutes (long waits: use a detached
-poll loop and a completion notification rather than blocking; CI takes 10–25 min).
+For each PR **bottom to top**, poll `gh pr checks <num> --json name,bucket,link` every ~4 minutes (long
+waits: use a detached poll loop and a completion notification rather than blocking; CI takes 10–25 min).
+Start every PR's checks by pushing the whole stack, but only move on to the next PR once this one is green
+(its required checks and, below, the others).
 
-- If a check fails, read its logs (`gh run view <run-id> --log-failed`), fix the cause, run the
-  relevant `bazel test` target locally, commit, push, and go back to polling.
+- If a check fails, read its logs (`gh run view <run-id> --log-failed`), fix the cause **on the branch that
+  owns the PR**, run the relevant `bazel test` target locally, commit, restack and push (Phase 0), and go back
+  to polling from this PR: the push restarted CI above it, and a fix here can break a PR above.
 - Known flakes in this repo (from project memory):
   - `qodana` reporting masses of "unused" or "unresolved" findings means the IDE didn't open the
     project through Bazel (`.qodana/open-as-bazel.sh`), not that the code changed — check its log
@@ -47,11 +76,14 @@ poll loop and a completion notification rather than blocking; CI takes 10–25 m
 
 ## Phase 3 — Ready for review
 
-`gh pr ready <num>`.
+Once a PR is green, `gh pr ready <num>`; do the stack bottom up, so the lowest PR is the first to leave draft.
 
 ## Phase 4 — Wait for CodeRabbit
 
-CodeRabbit reviews after the PR leaves draft. Poll every ~3 minutes for:
+CodeRabbit reviews after a PR leaves draft, and this repo is too small for it to review automatically: if no
+review starts, comment `@coderabbitai full review` on that PR (plain `review` can fail; it allows one review
+per hour, so on a stack trigger the bottom PR first and the next ones as each review lands). For each PR
+bottom to top, poll every ~3 minutes for:
 
 - review comments: `gh api repos/{owner}/{repo}/pulls/<num>/comments --jq '.[] | select(.user.login == "coderabbitai[bot]")'`
 - the review summary: `gh pr view <num> --json reviews,comments`
@@ -63,20 +95,23 @@ that.
 
 ## Phase 5 — Address every comment
 
-For each CodeRabbit inline comment (including ones inside collapsed "Additional comments" /
-"Nitpick" sections):
+For each PR **bottom to top**, and for each CodeRabbit inline comment on it (including ones inside collapsed
+"Additional comments" / "Nitpick" sections):
 
-- If the suggestion is correct or harmless-and-reasonable: implement it.
+- If the suggestion is correct or harmless-and-reasonable: implement it on this PR's branch.
 - If it is wrong or inapplicable: don't change code; reply to that comment explaining why
   (`gh api repos/{owner}/{repo}/pulls/<num>/comments/<id>/replies -f body=...`).
 - Never silently ignore a comment — every one gets either a code change or a reply.
 
-After implementing fixes: run the relevant tests plus `bazel build //... && bazel test //...`, commit
-(same trailer), push. If CodeRabbit re-reviews and raises NEW substantive comments, repeat this
-phase (cap at 3 rounds; after that summarise what's still open instead of looping).
+After implementing a PR's fixes: run the relevant tests, commit (same trailer), restack and push (Phase 0),
+then run `bazel build //... && bazel test //...` on the top. A fix in a lower PR changes the PRs above it, so
+finish the lower PR's comments before reading the next PR's. If CodeRabbit re-reviews and raises NEW
+substantive comments, repeat this phase for that PR (cap at 3 rounds per PR; after that summarise what's still
+open instead of looping).
 
 ## Phase 6 — Final green
 
-Poll checks as in Phase 2 until the final push is fully green, non-required checks included (same flake and fix handling). Then report:
-PR URL, checks status, how many CodeRabbit comments were fixed vs replied-to, and anything left
-open for the user.
+Poll every PR's checks as in Phase 2, bottom to top, until the final push is fully green, non-required
+checks included (same flake and fix handling). Do not merge anything: merging stays with the user. Then
+report, as one row per PR from the bottom up: PR URL, checks status, how many CodeRabbit comments were
+fixed vs replied-to, and anything left open for the user.
