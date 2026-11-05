@@ -26,6 +26,7 @@ kmp_test(
     android = True,
     associate = ":browser",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
     linux_deps = [
         "//utils/files",
         "@maven_kmp//:kotlinx_io_core",

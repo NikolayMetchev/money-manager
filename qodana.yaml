@@ -101,7 +101,7 @@ exclude:
       - app/apiimport/src/nativeMain/kotlin/com/moneymanager/apiimport/LocaleEnvironment.kt
       - app/model/core/src/linuxMain/kotlin/com/moneymanager/domain/MachineName.linux.kt
       - app/model/core/src/nativeMain/kotlin/com/moneymanager/domain/DeviceInfoProvider.native.kt
-      - app/remotestorage/googledrive/src/linuxMain/kotlin/com/moneymanager/remotestorage/googledrive/SystemBrowserLauncher.linux.kt
+      - utils/browser/src/linuxMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.linux.kt
       - app/terminal/src/nativeMain/kotlin/com/moneymanager/terminal/Interrupts.native.kt
       - utils/archive/src/nativeMain/kotlin/com/moneymanager/archive/Compression.native.kt
       - utils/files/src/linuxMain/kotlin/com/moneymanager/files/LastModified.linux.kt
@@ -135,7 +135,7 @@ exclude:
       # platform.* and the native-only libraries don't resolve: `kotlinx.coroutines.IO` (native's Dispatchers.IO
       # extension) and cinterop's `get` operator look unused.
       - app/db/core/src/nativeMain/kotlin/com/moneymanager/database/NativeDatabaseManager.kt
-      - app/remotestorage/googledrive/src/linuxMain/kotlin/com/moneymanager/remotestorage/googledrive/SystemBrowserLauncher.linux.kt
+      - utils/browser/src/linuxMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.linux.kt
       - utils/coroutines/src/nativeMain/kotlin/com/moneymanager/coroutines/IoDispatcher.native.kt
       - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/navigation/ScreenSerialization.kt
       # [5] — `import kotlinx.coroutines.IO` (common Dispatchers.IO), used by withContext(Dispatchers.IO).
@@ -359,7 +359,7 @@ exclude:
       - app/remotestorage/di/src/jvmMain
       - app/remotestorage/googledrive/src/commonMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProviderFactory.kt
       # [2] — the native browser launcher is wired by the CLI (#917), which this linter has no module for.
-      - app/remotestorage/googledrive/src/nativeMain/kotlin/com/moneymanager/remotestorage/googledrive/SystemBrowserLauncher.kt
+      - utils/browser/src/commonMain/kotlin/com/moneymanager/browser/SystemBrowserLauncher.kt
       - app/strategycatalog/src/commonTest/kotlin/com/moneymanager/strategycatalog/StrategyCatalogControllerTest.kt
       - app/ui/foundation/src/androidMain
       - app/ui/foundation/src/jvmMain
@@ -583,7 +583,7 @@ exclude:
       - app/remotestorage/di/src/androidMain
       - app/remotestorage/googledrive/src/commonMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProviderFactory.kt
       # [2] — the native browser launcher is wired by the CLI (#917), which this linter has no module for.
-      - app/remotestorage/googledrive/src/nativeMain/kotlin/com/moneymanager/remotestorage/googledrive/SystemBrowserLauncher.kt
+      - utils/browser/src/commonMain/kotlin/com/moneymanager/browser/SystemBrowserLauncher.kt
       - app/ui/foundation/src/androidMain
       - app/ui/foundation/src/jvmMain
       - test/app/db/src

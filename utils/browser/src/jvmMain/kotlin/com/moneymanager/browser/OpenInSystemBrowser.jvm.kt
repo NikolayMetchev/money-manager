@@ -17,12 +17,22 @@ internal actual fun openInSystemBrowser(url: String): Boolean {
             return true
         }
     }
-    val osName = System.getProperty("os.name").orEmpty().lowercase()
-    val command =
-        when {
-            "win" in osName -> listOf("rundll32", "url.dll,FileProtocolHandler", url)
-            "mac" in osName -> listOf("open", url)
-            else -> linuxBrowserOpenCommand(hyprland, url)
-        }
-    return runCatching { ProcessBuilder(command).start() }.isSuccess
+    return startWithoutWaiting(jvmBrowserOpenCommand(System.getProperty("os.name").orEmpty(), hyprland, url))
 }
+
+/** The JVM runs on every desktop OS, so unlike the native targets it picks the command at run time. */
+internal fun jvmBrowserOpenCommand(
+    osName: String,
+    hyprland: Boolean,
+    url: String,
+): List<String> {
+    val os = osName.lowercase()
+    return when {
+        "win" in os -> listOf("rundll32", "url.dll,FileProtocolHandler", url)
+        "mac" in os -> listOf("open", url)
+        else -> linuxBrowserOpenCommand(hyprland, url)
+    }
+}
+
+/** Starts [command] and returns at once; false if it couldn't be started. */
+internal fun startWithoutWaiting(command: List<String>): Boolean = runCatching { ProcessBuilder(command).start() }.isSuccess

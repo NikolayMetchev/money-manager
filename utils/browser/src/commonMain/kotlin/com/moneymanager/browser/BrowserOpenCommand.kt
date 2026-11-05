@@ -14,16 +14,17 @@ internal fun linuxBrowserOpenCommand(
     url: String,
 ): List<String> = if (hyprland) listOf("sh", "-c", HYPRLAND_OPEN_URL_SCRIPT, "sh", url) else listOf("xdg-open", url)
 
-private const val HYPRLAND_OPEN_URL_SCRIPT: String = """
+// Multi-dollar string, so the shell's own `$` stays literal.
+private const val HYPRLAND_OPEN_URL_SCRIPT: String = $$"""
 if command -v hyprctl >/dev/null 2>&1; then
   (
-    browser=${'$'}(xdg-settings get default-web-browser 2>/dev/null)
-    browser=${'$'}{browser%.desktop}
-    if [ -n "${'$'}browser" ]; then
+    browser=$(xdg-settings get default-web-browser 2>/dev/null)
+    browser=${browser%.desktop}
+    if [ -n "$browser" ]; then
       sleep 1
-      hyprctl dispatch focuswindow "class:(?i)^${'$'}{browser}${'$'}" >/dev/null 2>&1
+      hyprctl dispatch focuswindow "class:(?i)^${browser}$" >/dev/null 2>&1
     fi
   ) &
 fi
-exec xdg-open "${'$'}1"
+exec xdg-open "$1"
 """
