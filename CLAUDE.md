@@ -138,6 +138,7 @@ workflow because label events start it: any other label's run skips, without can
 | `utils/bigdecimal/` | Arbitrary-precision decimal arithmetic: `java.math` on JVM/Android, a java.math-identical (unscaled, scale) pair over ionspin's `BigInteger` on native and the browser (`nonJvmMain`) |
 | `utils/currency/` | Currency formatting (locale-aware on JVM/Android, plain decimal + code on native and the browser) native and the browser pad to the minor unit the database's currency records |
 | `utils/regex/` | `compileRegex`, the one way to compile a person's or a strategy's pattern, into a `PortableRegex`: Java's syntax (`(?i)`, `\Q…\E`, lookbehind) on every platform, and an invalid pattern is an `IllegalArgumentException`. It is `Regex` everywhere but Kotlin/JS, whose `Regex` is the browser's RegExp; there it runs Kotlin's own regex engine, copied into `jsMain` (its `README.md` says from where and what changed). `escapeRegex` quotes a literal as `\Q…\E` everywhere, so a saved pattern reads the same wherever it was made. Store a compiled pattern as `PortableRegex`, never `Regex` |
+| `utils/browser/` | `BrowserLauncher` (opens the Google consent URL) and its one system implementation, `SystemBrowserLauncher`, over `openInSystemBrowser` per target: a process on the JVM, `fork`/`exec` on Linux, `NSWorkspace` on macOS, `ShellExecute` on Windows (Android has none: Google Identity Services). `linuxBrowserOpenCommand` is the Linux argv; under Hyprland a separate `hyprlandFocusCommand` also asks `hyprctl` to focus the browser (by its desktop entry's `StartupWMClass`), as `xdg-open` carries no activation token. `PrintUrlBrowserLauncher` is for headless/SSH |
 | `utils/coroutines/` | `ioDispatcher`: `Dispatchers.IO` on the JVM and native, `Default` in the browser. Common code uses it, never `Dispatchers.IO` (a JVM member and a native extension, so the browser has none) |
 | `utils/humanreadable/` | English file-size / duration / "time ago" formatting (replaces Human-Readable, whose localisation layer pulled ICU4J into the desktop build) |
 | `utils/archive/` | Compress + password-encrypt the DB archive (`ArchiveCodec`); shared by remote backends and the credential vault. zlib is `java.util.zip` on JVM/Android and the platform zlib on native; crypto is the JDK provider or openssl3. `ArchiveGoldenTest` checks each platform reads the others' archives |
@@ -338,8 +339,8 @@ re-hydrates it (decrypt → inflate → write local `.db` → rebuild materializ
   (`app/remotestorage/googledrive/loopback`), with the redirect received on raw `ktor-network` sockets; on Android
   Google Identity Services; in the browser GIS's token model (`BrowserGoogleAccessTokenSource`, `webMain`): a popup
   grants an access token for the build's "Web application" client (`GOOGLE_OAUTH_WEB_CLIENT_ID`), held in memory
-  only, with no refresh token, so the vault keeps nothing and a build without the client offers no Drive. The only platform-specific piece of the loopback flow is `BrowserLauncher`: `DesktopBrowserLauncher` (JVM), `SystemBrowserLauncher`
-  (native), or `PrintUrlBrowserLauncher` for headless/SSH use.
+  only, with no refresh token, so the vault keeps nothing and a build without the client offers no Drive. The only platform-specific piece of the loopback flow is `BrowserLauncher`: `SystemBrowserLauncher` (`utils/browser`: JVM and native)
+  or `PrintUrlBrowserLauncher` for headless/SSH use.
 - `app/remotestorage/sync` — composes `DatabaseManager` + `ArchiveCodec` + a provider:
   `RemoteDatabaseSyncService` (the pipeline) and `RemoteDatabaseController` (session-scoped facade that
   reconstructs the provider via the factory and holds the in-memory password). `RemoteDatabaseController`

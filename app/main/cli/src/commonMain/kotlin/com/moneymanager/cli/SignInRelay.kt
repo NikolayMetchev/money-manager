@@ -1,7 +1,7 @@
 package com.moneymanager.cli
 
 import co.touchlab.kermit.Logger
-import com.moneymanager.remotestorage.googledrive.BrowserLauncher
+import com.moneymanager.browser.BrowserLauncher
 
 private val logger = Logger.withTag("SignInRelay")
 

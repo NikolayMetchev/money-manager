@@ -1,9 +1,9 @@
 package com.moneymanager.remotestorage.googledrive.loopback
 
+import com.moneymanager.browser.BrowserLauncher
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.httpclient.platformHttpClient
 import com.moneymanager.remotestorage.RemoteAuthException
-import com.moneymanager.remotestorage.googledrive.BrowserLauncher
 import com.moneymanager.remotestorage.googledrive.DRIVE_FILE_SCOPE
 import com.moneymanager.remotestorage.googledrive.DRIVE_READONLY_SCOPE
 import com.moneymanager.remotestorage.googledrive.GoogleAccessTokenSource

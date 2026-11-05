@@ -29,14 +29,9 @@ kotlin_constants(
 kmp_library(
     name = "googledrive",
     android = True,
-    apple_srcs = glob(["src/appleMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     generated_srcs = [":generated_google_oauth"],
-    jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
     keep_deps = ["@maven_kmp//:ktor_utils"],
-    linux_srcs = glob(["src/linuxMain/kotlin/**/*.kt"]),
-    mingw_srcs = glob(["src/mingwMain/kotlin/**/*.kt"]),
-    native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
     native_targets = [
         "linuxArm64",
         "linuxX64",
@@ -76,11 +71,6 @@ kmp_test(
     android = True,
     associate = ":googledrive",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
-    linux_deps = [
-        "//utils/files",
-        "@maven_kmp//:kotlinx_io_core",
-    ],
-    linux_srcs = glob(["src/linuxTest/kotlin/**/*.kt"]),
     native_targets = [
         "linuxArm64",
         "linuxX64",

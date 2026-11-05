@@ -1,0 +1,42 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_generate true
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64
+
+kmp_library(
+    name = "browser",
+    android = True,
+    android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
+    apple_srcs = glob(["src/appleMain/kotlin/**/*.kt"]),
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
+    linux_srcs = glob(["src/linuxMain/kotlin/**/*.kt"]),
+    mingw_srcs = glob(["src/mingwMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+kmp_test(
+    name = "test",
+    android = True,
+    associate = ":browser",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
+    linux_deps = [
+        "//utils/files",
+        "@maven_kmp//:kotlinx_io_core",
+    ],
+    linux_srcs = glob(["src/linuxTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    deps = ["//bazel/kmp/deps:kotlin_test"],
+)

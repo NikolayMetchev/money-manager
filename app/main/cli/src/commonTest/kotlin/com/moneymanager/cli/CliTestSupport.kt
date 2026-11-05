@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.mordant.rendering.AnsiLevel
 import com.github.ajalt.mordant.terminal.Terminal
 import com.github.ajalt.mordant.terminal.TerminalRecorder
+import com.moneymanager.browser.BrowserLauncher
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.testing.InMemoryLocalSettings
 import com.moneymanager.credentialvault.testing.inMemoryCredentialVault
@@ -12,7 +13,6 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.importfilesource.di.createImportFileSourceFactory
 import com.moneymanager.localsettings.LocalSettings
-import com.moneymanager.remotestorage.googledrive.BrowserLauncher
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.tui.NotATerminalException

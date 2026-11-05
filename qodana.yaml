@@ -101,7 +101,7 @@ exclude:
       - app/apiimport/src/nativeMain/kotlin/com/moneymanager/apiimport/LocaleEnvironment.kt
       - app/model/core/src/linuxMain/kotlin/com/moneymanager/domain/MachineName.linux.kt
       - app/model/core/src/nativeMain/kotlin/com/moneymanager/domain/DeviceInfoProvider.native.kt
-      - app/remotestorage/googledrive/src/linuxMain/kotlin/com/moneymanager/remotestorage/googledrive/SystemBrowserLauncher.linux.kt
+      - utils/browser/src/linuxMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.linux.kt
       - app/terminal/src/nativeMain/kotlin/com/moneymanager/terminal/Interrupts.native.kt
       - utils/archive/src/nativeMain/kotlin/com/moneymanager/archive/Compression.native.kt
       - utils/files/src/linuxMain/kotlin/com/moneymanager/files/LastModified.linux.kt
@@ -135,7 +135,7 @@ exclude:
       # platform.* and the native-only libraries don't resolve: `kotlinx.coroutines.IO` (native's Dispatchers.IO
       # extension) and cinterop's `get` operator look unused.
       - app/db/core/src/nativeMain/kotlin/com/moneymanager/database/NativeDatabaseManager.kt
-      - app/remotestorage/googledrive/src/linuxMain/kotlin/com/moneymanager/remotestorage/googledrive/SystemBrowserLauncher.linux.kt
+      - utils/browser/src/linuxMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.linux.kt
       - utils/coroutines/src/nativeMain/kotlin/com/moneymanager/coroutines/IoDispatcher.native.kt
       - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/navigation/ScreenSerialization.kt
       # [5] — `import kotlinx.coroutines.IO` (common Dispatchers.IO), used by withContext(Dispatchers.IO).
@@ -268,6 +268,8 @@ exclude:
   # fakes stubbing constants.
   - name: SameReturnValue
     paths:
+      # [5] — Android signs in through Google Identity Services, so its openInSystemBrowser actual is always false.
+      - utils/browser/src/androidMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.android.kt
       # [5] — actuals whose answer is fixed on their platform: Linux terminals always take VT sequences, and native
       # and the browser have no locale to give a default currency.
       - app/terminal/src/linuxMain/kotlin/com/moneymanager/terminal/VirtualTerminal.linux.kt
@@ -330,6 +332,8 @@ exclude:
   # "unused parameter".
   - name: unused
     paths:
+      # [5] — Android's openInSystemBrowser actual ignores the URL it can't open.
+      - utils/browser/src/androidMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.android.kt
       # [5] — native actuals that ignore the AppComponentParams their expect takes (Android's need its Context).
       - app/db/di/src/nativeMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.native.kt
       - utils/credentialvault/di/src/nativeMain/kotlin/com/moneymanager/credentialvault/di/CreateVaultPathResolver.native.kt
@@ -359,7 +363,7 @@ exclude:
       - app/remotestorage/di/src/jvmMain
       - app/remotestorage/googledrive/src/commonMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProviderFactory.kt
       # [2] — the native browser launcher is wired by the CLI (#917), which this linter has no module for.
-      - app/remotestorage/googledrive/src/nativeMain/kotlin/com/moneymanager/remotestorage/googledrive/SystemBrowserLauncher.kt
+      - utils/browser/src/commonMain/kotlin/com/moneymanager/browser/SystemBrowserLauncher.kt
       - app/strategycatalog/src/commonTest/kotlin/com/moneymanager/strategycatalog/StrategyCatalogControllerTest.kt
       - app/ui/foundation/src/androidMain
       - app/ui/foundation/src/jvmMain
@@ -398,6 +402,9 @@ exclude:
       - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/navigation/Screen.kt
   - name: UnusedSymbol
     paths:
+      # [5] — openInSystemBrowser's jvm and android actuals: no JVM module links them to the expect in commonMain.
+      - utils/browser/src/androidMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.android.kt
+      - utils/browser/src/jvmMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.jvm.kt
       # [2] — the test schema helpers are called by app/db/core's tests, another module.
       - test/app/db/read/src/commonMain/kotlin/com/moneymanager/test/database/read/TestReads.kt
       # [2] — StartupMilestone.FIRST_FRAME is reported only by the desktop entry point (app/main/jvm's Main.kt).
@@ -583,7 +590,7 @@ exclude:
       - app/remotestorage/di/src/androidMain
       - app/remotestorage/googledrive/src/commonMain/kotlin/com/moneymanager/remotestorage/googledrive/GoogleDriveProviderFactory.kt
       # [2] — the native browser launcher is wired by the CLI (#917), which this linter has no module for.
-      - app/remotestorage/googledrive/src/nativeMain/kotlin/com/moneymanager/remotestorage/googledrive/SystemBrowserLauncher.kt
+      - utils/browser/src/commonMain/kotlin/com/moneymanager/browser/SystemBrowserLauncher.kt
       - app/ui/foundation/src/androidMain
       - app/ui/foundation/src/jvmMain
       - test/app/db/src
