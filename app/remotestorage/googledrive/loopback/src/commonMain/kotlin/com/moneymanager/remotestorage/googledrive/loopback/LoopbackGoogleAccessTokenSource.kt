@@ -1,8 +1,9 @@
 package com.moneymanager.remotestorage.googledrive.loopback
 
+import com.moneymanager.browser.BrowserLaunchException
+import com.moneymanager.browser.BrowserLauncher
 import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.remotestorage.RemoteAuthException
-import com.moneymanager.remotestorage.googledrive.BrowserLauncher
 import com.moneymanager.remotestorage.googledrive.DRIVE_FILE_SCOPE
 import com.moneymanager.remotestorage.googledrive.GoogleAccessTokenSource
 import com.moneymanager.remotestorage.googledrive.GoogleDriveAccountStore
@@ -61,7 +62,11 @@ internal suspend fun performLoopbackSignIn(
     withContext(ioDispatcher) {
         LoopbackRedirectReceiver.bind().use { receiver ->
             val state = oauth.newState()
-            browser.open(oauth.consentUrl(credentials.clientId, receiver.redirectUri, state, scopes))
+            try {
+                browser.open(oauth.consentUrl(credentials.clientId, receiver.redirectUri, state, scopes))
+            } catch (e: BrowserLaunchException) {
+                throw RemoteAuthException(e.message.orEmpty(), e)
+            }
             val code = receiver.awaitCode(state)
             val tokens = oauth.exchangeCode(credentials, code, receiver.redirectUri)
             val refreshToken =

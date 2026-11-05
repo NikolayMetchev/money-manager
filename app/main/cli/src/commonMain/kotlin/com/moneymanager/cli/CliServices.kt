@@ -1,5 +1,8 @@
 package com.moneymanager.cli
 
+import com.moneymanager.browser.BrowserLauncher
+import com.moneymanager.browser.PrintUrlBrowserLauncher
+import com.moneymanager.browser.SystemBrowserLauncher
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.cryptodata.installCryptoCatalog
 import com.moneymanager.database.DatabaseManager
@@ -10,8 +13,6 @@ import com.moneymanager.files.appDataDirectory
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.importfilesource.di.createImportFileSourceFactory
 import com.moneymanager.localsettings.LocalSettings
-import com.moneymanager.remotestorage.googledrive.BrowserLauncher
-import com.moneymanager.remotestorage.googledrive.PrintUrlBrowserLauncher
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.terminal.stderrIsTerminal
 import com.moneymanager.tui.TuiController
@@ -72,7 +73,7 @@ internal class CliPlatform(
                         )
                     }
                 },
-                systemBrowser = ::systemBrowserLauncher,
+                systemBrowser = { SystemBrowserLauncher() },
                 logFile = Path(appDataDirectory(), "logs", "mm.log"),
             )
     }
@@ -80,6 +81,3 @@ internal class CliPlatform(
 
 /** The platform's [AppComponentParams] carrying [browser]. */
 internal expect fun cliComponentParams(browser: BrowserLauncher): AppComponentParams
-
-/** Opens a URL in the OS's default browser. */
-internal expect fun systemBrowserLauncher(): BrowserLauncher

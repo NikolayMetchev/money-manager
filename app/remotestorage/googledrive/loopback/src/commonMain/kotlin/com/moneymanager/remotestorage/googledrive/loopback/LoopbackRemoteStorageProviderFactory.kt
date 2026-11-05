@@ -1,10 +1,10 @@
 package com.moneymanager.remotestorage.googledrive.loopback
 
+import com.moneymanager.browser.BrowserLauncher
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.remotestorage.RemoteStorageProvider
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory
 import com.moneymanager.remotestorage.RemoteStorageType
-import com.moneymanager.remotestorage.googledrive.BrowserLauncher
 import com.moneymanager.remotestorage.googledrive.GOOGLE_DRIVE_PROVIDER_ID
 import com.moneymanager.remotestorage.googledrive.GoogleOAuthDefaults
 

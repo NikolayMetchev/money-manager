@@ -1,5 +1,6 @@
 package com.moneymanager.importfilesource.di
 
+import com.moneymanager.browser.BrowserLauncher
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
@@ -8,7 +9,6 @@ import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.importfilesource.ImportFolder
 import com.moneymanager.importfilesource.localfolder.LocalFolderImportFileSource
-import com.moneymanager.remotestorage.googledrive.BrowserLauncher
 import com.moneymanager.remotestorage.googledrive.DriveImportFileSource
 import com.moneymanager.remotestorage.googledrive.GoogleAccessTokenSource
 import com.moneymanager.remotestorage.googledrive.GoogleOAuthDefaults

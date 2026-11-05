@@ -30,5 +30,6 @@ kmp_library(
         "//app/model/importdirectory",
         "//app/remotestorage/googledrive",
         "//app/remotestorage/googledrive/loopback",
+        "//utils/browser",
     ],
 )

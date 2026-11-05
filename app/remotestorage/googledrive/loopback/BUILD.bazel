@@ -19,6 +19,7 @@ kmp_library(
     exports = ["//app/remotestorage/googledrive"],
     deps = [
         "//app/remotestorage/core",
+        "//utils/browser",
         "//utils/coroutines",
         "//utils/credentialvault",
         "//utils/httpclient",
@@ -49,6 +50,7 @@ kmp_test(
         "//app/remotestorage/googledrive",
         "//bazel/kmp/deps:kotlin_test",
         "//test/utils/credentialvault",
+        "//utils/browser",
         "//utils/httpclient",
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_coroutines_test",

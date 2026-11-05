@@ -1,6 +1,6 @@
 package com.moneymanager.di.params
 
-import com.moneymanager.remotestorage.googledrive.BrowserLauncher
+import com.moneymanager.browser.BrowserLauncher
 
 actual class AppComponentParams(
     /**

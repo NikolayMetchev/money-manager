@@ -1,8 +1,8 @@
 package com.moneymanager.remotestorage.googledrive.loopback
 
+import com.moneymanager.browser.BrowserLauncher
 import com.moneymanager.credentialvault.testing.inMemoryCredentialVault
 import com.moneymanager.credentialvault.testing.unlockedCredentialVault
-import com.moneymanager.remotestorage.googledrive.BrowserLauncher
 import com.moneymanager.remotestorage.googledrive.GoogleDriveCredentials
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
