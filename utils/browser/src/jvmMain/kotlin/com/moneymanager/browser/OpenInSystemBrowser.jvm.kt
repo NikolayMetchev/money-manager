@@ -7,20 +7,24 @@ private const val HYPRLAND_ENV = "HYPRLAND_INSTANCE_SIGNATURE"
  * (where it ends in `xdg-open` anyway) and can't raise the browser under Hyprland, which the command's focus
  * step does.
  */
-internal actual fun openInSystemBrowser(url: String): Boolean =
-    startWithoutWaiting(jvmBrowserOpenCommand(System.getProperty("os.name").orEmpty(), System.getenv(HYPRLAND_ENV) != null, url))
+internal actual fun openInSystemBrowser(url: String): Boolean {
+    val osName = System.getProperty("os.name").orEmpty()
+    hyprlandFocusCommand(System.getenv(HYPRLAND_ENV) != null)?.takeIf { isLinux(osName) }?.let(::startWithoutWaiting)
+    return startWithoutWaiting(jvmBrowserOpenCommand(osName, url))
+}
+
+private fun isLinux(osName: String): Boolean = osName.lowercase().let { "win" !in it && "mac" !in it }
 
 /** The JVM runs on every desktop OS, so unlike the native targets it picks the command at run time. */
 internal fun jvmBrowserOpenCommand(
     osName: String,
-    hyprland: Boolean,
     url: String,
 ): List<String> {
     val os = osName.lowercase()
     return when {
         "win" in os -> listOf("rundll32", "url.dll,FileProtocolHandler", url)
         "mac" in os -> listOf("open", url)
-        else -> linuxBrowserOpenCommand(hyprland, url)
+        else -> linuxBrowserOpenCommand(url)
     }
 }
 

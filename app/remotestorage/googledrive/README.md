@@ -13,7 +13,7 @@ Unlike the Google Java SDK (whose OAuth helpers are JVM-only), this backend talk
 v3 over the shared KMP [Ktor](../../../utils/rest) client** and does the OAuth code exchange itself, so the
 *entire* provider lives in one `jvmAndroidMain` source set and behaves identically on JVM and Android. The
 only platform-specific piece is launching the system browser ([`BrowserLauncher`](../../../utils/browser) — the OS open command
-on the JVM, an `ACTION_VIEW` intent on Android).
+on the JVM and native; Android signs in through Google Identity Services instead).
 
 - `GoogleDriveProvider` — Drive REST v3 (`list`/`download`/multipart `upload`/`delete`).
 - `GoogleOAuth` — consent URL, `code`→tokens, `refresh_token`→access token.

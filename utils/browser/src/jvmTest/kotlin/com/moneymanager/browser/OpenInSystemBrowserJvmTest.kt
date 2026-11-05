@@ -10,18 +10,17 @@ class OpenInSystemBrowserJvmTest {
 
     @Test
     fun usesTheShellOpenerOnWindows() {
-        assertEquals(listOf("rundll32", "url.dll,FileProtocolHandler", url), jvmBrowserOpenCommand("Windows 11", false, url))
+        assertEquals(listOf("rundll32", "url.dll,FileProtocolHandler", url), jvmBrowserOpenCommand("Windows 11", url))
     }
 
     @Test
     fun usesOpenOnMac() {
-        assertEquals(listOf("open", url), jvmBrowserOpenCommand("Mac OS X", false, url))
+        assertEquals(listOf("open", url), jvmBrowserOpenCommand("Mac OS X", url))
     }
 
     @Test
     fun usesTheLinuxCommandElsewhere() {
-        assertEquals(linuxBrowserOpenCommand(false, url), jvmBrowserOpenCommand("Linux", false, url))
-        assertEquals(linuxBrowserOpenCommand(true, url), jvmBrowserOpenCommand("Linux", true, url))
+        assertEquals(linuxBrowserOpenCommand(url), jvmBrowserOpenCommand("Linux", url))
     }
 
     @Test

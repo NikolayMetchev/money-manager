@@ -24,8 +24,8 @@ import platform.posix.waitpid
 import platform.posix.write
 
 /**
- * Starts the open-a-URL command (`xdg-open`, see `linuxBrowserOpenCommand`) without waiting for it: depending on the desktop, it can run for as long as the browser
- * it launched, and the sign-in must go on to read the loopback callback meanwhile. A double fork hands the
+ * Opens the URL with `xdg-open` (and, under Hyprland, starts the focus command beside it), without waiting: depending on
+ * the desktop, `xdg-open` can run for as long as the browser it launched, and the sign-in must go on to read the loopback callback meanwhile. A double fork hands the
  * opener to init (so it never lingers as a zombie), and a close-on-exec pipe still reports a failed exec:
  * EOF means it started, a byte means it couldn't be run.
  *
@@ -33,10 +33,15 @@ import platform.posix.write
  * shell would treat as command separators.
  */
 @OptIn(ExperimentalForeignApi::class)
-internal actual fun openInSystemBrowser(url: String): Boolean =
+internal actual fun openInSystemBrowser(url: String): Boolean {
+    hyprlandFocusCommand(getenv("HYPRLAND_INSTANCE_SIGNATURE") != null)?.let(::startDetached)
+    return startDetached(linuxBrowserOpenCommand(url))
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun startDetached(command: List<String>): Boolean =
     memScoped {
         // Everything the children touch is allocated before forking: they may only exec, write and exit.
-        val command = linuxBrowserOpenCommand(getenv("HYPRLAND_INSTANCE_SIGNATURE") != null, url)
         val argv = allocArrayOf(*command.map { it.cstr.ptr }.toTypedArray(), null)
         val failure = alloc<ByteVar>()
         val fds = allocArray<IntVar>(2)

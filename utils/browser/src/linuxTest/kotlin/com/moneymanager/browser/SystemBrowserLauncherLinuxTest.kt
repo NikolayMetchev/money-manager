@@ -10,7 +10,6 @@ import platform.posix.chmod
 import platform.posix.getenv
 import platform.posix.getpid
 import platform.posix.setenv
-import platform.posix.unsetenv
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -52,8 +51,6 @@ class SystemBrowserLauncherLinuxTest {
             writeText(opener, script)
             chmod(opener.toString(), "755".toUInt(8))
         }
-        // Under Hyprland the opener is a shell script, which the test's PATH has no sh for.
-        unsetenv("HYPRLAND_INSTANCE_SIGNATURE")
         setenv("PATH", binDir.toString(), 1)
     }
 }

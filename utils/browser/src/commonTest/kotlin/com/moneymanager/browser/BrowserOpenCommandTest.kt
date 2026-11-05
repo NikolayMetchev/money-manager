@@ -2,24 +2,29 @@ package com.moneymanager.browser
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BrowserOpenCommandTest {
     private val url = "https://accounts.example.test/auth?a=1&b=2"
 
     @Test
-    fun opensWithXdgOpenOutsideHyprland() {
-        assertEquals(listOf("xdg-open", url), linuxBrowserOpenCommand(hyprland = false, url = url))
+    fun opensWithXdgOpenWithTheUrlAsItsOwnArgument() {
+        assertEquals(listOf("xdg-open", url), linuxBrowserOpenCommand(url))
     }
 
     @Test
-    fun passesTheUrlAsItsOwnArgumentUnderHyprland() {
-        val command = linuxBrowserOpenCommand(hyprland = true, url = url)
+    fun noFocusCommandOutsideHyprland() {
+        assertNull(hyprlandFocusCommand(hyprland = false))
+    }
+
+    @Test
+    fun hyprlandFocusesTheBrowsersWindowByItsStartupWmClass() {
+        val command = hyprlandFocusCommand(hyprland = true)!!
 
         assertEquals(listOf("sh", "-c"), command.take(2))
-        assertEquals(url, command.last())
+        assertTrue("StartupWMClass" in command[2])
         assertTrue("hyprctl dispatch focuswindow" in command[2])
-        assertTrue("exec xdg-open" in command[2])
     }
 
     @Test
