@@ -268,6 +268,8 @@ exclude:
   # fakes stubbing constants.
   - name: SameReturnValue
     paths:
+      # [5] — Android signs in through Google Identity Services, so its openInSystemBrowser actual is always false.
+      - utils/browser/src/androidMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.android.kt
       # [5] — actuals whose answer is fixed on their platform: Linux terminals always take VT sequences, and native
       # and the browser have no locale to give a default currency.
       - app/terminal/src/linuxMain/kotlin/com/moneymanager/terminal/VirtualTerminal.linux.kt
@@ -330,6 +332,8 @@ exclude:
   # "unused parameter".
   - name: unused
     paths:
+      # [5] — Android's openInSystemBrowser actual ignores the URL it can't open.
+      - utils/browser/src/androidMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.android.kt
       # [5] — native actuals that ignore the AppComponentParams their expect takes (Android's need its Context).
       - app/db/di/src/nativeMain/kotlin/com/moneymanager/database/di/CreateDatabaseManager.native.kt
       - utils/credentialvault/di/src/nativeMain/kotlin/com/moneymanager/credentialvault/di/CreateVaultPathResolver.native.kt
@@ -398,6 +402,9 @@ exclude:
       - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/navigation/Screen.kt
   - name: UnusedSymbol
     paths:
+      # [5] — openInSystemBrowser's jvm and android actuals: no JVM module links them to the expect in commonMain.
+      - utils/browser/src/androidMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.android.kt
+      - utils/browser/src/jvmMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.jvm.kt
       # [2] — the test schema helpers are called by app/db/core's tests, another module.
       - test/app/db/read/src/commonMain/kotlin/com/moneymanager/test/database/read/TestReads.kt
       # [2] — StartupMilestone.FIRST_FRAME is reported only by the desktop entry point (app/main/jvm's Main.kt).

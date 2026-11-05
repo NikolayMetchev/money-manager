@@ -9,16 +9,32 @@ private const val HYPRLAND_ENV = "HYPRLAND_INSTANCE_SIGNATURE"
  * Tries AWT [Desktop] first, then the OS "open a URL" command: `Desktop.browse` is frequently unsupported on
  * Linux, and under Hyprland it can't raise the browser, so there the command's focus step is what's wanted.
  */
-internal actual fun openInSystemBrowser(url: String): Boolean {
-    val hyprland = System.getenv(HYPRLAND_ENV) != null
+internal actual fun openInSystemBrowser(url: String): Boolean =
+    openOnJvm(
+        url = url,
+        osName = System.getProperty("os.name").orEmpty(),
+        hyprland = System.getenv(HYPRLAND_ENV) != null,
+        browse = ::browseWithDesktop,
+        start = ::startWithoutWaiting,
+    )
+
+internal fun openOnJvm(
+    url: String,
+    osName: String,
+    hyprland: Boolean,
+    browse: (String) -> Boolean,
+    start: (List<String>) -> Boolean,
+): Boolean = (!hyprland && browse(url)) || start(jvmBrowserOpenCommand(osName, hyprland, url))
+
+private fun browseWithDesktop(url: String): Boolean =
     runCatching {
-        if (!hyprland && Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-            Desktop.getDesktop().browse(URI(url))
-            return true
-        }
-    }
-    return startWithoutWaiting(jvmBrowserOpenCommand(System.getProperty("os.name").orEmpty(), hyprland, url))
-}
+        Desktop.isDesktopSupported() &&
+            Desktop.getDesktop().isSupported(Desktop.Action.BROWSE) &&
+            run {
+                Desktop.getDesktop().browse(URI(url))
+                true
+            }
+    }.getOrDefault(false)
 
 /** The JVM runs on every desktop OS, so unlike the native targets it picks the command at run time. */
 internal fun jvmBrowserOpenCommand(

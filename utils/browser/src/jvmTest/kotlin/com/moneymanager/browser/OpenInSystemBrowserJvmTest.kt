@@ -36,4 +36,51 @@ class OpenInSystemBrowserJvmTest {
         assertTrue(startWithoutWaiting(listOf(java, "-version")))
         assertFalse(startWithoutWaiting(listOf("/no/such/browser-opener")))
     }
+
+    @Test
+    fun theDesktopBrowserIsTriedFirstAndNoProcessStartsWhenItWorks() {
+        val started = mutableListOf<List<String>>()
+
+        assertTrue(
+            openOnJvm(url, "Linux", hyprland = false, browse = { true }, start = {
+                started += it
+                true
+            }),
+        )
+
+        assertTrue(started.isEmpty())
+    }
+
+    @Test
+    fun fallsBackToTheOsCommandWhenTheDesktopCannotBrowse() {
+        val started = mutableListOf<List<String>>()
+
+        assertTrue(
+            openOnJvm(url, "Linux", hyprland = false, browse = { false }, start = {
+                started += it
+                true
+            }),
+        )
+
+        assertEquals(listOf(listOf("xdg-open", url)), started)
+    }
+
+    @Test
+    fun hyprlandSkipsTheDesktopBrowserSoTheFocusStepRuns() {
+        val started = mutableListOf<List<String>>()
+
+        assertTrue(
+            openOnJvm(url, "Linux", hyprland = true, browse = { error("not tried") }, start = {
+                started += it
+                true
+            }),
+        )
+
+        assertEquals("sh", started.single().first())
+    }
+
+    @Test
+    fun reportsFailureWhenNothingCouldOpenTheBrowser() {
+        assertFalse(openOnJvm(url, "Linux", hyprland = false, browse = { false }, start = { false }))
+    }
 }

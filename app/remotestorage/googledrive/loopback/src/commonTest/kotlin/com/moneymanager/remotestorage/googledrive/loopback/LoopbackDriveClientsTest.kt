@@ -1,11 +1,14 @@
 package com.moneymanager.remotestorage.googledrive.loopback
 
+import com.moneymanager.browser.BrowserLaunchException
 import com.moneymanager.browser.BrowserLauncher
 import com.moneymanager.credentialvault.testing.inMemoryCredentialVault
 import com.moneymanager.credentialvault.testing.unlockedCredentialVault
+import com.moneymanager.remotestorage.RemoteAuthException
 import com.moneymanager.remotestorage.googledrive.GoogleDriveCredentials
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 
@@ -28,5 +31,18 @@ class LoopbackDriveClientsTest {
             // A second provider for the same OAuth client shares its Drive client.
             assertFalse(googleDriveProvider(config, vault, browser).isSignedIn())
             assertFalse(googleDriveTokenSource(config, vault, browser).isSignedIn())
+        }
+
+    @Test
+    fun `a browser that can't be opened fails sign-in as an auth error carrying the message`() =
+        runTest {
+            val unopenable = BrowserLauncher { throw BrowserLaunchException("open https://consent.example.test yourself") }
+
+            val failure =
+                assertFailsWith<RemoteAuthException> {
+                    googleDriveTokenSource(config, unlockedCredentialVault(), unopenable).signIn()
+                }
+
+            assertEquals("open https://consent.example.test yourself", failure.message)
         }
 }

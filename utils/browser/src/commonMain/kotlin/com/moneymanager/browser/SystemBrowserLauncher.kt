@@ -1,15 +1,15 @@
 package com.moneymanager.browser
 
-import com.moneymanager.browser.BrowserLaunchException
-
 /**
  * Opens the OAuth consent URL in the OS default browser. The one [BrowserLauncher] for the desktop app and
  * the CLI on every platform; only [openInSystemBrowser], the part that starts a process or calls the OS,
  * differs per target.
  */
-class SystemBrowserLauncher : BrowserLauncher {
+class SystemBrowserLauncher(
+    private val opener: (String) -> Boolean = ::openInSystemBrowser,
+) : BrowserLauncher {
     override fun open(url: String) {
-        if (!openInSystemBrowser(url)) {
+        if (!opener(url)) {
             throw BrowserLaunchException("Couldn't open a browser automatically. Open this URL to finish signing in: $url")
         }
     }
