@@ -5,9 +5,9 @@
 # -XX:AOTMode=on, which fails unless the installed AOT cache loads (#1254). CI runs it on fresh runners; it needs root
 # on Linux (apt) and a display (Linux: Xvfb).
 #
-# A pull request's macOS and Windows installers are built without the AOT caches (--define=aot=false) and the native
-# mm (#1273): INSTALLER_AOT=false drops AOTMode=on, INSTALLER_NATIVE_CLI=false skips checking mm. Both default to true,
-# so main, releases and the Linux deb check everything.
+# A pull request's installers are built without the AOT caches (--define=aot=false), and its macOS and Windows ones
+# without the native mm (#1273): INSTALLER_AOT=false drops AOTMode=on, INSTALLER_NATIVE_CLI=false skips checking mm.
+# Both default to true, so main and releases check everything.
 #
 # With STARTUP_BENCH_DBS (a directory holding //tools/bench-db's bench.db and empty.db, and the tool that times them,
 # repo-scripts-tool_deploy.jar) and STARTUP_BENCH_OUT (a file), it then times the installed launchers' startup with the tool,
