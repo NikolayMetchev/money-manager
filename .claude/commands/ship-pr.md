@@ -1,5 +1,5 @@
 ---
-description: Create draft PR(s), wait for green CI, mark ready, address all CodeRabbit comments, and get the final PR(s) green. Handles a single branch or a whole `gh stack`, bottom up
+description: Create draft PR(s), wait for green CI, mark ready, address CodeRabbit's comments on the most important PR, and get the final PR(s) green. Handles a single branch or a whole `gh stack`, bottom up
 ---
 
 Drive the current branch's changes all the way through the PR lifecycle. Work autonomously through
@@ -15,7 +15,7 @@ instead of `gh stack`). Never ship a stack by hand-rolling `--base` PRs: a PR on
 made with `gh stack` (`init`/`add`/`submit`).
 
 **Order rule for the whole command:** every phase runs on the stack **bottom up**. A PR is only worked on
-(waited for, marked ready, reviewed) after every PR below it is done with that phase, because a change in a
+(waited for, marked ready) after every PR below it is done with that phase, because a change in a
 lower PR restacks and re-runs CI on everything above it.
 
 1. If on `main`, create a feature branch named after the change first.
@@ -81,15 +81,18 @@ Start every PR's checks by pushing the whole stack, but only move on to the next
 
 Once a PR is green, `gh pr ready <num>`; do the stack bottom up, so the lowest PR is the first to leave draft.
 
-## Phase 4 — Wait for CodeRabbit
+## Phase 4 — One CodeRabbit review
 
-Phases 4 and 5 are one loop per PR, bottom to top: get a PR's review, address it, push, and only then trigger
-the next PR's, so that each review reads the head its lower PRs' fixes restacked. If a PR's current head can't
-get a review, say so in the final report.
+The goal is the whole stack green as soon as possible, and CodeRabbit allows one review per hour, so a stack gets
+**one** review: on its most important PR, the one with the most behaviour at risk (not simply the lowest). A
+single-PR ship reviews that PR. If fixing and building have run for over an hour and the stack still isn't
+done, the next review is free, so you may run one on the next most important PR; never wait an hour just to
+get one. If the one review is rate limited, carry on with the rest of the stack and trigger it when the limit
+lifts. Say in the final report which PRs weren't reviewed.
 
 CodeRabbit reviews after a PR leaves draft, and this repo is too small for it to review automatically: if no
-review starts, comment `@coderabbitai full review` on that PR (plain `review` can fail; it allows one review
-per hour, so wait out a rate limit rather than triggering the next PR early). Poll every ~3 minutes for:
+review starts, comment `@coderabbitai full review` on that PR (plain `review` can fail). Poll every ~3 minutes
+for:
 
 - review comments: `gh api repos/{owner}/{repo}/pulls/<num>/comments --jq '.[] | select(.user.login == "coderabbitai[bot]")'`
 - the review summary: `gh pr view <num> --json reviews,comments`
@@ -101,7 +104,7 @@ that.
 
 ## Phase 5 — Address every comment
 
-For each CodeRabbit inline comment on the PR (including ones inside collapsed "Additional comments" / "Nitpick"
+For each CodeRabbit inline comment on the reviewed PR (including ones inside collapsed "Additional comments" / "Nitpick"
 sections):
 
 - If the suggestion is correct or harmless-and-reasonable: implement it on this PR's branch.
@@ -110,10 +113,8 @@ sections):
 - Never silently ignore a comment — every one gets either a code change or a reply.
 
 After implementing a PR's fixes: run the relevant tests, commit (same trailer), restack and push (Phase 0),
-then run `bazel build //... && bazel test //...` on the top. A fix in a lower PR changes the PRs above it, so
-finish the lower PR's comments before reading the next PR's. If CodeRabbit re-reviews and raises NEW
-substantive comments, repeat this phase for that PR (cap at 3 rounds per PR; after that summarise what's still
-open instead of looping).
+then run `bazel build //... && bazel test //...` on the top. If CodeRabbit re-reviews and raises NEW substantive comments,
+repeat this phase for that PR (cap at 3 rounds; after that summarise what's still open instead of looping).
 
 ## Phase 6 — Final green
 
