@@ -373,6 +373,10 @@ jobs:
         with:
           persist-credentials: false  # read-only job, no git push
 
+      # A Mac only needs the Command Line Tools (#1319), so build as one that has nothing else.
+      - name: Use the Command Line Tools instead of Xcode
+        run: sudo xcode-select --switch /Library/Developer/CommandLineTools
+
       - name: Set up Bazel
         uses: ./.github/actions/bazel-setup
         with:

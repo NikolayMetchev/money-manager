@@ -170,8 +170,15 @@ def _impl(rctx):
         sha256 = rctx.attr.dist_sha256,
         stripPrefix = _dist_prefix(version, host),
     )
-    props = parse_properties(rctx.read("dist/konan/konan.properties"))
+    konan_properties = rctx.read("dist/konan/konan.properties")
+    props = parse_properties(konan_properties)
     targets = HOST_TARGETS[host]
+
+    # konan only asks for Xcode's version, through `xcodebuild`, to compare it with `minimalXcodeVersion`; its SDK and
+    # tools come from `xcrun`, which the Command Line Tools answer too (#1319). This is the file rather than
+    # `-Xoverride-konan-properties` because `clang` and `llvm` pass every argument to the LLVM tool. The last value wins.
+    if "macos_arm64" in targets:
+        rctx.file("dist/konan/konan.properties", konan_properties + "\nignoreXcodeVersionCheck = true\n", executable = False)
     names = dependencies(props, host, targets)
     missing = [name for name in names if name not in rctx.attr.dependency_sha256]
     if missing:
