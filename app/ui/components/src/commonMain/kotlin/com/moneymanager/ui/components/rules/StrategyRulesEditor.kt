@@ -661,12 +661,13 @@ private fun LegRoleEditor(
     pathField: ConditionPathField,
     enabled: Boolean,
 ) {
-    val choices = listOf("Debit", "Credit", "By the sign of a value")
+    val choices = listOf("Debit", "Credit", "By the sign of a value", "Member (either way, for linked rows)")
     val selected =
         when (role) {
             LegRole.Debit -> choices[0]
             LegRole.Credit -> choices[1]
             is LegRole.BySign -> choices[2]
+            LegRole.Member -> choices[3]
         }
     ChoiceDropdown("Leg side", selected, choices, { it }, enabled) {
         if (it == selected) return@ChoiceDropdown
@@ -674,6 +675,7 @@ private fun LegRoleEditor(
             when (it) {
                 choices[0] -> LegRole.Debit
                 choices[1] -> LegRole.Credit
+                choices[3] -> LegRole.Member
                 else -> LegRole.BySign("")
             },
         )

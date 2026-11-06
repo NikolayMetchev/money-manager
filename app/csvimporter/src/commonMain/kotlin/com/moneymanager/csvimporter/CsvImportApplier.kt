@@ -132,6 +132,22 @@ private fun pairDebitsToCredits(
 }
 
 /**
+ * Links every member leg to the anchor leg that shares its key, as the relationship's primary member. A leg with a blank
+ * key (the row names no group) links to nothing, and an anchor never links to itself.
+ */
+private fun linkMembersToAnchors(
+    legs: List<CsvTransferWithAttributes>,
+    relationshipTypeName: String,
+): List<Pair<Long, BatchRelationship>> {
+    val (anchors, members) = legs.filter { it.groupLeg!!.key.isNotBlank() }.partition { it.groupLeg!!.funding }
+    val anchorByKey = anchors.sortedBy { it.rowIndex }.groupBy { it.groupLeg!!.key }.mapValues { (_, group) -> group.first() }
+    return members.mapNotNull { member ->
+        val anchor = anchorByKey[member.groupLeg!!.key] ?: return@mapNotNull null
+        member.rowIndex to BatchRelationship(ImportRowKey.CsvRow(anchor.rowIndex), relationshipTypeName)
+    }
+}
+
+/**
  * Links each funding leg (from the funding leg) to the nearest unclaimed non-funding leg on the other side
  * with the same key within [window], one to one. Legs the source excluded (a refused deposit) record no
  * movement, so they pair with nothing.
@@ -1156,12 +1172,23 @@ suspend fun runCsvImport(
         strategy.config.legGroups
             .withIndex()
             .flatMap { (index, rule) ->
-                val assembly = rule.assembly as? LegAssembly.ThroughAccount ?: return@flatMap emptyList()
                 val legs = finalPrep.validTransfers.filter { it.groupLeg?.ruleIndex == index }
-                if (assembly.fundingWhen.isEmpty()) {
-                    pairDebitsToCredits(legs, rule.windowSeconds.seconds, assembly.relationshipTypeName)
-                } else {
-                    pairFundingLegs(legs, rule.windowSeconds.seconds, assembly.relationshipTypeName)
+                when (val assembly = rule.assembly) {
+                    is LegAssembly.Trade -> {
+                        emptyList()
+                    }
+
+                    is LegAssembly.Linked -> {
+                        linkMembersToAnchors(legs, assembly.relationshipTypeName)
+                    }
+
+                    is LegAssembly.ThroughAccount -> {
+                        if (assembly.fundingWhen.isEmpty()) {
+                            pairDebitsToCredits(legs, rule.windowSeconds.seconds, assembly.relationshipTypeName)
+                        } else {
+                            pairFundingLegs(legs, rule.windowSeconds.seconds, assembly.relationshipTypeName)
+                        }
+                    }
                 }
             }.toMap()
 

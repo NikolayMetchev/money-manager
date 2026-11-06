@@ -97,4 +97,28 @@ sealed interface LegAssembly {
         @Serializable(with = SortedConditionListSerializer::class)
         val fundingWhen: List<Condition> = emptyList(),
     ) : LegAssembly
+
+    /**
+     * Each row of the event is linked to the event's one anchor row by a [relationshipTypeName] relationship: the
+     * row is the relationship's primary member, the anchor its related one. For a source whose rows name the row
+     * they belong to (Koinly's `Parent ID`: a staking reward points at the gas-cost withdrawal that produced it).
+     * One anchor can have any number of members, and a row's side (money in or out) doesn't matter, so rules
+     * claim the rows with the `Member` role.
+     *
+     * Which rows form one event is the group's [LegGroupRule.key] alone: [LegGroupRule.windowSeconds] isn't used,
+     * as the key already says which rows belong together. An event with no anchor, or whose anchor wasn't newly
+     * imported (it was a duplicate of an existing record), links nothing. Rows are still imported as ordinary
+     * transfers, so nothing is dropped.
+     *
+     *  relationshipTypeName Links each member to its anchor (resolved get-or-create).
+     *  anchorWhen A row is its event's anchor when all of these hold. A row that isn't is a member.
+     */
+    @Serializable
+    @SerialName("linked")
+    data class Linked(
+        val relationshipTypeName: String,
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        @Serializable(with = SortedConditionListSerializer::class)
+        val anchorWhen: List<Condition> = emptyList(),
+    ) : LegAssembly
 }

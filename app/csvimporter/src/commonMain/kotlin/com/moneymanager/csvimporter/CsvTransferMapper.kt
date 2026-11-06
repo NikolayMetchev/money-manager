@@ -174,8 +174,8 @@ data class CsvPassThrough(
     val conduitName: String get() = conduitNames.first()
 }
 
-/** Which side of its event a leg is on (see `LegGroupRule`). */
-enum class GroupLegSide { DEBIT, CREDIT }
+/** Which side of its event a leg is on (see `LegGroupRule`); [MEMBER] is a leg of a linking-only group, which has no side. */
+enum class GroupLegSide { DEBIT, CREDIT, MEMBER }
 
 /**
  * Marks a mapped row as one leg of a movement the source split across several rows (see
@@ -190,7 +190,7 @@ data class GroupLeg(
     val ruleIndex: Int,
     val side: GroupLegSide,
     val key: String,
-    /** The leg matches its rule's `ThroughAccount.fundingWhen`: the funding side of its event. */
+    /** The leg matches its rule's `ThroughAccount.fundingWhen` (the funding side of its event) or `Linked.anchorWhen` (its anchor). */
     val funding: Boolean = false,
 )
 
@@ -937,6 +937,10 @@ class CsvTransferMapper(
                         GroupLegSide.CREDIT
                     }
 
+                    LegRole.Member -> {
+                        GroupLegSide.MEMBER
+                    }
+
                     is LegRole.BySign -> {
                         val amount =
                             getColumnValueOrNull(role.path, values)
@@ -950,10 +954,12 @@ class CsvTransferMapper(
                         }
                     }
                 } ?: return@firstNotNullOfOrNull null
+            // A member has no side, so only a group that links its rows can use it.
+            if (side == GroupLegSide.MEMBER && group.assembly !is LegAssembly.Linked) return@firstNotNullOfOrNull null
             val intermediates = outcome.accountsFor(AccountSide.INTERMEDIATE)
             val throughAccountName =
                 when (group.assembly) {
-                    is LegAssembly.Trade -> {
+                    is LegAssembly.Trade, is LegAssembly.Linked -> {
                         null
                     }
 
@@ -970,10 +976,11 @@ class CsvTransferMapper(
                     }
                 }
             val funding =
-                (group.assembly as? LegAssembly.ThroughAccount)
-                    ?.fundingWhen
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { rules.all(it, trimmed) } == true
+                when (val assembly = group.assembly) {
+                    is LegAssembly.ThroughAccount -> assembly.fundingWhen
+                    is LegAssembly.Linked -> assembly.anchorWhen
+                    is LegAssembly.Trade -> emptyList()
+                }.takeIf { it.isNotEmpty() }?.let { rules.all(it, trimmed) } == true
             val key =
                 group.key.joinToString(
                     PAIRING_KEY_SEPARATOR,

@@ -149,6 +149,14 @@ sealed interface LegRole {
     data class BySign(
         val path: String,
     ) : LegRole
+
+    /**
+     * A member of a group that only links its rows (`LegAssembly.Linked`), whichever way the row moves money. In a
+     * group that pairs debits with credits it makes the row no leg.
+     */
+    @Serializable
+    @SerialName("member")
+    data object Member : LegRole
 }
 
 /** Where a [RuleAction.Capture]'s values go when records are assembled into rows (PDF lines). */

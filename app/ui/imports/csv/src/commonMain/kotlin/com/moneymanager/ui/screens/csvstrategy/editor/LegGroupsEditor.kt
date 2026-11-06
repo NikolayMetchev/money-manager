@@ -98,12 +98,14 @@ private fun LegGroupRuleEditor(
     )
     Spacer(modifier = Modifier.height(8.dp))
     KeyPartsEditor(rule.key, { onRuleChanged(rule.copy(key = it)) }, columns, firstRow, enabled)
-    LongField(
-        value = rule.windowSeconds,
-        onValueChange = { onRuleChanged(rule.copy(windowSeconds = it.coerceAtLeast(0))) },
-        label = "Window between legs of one event (seconds)",
-        enabled = enabled,
-    )
+    if (rule.assembly !is LegAssembly.Linked) {
+        LongField(
+            value = rule.windowSeconds,
+            onValueChange = { onRuleChanged(rule.copy(windowSeconds = it.coerceAtLeast(0))) },
+            label = "Window between legs of one event (seconds)",
+            enabled = enabled,
+        )
+    }
     ReconcileWindowField(
         value = rule.reconcileWindowSeconds,
         onValueChange = { onRuleChanged(rule.copy(reconcileWindowSeconds = it?.coerceAtLeast(0))) },
@@ -117,6 +119,11 @@ private fun LegGroupRuleEditor(
     Choice("Through an account, each debit linked to its credit", rule.assembly is LegAssembly.ThroughAccount, enabled) {
         if (rule.assembly !is LegAssembly.ThroughAccount) {
             onRuleChanged(rule.copy(assembly = LegAssembly.ThroughAccount(relationshipTypeName = "conversion")))
+        }
+    }
+    Choice("Linked to an anchor row (each row links to the row its key names)", rule.assembly is LegAssembly.Linked, enabled) {
+        if (rule.assembly !is LegAssembly.Linked) {
+            onRuleChanged(rule.copy(assembly = LegAssembly.Linked(relationshipTypeName = "parent")))
         }
     }
     when (val assembly = rule.assembly) {
@@ -154,6 +161,32 @@ private fun LegGroupRuleEditor(
                 columns = columns,
                 enabled = enabled,
                 title = "Funding leg when all of these hold (optional; pairs one funding leg with one other leg)",
+            )
+        }
+
+        is LegAssembly.Linked -> {
+            Text(
+                "Rows whose key matches are one event. Claim every row with the \"Member\" leg side; the anchor row is " +
+                    "the one that satisfies the conditions below, and every other row is linked to it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = assembly.relationshipTypeName,
+                onValueChange = { onRuleChanged(rule.copy(assembly = assembly.copy(relationshipTypeName = it))) },
+                label = { Text("Relationship type name") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                enabled = enabled,
+                isError = assembly.relationshipTypeName.isBlank(),
+                supportingText = { Text("Links each row to its anchor (e.g. \"parent\")") },
+            )
+            RowConditionsEditor(
+                conditions = assembly.anchorWhen,
+                onConditionsChanged = { onRuleChanged(rule.copy(assembly = assembly.copy(anchorWhen = it))) },
+                columns = columns,
+                enabled = enabled,
+                title = "Anchor row when all of these hold",
             )
         }
     }
@@ -231,8 +264,18 @@ internal fun LegGroupRule.isComplete(): Boolean =
     name.isNotBlank() &&
         key.all { it.primaryPath.isNotBlank() } &&
         when (val assembly = assembly) {
-            is LegAssembly.Trade -> true
-            is LegAssembly.ThroughAccount -> assembly.fundingWhen.all { it.isComplete() } && assembly.relationshipTypeName.isNotBlank()
+            is LegAssembly.Trade -> {
+                true
+            }
+
+            is LegAssembly.ThroughAccount -> {
+                assembly.fundingWhen.all { it.isComplete() } && assembly.relationshipTypeName.isNotBlank()
+            }
+
+            is LegAssembly.Linked -> {
+                assembly.anchorWhen.isNotEmpty() && assembly.anchorWhen.all { it.isComplete() } &&
+                    assembly.relationshipTypeName.isNotBlank()
+            }
         }
 
 private fun defaultLegGroupRule(): LegGroupRule = LegGroupRule(name = "", assembly = LegAssembly.Trade())
