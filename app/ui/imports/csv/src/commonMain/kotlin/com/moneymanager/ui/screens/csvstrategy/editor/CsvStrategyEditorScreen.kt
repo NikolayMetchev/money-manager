@@ -181,7 +181,11 @@ fun CsvStrategyEditorScreen(
                         .orEmpty(),
                 )?.columns ?: importColumns
         }
-    val availableColumnNames = remember(initialColumns) { initialColumns.map { it.originalName }.toSet() }
+    // The columns the strategy's rules set count too: a file without them still has them once the rules have run.
+    val availableColumnNames =
+        remember(initialColumns, existingStrategy) {
+            initialColumns.map { it.originalName }.toSet() + existingStrategy?.config?.ruleColumns().orEmpty()
+        }
     val editKey = strategyId?.toString() ?: "create:${csvImportId?.toString() ?: "external"}"
     val state = rememberCsvStrategyEditorState(editKey, existingStrategy, availableColumnNames, pdf = previewer != null)
     val pdfPreview = previewer?.let { remember(it, state.pdfLineRules) { it.preview(state.pdfLineRules.orEmpty()) } }

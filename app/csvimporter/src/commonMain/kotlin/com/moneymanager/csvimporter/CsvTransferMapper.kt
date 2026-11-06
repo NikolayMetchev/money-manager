@@ -324,8 +324,9 @@ class CsvTransferMapper(
      */
     private val attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
 ) {
-    private val columnIndexByName: Map<String, Int> =
-        columns.associate { it.originalName to it.columnIndex }
+    // The file's columns, then any a rule sets that the file lacks (see CsvStrategyConfig.ruleColumns): those read
+    // as absent until a rule sets them, and the mappings read them like any other.
+    private val columnIndexByName: Map<String, Int> = columnIndexWithRuleColumns(columns, strategy.config)
 
     // A reconciliation source (see ReconciliationConfig) must only ever resolve onto its own shadow
     // accounts, which the caller passes as [existingAccounts] (see accountsVisibleTo). Persisted mappings
@@ -830,7 +831,7 @@ class CsvTransferMapper(
                 feeDescription = rowFee?.description,
                 fundingMatchValue =
                     strategy.config.fundingAttributeMatch?.let {
-                        getColumnValueOrNull(it.column, originalValues)?.trim()?.takeIf { v -> v.isNotBlank() }
+                        getColumnValueOrNull(it.column, values)?.trim()?.takeIf { v -> v.isNotBlank() }
                     },
                 unidentifiedCounterpartyAccountId = unidentifiedCounterpartyAccountId,
                 // The own account is the source of a payment and the target of a refund (flipped row).

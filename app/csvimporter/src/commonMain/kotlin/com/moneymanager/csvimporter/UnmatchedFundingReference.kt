@@ -3,6 +3,8 @@ package com.moneymanager.csvimporter
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.rules.ColumnRecord
+import com.moneymanager.domain.model.rules.RuleEngine
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import kotlinx.coroutines.flow.first
 
@@ -55,8 +57,9 @@ suspend fun findUnmatchedFundingReferences(
         val fundingMatch = strategy?.config?.fundingAttributeMatch ?: continue
         // getAllImports() doesn't populate columns; re-fetch the full import to locate the column.
         val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: listedImport
-        val columnIndex = csvImport.columns.firstOrNull { it.originalName == fundingMatch.column }?.columnIndex
-        val values = columnIndex?.let { fundingColumnValues(csvImportRepository, csvImport.id, it) }.orEmpty()
+        // The value is read as the rules leave the row, because a rule may set the column from whichever one the file has.
+        val columnIndex = columnIndexWithRuleColumns(csvImport.columns, strategy.config)
+        val values = fundingColumnValues(csvImportRepository, csvImport.id, strategy, columnIndex, fundingMatch.column)
         for (value in values) {
             val entry = occurrences.getOrPut(Key(fundingMatch.attributeTypeName, value)) { Occurrences() }
             entry.rows++
@@ -78,19 +81,24 @@ suspend fun findUnmatchedFundingReferences(
     }
 }
 
-/** The non-blank, trimmed values of [columnIndex] across every staged row of [importId]. */
+/** The non-blank, trimmed values of [column] across every staged row of [importId], once [strategy]'s rules have run. */
 private suspend fun fundingColumnValues(
     csvImportRepository: CsvImportReadRepository,
     importId: CsvImportId,
-    columnIndex: Int,
+    strategy: CsvImportStrategy,
+    columnIndex: Map<String, Int>,
+    column: String,
 ): List<String> {
+    val engine = RuleEngine()
     val values = mutableListOf<String>()
     var offset = 0
     do {
         val page = csvImportRepository.getImportRows(importId, limit = FUNDING_SCAN_PAGE_SIZE, offset = offset)
         page.mapNotNullTo(values) { row ->
-            row.values
-                .getOrNull(columnIndex)
+            engine
+                .evaluate(strategy.config.rules, ColumnRecord(row.values, columnIndex))
+                .record
+                .text(column)
                 ?.trim()
                 ?.takeIf { it.isNotEmpty() }
         }
