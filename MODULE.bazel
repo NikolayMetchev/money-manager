@@ -644,7 +644,7 @@ maven.install(
 maven.install(
     name = "dokka",
     artifacts = [
-        "org.jetbrains.dokka:all-modules-page-plugin:2.2.0",
+        "org.jetbrains.dokka:all-modules-page-plugin:2.3.0",
         "org.jetbrains.dokka:analysis-kotlin-symbols:2.2.0",
         "org.jetbrains.dokka:dokka-base:2.2.0",
         "org.jetbrains.dokka:dokka-cli:2.2.0",
