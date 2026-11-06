@@ -50,7 +50,7 @@ nothing) and features that only built-ins could configure. Don't recreate that d
 Bazel runs through bazelisk, at the version in `.bazelversion`; nothing else needs installing (it downloads the JDK,
 Kotlin, Kotlin/Native and the Android SDK's `compile_sdk` platform and adb). Android targets need the Android SDK License accepted once:
 `bazel run //tools/repo-scripts:repo-scripts-tool -- accept-android-license` (a build that needs it fails naming that command). Device
-tests' emulator is the one thing installed separately. How the build itself works (the KMP rules, Gazelle, the resolver, bumping Kotlin) is in
+tests' emulator is installed separately, and a Mac needs the Xcode Command Line Tools (`xcode-select --install`; not Xcode itself). How the build itself works (the KMP rules, Gazelle, the resolver, bumping Kotlin) is in
 [`bazel/README.md`](bazel/README.md). A cold `bazel build //...` takes well over 2 minutes, so never run it with a short
 timeout; use at least 20 minutes.
 

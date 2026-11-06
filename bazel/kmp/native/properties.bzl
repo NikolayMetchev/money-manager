@@ -6,8 +6,8 @@ The selection mirrors KonanPropertiesLoader: the host's LLVM and libffi, plus ea
 `targetToolchain`, `targetSysRoot` and emulator, keyed `<host>-<target>` when cross-compiling.
 """
 
-# konan's own names for the hosts and targets we build. Apple targets only build on macOS (they need
-# Xcode); cross-compiling to linux_arm64 and mingw_x64 works from every desktop host.
+# konan's own names for the hosts and targets we build. Apple targets only build on macOS (they need the
+# Command Line Tools' SDK and linker); cross-compiling to linux_arm64 and mingw_x64 works from every desktop host.
 HOST_TARGETS = {
     "linux_x64": ["linux_x64", "linux_arm64", "mingw_x64"],
     "macos_arm64": ["linux_x64", "linux_arm64", "macos_arm64", "mingw_x64"],
@@ -128,7 +128,7 @@ def dependencies(props, host, targets):
     """The dependency names konan needs on `host` for `targets`, in a stable order, without duplicates.
 
     Dependencies served from JetBrains' internal server (`remote:internal`: the Xcode toolchain and
-    sysroots) are left out: on macOS konan takes those from the installed Xcode.
+    sysroots) are left out: on macOS konan takes those from `xcrun` (the Command Line Tools or Xcode).
     """
     names = []
     candidates = [

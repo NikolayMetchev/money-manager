@@ -219,7 +219,10 @@ The `kotlin_native` module extension (`kmp/native`) downloads an exec host's `ko
 dependency it would fetch into `~/.konan` (LLVM, GCC sysroots, msys2, libffi), all sha256-pinned in `pins.bzl`, into
 `@kotlin_native_<host>` with konan's data dir inside it: one repository per exec host, fetched only once a toolchain on
 that host is selected. Rules call konan through `run_konan` (`toolchain.bzl`), which
-passes `airplaneMode=true`, so nothing is fetched at build time. One toolchain per exec host carries every target it
+passes `airplaneMode=true`, so nothing is fetched at build time. The one thing konan takes from the machine is macosArm64's
+SDK and linker, from `xcrun`: the Command Line Tools are enough, as the macOS repository sets `ignoreXcodeVersionCheck`
+(konan would otherwise run `xcodebuild`, which only Xcode has), and CI's macOS native job runs on them alone to keep it
+that way. One toolchain per exec host carries every target it
 builds (Linux and Windows hosts: linuxX64, linuxArm64, mingwX64; macOS adds macosArm64; Linux also compiles macosArm64
 klibs, from the macOS distribution's platform klibs, but can't cinterop or link them: `KLIB_ONLY_TARGETS`), picked by name rather than
 by platform, which is how a Linux x64 host cross-links for `//bazel/platforms:linux_arm64`: `kmp_test`'s `:<name>_<target>_cross`
