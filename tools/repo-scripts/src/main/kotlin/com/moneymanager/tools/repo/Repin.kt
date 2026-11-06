@@ -339,6 +339,7 @@ fun repinAndroidSdk(
     val index =
         DocumentBuilderFactory
             .newInstance()
+            .apply { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
             .newDocumentBuilder()
             .parse(ByteArrayInputStream(download("$SDK_REPOSITORY/repository2-3.xml")))
             .documentElement
@@ -368,7 +369,10 @@ fun repinAndroidSdk(
             pinnedPlatform
         } else {
             val bytes = fetch(platform)
-            val dir = ZipInputStream(ByteArrayInputStream(bytes)).use { it.nextEntry.name.substringBefore('/') }
+            val dir =
+                ZipInputStream(ByteArrayInputStream(bytes)).use {
+                    (it.nextEntry ?: error("${platform.file} is empty")).name.substringBefore('/')
+                }
             mapOf("dir" to dir, "file" to platform.file, "sha256" to sha256Hex(bytes))
         }
 

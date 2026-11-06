@@ -30,7 +30,28 @@ func (*kmpLang) Embeds(r *rule.Rule, from label.Label) []label.Label { return ni
 
 // Libraries the toolchain, the distribution and the Android SDK (android.jar, on every Android compile) provide:
 // no dependency to add. The browser's DOM (`kotlinx.browser`, `org.w3c`) isn't: it's the kotlinx-browser library.
-var builtin = []string{"kotlin.", "java.", "javax.", "org.w3c.", "sun.", "kotlinx.cinterop.", "platform.", "android."}
+var builtin = []string{"kotlin.", "java.", "javax.", "sun.", "kotlinx.cinterop.", "platform.", "android."}
+
+// The JDK's and android.jar's XML DOM, which shares its package with the browser's DOM.
+const jvmDom = "org.w3c."
+
+// isBuiltin says whether an import, in code compiled for the lockfile platforms `on`, needs no dependency.
+func isBuiltin(name string, on []string) bool {
+	for _, prefix := range builtin {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	if !strings.HasPrefix(name, jvmDom) || len(on) == 0 {
+		return false
+	}
+	for _, platform := range on {
+		if platform != "jvm" && platform != "android" {
+			return false
+		}
+	}
+	return true
+}
 
 // Dependencies kotlin.* names stand for, which aren't Maven libraries here.
 var kotlinLibraries = map[string]string{
@@ -287,10 +308,8 @@ func resolveImport(c *config.Config, ix *resolve.RuleIndex, kc *kmpConfig, name 
 			return lib, true
 		}
 	}
-	for _, prefix := range builtin {
-		if strings.HasPrefix(name, prefix) {
-			return "", true
-		}
+	if isBuiltin(name, on) {
+		return "", true
 	}
 	for _, pkg := range candidates(name) {
 		matches := ix.FindRulesByImportWithConfig(c, resolve.ImportSpec{Lang: languageName, Imp: pkg}, languageName)

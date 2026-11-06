@@ -10,7 +10,10 @@ private const val LICENSE_RECORD = "money-manager-sdk-license.txt"
  * terminal. The record is what `bazel/kmp/android/extensions.bzl` looks for before downloading the SDK.
  */
 fun acceptAndroidLicense() {
-    val home = System.getenv("ANDROID_USER_HOME") ?: "${System.getProperty("user.home")}/.android"
+    // The lookup extensions.bzl's _android_user_home makes, or it wouldn't find the record.
+    val home =
+        System.getenv("ANDROID_USER_HOME")?.takeIf { it.isNotEmpty() }
+            ?: "${System.getenv("HOME") ?: System.getenv("USERPROFILE") ?: ""}/.android"
     val accepted = acceptAndroidLicense(workspaceFile(LICENSE_TEXT), File(home, LICENSE_RECORD), ::println, ::readlnOrNull)
     if (!accepted) fail("Not accepted: Android targets won't build.")
 }

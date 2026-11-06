@@ -1,6 +1,7 @@
 package com.moneymanager.bazel.kmp.testing;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -49,40 +50,46 @@ public final class KnTestLauncher {
     try (Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
         BufferedReader reader =
             new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-      String line;
-      while ((line = reader.readLine()) != null) {
-        int start = line.indexOf(PREFIX);
-        if (start < 0) {
-          System.out.println(line);
-          continue;
-        }
-        if (start > 0) {
-          // Output the test printed without a newline before the message.
-          System.out.println(line.substring(0, start));
-        }
-        Map<String, String> attrs = new HashMap<>();
-        String type = parse(line, start + PREFIX.length(), attrs);
-        String name = attrs.getOrDefault("name", "");
-        switch (type) {
-          case "testSuiteStarted" -> suite = name;
-          case "testSuiteFinished" -> suite = "";
-          case "testStarted" -> report.caseFor(suite, name);
-          case "testFinished" -> report.caseFor(suite, name).seconds =
-              Long.parseLong(attrs.getOrDefault("duration", "0")) / 1000.0;
-          case "testIgnored" -> {
-            report.caseFor(suite, name).skipped = true;
-            ignored++;
+      // Closing a Process waits for it, and a test that keeps running would never let this fail.
+      try {
+        String line;
+        while ((line = reader.readLine()) != null) {
+          int start = line.indexOf(PREFIX);
+          if (start < 0) {
+            System.out.println(line);
+            continue;
           }
-          case "testFailed" -> {
-            JUnitXml.Case c = report.caseFor(suite, name);
-            c.failureMessage = attrs.getOrDefault("message", "");
-            c.failureDetails = attrs.getOrDefault("details", c.failureMessage);
-            failed++;
-            System.err.println("FAILED " + suite + "." + name);
-            System.err.println(c.failureDetails);
+          if (start > 0) {
+            // Output the test printed without a newline before the message.
+            System.out.println(line.substring(0, start));
           }
-          default -> {}
+          Map<String, String> attrs = new HashMap<>();
+          String type = parse(line, start + PREFIX.length(), attrs);
+          String name = attrs.getOrDefault("name", "");
+          switch (type) {
+            case "testSuiteStarted" -> suite = name;
+            case "testSuiteFinished" -> suite = "";
+            case "testStarted" -> report.caseFor(suite, name);
+            case "testFinished" -> report.caseFor(suite, name).seconds =
+                Long.parseLong(attrs.getOrDefault("duration", "0")) / 1000.0;
+            case "testIgnored" -> {
+              report.caseFor(suite, name).skipped = true;
+              ignored++;
+            }
+            case "testFailed" -> {
+              JUnitXml.Case c = report.caseFor(suite, name);
+              c.failureMessage = attrs.getOrDefault("message", "");
+              c.failureDetails = attrs.getOrDefault("details", c.failureMessage);
+              failed++;
+              System.err.println("FAILED " + suite + "." + name);
+              System.err.println(c.failureDetails);
+            }
+            default -> {}
+          }
         }
+      } catch (IOException | RuntimeException e) {
+        process.destroyForcibly();
+        throw e;
       }
       exit = process.waitFor();
     }
