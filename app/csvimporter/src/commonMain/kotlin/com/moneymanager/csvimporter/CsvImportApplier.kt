@@ -32,6 +32,7 @@ import com.moneymanager.domain.model.csvstrategy.uniqueIdentifierAttributeTypes
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.rules.ColumnRecord
 import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleEngine
 import com.moneymanager.domain.model.rules.RuleEvaluator
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.repository.AccountMappingReadRepository
@@ -301,7 +302,7 @@ private fun collectCryptoCodes(
     fiatCodes: Set<String>,
     existingCryptoCodes: Set<String>,
 ): Set<String> {
-    val indexByName = columns.associate { it.originalName to it.columnIndex }
+    val indexByName = columnIndexWithRuleColumns(columns, strategy.config)
 
     // Every value holding an asset code: the currency lookups plus a fee paid in its own asset.
     val lookups = listOf(TransferField.CURRENCY, TransferField.TO_CURRENCY).mapNotNull { strategy.config.fieldMappings[it] }
@@ -315,9 +316,11 @@ private fun collectCryptoCodes(
     if (readableExprs.isEmpty()) return emptySet()
 
     val rules = RuleEvaluator()
+    val engine = RuleEngine(rules)
     val codes = mutableSetOf<String>()
     for (row in rows) {
-        val record = ColumnRecord(row.values, indexByName)
+        // The code is read as the strategy's rules leave the row, as the mapper reads it.
+        val record = engine.evaluate(strategy.config.rules, ColumnRecord(row.values, indexByName)).record
         for (expr in readableExprs) {
             val raw = rules.resolve(expr) { record.text(it)?.trim() }
             if (raw.isBlank()) continue
