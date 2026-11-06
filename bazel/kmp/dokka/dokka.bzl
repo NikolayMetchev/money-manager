@@ -241,7 +241,7 @@ dokka_module = rule(
         "native": attr.bool(doc = "Whether the module has native targets (its source sets are the native hierarchy's too)."),
         "native_deps": attr.label_list(providers = [KlibInfo], doc = "linuxX64's."),
         "native_srcs": attr.label_list(allow_files = [".kt"]),
-        "_android_jar": attr.label(default = "@android_sdk//:android.jar", allow_single_file = True),
+        "_android_jar": attr.label(default = "@android_platform//:android.jar", allow_single_file = True),
         "_jvm_stdlib": attr.label(default = "@rules_kotlin//kotlin/compiler:kotlin-stdlib", allow_files = True),
         "_module_plugins": attr.label_list(default = _MODULE_PLUGINS, providers = [JavaInfo]),
     },

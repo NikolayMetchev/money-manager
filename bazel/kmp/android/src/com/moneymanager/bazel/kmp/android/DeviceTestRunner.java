@@ -36,6 +36,9 @@ public final class DeviceTestRunner {
       String[] app = args[i].split("=", 2);
       apps.put(app[0], Path.of(app[1]).toAbsolutePath().toString());
     }
+    // The build's adb can differ from the one that started the server (an emulator runner's, Android Studio's), and a
+    // version mismatch restarts the server, which then takes a moment to find the device again.
+    run(List.of(adb, "wait-for-device"), true);
     for (String app : apps.values()) {
       run(List.of(adb, "install", "-r", "-t", app), true);
     }
@@ -44,19 +47,19 @@ public final class DeviceTestRunner {
     Integer code;
     String failure;
     try {
-      Process process = new ProcessBuilder(adb, "shell", "am", "instrument", "-w", "-r", pkg + "/" + runner)
-          .redirectErrorStream(true)
-          .start();
       List<String> lines = new ArrayList<>();
-      try (BufferedReader in = new BufferedReader(
-          new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+      try (Process process = new ProcessBuilder(adb, "shell", "am", "instrument", "-w", "-r", pkg + "/" + runner)
+              .redirectErrorStream(true)
+              .start();
+          BufferedReader in = new BufferedReader(
+              new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
         String line;
         while ((line = in.readLine()) != null) {
           System.out.println(line);
           lines.add(line);
         }
+        process.waitFor();
       }
-      process.waitFor();
       Parsed parsed = parse(lines);
       results = parsed.results;
       code = parsed.code;
@@ -196,10 +199,11 @@ public final class DeviceTestRunner {
   }
 
   private static void run(List<String> command, boolean check) throws IOException, InterruptedException {
-    Process process = new ProcessBuilder(command).inheritIO().start();
-    int exit = process.waitFor();
-    if (check && exit != 0) {
-      throw new IllegalStateException(String.join(" ", command) + " exited " + exit);
+    try (Process process = new ProcessBuilder(command).inheritIO().start()) {
+      int exit = process.waitFor();
+      if (check && exit != 0) {
+        throw new IllegalStateException(String.join(" ", command) + " exited " + exit);
+      }
     }
   }
 }

@@ -6,7 +6,7 @@ load(":apk.bzl", "stamp_setting")
 # The SDK's android.jar, which every Android compile has on its classpath (neverlink): extensions.bzl.
 alias(
     name = "android_jar",
-    actual = "@android_sdk//:android_jar",
+    actual = "@android_platform//:android_jar",
     visibility = ["//visibility:public"],
 )
 
@@ -19,7 +19,7 @@ java_binary(
 
 genrule(
     name = "mockable_android_jar_gen",
-    srcs = ["@android_sdk//:android.jar"],
+    srcs = ["@android_platform//:android.jar"],
     outs = ["mockable-android.jar"],
     cmd = "$(execpath :mockable_jar) $< $@",
     tools = [":mockable_jar"],

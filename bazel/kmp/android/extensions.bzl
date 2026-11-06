@@ -1,18 +1,43 @@
-"""`android_sdk` module extension: the Android SDK platform modules compile against (#1021), and aapt2 (#1023).
+"""`android_sdk` module extension: the Android SDK parts the build reads (#1021, #1310), and aapt2 (#1023).
 
-AGP compiles an Android library against the SDK's `platforms/android-<compileSdk>/android.jar`. This finds the SDK
-as AGP does (`ANDROID_HOME`, then `ANDROID_SDK_ROOT`, then `local.properties`' `sdk.dir`) and exposes that jar,
-neverlink, as `@android_sdk//:android_jar`. `compileSdk` is `android_sdk.levels`' `compile_sdk`. Nothing is
-downloaded: installing the SDK means accepting its license, which stays the person's (or CI's `sdkmanager`) call.
-Without the SDK the repository still loads, and building anything that needs the jar says what's missing.
+Nothing needs installing: the build downloads what it reads from Google's SDK repository, at the versions `pins.bzl`
+names. `@android_platform` is the `compile_sdk` platform: its `android.jar`, neverlink, as `:android_jar`, and the
+platform laid out as an SDK for lint as `:lint_sdk`. `@android_platform_tools//:adb` is what device tests run through.
+Emulators stay outside the build.
 
-`@android_sdk//:versions.bzl` holds the levels `android_sdk.levels` sets (min, target, compile) and AGP's version, `@android_sdk//:adb` is platform-tools' adb (device tests run through it), and
-`@aapt2//:aapt2` is the host's aapt2, the build AGP itself downloads (`pins.bzl`).
+Both are under the Android SDK License, which the person accepts, not the build: Bazel has no way to ask during a
+build, so until `bazel run //tools/repo-scripts:repo-scripts-tool -- accept-android-license` has recorded it, these
+repositories hold an action that fails saying so, and only what needs them breaks. The record is a copy of the license
+text (`sdk_license.txt`) in the Android user home, so a license `repin` brings in that differs is asked about again.
+
+`@android_sdk` downloads nothing, as every BUILD file loads it: `:versions.bzl` holds the levels `android_sdk.levels`
+sets (min, target, compile) and AGP's version, and `:debug.keystore` the debug signing key. `@aapt2//:aapt2` is the
+host's aapt2, the build AGP itself downloads (`pins.bzl`).
 """
 
-load("//bazel/kmp/android:pins.bzl", "AAPT2_BUILD", "AAPT2_SHA256")
+load("//bazel/kmp/android:pins.bzl", "AAPT2_BUILD", "AAPT2_SHA256", "ANDROID_PLATFORM", "PLATFORM_TOOLS")
 
-_FOUND = """\
+_SDK_REPOSITORY = "https://dl.google.com/android/repository/"
+
+_LICENSE = Label("//bazel/kmp/android:sdk_license.txt")
+
+# repo-scripts' accept-android-license and bazel/ci/accept_android_license.sh write this.
+_LICENSE_RECORD = "money-manager-sdk-license.txt"
+
+_NOT_ACCEPTED = ("Android builds need the Android SDK License accepted. Read and accept it with: " +
+                 "bazel run //tools/repo-scripts:repo-scripts-tool -- accept-android-license")
+
+def _android_user_home(rctx):
+    return rctx.getenv("ANDROID_USER_HOME") or (rctx.getenv("HOME", rctx.getenv("USERPROFILE", "")) + "/.android")
+
+def _license_accepted(rctx):
+    record = rctx.path(_android_user_home(rctx) + "/" + _LICENSE_RECORD)
+    rctx.watch(record)
+    return record.exists and rctx.read(record) == rctx.read(_LICENSE)
+
+_FAILING_CMD = repr("echo '%s' >&2; exit 1" % _NOT_ACCEPTED)
+
+_PLATFORM = """\
 load("@rules_java//java:java_import.bzl", "java_import")
 
 exports_files(["android.jar"])
@@ -32,19 +57,17 @@ filegroup(
         "sdk/platforms/*/build.prop",
         "sdk/platforms/*/data/**",
         "sdk/platforms/*/optional/**",
-        "sdk/platforms/*/package.xml",
         "sdk/platforms/*/*.properties",
     ]),
     visibility = ["//visibility:public"],
 )
 """
 
-# Without the platform the jar is an action that fails saying so, so only what compiles for Android breaks.
-_MISSING = """\
+_PLATFORM_NOT_ACCEPTED = """\
 load("@rules_java//java:java_import.bzl", "java_import")
 
 genrule(
-    name = "missing",
+    name = "not_accepted",
     outs = ["android.jar"],
     cmd = {cmd},
     visibility = ["//visibility:public"],
@@ -52,39 +75,84 @@ genrule(
 
 java_import(
     name = "android_jar",
-    jars = [":missing"],
+    jars = [":not_accepted"],
     neverlink = True,
     visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "lint_sdk",
-    srcs = [":missing"],
+    srcs = [":not_accepted"],
     visibility = ["//visibility:public"],
 )
 """
 
-def _properties(text):
-    out = {}
-    for line in text.splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, _, value = line.partition("=")
-            out[key.strip()] = value.strip()
-    return out
+def _platform_impl(rctx):
+    # Checked here, not in the extension: repin itself runs through Bazel, on a MODULE.bazel that has just moved.
+    if ANDROID_PLATFORM["compile_sdk"] != rctx.attr.compile_sdk:
+        fail("pins.bzl has the Android platform for API %d, MODULE.bazel's compile_sdk is %d: run bazel/renovate/repin.sh" % (
+            ANDROID_PLATFORM["compile_sdk"],
+            rctx.attr.compile_sdk,
+        ))
+    if not _license_accepted(rctx):
+        rctx.file("BUILD.bazel", _PLATFORM_NOT_ACCEPTED.format(cmd = _FAILING_CMD))
+        return
+    rctx.download_and_extract(
+        url = _SDK_REPOSITORY + ANDROID_PLATFORM["file"],
+        sha256 = ANDROID_PLATFORM["sha256"],
+        output = "sdk/platforms",
+    )
+    rctx.symlink("sdk/platforms/%s/android.jar" % ANDROID_PLATFORM["dir"], "android.jar")
+    rctx.file("BUILD.bazel", _PLATFORM)
 
-def _sdk_dir(rctx):
-    for var in ["ANDROID_HOME", "ANDROID_SDK_ROOT"]:
-        value = rctx.getenv(var)
-        if value:
-            return value
-    # The workspace's own, found from the invocation rather than passed in: the lockfile records the extension's
-    # repo attributes, and an absolute path there would send every other checkout to this one's file.
-    local = rctx.workspace_root.get_child("local.properties")
-    rctx.watch(local)
-    if local.exists:
-        return _properties(rctx.read(local)).get("sdk.dir")
-    return None
+_platform = repository_rule(
+    implementation = _platform_impl,
+    attrs = {"compile_sdk": attr.int(mandatory = True)},
+)
+
+_ADB_FILES = """\
+filegroup(
+    name = "adb_files",
+    srcs = {srcs},
+    visibility = ["//visibility:public"],
+)
+"""
+
+_ADB_UNIX = 'exports_files(["adb"])\n\n' + _ADB_FILES.format(srcs = '["adb"]')
+
+# adb.exe loads its DLLs from beside it, so a test's runfiles carry them too.
+_ADB_WINDOWS = ('alias(name = "adb", actual = "adb.exe", visibility = ["//visibility:public"])\n\n' +
+                _ADB_FILES.format(srcs = 'glob(["adb.exe", "*.dll"])'))
+
+_ADB_NOT_ACCEPTED = """\
+genrule(
+    name = "not_accepted",
+    outs = ["adb"],
+    cmd = {cmd},
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "adb_files",
+    srcs = [":not_accepted"],
+    visibility = ["//visibility:public"],
+)
+"""
+
+def _host(rctx):
+    name = rctx.os.name.lower()
+    return "osx" if name.startswith("mac") else "windows" if name.startswith("windows") else "linux"
+
+def _platform_tools_impl(rctx):
+    if not _license_accepted(rctx):
+        rctx.file("BUILD.bazel", _ADB_NOT_ACCEPTED.format(cmd = _FAILING_CMD))
+        return
+    host = _host(rctx)
+    archive, sha256 = PLATFORM_TOOLS[host]
+    rctx.download_and_extract(url = _SDK_REPOSITORY + archive, sha256 = sha256, strip_prefix = "platform-tools")
+    rctx.file("BUILD.bazel", _ADB_WINDOWS if host == "windows" else _ADB_UNIX)
+
+_platform_tools = repository_rule(implementation = _platform_tools_impl)
 
 _VERSIONS = """\
 MIN_SDK = {min}
@@ -92,31 +160,6 @@ TARGET_SDK = {target}
 COMPILE_SDK = {compile}
 AGP_VERSION = "{agp}"
 """
-
-# The adb device tests install and run through (`android_device_test`); without platform-tools only running them fails.
-_ADB_FOUND = """
-exports_files(["adb"])
-"""
-
-_ADB_MISSING = """
-genrule(
-    name = "adb_missing",
-    outs = ["adb"],
-    cmd = {cmd},
-    visibility = ["//visibility:public"],
-)
-"""
-
-def _adb(rctx, sdk):
-    exe = "adb.exe" if rctx.os.name.lower().startswith("windows") else "adb"
-    if sdk:
-        adb = rctx.path("%s/platform-tools/%s" % (sdk, exe))
-        rctx.watch(adb)
-        if adb.exists:
-            rctx.symlink(adb, "adb")
-            return _ADB_FOUND
-    message = "No adb: install the SDK's platform-tools with `sdkmanager platform-tools`."
-    return _ADB_MISSING.format(cmd = repr("echo '%s' >&2; exit 1" % message))
 
 # AGP signs debug builds with ~/.android/debug.keystore, creating it when it's missing, so a Bazel APK and a
 # Gradle one install over each other. Without one the build makes its own, as AGP would.
@@ -135,42 +178,24 @@ genrule(
 """
 
 def _debug_keystore(rctx):
-    home = rctx.getenv("ANDROID_USER_HOME") or (rctx.getenv("HOME", rctx.getenv("USERPROFILE", "")) + "/.android")
-    keystore = rctx.path(home + "/debug.keystore")
+    keystore = rctx.path(_android_user_home(rctx) + "/debug.keystore")
     rctx.watch(keystore)
     if keystore.exists:
         rctx.symlink(keystore, "debug.keystore")
         return _KEYSTORE_FOUND
     return _KEYSTORE_MISSING
 
-def _platform_impl(rctx):
-    tools = _debug_keystore(rctx)
+def _sdk_impl(rctx):
     rctx.file("versions.bzl", _VERSIONS.format(
         min = rctx.attr.min_sdk,
         target = rctx.attr.target_sdk,
         compile = rctx.attr.compile_sdk,
         agp = rctx.attr.agp,
     ))
-    sdk = _sdk_dir(rctx)
-    tools += _adb(rctx, sdk)
-    level = rctx.attr.compile_sdk
-    # Newer SDKs name the platform after its minor version too (`android-37.0`).
-    candidates = ["android-%s" % level, "android-%s.0" % level]
-    if sdk:
-        for candidate in candidates:
-            jar = rctx.path("%s/platforms/%s/android.jar" % (sdk, candidate))
-            rctx.watch(jar)
-            if jar.exists:
-                rctx.symlink(jar, "android.jar")
-                rctx.symlink(jar.dirname, "sdk/platforms/" + candidate)
-                rctx.file("BUILD.bazel", _FOUND + tools)
-                return
-    message = ("No Android SDK platform %s: set ANDROID_HOME (or sdk.dir in local.properties) and install it " +
-               "with `sdkmanager \"platforms;%s\"`. Looked in %s.") % (level, candidates[-1], sdk or "no SDK")
-    rctx.file("BUILD.bazel", _MISSING.format(cmd = repr("echo '%s' >&2; exit 1" % message)) + tools)
+    rctx.file("BUILD.bazel", _debug_keystore(rctx))
 
-_platform = repository_rule(
-    implementation = _platform_impl,
+_sdk = repository_rule(
+    implementation = _sdk_impl,
     attrs = {
         "agp": attr.string(mandatory = True),
         "compile_sdk": attr.string(mandatory = True),
@@ -181,8 +206,7 @@ _platform = repository_rule(
 )
 
 def _aapt2_impl(rctx):
-    name = rctx.os.name.lower()
-    host = "osx" if name.startswith("mac") else "windows" if name.startswith("windows") else "linux"
+    host = _host(rctx)
     version = "%s-%s" % (rctx.attr.agp, AAPT2_BUILD)
     rctx.download_and_extract(
         url = "https://dl.google.com/android/maven2/com/android/tools/build/aapt2/%s/aapt2-%s-%s.jar" % (
@@ -212,13 +236,15 @@ def _android_sdk_impl(module_ctx):
     levels = [tag for mod in module_ctx.modules if mod.is_root for tag in mod.tags.levels]
     if len(levels) != 1:
         fail("android_sdk: the root module sets the API levels with exactly one android_sdk.levels(…)")
-    _platform(
+    _sdk(
         name = "android_sdk",
         agp = agps[0],
         compile_sdk = str(levels[0].compile_sdk),
         min_sdk = str(levels[0].min_sdk),
         target_sdk = str(levels[0].target_sdk),
     )
+    _platform(name = "android_platform", compile_sdk = levels[0].compile_sdk)
+    _platform_tools(name = "android_platform_tools")
     _aapt2(name = "aapt2", agp = agps[0])
     return module_ctx.extension_metadata(reproducible = False)
 

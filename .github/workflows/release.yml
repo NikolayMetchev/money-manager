@@ -128,7 +128,6 @@ jobs:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
           config: ${{ matrix.config }}
           cache-name: release-${{ matrix.platform }}
-          android-sdk: ${{ matrix.platform == 'Android' }}
 
       - name: Install packaging tools
         if: matrix.packages
@@ -184,7 +183,6 @@ jobs:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
           config: ${{ matrix.config }}
           cache-name: release-cli-${{ matrix.platform }}
-          android-sdk: 'false'
 
       - name: Link mm
         run: |

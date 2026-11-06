@@ -99,3 +99,21 @@ func TestMavenIndexResolvesPerPlatform(t *testing.T) {
 		t.Errorf("find(p) on linuxX64 found a library")
 	}
 }
+
+func TestDomIsBuiltinOnlyOnTheJvmAndAndroid(t *testing.T) {
+	const dom = "org.w3c.dom.Element"
+	for _, on := range [][]string{{"jvm"}, {"android"}, {"jvm", "android"}} {
+		if !isBuiltin(dom, on) {
+			t.Errorf("isBuiltin(%s, %v) = false, want true", dom, on)
+		}
+	}
+	// kotlinx-browser declares it in the browser, so these need that dependency.
+	for _, on := range [][]string{{"js"}, {"wasmJs"}, {"jvm", "js"}, nil} {
+		if isBuiltin(dom, on) {
+			t.Errorf("isBuiltin(%s, %v) = true, want false", dom, on)
+		}
+	}
+	if !isBuiltin("kotlin.collections.List", []string{"js"}) {
+		t.Errorf("kotlin.* isn't builtin in the browser")
+	}
+}

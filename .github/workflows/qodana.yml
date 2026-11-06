@@ -106,9 +106,6 @@ jobs:
           # Plugins too, so the scan runs only the ones qodana.yaml lists: main's cache still holds the Gradle build's
           # SQLDelight plugin, which can't find the dialect without a Gradle import and rejects valid SQLite.
           rm -rf "$CACHES/plugins"
-      # The runner image sets ANDROID_HOME in its environment, which the env context below doesn't see.
-      - name: Expose the Android SDK path
-        run: echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.2
         env:
@@ -125,7 +122,7 @@ jobs:
           # Sync builds the generated sources (SQLDelight, kotlin_constants) the model needs, and the Bazel plugin opens
           # the checkout as a Bazel project only with auto-open on (the bootstrap moves .idea aside, see
           # .qodana/open-as-bazel.sh). The bootstrap installs packages, so the container runs as root.
-          args: --property=bsp.build.project.on.sync=true,--property=idea.is.internal=true,--property=bazel.project.auto.open.if.present=true,--user,root,--volume,${{ env.ANDROID_HOME }}:/opt/android-sdk:ro,--env,ANDROID_HOME=/opt/android-sdk
+          args: --property=bsp.build.project.on.sync=true,--property=idea.is.internal=true,--property=bazel.project.auto.open.if.present=true,--user,root
       - name: Save Qodana cache
         if: always() && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/releases/'))
         uses: actions/cache/save@v6

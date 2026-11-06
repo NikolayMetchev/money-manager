@@ -158,7 +158,7 @@ def _model_impl(ctx):
 
     files = []
     for basename, content in [
-        # The SDK lint looks compileTarget up in (`--sdk-home`): the platform `@android_sdk//:lint_sdk` lays out.
+        # The SDK lint looks compileTarget up in (`--sdk-home`): the platform `@android_platform//:lint_sdk` lays out.
         ("sdk-home", "@ROOT@/" + ctx.files._sdk[0].short_path.split("/sdk/platforms/")[0] + "/sdk"),
         ("module.xml", module),
         (ctx.attr.variant + ".xml", variant),
@@ -182,8 +182,8 @@ _model = rule(
         "java_source_level": attr.string(mandatory = True),
         "srcs": attr.label_list(allow_files = True),
         "variant": attr.string(mandatory = True),
-        "_android_jar": attr.label(default = Label("@android_sdk//:android_jar"), allow_single_file = True),
-        "_sdk": attr.label(default = Label("@android_sdk//:lint_sdk")),
+        "_android_jar": attr.label(default = Label("@android_platform//:android_jar"), allow_single_file = True),
+        "_sdk": attr.label(default = Label("@android_platform//:lint_sdk")),
     },
 )
 

@@ -157,9 +157,11 @@ public final class JPackageRunner {
         String wix = Path.of(one(options, "--wix")).toAbsolutePath().toString();
         process.environment().merge("PATH", wix, (path, dir) -> dir + ";" + path);
       }
-      int code = process.start().waitFor();
-      if (code != 0) {
-        throw new IllegalStateException("jpackage exited with " + code + ": " + String.join(" ", command));
+      try (Process jpackage = process.start()) {
+        int code = jpackage.waitFor();
+        if (code != 0) {
+          throw new IllegalStateException("jpackage exited with " + code + ": " + String.join(" ", command));
+        }
       }
       if (mode.equals("image") && HOST_OS == OS.MAC) {
         signRuntime(out.resolve(one(options, "--name") + ".app"), Path.of(values.get("{entitlements}")));
@@ -480,9 +482,11 @@ public final class JPackageRunner {
   }
 
   private static void run(List<String> command) throws Exception {
-    int code = new ProcessBuilder(command).inheritIO().start().waitFor();
-    if (code != 0) {
-      throw new IllegalStateException(String.join(" ", command) + " exited with " + code);
+    try (Process process = new ProcessBuilder(command).inheritIO().start()) {
+      int code = process.waitFor();
+      if (code != 0) {
+        throw new IllegalStateException(String.join(" ", command) + " exited with " + code);
+      }
     }
   }
 

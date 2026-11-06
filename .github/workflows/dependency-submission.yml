@@ -32,7 +32,6 @@ jobs:
         with:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
           cache-name: dependency-submission
-          android-sdk: 'false'
 
       # Bazel's resolution is the Maven lockfiles (`bazel run @<hub>//:pin`), so the graph is read from
       # them; nothing needs building. The Kotlin stdlib comes from the Kotlin toolchain, not a lockfile.

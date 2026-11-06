@@ -18,34 +18,11 @@ flags=("$@")
 # On a remote runner: what the GitHub job's setup (bazel-setup, the packaging tools) provides. The snapshot keeps
 # both, so only a new runner installs them.
 if [ -n "${BUILDBUDDY_CI_RUNNER_ROOT_DIR:-}" ]; then
-  # jpackage's deb needs fakeroot, sdkmanager a JRE, and the native test binaries zstd.
-  command -v fakeroot > /dev/null && command -v java > /dev/null && command -v zstd > /dev/null ||
-    { sudo apt-get update -q && sudo apt-get install -yq fakeroot openjdk-21-jre-headless zstd; } || exit 1
+  # jpackage's deb needs fakeroot, and the native test binaries zstd.
+  command -v fakeroot > /dev/null && command -v zstd > /dev/null ||
+    { sudo apt-get update -q && sudo apt-get install -yq fakeroot zstd; } || exit 1
 
-  # The SDK platform the Android compiles read (MODULE.bazel's compile_sdk), installed by sdkmanager as on GitHub's
-  # runners. local.properties rather than ANDROID_HOME, which rules_android's SDK repository also reads, and fails on
-  # without build-tools.
-  sdk=$HOME/android-sdk
-  echo "sdk.dir=$sdk" > local.properties
-  level=$(sed -n 's/^ *compile_sdk = \([0-9]*\),$/\1/p' MODULE.bazel)
-  if [ ! -f "$sdk/platforms/android-$level.0/package.xml" ]; then
-    sdkmanager=$sdk/cmdline-tools/latest/bin/sdkmanager
-    if [ ! -x "$sdkmanager" ]; then
-      read -r zip sha1 < <(curl -fsSL https://dl.google.com/android/repository/repository2-3.xml | awk '
-        /<remotePackage path="cmdline-tools;latest">/ { inside = 1 }
-        inside && /<checksum/ { checksum = $0; sub(/.*<checksum[^>]*>/, "", checksum); sub(/<\/checksum>.*/, "", checksum) }
-        inside && /<url>commandlinetools-linux-/ { url = $0; sub(/.*<url>/, "", url); sub(/<\/url>.*/, "", url); print url, checksum; exit }
-      ') || exit 1
-      tmp=$(mktemp -d)
-      curl -fsSL -o "$tmp/tools.zip" "https://dl.google.com/android/repository/$zip" &&
-        echo "$sha1  $tmp/tools.zip" | sha1sum -c --quiet &&
-        unzip -q "$tmp/tools.zip" -d "$tmp" &&
-        mkdir -p "$sdk/cmdline-tools" && mv "$tmp/cmdline-tools" "$sdk/cmdline-tools/latest" || exit 1
-      rm -rf "$tmp"
-    fi
-    yes | "$sdkmanager" --licenses > /dev/null
-    "$sdkmanager" --install "platforms;android-$level.0" || exit 1
-  fi
+  bazel/ci/accept_android_license.sh || exit 1
 
   if [ -n "${BUILDBUDDY_API_KEY:-}" ]; then
     {
