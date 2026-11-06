@@ -226,6 +226,16 @@ class StrategySelectorTest {
     }
 
     @Test
+    fun `the newer Curve export selects the same Curve CSV strategy`() {
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
+        val headings = listOf("Export Format", "Date (YYYY-MM-DD as UTC)", "Time (HH:MM:SS as UTC)", "Merchant", "Card Last 4 Digits")
+        val columns = headings.mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }
+        val rows = listOf(CsvRow(rowIndex = 1L, values = listOf("v2", "2026-06-16", "10:00:00", "TFL", "7721")))
+
+        assertEquals("Curve CSV", builtIns.selectForCsv("Transactions 2026-06-16.csv", columns, rows)?.name)
+    }
+
+    @Test
     fun `a Wise export still selects the Wise CSV strategy alongside Curve`() {
         // Both Curve and Wise name their export "transaction-history"-ish, so this guards against the
         // Curve fileNamePattern hijacking a Wise file — the disjoint column sets must keep them apart.
