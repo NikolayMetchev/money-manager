@@ -31,7 +31,11 @@ public final class KnTestLauncher {
   static void main(String[] args) throws Exception {
     List<String> command = new ArrayList<>();
     if (args[0].equals("--node")) {
-      for (int i = 1; i < args.length; i++) {
+      command.add(Path.of(args[1]).toAbsolutePath().toString());
+      // A local run's node_modules is symlinks into Bazel's repositories. Following them would leave the tree, and a
+      // package's require() of its sibling (@js-joda/timezone's @js-joda/core) would no longer find it.
+      command.add("--preserve-symlinks");
+      for (int i = 2; i < args.length; i++) {
         command.add(Path.of(args[i]).toAbsolutePath().toString());
       }
     } else {
