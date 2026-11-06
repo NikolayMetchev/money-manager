@@ -57,7 +57,6 @@ object BuiltInCsvStrategies {
     val bybitFundingCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000f")
     val bybitUnifiedCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000010")
     val payPalCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000011")
-    val payPalLegacyCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000012")
     val curveTransactionsCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000013")
     val amexQifStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000014")
     val amexPdfStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000015")
@@ -244,6 +243,13 @@ object BuiltInCsvStrategies {
      */
     private const val PAYPAL_RECONCILE_WINDOW_SECONDS = 172_800L
 
+    /** The columns every PayPal activity download has, whichever year it is from. */
+    private val PAYPAL_COLUMNS =
+        setOf("Date", "Time", "Time zone", "Name", "Type", "Status", "Currency", "Amount", "Receipt ID", "Balance")
+
+    /** Columns only the newer export has. */
+    private val PAYPAL_OPTIONAL_COLUMNS = setOf("Fees", "Total", "Exchange Rate", "Transaction ID", "Item Title")
+
     /** PayPal's leg group pairing a conversion's debit and credit rows into one trade. */
     private const val PAYPAL_CONVERSION_GROUP = "conversion"
 
@@ -395,7 +401,6 @@ object BuiltInCsvStrategies {
             buildBybitFundingCsvStrategy(now),
             buildBybitUnifiedCsvStrategy(now),
             buildPayPalCsvStrategy(now),
-            buildPayPalLegacyCsvStrategy(now),
         )
 
     /**
@@ -1109,77 +1114,21 @@ object BuiltInCsvStrategies {
 
     /**
      * Built-in strategy for PayPal's activity download (`Download.CSV`, or a date-range name such as
-     * `2025-05-04-2026-05-03.CSV`) in its current 15-column form. See [payPalStrategyConfig].
+     * `2025-05-04-2026-05-03.CSV`), in both its current 15-column form and the older 10-column one that
+     * lacks [PAYPAL_OPTIONAL_COLUMNS]. See [payPalStrategyConfig].
      */
     fun buildPayPalCsvStrategy(now: Instant): CsvImportStrategy =
         CsvImportStrategy(
             id = CsvImportStrategyId(payPalCsvStrategyId),
             name = "PayPal CSV",
             config =
-                payPalStrategyConfig(
-                    identificationColumns =
-                        setOf(
-                            "Date",
-                            "Time",
-                            "Time zone",
-                            "Name",
-                            "Type",
-                            "Status",
-                            "Currency",
-                            "Amount",
-                            "Fees",
-                            "Total",
-                            "Exchange Rate",
-                            "Receipt ID",
-                            "Balance",
-                            "Transaction ID",
-                            "Item Title",
-                        ),
-                    extraAttributes =
-                        listOf(
-                            attribute("Transaction ID", "paypal-transaction-id"),
-                            attribute("Item Title", "paypal-item-title"),
-                            // Informational: Amount is already net of it (it is what moved the balance).
-                            attribute("Fees", "paypal-fee", extraction = Extraction(pattern = "^.*[1-9].*$")),
-                        ),
-                    exclusions = emptyList(),
-                ),
+                payPalStrategyConfig(),
             createdAt = now,
             updatedAt = now,
         )
 
     /**
-     * Built-in strategy for PayPal's older 10-column activity download (no Fees/Total/Transaction ID). It
-     * lists every withdrawal to a bank twice: the row that moves the balance (status `Pending`, or
-     * `Removed`) and, seconds later, a `Completed` echo that leaves the balance where it was. The echo is
-     * imported excluded. (Two withdrawals in the user's 2015–2020 export have no earlier twin and are lost
-     * to this rule; a file that only holds `Removed` rows, like a 2020 one, is unaffected.)
-     */
-    fun buildPayPalLegacyCsvStrategy(now: Instant): CsvImportStrategy =
-        CsvImportStrategy(
-            id = CsvImportStrategyId(payPalLegacyCsvStrategyId),
-            name = "PayPal CSV (legacy)",
-            config =
-                payPalStrategyConfig(
-                    identificationColumns =
-                        setOf("Date", "Time", "Time zone", "Name", "Type", "Status", "Currency", "Amount", "Receipt ID", "Balance"),
-                    extraAttributes = emptyList(),
-                    exclusions =
-                        listOf(
-                            excludeWhen(
-                                "Type",
-                                "^General Withdrawal$",
-                                "status echo of a withdrawal",
-                                conditions = listOf(Condition("Status", ConditionOp.EQUALS, "Completed")),
-                            ),
-                        ),
-                ),
-            createdAt = now,
-            updatedAt = now,
-        )
-
-    /**
-     * What both PayPal export formats share. Every row moves money into or out of the one [PAYPAL_ACCOUNT]
+     * What every PayPal export shares. Every row moves money into or out of the one [PAYPAL_ACCOUNT]
      * (signed Amount, positive = in), whatever its currency. The counterparty is the row's Name — the
      * merchant or person — except where the export cannot say who it was:
      *
@@ -1202,11 +1151,7 @@ object BuiltInCsvStrategies {
      * profile, and the `Time zone` column names the zone by abbreviation (GMT/BST), which
      * [payPalTimezones] turns into an offset.
      */
-    private fun payPalStrategyConfig(
-        identificationColumns: Set<String>,
-        extraAttributes: List<StrategyRule>,
-        exclusions: List<StrategyRule>,
-    ): CsvStrategyConfig<FieldMapping> {
+    private fun payPalStrategyConfig(): CsvStrategyConfig<FieldMapping> {
         val fieldMappings =
             mapOf(
                 accountFromRules(TransferField.SOURCE_ACCOUNT),
@@ -1243,7 +1188,25 @@ object BuiltInCsvStrategies {
                     "not a movement",
                 ),
                 excludeWhen("Status", "^Refused$", "refused"),
-            ) + extraAttributes + exclusions +
+                attribute("Transaction ID", "paypal-transaction-id"),
+                attribute("Item Title", "paypal-item-title"),
+                // Informational: Amount is already net of it (it is what moved the balance).
+                attribute("Fees", "paypal-fee", extraction = Extraction(pattern = "^.*[1-9].*$")),
+                // The older export lists every withdrawal to a bank twice: the row that moves the balance (status
+                // `Pending`, or `Removed`) and, seconds later, a `Completed` echo that leaves it where it was. Only
+                // that export lacks a Transaction ID. (Two withdrawals in a 2015-2020 export have no earlier twin and
+                // are lost to this rule; a file holding only `Removed` rows is unaffected.)
+                excludeWhen(
+                    "Type",
+                    "^General Withdrawal$",
+                    "status echo of a withdrawal",
+                    conditions =
+                        listOf(
+                            Condition("Status", ConditionOp.EQUALS, "Completed"),
+                            Condition("Transaction ID", ConditionOp.MISSING),
+                        ),
+                ),
+            ) +
                 listOf(
                     incomingWhenPositive("Amount"),
                     accounts(AccountSide.SOURCE, fixedNaming("Type", PAYPAL_ACCOUNT), naming("Type")),
@@ -1282,7 +1245,8 @@ object BuiltInCsvStrategies {
                     ),
                 )
         return CsvStrategyConfig(
-            identificationColumns = identificationColumns,
+            identificationColumns = PAYPAL_COLUMNS,
+            optionalColumns = PAYPAL_OPTIONAL_COLUMNS,
             fieldMappings = fieldMappings,
             rules = rules,
             crossSourceReconcileWindow = SettlementWindow.Elapsed(PAYPAL_RECONCILE_WINDOW_SECONDS),
