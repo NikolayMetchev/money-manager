@@ -48,8 +48,9 @@ nothing) and features that only built-ins could configure. Don't recreate that d
 ## Build Commands
 
 Bazel runs through bazelisk, at the version in `.bazelversion`; nothing else needs installing (it downloads the JDK,
-Kotlin and Kotlin/Native). Android targets need an SDK with the `compile_sdk` platform (`android_sdk.levels` in `MODULE.bazel`) (`ANDROID_HOME`
-or `local.properties`). How the build itself works (the KMP rules, Gazelle, the resolver, bumping Kotlin) is in
+Kotlin, Kotlin/Native and the Android SDK's `compile_sdk` platform and adb). Android targets need the Android SDK License accepted once:
+`bazel run //tools/repo-scripts:repo-scripts-tool -- accept-android-license` (a build that needs it fails naming that command). Device
+tests' emulator is the one thing installed separately. How the build itself works (the KMP rules, Gazelle, the resolver, bumping Kotlin) is in
 [`bazel/README.md`](bazel/README.md). A cold `bazel build //...` takes well over 2 minutes, so never run it with a short
 timeout; use at least 20 minutes.
 
@@ -189,7 +190,7 @@ workflow because label events start it: any other label's run skips, without can
 | `app/ui/{foundation,components}/` | Platform UI helpers; shared widgets and editors (pickers, `ConditionsEditor`, `StrategyRulesEditor`, …) |
 | `app/ui/{accounts,audit,categories,currencies,people,settings,transactions}/`, `app/ui/imports/{api,csv,importDirectory,reconciliation,timeline}/` | One module per feature screen |
 | `tools/{strategy-catalog,crypto-dataset}/` | Build-time tools: catalog site renderer; crypto dataset builder |
-| `tools/repo-scripts/` | The repository's scripts, in Kotlin: `repin` (what a version bump leaves stale, run by `bazel/renovate/repin.sh`), `dependency-snapshot` (GitHub's dependency graph from the lockfiles) and `startup-bench` (the installed launchers' startup times). Run with `bazel run //tools/repo-scripts:repo-scripts-tool -- <script> <args>` |
+| `tools/repo-scripts/` | The repository's scripts, in Kotlin: `repin` (what a version bump leaves stale, run by `bazel/renovate/repin.sh`), `dependency-snapshot` (GitHub's dependency graph from the lockfiles), `startup-bench` (the installed launchers' startup times) and `accept-android-license` (records the Android SDK License, so Bazel downloads the SDK). Run with `bazel run //tools/repo-scripts:repo-scripts-tool -- <script> <args>` |
 | `test/app/db/read/`, `test/app/db/write/` | SQLDelight queries only tests need (row counts, audit history, schema introspection; fixture writes): `testReads`/`testWrites` on `MoneyManagerDatabaseWrapper`. Kept apart from `app/db/{read,write}` so production code can't reach them |
 | `test/{app/db,app/ui,app/remotestorage,utils/credentialvault}/` | Test fixtures only (see **Testing**); `app/remotestorage` is the in-memory cloud store (`InMemoryStorageProvider`, `SingleProviderFactory`) |
 | `app/main/jvm/` | JVM Desktop entry point |

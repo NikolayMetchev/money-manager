@@ -7,13 +7,16 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.w3c.dom.Element
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.net.URLEncoder
+import java.security.MessageDigest
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
+import javax.xml.parsers.DocumentBuilderFactory
 
-private const val REPIN_USAGE = "usage: repin node|jdk|bytecode|skiko|pdfium|aapt2 <args>"
+private const val REPIN_USAGE = "usage: repin node|jdk|bytecode|skiko|pdfium|aapt2|android-sdk <args>"
 
 /** Re-pins what a version bump in MODULE.bazel leaves stale; `bazel/renovate/repin.sh` runs each subcommand. */
 fun repin(args: List<String>) {
@@ -25,6 +28,7 @@ fun repin(args: List<String>) {
         "skiko" -> repinSkiko(workspaceFile(rest[0]))
         "pdfium" -> repinPdfium(workspaceFile(rest[0]))
         "aapt2" -> repinAapt2(workspaceFile(rest[0]), workspaceFile(rest[1]))
+        "android-sdk" -> repinAndroidSdk(workspaceFile(rest[0]), workspaceFile(rest[1]), workspaceFile(rest[2]))
         else -> fail(REPIN_USAGE)
     }
 }
@@ -304,3 +308,116 @@ fun repinAapt2(
     if (count != 3) fail("expected 3 aapt2 checksums in $pinsFile, found $count")
     if (writeIfChanged(pinsFile, pins, updated)) println("Re-pinned aapt2 $version")
 }
+
+// --- The Android SDK: the compile_sdk platform and platform-tools from Google's index, and the license they're under.
+
+private const val SDK_REPOSITORY = "https://dl.google.com/android/repository"
+private const val STABLE_CHANNEL = "channel-0"
+
+/** The index's host names against pins.bzl's (aapt2's, which are AGP's). */
+private val SDK_HOSTS = mapOf("linux" to "linux", "macosx" to "osx", "windows" to "windows")
+
+private val PLATFORM_PIN = Regex("""^ANDROID_PLATFORM = \{\n(.*?)^}""", setOf(RegexOption.MULTILINE, RegexOption.DOT_MATCHES_ALL))
+private val TOOLS_PIN = Regex("""^PLATFORM_TOOLS = \{\n(.*?)^}""", setOf(RegexOption.MULTILINE, RegexOption.DOT_MATCHES_ALL))
+private val PIN_FIELD = Regex(""""(\w+)": (?:"([^"]*)"|(\d+))""")
+private val TOOLS_ENTRY = Regex(""""(\w+)": \["([^"]+)", "([0-9a-f]{64})"]""")
+
+private class SdkArchive(
+    val file: String,
+    val sha1: String,
+)
+
+fun repinAndroidSdk(
+    moduleFile: File,
+    pinsFile: File,
+    licenseFile: File,
+    download: (String) -> ByteArray = ::httpGet,
+) {
+    val level =
+        Regex("""^ *compile_sdk = (\d+),$""", MULTILINE).find(moduleFile.readText())?.groupValues?.get(1)
+            ?: fail("no compile_sdk in $moduleFile")
+    val index =
+        DocumentBuilderFactory
+            .newInstance()
+            .newDocumentBuilder()
+            .parse(ByteArrayInputStream(download("$SDK_REPOSITORY/repository2-3.xml")))
+            .documentElement
+    val pins = pinsFile.readText()
+
+    // Only a new archive is downloaded: repin.sh runs on every Renovate branch, and the platform is 67 MB.
+    val fetch = { archive: SdkArchive ->
+        val bytes = download("$SDK_REPOSITORY/${archive.file}")
+        val sha1 = MessageDigest.getInstance("SHA-1").digest(bytes).joinToString("") { "%02x".format(it) }
+        check(sha1 == archive.sha1) { "${archive.file}: the index says SHA-1 ${archive.sha1}, the download is $sha1" }
+        bytes
+    }
+
+    val platform =
+        listOf("platforms;android-$level.0", "platforms;android-$level")
+            .firstNotNullOfOrNull { index.stablePackage(it) }
+            ?.archives()
+            ?.values
+            ?.single()
+            ?: error("no stable Android platform for API $level in the SDK index")
+    val pinnedPlatform =
+        PLATFORM_PIN.find(pins)?.let { pin ->
+            PIN_FIELD.findAll(pin.groupValues[1]).associate { it.groupValues[1] to it.groupValues[2].ifEmpty { it.groupValues[3] } }
+        } ?: fail("no ANDROID_PLATFORM in $pinsFile")
+    val platformFields =
+        if (pinnedPlatform["file"] == platform.file && pinnedPlatform["compile_sdk"] == level) {
+            pinnedPlatform
+        } else {
+            val bytes = fetch(platform)
+            val dir = ZipInputStream(ByteArrayInputStream(bytes)).use { it.nextEntry.name.substringBefore('/') }
+            mapOf("dir" to dir, "file" to platform.file, "sha256" to sha256Hex(bytes))
+        }
+
+    val tools = (index.stablePackage("platform-tools") ?: error("no stable platform-tools in the SDK index")).archives()
+    val pinnedTools =
+        TOOLS_ENTRY.findAll(TOOLS_PIN.find(pins)?.groupValues?.get(1) ?: fail("no PLATFORM_TOOLS in $pinsFile")).associate {
+            it.groupValues[1] to (it.groupValues[2] to it.groupValues[3])
+        }
+    val toolsEntries =
+        SDK_HOSTS.values.sorted().joinToString("") { host ->
+            val archive = tools[host] ?: error("platform-tools has no archive for $host")
+            val sha256 =
+                pinnedTools[host]?.takeIf { it.first == archive.file }?.second ?: sha256Hex(fetch(archive))
+            "    \"$host\": [\"${archive.file}\", \"$sha256\"],\n"
+        }
+
+    val platformEntries =
+        "    \"compile_sdk\": $level,\n" +
+            listOf("dir", "file", "sha256").joinToString("") { "    \"$it\": \"${platformFields[it]}\",\n" }
+    val updated =
+        TOOLS_PIN.replace(PLATFORM_PIN.replace(pins) { "ANDROID_PLATFORM = {\n$platformEntries}" }) {
+            "PLATFORM_TOOLS = {\n$toolsEntries}"
+        }
+    if (writeIfChanged(pinsFile, pins, updated)) println("Re-pinned the Android SDK: ${platform.file}, ${tools.values.first().file}")
+
+    val license =
+        index
+            .elements("license")
+            .firstOrNull { it.getAttribute("id") == "android-sdk-license" }
+            ?.textContent
+            ?: error("no android-sdk-license in the SDK index")
+    if (writeIfChanged(licenseFile, licenseFile.readText(), license)) {
+        println("The Android SDK License changed: everyone accepts it again")
+    }
+}
+
+private fun Element.elements(tag: String): List<Element> =
+    getElementsByTagName(tag).let { nodes -> (0 until nodes.length).map { nodes.item(it) as Element } }
+
+private fun Element.stablePackage(path: String): Element? =
+    elements("remotePackage").firstOrNull { pkg ->
+        pkg.getAttribute("path") == path && pkg.elements("channelRef").single().getAttribute("ref") == STABLE_CHANNEL
+    }
+
+/** A package's archives by pins.bzl's host name; an archive for every host (a platform's) is under one key. */
+private fun Element.archives(): Map<String, SdkArchive> =
+    elements("archive").associate { archive ->
+        val host = archive.elements("host-os").singleOrNull()?.textContent
+        val complete = archive.elements("complete").single()
+        (SDK_HOSTS[host] ?: "any") to
+            SdkArchive(complete.elements("url").single().textContent, complete.elements("checksum").single().textContent)
+    }

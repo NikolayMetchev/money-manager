@@ -784,4 +784,4 @@ android_sdk.levels(
     min_sdk = 30,
     target_sdk = 36,
 )
-use_repo(android_sdk, "aapt2", "android_sdk")
+use_repo(android_sdk, "aapt2", "android_platform", "android_platform_tools", "android_sdk")

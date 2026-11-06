@@ -585,7 +585,6 @@ jobs:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
           config: ${{ matrix.config }}
           cache-name: installer-${{ matrix.name }}
-          android-sdk: 'false'
 
       # The startup timing tool (main only) is compiled for MODULE.bazel's JDK, and the installed runtime has no java.
       - name: Read the JDK version
@@ -725,7 +724,6 @@ jobs:
         with:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
           cache-name: format
-          android-sdk: 'false'
 
       # Stale BUILD files are regenerated and pushed, not reported. Gazelle failing is a real error (two modules
       # declaring one package, an import nothing provides), so it fails the job.

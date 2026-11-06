@@ -334,12 +334,18 @@ it is relative, so it runs under any prefix.
 
 ## Android (`kmp/android`)
 
-- **SDK**: the `android_sdk` extension finds the SDK as AGP does (`ANDROID_HOME`, `ANDROID_SDK_ROOT`,
-  `local.properties`) and takes the `compile_sdk` platform `android_sdk.levels(…)` sets, never downloading it (CI runs
-  `sdkmanager`). `@android_sdk//:lint_sdk` is that platform laid out as an SDK for lint. AGP's own tools come from the
+- **SDK**: the `android_sdk` extension downloads what the build reads from Google's SDK repository, at `pins.bzl`'s
+  versions (`repo-scripts repin android-sdk` rewrites them from its index): `@android_platform`, the `compile_sdk`
+  platform `android_sdk.levels(…)` sets, and `@android_platform_tools`' adb. Neither `ANDROID_HOME` nor `local.properties`
+  is read, and nothing that doesn't need them fetches them. Both are under the Android SDK License, and Bazel can't ask
+  during a build: until `bazel run //tools/repo-scripts:repo-scripts-tool -- accept-android-license` has recorded
+  `sdk_license.txt` in `~/.android` (`ANDROID_USER_HOME`), they hold an action that fails naming that command. When repin
+  brings in a changed license it is asked again; CI accepts with `bazel/ci/accept_android_license.sh`.
+  `@android_platform//:lint_sdk` is that platform laid out as an SDK for lint (its zip has no sdkmanager `package.xml`,
+  which lint doesn't need). AGP's own tools come from the
   `@android_tools` install; aapt2 is downloaded as AGP does, for the release `android_sdk.agp(version = …)` names (`pins.bzl`, from AGP's `aapt2_version.properties`).
 - **Libraries**: `# gazelle:kmp_targets android …` gives a module `:<name>_android`: `commonMain ← jvmAndroidMain ←
-  androidMain` against `@android_sdk//:android_jar` (neverlink), on the JVM's toolchain. `jvmAndroidMain`'s deps are
+  androidMain` against `@android_platform//:android_jar` (neverlink), on the JVM's toolchain. `jvmAndroidMain`'s deps are
   `jvm_android_deps`/`jvm_android_exports`, which both compiles see. An `androidMain` runtime-only dep is
   `kmp_keep_dep … androidMain` (the cryptography provider). Resources, manifests and dexing are the app's.
 - **Host tests**: `kmp_test(android = True)`'s `:<name>_android` compiles `commonTest ← jvmAndroidTest ←

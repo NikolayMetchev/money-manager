@@ -136,8 +136,9 @@ The main modules (see [`CLAUDE.md`](CLAUDE.md) for the full table and the
 ## Building & Running
 
 > Install [bazelisk](https://github.com/bazelbuild/bazelisk) (as `bazel`); it runs the Bazel version in
-> `.bazelversion`, and Bazel downloads the JDK, Kotlin and Kotlin/Native itself. Android targets also need an
-> Android SDK (`ANDROID_HOME`) with the platform the catalog's `android-compileSdk` names.
+> `.bazelversion`, and Bazel downloads the JDK, Kotlin, Kotlin/Native and the Android SDK itself. Android targets need
+> the Android SDK License accepted once: `bazel run //tools/repo-scripts:repo-scripts-tool -- accept-android-license`
+> shows it and asks. Android device tests also need an emulator of your own.
 
 | Command | Description |
 |---------|-------------|

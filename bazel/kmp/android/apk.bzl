@@ -381,7 +381,7 @@ android_apk = rule(
         "version_code": attr.int(),
         "version_name": attr.string(),
         "_aapt2": attr.label(default = Label("@aapt2"), executable = True, cfg = "exec", allow_single_file = True),
-        "_android_jar": attr.label(default = Label("@android_sdk//:android.jar"), allow_single_file = True),
+        "_android_jar": attr.label(default = Label("@android_platform//:android.jar"), allow_single_file = True),
         "_d8": attr.label(default = Label("//bazel/kmp/android:d8"), executable = True, cfg = "exec"),
         "_debug_keystore": attr.label(default = Label("@android_sdk//:debug.keystore"), allow_single_file = True),
         "_stamp": attr.label(default = Label("//bazel/kmp/android:stamp"), providers = [_StampInfo]),

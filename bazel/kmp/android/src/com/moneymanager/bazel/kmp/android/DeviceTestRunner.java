@@ -36,6 +36,9 @@ public final class DeviceTestRunner {
       String[] app = args[i].split("=", 2);
       apps.put(app[0], Path.of(app[1]).toAbsolutePath().toString());
     }
+    // The build's adb can differ from the one that started the server (an emulator runner's, Android Studio's), and a
+    // version mismatch restarts the server, which then takes a moment to find the device again.
+    run(List.of(adb, "wait-for-device"), true);
     for (String app : apps.values()) {
       run(List.of(adb, "install", "-r", "-t", app), true);
     }

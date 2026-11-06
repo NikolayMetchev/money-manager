@@ -7,3 +7,5 @@ if [ -d .idea ]; then
   rm -rf .qodana/idea
   mv .idea .qodana/idea
 fi
+# The Android modules' model needs the SDK platform, which Bazel only downloads once its license is accepted.
+sh bazel/ci/accept_android_license.sh

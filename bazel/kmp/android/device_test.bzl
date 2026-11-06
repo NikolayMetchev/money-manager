@@ -28,12 +28,12 @@ def android_device_test(name, apk, package, runner = INSTRUMENTATION_RUNNER, ins
         main_class = "com.moneymanager.bazel.kmp.android.DeviceTestRunner",
         use_testrunner = False,
         args = [
-            "$(rootpath %s)" % Label("@android_sdk//:adb"),
+            "$(rootpath %s)" % Label("@android_platform_tools//:adb"),
             "$(rootpath %s)" % apk,
             package,
             runner,
         ] + extra,
-        data = [Label("@android_sdk//:adb"), apk] + install.values(),
+        data = [Label("@android_platform_tools//:adb"), Label("@android_platform_tools//:adb_files"), apk] + install.values(),
         tags = ["manual", "local", "exclusive", "external", "android_device"],
         runtime_deps = [Label("//bazel/kmp/android:device_test_runner")],
         **kwargs

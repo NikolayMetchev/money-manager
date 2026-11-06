@@ -8,14 +8,10 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 target=//app/main/android:debug
 
-# The SDK the build uses, found the way AGP and bazel/kmp/android/extensions.bzl find it.
-sdk=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}
-if [[ -z $sdk && -f local.properties ]]; then
-  sdk=$(sed -n 's/^sdk\.dir[[:space:]]*=[[:space:]]*//p' local.properties | tail -1)
-fi
-adb=${sdk:-$HOME/Android/Sdk}/platform-tools/adb
+adb_target=@android_platform_tools//:adb
 
-bazel build "$target"
+bazel build "$target" "$adb_target"
+adb=$(bazel info execution_root)/$(bazel cquery --output=files "$adb_target" 2>/dev/null)
 apk=$(bazel cquery --output=files "$target" 2>/dev/null | grep '\.apk$' | head -1)
 echo "Installing $apk"
 "$adb" install -r "$apk"
