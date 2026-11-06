@@ -114,16 +114,13 @@ class KoinlyParentIdE2ETest : DbTest() {
         "Method Name (read-only)" to "MsgWithdrawDelegatorReward",
     )
 
-    private suspend fun stage(
-        fileName: String,
-        rows: List<List<String>>,
-    ): CsvImport {
+    private suspend fun stage(rows: List<List<String>>): CsvImport {
         val id =
             repositories.csvImportRepository.createImport(
-                fileName = fileName,
+                fileName = "transactions.csv",
                 headers = headers,
                 rows = rows,
-                fileChecksum = "checksum-$fileName",
+                fileChecksum = "checksum-transactions.csv",
                 fileLastModified = now,
             )
         return repositories.csvImportRepository.getImport(id).first()!!
@@ -156,7 +153,7 @@ class KoinlyParentIdE2ETest : DbTest() {
     @Test
     fun `a row's method names it when it has no description`() =
         runDbTest {
-            val result = applyAll(listOf(stage("transactions.csv", listOf(claimFee, rewardOne, rewardTwo, plainDeposit))))
+            val result = applyAll(listOf(stage(listOf(claimFee, rewardOne, rewardTwo, plainDeposit))))
             assertEquals(1, result.filesImported)
 
             // The method beats the tag and type; a row with its own description keeps it.
