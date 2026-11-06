@@ -41,14 +41,14 @@ public final class KnTestLauncher {
         command.add("--ktest_regex_filter=.*" + regexLiteral(only.replace('#', '.')) + ".*");
       }
     }
-    Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
-
     JUnitXml report = new JUnitXml();
     String suite = "";
     int failed = 0;
     int ignored = 0;
-    try (BufferedReader reader =
-        new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+    int exit;
+    try (Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
       String line;
       while ((line = reader.readLine()) != null) {
         int start = line.indexOf(PREFIX);
@@ -84,8 +84,8 @@ public final class KnTestLauncher {
           default -> {}
         }
       }
+      exit = process.waitFor();
     }
-    int exit = process.waitFor();
 
     String xmlOutput = System.getenv("XML_OUTPUT_FILE");
     if (xmlOutput != null) {
