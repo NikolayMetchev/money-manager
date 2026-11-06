@@ -646,7 +646,7 @@ maven.install(
     artifacts = [
         "org.jetbrains.dokka:all-modules-page-plugin:2.3.0",
         "org.jetbrains.dokka:analysis-kotlin-symbols:2.2.0",
-        "org.jetbrains.dokka:dokka-base:2.2.0",
+        "org.jetbrains.dokka:dokka-base:2.3.0",
         "org.jetbrains.dokka:dokka-cli:2.2.0",
         "org.jetbrains.dokka:templating-plugin:2.2.0",
         # Transitive versions held at the newest (see version_conflict_policy).
