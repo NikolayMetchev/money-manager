@@ -114,6 +114,21 @@ class StrategyRulesEditorTest {
         }
 
     @Test
+    fun aLegCanBeMadeAMemberOfALinkedGroup() {
+        val leg = StrategyRule(actions = listOf(RuleAction.Leg("family", LegRole.Debit)))
+        runEditor(listOf(leg)) { rules ->
+            onNodeWithContentDescription("Expand rule").performClick()
+            waitForIdle()
+            onNodeWithText("Debit").performScrollTo().performClick()
+            waitForIdle()
+            onNodeWithText("Member (either way, for linked rows)").performClick()
+            waitForIdle()
+            assertEquals(LegRole.Member, (rules().single().actions.single() as RuleAction.Leg).role)
+            onNodeWithText("Member (either way, for linked rows)").assertExists()
+        }
+    }
+
+    @Test
     fun anApiTransactionCounterpartyCanBeMarkedBuiltIn() {
         val atm =
             StrategyRule(actions = listOf(RuleAction.Account(AccountSide.COUNTERPARTY, AccountNaming(ValueExpr.of("id"), name = "ATM"))))
@@ -259,12 +274,22 @@ class StrategyRulesEditorTest {
             everyAction.map { it.summary() },
         )
         assertEquals(
-            listOf("money out", "exclude", "buy", "credit leg of ?", "source “?”", "own account “Monzo”", "intermediate “Fx”"),
+            listOf(
+                "money out",
+                "exclude",
+                "buy",
+                "credit leg of ?",
+                "member leg of family",
+                "source “?”",
+                "own account “Monzo”",
+                "intermediate “Fx”",
+            ),
             listOf(
                 RuleAction.SetDirection(incoming = false),
                 RuleAction.Exclude(),
                 RuleAction.TradeSide(buy = true),
                 RuleAction.Leg("", LegRole.Credit),
+                RuleAction.Leg("family", LegRole.Member),
                 RuleAction.Account(AccountSide.SOURCE, AccountNaming(ValueExpr.of("x"), name = "")),
                 RuleAction.Account(AccountSide.OWN, AccountNaming(ValueExpr.of("x"), name = "Monzo")),
                 RuleAction.Account(AccountSide.INTERMEDIATE, AccountNaming(ValueExpr.of("x"), name = "Fx")),
