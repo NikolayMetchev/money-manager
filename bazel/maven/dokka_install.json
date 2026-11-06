@@ -3,24 +3,24 @@
   "__INPUT_ARTIFACTS_HASH": {
     "org.jetbrains.dokka:all-modules-page-plugin": 232355669,
     "org.jetbrains.dokka:analysis-kotlin-symbols": 1992716691,
-    "org.jetbrains.dokka:dokka-base": 1496278357,
+    "org.jetbrains.dokka:dokka-base": -300673002,
     "org.jetbrains.dokka:dokka-cli": -756219158,
     "org.jetbrains.dokka:templating-plugin": -1389672886,
     "org.jetbrains.kotlin:kotlin-stdlib-common": -1997958569,
     "repositories": -1949687017
   },
   "__RESOLVED_ARTIFACTS_HASH": {
-    "com.fasterxml.jackson.core:jackson-annotations": -606714251,
-    "com.fasterxml.jackson.core:jackson-core": -1960100598,
-    "com.fasterxml.jackson.core:jackson-databind": -429496554,
-    "com.fasterxml.jackson.module:jackson-module-kotlin": -669504849,
-    "org.freemarker:freemarker": 707519607,
-    "org.jetbrains.dokka:all-modules-page-plugin": -70002379,
+    "com.fasterxml.jackson.core:jackson-annotations": -1012223496,
+    "com.fasterxml.jackson.core:jackson-core": 1787458085,
+    "com.fasterxml.jackson.core:jackson-databind": 472908527,
+    "com.fasterxml.jackson.module:jackson-module-kotlin": -555277698,
+    "org.freemarker:freemarker": -235099830,
+    "org.jetbrains.dokka:all-modules-page-plugin": 415865342,
     "org.jetbrains.dokka:analysis-kotlin-symbols": 186422487,
     "org.jetbrains.dokka:analysis-markdown": -1189503933,
-    "org.jetbrains.dokka:dokka-base": -377673618,
+    "org.jetbrains.dokka:dokka-base": -2083049069,
     "org.jetbrains.dokka:dokka-cli": -38005855,
-    "org.jetbrains.dokka:templating-plugin": 1158281134,
+    "org.jetbrains.dokka:templating-plugin": -1011538057,
     "org.jetbrains.kotlin:kotlin-reflect": 1942089702,
     "org.jetbrains.kotlin:kotlin-stdlib": 226257048,
     "org.jetbrains.kotlin:kotlin-stdlib-common:pom": 1267496593,
@@ -35,33 +35,33 @@
   "artifacts": {
     "com.fasterxml.jackson.core:jackson-annotations": {
       "shasums": {
-        "jar": "aae865c3d88256d61b11523cb1e88bd48d5b9ad5855fa1fc859504fd2204708a"
+        "jar": "21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0"
       },
-      "version": "2.15.3"
+      "version": "2.22"
     },
     "com.fasterxml.jackson.core:jackson-core": {
       "shasums": {
-        "jar": "51fab7aad51ed588482edc507fd542747936c5094d1ab76ed21ddb63b96b610d"
+        "jar": "ff167a6317be15895706c26668f45b898efe40ab8780970658210fe1393d52a6"
       },
-      "version": "2.15.3"
+      "version": "2.22.2"
     },
     "com.fasterxml.jackson.core:jackson-databind": {
       "shasums": {
-        "jar": "c3c53333a2172a80678bda1803e39cff45bec6ae3e9c7d4f44a81ec4e2ab18dc"
+        "jar": "d0da14c12b16b5d54719aa172d83b542ff4abeb8b0fb7db476fde8ceece760ca"
       },
-      "version": "2.15.3"
+      "version": "2.22.2"
     },
     "com.fasterxml.jackson.module:jackson-module-kotlin": {
       "shasums": {
-        "jar": "8f72e6b99e6145e3284a5224355ca8ee6030afa8c1d6a3395b530d29026f8d52"
+        "jar": "174e917ea64c0559df824e92317782a92eba7278de488d4a11df0b8597791874"
       },
-      "version": "2.15.3"
+      "version": "2.22.2"
     },
     "org.freemarker:freemarker": {
       "shasums": {
-        "jar": "04d65ec1bde6cea20e3495d5e78ef96ab774d9936434861d3254bd88e7e94f92"
+        "jar": "0fac87dddd78f1223139e8ef88e819c7f483c0a3835cdf5982ad5e4576d1d896"
       },
-      "version": "2.3.32"
+      "version": "2.3.35"
     },
     "org.jetbrains.dokka:all-modules-page-plugin": {
       "shasums": {
@@ -83,9 +83,9 @@
     },
     "org.jetbrains.dokka:dokka-base": {
       "shasums": {
-        "jar": "721c5a1647dc49d1680d884350b438a039b2426aec65b696baee8e5aeb6442f5"
+        "jar": "25f9cce85729aa04d5f906cd67cbac3cdf43e144899cd5344b31355e4700c397"
       },
-      "version": "2.2.0"
+      "version": "2.3.0"
     },
     "org.jetbrains.dokka:dokka-cli": {
       "shasums": {
@@ -236,8 +236,8 @@
       "com.fasterxml.jackson.core.exc",
       "com.fasterxml.jackson.core.filter",
       "com.fasterxml.jackson.core.format",
+      "com.fasterxml.jackson.core.internal.shaded.fdp.v2_22_2",
       "com.fasterxml.jackson.core.io",
-      "com.fasterxml.jackson.core.io.doubleparser",
       "com.fasterxml.jackson.core.io.schubfach",
       "com.fasterxml.jackson.core.json",
       "com.fasterxml.jackson.core.json.async",
@@ -276,11 +276,11 @@
     "org.freemarker:freemarker": [
       "freemarker.cache",
       "freemarker.core",
-      "freemarker.debug",
-      "freemarker.debug.impl",
       "freemarker.ext.ant",
       "freemarker.ext.beans",
       "freemarker.ext.dom",
+      "freemarker.ext.jakarta.jsp",
+      "freemarker.ext.jakarta.servlet",
       "freemarker.ext.jdom",
       "freemarker.ext.jsp",
       "freemarker.ext.jython",
@@ -1785,13 +1785,9 @@
       "org.jetbrains.dokka.analysis.markdown.jb.factories"
     ],
     "org.jetbrains.dokka:dokka-base": [
-      "org.jetbrains.dokka.analysis",
       "org.jetbrains.dokka.base",
-      "org.jetbrains.dokka.base.deprecated",
       "org.jetbrains.dokka.base.generation",
       "org.jetbrains.dokka.base.pages",
-      "org.jetbrains.dokka.base.parsers",
-      "org.jetbrains.dokka.base.parsers.factories",
       "org.jetbrains.dokka.base.renderers",
       "org.jetbrains.dokka.base.renderers.html",
       "org.jetbrains.dokka.base.renderers.html.command.consumers",
@@ -1810,9 +1806,7 @@
       "org.jetbrains.dokka.base.transformers.pages.merger",
       "org.jetbrains.dokka.base.transformers.pages.sourcelinks",
       "org.jetbrains.dokka.base.transformers.pages.tags",
-      "org.jetbrains.dokka.base.translators.descriptors",
       "org.jetbrains.dokka.base.translators.documentables",
-      "org.jetbrains.dokka.base.translators.psi",
       "org.jetbrains.dokka.base.utils"
     ],
     "org.jetbrains.dokka:dokka-cli": [
