@@ -24,15 +24,18 @@ lower PR restacks and re-runs CI on everything above it.
 3. Run `bazel build //... && bazel test //...` locally **on the top branch** (it contains every branch
    below it) and make sure it passes (pre-push rule from CLAUDE.md). If it fails, fix on the branch that owns
    the failure, restack (below), and run it again.
-4. Before pushing a stack, make local refs match origin: `git fetch origin`, then for each branch check
-   `git rev-list --count origin/<b>..<b>` and `<b>..origin/<b>`. `gh stack push` and `submit` force-push the
-   **whole** stack, so a branch with commits on origin that you don't have would be rolled back: stop and
-   reconcile first.
+4. `gh stack push` and `submit` force-push the **whole** stack, so a branch with commits on origin that you
+   don't have would be rolled back. Note each branch's `git rev-parse origin/<b>` before you commit or rebase
+   anything (a branch with no origin ref is new: nothing to check). Right before pushing, `git fetch origin`
+   and compare: an `origin/<b>` that moved since you noted it holds someone else's commits (Auto-format PR
+   pushes too), so stop and reconcile first. Comparing with `git rev-list <b>..origin/<b>` only works before a
+   rebase: a restack rewrites a branch's commits, so its old ones always show up as remote-only.
 5. Push: `gh stack push` (stack) or `git push -u` (single branch).
 
-**Restacking.** Whenever you commit to a branch that has branches above it: `gh stack rebase` (cascades the
-change upward; resolve conflicts, taking the lower branch's side unless the upper change is the point),
-re-run step 3 on the top, then `gh stack push`.
+**Restacking.** Whenever you commit to a branch that has branches above it: on that branch,
+`gh stack rebase --upstack --no-trunk` (cascades the change upward, and leaves `main` out of it). Resolve a
+conflict by keeping what both branches meant to do. A clean rebase can still break an upper branch, so re-run
+step 3 on the top, then `gh stack push`.
 
 ## Phase 1 — Draft PR(s)
 
@@ -80,10 +83,13 @@ Once a PR is green, `gh pr ready <num>`; do the stack bottom up, so the lowest P
 
 ## Phase 4 — Wait for CodeRabbit
 
+Phases 4 and 5 are one loop per PR, bottom to top: get a PR's review, address it, push, and only then trigger
+the next PR's, so that each review reads the head its lower PRs' fixes restacked. If a PR's current head can't
+get a review, say so in the final report.
+
 CodeRabbit reviews after a PR leaves draft, and this repo is too small for it to review automatically: if no
 review starts, comment `@coderabbitai full review` on that PR (plain `review` can fail; it allows one review
-per hour, so on a stack trigger the bottom PR first and the next ones as each review lands). For each PR
-bottom to top, poll every ~3 minutes for:
+per hour, so wait out a rate limit rather than triggering the next PR early). Poll every ~3 minutes for:
 
 - review comments: `gh api repos/{owner}/{repo}/pulls/<num>/comments --jq '.[] | select(.user.login == "coderabbitai[bot]")'`
 - the review summary: `gh pr view <num> --json reviews,comments`
@@ -95,8 +101,8 @@ that.
 
 ## Phase 5 — Address every comment
 
-For each PR **bottom to top**, and for each CodeRabbit inline comment on it (including ones inside collapsed
-"Additional comments" / "Nitpick" sections):
+For each CodeRabbit inline comment on the PR (including ones inside collapsed "Additional comments" / "Nitpick"
+sections):
 
 - If the suggestion is correct or harmless-and-reasonable: implement it on this PR's branch.
 - If it is wrong or inapplicable: don't change code; reply to that comment explaining why
