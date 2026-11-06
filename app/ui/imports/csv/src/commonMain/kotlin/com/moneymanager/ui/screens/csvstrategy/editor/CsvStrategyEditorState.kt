@@ -66,6 +66,9 @@ internal class CsvStrategyEditorState(
     var identificationColumns by
         mutableStateOf(config?.identificationColumns?.filter { it in availableColumnNames }?.toSet() ?: availableColumnNames)
 
+    // Kept whole, including columns the sample file lacks (a later export's columns, saved against an older file).
+    var optionalColumns by mutableStateOf(config?.optionalColumns.orEmpty())
+
     private val timestampMapping = config?.fieldMappings?.get(TransferField.TIMESTAMP) as? DateTimeParsingMapping
     var dateColumnName by mutableStateOf(timestampMapping?.dateColumnName.takeIfPresentIn(availableColumnNames))
     var dateFormat by mutableStateOf(timestampMapping?.dateFormat ?: "dd/MM/yyyy")
@@ -104,7 +107,8 @@ internal class CsvStrategyEditorState(
                 ?.paths
                 .orEmpty()
                 .drop(1)
-                .mapNotNull { it.takeIfPresentIn(availableColumnNames) },
+                // A column the strategy lists as optional stays, though the sample file may be an older export without it.
+                .filter { it in availableColumnNames || it in config?.optionalColumns.orEmpty() },
         )
     var descriptionExtraction by mutableStateOf(descriptionMapping?.value?.extraction)
 

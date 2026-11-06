@@ -25,7 +25,12 @@ import kotlinx.serialization.encoding.Encoder
  * comments) and keep default insertion-order serialization instead.
  *
  * @property identificationColumns Set of column names used to auto-identify this strategy
- *                                 when importing a CSV file. Matching is exact and order-independent.
+ *                                 when importing a CSV file. A file must have all of them, and no column that
+ *                                 isn't also in [optionalColumns]; order doesn't matter.
+ * @property optionalColumns Columns a file of this format may or may not have (a later export added them), so
+ *                           one strategy covers every version of the export. A rule reads one with
+ *                           `Condition(column, EXISTS)`; any other read of an optional column a file lacks
+ *                           sees a blank value rather than failing.
  * @property fieldMappings Map of TransferField to the mapping defining how each field is populated
  * @property rules The strategy's if/then rules, run in order over each row before the field mappings
  *                 parse it (see [StrategyRule]): they rewrite cells, name the accounts, set the direction,
@@ -111,11 +116,16 @@ data class CsvStrategyConfig<out M>(
     // NEVER-encoded when null, same rationale.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val pdfLines: PdfLineConfig? = null,
+    // NEVER-encoded when empty, same rationale.
+    @Serializable(with = SortedStringSetSerializer::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val optionalColumns: Set<String> = emptySet(),
 ) {
     /** This config with each field mapping replaced by [transform]'s result, everything else unchanged. */
     fun <N> mapFieldMappings(transform: (M) -> N): CsvStrategyConfig<N> =
         CsvStrategyConfig(
             identificationColumns = identificationColumns,
+            optionalColumns = optionalColumns,
             fieldMappings = fieldMappings.mapValues { (_, mapping) -> transform(mapping) },
             rules = rules,
             contentMatchRules = contentMatchRules,

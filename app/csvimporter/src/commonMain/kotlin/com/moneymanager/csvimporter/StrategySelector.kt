@@ -74,12 +74,22 @@ fun List<CsvImportStrategy>.selectForCsv(
     // Exact column match first (the strict, unchanged behaviour). Only when nothing matches exactly,
     // fall back to a tolerant match for a file that is missing optional columns a later export added
     // (e.g. crypto.com's card/fiat exports gained a "Transaction Hash" column, so older files have one
-    // fewer): the file's columns must all still be known to the strategy (a subset of its identification
-    // columns). The filename/content ranking below then disambiguates as usual, so a genuinely different
+    // fewer): the file's columns must all still be known to the strategy (a subset of its identification and
+    // optional columns). The filename/content ranking below then disambiguates as usual, so a genuinely different
     // file (disjoint or extra columns) still resolves to null rather than being misrouted.
     val candidates =
         filter { it.matchesColumns(headings) }
-            .ifEmpty { if (headings.isEmpty()) emptyList() else filter { it.config.identificationColumns.containsAll(headings) } }
+            .ifEmpty {
+                if (headings.isEmpty()) {
+                    emptyList()
+                } else {
+                    filter {
+                        (it.config.identificationColumns + it.config.optionalColumns).containsAll(
+                            headings,
+                        )
+                    }
+                }
+            }
     if (candidates.isEmpty()) return null
 
     val indexByName = columns.associate { it.originalName to it.columnIndex }

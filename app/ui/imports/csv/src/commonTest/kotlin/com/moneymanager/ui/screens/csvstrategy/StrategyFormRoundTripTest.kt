@@ -305,6 +305,17 @@ class StrategyFormRoundTripTest {
     }
 
     @Test
+    fun `optional columns the sample file lacks survive a save`() {
+        // Editing the strategy against an older export, which has none of its optional columns, must not drop them.
+        val koinly = BuiltInCsvStrategies.buildKoinlyCsvStrategy(timestamp)
+
+        val state = CsvStrategyEditorState(koinly, koinly.config.identificationColumns)
+        val rebuilt = buildStrategyFromEditorState(state, koinly.id, koinly.createdAt, koinly.updatedAt)
+
+        assertEquals(koinly.config.optionalColumns, rebuilt.config.optionalColumns)
+    }
+
+    @Test
     fun `properties with no widget survive a no-op save`() {
         val original =
             advancedStrategy().copy(
