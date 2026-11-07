@@ -3,6 +3,7 @@ package com.moneymanager.domain.model
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class AssetAliasTest {
     private val catalog =
@@ -48,6 +49,6 @@ class AssetAliasTest {
     fun `catalog aliases of an asset are listed in order`() {
         CryptoRegistry.install(catalog)
         assertEquals(listOf("LUNC"), CryptoRegistry.catalogAliasesOf("LUNA"))
-        assertEquals(emptyList(), CryptoRegistry.catalogAliasesOf("BTC"))
+        assertTrue(CryptoRegistry.catalogAliasesOf("BTC").isEmpty())
     }
 }

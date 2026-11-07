@@ -24,7 +24,6 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
-import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.CaptureTarget
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp

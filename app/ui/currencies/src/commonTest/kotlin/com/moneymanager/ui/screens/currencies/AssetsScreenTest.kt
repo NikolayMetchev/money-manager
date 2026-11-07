@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.screens.currencies
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.assertIsDisplayed
@@ -75,7 +76,7 @@ class AssetsScreenTest {
     private val bitcoin = CryptoAsset(id = CryptoId(2L), code = "BTC", name = "Bitcoin")
     private val euro = Currency(CurrencyId(1L), code = "EUR", name = "Euro", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
 
-    private fun ComposeUiTest.showAssets(engine: FakeEngine) {
+    private fun assetsScreen(engine: FakeEngine): @Composable () -> Unit {
         val currencies: CurrencyReadRepository =
             mock(MockMode.autoUnit) { every { getAllCurrencies() } returns flowOf(listOf(euro)) }
         val crypto: CryptoReadRepository =
@@ -83,7 +84,7 @@ class AssetsScreenTest {
                 every { getAllCryptoAssets() } returns flowOf(listOf(luna, bitcoin))
                 every { getAssetAliases() } returns engine.aliases
             }
-        setContent {
+        return {
             ProvideSchemaAwareScope {
                 CompositionLocalProvider(LocalImportEngine provides engine) {
                     AssetsScreen(
@@ -98,7 +99,7 @@ class AssetsScreenTest {
     }
 
     private fun ComposeUiTest.showCryptoTab(engine: FakeEngine) {
-        showAssets(engine)
+        setContent(assetsScreen(engine))
         onNodeWithText("Crypto").performClick()
         waitUntilExactlyOneExists(hasText("Your Crypto Assets"))
     }
@@ -113,7 +114,7 @@ class AssetsScreenTest {
     @Test
     fun assetsScreen_currenciesTab_offersAliasesOfACurrency() {
         runMoneyManagerComposeUiTest {
-            showAssets(engineWith(AssetAlias("ZEUR", "EUR")))
+            setContent(assetsScreen(engineWith(AssetAlias("ZEUR", "EUR"))))
 
             waitUntilExactlyOneExists(hasText("ZEUR ✕"))
             onNodeWithText("EUR").assertIsDisplayed()

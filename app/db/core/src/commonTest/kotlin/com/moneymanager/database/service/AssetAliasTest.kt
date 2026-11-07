@@ -56,16 +56,16 @@ class AssetAliasTest : DbTest() {
 
     private suspend fun aliases() = repositories.cryptoRepository.getAssetAliases().first()
 
-    private suspend fun cryptoIdOf(code: String): CryptoId =
+    private suspend fun lunaId(): CryptoId =
         repositories.cryptoRepository
-            .getCryptoAssetByCode(code)
+            .getCryptoAssetByCode("LUNA")
             .first()!!
             .id
 
-    private suspend fun importCelsiusRow(coin: String) {
+    private suspend fun importLuncRow() {
         val id =
             repositories.csvImportRepository.createImport(
-                fileName = "transactions-export-$coin.csv",
+                fileName = "transactions-export.csv",
                 headers =
                     listOf(
                         "Internal id",
@@ -78,8 +78,8 @@ class AssetAliasTest : DbTest() {
                         " Reward Amount In Original Coin",
                         " Confirmed",
                     ),
-                rows = listOf(listOf("1", "June 11, 2022 10:38 PM", "Transfer", coin, "4", "1.5", "", "", "Yes")),
-                fileChecksum = "checksum-$coin",
+                rows = listOf(listOf("1", "June 11, 2022 10:38 PM", "Transfer", "LUNC", "4", "1.5", "", "", "Yes")),
+                fileChecksum = "checksum-LUNC",
                 fileLastModified = Clock.System.now(),
             )
         bulkApplyCsv(
@@ -132,7 +132,7 @@ class AssetAliasTest : DbTest() {
         runDbTest {
             createCrypto("LUNA")
             repositories.importEngine.setAssetAlias("LUNC", "LUNA")
-            repositories.cryptoRepository.deleteCryptoAsset(cryptoIdOf("LUNA"))
+            repositories.cryptoRepository.deleteCryptoAsset(lunaId())
             assertEquals(emptyList(), aliases())
         }
 
@@ -143,7 +143,7 @@ class AssetAliasTest : DbTest() {
             createCrypto("LUNC")
             repositories.importEngine.setAssetAlias("LUNC", "LUNA")
 
-            importCelsiusRow("LUNC")
+            importLuncRow()
 
             assertEquals(setOf("LUNA"), bookedAssetCodes())
         }
@@ -151,7 +151,7 @@ class AssetAliasTest : DbTest() {
     @Test
     fun `an import books the catalog alias when the database has no such asset`() =
         runDbTest {
-            importCelsiusRow("LUNC")
+            importLuncRow()
             assertEquals(setOf("LUNA"), bookedAssetCodes())
         }
 
