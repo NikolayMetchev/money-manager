@@ -493,6 +493,42 @@ class AccountTransactionsScreenTest {
     }
 
     @Test
+    fun failedPageLoad_endsTheSpinnerAndSaysSo() {
+        runMoneyManagerComposeUiTest {
+            val now = Clock.System.now()
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
+            val account = Account(id = AccountId(1L), name = "Checking", openingDate = now)
+            val transactionRepository: TransactionWriteRepository =
+                mock(MockMode.autoUnit) {
+                    every { getAccountBalances() } returns flowOf(emptyList())
+                    everySuspend { getPageContainingTransaction(any(), any(), any(), any()) } calls
+                        { throw IllegalArgumentException("Transaction not found") }
+                }
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountTransactionsScreen(
+                        accountId = account.id,
+                        transactionRepository = transactionRepository,
+                        accountRepository = createAccountRepository(listOf(account)),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        currencyRepository = createCurrencyRepository(listOf(usd)),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        exchangeOrderRepository = createExchangeOrderRepository(),
+                        maintenance = createMaintenance(),
+                        scrollToTransferId = TransferId(1L),
+                    )
+                }
+            }
+
+            waitUntilAtLeastOneExists(hasText("Couldn't load these transactions."), timeoutMillis = 5_000)
+        }
+    }
+
+    @Test
     fun feeBadges_distinguishMainAndFee_andEachLinksToTheOther() {
         runMoneyManagerComposeUiTest {
             val now = Clock.System.now()

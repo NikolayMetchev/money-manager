@@ -280,15 +280,14 @@ class TransactionReadRepositoryImpl(
 
     override suspend fun getPageContainingTransaction(
         accountId: AccountId,
-        transactionId: TransferId,
+        transactionId: TransactionId,
         pageSize: Int,
         currencyId: CurrencyId?,
     ): PageWithTargetIndex<AccountRow> =
         withContext(Dispatchers.Default) {
-            // First, get the transaction to find its timestamp
-            val transaction =
+            val timestamp =
                 transferSelectQueries
-                    .selectById(transactionId.id, TransferMapper::mapRaw)
+                    .selectTransactionTimestamp(transactionId.id)
                     .awaitAsOneOrNull()
                     ?: throw IllegalArgumentException("Transaction not found: $transactionId")
 
@@ -298,7 +297,7 @@ class TransactionReadRepositoryImpl(
                     .getTransactionRowPosition(
                         accountId = accountId.id,
                         currencyId = currencyId?.id,
-                        targetTimestamp = transaction.timestamp.toEpochMilliseconds(),
+                        targetTimestamp = timestamp,
                         targetId = transactionId.id,
                     ).awaitAsOne()
 

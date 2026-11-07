@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.importengineapi.createTrade
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
@@ -126,5 +127,29 @@ class RunningBalancePaginationCurrencyFilterTest : DbTest() {
             assertEquals(listOf("Old USD 2"), backward.items.map { it.description })
             assertEquals(listOf("-3000"), backward.items.map { it.runningBalance.amount.toString() })
             assertEquals(false, backward.pagingInfo.hasMore)
+        }
+
+    @Test
+    fun `a page can centre on a trade`() =
+        runDbTest {
+            val gbp = currency("GBP")
+            val usd = currency("USD")
+            val isa = createAccount("ISA")
+            val tradeId =
+                repositories.importEngine.createTrade(
+                    timestamp = baseTime,
+                    description = "Buy USD",
+                    fromAccountId = isa,
+                    fromAmount = Money(1000, gbp),
+                    toAccountId = isa,
+                    toAmount = Money(1300, usd),
+                )
+            repositories.maintenanceService.fullRefreshMaterializedViews()
+
+            val page =
+                repositories.transactionRepository
+                    .getPageContainingTransaction(isa, tradeId, pageSize = 5, currencyId = usd.id)
+
+            assertEquals(listOf(tradeId.id), page.items.map { it.transactionId.id })
         }
 }
