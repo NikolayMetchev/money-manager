@@ -1428,6 +1428,41 @@ class ImportDeduperTest {
             .classify(listOf(placeholderDeposit(0, timestamp = londonNoon(cardDate)).copy(uniqueKey = mapOf("line" to "1"))))
             .single()
 
+    // A bank that names only the broker, and a broker that names no bank: no account in common.
+    private val brokerPayee = AccountId(70)
+
+    private fun placeholderAgainstOtherSide(
+        window: SettlementWindow,
+        bankDate: String,
+        cardDate: String,
+    ): Classified =
+        ImportDeduper(
+            businessDayPolicy(window),
+            existing = emptyList(),
+            calendars = londonCalendars,
+            otherSideLegs = listOf(bankCredit(60, timestamp = londonNoon(bankDate), tgt = brokerPayee).transfer),
+        ).classify(listOf(placeholderDeposit(0, timestamp = londonNoon(cardDate)).copy(uniqueKey = mapOf("line" to "1"))))
+            .single()
+
+    @Test
+    fun otherSide_joinsRecordsSharingNoAccountAcrossTheEasterWeekend() {
+        val result = placeholderAgainstOtherSide(SettlementWindow.BusinessDays(3), "2021-04-01", "2021-04-05")
+
+        assertEquals(AccountRef.Existing(bank), result.transfer.fromAccount)
+        assertEquals(AccountRef.Existing(wallet), result.transfer.toAccount)
+        assertEquals(null, result.transfer.unidentifiedCounterpartyAccountId)
+        assertEquals(TransferId(60), result.excludeExisting?.transfer?.id)
+        assertEquals(listOf(TransferId(60)), result.transfer.relationships.map { it.relatedTransferId })
+    }
+
+    @Test
+    fun otherSide_leavesTheRowAloneOutsideTheWindow() {
+        val result = placeholderAgainstOtherSide(SettlementWindow.Elapsed(24 * 60 * 60L), "2021-04-01", "2021-04-05")
+
+        assertEquals(AccountRef.Existing(placeholder), result.transfer.fromAccount)
+        assertEquals(null, result.excludeExisting)
+    }
+
     @Test
     fun businessDays_placeholderReconcilesAcrossTheEasterWeekend() {
         val result = placeholderAgainstBank(businessDayPolicy(SettlementWindow.BusinessDays(3)), "2021-04-01", "2021-04-05")

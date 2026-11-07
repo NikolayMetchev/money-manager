@@ -76,6 +76,12 @@ object WellKnownIds {
      */
     const val UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME: String = "unidentified-counterparty"
 
+    /** That attribute's value when the transfer's source is the placeholder. */
+    const val UNIDENTIFIED_SOURCE: String = "source"
+
+    /** That attribute's value when the transfer's target is the placeholder. */
+    const val UNIDENTIFIED_TARGET: String = "target"
+
     /**
      * Attribute type (get-or-create by name) that marks a transfer a manual-entry rule asked for an amount on;
      * its value is the entry's name.

@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.calendar.WeekendOnlyCalendar
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -168,6 +169,11 @@ class ImportDeduper(
     private val ownSourceLegs: Set<TransferId> = emptySet(),
     /** Which days a business-day window counts, per pair of records (see [SettlementCalendars]). */
     private val calendars: SettlementCalendars = SettlementCalendars.WEEKENDS_ONLY,
+    /**
+     * Counted transfers on any accounts near the batch with one of its amounts ([otherSideOf]'s candidates),
+     * whichever accounts they are on: the rest of [existing] only covers the batch's own.
+     */
+    otherSideLegs: List<Transfer> = emptyList(),
 ) {
     /**
      * Exact-match key over a transfer's core fields. Incoming-side fields are nullable, so an
@@ -360,6 +366,11 @@ class ImportDeduper(
         reconcileSplitConduitMovements(classified)
         return classified
     }
+
+    private val otherSideLegsByAmount: Map<Money, List<Transfer>> =
+        otherSideLegs
+            .filter { it.sourceAccountId !in ownBatchAccounts && it.targetAccountId !in ownBatchAccounts }
+            .groupBy { it.amount }
 
     /** What the placeholder rules need from the policy, or null when it leaves them off. */
     private class PlaceholderSettings(
@@ -668,14 +679,90 @@ class ImportDeduper(
 
     private fun classifyOne(
         index: Int,
+        incoming: ImportTransfer,
+    ): Classified {
+        val transfer = incoming.withPlaceholderSide()
+        val classified =
+            when (policy) {
+                is DedupePolicy.None -> Classified(transfer, ImportStatus.IMPORTED, null)
+                is DedupePolicy.UniqueIdentifier -> classifyByUniqueId(transfer, policy)
+                is DedupePolicy.FuzzyAllFields -> classifyByAllFields(transfer, policy)
+                is DedupePolicy.ApiMultiKey -> classifyByApiMultiKey(index, transfer, policy)
+            }
+        val settings = placeholderSettings ?: return classified
+        if (!classified.isUnmatchedImport(settings)) return classified
+        return otherSideOf(classified.transfer, settings) ?: classified
+    }
+
+    /** Records which end is the placeholder, for the import that later meets this leg as [otherSideOf]'s candidate. */
+    private fun ImportTransfer.withPlaceholderSide(): ImportTransfer {
+        val value =
+            when (unidentifiedCounterpartyAccountId) {
+                null -> return this
+                fromAccount.requireId() -> WellKnownIds.UNIDENTIFIED_SOURCE
+                toAccount.requireId() -> WellKnownIds.UNIDENTIFIED_TARGET
+                else -> return this
+            }
+        return copy(attributes = attributes.map { if (it.typeId == unidentifiedCounterpartyTypeId) it.copy(value = value) else it })
+    }
+
+    /**
+     * The two records of one transfer, when they share no account: each source knows one real end and has only
+     * a stand-in for the other (a broker's `Top Ups -> ISA` and a bank's `Monzo -> Freetrade Limited`). Only the
+     * asset, the amount and the time say they are one movement, within the placeholder window, and the nearest
+     * record in time is the one. Excluding either alone would leave its stand-in holding the money, so the
+     * incoming row becomes the whole transfer, real end to real end, and the other record is excluded; either
+     * import order reaches the same `Monzo -> ISA`. This row's placeholder may meet an identified record, or the
+     * other way round; two placeholders say nothing of where the money came from.
+     */
+    private fun otherSideOf(
         transfer: ImportTransfer,
-    ): Classified =
-        when (policy) {
-            is DedupePolicy.None -> Classified(transfer, ImportStatus.IMPORTED, null)
-            is DedupePolicy.UniqueIdentifier -> classifyByUniqueId(transfer, policy)
-            is DedupePolicy.FuzzyAllFields -> classifyByAllFields(transfer, policy)
-            is DedupePolicy.ApiMultiKey -> classifyByApiMultiKey(index, transfer, policy)
-        }
+        settings: PlaceholderSettings,
+    ): Classified? {
+        if (transfer.passThrough != null || transfer.conversion != null) return null
+        val amount = transfer.amount ?: return null
+        val timestamp = transfer.timestamp ?: return null
+        val placeholder = transfer.unidentifiedCounterpartyAccountId
+        val candidates =
+            otherSideLegsByAmount[amount]
+                .orEmpty()
+                .filter { (placeholderSide(it) != null) == (placeholder == null) && it.id !in pairedInBatch }
+                .map { it.id to it }
+        val matchId =
+            selectNearestUnconsumedLeg(candidates, timestamp, consumedReconcileIds) { existing ->
+                settings.window.holds(timestamp, existing.timestamp, transfer.accounts() + existing.accounts())
+            } ?: return null
+        val other = candidates.first { it.first == matchId }.second
+        consumedReconcileIds += matchId
+        val replaceSource =
+            if (placeholder != null) {
+                placeholder == transfer.fromAccount.requireId()
+            } else {
+                placeholderSide(other) != WellKnownIds.UNIDENTIFIED_SOURCE
+            }
+        val whole =
+            if (replaceSource) {
+                transfer.copy(fromAccount = AccountRef.Existing(other.sourceAccountId))
+            } else {
+                transfer.copy(toAccount = AccountRef.Existing(other.targetAccountId))
+            }
+        return Classified(
+            whole.copy(
+                attributes = whole.attributes.filter { it.typeId != unidentifiedCounterpartyTypeId },
+                unidentifiedCounterpartyAccountId = null,
+                relationships = whole.relationships + NewRelationship(relatedTransferId = matchId, typeId = settings.relationshipTypeId),
+            ),
+            ImportStatus.IMPORTED,
+            existing = null,
+            excludeExisting = ExcludeExistingLeg(other, settings.exclusionTypeId),
+        )
+    }
+
+    private fun placeholderSide(leg: Transfer): String? =
+        leg.attributes
+            .firstOrNull { it.attributeType.id == unidentifiedCounterpartyTypeId }
+            ?.value
+            ?.takeIf { it == WellKnownIds.UNIDENTIFIED_SOURCE || it == WellKnownIds.UNIDENTIFIED_TARGET }
 
     private fun classifyByApiMultiKey(
         index: Int,
@@ -1544,3 +1631,12 @@ private const val MAX_SPLIT_LEGS = 4
 
 /** Chain movements per merchant considered for one split, nearest first; bounds the subset search at 2^8. */
 private const val MAX_SPLIT_CANDIDATES = 8
+
+/** The exclusion attribute of a policy that reconciles placeholders, or null when it leaves them off. */
+internal fun DedupePolicy.placeholderExclusionTypeId(): AttributeTypeId? =
+    when (this) {
+        is DedupePolicy.FuzzyAllFields -> reconciledExclusionAttributeTypeId.takeIf { unidentifiedCounterpartyAttributeTypeId != null }
+        is DedupePolicy.ApiMultiKey -> reconciledExclusionAttributeTypeId.takeIf { unidentifiedCounterpartyAttributeTypeId != null }
+        is DedupePolicy.UniqueIdentifier -> reconciledExclusionAttributeTypeId.takeIf { unidentifiedCounterpartyAttributeTypeId != null }
+        DedupePolicy.None -> null
+    }

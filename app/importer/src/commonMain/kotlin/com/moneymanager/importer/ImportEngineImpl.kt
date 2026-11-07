@@ -691,6 +691,7 @@ class ImportEngineImpl(
                 passThroughOnward = passThroughOnward(existing, existingRelationships),
                 ownSourceLegs = ownSourceLegs(resolvedTransfers, existing),
                 calendars = calendars,
+                otherSideLegs = otherSideLegs(resolvedTransfers, batch, calendars),
             ).classify(resolvedTransfers)
 
         val toImport = resolveReversalLinks(classified.filter { it.status == ImportStatus.IMPORTED })
@@ -1628,6 +1629,25 @@ class ImportEngineImpl(
                 .first()
                 .associate { it.accountId to it.value }
         return SettlementCalendars(locations, settingsRepository.getDefaultLocation().first(), repository.getAll().first())
+    }
+
+    /** The candidates for [ImportDeduper]'s other-side match; a reconciliation source's data stays isolated. */
+    private suspend fun otherSideLegs(
+        transfers: List<ImportTransfer>,
+        batch: ImportBatch,
+        calendars: SettlementCalendars,
+    ): List<Transfer> {
+        if (batch.shadowSource != null) return emptyList()
+        val exclusionTypeId = batch.dedupePolicy.placeholderExclusionTypeId() ?: return emptyList()
+        val timestamps = transfers.mapNotNull { it.timestamp }
+        if (timestamps.isEmpty()) return emptyList()
+        val range = batch.dedupePolicy.windows().reach(timestamps.min()..timestamps.max(), calendars.strictest, times = 1)
+        return transactionRepository.getOtherSideCandidates(
+            transfers.mapNotNullTo(mutableSetOf()) { it.amount },
+            range.start,
+            range.endInclusive,
+            exclusionTypeId,
+        )
     }
 
     private suspend fun loadExisting(

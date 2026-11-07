@@ -3,6 +3,7 @@ package com.moneymanager.domain.repository
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PageWithTargetIndex
@@ -43,6 +44,17 @@ interface TransactionReadRepository {
     suspend fun getTransactionsByAccountsWithAttributeType(
         accountIds: Collection<AccountId>,
         attributeTypeName: String,
+    ): List<Transfer>
+
+    /**
+     * Counted transfers of [amounts] between [earliest] and [latest] on any accounts, leaving out fees,
+     * pass-through chains' legs and shadow accounts: the candidates for the other side of a transfer.
+     */
+    suspend fun getOtherSideCandidates(
+        amounts: Set<Money>,
+        earliest: Instant,
+        latest: Instant,
+        exclusionTypeId: AttributeTypeId,
     ): List<Transfer>
 
     /** Transfers on any of [accountIds] carrying an attribute (of any type) whose value is one of [values], at any date. */

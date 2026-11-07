@@ -6,6 +6,7 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -19,6 +20,7 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
@@ -393,56 +395,173 @@ class FreetradeCsvE2ETest : DbTest() {
         runDbTest {
             val isa = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Freetrade ISA", openingDate = now))
             val bank = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now))
-            val bankHeaders = listOf("Date", "Amount", "Currency", "Description")
-            val bankStrategy =
-                CsvImportStrategy(
-                    id = CsvImportStrategyId(Uuid.random()),
-                    name = "Bank",
-                    config =
-                        CsvStrategyConfig(
-                            identificationColumns = bankHeaders.toSet(),
-                            fieldMappings =
-                                mapOf(
-                                    TransferField.TIMESTAMP to
-                                        DateTimeParsingMapping(TransferField.TIMESTAMP, dateColumnName = "Date", dateFormat = "yyyy-MM-dd"),
-                                    TransferField.SOURCE_ACCOUNT to HardCodedAccountMapping(TransferField.SOURCE_ACCOUNT, bank),
-                                    TransferField.TARGET_ACCOUNT to HardCodedAccountMapping(TransferField.TARGET_ACCOUNT, isa),
-                                    TransferField.DESCRIPTION to
-                                        DirectColumnMapping(TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
-                                    TransferField.AMOUNT to
-                                        AmountParsingMapping(TransferField.AMOUNT, AmountMode.SINGLE_COLUMN, amountColumnName = "Amount"),
-                                    TransferField.CURRENCY to
-                                        CurrencyLookupMapping(TransferField.CURRENCY, value = ValueExpr(listOf("Currency"))),
-                                    TransferField.TIMEZONE to HardCodedTimezoneMapping(TransferField.TIMEZONE, "UTC"),
-                                ),
-                        ),
-                    createdAt = now,
-                    updatedAt = now,
-                )
-            val bankImportId =
-                repositories.csvImportRepository.createImport(
-                    fileName = "bank.csv",
-                    headers = bankHeaders,
-                    rows = listOf(listOf("2026-03-01", "1000.00", "GBP", "FREETRADE")),
-                    fileChecksum = "bank",
-                    fileLastModified = now,
-                )
-            applyStagedCsv(
-                csvImport = repositories.csvImportRepository.getImport(bankImportId).first()!!,
-                strategy = bankStrategy,
-                sourceAccountOverride = null,
-                currencies = repositories.currencyRepository.getAllCurrencies().first(),
-                accountMappingRepository = repositories.accountMappingRepository,
-                accountRepository = repositories.accountRepository,
-                csvImportRepository = repositories.csvImportRepository,
-                maintenance = maintenance,
-                importEngine = repositories.importEngine,
-                refreshViews = false,
-                cryptoRepository = repositories.cryptoRepository,
-            )
+            applyBankStatement(bank, isa)
 
             apply(listOf(stage(listOf(topUp))))
 
             assertEquals(mapOf("GBP" to "1000"), balances())
         }
+
+    @Test
+    fun `a top-up the bank paid to the broker is one transfer into the ISA with the bank imported first`() =
+        runDbTest {
+            val bank = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now))
+            val payee =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Freetrade Limited", openingDate = now),
+                )
+            applyBankStatement(bank, payee)
+
+            apply(listOf(stage(listOf(topUp))))
+
+            assertOneTransferIntoTheIsa()
+        }
+
+    @Test
+    fun `a top-up the bank paid to the broker is one transfer into the ISA with the export imported first`() =
+        runDbTest {
+            apply(listOf(stage(listOf(topUp))))
+
+            val bank = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now))
+            val payee =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Freetrade Limited", openingDate = now),
+                )
+            applyBankStatement(bank, payee)
+
+            assertOneTransferIntoTheIsa()
+        }
+
+    @Test
+    fun `a top-up pairs with the bank payment nearest it rather than an earlier one`() =
+        runDbTest {
+            val bank = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now))
+            val payee =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Freetrade Limited", openingDate = now),
+                )
+            val elsewhere = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Landlord", openingDate = now))
+            applyBankStatement(bank, elsewhere, date = "2026-02-28", description = "RENT")
+            applyBankStatement(bank, payee)
+
+            apply(listOf(stage(listOf(topUp))))
+
+            assertEquals(mapOf("GBP" to "1000"), balances())
+            assertEquals(mapOf("GBP" to "1000"), balances("Landlord"))
+            assertEquals(mapOf("GBP" to "-2000"), balances("Bank"))
+        }
+
+    @Test
+    fun `a top-up with no bank payment of its amount near it stays on its placeholder`() =
+        runDbTest {
+            val bank = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now))
+            val payee =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Freetrade Limited", openingDate = now),
+                )
+            applyBankStatement(bank, payee, date = "2026-01-01")
+
+            apply(listOf(stage(listOf(topUp))))
+
+            assertEquals(mapOf("GBP" to "1000"), balances())
+            assertEquals(mapOf("GBP" to "-1000"), balances("Freetrade Top Ups"))
+            assertEquals(mapOf("GBP" to "1000"), balances("Freetrade Limited"))
+        }
+
+    @Test
+    fun `re-importing the export keeps a top-up one transfer into the ISA`() =
+        runDbTest {
+            val bank = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now))
+            val payee =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Freetrade Limited", openingDate = now),
+                )
+            applyBankStatement(bank, payee)
+            apply(listOf(stage(listOf(topUp))))
+
+            val reimports = repositories.reimports(maintenance)
+            reimports.reimportAll(
+                reimports.planAll(
+                    repositories.csvImportRepository
+                        .getAllImports()
+                        .first()
+                        .filter { it.originalFileName.startsWith("freetrade") },
+                ),
+                accountId = null,
+                currencyId = null,
+                onProgress = {},
+            )
+
+            assertEquals(mapOf("GBP" to "1000"), balances())
+            assertEquals(mapOf("GBP" to "-1000"), balances("Bank"))
+            assertEquals(emptyMap(), balances("Freetrade Limited"))
+        }
+
+    private suspend fun assertOneTransferIntoTheIsa() {
+        assertEquals(mapOf("GBP" to "1000"), balances())
+        assertEquals(mapOf("GBP" to "-1000"), balances("Bank"))
+        assertEquals(emptyMap(), balances("Freetrade Limited"))
+        assertEquals(emptyMap(), balances("Freetrade Top Ups"))
+    }
+
+    private suspend fun applyBankStatement(
+        bank: AccountId,
+        payee: AccountId,
+        date: String = "2026-03-01",
+        description: String = "FREETRADE",
+    ) {
+        val bankHeaders = listOf("Date", "Amount", "Currency", "Description")
+        val bankStrategy =
+            CsvImportStrategy(
+                id = CsvImportStrategyId(Uuid.random()),
+                name = "Bank $description",
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = bankHeaders.toSet(),
+                        crossSourceReconcileWindow = SettlementWindow.Elapsed(BANK_RECONCILE_WINDOW_SECONDS),
+                        fieldMappings =
+                            mapOf(
+                                TransferField.TIMESTAMP to
+                                    DateTimeParsingMapping(TransferField.TIMESTAMP, dateColumnName = "Date", dateFormat = "yyyy-MM-dd"),
+                                TransferField.SOURCE_ACCOUNT to HardCodedAccountMapping(TransferField.SOURCE_ACCOUNT, bank),
+                                TransferField.TARGET_ACCOUNT to HardCodedAccountMapping(TransferField.TARGET_ACCOUNT, payee),
+                                TransferField.DESCRIPTION to
+                                    DirectColumnMapping(TransferField.DESCRIPTION, value = ValueExpr(listOf("Description"))),
+                                TransferField.AMOUNT to
+                                    AmountParsingMapping(TransferField.AMOUNT, AmountMode.SINGLE_COLUMN, amountColumnName = "Amount"),
+                                TransferField.CURRENCY to
+                                    CurrencyLookupMapping(TransferField.CURRENCY, value = ValueExpr(listOf("Currency"))),
+                                TransferField.TIMEZONE to HardCodedTimezoneMapping(TransferField.TIMEZONE, "UTC"),
+                            ),
+                    ),
+                createdAt = now,
+                updatedAt = now,
+            )
+        repositories.csvImportStrategyRepository.createStrategy(bankStrategy, Source.Manual)
+        val bankImportId =
+            repositories.csvImportRepository.createImport(
+                fileName = "bank.csv",
+                headers = bankHeaders,
+                rows = listOf(listOf(date, "1000.00", "GBP", description)),
+                fileChecksum = "bank-$description",
+                fileLastModified = now,
+            )
+        applyStagedCsv(
+            csvImport = repositories.csvImportRepository.getImport(bankImportId).first()!!,
+            strategy = bankStrategy,
+            sourceAccountOverride = null,
+            currencies = repositories.currencyRepository.getAllCurrencies().first(),
+            accountMappingRepository = repositories.accountMappingRepository,
+            accountRepository = repositories.accountRepository,
+            csvImportRepository = repositories.csvImportRepository,
+            maintenance = maintenance,
+            importEngine = repositories.importEngine,
+            refreshViews = false,
+            cryptoRepository = repositories.cryptoRepository,
+        )
+    }
+
+    private companion object {
+        const val BANK_RECONCILE_WINDOW_SECONDS = 172_800L
+    }
 }
