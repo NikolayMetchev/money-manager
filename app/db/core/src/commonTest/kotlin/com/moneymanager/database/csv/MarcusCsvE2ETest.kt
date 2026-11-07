@@ -177,7 +177,7 @@ class MarcusCsvE2ETest : DbTest() {
         runDbTest {
             val marcus = numberedAccount("Alex Smith (1234)", MARCUS_NUMBER)
             val bank = numberedAccount("Monzo", BANK_NUMBER)
-            applyBankFeed(from = bank, to = marcus, date = "2020-05-04")
+            applyBankFeed(from = bank, to = marcus)
 
             apply(listOf(stage(listOf(deposit))))
 
@@ -191,7 +191,7 @@ class MarcusCsvE2ETest : DbTest() {
             val bank = numberedAccount("Monzo", BANK_NUMBER)
             apply(listOf(stage(listOf(deposit))))
 
-            applyBankFeed(from = bank, to = marcus, date = "2020-05-04")
+            applyBankFeed(from = bank, to = marcus)
 
             assertEquals(mapOf("Alex Smith (1234)" to "22.5", "Monzo" to "-22.5"), balances())
         }
@@ -226,7 +226,7 @@ class MarcusCsvE2ETest : DbTest() {
         runDbTest {
             val marcus = numberedAccount("Alex Smith (1234)", MARCUS_NUMBER)
             val bank = numberedAccount("Monzo", BANK_NUMBER)
-            applyBankFeed(from = bank, to = marcus, date = "2020-05-04")
+            applyBankFeed(from = bank, to = marcus)
             apply(listOf(stage(listOf(withdrawal, deposit, interest))))
             val before = balances()
 
@@ -272,15 +272,13 @@ class MarcusCsvE2ETest : DbTest() {
         )
     }
 
-    private suspend fun heldAccount(
-        name: String,
-        number: String,
-    ): AccountId {
+    /** Santander's account, carrying its number, owned by its holder. */
+    private suspend fun santanderHeldByItsHolder(): AccountId {
         val holder =
             repositories.personRepository.createPerson(
                 Person(PersonId(0), firstName = "ALEX", middleName = null, lastName = "SMITH"),
             )
-        return numberedAccount(name, number).also { repositories.personAccountOwnershipRepository.createOwnership(holder, it) }
+        return numberedAccount("Santander", BANK_NUMBER).also { repositories.personAccountOwnershipRepository.createOwnership(holder, it) }
     }
 
     private val marcusWithdrawal = row("20200506", "Withdrawal to $BANK_NUMBER", "-20.00", "80.00")
@@ -288,7 +286,7 @@ class MarcusCsvE2ETest : DbTest() {
     @Test
     fun `a receipt from the account holder is the other side of a Marcus withdrawal`() =
         runDbTest {
-            val santander = heldAccount("Santander", BANK_NUMBER)
+            val santander = santanderHeldByItsHolder()
             numberedAccount("Marcus (1234)", MARCUS_NUMBER)
             santanderReceipt(santander, "ALEX SMITH")
 
@@ -300,7 +298,7 @@ class MarcusCsvE2ETest : DbTest() {
     @Test
     fun `a Marcus withdrawal is the other side of a later receipt from the account holder`() =
         runDbTest {
-            val santander = heldAccount("Santander", BANK_NUMBER)
+            val santander = santanderHeldByItsHolder()
             numberedAccount("Marcus (1234)", MARCUS_NUMBER)
             apply(listOf(stage(listOf(marcusWithdrawal))))
 
@@ -312,7 +310,7 @@ class MarcusCsvE2ETest : DbTest() {
     @Test
     fun `a receipt from someone else is not a Marcus withdrawal`() =
         runDbTest {
-            val santander = heldAccount("Santander", BANK_NUMBER)
+            val santander = santanderHeldByItsHolder()
             numberedAccount("Marcus (1234)", MARCUS_NUMBER)
             santanderReceipt(santander, "JANE DOE")
 
@@ -321,11 +319,10 @@ class MarcusCsvE2ETest : DbTest() {
             assertEquals(mapOf("Santander" to "40", "Marcus (1234)" to "-20", "JANE DOE" to "-20"), balances())
         }
 
-    /** A bank feed's record of a £22.50 payment [from] → [to], the way a feed that knows both ends books it. */
+    /** A bank feed's record of a £22.50 payment [from] → [to] on 4 May 2020, the way a feed that knows both ends books it. */
     private suspend fun applyBankFeed(
         from: AccountId,
         to: AccountId,
-        date: String,
     ) {
         val feedHeaders = listOf("Date", "Amount", "Currency", "Description")
         val feed =
@@ -359,8 +356,8 @@ class MarcusCsvE2ETest : DbTest() {
             repositories.csvImportRepository.createImport(
                 fileName = "bank-feed.csv",
                 headers = feedHeaders,
-                rows = listOf(listOf(date, "-22.50", "GBP", "Alex Smith")),
-                fileChecksum = "bank-feed-$date",
+                rows = listOf(listOf("2020-05-04", "-22.50", "GBP", "Alex Smith")),
+                fileChecksum = "bank-feed",
                 fileLastModified = now,
             )
         applyStagedCsv(
