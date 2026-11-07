@@ -567,7 +567,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
             repositories.importEngine.setReconciliationLinks(shadow, emptySet())
             assertTrue(declined())
-            val source = reconciliation.getSources().first().single()
+            val source = reconciliation.getSources().first().single { it.name == "Koinly" }
             val real = realAccounts(repositories.accountRepository.getAllAccounts().first(), reconciliation.getShadowAccounts().first())
             assertEquals(
                 emptyMap(),
@@ -709,7 +709,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
             // The Coinbase wallet is unlinked, so its deposit is out of scope rather than "missing".
             assertTrue(result.missingInMm.isEmpty())
             assertTrue(result.missingInSource.isEmpty())
-            assertEquals(listOf("Koinly"), reconciliation.getSources().first().map { it.name })
+            assertTrue("Koinly" in reconciliation.getSources().first().map { it.name })
             assertNull(accountByName("Koinly · Binance")?.takeIf { it.id !in shadow })
         }
 }

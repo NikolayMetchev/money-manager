@@ -385,6 +385,24 @@ class StrategySelectorTest {
     }
 
     @Test
+    fun `one Accointing strategy selects both export formats`() {
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
+        val accointing = builtIns.single { it.name == "Accointing" }
+
+        fun select(headings: Set<String>): String? {
+            val names = headings.toList()
+            val csvColumns = names.mapIndexed { i, name -> CsvColumn(CsvColumnId(Uuid.random()), i, name) }
+            val row = CsvRow(rowIndex = 1L, values = names.map { "" })
+            return builtIns.selectForCsv("history.xlsx", csvColumns, listOf(row))?.name
+        }
+        val required = accointing.config.identificationColumns
+        assertEquals("Accointing", select(required))
+        assertEquals("Accointing", select(required + "providerId"))
+        // The upload template names no wallet, and its rows come back in the export: it stays unselected.
+        assertNull(select(setOf("transactionType", "date", "inBuyAmount", "inBuyAsset", "outSellAmount", "outSellAsset")))
+    }
+
+    @Test
     fun `a Monzo export still selects the Monzo CSV strategy alongside Binance`() {
         val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
         val monzo = builtIns.single { it.name == "Monzo CSV" }

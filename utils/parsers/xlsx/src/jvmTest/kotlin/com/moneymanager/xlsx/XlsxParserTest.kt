@@ -88,6 +88,49 @@ class XlsxParserTest {
         assertEquals(listOf("1", "2", ""), result.rows[0])
     }
 
+    @Test
+    fun parse_dateFormatHidingTheTime_keepsTheTime() {
+        val result = parser.parse(dateCellsWorkbook("D/M/YYYY", 43940.45821759259, 44153.0))
+
+        assertEquals(listOf(listOf("19/4/2020 10:59:50"), listOf("18/11/2020")), result.rows)
+    }
+
+    @Test
+    fun parse_dateFormatShowingTheTime_readsAsShown() {
+        val result = parser.parse(dateCellsWorkbook("yyyy-mm-dd hh:mm", 43940.45821759259))
+
+        assertEquals(listOf(listOf("2020-04-19 10:59")), result.rows)
+    }
+
+    @Test
+    fun parse_numberCell_keepsItsFraction() {
+        val bytes =
+            XSSFWorkbook().use { workbook ->
+                val sheet = workbook.createSheet("Sheet1")
+                sheet.createRow(0).createCell(0).setCellValue("amount")
+                sheet.createRow(1).createCell(0).setCellValue(43940.25)
+                ByteArrayOutputStream().also { workbook.write(it) }.toByteArray()
+            }
+
+        assertEquals(listOf(listOf("43940.25")), parser.parse(bytes).rows)
+    }
+
+    private fun dateCellsWorkbook(
+        format: String,
+        vararg serials: Double,
+    ): ByteArray =
+        XSSFWorkbook().use { workbook ->
+            val sheet = workbook.createSheet("Sheet1")
+            sheet.createRow(0).createCell(0).setCellValue("date")
+            val style = workbook.createCellStyle().apply { dataFormat = workbook.createDataFormat().getFormat(format) }
+            serials.forEachIndexed { index, serial ->
+                val cell = sheet.createRow(index + 1).createCell(0)
+                cell.setCellValue(serial)
+                cell.cellStyle = style
+            }
+            ByteArrayOutputStream().also { workbook.write(it) }.toByteArray()
+        }
+
     private class WorkbookBuilder(
         private val workbook: XSSFWorkbook,
     ) {

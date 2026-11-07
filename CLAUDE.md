@@ -490,10 +490,10 @@ an expected test result to make a refactor pass; report the divergence instead. 
 re-sync into databases that already installed them. Export lists must serialize in a canonical order, or
 Drive strategy sync sees false conflicts, but never sort first-match-wins rule lists.
 
-## Reconciliation Sources (Koinly, …)
+## Reconciliation Sources (Koinly, Accointing, …)
 
 A CSV strategy with a `ReconciliationConfig(sourceName, linkableAccountPrefix)` is a **reconciliation
-source** (built-in: Koinly). Its data never touches real accounts:
+source** (built-ins: Koinly, Accointing). Its data never touches real accounts:
 
 - Every account it resolves/creates is a **shadow account** tagged with the `reconciliation-source`
   account attribute (-9, value = source name). The mapper only sees that source's shadow accounts
