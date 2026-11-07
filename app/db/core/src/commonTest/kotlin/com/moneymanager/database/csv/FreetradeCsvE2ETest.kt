@@ -311,7 +311,7 @@ class FreetradeCsvE2ETest : DbTest() {
             val earlier = stage(listOf(buy, topUp), fileName = "freetrade_ISA_all_activity_max_01-04-2026.csv")
             apply(listOf(earlier))
             val next = cash("Top up", "TOP_UP", "2026-05-01T10:00:00.000Z", "15.00")
-            apply(listOf(stage(listOf(next, buy, topUp), fileName = "freetrade_ISA_all_activity_max_07-11-2026.csv")))
+            apply(listOf(stage(listOf(next, buy, topUp))))
 
             assertEquals(mapOf("GBP" to "16.36", "EXFD" to "202"), balances())
         }
