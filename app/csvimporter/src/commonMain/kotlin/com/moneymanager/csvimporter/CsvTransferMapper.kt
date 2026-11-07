@@ -326,6 +326,8 @@ class CsvTransferMapper(
      * match against account attributes. The applier uses the same registry for funding reconciliation.
      */
     private val attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
+    /** The file the rows came from, which rules read as `FILE_NAME_COLUMN`. */
+    private val fileName: String? = null,
 ) {
     // The file's columns, then any a rule sets that the file lacks (see CsvStrategyConfig.ruleColumns): those read
     // as absent until a rule sets them, and the mappings read them like any other.
@@ -445,7 +447,7 @@ class CsvTransferMapper(
             // The rules see the row as the CSV has it; field parsing reads the row as they left it (cells
             // swapped or set). Attributes are claimed by whichever rule tags them, so a strategy that wants
             // the original cells tags them before rewriting any.
-            val originalValues = row.values
+            val originalValues = row.values.withFileName(columnIndexByName, fileName)
             val outcome = engine.evaluate(strategy.config.rules, ColumnRecord(originalValues, columnIndexByName))
             if (outcome.skipped) return MappingResult.Skipped(row.rowIndex)
             val values = rewrittenValues(originalValues, outcome)

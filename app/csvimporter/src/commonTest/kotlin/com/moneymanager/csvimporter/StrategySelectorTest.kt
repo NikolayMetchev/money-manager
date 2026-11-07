@@ -403,6 +403,27 @@ class StrategySelectorTest {
     }
 
     @Test
+    fun `a Freetrade export selects the Freetrade strategy when its file name says the account type`() {
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
+        val names =
+            BuiltInCsvStrategies
+                .buildFreetradeCsvStrategy(Clock.System.now())
+                .config.identificationColumns
+                .toList()
+        val csvColumns = names.mapIndexed { i, name -> CsvColumn(CsvColumnId(Uuid.random()), i, name) }
+        val row = CsvRow(rowIndex = 1L, values = names.map { "" })
+
+        fun select(fileName: String) = builtIns.selectForCsv(fileName, csvColumns, listOf(row))?.name
+
+        assertEquals("Freetrade", select("freetrade_ISA_all_activity_max_07-11-2026.csv"))
+        assertEquals("Freetrade", select("freetrade_GIA_all_activity_max_07-11-2026.csv"))
+        assertEquals("Freetrade", select("ISA.csv"))
+        assertNull(select("freetrade_SIPP_all_activity_max_07-11-2026.csv"))
+        // Part of a longer word isn't the account type.
+        assertNull(select("visa.csv"))
+    }
+
+    @Test
     fun `a Celsius export selects the Celsius strategy by its spaced headers`() {
         val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
         val names =

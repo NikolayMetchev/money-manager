@@ -10,9 +10,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.csv.CsvColumn
+import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csvstrategy.FILE_NAME_COLUMN
 import com.moneymanager.ui.components.rules.RuleContext
 import com.moneymanager.ui.components.rules.StrategyRulesEditor
+import kotlin.uuid.Uuid
 
 /**
  * Rules tab: the strategy's if/then rules, which decide everything about a row the field mappings don't —
@@ -64,8 +67,12 @@ internal fun RulesTab(
             rules = state.rules,
             onRulesChanged = { state.rules = it },
             context = RuleContext.CSV_ROW,
-            pathField = columnPathField(csvColumns, firstRow, enabled),
+            pathField = columnPathField(csvColumns + fileNameColumn(csvColumns), firstRow, enabled),
             enabled = enabled,
         )
     }
 }
+
+/** The file name, offered to row rules beside the file's columns. A row has no cell for it, so it shows no sample. */
+private fun fileNameColumn(columns: List<CsvColumn>) =
+    CsvColumn(CsvColumnId(Uuid.NIL), (columns.maxOfOrNull { it.columnIndex } ?: -1) + 1, FILE_NAME_COLUMN)

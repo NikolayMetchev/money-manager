@@ -199,6 +199,7 @@ private fun pairFundingLegs(
 suspend fun ensureCryptoAssets(
     strategy: CsvImportStrategy,
     columns: List<CsvColumn>,
+    fileName: String,
     rows: List<CsvRow>,
     currencies: List<Currency>,
     importEngine: ImportEngine,
@@ -208,7 +209,7 @@ suspend fun ensureCryptoAssets(
     val fiatCodes = currencies.mapTo(mutableSetOf()) { it.code.uppercase() }
     val existingCrypto = cryptoRepository.getAllCryptoAssets().first().mapTo(mutableSetOf()) { it.code.uppercase() }
     createCryptoAssets(
-        collectCryptoCodes(strategy, columns, rows, fiatCodes, existingCrypto, cryptoRepository.assetAliasMap()),
+        collectCryptoCodes(strategy, columns, fileName, rows, fiatCodes, existingCrypto, cryptoRepository.assetAliasMap()),
         importEngine,
     )
     return cryptoRepository.getAllCryptoAssets().first()
@@ -305,7 +306,7 @@ private suspend fun cryptoCodesForImport(
     // updates, transfer→trade conversions), and their tickers must resolve at plan time. For a fresh
     // import every row is unimported, so this is the same set.
     val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
-    return collectCryptoCodes(strategy, csvImport.columns, allRows, fiatCodes, existingCrypto, assetAliases)
+    return collectCryptoCodes(strategy, csvImport.columns, csvImport.originalFileName, allRows, fiatCodes, existingCrypto, assetAliases)
 }
 
 /**
@@ -316,6 +317,7 @@ private suspend fun cryptoCodesForImport(
 private fun collectCryptoCodes(
     strategy: CsvImportStrategy,
     columns: List<CsvColumn>,
+    fileName: String,
     rows: List<CsvRow>,
     fiatCodes: Set<String>,
     existingCryptoCodes: Set<String>,
@@ -339,7 +341,12 @@ private fun collectCryptoCodes(
     val codes = mutableSetOf<String>()
     for (row in rows) {
         // The code is read as the strategy's rules leave the row, as the mapper reads it.
-        val record = engine.evaluate(strategy.config.rules, ColumnRecord(row.values, indexByName)).record
+        val record =
+            engine
+                .evaluate(
+                    strategy.config.rules,
+                    ColumnRecord(row.values.withFileName(indexByName, fileName), indexByName),
+                ).record
         for (expr in readableExprs) {
             val raw = rules.resolve(expr) { record.text(it)?.trim() }
             if (raw.isBlank()) continue
@@ -545,7 +552,8 @@ suspend fun applyStagedCsv(
     // On-demand: create a crypto asset for every non-fiat ticker appearing in the strategy's currency
     // column, so rows denominated in crypto resolve to a real crypto asset (upsert = idempotent on
     // re-import). No-op unless a CryptoReadRepository is supplied and the currency column carries crypto.
-    val cryptoAssets = ensureCryptoAssets(strategy, stagedImport.columns, rows, currencies, importEngine, cryptoRepository)
+    val cryptoAssets =
+        ensureCryptoAssets(strategy, stagedImport.columns, stagedImport.originalFileName, rows, currencies, importEngine, cryptoRepository)
     val assetAliases = cryptoRepository?.assetAliasMap().orEmpty()
 
     // Re-fetch accounts so payee accounts created by earlier files in the same scan are seen.
@@ -565,6 +573,7 @@ suspend fun applyStagedCsv(
             cryptoAssets,
             attributeAccountMatchers,
             assetAliases,
+            stagedImport.originalFileName,
         ).prepareImport(rows)
 
     return runCsvImport(
@@ -776,6 +785,7 @@ fun buildCsvMapper(
     cryptoAssets: List<CryptoAsset> = emptyList(),
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
     assetAliases: Map<String, String> = emptyMap(),
+    fileName: String? = null,
 ): CsvTransferMapper =
     CsvTransferMapper(
         strategy = strategy,
@@ -790,6 +800,7 @@ fun buildCsvMapper(
         sourceAccountOverride = sourceAccountOverride,
         passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
         attributeAccountMatchers = attributeAccountMatchers,
+        fileName = fileName,
     )
 
 /**
@@ -1038,6 +1049,7 @@ suspend fun runCsvImport(
             sourceAccountOverride = selectedSourceAccountId,
             passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
             attributeAccountMatchers = attributeAccountMatchers,
+            fileName = csvImport.originalFileName,
         )
 
     // Handle case when all rows are already processed (rows is already filtered by the caller)

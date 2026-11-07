@@ -194,6 +194,7 @@ fun ApplyStrategyDialog(
                         CsvTransferMapper(
                             strategy = strategy,
                             columns = csvImport.columns,
+                            fileName = csvImport.originalFileName,
                             existingAccounts = accountsByName,
                             existingCurrencies = currenciesById,
                             existingCurrenciesByCode = currenciesByCode,
@@ -261,6 +262,7 @@ fun ApplyStrategyDialog(
                         CsvTransferMapper(
                             strategy = strategy,
                             columns = csvImport.columns,
+                            fileName = csvImport.originalFileName,
                             existingAccounts = accountsByName,
                             existingCurrencies = currenciesById,
                             existingCurrenciesByCode = currenciesByCode,
@@ -390,6 +392,7 @@ fun ApplyStrategyDialog(
                                 ensureCryptoAssets(
                                     strategy = strategy,
                                     columns = csvImport.columns,
+                                    fileName = csvImport.originalFileName,
                                     rows = rowsToProcess,
                                     currencies = currencies,
                                     importEngine = importEngine,
