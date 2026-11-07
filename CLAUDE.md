@@ -486,7 +486,7 @@ alone, inside the placeholder window (business days included), and the nearest r
 (`unidentified-counterparty`, whose value says which end it is: `source` or `target`). The incoming row becomes the whole
 transfer, real end to real end, and the other record is excluded and linked, so either import order books `Monzo -> ISA`.
 Fees, pass-through chain legs and shadow accounts are never candidates (`selectOtherSideCandidates`), and nor is anything on
-an account the batch itself books.
+an account the batch itself books, a record of the same source, or a record another row already reconciled against.
 
 **Still separate, on purpose:** `TradeReconciler`, `ConversionTradeReconciler` and `ConversionGroupReconciler`
 use genuinely different assignment rules, and `app/reconciliation`'s `LegMatcher` is a read-only report.

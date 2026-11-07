@@ -726,8 +726,10 @@ class ImportDeduper(
         val candidates =
             otherSideLegsByAmount[amount]
                 .orEmpty()
-                .filter { (placeholderSide(it) != null) == (placeholder == null) && it.id !in pairedInBatch }
-                .map { it.id to it }
+                .filter { leg ->
+                    val otherSideKnown = if (placeholder != null) !isPlaceholder(leg) else placeholderSide(leg) != null
+                    otherSideKnown && leg.id !in pairedInBatch && leg.id !in claimedReconcileTargets && leg.id !in ownSourceLegs
+                }.map { it.id to it }
         val matchId =
             selectNearestUnconsumedLeg(candidates, timestamp, consumedReconcileIds) { existing ->
                 settings.window.holds(timestamp, existing.timestamp, transfer.accounts() + existing.accounts())
@@ -757,6 +759,8 @@ class ImportDeduper(
             excludeExisting = ExcludeExistingLeg(other, settings.exclusionTypeId),
         )
     }
+
+    private fun isPlaceholder(leg: Transfer): Boolean = leg.attributes.any { it.attributeType.id == unidentifiedCounterpartyTypeId }
 
     private fun placeholderSide(leg: Transfer): String? =
         leg.attributes
