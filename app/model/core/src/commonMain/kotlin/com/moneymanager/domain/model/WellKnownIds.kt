@@ -24,6 +24,9 @@ object WellKnownIds {
     /** "account number" account attribute type used for personal counterparties. */
     const val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID: Long = -6
 
+    /** Name of the [ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID] attribute type. */
+    const val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_NAME: String = "account-account-number"
+
     /**
      * "counterparty-name-key" account attribute: the normalised name key used to reconcile counterparties
      * that have no stable id and no bank identity (e.g. Monzo transfers carrying only an ephemeral

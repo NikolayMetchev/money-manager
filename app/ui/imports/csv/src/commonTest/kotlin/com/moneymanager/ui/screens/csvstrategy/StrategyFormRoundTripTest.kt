@@ -2,6 +2,7 @@ package com.moneymanager.ui.screens.csvstrategy
 
 import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.domain.model.CsvImportStrategyId
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
@@ -345,6 +346,16 @@ class StrategyFormRoundTripTest {
         val rebuilt = buildStrategyFromEditorState(state, freetrade.id, freetrade.createdAt, freetrade.updatedAt)
 
         assertEquals(freetrade.config, rebuilt.config)
+    }
+
+    @Test
+    fun `the built-in Marcus strategy survives a no-op save`() {
+        val marcus = BuiltInCsvStrategies.buildMarcusCsvStrategy(timestamp, CurrencyId(1))
+
+        val state = CsvStrategyEditorState(marcus, marcus.config.identificationColumns)
+        val rebuilt = buildStrategyFromEditorState(state, marcus.id, marcus.createdAt, marcus.updatedAt)
+
+        assertEquals(marcus.config, rebuilt.config)
     }
 
     @Test

@@ -22,3 +22,8 @@ WHERE aa.id IN (
     JOIN account a2 ON a2.id = aa2.account_id
     GROUP BY aa2.name
 );
+
+selectAccountOwnerNames:
+SELECT o.account_id, p.first_name, p.middle_name, p.last_name
+FROM person_account_ownership o
+JOIN person p ON p.id = o.person_id;

@@ -57,6 +57,8 @@ class ImportTimelineScreenTest {
 
             override suspend fun getPreviousAccountNames(): Map<String, AccountId> = emptyMap()
 
+            override suspend fun getAccountOwnerNames(): Map<AccountId, List<String>> = emptyMap()
+
             override suspend fun getAccountIdsByAttribute(
                 attributeTypeId: Long,
                 value: String?,

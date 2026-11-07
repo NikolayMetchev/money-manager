@@ -21,6 +21,9 @@ interface AccountReadRepository {
      */
     suspend fun getPreviousAccountNames(): Map<String, AccountId>
 
+    /** The full names of the people who own each owned account. */
+    suspend fun getAccountOwnerNames(): Map<AccountId, List<String>>
+
     /** Ids of the accounts carrying an attribute of [attributeTypeId] whose value is exactly [value] (any value when null). */
     suspend fun getAccountIdsByAttribute(
         attributeTypeId: Long,
