@@ -1979,7 +1979,8 @@ object BuiltInCsvStrategies {
      * A number no account carries yet names its own account, which a person can map onto theirs.
      *
      * The export has no transaction id, but its running balance makes each row unique, and overlapping exports
-     * repeat a row exactly, so date, amount and balance together are the row's identity.
+     * repeat a row exactly, so the account, date, amount and balance together are the row's
+     * identity (two accounts can share the other three).
      */
     fun buildMarcusCsvStrategy(
         now: Instant,
@@ -2025,9 +2026,11 @@ object BuiltInCsvStrategies {
                             rule(
                                 RuleAction.SetValue(
                                     MARCUS_ROW_ID_COLUMN,
-                                    RuleValue.constant("{$MARCUS_DATE_COLUMN} {$MARCUS_VALUE_COLUMN} {$MARCUS_BALANCE_COLUMN}"),
+                                    RuleValue.constant(
+                                        "{$MARCUS_ACCOUNT_NUMBER_COLUMN} {$MARCUS_DATE_COLUMN} {$MARCUS_VALUE_COLUMN} {$MARCUS_BALANCE_COLUMN}",
+                                    ),
                                 ),
-                                name = "Date, amount and balance identify a row",
+                                name = "Account, date, amount and balance identify a row",
                             ),
                             attribute(MARCUS_ROW_ID_COLUMN, "marcus-row-id", unique = true),
                             incomingWhenPositive(MARCUS_VALUE_COLUMN),
