@@ -337,9 +337,12 @@ it is relative, so it runs under any prefix.
 
 ## Android (`kmp/android`)
 
-- **SDK**: the `android_sdk` extension downloads what the build reads from Google's SDK repository, at `pins.bzl`'s
-  versions (`repo-scripts repin android-sdk` rewrites them from its index): `@android_platform`, the `compile_sdk`
-  platform `android_sdk.levels(…)` sets, and `@android_platform_tools`' adb. Neither `ANDROID_HOME` nor `local.properties`
+- **SDK**: the `android_sdk` extension downloads what the build reads from Google's SDK repository: `@android_platform`,
+  the `compile_sdk` platform `android_sdk.levels(…)` sets, and `@android_platform_tools`' adb. Their versions are
+  `android_sdk.platform` and `android_sdk.platform_tools` in `MODULE.bazel`, which Renovate bumps through custom
+  datasources over the repository's index (stable channel only; another API level, even 37.1, is never proposed), and
+  `repo-scripts repin android-sdk` then rewrites `pins.bzl`'s archives and SHA-256s. Changing `compile_sdk` by hand moves
+  `android_sdk.platform` to that level's newest stable release on the next repin. Neither `ANDROID_HOME` nor `local.properties`
   is read, and nothing that doesn't need them fetches them. Both are under the Android SDK License, and Bazel can't ask
   during a build: until `bazel run //tools/repo-scripts:repo-scripts-tool -- accept-android-license` has recorded
   `sdk_license.txt` in `~/.android` (`ANDROID_USER_HOME`), they hold an action that fails naming that command. When repin

@@ -54,6 +54,18 @@
       "description": "Azul Zulu JDK releases (Linux x64 stands for every platform; repo-scripts repin jdk fails if one lacks the release), as major.minor.patch",
       "defaultRegistryUrlTemplate": "https://api.azul.com/metadata/v1/zulu/packages/?os=linux&arch=x64&archive_type=tar.gz&java_package_type=jdk&javafx_bundled=false&crac_supported=false&release_status=ga&availability_types=CA&page_size=1000",
       "transformTemplates": ["{\"releases\": [$map($, function($p) { {\"version\": $join($map($p.java_version[[0..2]], $string), \".\")} })]}"]
+    },
+    "android-platform": {
+      "description": "Stable releases of Android platforms in the SDK repository's XML index, read line by line and rejoined: a package's channel and archive are on different lines. Previews (platform-37.2-beta3) and extension levels (platform-36-ext19) don't match",
+      "defaultRegistryUrlTemplate": "https://dl.google.com/android/repository/repository2-3.xml",
+      "format": "plain",
+      "transformTemplates": ["{\"releases\": [$map($match($join(releases.version, \"\\n\"), /<channelRef ref=\"channel-0\"\\/>\\s*<archives>\\s*<archive>\\s*<complete>\\s*<size>\\d+<\\/size>\\s*<checksum type=\"sha1\">\\w+<\\/checksum>\\s*<url>platform-(\\d+(?:\\.\\d+)?_r\\d+)\\.zip/), function($m) { {\"version\": $m.groups[0]} })]}"]
+    },
+    "android-platform-tools": {
+      "description": "Stable releases of platform-tools in the SDK repository's XML index, read as android-platform is. Dev-channel releases are listed too, so matching the filename alone would pick them",
+      "defaultRegistryUrlTemplate": "https://dl.google.com/android/repository/repository2-3.xml",
+      "format": "plain",
+      "transformTemplates": ["{\"releases\": [$map($match($join(releases.version, \"\\n\"), /<channelRef ref=\"channel-0\"\\/>\\s*<archives>\\s*<archive>\\s*<complete>\\s*<size>\\d+<\\/size>\\s*<checksum type=\"sha1\">\\w+<\\/checksum>\\s*<url>platform-tools_r(\\d+\\.\\d+\\.\\d+)-linux\\.zip/), function($m) { {\"version\": $m.groups[0]} })]}"]
     }
   },
   "customManagers": [
@@ -113,6 +125,23 @@
       "depNameTemplate": "com.android.tools.build:gradle",
       "datasourceTemplate": "maven",
       "registryUrlTemplate": "https://maven.google.com"
+    },
+    {
+      "customType": "regex",
+      "description": "The Android platform release (MODULE.bazel's android_sdk.platform, <api>_r<revision>). The API is the compatibility group, so only a new revision of the same API is an update: moving API is a compile_sdk decision. repin.sh rewrites pins.bzl",
+      "managerFilePatterns": ["/^MODULE\\.bazel$/"],
+      "matchStrings": ["android_sdk\\.platform\\(version = \"(?<currentValue>[^\"]+)\"\\)"],
+      "depNameTemplate": "android-platform",
+      "datasourceTemplate": "custom.android-platform",
+      "versioningTemplate": "regex:^(?<compatibility>\\d+(?:\\.\\d+)?)_r(?<patch>\\d+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "The Android platform-tools release adb comes from (MODULE.bazel's android_sdk.platform_tools); repin.sh rewrites pins.bzl",
+      "managerFilePatterns": ["/^MODULE\\.bazel$/"],
+      "matchStrings": ["android_sdk\\.platform_tools\\(version = \"(?<currentValue>[^\"]+)\"\\)"],
+      "depNameTemplate": "android-platform-tools",
+      "datasourceTemplate": "custom.android-platform-tools"
     },
     {
       "customType": "regex",

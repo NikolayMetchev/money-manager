@@ -317,6 +317,8 @@ private const val STABLE_CHANNEL = "channel-0"
 /** The index's host names against pins.bzl's (aapt2's, which are AGP's). */
 private val SDK_HOSTS = mapOf("linux" to "linux", "macosx" to "osx", "windows" to "windows")
 
+private val PLATFORM_TAG = Regex("""(android_sdk\.platform\(version = ")([^"]+)("\))""")
+private val TOOLS_TAG = Regex("""android_sdk\.platform_tools\(version = "([^"]+)"\)""")
 private val PLATFORM_PIN = Regex("""^ANDROID_PLATFORM = \{\n(.*?)^}""", setOf(RegexOption.MULTILINE, RegexOption.DOT_MATCHES_ALL))
 private val TOOLS_PIN = Regex("""^PLATFORM_TOOLS = \{\n(.*?)^}""", setOf(RegexOption.MULTILINE, RegexOption.DOT_MATCHES_ALL))
 private val PIN_FIELD = Regex(""""(\w+)": (?:"([^"]*)"|(\d+))""")
@@ -333,9 +335,12 @@ fun repinAndroidSdk(
     licenseFile: File,
     download: (String) -> ByteArray = ::httpGet,
 ) {
+    val module = moduleFile.readText()
     val level =
-        Regex("""^ *compile_sdk = (\d+),$""", MULTILINE).find(moduleFile.readText())?.groupValues?.get(1)
+        Regex("""^ *compile_sdk = (\d+),$""", MULTILINE).find(module)?.groupValues?.get(1)
             ?: fail("no compile_sdk in $moduleFile")
+    val platformRelease = PLATFORM_TAG.find(module)?.groupValues?.get(2) ?: fail("no android_sdk.platform in $moduleFile")
+    val toolsVersion = TOOLS_TAG.find(module)?.groupValues?.get(1) ?: fail("no android_sdk.platform_tools in $moduleFile")
     val index =
         DocumentBuilderFactory
             .newInstance()
@@ -353,13 +358,19 @@ fun repinAndroidSdk(
         bytes
     }
 
+    // A release of another API means compile_sdk was changed by hand, and compile_sdk decides.
     val platform =
-        listOf("platforms;android-$level.0", "platforms;android-$level")
-            .firstNotNullOfOrNull { index.stablePackage(it) }
-            ?.archives()
-            ?.values
-            ?.single()
-            ?: error("no stable Android platform for API $level in the SDK index")
+        if (platformRelease.substringBefore('_').substringBefore('.') == level) {
+            index.stableArchives("platforms;", "platform-$platformRelease.zip")?.values?.single()
+                ?: error("android_sdk.platform $platformRelease isn't a stable release in the SDK index")
+        } else {
+            listOf("platforms;android-$level.0", "platforms;android-$level")
+                .firstNotNullOfOrNull { index.stablePackage(it) }
+                ?.archives()
+                ?.values
+                ?.single()
+                ?: error("no stable Android platform for API $level in the SDK index")
+        }
     val pinnedPlatform =
         PLATFORM_PIN.find(pins)?.let { pin ->
             PIN_FIELD.findAll(pin.groupValues[1]).associate { it.groupValues[1] to it.groupValues[2].ifEmpty { it.groupValues[3] } }
@@ -376,7 +387,9 @@ fun repinAndroidSdk(
             mapOf("dir" to dir, "file" to platform.file, "sha256" to sha256Hex(bytes))
         }
 
-    val tools = (index.stablePackage("platform-tools") ?: error("no stable platform-tools in the SDK index")).archives()
+    val tools =
+        index.stableArchives("platform-tools", "platform-tools_r$toolsVersion-linux.zip")
+            ?: error("android_sdk.platform_tools $toolsVersion isn't a stable release in the SDK index")
     val pinnedTools =
         TOOLS_ENTRY.findAll(TOOLS_PIN.find(pins)?.groupValues?.get(1) ?: fail("no PLATFORM_TOOLS in $pinsFile")).associate {
             it.groupValues[1] to (it.groupValues[2] to it.groupValues[3])
@@ -398,6 +411,9 @@ fun repinAndroidSdk(
         }
     if (writeIfChanged(pinsFile, pins, updated)) println("Re-pinned the Android SDK: ${platform.file}, ${tools.values.first().file}")
 
+    val release = platform.file.removePrefix("platform-").removeSuffix(".zip")
+    writeIfChanged(moduleFile, module, PLATFORM_TAG.replace(module) { "${it.groupValues[1]}$release${it.groupValues[3]}" })
+
     val license =
         index
             .elements("license")
@@ -413,9 +429,20 @@ private fun Element.elements(tag: String): List<Element> =
     getElementsByTagName(tag).let { nodes -> (0 until nodes.length).map { nodes.item(it) as Element } }
 
 private fun Element.stablePackage(path: String): Element? =
-    elements("remotePackage").firstOrNull { pkg ->
-        pkg.getAttribute("path") == path && pkg.elements("channelRef").single().getAttribute("ref") == STABLE_CHANNEL
-    }
+    elements("remotePackage").firstOrNull { it.getAttribute("path") == path && it.isStable() }
+
+private fun Element.isStable(): Boolean = elements("channelRef").single().getAttribute("ref") == STABLE_CHANNEL
+
+/** The archives of the stable package under [pathPrefix] that holds [file]. */
+private fun Element.stableArchives(
+    pathPrefix: String,
+    file: String,
+): Map<String, SdkArchive>? =
+    elements("remotePackage")
+        .asSequence()
+        .filter { it.getAttribute("path").startsWith(pathPrefix) && it.isStable() }
+        .map { it.archives() }
+        .firstOrNull { archives -> archives.values.any { it.file == file } }
 
 /** A package's archives by pins.bzl's host name; an archive for every host (a platform's) is under one key. */
 private fun Element.archives(): Map<String, SdkArchive> =

@@ -286,8 +286,8 @@
   "moduleExtensions": {
     "//bazel/kmp/android:extensions.bzl%android_sdk": {
       "general": {
-        "bzlTransitiveDigest": "leMpgmNCpU4I+Ai+cf3NyAvrvl5lkgQ9wg4QNJeKrJc=",
-        "usagesDigest": "SpsN3+BHyJklqzBMvjAnq8Nkw7QnGJGIxT5/AaD6tIY=",
+        "bzlTransitiveDigest": "YyItNJJ82cHDOfCCxnUp8F48Ox+F33hALiS3159eyPw=",
+        "usagesDigest": "DC6Su2avWfTTs39wkStO1TiOr0Cyb/TwRO4dG2/mwUg=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "android_sdk": {
@@ -302,12 +302,15 @@
           "android_platform": {
             "repoRuleId": "@@//bazel/kmp/android:extensions.bzl%_platform",
             "attributes": {
-              "compile_sdk": 37
+              "compile_sdk": 37,
+              "version": "37.0_r02"
             }
           },
           "android_platform_tools": {
             "repoRuleId": "@@//bazel/kmp/android:extensions.bzl%_platform_tools",
-            "attributes": {}
+            "attributes": {
+              "version": "37.0.1"
+            }
           },
           "aapt2": {
             "repoRuleId": "@@//bazel/kmp/android:extensions.bzl%_aapt2",
