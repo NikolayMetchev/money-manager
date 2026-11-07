@@ -4,6 +4,7 @@ import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.repository.DeviceReadRepositoryImpl
 import com.moneymanager.database.repository.write.DeviceWriteRepositoryImpl
 import com.moneymanager.database.service.AccountMappingExportService
+import com.moneymanager.database.service.AssetExportService
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.scope.DatabaseScope
@@ -66,6 +67,8 @@ interface DatabaseComponent {
     val csvImportStrategyRepository: CsvImportStrategyWriteRepository
     val csvStrategyExportService: CsvStrategyExportService
     val accountMappingExportService: AccountMappingExportService
+
+    val assetExportService: AssetExportService
     val strategyLibrary: StrategyLibrary
     val currencyRepository: CurrencyWriteRepository
 

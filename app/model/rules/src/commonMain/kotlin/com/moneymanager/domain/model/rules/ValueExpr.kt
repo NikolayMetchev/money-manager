@@ -1,7 +1,6 @@
 package com.moneymanager.domain.model.rules
 
 import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
-import com.moneymanager.domain.model.serialization.SortedStringToStringMapSerializer
 import com.moneymanager.regex.compileRegex
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
@@ -53,41 +52,29 @@ data class ValueExpr(
 }
 
 /**
- * How a source's asset codes are turned into the codes Money Manager uses: [stripSuffixes] are removed
- * first (Kraken's Earn holdings `XETH.F` → `XETH`), then [aliases] map what's left (Kraken `XXBT` →
- * `BTC`, Koinly `KNCL` → `KNC`). Codes are upper-cased and trimmed before both steps; keys are upper case.
+ * How a source's asset codes are normalised before they are looked up as assets: upper-cased and trimmed, then
+ * [stripSuffixes] removed (Kraken's Earn holdings `XETH.F` → `XETH`). That one asset goes by several codes is not a
+ * source's to say: see `resolveAssetCode`.
  */
 @Serializable
 data class AssetCodeRules(
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    @Serializable(with = SortedStringToStringMapSerializer::class)
-    val aliases: Map<String, String> = emptyMap(),
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
     @Serializable(with = SortedStringSetSerializer::class)
     val stripSuffixes: Set<String> = emptySet(),
 ) {
-    @Transient
-    private val aliasesByUpperCode: Map<String, String> =
-        aliases.entries.associate { (code, alias) ->
-            code.trim().uppercase() to
-                alias.trim().uppercase()
-        }
-
     // Normalised once, like the code they are matched against; a blank suffix would match every code and
     // strip nothing, hiding any later suffix that should apply.
     @Transient
     private val normalisedSuffixes: List<String> = stripSuffixes.map { it.trim().uppercase() }.filter { it.isNotEmpty() }
 
-    val isEmpty: Boolean get() = aliases.isEmpty() && stripSuffixes.isEmpty()
+    val isEmpty: Boolean get() = stripSuffixes.isEmpty()
 
-    /** [code] normalised: trimmed, upper-cased, a known suffix stripped, then aliased. */
+    /** [code] normalised: trimmed, upper-cased, a known suffix stripped. */
     fun canonical(code: String): String {
         val normalised = code.trim().uppercase()
-        val stripped =
-            normalisedSuffixes
-                .firstOrNull { normalised.endsWith(it) }
-                ?.let { normalised.dropLast(it.length) }
-                ?: normalised
-        return aliasesByUpperCode[stripped] ?: stripped
+        return normalisedSuffixes
+            .firstOrNull { normalised.endsWith(it) }
+            ?.let { normalised.dropLast(it.length) }
+            ?: normalised
     }
 }

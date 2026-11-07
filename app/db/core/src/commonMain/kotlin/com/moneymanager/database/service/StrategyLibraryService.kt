@@ -2,12 +2,14 @@ package com.moneymanager.database.service
 
 import com.moneymanager.database.json.AccountMappingExportCodec
 import com.moneymanager.database.json.ApiStrategyExportCodec
+import com.moneymanager.database.json.AssetListExportCodec
 import com.moneymanager.database.json.CsvStrategyExportCodec
 import com.moneymanager.database.json.CurrencyListExportCodec
 import com.moneymanager.database.json.HolidayCalendarExportCodec
 import com.moneymanager.database.json.PassThroughExportCodec
 import com.moneymanager.database.json.StrategyArtifactCodec
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.AssetExportKind
 import com.moneymanager.domain.model.CurrencyExportEntry
 import com.moneymanager.domain.model.CurrencyListExport
 import com.moneymanager.domain.model.Source
@@ -60,6 +62,7 @@ class StrategyLibraryService(
     private val csvStrategyExportService: CsvStrategyExportService,
     private val apiStrategyExportService: ApiStrategyExportService,
     private val accountMappingExportService: AccountMappingExportService,
+    private val assetExportService: AssetExportService,
     private val importEngine: ImportEngine,
 ) : StrategyLibrary {
     override suspend fun listLocal(appVersion: AppVersion): List<LocalStrategyEntry> {
@@ -103,6 +106,20 @@ class StrategyLibraryService(
             entries += entry(StrategyKey(StrategyKind.HOLIDAY_CALENDAR, calendar.id), json)
         }
 
+        val assets = assetExportService.toExport(appVersion)
+        if (assets.assets.isNotEmpty()) {
+            entries += entry(StrategyKey(StrategyKind.ASSETS, StrategyFileNaming.ASSETS_NAME), AssetListExportCodec.encode(assets))
+        }
+
+        val cryptoList = assetExportService.toPublishedCryptoList(appVersion)
+        if (cryptoList.assets.isNotEmpty()) {
+            entries +=
+                entry(
+                    StrategyKey(StrategyKind.CRYPTO_ASSETS, StrategyFileNaming.CRYPTO_ASSETS_NAME),
+                    AssetListExportCodec.encode(cryptoList),
+                )
+        }
+
         return entries
     }
 
@@ -124,6 +141,16 @@ class StrategyLibraryService(
 
             StrategyKind.CURRENCIES -> {
                 val codes = CurrencyListExportCodec.decode(json).currencies.mapTo(mutableSetOf()) { it.code }
+                StrategyParseResult(key, emptyList(), provides = mapOf(CsvReferenceType.CURRENCY to codes))
+            }
+
+            StrategyKind.ASSETS, StrategyKind.CRYPTO_ASSETS -> {
+                val codes =
+                    AssetListExportCodec
+                        .decode(json)
+                        .assets
+                        .filter { it.kind == AssetExportKind.CURRENCY }
+                        .mapTo(mutableSetOf()) { it.code }
                 StrategyParseResult(key, emptyList(), provides = mapOf(CsvReferenceType.CURRENCY to codes))
             }
 
@@ -149,6 +176,8 @@ class StrategyLibraryService(
             StrategyKind.GLOBAL_MAPPINGS -> applyGlobalMappings(json, resolutions)
             StrategyKind.CURRENCIES -> applyCurrencies(json)
             StrategyKind.HOLIDAY_CALENDAR -> applyHolidayCalendar(key.name, json)
+            StrategyKind.ASSETS -> assetExportService.importAssets(AssetListExportCodec.decode(json))
+            StrategyKind.CRYPTO_ASSETS -> assetExportService.installPublishedCryptoList(AssetListExportCodec.decode(json))
         }
     }
 

@@ -5863,7 +5863,7 @@ KMHYPE	Kinetiq Markets HYPE
 KMNO	Kamino	
 KNC	Kyber Network Crystal	
 KNCH	KAANCH NETWORK	
-KNCL	Kyber Network Crystal Legacy	
+KNCL	Kyber Network Crystal Legacy	KNC
 KNC_B	Bridged Kyber Network Crystal (BSC)	
 KNC_E	Bridged Kyber Network Crystal (Ethereum)	
 KNDX	KONDUX	
@@ -6402,7 +6402,7 @@ LUMOX	Lumox Studio
 LUMPY	Lumpy	
 LUNA	Terra	
 LUNAR	MoonPrime Games	
-LUNC	Terra Luna Classic	
+LUNC	Terra Luna Classic	LUNA
 LUNCHMONEY	LUNCHMONEY	
 LUNR	Intuitive Machines • Robinhood Token	
 LUNRON	Intuitive Machines (Ondo Tokenized)	
@@ -12499,7 +12499,7 @@ XBLD	xBLD_Astrovault
 XBO	$XBO Token	
 XBONZO	xBONZO	
 XBOO	Boo MirrorWorld	
-XBT	XBT	
+XBT	XBT	BTC
 XBTC	CrossCurve BTC	
 XCAD	XCAD Network	
 XCCX	BlockChainCoinX	
@@ -12523,6 +12523,7 @@ XDAI	XDAI
 XDATA	Streamr XDATA	
 XDB	XDB CHAIN	
 XDC	XDC Network	
+XDG	Dogecoin	DOGE
 XDNA	extraDNA	
 XDOG	XDOG	
 XDOGE	Xdoge	
@@ -12546,7 +12547,8 @@ XERIS	XerisCoin
 XERO	XERO	
 XET	Xfinite Entertainment	
 XETA	XANA	
-XETH	f(x) Protocol Leveraged ETH	
+XETC	Ethereum Classic	ETC
+XETH	f(x) Protocol Leveraged ETH	ETH
 XEXAI	XEXAMAI	
 XEZETH	Leveraged ezETH	
 XFC	Football Coin	
@@ -12588,8 +12590,10 @@ XLG	xiao lang gou
 XLK	State Street Technology Select Sector SPDR ETF • Robinhood Token	
 XLLM2	xLLM2	
 XLM	Stellar	
+XLTC	Litecoin	LTC
 XMAS	Christmas Season	
 XMD	Metal Dollar	
+XMLN	Enzyme	MLN
 XMN	xMoney	
 XMON	XMON	
 XMONEY	XMONEY	
@@ -12642,6 +12646,7 @@ XR	Xraders
 XRAY	Ray Network	
 XRB	OroBit	
 XRD	Radix	
+XREP	Augur	REP
 XRING	Darwinia Network xRING	
 XROCK	xRocket	
 XRP	XRP	
@@ -12710,12 +12715,18 @@ XWG	X World Games
 XWIN	xWIN Finance	
 XWORLD	xWorld	
 XX	XX Network	
+XXBT	Bitcoin	BTC
+XXDG	Dogecoin	DOGE
+XXLM	Stellar	XLM
+XXMR	Monero	XMR
+XXRP	XRP	XRP
 XYLDON	Global X S&P 500 Covered Call ETF (Ondo Tokenized)	
 XYM	Symbol	
 XYO	XYO Network	
 XYRO	XYRO	
 XYZ	Universe.XYZ	
 XYZON	Block (Ondo Tokenized Stock)	
+XZEC	Zcash	ZEC
 XZK	Expand	
 Y	ellow	
 Y24	Yield 24	
@@ -12893,6 +12904,7 @@ ZARM	Mento South African Rand
 ZARO	ZARO Coin	
 ZARP	ZARP Stablecoin	
 ZAT	zkApes Token	
+ZAUD	Australian Dollar	AUD
 ZAUTH	Zauthx402	
 ZAYED	The Golden Bull	
 ZAZA	Zaza (SOL)	
@@ -12904,7 +12916,8 @@ ZBT	ZEROBASE
 ZBTC	Zeus Network zBTC	
 ZBU	Zeebu	
 ZC	Z Combinator	
-ZCHF	Frankencoin	
+ZCAD	Canadian Dollar	CAD
+ZCHF	Frankencoin	CHF
 ZCL	Zclassic	
 ZCN	Zus	
 ZCO	Zebi	
@@ -12947,12 +12960,14 @@ ZETA	ZetaChain
 ZETH	ZeroLiquid ETH	
 ZETRIX	Zetrix	
 ZEUM	Colizeum	
+ZEUR	Euro	EUR
 ZEUS	Ansems Dog	
 ZEUSD	ZeUSD	
 ZEUZ	Zeuz	
 ZEX	Zeta	
 ZF	zkSwap Finance	
 ZFI	Zyfai	
+ZGBP	Pound Sterling	GBP
 ZGC	Z Generation Coin	
 ZHC	ZERO-HUMAN COMPANY	
 ZHOA	Chengpang Zhoa	
@@ -12967,6 +12982,7 @@ ZIOW	ZIOWCHAIN
 ZIP227	Zcash Shielded Asset	
 ZIPPYSOL	Zippy Staked SOL	
 ZIX	Coinzix Token	
+ZJPY	Japanese Yen	JPY
 ZK	ZKsync	
 ZK402	zk402	
 ZKAI	ZKCrypt AI	
@@ -13031,7 +13047,7 @@ ZUG	ZugChain
 ZUL	Zul	
 ZULU	Zulu Network	
 ZUNO	OFFICIAL ZUNO	
-ZUSD	Zasset zUSD	
+ZUSD	Zasset zUSD	USD
 ZUZALU	zuzalu	
 ZWBTC	LayerZero Bridged WBTC (Aptos)	
 ZWIF	Zeekwifhat	

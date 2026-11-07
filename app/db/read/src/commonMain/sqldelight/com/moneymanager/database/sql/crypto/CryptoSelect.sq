@@ -1,6 +1,19 @@
 selectAll:
 SELECT * FROM crypto ORDER BY code;
 
+-- entity_type 10 is crypto, source_type 4 is system: the assets the catalog's crypto list installed.
+-- The unary + keeps SQLite off idx_entity_source_type, where every asset would scan every system row (8s at 13k assets).
+selectSystemCreated:
+SELECT crypto.* FROM crypto
+WHERE EXISTS (
+    SELECT 1 FROM entity_source
+    WHERE entity_source.entity_type_id = 10
+      AND entity_source.entity_id = crypto.id
+      AND entity_source.revision_id = 1
+      AND +entity_source.source_type_id = 4
+)
+ORDER BY code;
+
 selectById:
 SELECT * FROM crypto WHERE id = ?;
 

@@ -9,7 +9,13 @@ import com.moneymanager.domain.model.CryptoRegistry
  * real names offline.
  */
 object BundledCryptoCatalog : CryptoCatalog {
-    private val entries: Map<String, CryptoRegistry.Entry> by lazy { parseCryptoDataset(GeneratedCryptoDataset.COINS_TSV) }
+    /** Every row of the dataset, an alias's among them. The strategy catalog publishes the list from these. */
+    val rows: List<CryptoDatasetEntry> by lazy { parseCryptoDatasetEntries(GeneratedCryptoDataset.COINS_TSV) }
+    private val entries: Map<String, CryptoRegistry.Entry> by lazy { rows.associate { it.symbol to CryptoRegistry.Entry(it.name) } }
+
+    override val aliases: Map<String, String> by lazy {
+        rows.mapNotNull { row -> row.aliasOf?.let { row.symbol to it } }.toMap()
+    }
 
     override fun lookup(code: String): CryptoRegistry.Entry? = entries[code.uppercase()]
 

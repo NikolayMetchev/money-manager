@@ -209,9 +209,6 @@ internal class CsvStrategyEditorState(
     var reconciliationSourceName by mutableStateOf(config?.reconciliation?.sourceName.orEmpty())
     var reconciliationLinkablePrefix by mutableStateOf(config?.reconciliation?.linkableAccountPrefix.orEmpty())
 
-    // "FROM=TO" pairs, comma-separated (see CsvStrategyConfig.assetCodes).
-    var assetAliasesText by mutableStateOf(formatAliases(config?.assetCodes?.aliases.orEmpty()))
-
     // No editors of their own yet (set by built-in strategies); carried through so saving an edited
     // strategy doesn't silently drop them.
     val currencyExtraction = (currencyMapping as? CurrencyLookupMapping)?.value?.extraction

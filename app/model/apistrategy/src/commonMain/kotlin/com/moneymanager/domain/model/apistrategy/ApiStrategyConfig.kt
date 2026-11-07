@@ -1180,8 +1180,8 @@ data class ApiStrategyConfig(
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val reconcileWindows: ApiReconcileWindows = ApiReconcileWindows(),
     /**
-     * How raw asset codes in API responses map onto canonical codes: Earn-holding suffixes stripped
-     * (Kraken `XETH.F` → `XETH`), then legacy codes aliased (Kraken `XXBT` → `BTC`, `ZUSD` → `USD`).
+     * How raw asset codes in API responses are cleaned up: Earn-holding suffixes stripped (Kraken `XETH.F` → `XETH`).
+     * The assets' own aliases then apply (Kraken `XXBT` → `BTC`; see `AssetAlias`).
      * Applied to every asset code resolved from a trade or transfer item before currency/crypto-asset
      * lookup; without it a suffixed code fails resolution and its transfer is dropped.
      */

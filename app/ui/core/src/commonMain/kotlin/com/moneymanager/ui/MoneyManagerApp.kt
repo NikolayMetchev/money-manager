@@ -451,6 +451,8 @@ fun MoneyManagerApp(
                                             AssetsScreen(
                                                 currencyRepository = services.accounts.currencyRepository,
                                                 cryptoRepository = services.accounts.cryptoRepository,
+                                                assetExportService = services.accounts.assetExportService,
+                                                appVersion = appVersion,
                                                 onCurrencyAuditClick = { currency ->
                                                     navigationHistory.navigateTo(Screen.CurrencyAuditHistory(currency.id, currency.code))
                                                 },

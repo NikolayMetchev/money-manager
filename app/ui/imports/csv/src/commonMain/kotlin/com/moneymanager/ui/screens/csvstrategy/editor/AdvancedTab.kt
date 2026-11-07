@@ -197,23 +197,6 @@ internal fun AdvancedTab(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Asset Aliases (Optional)", style = MaterialTheme.typography.titleSmall)
-        Text(
-            "Map this source's asset codes onto the ones Money Manager uses, e.g. KNCL=KNC, CELO=CGLD.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        OutlinedTextField(
-            value = state.assetAliasesText,
-            onValueChange = { state.assetAliasesText = it },
-            label = { Text("Aliases (FROM=TO, comma-separated)") },
-            singleLine = true,
-            enabled = enabled,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
         Text("Content Match Rules (Optional)", style = MaterialTheme.typography.titleSmall)
         Text(
             "Auto-detect this strategy from row content when the column set is fixed and can't " +

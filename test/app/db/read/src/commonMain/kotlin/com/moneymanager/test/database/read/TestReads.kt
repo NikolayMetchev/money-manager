@@ -83,6 +83,8 @@ private val EXCLUDED_FROM_AUDIT =
         "holiday_calendar_weekend_day",
         "holiday_calendar_day",
         "holiday_calendar_audit",
+        "asset_alias",
+        "asset_alias_audit",
         "relationship",
         "relationship_member",
         "account_attribute",

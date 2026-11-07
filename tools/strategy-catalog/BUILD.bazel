@@ -17,6 +17,7 @@ kmp_library(
         "//app/model/calendar",
         "@maven_kmp//:kotlinx_datetime",
         "@maven_kmp//:strata_basics",
+        "//app/cryptodata",
     ],
     jvm_srcs = glob(["src/main/kotlin/**/*.kt"]),
     visibility = ["//visibility:public"],
@@ -35,6 +36,7 @@ kmp_test(
         "@maven_kmp//:kotlinx_datetime",
         "//app/model/core",
         "//test/app/model/calendar",
+        "//app/cryptodata",
     ],
     jvm_srcs = glob(["src/test/kotlin/**/*.kt"]),
 )

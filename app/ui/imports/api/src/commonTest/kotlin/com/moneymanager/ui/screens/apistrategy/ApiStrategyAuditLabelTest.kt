@@ -52,7 +52,6 @@ class ApiStrategyAuditLabelTest {
 
     @Test
     fun `user-named map keys are left exactly as typed`() {
-        assertEquals("Asset codes aliases XXBT", labelForPath("assetCodes.aliases.XXBT"))
         assertEquals("Minor unit decimal places GBP", labelForPath("minorUnitDecimalPlaces.GBP"))
     }
 

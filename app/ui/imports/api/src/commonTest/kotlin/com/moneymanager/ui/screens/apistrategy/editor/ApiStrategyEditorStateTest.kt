@@ -133,11 +133,6 @@ class ApiStrategyEditorStateTest {
                     maxRateLimitRetries = 6,
                     assetCodes =
                         AssetCodeRules(
-                            aliases =
-                                mapOf(
-                                    "XXBT" to "BTC",
-                                    "ZUSD" to "USD",
-                                ),
                             stripSuffixes = setOf(".F", ".S", ".M"),
                         ),
                     minorUnitDecimalPlaces =

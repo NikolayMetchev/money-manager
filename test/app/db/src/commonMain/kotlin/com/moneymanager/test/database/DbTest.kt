@@ -1,10 +1,12 @@
 package com.moneymanager.test.database
 
+import com.moneymanager.cryptodata.BundledCryptoCatalog
 import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.database.sql.entitySource.EntitySourceWriteQueries
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.ApiCredentialId
+import com.moneymanager.domain.model.CryptoRegistry
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
@@ -45,6 +47,8 @@ open class DbTest {
         repositories = openDatabaseComponent(database)
         entitySourceQueries = database.entitySourceWriteQueries
         if (installBuiltInStrategies) {
+            // Built-ins read the catalog's aliases (Kraken's XXBT, Koinly's KNCL), as they do in the app.
+            CryptoRegistry.install(BundledCryptoCatalog)
             repositories.installBuiltInCsvStrategies()
             repositories.installBuiltInApiStrategies()
             repositories.installBuiltInPassThroughs()
@@ -53,6 +57,7 @@ open class DbTest {
 
     @AfterTest
     fun cleanup() {
+        CryptoRegistry.resetForTest()
         if (::testDbLocation.isInitialized) deleteTestDatabase(testDbLocation)
     }
 

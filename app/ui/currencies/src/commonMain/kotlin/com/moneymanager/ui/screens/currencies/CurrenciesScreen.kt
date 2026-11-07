@@ -17,6 +17,8 @@ import com.moneymanager.ui.foundation.LocalImportEngine
 fun CurrenciesScreen(
     currencyRepository: CurrencyReadRepository,
     onAuditClick: (Currency) -> Unit = {},
+    assetDetails: @Composable (code: String) -> Unit = {},
+    aliasesOf: (code: String) -> List<String> = { emptyList() },
 ) {
     val currencies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         currencyRepository.getAllCurrencies()
@@ -26,6 +28,7 @@ fun CurrenciesScreen(
         title = "Your Currencies",
         items = currencies,
         itemKey = { it.id.id },
+        searchTexts = { listOf(it.code, it.name) + aliasesOf(it.code) },
         emptyMessage = "No currencies yet. Add your first currency!",
         createDialog = { onClose -> CreateCurrencyDialog(onCurrencyCreated = { onClose() }, onDismiss = onClose) },
     ) { currency ->
@@ -33,6 +36,7 @@ fun CurrenciesScreen(
             code = currency.code,
             name = currency.name,
             deleteDialog = { onDismiss -> DeleteCurrencyDialog(currency = currency, onDismiss = onDismiss) },
+            details = { assetDetails(currency.code) },
         ) {
             IconButton(onClick = { onAuditClick(currency) }) {
                 Text(text = "📋", style = MaterialTheme.typography.titleMedium)

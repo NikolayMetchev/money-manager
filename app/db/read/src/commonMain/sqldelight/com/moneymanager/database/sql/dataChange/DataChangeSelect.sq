@@ -21,6 +21,8 @@ SELECT SUM(n) FROM (
     UNION ALL
     SELECT COUNT(*) AS n FROM exchange_order_audit
     UNION ALL
+    SELECT COUNT(*) AS n FROM asset_alias_audit
+    UNION ALL
     SELECT COUNT(*) AS n FROM holiday_calendar_audit
     UNION ALL
     SELECT COUNT(*) AS n FROM import_directory_audit

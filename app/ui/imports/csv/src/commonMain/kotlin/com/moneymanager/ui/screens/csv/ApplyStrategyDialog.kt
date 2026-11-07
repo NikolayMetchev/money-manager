@@ -51,6 +51,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.assetAliasMap
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
@@ -117,6 +118,7 @@ fun ApplyStrategyDialog(
     // earlier import. Brand-new tickers are created at import time (below), not during the read-only
     // preview. Refreshed after a successful import.
     var cryptoAssets by remember { mutableStateOf<List<CryptoAsset>>(emptyList()) }
+    var assetAliases by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
     // Strategies whose SOURCE_ACCOUNT mapping resolves per-row (e.g. by currency) need no
     // user-selected source account; the mapping decides the account for each row.
@@ -148,6 +150,7 @@ fun ApplyStrategyDialog(
     LaunchedEffect(Unit) {
         historicalAccountNames = accountRepository.getPreviousAccountNames()
         cryptoAssets = cryptoRepository.getAllCryptoAssets().first()
+        assetAliases = cryptoRepository.assetAliasMap()
     }
 
     // Auto-select matching strategy when strategies load (filename/content-aware selection)
@@ -177,6 +180,7 @@ fun ApplyStrategyDialog(
         accountMappings,
         historicalAccountNames,
         cryptoAssets,
+        assetAliases,
     ) {
         selectedStrategy?.let { strategy ->
             // An empty accounts list is fine: the mapper resolves unknown accounts to
@@ -194,6 +198,7 @@ fun ApplyStrategyDialog(
                             existingCurrencies = currenciesById,
                             existingCurrenciesByCode = currenciesByCode,
                             existingCryptoByCode = cryptoAssets.associateBy { it.code.uppercase() },
+                            assetAliases = assetAliases,
                             accountMappings = accountMappings,
                             historicalAccountNames = historicalAccountNames,
                             sourceAccountOverride = selectedSourceAccountId,
@@ -237,6 +242,7 @@ fun ApplyStrategyDialog(
         selectedExistingAccounts,
         historicalAccountNames,
         cryptoAssets,
+        assetAliases,
     ) {
         selectedStrategy?.let { strategy ->
             val basePreparation = baseImportPreparation
@@ -259,6 +265,7 @@ fun ApplyStrategyDialog(
                             existingCurrencies = currenciesById,
                             existingCurrenciesByCode = currenciesByCode,
                             existingCryptoByCode = cryptoAssets.associateBy { it.code.uppercase() },
+                            assetAliases = assetAliases,
                             accountMappings = accountMappings + previewMappings,
                             historicalAccountNames = historicalAccountNames,
                             sourceAccountOverride = selectedSourceAccountId,
@@ -405,6 +412,8 @@ fun ApplyStrategyDialog(
                                     maintenance = maintenance,
                                     importEngine = importEngine,
                                     cryptoAssets = resolvedCrypto,
+                                    // Read now, like the crypto assets above: the preview's copy is empty until it has loaded.
+                                    assetAliases = cryptoRepository.assetAliasMap(),
                                     passThroughAccounts = passThroughAccounts,
                                     attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
                                 )
