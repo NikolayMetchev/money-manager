@@ -1,0 +1,9 @@
+selectAll:
+SELECT asset_alias.alias, upper(asset_details.code) AS asset_code, asset_alias.published
+FROM asset_alias
+JOIN asset_details ON asset_details.id = asset_alias.asset_id
+ORDER BY asset_alias.alias;
+
+-- A currency and a crypto asset can share a code; an import reads such a code as the currency.
+selectAssetIdByCode:
+SELECT id FROM asset_details WHERE upper(code) = ? ORDER BY kind = 'CRYPTO' LIMIT 1;

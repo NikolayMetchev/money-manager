@@ -455,4 +455,6 @@ private fun StrategyKey.displayLabel(): String =
         StrategyKind.PASS_THROUGH -> "$name (Pass-through)"
         StrategyKind.CURRENCIES -> "$name (Currencies)"
         StrategyKind.HOLIDAY_CALENDAR -> "$name (Location)"
+        StrategyKind.ASSETS -> "Assets and aliases"
+        StrategyKind.CRYPTO_ASSETS -> "$name (Crypto list)"
     }

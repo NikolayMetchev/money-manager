@@ -60,6 +60,7 @@ import com.moneymanager.database.repository.write.TransferAttributeWriteReposito
 import com.moneymanager.database.repository.write.TransferSourceWriteRepositoryImpl
 import com.moneymanager.database.service.AccountMappingExportService
 import com.moneymanager.database.service.ApiStrategyExportService
+import com.moneymanager.database.service.AssetExportService
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.database.service.StrategyLibraryService
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
@@ -452,6 +453,14 @@ object RepositoryModule {
 
     @Provides
     @SingleIn(DatabaseScope::class)
+    fun provideAssetExportService(
+        currencyRepository: CurrencyReadRepository,
+        cryptoRepository: CryptoReadRepository,
+        importEngine: ImportEngine,
+    ): AssetExportService = AssetExportService(currencyRepository, cryptoRepository, importEngine)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
     fun provideApiStrategyExportService(): ApiStrategyExportService = ApiStrategyExportService()
 
     @Provides
@@ -466,6 +475,7 @@ object RepositoryModule {
         csvStrategyExportService: CsvStrategyExportService,
         apiStrategyExportService: ApiStrategyExportService,
         accountMappingExportService: AccountMappingExportService,
+        assetExportService: AssetExportService,
         importEngine: ImportEngine,
     ): StrategyLibrary =
         StrategyLibraryService(
@@ -478,6 +488,7 @@ object RepositoryModule {
             csvStrategyExportService,
             apiStrategyExportService,
             accountMappingExportService,
+            assetExportService,
             importEngine,
         )
 

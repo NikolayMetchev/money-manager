@@ -178,11 +178,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             assertEquals(SignatureEncoding.BASE64, signing.signatureEncoding)
             assertEquals("Kraken", assertIs<ApiAccountsSource.Single>(kraken.config.accounts).name)
             assertTrue(kraken.config.dataEndpoints.isNotEmpty(), "data endpoints persisted")
-            assertTrue(
-                kraken.config.assetCodes.aliases
-                    .containsKey("XXBT"),
-                "asset aliases persisted",
-            )
+            assertEquals(setOf(".F", ".S", ".M"), kraken.config.assetCodes.stripSuffixes, "asset suffixes persisted")
             val trades = kraken.config.dataEndpoints.first { it.kind == ApiEndpointKind.TRADES }
             assertTrue(trades.endpoint.responseObjectValues, "trades response is a keyed object")
             assertEquals("error", trades.endpoint.errorArrayField)

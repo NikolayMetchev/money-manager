@@ -311,6 +311,21 @@ CREATE TABLE holiday_calendar_audit (
 
 CREATE INDEX IF NOT EXISTS idx_holiday_calendar_audit_code_timestamp ON holiday_calendar_audit(code, audit_timestamp DESC);
 
+-- asset_alias_audit: Audit trail for asset_alias, written by its own triggers for the reasons
+-- pass_through_account_audit is (config without provenance, counted by dataChangeToken()).
+-- noinspection UnusedColumn
+CREATE TABLE asset_alias_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    alias TEXT NOT NULL,
+    asset_id INTEGER NOT NULL,
+    published INTEGER NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_asset_alias_audit_alias_timestamp ON asset_alias_audit(alias, audit_timestamp DESC);
+
 -- exchange_order_audit: Audit trail for exchange_order table
 CREATE TABLE exchange_order_audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

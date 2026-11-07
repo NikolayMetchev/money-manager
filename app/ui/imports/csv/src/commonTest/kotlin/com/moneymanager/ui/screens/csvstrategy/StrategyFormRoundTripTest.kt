@@ -392,7 +392,7 @@ class StrategyFormRoundTripTest {
                                         ),
                                 ),
                         // Neither do asset suffixes to strip.
-                        assetCodes = AssetCodeRules(aliases = mapOf("XXBT" to "BTC"), stripSuffixes = setOf(".F")),
+                        assetCodes = AssetCodeRules(stripSuffixes = setOf(".F")),
                     ),
             )
         val availableColumns = columns.map { it.originalName }.toSet()

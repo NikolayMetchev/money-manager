@@ -223,6 +223,16 @@ rendered from the Pages build's JDK with each code's ISO minor unit (`CurrencyEx
 never renames or deletes. Only SYSTEM-created currencies (seeded or installed) count as the local copy, so
 user-created ones don't show up as a change. Test databases seed USD and EUR (`testCurrencies`, `test/app/db`).
 
+**Crypto assets and aliases**: a new database holds no crypto asset either; an import creates each code it meets, named from the
+bundled `coins.tsv`, whose third column makes a row an alias of another code. The catalog publishes the same dataset as
+one `StrategyKind.CRYPTO_ASSETS` artifact (`AssetListExport`, the coins and their aliases, with any currency an alias names),
+and installing it only adds, like the currency list: its assets are SYSTEM-created and its aliases `published`, which is the
+local copy the catalog compares, so a person's own aliases and imported coins don't show up as a change. A person edits
+aliases on the Assets screen, which also exports and imports `assets.json` (`StrategyKind.ASSETS`, `AssetExportService`): a
+database's own assets and aliases, personal like the global mappings, so strategy sync carries it and the catalog refuses it.
+An alias joins what is imported from then on: re-import to move what's booked. A trade whose two sides resolve to one asset
+fails its import, as a trade needs two assets.
+
 **Locations**: likewise none are bundled. A database's locations (`holiday_calendar` table) are installed from the
 catalog (its Locations chip), and Settings → Locations and holiday calendars edits them. Tests use
 `TestHolidayCalendars` (`test/app/model/calendar`). The database has a default location (`settings.default_location`,
@@ -433,7 +443,7 @@ What isn't a per-record decision stays structural config:
 | "Does this row/item match?" | `Condition`, evaluated by one `RuleEvaluator` over CSV rows and JSON items (rule conditions, strategy selection, content-match rules) | row conditions, predicates, item filters |
 | Reconcile windows | `SettlementWindow`: `Elapsed(seconds)` or `BusinessDays(days)`, counted on the combined calendars of every account on both records (the `location` account attribute, -11, else the database's default location, else weekends only). Every reconcile window, CSV (`crossSourceReconcileWindow`, `placeholderReconcileWindow`) and API (`reconcileWindows`, the internal-transfer `window`), edited by one `SettlementWindowEditor`. Trade-side windows (`TradeDedupePolicy.Fuzzy`, the conversion reconcilers, `LegGroupRule.reconcileWindowSeconds`) stay clock time: exchanges stamp trades to the second | `crossSourceReconcileWindowSeconds`, the hard-coded 5-minute and 3-day API windows, the placeholder window borrowed from `dateTolerance` |
 | "Compute a value" | `ValueExpr`: ordered fallback columns/paths, extraction | per-field fallback/extraction settings |
-| Asset tickers | `AssetCodeRules`: aliases + suffix handling | separate CSV and API alias/suffix settings |
+| Asset tickers | `AssetCodeRules`: a strategy's suffix handling. Aliases belong to the asset, not the strategy: `asset_alias` rows edited on the Assets screen (`LUNC` → `LUNA`), then `coins.tsv`'s third column for a code no asset has. `resolveAssetCode` is the one lookup, for CSV and API alike, and a database alias wins even over an asset of that code | separate CSV and API alias/suffix settings, each strategy's alias list |
 | Multi-row grouping | `LegGroupRule` (name, key, window) with `Trade`, `ThroughAccount` or `Linked` assembly; rows join it through `Leg` actions (no accounts + `fundingWhen` = link two rows as one pass-through, e.g. PayPal's card deposit → payment; `Linked` = every row of a key (the `Member` leg side) gets a relationship to the group's one anchor row, for a source whose rows name their parent, e.g. Koinly's `Parent ID`. `ThroughAccount`'s linking-only mode pairs two rows and `Linked` fans many onto one: kept apart because merging them would change PayPal's outcomes) | `ConversionConfig`, `TradeGroupConfig` |
 | API fetching | One pipeline: `ApiAccountsSource` (`Downloaded`/`Single`) × `ApiDateWindowing` × `ApiPaging` (single/offset/before-cursor/forward-id/token), walked by one `PageWalker` | separate bank vs exchange paths and three hand-written pagination loops |
 | API ledger trades | `ApiLedgerTrades` (which rows join one is `LedgerTradeLeg`) | `reconcileTradeAmounts*`, `unpairedTradeLeg*` |
@@ -521,7 +531,7 @@ source** (built-ins: Koinly, Accointing). Its data never touches real accounts:
   legs inherit its exclusion. Imports declare the attribute types their source **owns**
   (`ownedAttributeValues`: the types a CSV strategy's `Attribute` and `Exclude` rules write); a re-import removes an
   owned value the row no longer reports — so a row un-deleted at the source comes back — and never touches other attributes.
-- `CsvStrategyConfig.assetCodes` (`AssetCodeRules`) maps a source's tickers onto Money Manager's (Koinly `KNCL` → `KNC`).
+- A source's tickers map onto Money Manager's through the assets' aliases (Koinly `KNCL` → `KNC`, in `coins.tsv`).
 - Shadow accounts are hidden by default in the Accounts screen and in `AccountPicker` (tickbox to show).
 - Keep it source-agnostic: no Koinly-specific code outside the built-in strategy's config.
 

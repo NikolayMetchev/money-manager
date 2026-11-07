@@ -12,6 +12,9 @@ import kotlin.concurrent.Volatile
 interface CryptoCatalog {
     /** Returns the known [CryptoRegistry.Entry] for [code] (already uppercased), or null. */
     fun lookup(code: String): CryptoRegistry.Entry?
+
+    /** Every alias the catalog knows, as upper-case alias to the upper-case code of the asset it names. */
+    val aliases: Map<String, String> get() = emptyMap()
 }
 
 /**
@@ -77,6 +80,18 @@ object CryptoRegistry {
         val upper = code.uppercase()
         return defaultEntries[upper] ?: overrides[upper] ?: installedCatalog?.lookup(upper)
     }
+
+    /** The code of the asset the installed catalog says [code] is another code for, or null. */
+    fun aliasTarget(code: String): String? = installedCatalog?.aliases?.get(code.uppercase())
+
+    /** Every code the installed catalog says is another code for the asset [code], sorted. */
+    fun catalogAliasesOf(code: String): List<String> =
+        installedCatalog
+            ?.aliases
+            .orEmpty()
+            .filterValues { it == code.uppercase() }
+            .keys
+            .sorted()
 
     /** Returns the display name for [code], defaulting to the ticker itself for unknown tickers. */
     fun nameFor(code: String): String = lookup(code)?.name ?: code.uppercase()

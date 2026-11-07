@@ -3,7 +3,9 @@ package com.moneymanager.tools.strategycatalog
 import com.moneymanager.builtin.BuiltInApiStrategies
 import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.builtin.BuiltInPassThroughs
+import com.moneymanager.cryptodata.BundledCryptoCatalog
 import com.moneymanager.database.json.ApiStrategyExportCodec
+import com.moneymanager.database.json.AssetListExportCodec
 import com.moneymanager.database.json.CsvStrategyExportCodec
 import com.moneymanager.database.json.CurrencyListExportCodec
 import com.moneymanager.database.json.HolidayCalendarExportCodec
@@ -36,7 +38,7 @@ private const val GBP_CURRENCY_CODE = "GBP"
 
 /**
  * Generates the strategy catalog for the GitHub Pages site: renders every Kotlin built-in definition
- * (app/strategies), the ISO 4217 currency list and Strata's locations to their portable JSON artifacts and writes
+ * (app/strategies), the ISO 4217 currency list, the crypto list and Strata's locations to their portable JSON artifacts and writes
  * `<webpageDir>/strategy-library/` — index.json plus one file per artifact. Nothing is checked in; CI
  * runs this before uploading the `webpage/` directory to Pages.
  */
@@ -76,9 +78,12 @@ internal fun builtInArtifacts(): Map<StrategyKey, String> {
     }
 
     // The app bundles no currencies or locations: a new database installs them from here, rendered from this JDK and
-    // from Strata when the site is published.
+    // from Strata when the site is published. The crypto list comes from the dataset the app also bundles.
     artifacts[StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)] =
         CurrencyListExportCodec.encode(currencyListExport(jdkIsoCurrencies()))
+
+    artifacts[StrategyKey(StrategyKind.CRYPTO_ASSETS, StrategyFileNaming.CRYPTO_ASSETS_NAME)] =
+        AssetListExportCodec.encode(cryptoAssetListExport(BundledCryptoCatalog.rows, jdkIsoCurrencies()))
 
     for (calendar in strataHolidayCalendars()) {
         artifacts[StrategyKey(StrategyKind.HOLIDAY_CALENDAR, calendar.id)] =
@@ -111,6 +116,9 @@ internal fun generateCatalogSite(webpageDir: File) {
         builtInArtifacts().map { (key, json) ->
             require(key.kind != StrategyKind.GLOBAL_MAPPINGS) {
                 "${key.name}: global account mappings are personal data and don't belong in the catalog"
+            }
+            require(key.kind != StrategyKind.ASSETS) {
+                "${key.name}: a database's assets are personal data and don't belong in the catalog"
             }
             val fileName = StrategyFileNaming.fileName(key)
             val embeddedName = StrategyArtifactCodec.embeddedName(key.kind, json)

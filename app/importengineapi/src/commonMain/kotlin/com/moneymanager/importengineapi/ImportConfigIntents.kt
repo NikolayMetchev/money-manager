@@ -47,6 +47,20 @@ sealed interface PassThroughMutation {
     ) : PassThroughMutation
 }
 
+/** A write on the database's own asset aliases, keyed by alias. */
+sealed interface AssetAliasMutation {
+    /** Makes [alias] another code for the asset with code [assetCode], replacing what it named before. */
+    data class Set(
+        val alias: String,
+        val assetCode: String,
+        val published: Boolean = false,
+    ) : AssetAliasMutation
+
+    data class Remove(
+        val alias: String,
+    ) : AssetAliasMutation
+}
+
 /** A write on the locations' holiday calendars, keyed by code ([HolidayCalendar.id]). */
 sealed interface HolidayCalendarMutation {
     /** Creates the calendar, or replaces the one with its code. */

@@ -146,25 +146,10 @@ internal fun AdvancedTab(
         )
 
         HorizontalDivider()
-        SectionHeader("Asset aliases")
+        SectionHeader("Asset code suffixes")
         Text(
             text =
-                "Normalizes a provider's raw asset/currency code to its canonical form before lookup " +
-                    "(e.g. Kraken's legacy \"XXBT\" -> \"BTC\").",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        StringMapEditor(
-            label = "Aliases (raw code -> canonical code)",
-            entries = state.config.assetCodes.aliases,
-            onChange = { v -> state.updateConfig { copy(assetCodes = assetCodes.copy(aliases = v)) } },
-            keyLabel = "Raw code",
-            valueLabel = "Canonical code",
-            enabled = enabled,
-        )
-        Text(
-            text =
-                "Suffixes stripped from a raw code before the alias/currency lookup above (e.g. Kraken's " +
+                "Suffixes stripped from a raw code before it is looked up as an asset (e.g. Kraken's " +
                     "Earn holding \"XETH.F\" -> \"XETH\").",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -34,6 +34,7 @@ import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.excludedAttributeValue
 import com.moneymanager.domain.model.csvstrategy.uniqueIdentifierAttributeTypes
+import com.moneymanager.domain.model.resolveAssetCode
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.ColumnRecord
@@ -305,6 +306,8 @@ class CsvTransferMapper(
     private val existingCurrenciesByCode: Map<String, Currency>,
     /** Crypto assets keyed by uppercased ticker; consulted when a code isn't a known fiat currency. */
     private val existingCryptoByCode: Map<String, CryptoAsset> = emptyMap(),
+    /** The database's own asset aliases, as alias to asset code; see [resolveAssetCode]. */
+    private val assetAliases: Map<String, String> = emptyMap(),
     private val existingTransfers: List<ExistingTransferInfo> = emptyList(),
     accountMappings: List<AccountMapping> = emptyList(),
     /**
@@ -1305,9 +1308,10 @@ class CsvTransferMapper(
 
     // Fiat first; fall back to crypto so a strategy can denominate a leg in a crypto asset.
     private fun lookupAsset(code: String): Asset? =
-        strategy.config.assetCodes
-            .canonical(code)
-            .let { existingCurrenciesByCode[it] ?: existingCryptoByCode[it] }
+        resolveAssetCode(strategy.config.assetCodes.canonical(code), assetAliases) {
+            it in existingCurrenciesByCode ||
+                it in existingCryptoByCode
+        }.let { existingCurrenciesByCode[it] ?: existingCryptoByCode[it] }
 
     private fun getColumnValue(
         columnName: String,

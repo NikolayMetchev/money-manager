@@ -1,6 +1,7 @@
 package com.moneymanager.database.di
 
 import com.moneymanager.database.service.AccountMappingExportService
+import com.moneymanager.database.service.AssetExportService
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
@@ -56,6 +57,7 @@ data class AccountsDomain(
     val categoryRepository: CategoryReadRepository,
     val currencyRepository: CurrencyReadRepository,
     val cryptoRepository: CryptoReadRepository,
+    val assetExportService: AssetExportService,
 )
 
 data class ImportsDomain(
@@ -113,6 +115,7 @@ fun DatabaseComponent.toAppServices(importEngine: ImportEngine) =
                 categoryRepository = categoryRepository,
                 currencyRepository = currencyRepository,
                 cryptoRepository = cryptoRepository,
+                assetExportService = assetExportService,
             ),
         imports =
             ImportsDomain(

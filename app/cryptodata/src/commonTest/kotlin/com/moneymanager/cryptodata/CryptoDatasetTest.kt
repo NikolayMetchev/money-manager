@@ -36,4 +36,13 @@ class CryptoDatasetTest {
         assertEquals("Solana", map["SOL"]?.name)
         assertEquals("Bitcoin", map["BTC"]?.name)
     }
+
+    @Test
+    fun aliasColumnRoundTrips() {
+        val tsv = renderCryptoDataset(listOf(CryptoDatasetEntry("LUNA", "Terra"), CryptoDatasetEntry("LUNC", "Classic", aliasOf = "LUNA")))
+        assertEquals(
+            listOf(CryptoDatasetEntry("LUNA", "Terra"), CryptoDatasetEntry("LUNC", "Classic", aliasOf = "LUNA")),
+            parseCryptoDatasetEntries(tsv),
+        )
+    }
 }

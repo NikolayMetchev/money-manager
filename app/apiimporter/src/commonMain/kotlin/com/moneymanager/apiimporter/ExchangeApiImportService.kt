@@ -27,6 +27,7 @@ import com.moneymanager.domain.model.apistrategy.ApiValueSet
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.apistrategy.TransferDirection
+import com.moneymanager.domain.model.resolveAssetCode
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.FeeRule
@@ -37,6 +38,7 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.assetAliasMap
 import com.moneymanager.importengineapi.AccountBridge
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
@@ -865,10 +867,15 @@ suspend fun importApiSessionExchange(
         }
     }
 
+    val fiatByCode = currencyRepository.getAllCurrencies().first().associateBy { it.code.uppercase() }
+    val existingCryptoCodes = cryptoRepository.getAllCryptoAssets().first().mapTo(mutableSetOf()) { it.code.uppercase() }
+    val assetAliases = cryptoRepository.assetAliasMap()
+
     // Normalize provider-specific asset codes before any currency/crypto lookup — strip a sub-holding
-    // suffix (Kraken Earn "XETH.F" -> "XETH"), then alias legacy codes ("XXBT" -> "BTC") — so every
+    // suffix (Kraken Earn "XETH.F" -> "XETH"), then resolve aliases ("XXBT" -> "BTC") — so every
     // form of one asset resolves to it instead of failing resolution and silently dropping the item.
-    fun canonicalAsset(code: String): String = strategy.config.assetCodes.canonical(code)
+    fun canonicalAsset(code: String): String =
+        resolveAssetCode(strategy.config.assetCodes.canonical(code), assetAliases) { it in fiatByCode || it in existingCryptoCodes }
     val ledgerReconciled = reconcileTradesAgainstLedger(parsed.trades, parsed.ledgerTradeLegs, ::canonicalAsset)
     val trades = ledgerReconciled.trades
     // Enrichment endpoints (e.g. Kraken DepositStatus/WithdrawStatus) supply on-chain address/network/
@@ -900,7 +907,6 @@ suspend fun importApiSessionExchange(
     bar.emit(base = BUILD_BASE, detail = "Resolving assets")
     // Resolve assets: any code that isn't a known fiat currency is treated as a crypto asset and
     // auto-created (the same rule as the CSV importer), sized to the precision the data actually uses.
-    val fiatByCode = currencyRepository.getAllCurrencies().first().associateBy { it.code.uppercase() }
     val cryptoCodes = mutableSetOf<String>()
 
     fun noteCrypto(code: String?) {
