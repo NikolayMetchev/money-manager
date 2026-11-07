@@ -486,8 +486,20 @@ class CsvTransferMapper(
                     val toCurrencyMapping = strategy.config.fieldMappings[TransferField.TO_CURRENCY] ?: return@run null
                     val toAmountMapping = strategy.config.fieldMappings[TransferField.TO_AMOUNT] ?: return@run null
                     val toAsset = parseCurrency(toCurrencyMapping, values) ?: return@run null
-                    if (toAsset.id == currency.id) return@run null
                     val toRaw = parseAmount(toAmountMapping, values).abs()
+                    if (toAsset.id == currency.id) {
+                        // A row naming one code twice is an ordinary transfer. Two codes an alias joined, for
+                        // different amounts, is a conversion a transfer can't hold: the credited amount would be lost.
+                        val fromCode = assetCodeIn(currencyMapping, values) ?: currency.code
+                        val toCode = assetCodeIn(toCurrencyMapping, values) ?: toAsset.code
+                        if (!fromCode.equals(toCode, ignoreCase = true) && toRaw.compareTo(rawAmount.abs()) != 0) {
+                            return MappingResult.Error(
+                                row.rowIndex,
+                                "$fromCode and $toCode are both ${currency.code}, so this conversion needs two assets",
+                            )
+                        }
+                        return@run null
+                    }
                     if (toRaw.compareTo(BigDecimal.ZERO) == 0) return@run null
                     Money.fromDisplayValue(toRaw, toAsset)
                 }
@@ -1304,6 +1316,15 @@ class CsvTransferMapper(
             is HardCodedCurrencyMapping -> existingCurrencies[mapping.currencyId]
             is CurrencyLookupMapping -> lookupAsset(rules.resolve(mapping.value) { getColumnValue(it, values).trim() })
             else -> throw IllegalArgumentException("Invalid currency mapping type: ${mapping::class}")
+        }
+
+    /** The code [mapping] reads from the row, before any alias turns it into another asset's. */
+    private fun assetCodeIn(
+        mapping: FieldMapping,
+        values: List<String>,
+    ): String? =
+        (mapping as? CurrencyLookupMapping)?.let { lookup ->
+            strategy.config.assetCodes.canonical(rules.resolve(lookup.value) { getColumnValue(it, values).trim() })
         }
 
     // Fiat first; fall back to crypto so a strategy can denominate a leg in a crypto asset.

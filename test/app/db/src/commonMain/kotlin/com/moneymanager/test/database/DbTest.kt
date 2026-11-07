@@ -57,6 +57,7 @@ open class DbTest {
 
     @AfterTest
     fun cleanup() {
+        CryptoRegistry.resetForTest()
         if (::testDbLocation.isInitialized) deleteTestDatabase(testDbLocation)
     }
 

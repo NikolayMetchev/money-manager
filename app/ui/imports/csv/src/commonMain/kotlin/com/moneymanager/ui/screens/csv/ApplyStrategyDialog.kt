@@ -412,7 +412,8 @@ fun ApplyStrategyDialog(
                                     maintenance = maintenance,
                                     importEngine = importEngine,
                                     cryptoAssets = resolvedCrypto,
-                                    assetAliases = assetAliases,
+                                    // Read now, like the crypto assets above: the preview's copy is empty until it has loaded.
+                                    assetAliases = cryptoRepository.assetAliasMap(),
                                     passThroughAccounts = passThroughAccounts,
                                     attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
                                 )

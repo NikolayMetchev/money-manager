@@ -231,7 +231,7 @@ local copy the catalog compares, so a person's own aliases and imported coins do
 aliases on the Assets screen, which also exports and imports `assets.json` (`StrategyKind.ASSETS`, `AssetExportService`): a
 database's own assets and aliases, personal like the global mappings, so strategy sync carries it and the catalog refuses it.
 An alias joins what is imported from then on: re-import to move what's booked. A trade whose two sides resolve to one asset
-fails its import, as a trade needs two assets.
+fails its import, as a trade needs two assets; a CSV row naming two codes an alias joined, for different amounts, is a row error for the same reason.
 
 **Locations**: likewise none are bundled. A database's locations (`holiday_calendar` table) are installed from the
 catalog (its Locations chip), and Settings → Locations and holiday calendars edits them. Tests use

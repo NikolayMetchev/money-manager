@@ -119,6 +119,7 @@ class AssetsScreenTest {
             waitUntilExactlyOneExists(hasText("ZEUR ✕"))
             onNodeWithText("EUR").assertIsDisplayed()
             onNodeWithContentDescription("Export assets").assertIsDisplayed()
+            onNodeWithContentDescription("Import assets").assertIsDisplayed()
         }
     }
 
@@ -212,6 +213,20 @@ class AssetsScreenTest {
             waitUntilDoesNotExist(hasText("BTC"))
             waitForIdle()
             onNodeWithText("LUNA").assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun assetsScreen_search_dropsAnAssetOnceTheAliasItMatchedIsRemoved() {
+        runMoneyManagerComposeUiTest {
+            showCryptoTab(engineWith(AssetAlias("LUNC", "LUNA")))
+            waitUntilExactlyOneExists(hasText("LUNC ✕"))
+            onNodeWithText("Search by code, name or alias").performTextInput("lunc")
+            waitUntilDoesNotExist(hasText("BTC"))
+
+            onNodeWithText("LUNC ✕").performClick()
+
+            waitUntilDoesNotExist(hasText("LUNA"))
         }
     }
 

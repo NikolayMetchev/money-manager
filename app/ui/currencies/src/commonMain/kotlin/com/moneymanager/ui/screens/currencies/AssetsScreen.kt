@@ -22,6 +22,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.moneymanager.compose.filepicker.rememberFilePicker
 import com.moneymanager.compose.filepicker.rememberFileSaver
 import com.moneymanager.database.json.AssetListExportCodec
@@ -145,7 +147,11 @@ private fun AssetExportActions(
             Icon(imageVector = Icons.Filled.Share, contentDescription = "Export assets")
         }
         IconButton(onClick = { filePicker.launch() }) {
-            Text(text = "⭳", style = MaterialTheme.typography.titleLarge)
+            Text(
+                text = "⭳",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.semantics { contentDescription = "Import assets" },
+            )
         }
     }
 }

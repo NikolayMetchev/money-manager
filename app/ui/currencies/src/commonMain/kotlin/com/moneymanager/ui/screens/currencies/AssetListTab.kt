@@ -47,7 +47,8 @@ internal fun <T> AssetListTab(
     var showCreateDialog by remember { mutableStateOf(false) }
     var search by remember { mutableStateOf("") }
     val shown =
-        remember(items, search) {
+        // searchTexts is a key because it reads the aliases, which change without the items changing.
+        remember(items, search, searchTexts) {
             val query = search.trim()
             if (query.isEmpty()) items else items.filter { item -> searchTexts(item).any { it.contains(query, ignoreCase = true) } }
         }
