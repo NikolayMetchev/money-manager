@@ -112,6 +112,10 @@ internal fun collapsePassThroughChain(
     return if (keptNodes.size < 2) null else keptNodes to keptDescriptions
 }
 
+/** A fee comes out of the row's own account, so a fee on money coming in isn't charged to whoever sent it. */
+private fun CsvTransferWithAttributes.feePayerId(): AccountId =
+    statementAccountId?.takeIf { it != UNRESOLVED_ACCOUNT_ID } ?: transfer.sourceAccountId
+
 /** Links each debit leg to the nearest credit leg of the same key within [window] (credits may be shared). */
 private fun pairDebitsToCredits(
     legs: List<CsvTransferWithAttributes>,
@@ -1140,7 +1144,7 @@ suspend fun runCsvImport(
             }
 
     // A trade carries no fee field, so a conversion row that also has a fee would otherwise drop it.
-    // Emit each such fee as its own standalone movement (source account -> "<strategy> Fees") so the
+    // Emit each such fee as its own standalone movement (own account -> "<strategy> Fees") so the
     // money isn't lost (e.g. Koinly trades). It carries the row's unique-id attributes, or re-importing
     // an overlapping export would book the fee again: the trade itself dedupes on its tuple, but a
     // key-less transfer never dedupes under a unique-id policy.
@@ -1154,7 +1158,7 @@ suspend fun runCsvImport(
             val exclusion = attributesFor(row.attributes).filter { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
             ImportTransfer(
                 rowKey = ImportRowKey.CsvRow(row.rowIndex),
-                fromAccount = AccountRef.Existing(row.transfer.sourceAccountId),
+                fromAccount = AccountRef.Existing(row.feePayerId()),
                 toAccount = AccountRef.Existing(feeAcct),
                 source = Source.Csv(csvImport.id),
                 timestamp = row.transfer.timestamp,
@@ -1214,7 +1218,7 @@ suspend fun runCsvImport(
                 val fee =
                     row.feeAmount?.let { feeMoney ->
                         ImportFee(
-                            source = AccountRef.Existing(row.transfer.sourceAccountId),
+                            source = AccountRef.Existing(row.feePayerId()),
                             target = AccountRef.Existing(feeAccountId!!),
                             amount = feeMoney,
                             description = row.feeDescription ?: "Fee",
