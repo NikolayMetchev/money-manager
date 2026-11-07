@@ -223,10 +223,12 @@ class AssetsScreenTest {
             waitUntilExactlyOneExists(hasText("LUNC ✕"))
             onNodeWithText("Search by code, name or alias").performTextInput("lunc")
             waitUntilDoesNotExist(hasText("BTC"))
+            waitForIdle()
 
             onNodeWithText("LUNC ✕").performClick()
 
             waitUntilDoesNotExist(hasText("LUNA"))
+            waitForIdle()
         }
     }
 
