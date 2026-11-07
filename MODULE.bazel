@@ -777,6 +777,12 @@ use_repo(maven_kmp, "maven_kmp")
 android_sdk = use_extension("//bazel/kmp/android:extensions.bzl", "android_sdk")
 android_sdk.agp(version = "9.5.1")
 
+# What Bazel downloads from Google's SDK repository: Renovate bumps both, and repin.sh rewrites pins.bzl to match.
+# A compile_sdk change moves android_sdk.platform to that level's newest stable release when repin.sh runs.
+android_sdk.platform(version = "37.0_r02")
+
+android_sdk.platform_tools(version = "37.0.1")
+
 # Keep target_sdk and the CI emulators (build.yml, android-release-smoke-test.yml) on one level. compile_sdk runs
 # ahead: androidx Compose 1.12 compiles against API 37, a compile-time floor that needs no emulator move.
 android_sdk.levels(

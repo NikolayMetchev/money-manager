@@ -94,6 +94,11 @@ def _platform_impl(rctx):
             ANDROID_PLATFORM["compile_sdk"],
             rctx.attr.compile_sdk,
         ))
+    if ANDROID_PLATFORM["file"] != "platform-%s.zip" % rctx.attr.version:
+        fail("pins.bzl has %s, MODULE.bazel's android_sdk.platform is %s: run bazel/renovate/repin.sh" % (
+            ANDROID_PLATFORM["file"],
+            rctx.attr.version,
+        ))
     if not _license_accepted(rctx):
         rctx.file("BUILD.bazel", _PLATFORM_NOT_ACCEPTED.format(cmd = _FAILING_CMD))
         return
@@ -107,7 +112,10 @@ def _platform_impl(rctx):
 
 _platform = repository_rule(
     implementation = _platform_impl,
-    attrs = {"compile_sdk": attr.int(mandatory = True)},
+    attrs = {
+        "compile_sdk": attr.int(mandatory = True),
+        "version": attr.string(mandatory = True),
+    },
 )
 
 _ADB_FILES = """\
@@ -144,15 +152,23 @@ def _host(rctx):
     return "osx" if name.startswith("mac") else "windows" if name.startswith("windows") else "linux"
 
 def _platform_tools_impl(rctx):
+    host = _host(rctx)
+    archive, sha256 = PLATFORM_TOOLS[host]
+    if not archive.startswith("platform-tools_r%s-" % rctx.attr.version):
+        fail("pins.bzl has %s, MODULE.bazel's android_sdk.platform_tools is %s: run bazel/renovate/repin.sh" % (
+            archive,
+            rctx.attr.version,
+        ))
     if not _license_accepted(rctx):
         rctx.file("BUILD.bazel", _ADB_NOT_ACCEPTED.format(cmd = _FAILING_CMD))
         return
-    host = _host(rctx)
-    archive, sha256 = PLATFORM_TOOLS[host]
     rctx.download_and_extract(url = _SDK_REPOSITORY + archive, sha256 = sha256, strip_prefix = "platform-tools")
     rctx.file("BUILD.bazel", _ADB_WINDOWS if host == "windows" else _ADB_UNIX)
 
-_platform_tools = repository_rule(implementation = _platform_tools_impl)
+_platform_tools = repository_rule(
+    implementation = _platform_tools_impl,
+    attrs = {"version": attr.string(mandatory = True)},
+)
 
 _VERSIONS = """\
 MIN_SDK = {min}
@@ -236,6 +252,12 @@ def _android_sdk_impl(module_ctx):
     levels = [tag for mod in module_ctx.modules if mod.is_root for tag in mod.tags.levels]
     if len(levels) != 1:
         fail("android_sdk: the root module sets the API levels with exactly one android_sdk.levels(…)")
+    platforms = [tag.version for mod in module_ctx.modules if mod.is_root for tag in mod.tags.platform]
+    if len(platforms) != 1:
+        fail("android_sdk: the root module sets the platform release with exactly one android_sdk.platform(version = …)")
+    tools = [tag.version for mod in module_ctx.modules if mod.is_root for tag in mod.tags.platform_tools]
+    if len(tools) != 1:
+        fail("android_sdk: the root module sets platform-tools with exactly one android_sdk.platform_tools(version = …)")
     _sdk(
         name = "android_sdk",
         agp = agps[0],
@@ -243,8 +265,8 @@ def _android_sdk_impl(module_ctx):
         min_sdk = str(levels[0].min_sdk),
         target_sdk = str(levels[0].target_sdk),
     )
-    _platform(name = "android_platform", compile_sdk = levels[0].compile_sdk)
-    _platform_tools(name = "android_platform_tools")
+    _platform(name = "android_platform", compile_sdk = levels[0].compile_sdk, version = platforms[0])
+    _platform_tools(name = "android_platform_tools", version = tools[0])
     _aapt2(name = "aapt2", agp = agps[0])
     return module_ctx.extension_metadata(reproducible = False)
 
@@ -253,6 +275,9 @@ android_sdk = module_extension(
     tag_classes = {
         # The AGP release aapt2 and AGP_VERSION come from; @android_tools resolves the same version.
         "agp": tag_class(attrs = {"version": attr.string(mandatory = True)}),
+        # The SDK repository's releases: `<api>_r<revision>` (platform-37.0_r02.zip), and platform-tools' version.
+        "platform": tag_class(attrs = {"version": attr.string(mandatory = True)}),
+        "platform_tools": tag_class(attrs = {"version": attr.string(mandatory = True)}),
         # The API levels: modules compile against compile_sdk's android.jar, and apps declare min and target.
         "levels": tag_class(attrs = {
             "compile_sdk": attr.int(mandatory = True),

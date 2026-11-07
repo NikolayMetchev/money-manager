@@ -13,6 +13,7 @@ AAPT2_SHA256 = {
 }
 
 # The SDK repository's archives extensions.bzl downloads, under https://dl.google.com/android/repository/.
+# Their versions are MODULE.bazel's android_sdk.platform and android_sdk.platform_tools, which Renovate bumps;
 # repo-scripts repin android-sdk (run by repin.sh) rewrites these, and sdk_license.txt, from its index.
 ANDROID_PLATFORM = {
     "compile_sdk": 37,
