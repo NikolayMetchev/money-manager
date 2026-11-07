@@ -48,8 +48,9 @@ data class AccountFromRulesMapping(
  * When [dateTimeFormat] is set, the [dateColumnName] column holds a combined
  * date+time value parsed with that format, and the other time settings are ignored.
  *
- * Formats are Unicode patterns; `MMM`/`MMMM` read English month names ("Jan", "January"). A date format
- * without a year (`d MMM`, as statements print their rows) takes its year from [yearFrom].
+ * Formats are Unicode patterns; `MMM`/`MMMM` read English month names ("Jan", "January") and a time ending
+ * `h:mm a` a 12-hour clock ("5:09 PM"). A date format without a year (`d MMM`, as statements print their rows)
+ * takes its year from [yearFrom].
  */
 @Serializable
 data class DateTimeParsingMapping(
