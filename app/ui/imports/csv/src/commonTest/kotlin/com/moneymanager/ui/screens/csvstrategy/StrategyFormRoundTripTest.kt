@@ -338,6 +338,16 @@ class StrategyFormRoundTripTest {
     }
 
     @Test
+    fun `the built-in Freetrade strategy survives a no-op save`() {
+        val freetrade = BuiltInCsvStrategies.buildFreetradeIsaCsvStrategy(timestamp)
+
+        val state = CsvStrategyEditorState(freetrade, freetrade.config.identificationColumns)
+        val rebuilt = buildStrategyFromEditorState(state, freetrade.id, freetrade.createdAt, freetrade.updatedAt)
+
+        assertEquals(freetrade.config, rebuilt.config)
+    }
+
+    @Test
     fun `optional columns the sample file lacks survive a save`() {
         // Editing the strategy against an older export, which has none of its optional columns, must not drop them.
         val koinly = BuiltInCsvStrategies.buildKoinlyCsvStrategy(timestamp)
