@@ -18,6 +18,19 @@ class DateFormatDetectorTest {
     }
 
     @Test
+    fun `the checks accept what the importer reads`() {
+        assertTrue(DateFormatDetector.parsesAsDate("d MMM yyyy", "2 Jan 2013"))
+        assertTrue(DateFormatDetector.parsesAsDateTime("MMMM d, yyyy h:mm a", "July 14, 2022 12:00 AM"))
+        assertTrue(DateFormatDetector.parsesAsTime("h:mm a", "5:09 PM"))
+    }
+
+    @Test
+    fun `detects a month name and a 12-hour clock`() {
+        val samples = listOf("July 14, 2022 12:00 AM", "June 11, 2022 10:38 PM")
+        assertEquals("MMMM d, yyyy h:mm a", DateFormatDetector.detectDateTime(samples))
+    }
+
+    @Test
     fun `parses returns false for an invalid pattern instead of throwing`() {
         assertFalse(DateFormatDetector.parsesAsDate("nonsense pattern", "2026-06-14"))
     }

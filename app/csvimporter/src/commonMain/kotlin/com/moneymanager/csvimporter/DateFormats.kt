@@ -12,8 +12,8 @@ import kotlinx.datetime.format.byUnicodePattern
 /**
  * Parses the dates a strategy's Unicode patterns describe, with the formats compiled once (building a
  * kotlinx-datetime format compiles a parser, which costs far more than the parse). On top of kotlinx-datetime's
- * patterns: `MMM`/`MMMM` read English month names, and a date pattern without a year reads the date in the
- * year that puts it on or before a reference date.
+ * patterns: `MMM`/`MMMM` read English month names, a time ending `h:mm a` reads a 12-hour clock, and a date
+ * pattern without a year reads the date in the year that puts it on or before a reference date.
  */
 internal class DateFormats {
     private val dateTimeFormats = HashMap<String, DateTimeFormat<LocalDateTime>>()
@@ -24,14 +24,18 @@ internal class DateFormats {
         value: String,
         pattern: String,
     ): LocalDateTime {
-        val (text, numeric) = withMonthNumbers(value, pattern)
+        val (monthText, monthPattern) = withMonthNumbers(value, pattern)
+        val (text, numeric) = withTwentyFourHourClock(monthText, monthPattern)
         return dateTimeFormats.getOrPut(numeric) { LocalDateTime.Format { byUnicodePattern(numeric) } }.parse(text)
     }
 
     fun time(
         value: String,
         pattern: String,
-    ): LocalTime = timeFormats.getOrPut(pattern) { LocalTime.Format { byUnicodePattern(pattern) } }.parse(value.trim())
+    ): LocalTime {
+        val (text, numeric) = withTwentyFourHourClock(value.trim(), pattern)
+        return timeFormats.getOrPut(numeric) { LocalTime.Format { byUnicodePattern(numeric) } }.parse(text)
+    }
 
     /**
      * [value] read with [pattern]. A pattern without a year needs [reference]: the date is read in its year, or
@@ -88,5 +92,27 @@ internal class DateFormats {
         }
 
         val MONTH_PREFIXES = listOf("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+
+        val TWELVE_HOUR_PATTERN = Regex("h{1,2}(:.*?)\\s*a$")
+        val TWELVE_HOUR_VALUE = Regex("\\b(1[0-2]|0?[1-9])((?::\\d{2}){1,2})\\s*([ap])m$", RegexOption.IGNORE_CASE)
+        const val HOURS_PER_HALF_DAY = 12
+
+        /**
+         * kotlinx-datetime's patterns have no 12-hour clock, so a pattern ending `h:mm a` reads a 24-hour one
+         * instead, the value's time rewritten to match. A value that isn't a 12-hour time ("13:00 PM", "17:00")
+         * is refused here, as the 24-hour pattern would read some of them.
+         */
+        fun withTwentyFourHourClock(
+            value: String,
+            pattern: String,
+        ): Pair<String, String> {
+            if (!TWELVE_HOUR_PATTERN.containsMatchIn(pattern)) return value to pattern
+            val time = requireNotNull(TWELVE_HOUR_VALUE.find(value)) { "'$value' has no 12-hour time" }
+            val (hour, rest, marker) = time.destructured
+            val offset = if (marker.equals("p", ignoreCase = true)) HOURS_PER_HALF_DAY else 0
+            val twentyFourHour = (hour.toInt() % HOURS_PER_HALF_DAY + offset).toString().padStart(2, '0') + rest
+            return value.replaceRange(time.range, twentyFourHour) to
+                TWELVE_HOUR_PATTERN.replace(pattern) { "HH${it.groupValues[1]}" }
+        }
     }
 }

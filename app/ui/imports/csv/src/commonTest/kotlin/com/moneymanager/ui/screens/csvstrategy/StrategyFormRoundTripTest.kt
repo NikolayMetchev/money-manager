@@ -328,6 +328,16 @@ class StrategyFormRoundTripTest {
     }
 
     @Test
+    fun `the built-in Celsius strategy survives a no-op save`() {
+        val celsius = BuiltInCsvStrategies.buildCelsiusCsvStrategy(timestamp)
+
+        val state = CsvStrategyEditorState(celsius, celsius.config.identificationColumns)
+        val rebuilt = buildStrategyFromEditorState(state, celsius.id, celsius.createdAt, celsius.updatedAt)
+
+        assertEquals(celsius.config, rebuilt.config)
+    }
+
+    @Test
     fun `optional columns the sample file lacks survive a save`() {
         // Editing the strategy against an older export, which has none of its optional columns, must not drop them.
         val koinly = BuiltInCsvStrategies.buildKoinlyCsvStrategy(timestamp)
