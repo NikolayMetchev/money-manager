@@ -405,7 +405,7 @@ exchange pipelines read the same `RuleOutcome`, so an action means the same thin
 
 | Action | Does | Replaced |
 |---|---|---|
-| `SwapValues`, `SetValue` | rewrite the record | row preprocessing / column swaps, fixed base/quote assets |
+| `SwapValues`, `SetValue` | rewrite the record. `SetValue` may name a column the file lacks (`CsvStrategyConfig.ruleColumns`): the mappings and the funding match then read it, so one strategy can cover exports that keep a value under different columns (`SetValue("Date", Read("Created Date", "Date (YYYY-MM-DD as UTC)"))`) | row preprocessing / column swaps, fixed base/quote assets |
 | `Flip` | swaps the resolved source and target | `flipSourceAndTarget` |
 | `SetDirection` | money in or out of the record's own account | `Direction` (amount sign / field / always outgoing), API `direction` |
 | `Skip` | the record isn't imported | item filters (negated conditions), status filters |

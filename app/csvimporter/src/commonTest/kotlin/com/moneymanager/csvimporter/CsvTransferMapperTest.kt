@@ -34,6 +34,7 @@ import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.PassThroughDetector
@@ -150,6 +151,44 @@ class CsvTransferMapperTest {
         assertEquals("Test payment", result.transfer.description)
         assertEquals(testSourceAccountId, result.transfer.sourceAccountId)
         assertEquals(testTargetAccountId, result.transfer.targetAccountId)
+        assertEquals(BigInteger(5000L), result.transfer.amount.amount)
+    }
+
+    @Test
+    fun `mapRow reads a column a rule sets from whichever column the file has`() {
+        val base = createStrategy()
+        // "Amount" is where one export keeps the value and "Gross" where another does; a rule gathers them under "Total".
+        val total = StrategyRule(actions = listOf(RuleAction.SetValue("Total", RuleValue.read("Amount", "Gross"))))
+        val strategy =
+            base.copy(
+                config =
+                    base.config.copy(
+                        rules = listOf(total) + base.config.rules,
+                        fieldMappings =
+                            base.config.fieldMappings +
+                                (
+                                    TransferField.AMOUNT to
+                                        AmountParsingMapping(
+                                            fieldType = TransferField.AMOUNT,
+                                            mode = AmountMode.SINGLE_COLUMN,
+                                            amountColumnName = "Total",
+                                        )
+                                ),
+                    ),
+            )
+        val grossColumns = columns.map { if (it.originalName == "Amount") it.copy(originalName = "Gross") else it }
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = grossColumns,
+                existingAccounts = mapOf("Payee Account" to testTargetAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        val result = mapper.mapRow(CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Test payment", "-50.00", "Payee Account")))
+
+        assertIs<MappingResult.Success>(result)
         assertEquals(BigInteger(5000L), result.transfer.amount.amount)
     }
 

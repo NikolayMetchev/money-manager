@@ -2,6 +2,7 @@ package com.moneymanager.domain.model.csvstrategy
 
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.SortedConditionListSerializer
 import com.moneymanager.domain.model.rules.StrategyRule
@@ -121,6 +122,15 @@ data class CsvStrategyConfig<out M>(
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val optionalColumns: Set<String> = emptySet(),
 ) {
+    /**
+     * The columns the rules set (`RuleAction.SetValue`), in rule order. A file that lacks one still has it once the
+     * rules have run, so a mapping can read a value that sits under a different column in each export.
+     */
+    fun ruleColumns(): List<String> =
+        rules
+            .flatMap { rule -> rule.actions.filterIsInstance<RuleAction.SetValue>().map { it.path } }
+            .distinct()
+
     /** This config with each field mapping replaced by [transform]'s result, everything else unchanged. */
     fun <N> mapFieldMappings(transform: (M) -> N): CsvStrategyConfig<N> =
         CsvStrategyConfig(
