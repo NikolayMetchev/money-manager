@@ -67,11 +67,10 @@ class RuleEvaluatorTest {
     }
 
     @Test
-    fun `asset codes strip a suffix then alias case-insensitively`() {
-        val codes = AssetCodeRules(aliases = mapOf("xxbt" to "btc"), stripSuffixes = setOf(".F"))
-        assertEquals("BTC", codes.canonical(" xxbt.f "))
-        assertEquals("ETH", codes.canonical("eth"))
-        assertEquals("KNC", AssetCodeRules(aliases = mapOf("KNCL" to "KNC")).canonical("kncl"))
+    fun `asset codes strip a suffix case-insensitively`() {
+        val codes = AssetCodeRules(stripSuffixes = setOf(".F"))
+        assertEquals("XXBT", codes.canonical("xxbt.f"))
+        assertEquals("ETH", codes.canonical("ETH"))
     }
 
     @Test

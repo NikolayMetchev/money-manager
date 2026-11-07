@@ -75,6 +75,8 @@ class AuditSourceCoverageTest : DbTest() {
                 "csv_import_application_audit",
                 // Locations are config like pass_through_account: seeded or edited in Settings, never imported.
                 "holiday_calendar_audit",
+                // Aliases too: edited on the Assets screen, never imported.
+                "asset_alias_audit",
             )
 
         // Provenanced entity types whose write paths (with source recording) are not implemented yet.

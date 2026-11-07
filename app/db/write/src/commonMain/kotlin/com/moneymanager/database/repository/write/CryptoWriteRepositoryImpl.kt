@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.write.CryptoWriteRepository
+import com.moneymanager.domain.repository.write.NewCryptoAsset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -24,25 +25,31 @@ class CryptoWriteRepositoryImpl(
     private val selectQueries = database.cryptoSelectQueries
     private val writeQueries = database.cryptoWriteQueries
     private val assetWriteQueries = database.assetWriteQueries
+    private val aliasSelectQueries = database.assetAliasSelectQueries
+    private val aliasWriteQueries = database.assetAliasWriteQueries
 
     override suspend fun upsertCryptoByCode(
         code: String,
         name: String?,
         source: Source,
-    ): CryptoId =
+    ): CryptoId = upsertCryptosByCode(listOf(NewCryptoAsset(code, name, source))).single()
+
+    override suspend fun upsertCryptosByCode(assets: List<NewCryptoAsset>): List<CryptoId> =
         withContext(Dispatchers.Default) {
             writeQueries.transactionWithResult {
-                val existing = selectQueries.selectByCode(code).awaitAsOneOrNull()
-                existing?.let { CryptoId(it.id) }
-                    ?: run {
-                        val displayName = name ?: CryptoRegistry.nameFor(code)
-                        // Allocate an id from the shared `asset` id space, then insert the crypto with it.
-                        assetWriteQueries.insert()
-                        val newId = assetWriteQueries.lastInsertedId().awaitAsOne()
-                        writeQueries.insert(newId, code, displayName, CryptoAsset.CRYPTO_SCALE_FACTOR)
-                        database.recordSource(deviceId, EntityType.CRYPTO, newId, 1L, source)
-                        CryptoId(newId)
-                    }
+                assets.map { asset ->
+                    val existing = selectQueries.selectByCode(asset.code).awaitAsOneOrNull()
+                    existing?.let { CryptoId(it.id) }
+                        ?: run {
+                            val displayName = asset.name ?: CryptoRegistry.nameFor(asset.code)
+                            // Allocate an id from the shared `asset` id space, then insert the crypto with it.
+                            assetWriteQueries.insert()
+                            val newId = assetWriteQueries.lastInsertedId().awaitAsOne()
+                            writeQueries.insert(newId, asset.code, displayName, CryptoAsset.CRYPTO_SCALE_FACTOR)
+                            database.recordSource(deviceId, EntityType.CRYPTO, newId, 1L, asset.source)
+                            CryptoId(newId)
+                        }
+                }
             }
         }
 
@@ -66,5 +73,25 @@ class CryptoWriteRepositoryImpl(
     override suspend fun deleteCryptoAsset(id: CryptoId): Unit =
         withContext(Dispatchers.Default) {
             writeQueries.delete(id.id)
+        }
+
+    override suspend fun setAssetAlias(
+        alias: String,
+        assetCode: String,
+        published: Boolean,
+    ): Unit =
+        withContext(Dispatchers.Default) {
+            val aliasCode = alias.trim().uppercase()
+            val code = assetCode.trim().uppercase()
+            require(aliasCode.isNotEmpty()) { "An asset alias can't be blank" }
+            require(aliasCode != code) { "'$aliasCode' can't be an alias of itself" }
+            val assetId =
+                requireNotNull(aliasSelectQueries.selectAssetIdByCode(code).awaitAsOneOrNull()) { "No asset has the code '$code'" }
+            aliasWriteQueries.upsert(aliasCode, assetId, if (published) 1L else 0L)
+        }
+
+    override suspend fun removeAssetAlias(alias: String): Unit =
+        withContext(Dispatchers.Default) {
+            aliasWriteQueries.delete(alias.trim().uppercase())
         }
 }

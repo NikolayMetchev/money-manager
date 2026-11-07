@@ -806,32 +806,6 @@ object BuiltInApiStrategies {
             requestCostWeight = requestCostWeight,
         )
 
-        // Kraken's legacy asset codes, normalized to their canonical ISO/ticker form before any
-        // currency/crypto lookup.
-        val assetAliasMap =
-            mapOf(
-                "XXBT" to "BTC",
-                "XBT" to "BTC",
-                "XETH" to "ETH",
-                "XXRP" to "XRP",
-                "XLTC" to "LTC",
-                "XXLM" to "XLM",
-                "XXMR" to "XMR",
-                "XZEC" to "ZEC",
-                "XETC" to "ETC",
-                "XREP" to "REP",
-                "XXDG" to "DOGE",
-                "XDG" to "DOGE",
-                "XMLN" to "MLN",
-                "ZUSD" to "USD",
-                "ZEUR" to "EUR",
-                "ZGBP" to "GBP",
-                "ZCAD" to "CAD",
-                "ZJPY" to "JPY",
-                "ZCHF" to "CHF",
-                "ZAUD" to "AUD",
-            )
-
         val tradeMappings =
             ApiTradeMappings(
                 instrumentField = "pair",
@@ -999,7 +973,7 @@ object BuiltInApiStrategies {
                     // Kraken Earn holdings use a suffixed asset code for the same underlying asset (e.g. the
                     // "Flexible Earn" ETH position is "XETH.F", staked is "XETH.S"); strip it so the position's
                     // deposit/withdrawal ledger entries resolve to the ordinary "ETH" asset like any other.
-                    assetCodes = AssetCodeRules(aliases = assetAliasMap, stripSuffixes = setOf(".F", ".S", ".M")),
+                    assetCodes = AssetCodeRules(stripSuffixes = setOf(".F", ".S", ".M")),
                     // Starter-tier decay is 0.33 counter/sec (Kraken's slowest verification tier), so 1 unit of
                     // cost needs ~3.03s to fully decay; 3100ms per unit keeps even the slowest tier clear of
                     // "EAPI:Rate limit exceeded" with a small margin. requestCostWeight above scales this per

@@ -63,6 +63,7 @@ class StrategyCatalogToolTest {
                 StrategyKind.API,
                 StrategyKind.PASS_THROUGH,
                 StrategyKind.CURRENCIES,
+                StrategyKind.CRYPTO_ASSETS,
                 StrategyKind.HOLIDAY_CALENDAR,
             ),
             kinds,

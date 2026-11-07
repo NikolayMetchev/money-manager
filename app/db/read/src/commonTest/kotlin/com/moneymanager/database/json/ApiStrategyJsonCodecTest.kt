@@ -194,7 +194,7 @@ class ApiStrategyJsonCodecTest {
     }
 
     @Test
-    fun `kraken-shaped keyed-object - offset paging - enrichment and asset aliases round-trip`() {
+    fun `kraken-shaped keyed-object - offset paging - enrichment and asset suffixes round-trip`() {
         val original =
             config(null).copy(
                 requestSigning =
@@ -213,7 +213,7 @@ class ApiStrategyJsonCodecTest {
                 rateLimitErrorSubstrings = listOf("Rate limit exceeded", "Throttled"),
                 rateLimitBackoffMillis = 5_000L,
                 maxRateLimitRetries = 6,
-                assetCodes = AssetCodeRules(aliases = mapOf("XXBT" to "BTC", "ZUSD" to "USD"), stripSuffixes = setOf(".F", ".S", ".M")),
+                assetCodes = AssetCodeRules(stripSuffixes = setOf(".F", ".S", ".M")),
                 minorUnitDecimalPlaces = mapOf("GBP" to 3),
                 // dataEndpoints is decoded in canonical (sorted-by kind/path/responseArrayKey) order -
                 // see SortedDataEndpointListSerializer - so the entries are listed here in that same
@@ -301,7 +301,6 @@ class ApiStrategyJsonCodecTest {
             )
         val decoded = ApiStrategyJsonCodec.decode(ApiStrategyJsonCodec.encode(original))
         assertEquals(original, decoded)
-        assertEquals(mapOf("XXBT" to "BTC", "ZUSD" to "USD"), decoded.assetCodes.aliases)
         assertEquals(
             WindowBoundFormat.EPOCH_S,
             decoded.dataEndpoints[2]

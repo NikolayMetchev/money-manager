@@ -48,6 +48,7 @@ kmp_library(
         "//bazel/kmp/deps:kotlin_test",
     ],
     deps = [
+        "//app/cryptodata",
         "//app/csvimporter",
         "//app/db/schema",
         "//app/importengineapi",

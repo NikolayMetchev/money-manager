@@ -14,6 +14,10 @@ import com.moneymanager.domain.model.csvstrategy.isXlsxStrategy
  * (conduit) account definition per file. [CURRENCIES] is the reference list of currencies a database is
  * seeded with (one file, [StrategyFileNaming.CURRENCIES_NAME]); applying it only adds missing codes.
  * [HOLIDAY_CALENDAR] is one location (holiday calendar) per file, named by its code; applying it replaces that
+ * location. [ASSETS] is the single file holding a database's own assets and aliases ([StrategyFileNaming.ASSETS_NAME]);
+ * like the global mappings it is personal, and applying it only adds.
+ * [CRYPTO_ASSETS] is the published crypto list and its aliases ([StrategyFileNaming.CRYPTO_ASSETS_NAME]), rendered from
+ * the crypto catalog; applying it only adds, like the currency list.
  * location.
  */
 enum class StrategyKind {
@@ -26,6 +30,8 @@ enum class StrategyKind {
     PASS_THROUGH,
     CURRENCIES,
     HOLIDAY_CALENDAR,
+    ASSETS,
+    CRYPTO_ASSETS,
 }
 
 /** Which of the CSV engine's kinds this strategy's library file is. */
@@ -74,8 +80,14 @@ data class StrategyParseResult(
 object StrategyFileNaming {
     const val GLOBAL_MAPPINGS_NAME: String = "global-account-mappings"
 
+    /** The name of the single [StrategyKind.ASSETS] artifact. */
+    const val ASSETS_NAME: String = "assets"
+
     /** The name of the single [StrategyKind.CURRENCIES] artifact. */
     const val CURRENCIES_NAME: String = "ISO 4217 currencies"
+
+    /** The name of the single [StrategyKind.CRYPTO_ASSETS] artifact. */
+    const val CRYPTO_ASSETS_NAME: String = "Crypto assets"
     private const val SUFFIX = ".json"
     private const val CSV_INFIX = ".csv"
     private const val QIF_INFIX = ".qif"
@@ -84,6 +96,7 @@ object StrategyFileNaming {
     private const val API_INFIX = ".api"
     private const val PASS_THROUGH_INFIX = ".passthrough"
     private const val CURRENCIES_INFIX = ".currencies"
+    private const val CRYPTO_ASSETS_INFIX = ".crypto"
     private const val HOLIDAY_CALENDAR_INFIX = ".calendar"
 
     fun fileName(key: StrategyKey): String =
@@ -97,6 +110,8 @@ object StrategyFileNaming {
             StrategyKind.PASS_THROUGH -> "${key.name}$PASS_THROUGH_INFIX$SUFFIX"
             StrategyKind.CURRENCIES -> "${key.name}$CURRENCIES_INFIX$SUFFIX"
             StrategyKind.HOLIDAY_CALENDAR -> "${key.name}$HOLIDAY_CALENDAR_INFIX$SUFFIX"
+            StrategyKind.ASSETS -> "$ASSETS_NAME$SUFFIX"
+            StrategyKind.CRYPTO_ASSETS -> "${key.name}$CRYPTO_ASSETS_INFIX$SUFFIX"
         }
 
     /** Parses a remote filename back into a [StrategyKey], or null if it isn't a library file. */
@@ -106,6 +121,7 @@ object StrategyFileNaming {
         if (stem == GLOBAL_MAPPINGS_NAME) {
             return StrategyKey(StrategyKind.GLOBAL_MAPPINGS, GLOBAL_MAPPINGS_NAME)
         }
+        if (stem == ASSETS_NAME) return StrategyKey(StrategyKind.ASSETS, ASSETS_NAME)
         return when {
             stem.endsWith(XLSX_INFIX) -> {
                 StrategyKey(StrategyKind.XLSX, stem.removeSuffix(XLSX_INFIX))
@@ -133,6 +149,10 @@ object StrategyFileNaming {
 
             stem.endsWith(CURRENCIES_INFIX) -> {
                 StrategyKey(StrategyKind.CURRENCIES, stem.removeSuffix(CURRENCIES_INFIX))
+            }
+
+            stem.endsWith(CRYPTO_ASSETS_INFIX) -> {
+                StrategyKey(StrategyKind.CRYPTO_ASSETS, stem.removeSuffix(CRYPTO_ASSETS_INFIX))
             }
 
             stem.endsWith(HOLIDAY_CALENDAR_INFIX) -> {

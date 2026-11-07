@@ -45,6 +45,7 @@ import com.moneymanager.domain.repository.write.CurrencyWriteRepository
 import com.moneymanager.domain.repository.write.ExchangeOrderWriteRepository
 import com.moneymanager.domain.repository.write.HolidayCalendarWriteRepository
 import com.moneymanager.domain.repository.write.ImportDirectoryWriteRepository
+import com.moneymanager.domain.repository.write.NewCryptoAsset
 import com.moneymanager.domain.repository.write.NewTrade
 import com.moneymanager.domain.repository.write.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
@@ -64,6 +65,7 @@ import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ApiSessionMutation
 import com.moneymanager.importengineapi.ApiStrategyMutation
+import com.moneymanager.importengineapi.AssetAliasMutation
 import com.moneymanager.importengineapi.AttributeSlot
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
@@ -216,10 +218,25 @@ class ImportEngineImpl(
                     intent.source,
                 )
         }
-        val createdCryptoIds = mutableMapOf<LocalCryptoKey, CryptoId>()
-        for (intent in batch.cryptoAssets.creates()) {
-            createdCryptoIds[intent.key] =
-                cryptoRepository.upsertCryptoByCode(requireNotNull(intent.code), intent.name, intent.source)
+        val cryptoCreates = batch.cryptoAssets.creates()
+        val createdCryptoIds: Map<LocalCryptoKey, CryptoId> =
+            if (cryptoCreates.isEmpty()) {
+                emptyMap()
+            } else {
+                cryptoCreates
+                    .map { it.key }
+                    .zip(
+                        cryptoRepository.upsertCryptosByCode(
+                            cryptoCreates.map { NewCryptoAsset(requireNotNull(it.code), it.name, it.source) },
+                        ),
+                    ).toMap()
+            }
+        // After the batch's currencies and crypto assets exist, as an alias names its asset by code.
+        for (m in batch.assetAliasMutations) {
+            when (m) {
+                is AssetAliasMutation.Set -> cryptoRepository.setAssetAlias(m.alias, m.assetCode, m.published)
+                is AssetAliasMutation.Remove -> cryptoRepository.removeAssetAlias(m.alias)
+            }
         }
         val createdTradeIds = mutableMapOf<LocalTradeKey, TradeId>()
         val dedupedTradeKeys = mutableSetOf<LocalTradeKey>()

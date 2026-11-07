@@ -5,6 +5,8 @@ package com.moneymanager.ui.screens.currencies
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.CurrencyScaleFactors
@@ -145,6 +147,37 @@ class CurrenciesScreenTest {
             onNodeWithText("Create").performClick()
 
             onNodeWithText("Currency code is required").assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun currenciesScreen_search_findsByCodeNameAndAlias() {
+        runMoneyManagerComposeUiTest {
+            val currencies =
+                listOf("USD" to "US Dollar", "EUR" to "Euro").mapIndexed { index, (code, name) ->
+                    Currency(id = CurrencyId(index + 1L), code = code, name = name, scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
+                }
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    CurrenciesScreen(
+                        currencyRepository = createCurrencyRepository(currencies),
+                        aliasesOf = { code -> if (code == "EUR") listOf("ZEUR") else emptyList() },
+                    )
+                }
+            }
+            val search = onNodeWithText("Search by code, name or alias")
+
+            search.performTextInput("zeur")
+            waitForIdle()
+            onNodeWithText("EUR").assertIsDisplayed()
+            onNodeWithText("USD").assertDoesNotExist()
+
+            search.performTextClearance()
+            search.performTextInput("dollar")
+            waitForIdle()
+            onNodeWithText("USD").assertIsDisplayed()
+            onNodeWithText("EUR").assertDoesNotExist()
         }
     }
 }

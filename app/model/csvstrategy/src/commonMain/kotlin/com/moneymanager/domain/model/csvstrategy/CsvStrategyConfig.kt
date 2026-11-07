@@ -70,9 +70,7 @@ import kotlinx.serialization.encoding.Encoder
  *                             against an unconsumed funding leg into the row's source account (same
  *                             amount+currency within [crossSourceReconcileWindow]), ignoring the
  *                             merchant. Null disables funding reconciliation.
- * @property assetCodes How the source's asset codes map onto Money Manager's, applied to every currency
- *                      column before lookup (e.g. Koinly's legacy `KNCL` → `KNC`), so the source neither
- *                      mints a duplicate asset nor fails to match.
+ * @property assetCodes How the source's asset codes are normalised, applied to every currency column before lookup.
  * @property reconciliation When set, this strategy imports a reconciliation source into shadow
  *                          accounts only (see [ReconciliationConfig]). Null for ordinary strategies.
  * @property pdfLines When set, this strategy reads PDFs: these rules assemble a document's lines into the

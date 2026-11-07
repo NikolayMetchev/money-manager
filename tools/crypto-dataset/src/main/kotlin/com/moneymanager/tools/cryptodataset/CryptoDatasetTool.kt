@@ -1,6 +1,7 @@
 package com.moneymanager.tools.cryptodataset
 
 import com.moneymanager.cryptodata.CryptoDatasetEntry
+import com.moneymanager.cryptodata.parseCryptoDatasetEntries
 import com.moneymanager.cryptodata.renderCryptoDataset
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -30,7 +31,8 @@ private data class Coin(
 /**
  * Regenerates the bundled `coins.tsv`. Ranked top coins (by market cap) are emitted first so their
  * canonical names win over the noisy long-tail list for colliding tickers (e.g. SOL -> Solana, not a
- * bridged variant). renderCryptoDataset de-dupes by symbol keeping the first (ranked) occurrence.
+ * bridged variant). renderCryptoDataset de-dupes by symbol keeping the first (ranked) occurrence. CoinGecko knows no
+ * aliases, so the rows carrying one are read back from the file being replaced and come first, keeping them.
  */
 fun main(args: Array<String>) {
     val outputPath = args.firstOrNull() ?: error("Usage: generateCryptoDataset <output coins.tsv path>")
@@ -60,8 +62,10 @@ fun main(args: Array<String>) {
             }
         }
 
-    val tsv = renderCryptoDataset(entries)
-    workspaceFile(outputPath).apply { parentFile?.mkdirs() }.writeText(tsv)
+    val output = workspaceFile(outputPath)
+    val aliased = if (output.exists()) parseCryptoDatasetEntries(output.readText()).filter { it.aliasOf != null } else emptyList()
+    val tsv = renderCryptoDataset(aliased + entries)
+    output.apply { parentFile?.mkdirs() }.writeText(tsv)
     println("Wrote ${tsv.lineSequence().count { it.isNotBlank() }} entries to $outputPath")
 }
 

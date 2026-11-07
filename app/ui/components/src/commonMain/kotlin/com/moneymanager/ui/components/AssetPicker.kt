@@ -28,6 +28,9 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.util.onEnterKeyDown
 
+// The menu composes every row it holds, and an installed crypto list has thousands. Currencies come first, so they stay in.
+private const val MAX_SHOWN_ASSETS = 100
+
 /**
  * A searchable picker over every [Asset] — fiat currencies and crypto assets combined — used where a
  * leg can be denominated in either (e.g. a trade). Mirrors [CurrencyPicker] but returns the full
@@ -114,7 +117,7 @@ fun AssetPicker(
                 searchQuery = ""
             },
         ) {
-            filtered.forEach { asset ->
+            filtered.take(MAX_SHOWN_ASSETS).forEach { asset ->
                 DropdownMenuItem(
                     text = { Text(label(asset)) },
                     onClick = {
@@ -122,6 +125,13 @@ fun AssetPicker(
                         expanded = false
                         searchQuery = ""
                     },
+                )
+            }
+            if (filtered.size > MAX_SHOWN_ASSETS) {
+                DropdownMenuItem(
+                    text = { Text("${filtered.size - MAX_SHOWN_ASSETS} more: type to narrow the list") },
+                    onClick = {},
+                    enabled = false,
                 )
             }
             HorizontalDivider()

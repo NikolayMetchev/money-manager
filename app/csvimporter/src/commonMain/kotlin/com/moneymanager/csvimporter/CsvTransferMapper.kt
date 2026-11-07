@@ -34,6 +34,7 @@ import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.excludedAttributeValue
 import com.moneymanager.domain.model.csvstrategy.uniqueIdentifierAttributeTypes
+import com.moneymanager.domain.model.resolveAssetCode
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.ColumnRecord
@@ -305,6 +306,8 @@ class CsvTransferMapper(
     private val existingCurrenciesByCode: Map<String, Currency>,
     /** Crypto assets keyed by uppercased ticker; consulted when a code isn't a known fiat currency. */
     private val existingCryptoByCode: Map<String, CryptoAsset> = emptyMap(),
+    /** The database's own asset aliases, as alias to asset code; see [resolveAssetCode]. */
+    private val assetAliases: Map<String, String> = emptyMap(),
     private val existingTransfers: List<ExistingTransferInfo> = emptyList(),
     accountMappings: List<AccountMapping> = emptyList(),
     /**
@@ -483,8 +486,20 @@ class CsvTransferMapper(
                     val toCurrencyMapping = strategy.config.fieldMappings[TransferField.TO_CURRENCY] ?: return@run null
                     val toAmountMapping = strategy.config.fieldMappings[TransferField.TO_AMOUNT] ?: return@run null
                     val toAsset = parseCurrency(toCurrencyMapping, values) ?: return@run null
-                    if (toAsset.id == currency.id) return@run null
                     val toRaw = parseAmount(toAmountMapping, values).abs()
+                    if (toAsset.id == currency.id) {
+                        // A row naming one code twice is an ordinary transfer. Two codes an alias joined, for
+                        // different amounts, is a conversion a transfer can't hold: the credited amount would be lost.
+                        val fromCode = assetCodeIn(currencyMapping, values) ?: currency.code
+                        val toCode = assetCodeIn(toCurrencyMapping, values) ?: toAsset.code
+                        if (!fromCode.equals(toCode, ignoreCase = true) && toRaw.compareTo(rawAmount.abs()) != 0) {
+                            return MappingResult.Error(
+                                row.rowIndex,
+                                "$fromCode and $toCode are both ${currency.code}, so this conversion needs two assets",
+                            )
+                        }
+                        return@run null
+                    }
                     if (toRaw.compareTo(BigDecimal.ZERO) == 0) return@run null
                     Money.fromDisplayValue(toRaw, toAsset)
                 }
@@ -1303,11 +1318,21 @@ class CsvTransferMapper(
             else -> throw IllegalArgumentException("Invalid currency mapping type: ${mapping::class}")
         }
 
+    /** The code [mapping] reads from the row, before any alias turns it into another asset's. */
+    private fun assetCodeIn(
+        mapping: FieldMapping,
+        values: List<String>,
+    ): String? =
+        (mapping as? CurrencyLookupMapping)?.let { lookup ->
+            strategy.config.assetCodes.canonical(rules.resolve(lookup.value) { getColumnValue(it, values).trim() })
+        }
+
     // Fiat first; fall back to crypto so a strategy can denominate a leg in a crypto asset.
     private fun lookupAsset(code: String): Asset? =
-        strategy.config.assetCodes
-            .canonical(code)
-            .let { existingCurrenciesByCode[it] ?: existingCryptoByCode[it] }
+        resolveAssetCode(strategy.config.assetCodes.canonical(code), assetAliases) {
+            it in existingCurrenciesByCode ||
+                it in existingCryptoByCode
+        }.let { existingCurrenciesByCode[it] ?: existingCryptoByCode[it] }
 
     private fun getColumnValue(
         columnName: String,

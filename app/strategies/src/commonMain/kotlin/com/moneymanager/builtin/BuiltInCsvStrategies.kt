@@ -24,7 +24,6 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
-import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.CaptureTarget
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
@@ -171,7 +170,7 @@ object BuiltInCsvStrategies {
 
     /**
      * Money Manager's code for Curve Cash points. Curve's export calls them `CPT`, which the crypto catalog
-     * already uses for an unrelated token, so the export's code is aliased onto this one.
+     * already uses for an unrelated token, so a rule rewrites the export's code to this one.
      */
     private const val CURVE_CASH_ASSET = "CURVECASH"
 
@@ -993,6 +992,11 @@ object BuiltInCsvStrategies {
                 setFrom("Merchant", "Merchant", "Merchant Name"),
                 setFrom("Amount", "Txn Amount (Funding Card)", "Txn Amount"),
                 setFrom("Currency", "Txn Currency (Funding Card)", "Txn Currency"),
+                // CPT is Curve's own name for its points here, so this is no alias: other sources' CPT is another asset.
+                rule(
+                    RuleAction.SetValue("Currency", RuleValue.constant(CURVE_CASH_ASSET)),
+                    conditions = listOf(Condition("Currency", ConditionOp.EQUALS, "CPT")),
+                ),
                 setFrom("Card Last 4 Digits", "Card Last 4 Digits", "Funding Card Last 4 Digits"),
                 attribute("Card Last 4 Digits", "curve-funding-card"),
                 attribute("Merchant MCC Code", "curve-mcc"),
@@ -1035,7 +1039,6 @@ object BuiltInCsvStrategies {
                             column = "Card Last 4 Digits",
                             attributeTypeName = WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME,
                         ),
-                    assetCodes = AssetCodeRules(aliases = mapOf("CPT" to CURVE_CASH_ASSET)),
                 ),
             createdAt = now,
             updatedAt = now,
@@ -2579,9 +2582,6 @@ object BuiltInCsvStrategies {
                                 ),
                             ),
                     reconciliation = ReconciliationConfig(sourceName = "Koinly", linkableAccountPrefix = KOINLY_WALLET_PREFIX),
-                    // Koinly keeps the pre-migration ticker for legacy Kyber Network (KNCL); exchanges and
-                    // Money Manager call it KNC.
-                    assetCodes = AssetCodeRules(aliases = mapOf("KNCL" to "KNC")),
                 ),
             createdAt = now,
             updatedAt = now,

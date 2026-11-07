@@ -68,8 +68,10 @@ class CryptoComCsvMapperTest {
     private fun mapper(
         strategy: CsvImportStrategy,
         cryptoWalletExists: Boolean = false,
+        assetAliases: Map<String, String> = emptyMap(),
     ): CsvTransferMapper =
         CsvTransferMapper(
+            assetAliases = assetAliases,
             strategy = strategy,
             columns = columns,
             existingAccounts =
@@ -300,6 +302,22 @@ class CryptoComCsvMapperTest {
         assertEquals(cash.id, r.transfer.targetAccountId)
         assertEquals(Money.fromDisplayValue(BigDecimal("46.03"), tgbp), r.transfer.amount)
         assertEquals(Money.fromDisplayValue(BigDecimal("46.03"), gbp), r.tradeTo)
+    }
+
+    @Test
+    fun `a conversion whose two codes an alias joined is an error - not a transfer that loses the credited amount`() {
+        val result =
+            mapper(cryptoStrategy, cryptoWalletExists = true, assetAliases = mapOf("TGBP" to "CRO"))
+                .mapRow(row("TGBP -> CRO", "TGBP", "-1499.936259", "CRO", "4965.5", "1499.94", "crypto_exchange"))
+        assertEquals("TGBP and CRO are both CRO, so this conversion needs two assets", assertIs<MappingResult.Error>(result).errorMessage)
+    }
+
+    @Test
+    fun `two codes an alias joined for one amount stay a plain transfer between the accounts`() {
+        val result =
+            mapper(fiatStrategy, cryptoWalletExists = true, assetAliases = mapOf("TGBP" to "GBP"))
+                .mapRow(row("GBP -> TGBP", "GBP", "-100.0", "TGBP", "100.00", "100.0", "viban_purchase"))
+        assertNull(assertIs<MappingResult.Success>(result).tradeTo)
     }
 
     @Test

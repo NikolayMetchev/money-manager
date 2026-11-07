@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-private val REFERENCE_DATA_KINDS = setOf(StrategyKind.CURRENCIES, StrategyKind.HOLIDAY_CALENDAR)
+private val REFERENCE_DATA_KINDS = setOf(StrategyKind.CURRENCIES, StrategyKind.CRYPTO_ASSETS, StrategyKind.HOLIDAY_CALENDAR)
 
 /** How a catalog artifact stands relative to the local database. */
 enum class CatalogItemStatus {

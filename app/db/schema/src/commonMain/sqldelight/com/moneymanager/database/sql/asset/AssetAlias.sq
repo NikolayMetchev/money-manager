@@ -1,0 +1,28 @@
+-- asset_alias: another code for an asset, in upper case: an import reading the code books the asset (LUNC -> LUNA). A
+-- database's own aliases, on top of the crypto catalog's (coins.tsv). `published` marks one the catalog's crypto list set:
+-- that list's local copy holds it, while a person's own alias stays out, so the catalog doesn't report it as a change. Like
+-- holiday_calendar, this is config with no provenance (EXCLUDED_FROM_AUDIT), audited by its own triggers so edits register in
+-- dataChangeToken() and sync.
+CREATE TABLE asset_alias (
+    alias TEXT NOT NULL PRIMARY KEY CHECK(length(trim(alias)) > 0),
+    asset_id INTEGER NOT NULL,
+    published INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (asset_id) REFERENCES asset(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_asset_alias_asset_id ON asset_alias(asset_id);
+
+-- An `asset` id outlives its subtype row, so the foreign key can't remove an alias with its asset.
+CREATE TRIGGER trigger_crypto_delete_asset_alias
+AFTER DELETE ON crypto
+FOR EACH ROW
+BEGIN
+    DELETE FROM asset_alias WHERE asset_id = old.id;
+END;
+
+CREATE TRIGGER trigger_currency_delete_asset_alias
+AFTER DELETE ON currency
+FOR EACH ROW
+BEGIN
+    DELETE FROM asset_alias WHERE asset_id = old.id;
+END;

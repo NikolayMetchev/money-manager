@@ -424,6 +424,33 @@ BEGIN
     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.code, new.name, new.time_zone);
 END;
 
+-- trigger_asset_alias_delete_audit
+CREATE TRIGGER trigger_asset_alias_delete_audit
+AFTER DELETE ON asset_alias
+FOR EACH ROW
+BEGIN
+    INSERT INTO asset_alias_audit (audit_timestamp, audit_type_id, alias, asset_id, published)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.alias, old.asset_id, old.published);
+END;
+
+-- trigger_asset_alias_insert_audit
+CREATE TRIGGER trigger_asset_alias_insert_audit
+AFTER INSERT ON asset_alias
+FOR EACH ROW
+BEGIN
+    INSERT INTO asset_alias_audit (audit_timestamp, audit_type_id, alias, asset_id, published)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.alias, new.asset_id, new.published);
+END;
+
+-- trigger_asset_alias_update_audit
+CREATE TRIGGER trigger_asset_alias_update_audit
+AFTER UPDATE ON asset_alias
+FOR EACH ROW
+BEGIN
+    INSERT INTO asset_alias_audit (audit_timestamp, audit_type_id, alias, asset_id, published)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.alias, new.asset_id, new.published);
+END;
+
 -- trigger_person_account_ownership_delete_audit
 CREATE TRIGGER trigger_person_account_ownership_delete_audit
 AFTER DELETE ON person_account_ownership

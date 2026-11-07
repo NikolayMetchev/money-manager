@@ -30,6 +30,7 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.ownedAttributeValues
 import com.moneymanager.domain.model.csvstrategy.uniqueIdentifierAttributeTypes
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
+import com.moneymanager.domain.model.resolveAssetCode
 import com.moneymanager.domain.model.rules.ColumnRecord
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleEngine
@@ -40,6 +41,7 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
+import com.moneymanager.domain.repository.assetAliasMap
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.BatchRelationship
 import com.moneymanager.importengineapi.CsvImportMutation
@@ -205,7 +207,10 @@ suspend fun ensureCryptoAssets(
     if (cryptoRepository == null) return emptyList()
     val fiatCodes = currencies.mapTo(mutableSetOf()) { it.code.uppercase() }
     val existingCrypto = cryptoRepository.getAllCryptoAssets().first().mapTo(mutableSetOf()) { it.code.uppercase() }
-    createCryptoAssets(collectCryptoCodes(strategy, columns, rows, fiatCodes, existingCrypto), importEngine)
+    createCryptoAssets(
+        collectCryptoCodes(strategy, columns, rows, fiatCodes, existingCrypto, cryptoRepository.assetAliasMap()),
+        importEngine,
+    )
     return cryptoRepository.getAllCryptoAssets().first()
 }
 
@@ -230,6 +235,7 @@ suspend fun prepareImports(
 ): List<CryptoAsset> {
     val fiatCodes = currencies.mapTo(mutableSetOf()) { it.code.uppercase() }
     val existingCrypto = cryptoRepository?.getAllCryptoAssets()?.first()?.mapTo(mutableSetOf()) { it.code.uppercase() }
+    val assetAliases = cryptoRepository?.assetAliasMap().orEmpty()
     val writes = Mutex()
     val reports = Mutex()
     val codes =
@@ -242,7 +248,14 @@ suspend fun prepareImports(
                             if (staged == null || existingCrypto == null) {
                                 emptySet()
                             } else {
-                                cryptoCodesForImport(staged.first, staged.second, csvImportRepository, fiatCodes, existingCrypto)
+                                cryptoCodesForImport(
+                                    staged.first,
+                                    staged.second,
+                                    csvImportRepository,
+                                    fiatCodes,
+                                    existingCrypto,
+                                    assetAliases,
+                                )
                             }
                         reports.withLock { onPrepared(index, listed) }
                         fileCodes
@@ -286,12 +299,13 @@ private suspend fun cryptoCodesForImport(
     csvImportRepository: CsvImportReadRepository,
     fiatCodes: Set<String>,
     existingCrypto: Set<String>,
+    assetAliases: Map<String, String>,
 ): Set<String> {
     // Scan ALL rows, not just importable ones: a re-import remaps already-IMPORTED rows too (value
     // updates, transfer→trade conversions), and their tickers must resolve at plan time. For a fresh
     // import every row is unimported, so this is the same set.
     val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
-    return collectCryptoCodes(strategy, csvImport.columns, allRows, fiatCodes, existingCrypto)
+    return collectCryptoCodes(strategy, csvImport.columns, allRows, fiatCodes, existingCrypto, assetAliases)
 }
 
 /**
@@ -305,6 +319,7 @@ private fun collectCryptoCodes(
     rows: List<CsvRow>,
     fiatCodes: Set<String>,
     existingCryptoCodes: Set<String>,
+    assetAliases: Map<String, String>,
 ): Set<String> {
     val indexByName = columnIndexWithRuleColumns(columns, strategy.config)
 
@@ -328,7 +343,11 @@ private fun collectCryptoCodes(
         for (expr in readableExprs) {
             val raw = rules.resolve(expr) { record.text(it)?.trim() }
             if (raw.isBlank()) continue
-            val code = strategy.config.assetCodes.canonical(raw)
+            val code =
+                resolveAssetCode(strategy.config.assetCodes.canonical(raw), assetAliases) {
+                    it in fiatCodes ||
+                        it in existingCryptoCodes
+                }
             if (code.isNotEmpty() && code !in fiatCodes && code !in existingCryptoCodes) {
                 codes += code
             }
@@ -527,6 +546,7 @@ suspend fun applyStagedCsv(
     // column, so rows denominated in crypto resolve to a real crypto asset (upsert = idempotent on
     // re-import). No-op unless a CryptoReadRepository is supplied and the currency column carries crypto.
     val cryptoAssets = ensureCryptoAssets(strategy, stagedImport.columns, rows, currencies, importEngine, cryptoRepository)
+    val assetAliases = cryptoRepository?.assetAliasMap().orEmpty()
 
     // Re-fetch accounts so payee accounts created by earlier files in the same scan are seen.
     val accounts = accountRepository.accountsVisibleTo(strategy)
@@ -544,10 +564,12 @@ suspend fun applyStagedCsv(
             historicalAccountNames,
             cryptoAssets,
             attributeAccountMatchers,
+            assetAliases,
         ).prepareImport(rows)
 
     return runCsvImport(
         cryptoAssets = cryptoAssets,
+        assetAliases = assetAliases,
         csvImport = stagedImport,
         rows = rows,
         columns = stagedImport.columns,
@@ -753,6 +775,7 @@ fun buildCsvMapper(
     historicalAccountNames: Map<String, AccountId> = emptyMap(),
     cryptoAssets: List<CryptoAsset> = emptyList(),
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
+    assetAliases: Map<String, String> = emptyMap(),
 ): CsvTransferMapper =
     CsvTransferMapper(
         strategy = strategy,
@@ -761,6 +784,7 @@ fun buildCsvMapper(
         existingCurrencies = currencies.associateBy { it.id },
         existingCurrenciesByCode = currencies.associateBy { it.code.uppercase() },
         existingCryptoByCode = cryptoAssets.associateBy { it.code.uppercase() },
+        assetAliases = assetAliases,
         accountMappings = accountMappings,
         historicalAccountNames = historicalAccountNames,
         sourceAccountOverride = sourceAccountOverride,
@@ -937,6 +961,7 @@ suspend fun runCsvImport(
     importEngine: ImportEngine,
     refreshViews: Boolean = true,
     cryptoAssets: List<CryptoAsset> = emptyList(),
+    assetAliases: Map<String, String> = emptyMap(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (suspend (Progress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
@@ -1007,6 +1032,7 @@ suspend fun runCsvImport(
             existingCurrencies = currenciesById,
             existingCurrenciesByCode = currenciesByCode,
             existingCryptoByCode = cryptoAssets.associateBy { it.code.uppercase() },
+            assetAliases = assetAliases,
             accountMappings = latestAccountMappings,
             historicalAccountNames = historicalAccountNames,
             sourceAccountOverride = selectedSourceAccountId,

@@ -137,6 +137,21 @@ suspend fun ImportEngine.deletePassThroughAccount(id: PassThroughAccountId) {
 
 // endregion
 
+// region Asset aliases
+
+suspend fun ImportEngine.setAssetAlias(
+    alias: String,
+    assetCode: String,
+) {
+    import(ImportBatch(assetAliasMutations = listOf(AssetAliasMutation.Set(alias, assetCode))))
+}
+
+suspend fun ImportEngine.removeAssetAlias(alias: String) {
+    import(ImportBatch(assetAliasMutations = listOf(AssetAliasMutation.Remove(alias))))
+}
+
+// endregion
+
 // region Holiday calendars
 
 suspend fun ImportEngine.upsertHolidayCalendar(calendar: HolidayCalendar) {

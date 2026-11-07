@@ -154,7 +154,7 @@ internal fun buildStrategyFromEditorState(
                         TimezoneLookupMapping(
                             fieldType = TransferField.TIMEZONE,
                             columnName = state.timezoneColumnName!!,
-                            aliases = parseAliases(state.timezoneAliasesText, upperCaseValues = false),
+                            aliases = parseAliases(state.timezoneAliasesText),
                         )
                     }
                 },
@@ -185,11 +185,7 @@ internal fun buildStrategyFromEditorState(
                     state.reconciliationSourceName.trim().takeIf { it.isNotEmpty() }?.let { source ->
                         ReconciliationConfig(source, state.reconciliationLinkablePrefix.takeIf { it.isNotEmpty() })
                     },
-                assetCodes =
-                    AssetCodeRules(
-                        aliases = parseAliases(state.assetAliasesText, upperCaseValues = true),
-                        stripSuffixes = state.assetSuffixesToStrip,
-                    ),
+                assetCodes = AssetCodeRules(stripSuffixes = state.assetSuffixesToStrip),
             ),
         worksheetName = state.worksheetName,
         createdAt = createdAt,
@@ -197,23 +193,20 @@ internal fun buildStrategyFromEditorState(
     )
 }
 
-/** Renders aliases (asset codes, timezone abbreviations) as the editor's `FROM=TO, …` text. */
+/** Renders timezone aliases as the editor's `FROM=TO, …` text. */
 internal fun formatAliases(aliases: Map<String, String>): String =
     aliases.entries.sortedBy { it.key }.joinToString(", ") { "${it.key}=${it.value}" }
 
 /**
- * Parses `FROM=TO, …` into aliases, dropping malformed entries. Keys are upper-cased; values only when
- * [upperCaseValues] (asset codes are, but a zone id like `Europe/London` is case-sensitive).
+ * Parses `FROM=TO, …` into timezone aliases, dropping malformed entries. Keys are upper-cased; values aren't, as a zone
+ * id like `Europe/London` is case-sensitive.
  */
-internal fun parseAliases(
-    text: String,
-    upperCaseValues: Boolean,
-): Map<String, String> =
+internal fun parseAliases(text: String): Map<String, String> =
     text
         .split(',', '\n')
         .mapNotNull { entry ->
             val parts = entry.split('=').map { it.trim() }
             parts.takeIf { it.size == 2 && it.all(String::isNotEmpty) }?.let {
-                it[0].uppercase() to if (upperCaseValues) it[1].uppercase() else it[1]
+                it[0].uppercase() to it[1]
             }
         }.toMap()

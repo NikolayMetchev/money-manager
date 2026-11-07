@@ -17,6 +17,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,19 +31,27 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 
 /**
  * The list screen shared by the fiat and crypto tabs: a headline, the items (or an empty-state
- * message) keyed by [itemKey] so per-row state follows its asset, and a "+" button that opens
- * [createDialog], which is handed the callback that closes it.
+ * message) keyed by [itemKey] so per-row state follows its asset, a search over [searchTexts] (the crypto list runs to
+ * thousands of rows), and a "+" button that opens [createDialog], which is handed the callback that closes it.
  */
 @Composable
 internal fun <T> AssetListTab(
     title: String,
     items: List<T>,
     itemKey: (T) -> Long,
+    searchTexts: (T) -> List<String>,
     emptyMessage: String,
     createDialog: @Composable (onClose: () -> Unit) -> Unit,
     itemContent: @Composable (T) -> Unit,
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
+    var search by remember { mutableStateOf("") }
+    val shown =
+        // searchTexts is a key because it reads the aliases, which change without the items changing.
+        remember(items, search, searchTexts) {
+            val query = search.trim()
+            if (query.isEmpty()) items else items.filter { item -> searchTexts(item).any { it.contains(query, ignoreCase = true) } }
+        }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -56,6 +65,16 @@ internal fun <T> AssetListTab(
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(bottom = 16.dp),
             )
+
+            if (items.isNotEmpty()) {
+                OutlinedTextField(
+                    value = search,
+                    onValueChange = { search = it },
+                    label = { Text("Search by code, name or alias") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                )
+            }
 
             if (items.isEmpty()) {
                 Box(
@@ -75,7 +94,7 @@ internal fun <T> AssetListTab(
                         state = lazyListState,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(items, key = itemKey) { item -> itemContent(item) }
+                        items(shown, key = itemKey) { item -> itemContent(item) }
                     }
                     VerticalScrollbarForLazyList(
                         lazyListState = lazyListState,
@@ -102,13 +121,15 @@ internal fun <T> AssetListTab(
 }
 
 /**
- * One asset row: code and name, any [extraActions], then a delete button that opens [deleteDialog].
+ * One asset row: code, name and any [details] below them, any [extraActions], then a delete button that opens
+ * [deleteDialog].
  */
 @Composable
 internal fun AssetCard(
     code: String,
     name: String,
     deleteDialog: @Composable (onDismiss: () -> Unit) -> Unit,
+    details: @Composable () -> Unit = {},
     extraActions: @Composable RowScope.() -> Unit = {},
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -132,6 +153,7 @@ internal fun AssetCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                details()
             }
             extraActions()
             IconButton(onClick = { showDeleteDialog = true }) {
