@@ -403,6 +403,27 @@ class StrategySelectorTest {
     }
 
     @Test
+    fun `a Celsius export selects the Celsius strategy by its spaced headers`() {
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
+        val names =
+            listOf(
+                "Internal id",
+                " Date and time",
+                " Transaction type",
+                " Coin type",
+                " Coin amount",
+                " USD Value",
+                " Original Reward Coin",
+                " Reward Amount In Original Coin",
+                " Confirmed",
+            )
+        val csvColumns = names.mapIndexed { i, name -> CsvColumn(CsvColumnId(Uuid.random()), i, name) }
+        val row = CsvRow(rowIndex = 1L, values = names.map { "" })
+
+        assertEquals("Celsius CSV", builtIns.selectForCsv("transactions-export-1.csv", csvColumns, listOf(row))?.name)
+    }
+
+    @Test
     fun `a Monzo export still selects the Monzo CSV strategy alongside Binance`() {
         val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
         val monzo = builtIns.single { it.name == "Monzo CSV" }
