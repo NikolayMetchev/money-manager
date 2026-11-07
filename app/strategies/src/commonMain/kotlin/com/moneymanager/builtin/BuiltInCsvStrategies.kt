@@ -57,7 +57,6 @@ object BuiltInCsvStrategies {
     val bybitFundingCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000f")
     val bybitUnifiedCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000010")
     val payPalCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000011")
-    val curveTransactionsCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000013")
     val amexQifStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000014")
     val amexPdfStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000015")
 
@@ -393,7 +392,6 @@ object BuiltInCsvStrategies {
             buildCryptoComFiatStrategy(now),
             buildCryptoComCryptoStrategy(now),
             buildCurveCsvStrategy(now),
-            buildCurveTransactionsCsvStrategy(now),
             buildCryptoComCardXlsxStrategy(now),
             buildBinanceCsvStrategy(now),
             buildKoinlyCsvStrategy(now),
@@ -924,112 +922,40 @@ object BuiltInCsvStrategies {
     }
 
     /**
-     * Built-in strategy for Curve's "Transaction History <date>.csv" export. Curve is a card
-     * aggregator: a Curve payment is forwarded to an underlying card, so each Curve row is the
-     * merchant-facing side of a movement whose funding side lives on the underlying card's statement.
+     * Built-in strategy for Curve's transaction exports: the older "Transaction History <date>.csv" and the
+     * newer "Transactions <dates>.csv" that replaced it. Curve is a card aggregator: a Curve payment is
+     * forwarded to an underlying card, so each Curve row is the merchant-facing side of a movement whose
+     * funding side lives on the underlying card's statement.
      *
-     * Every row runs through [CURVE_CONDUIT_ACCOUNT] (the strategy's conduit) as the chain
+     * The two exports share no column, so the rules first gather what the mappings read under one name each
+     * (`Date`, `Time`, `Merchant`, `Amount`, `Currency`, `Card Last 4 Digits`) from whichever column the file
+     * has, and nothing identifies a file by its columns alone: every column is optional, and the file name
+     * (`Transaction History…` or `Transactions…`) picks the strategy.
+     *
+     * Every row but a Curve Cash one runs through [CURVE_CONDUIT_ACCOUNT] (the strategy's conduit) as the chain
      * `Curve card <last 4> -> Curve -> merchant`, so Curve always nets to zero. The funding side is a
      * placeholder per card. Where the card's own import booked the charge into Curve (its "CRV*<merchant>"
      * pass-through, see [com.moneymanager.builtin.BuiltInPassThroughs.curve]), the two reconcile — by the
      * card's `card-last4` attribute, or by the card's movement into Curve alone — and, in either import
      * order, the card's record of the funding stays counted while this row's merchant leg, naming the real
-     * merchant, supersedes the card's guess at it. Foreign-currency rows (Curve records the merchant-side
-     * amount/currency, not what the card was billed) can't match the card's funding leg, so they stay
-     * funded by the placeholder, in their own currency.
+     * merchant, supersedes the card's guess at it.
      *
-     * The export's first column has a BLANK header (a running row index); it is part of the
-     * identification column set but is otherwise unused. Amounts are always positive spends out of
-     * Curve, so there is deliberately no flip-on-positive.
-     */
-    fun buildCurveCsvStrategy(now: Instant): CsvImportStrategy {
-        val fieldMappings =
-            mapOf(
-                accountFromRules(TransferField.SOURCE_ACCOUNT),
-                accountFromRules(TransferField.TARGET_ACCOUNT),
-                TransferField.TIMESTAMP to
-                    DateTimeParsingMapping(
-                        fieldType = TransferField.TIMESTAMP,
-                        dateColumnName = "Created Date",
-                        dateFormat = "yyyy-MM-dd",
-                    ),
-                TransferField.DESCRIPTION to
-                    DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Merchant Name"))),
-                TransferField.AMOUNT to
-                    AmountParsingMapping(
-                        fieldType = TransferField.AMOUNT,
-                        mode = AmountMode.SINGLE_COLUMN,
-                        amountColumnName = "Txn Amount",
-                    ),
-                TransferField.CURRENCY to
-                    CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Txn Currency"))),
-                TransferField.TIMEZONE to
-                    HardCodedTimezoneMapping(
-                        fieldType = TransferField.TIMEZONE,
-                        timezoneId = "UTC",
-                    ),
-            )
-        val rules =
-            listOf(
-                attribute("Funding Card Last 4 Digits", "curve-funding-card"),
-                attribute("Merchant MCC Code", "curve-mcc"),
-                accounts(AccountSide.SOURCE, *curveFundingCards("Funding Card Last 4 Digits")),
-                // Merchant account, looked up/created from the clean Merchant Name; persisted account mappings
-                // apply, so a user can normalise Curve's names onto their own merchant accounts.
-                accounts(AccountSide.TARGET, naming("Merchant Name")),
-                rule(RuleAction.ThroughConduit(CURVE_CONDUIT_ACCOUNT)),
-            )
-        return CsvImportStrategy(
-            id = CsvImportStrategyId(curveCsvStrategyId),
-            name = "Curve CSV",
-            config =
-                CsvStrategyConfig(
-                    identificationColumns =
-                        setOf(
-                            "",
-                            "Created Date",
-                            "Merchant Name",
-                            "Funding Card Last 4 Digits",
-                            "Merchant MCC Code",
-                            "Txn Currency",
-                            "Txn Amount",
-                        ),
-                    fieldMappings = fieldMappings,
-                    rules = rules,
-                    // Only a tiebreaker among column-matched candidates; Curve's column set is disjoint from
-                    // Wise's transaction-history.csv, so the two never compete.
-                    fileNamePattern = "^Transaction History",
-                    crossSourceReconcileWindow = SettlementWindow.Elapsed(CURVE_RECONCILE_WINDOW_SECONDS),
-                    // Reconcile each spend against the funding leg on the account whose card-last4 attribute
-                    // matches this column, so a Curve charge isn't double-counted against the underlying card's
-                    // own import.
-                    fundingAttributeMatch =
-                        AttributeAccountMatch(
-                            column = "Funding Card Last 4 Digits",
-                            attributeTypeName = WellKnownIds.ACCOUNT_CARD_LAST4_ATTR_TYPE_NAME,
-                        ),
-                ),
-            createdAt = now,
-            updatedAt = now,
-        )
-    }
-
-    /**
-     * Built-in strategy for Curve's newer "Transactions <dates>.csv" export, which replaced the
-     * [buildCurveCsvStrategy] layout. Real-card rows work the same way: each is the chain
-     * `Curve card <last 4> -> Curve -> merchant`, reconciled against the underlying card's funding leg
-     * through the `Card Last 4 Digits` funding match. Unlike the old export, this one gives the amount the funding card
-     * was charged (`Txn Amount (Funding Card)`, which includes any Curve fee) alongside the merchant-side
-     * foreign spend, so the spend is booked in what the card paid: that is what the card statement's funding
-     * leg holds, foreign purchases included. The foreign spend and the fee are kept as attributes.
+     * **Older export.** Its first column has a BLANK header (a running row index), which is otherwise unused.
+     * Amounts are the merchant-side amount and currency, always positive spends out of Curve, so there is
+     * deliberately no flip-on-positive. A foreign-currency row can't match the card's funding leg, so it stays
+     * funded by the placeholder, in its own currency.
      *
-     * Curve Cash rows have no card and don't pass through [CURVE_CONDUIT_ACCOUNT]. Their amounts are points
-     * (`CPT`, booked as [CURVE_CASH_ASSET]):
+     * **Newer export.** It gives the amount the funding card was charged (`Txn Amount (Funding Card)`, which
+     * includes any Curve fee) alongside the merchant-side foreign spend, so the spend is booked in what the
+     * card paid: that is what the card statement's funding leg holds, foreign purchases included. The foreign
+     * spend and the fee are kept as attributes. Curve Cash rows have no card. Their amounts are points (`CPT`,
+     * booked as [CURVE_CASH_ASSET]):
      *  - a row with no Type is points earned on a purchase: [CURVE_CASHBACK_ACCOUNT] -> [CURVE_CASH_ACCOUNT];
      *  - a row paid with the "Curve Cash" card spends points: [CURVE_CASH_ACCOUNT] -> merchant.
      */
-    fun buildCurveTransactionsCsvStrategy(now: Instant): CsvImportStrategy {
+    fun buildCurveCsvStrategy(now: Instant): CsvImportStrategy {
         val earned = listOf(Condition("Card Name", ConditionOp.EQUALS, "Curve Cash"), Condition("Type", ConditionOp.BLANK))
+        val curveCash = Condition("Card Name", ConditionOp.EQUALS, "Curve Cash")
         val fieldMappings =
             mapOf(
                 accountFromRules(TransferField.SOURCE_ACCOUNT),
@@ -1037,9 +963,9 @@ object BuiltInCsvStrategies {
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         fieldType = TransferField.TIMESTAMP,
-                        dateColumnName = "Date (YYYY-MM-DD as UTC)",
+                        dateColumnName = "Date",
                         dateFormat = "yyyy-MM-dd",
-                        timeColumnName = "Time (HH:MM:SS as UTC)",
+                        timeColumnName = "Time",
                         timeFormat = "HH:mm:ss",
                     ),
                 TransferField.DESCRIPTION to
@@ -1048,16 +974,24 @@ object BuiltInCsvStrategies {
                     AmountParsingMapping(
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
-                        amountColumnName = "Txn Amount (Funding Card)",
+                        amountColumnName = "Amount",
                     ),
                 TransferField.CURRENCY to
-                    CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Txn Currency (Funding Card)"))),
+                    CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Currency"))),
                 TransferField.TIMEZONE to HardCodedTimezoneMapping(fieldType = TransferField.TIMEZONE, timezoneId = "UTC"),
             )
-        val curveCash = Condition("Card Name", ConditionOp.EQUALS, "Curve Cash")
         val rules =
             listOf(
+                // One name for what each export keeps under its own column. The older export has no time, so
+                // its rows take the default one.
+                setFrom("Date", "Date (YYYY-MM-DD as UTC)", "Created Date"),
+                setFrom("Time", "Time (HH:MM:SS as UTC)"),
+                setFrom("Merchant", "Merchant", "Merchant Name"),
+                setFrom("Amount", "Txn Amount (Funding Card)", "Txn Amount"),
+                setFrom("Currency", "Txn Currency (Funding Card)", "Txn Currency"),
+                setFrom("Card Last 4 Digits", "Card Last 4 Digits", "Funding Card Last 4 Digits"),
                 attribute("Card Last 4 Digits", "curve-funding-card"),
+                attribute("Merchant MCC Code", "curve-mcc"),
                 attribute("Card Name", "curve-card-name"),
                 attribute("Category", "curve-category"),
                 attribute("Fees", "curve-fee"),
@@ -1068,6 +1002,8 @@ object BuiltInCsvStrategies {
                 accounts(AccountSide.SOURCE, fixedNaming("Merchant", CURVE_CASH_ACCOUNT), conditions = listOf(curveCash)),
                 accounts(AccountSide.SOURCE, *curveFundingCards("Card Last 4 Digits")),
                 accounts(AccountSide.TARGET, fixedNaming("Merchant", CURVE_CASH_ACCOUNT), conditions = earned),
+                // Merchant account, looked up/created from the clean merchant name; persisted account mappings
+                // apply, so a user can normalise Curve's names onto their own merchant accounts.
                 accounts(AccountSide.TARGET, naming("Merchant")),
                 rule(
                     RuleAction.ThroughConduit(CURVE_CONDUIT_ACCOUNT),
@@ -1075,31 +1011,21 @@ object BuiltInCsvStrategies {
                 ),
             )
         return CsvImportStrategy(
-            id = CsvImportStrategyId(curveTransactionsCsvStrategyId),
-            name = "Curve CSV (Transactions)",
+            id = CsvImportStrategyId(curveCsvStrategyId),
+            name = "Curve CSV",
             config =
                 CsvStrategyConfig(
-                    identificationColumns =
-                        setOf(
-                            "Export Format",
-                            "Date (YYYY-MM-DD as UTC)",
-                            "Time (HH:MM:SS as UTC)",
-                            "Merchant",
-                            "Txn Amount (Funding Card)",
-                            "Txn Currency (Funding Card)",
-                            "Txn Amount (Foreign Spend)",
-                            "Txn Currency (Foreign Spend)",
-                            "Card Name",
-                            "Card Last 4 Digits",
-                            "Type",
-                            "Category",
-                            "Notes",
-                            "Fees",
-                        ),
+                    identificationColumns = emptySet(),
+                    optionalColumns = CURVE_COLUMNS,
                     fieldMappings = fieldMappings,
                     rules = rules,
-                    fileNamePattern = "^Transactions",
+                    // What picks the strategy, as no column does: Curve's column sets are disjoint from every other
+                    // strategy's, so only a file named like a Curve export can reach it.
+                    fileNamePattern = "^(Transaction History|Transactions)",
                     crossSourceReconcileWindow = SettlementWindow.Elapsed(CURVE_RECONCILE_WINDOW_SECONDS),
+                    // Reconcile each spend against the funding leg on the account whose card-last4 attribute
+                    // matches this column, so a Curve charge isn't double-counted against the underlying card's
+                    // own import.
                     fundingAttributeMatch =
                         AttributeAccountMatch(
                             column = "Card Last 4 Digits",
@@ -1111,6 +1037,40 @@ object BuiltInCsvStrategies {
             updatedAt = now,
         )
     }
+
+    /** `column` set to the first non-blank of [from]. */
+    private fun setFrom(
+        column: String,
+        vararg from: String,
+    ): StrategyRule = rule(RuleAction.SetValue(column, RuleValue.read(from.first(), *from.drop(1).toTypedArray())))
+
+    /** Every column of Curve's two exports (the older one's first column has a blank header). */
+    private val CURVE_COLUMNS =
+        setOf(
+            // Older "Transaction History" export.
+            "",
+            "Created Date",
+            "Merchant Name",
+            "Funding Card Last 4 Digits",
+            "Merchant MCC Code",
+            "Txn Currency",
+            "Txn Amount",
+            // Newer "Transactions" export.
+            "Export Format",
+            "Date (YYYY-MM-DD as UTC)",
+            "Time (HH:MM:SS as UTC)",
+            "Merchant",
+            "Txn Amount (Funding Card)",
+            "Txn Currency (Funding Card)",
+            "Txn Amount (Foreign Spend)",
+            "Txn Currency (Foreign Spend)",
+            "Card Name",
+            "Card Last 4 Digits",
+            "Type",
+            "Category",
+            "Notes",
+            "Fees",
+        )
 
     /**
      * Built-in strategy for PayPal's activity download (`Download.CSV`, or a date-range name such as
