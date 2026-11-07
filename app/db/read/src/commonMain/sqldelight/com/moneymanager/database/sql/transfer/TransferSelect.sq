@@ -91,6 +91,12 @@ WHERE account_id = :accountId
 ORDER BY timestamp ASC, id ASC
 LIMIT :limit;
 
+-- The time of a transaction of either kind: transfers and trades draw their ids from one supertype.
+selectTransactionTimestamp:
+SELECT timestamp FROM transfer WHERE id = :id
+UNION ALL
+SELECT timestamp FROM trade WHERE id = :id;
+
 -- Get the row position (0-indexed) of a transaction within an account's transaction list
 -- Returns the count of transactions that come BEFORE this one (i.e., have higher timestamp or same timestamp but higher id)
 getTransactionRowPosition:

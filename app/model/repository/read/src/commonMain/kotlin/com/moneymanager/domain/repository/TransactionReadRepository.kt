@@ -117,7 +117,7 @@ interface TransactionReadRepository {
      */
     suspend fun getPageContainingTransaction(
         accountId: AccountId,
-        transactionId: TransferId,
+        transactionId: TransactionId,
         pageSize: Int,
         currencyId: CurrencyId? = null,
     ): PageWithTargetIndex<AccountRow>

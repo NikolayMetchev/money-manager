@@ -263,6 +263,7 @@ fun AccountTransactionsScreen(
     var currentPagingInfo by remember { mutableStateOf<com.moneymanager.domain.model.PagingInfo?>(null) }
     var isLoadingPage by remember { mutableStateOf(false) }
     var hasLoadedFirstPage by remember { mutableStateOf(false) }
+    var firstPageFailed by remember { mutableStateOf(false) }
     // Backward paging state - tracks if there are more items at the start of the list
     var hasPreviousPage by remember { mutableStateOf(false) }
     var isLoadingPreviousPage by remember { mutableStateOf(false) }
@@ -422,6 +423,7 @@ fun AccountTransactionsScreen(
             runningBalances = emptyList()
             currentPagingInfo = null
             hasLoadedFirstPage = false
+            firstPageFailed = false
             isLoadingPage = true
             hasPreviousPage = false
 
@@ -460,6 +462,9 @@ fun AccountTransactionsScreen(
                 throw e
             } catch (expected: Exception) {
                 logger.e(expected) { "Failed to load transactions: ${expected.message}" }
+                // The spinner waits on hasLoadedFirstPage, so a failure must end it too.
+                firstPageFailed = true
+                hasLoadedFirstPage = true
             } finally {
                 isLoadingPage = false
                 pageLoadGeneration++
@@ -896,7 +901,9 @@ fun AccountTransactionsScreen(
                 ) {
                     Text(
                         text =
-                            if (dateRange.isActive) {
+                            if (firstPageFailed) {
+                                "Couldn't load these transactions."
+                            } else if (dateRange.isActive) {
                                 "No transactions in this period."
                             } else if (selectedCurrencyId != null) {
                                 "No transactions for selected currency."
