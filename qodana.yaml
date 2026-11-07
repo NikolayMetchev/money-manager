@@ -176,6 +176,9 @@ exclude:
   - name: KotlinConstantConditions
     paths:
       - app/ui/transactions/src/commonTest/kotlin/com/moneymanager/ui/screens/transactions/AccountTransactionsScreenTest.kt
+      # [2] `this == XLSX || this == PDF` is true for those two kinds: ImportFileStaging reads them as bytes, and the
+      # Excel and PDF imports run in production. The linter reports each comparison as always false.
+      - app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/ImportFileKind.kt
 
   # `assertEquals(emptyList(), decodeRowRules(...))` already has the expected value first.
   - name: KotlinMisorderedAssertEqualsArguments
