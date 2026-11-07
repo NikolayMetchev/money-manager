@@ -468,7 +468,7 @@ class CurveCsvE2ETest : DbTest() {
 
             // Assigning the card changes nothing more: the row is already reconciled.
             registerCryptoComCard("7721")
-            reimport(first.id, strategyName = "Curve CSV")
+            reimport(first.id)
             repositories.maintenanceService.refreshMaterializedViews()
             assertTrue(unmatchedFundingReferences().isEmpty())
             assertTrue(!transfersBetween("Curve", "Lastpass.com").single().isExcluded())

@@ -148,10 +148,10 @@ object BuiltInCsvStrategies {
      * export can't identify further. The engine reconciles it against that card's own statement where the
      * card's import booked the same charge into Curve.
      */
-    private fun curveFundingCards(lastFourColumn: String): Array<AccountNaming> =
+    private fun curveFundingCards(): Array<AccountNaming> =
         arrayOf(
-            naming(lastFourColumn, trim = true, pattern = "^(\\S+)$", name = "$CURVE_FUNDING_CARD_PREFIX $1", unidentified = true),
-            naming(lastFourColumn, name = CURVE_FUNDING_CARD_PREFIX, unidentified = true),
+            naming("Card Last 4 Digits", trim = true, pattern = "^(\\S+)$", name = "$CURVE_FUNDING_CARD_PREFIX $1", unidentified = true),
+            naming("Card Last 4 Digits", name = CURVE_FUNDING_CARD_PREFIX, unidentified = true),
         )
 
     /** Prefix of the per-card placeholder accounts funding Curve rows ("Curve card 7721"). */
@@ -1011,7 +1011,7 @@ object BuiltInCsvStrategies {
                 attribute("Notes", "curve-notes"),
                 accounts(AccountSide.SOURCE, fixedNaming("Merchant", CURVE_CASHBACK_ACCOUNT), conditions = earned),
                 accounts(AccountSide.SOURCE, fixedNaming("Merchant", CURVE_CASH_ACCOUNT), conditions = listOf(curveCash)),
-                accounts(AccountSide.SOURCE, *curveFundingCards("Card Last 4 Digits")),
+                accounts(AccountSide.SOURCE, *curveFundingCards()),
                 accounts(AccountSide.TARGET, fixedNaming("Merchant", CURVE_CASH_ACCOUNT), conditions = earned),
                 // Merchant account, looked up/created from the clean merchant name; persisted account mappings
                 // apply, so a user can normalise Curve's names onto their own merchant accounts.

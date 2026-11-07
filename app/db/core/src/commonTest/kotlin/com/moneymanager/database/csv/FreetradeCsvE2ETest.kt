@@ -286,7 +286,7 @@ class FreetradeCsvE2ETest : DbTest() {
             val result = apply(listOf(isa, gia))
 
             assertEquals(2, result.filesImported)
-            assertEquals(mapOf("GBP" to "1000"), balances("Freetrade ISA"))
+            assertEquals(mapOf("GBP" to "1000"), balances())
             assertEquals(mapOf("GBP" to "50"), balances("Freetrade GIA"))
         }
 
