@@ -318,6 +318,16 @@ class StrategyFormRoundTripTest {
     }
 
     @Test
+    fun `the built-in Accointing strategy survives a no-op save`() {
+        val accointing = BuiltInCsvStrategies.buildAccointingCsvStrategy(timestamp)
+
+        val state = CsvStrategyEditorState(accointing, accointing.config.identificationColumns)
+        val rebuilt = buildStrategyFromEditorState(state, accointing.id, accointing.createdAt, accointing.updatedAt)
+
+        assertEquals(accointing.config, rebuilt.config)
+    }
+
+    @Test
     fun `optional columns the sample file lacks survive a save`() {
         // Editing the strategy against an older export, which has none of its optional columns, must not drop them.
         val koinly = BuiltInCsvStrategies.buildKoinlyCsvStrategy(timestamp)
