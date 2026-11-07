@@ -2655,13 +2655,16 @@ object BuiltInCsvStrategies {
     )
 
     /** An asset Accointing doesn't know has the ticker `???` and only a name of its own, so two of them stay apart. */
-    private fun accointingNamedAsset(column: String): StrategyRule =
+    private fun accointingNamedAsset(
+        column: String,
+        nameColumn: String = "temporaryCurrencyName",
+    ): StrategyRule =
         rule(
-            RuleAction.SetValue(column, RuleValue.read("temporaryCurrencyName")),
+            RuleAction.SetValue(column, RuleValue.read(nameColumn)),
             conditions =
                 listOf(
                     Condition(column, ConditionOp.EQUALS, value = "???"),
-                    Condition("temporaryCurrencyName", ConditionOp.NOT_BLANK),
+                    Condition(nameColumn, ConditionOp.NOT_BLANK),
                 ),
         )
 
@@ -2762,6 +2765,7 @@ object BuiltInCsvStrategies {
                             ),
                             accointingNamedAsset("boughtCurrency"),
                             accointingNamedAsset("soldCurrency"),
+                            accointingNamedAsset("feeCurrency", nameColumn = "temporaryFeeCurrencyName"),
                             // A pair's two rows name each other, so both are keyed by the withdrawal's id.
                             rule(
                                 RuleAction.SetValue(ACCOINTING_PAIR_COLUMN, RuleValue.read("id")),

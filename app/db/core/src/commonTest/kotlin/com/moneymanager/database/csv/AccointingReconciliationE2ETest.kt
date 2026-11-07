@@ -387,6 +387,32 @@ class AccointingReconciliationE2ETest : DbTest() {
         }
 
     @Test
+    fun `an unknown fee asset takes its own name instead of the placeholder ticker`() =
+        runDbTest {
+            val unknownFee =
+                row(
+                    "timeExecuted" to "6/7/2021 10:00:00",
+                    "type" to "withdraw",
+                    "soldQuantity" to "1.5",
+                    "soldCurrency" to "BTC",
+                    "feeQuantity" to "0.25",
+                    "feeCurrency" to "???",
+                    "walletName" to "Binance",
+                    "temporaryFeeCurrencyName" to "Compound Collateral",
+                    "id" to "8",
+                )
+
+            applyAll(listOf(stage("history.xlsx", listOf(unknownFee))))
+
+            assertEquals(
+                "COMPOUND COLLATERAL",
+                transfers()
+                    .byAmount("0.25")
+                    .amount.asset.code,
+            )
+        }
+
+    @Test
     fun `the two rows of an internal transfer are linked`() =
         runDbTest {
             applyAll(listOf(stage("history.xlsx", listOf(pairIn, pairOut))))
