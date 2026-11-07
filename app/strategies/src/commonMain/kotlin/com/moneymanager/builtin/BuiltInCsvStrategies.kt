@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
+import com.moneymanager.domain.model.csvstrategy.FILE_NAME_COLUMN
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
@@ -60,8 +61,7 @@ object BuiltInCsvStrategies {
     val amexPdfStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000015")
     val accointingCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000016")
     val celsiusCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000017")
-    val freetradeIsaCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000018")
-    val freetradeGiaCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000019")
+    val freetradeCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000018")
 
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
@@ -400,8 +400,7 @@ object BuiltInCsvStrategies {
             buildKoinlyCsvStrategy(now),
             buildAccointingCsvStrategy(now),
             buildCelsiusCsvStrategy(now),
-            buildFreetradeIsaCsvStrategy(now),
-            buildFreetradeGiaCsvStrategy(now),
+            buildFreetradeCsvStrategy(now),
             buildBybitSpotCsvStrategy(now),
             buildBybitFundingCsvStrategy(now),
             buildBybitUnifiedCsvStrategy(now),
@@ -2981,6 +2980,12 @@ object BuiltInCsvStrategies {
     private const val FREETRADE_TRADE_ASSET_COLUMN = "Trade Asset"
     private const val FREETRADE_TRADE_AMOUNT_COLUMN = "Trade Amount"
 
+    // Set by the rules from the file name: the account every row of the file belongs to.
+    private const val FREETRADE_ACCOUNT_COLUMN = "Account"
+
+    /** The account type [accountTypes] (a regex alternative) as a word of a file name: `visa.csv` isn't an ISA. */
+    private fun freetradeAccountTypePattern(accountTypes: String): String = "(^|[^a-z])($accountTypes)([^a-z]|$)"
+
     private val freetradeColumns =
         setOf(
             FREETRADE_TITLE_COLUMN,
@@ -3029,15 +3034,9 @@ object BuiltInCsvStrategies {
             "Stock Split Fractional Payout Cash Received Currency",
         )
 
-    fun buildFreetradeIsaCsvStrategy(now: Instant): CsvImportStrategy =
-        buildFreetradeCsvStrategy(freetradeIsaCsvStrategyId, FREETRADE_ISA_ACCOUNT, "ISA", now)
-
-    fun buildFreetradeGiaCsvStrategy(now: Instant): CsvImportStrategy =
-        buildFreetradeCsvStrategy(freetradeGiaCsvStrategyId, FREETRADE_GIA_ACCOUNT, "GIA", now)
-
     /**
      * Freetrade's activity export (`freetrade_ISA_all_activity_…csv`). Each account type exports its own file with the
-     * same columns and nothing inside says which it is, so the file name picks the strategy and with it the account.
+     * same columns and nothing inside says which it is, so the rules read the account from the file name.
      *
      * Every amount is positive, so `Type` and `Buy / Sell` give the direction. A row of a type this doesn't know names
      * no counterparty, so it fails visibly instead of leaving a balance silently wrong. An order's total already
@@ -3045,19 +3044,14 @@ object BuiltInCsvStrategies {
      * Shares are assets named by their ticker, created on demand. A free share is paid for by
      * [FREETRADE_FREE_SHARES_ACCOUNT], as it costs the account's cash nothing.
      */
-    private fun buildFreetradeCsvStrategy(
-        id: Uuid,
-        account: String,
-        accountType: String,
-        now: Instant,
-    ): CsvImportStrategy =
+    fun buildFreetradeCsvStrategy(now: Instant): CsvImportStrategy =
         CsvImportStrategy(
-            id = CsvImportStrategyId(id),
-            name = account,
+            id = CsvImportStrategyId(freetradeCsvStrategyId),
+            name = "Freetrade",
             config =
                 CsvStrategyConfig(
                     identificationColumns = freetradeColumns,
-                    fileNamePattern = "(^|[^a-z])$accountType([^a-z]|$)",
+                    fileNamePattern = freetradeAccountTypePattern("ISA|GIA"),
                     // Timestamps are to the millisecond, and two top-ups of one amount in a week are two top-ups.
                     duplicateDateTolerance = SettlementWindow.Elapsed(0),
                     crossSourceReconcileWindow = SettlementWindow.Elapsed(FREETRADE_RECONCILE_WINDOW_SECONDS),
@@ -3109,6 +3103,16 @@ object BuiltInCsvStrategies {
                                 conditions = listOf(Condition(FREETRADE_TYPE_COLUMN, ConditionOp.EQUALS, "MONTHLY_STATEMENT")),
                                 name = "A statement moves no money",
                             ),
+                            rule(
+                                RuleAction.SetValue(FREETRADE_ACCOUNT_COLUMN, RuleValue.constant(FREETRADE_ISA_ACCOUNT)),
+                                conditions = listOf(Condition(FILE_NAME_COLUMN, ConditionOp.MATCHES, freetradeAccountTypePattern("ISA"))),
+                                name = "An ISA export is the ISA account",
+                            ),
+                            rule(
+                                RuleAction.SetValue(FREETRADE_ACCOUNT_COLUMN, RuleValue.constant(FREETRADE_GIA_ACCOUNT)),
+                                conditions = listOf(Condition(FILE_NAME_COLUMN, ConditionOp.MATCHES, freetradeAccountTypePattern("GIA"))),
+                                name = "A GIA export is the GIA account",
+                            ),
                             attribute(FREETRADE_TYPE_COLUMN, "freetrade-type"),
                             attribute(FREETRADE_ORDER_ID_COLUMN, "freetrade-order-id"),
                             attribute(FREETRADE_TICKER_COLUMN, "freetrade-ticker"),
@@ -3134,11 +3138,15 @@ object BuiltInCsvStrategies {
                             accounts(
                                 AccountSide.SOURCE,
                                 naming(FREETRADE_TYPE_COLUMN, pattern = "^FREESHARE_ORDER$", name = FREETRADE_FREE_SHARES_ACCOUNT),
-                                fixedNaming(FREETRADE_TYPE_COLUMN, account),
+                                naming(FREETRADE_ACCOUNT_COLUMN),
                             ),
                             accounts(
                                 AccountSide.TARGET,
-                                naming(FREETRADE_TYPE_COLUMN, pattern = "^(ORDER|FREESHARE_ORDER)$", name = account),
+                                naming(FREETRADE_ACCOUNT_COLUMN),
+                                conditions = listOf(Condition(FREETRADE_TYPE_COLUMN, ConditionOp.IN, "ORDER,FREESHARE_ORDER")),
+                            ),
+                            accounts(
+                                AccountSide.TARGET,
                                 // The export never says which bank the money came from or went to.
                                 naming(FREETRADE_TYPE_COLUMN, pattern = "^TOP_UP$", name = FREETRADE_TOP_UPS_ACCOUNT, unidentified = true),
                                 naming(

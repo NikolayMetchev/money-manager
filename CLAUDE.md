@@ -484,6 +484,8 @@ guessed ones, in either import order, so a conduit always nets to zero.
 use genuinely different assignment rules, and `app/reconciliation`'s `LegMatcher` is a read-only report.
 Merging any of them would change built-in outcomes.
 
+**The file name is a column:** rules read `FILE_NAME_COLUMN` (`(file name)`) like any other, on every row of every staged file, for what only the name says. Freetrade's ISA and GIA exports have one set of columns, so one strategy picks the account with a `SetValue` per account type. `fileNamePattern` still selects the strategy.
+
 **One strategy covers every version of an export:** `CsvStrategyConfig.optionalColumns` lists columns a later export
 added. A file matches when it has every identification column and no column outside identification + optional
 (`CsvImportStrategy.matchesColumns`), so an old and a new export select the same strategy rather than a copy of it. A

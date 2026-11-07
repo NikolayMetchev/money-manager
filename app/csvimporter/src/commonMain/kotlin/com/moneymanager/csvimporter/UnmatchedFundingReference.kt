@@ -59,7 +59,7 @@ suspend fun findUnmatchedFundingReferences(
         val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: listedImport
         // The value is read as the rules leave the row, because a rule may set the column from whichever one the file has.
         val columnIndex = columnIndexWithRuleColumns(csvImport.columns, strategy.config)
-        val values = fundingColumnValues(csvImportRepository, csvImport.id, strategy, columnIndex, fundingMatch.column)
+        val values = fundingColumnValues(csvImportRepository, csvImport, strategy, columnIndex, fundingMatch.column)
         for (value in values) {
             val entry = occurrences.getOrPut(Key(fundingMatch.attributeTypeName, value)) { Occurrences() }
             entry.rows++
@@ -81,10 +81,10 @@ suspend fun findUnmatchedFundingReferences(
     }
 }
 
-/** The non-blank, trimmed values of [column] across every staged row of [importId], once [strategy]'s rules have run. */
+/** The non-blank, trimmed values of [column] across every staged row of [csvImport], once [strategy]'s rules have run. */
 private suspend fun fundingColumnValues(
     csvImportRepository: CsvImportReadRepository,
-    importId: CsvImportId,
+    csvImport: CsvImport,
     strategy: CsvImportStrategy,
     columnIndex: Map<String, Int>,
     column: String,
@@ -93,11 +93,13 @@ private suspend fun fundingColumnValues(
     val values = mutableListOf<String>()
     var offset = 0
     do {
-        val page = csvImportRepository.getImportRows(importId, limit = FUNDING_SCAN_PAGE_SIZE, offset = offset)
+        val page = csvImportRepository.getImportRows(csvImport.id, limit = FUNDING_SCAN_PAGE_SIZE, offset = offset)
         page.mapNotNullTo(values) { row ->
             engine
-                .evaluate(strategy.config.rules, ColumnRecord(row.values, columnIndex))
-                .record
+                .evaluate(
+                    strategy.config.rules,
+                    ColumnRecord(row.values.withFileName(columnIndex, csvImport.originalFileName), columnIndex),
+                ).record
                 .text(column)
                 ?.trim()
                 ?.takeIf { it.isNotEmpty() }

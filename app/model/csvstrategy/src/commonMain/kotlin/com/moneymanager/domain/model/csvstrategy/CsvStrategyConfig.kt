@@ -16,6 +16,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
+ * The column every record has, holding the name of the file it came from: rules read it like any other, so one strategy
+ * can tell apart exports that differ only by name. Bracketed, as no export is likely to have a column called this; one
+ * that does keeps its own.
+ */
+const val FILE_NAME_COLUMN: String = "(file name)"
+
+/**
  * Everything a CSV import strategy configures — the one declaration of its fields, persisted whole as
  * `csv_import_strategy.config_json` and embedded in the portable export. Generic over the
  * field-mapping type [M] because field mappings are the only part that references database entities:

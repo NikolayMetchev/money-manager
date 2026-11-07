@@ -275,6 +275,61 @@ class FreetradeCsvE2ETest : DbTest() {
         }
 
     @Test
+    fun `the one strategy keeps each export on its own account`() =
+        runDbTest {
+            val isa = stage(listOf(topUp))
+            val gia =
+                stage(
+                    listOf(cash("Top up", "TOP_UP", "2026-03-05T10:00:00.000Z", "50.00")),
+                    fileName = "freetrade_GIA_all_activity_max_07-11-2026.csv",
+                )
+            val result = apply(listOf(isa, gia))
+
+            assertEquals(2, result.filesImported)
+            assertEquals(mapOf("GBP" to "1000"), balances("Freetrade ISA"))
+            assertEquals(mapOf("GBP" to "50"), balances("Freetrade GIA"))
+        }
+
+    @Test
+    fun `a purchase on a GIA export is a trade within the GIA account`() =
+        runDbTest {
+            apply(listOf(stage(listOf(topUp, buy), fileName = "freetrade_GIA_all_activity_max_07-11-2026.csv")))
+
+            assertEquals(mapOf("GBP" to "1.36", "EXFD" to "202"), balances("Freetrade GIA"))
+        }
+
+    @Test
+    fun `the strategy applied by hand to a file naming no account type errors rather than guessing`() =
+        runDbTest {
+            val import = stage(listOf(topUp), fileName = "activity.csv")
+            applyStagedCsv(
+                csvImport = import,
+                strategy =
+                    repositories.csvImportStrategyRepository
+                        .getAllStrategies()
+                        .first()
+                        .single { it.name == "Freetrade" },
+                sourceAccountOverride = null,
+                currencies = repositories.currencyRepository.getAllCurrencies().first(),
+                accountMappingRepository = repositories.accountMappingRepository,
+                accountRepository = repositories.accountRepository,
+                csvImportRepository = repositories.csvImportRepository,
+                maintenance = maintenance,
+                importEngine = repositories.importEngine,
+                refreshViews = false,
+                cryptoRepository = repositories.cryptoRepository,
+            )
+
+            val status =
+                repositories.csvImportRepository
+                    .getImportRows(import.id, limit = 10, offset = 0)
+                    .single()
+                    .importStatus
+            assertEquals(ImportStatus.ERROR, status)
+            assertEquals(emptyList(), transfers())
+        }
+
+    @Test
     fun `an export of nothing but statements imports without error`() =
         runDbTest {
             val result = apply(listOf(stage(listOf(statement), fileName = "freetrade_GIA_all_activity_max_07-11-2026.csv")))

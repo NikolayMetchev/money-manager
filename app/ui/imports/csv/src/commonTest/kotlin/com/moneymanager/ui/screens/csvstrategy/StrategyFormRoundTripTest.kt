@@ -339,7 +339,7 @@ class StrategyFormRoundTripTest {
 
     @Test
     fun `the built-in Freetrade strategy survives a no-op save`() {
-        val freetrade = BuiltInCsvStrategies.buildFreetradeIsaCsvStrategy(timestamp)
+        val freetrade = BuiltInCsvStrategies.buildFreetradeCsvStrategy(timestamp)
 
         val state = CsvStrategyEditorState(freetrade, freetrade.config.identificationColumns)
         val rebuilt = buildStrategyFromEditorState(state, freetrade.id, freetrade.createdAt, freetrade.updatedAt)

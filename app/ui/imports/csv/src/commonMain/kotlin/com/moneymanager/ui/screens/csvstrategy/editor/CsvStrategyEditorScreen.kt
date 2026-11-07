@@ -33,6 +33,7 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.PdfTextLine
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.FILE_NAME_COLUMN
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.Condition
@@ -181,10 +182,11 @@ fun CsvStrategyEditorScreen(
                         .orEmpty(),
                 )?.columns ?: importColumns
         }
-    // The columns the strategy's rules set count too: a file without them still has them once the rules have run.
+    // The columns the strategy's rules set count too, a file without them still has them once the rules have run, and
+    // every record has its file name.
     val availableColumnNames =
         remember(initialColumns, existingStrategy) {
-            initialColumns.map { it.originalName }.toSet() + existingStrategy?.config?.ruleColumns().orEmpty()
+            initialColumns.map { it.originalName }.toSet() + FILE_NAME_COLUMN + existingStrategy?.config?.ruleColumns().orEmpty()
         }
     val editKey = strategyId?.toString() ?: "create:${csvImportId?.toString() ?: "external"}"
     val state = rememberCsvStrategyEditorState(editKey, existingStrategy, availableColumnNames, pdf = previewer != null)
