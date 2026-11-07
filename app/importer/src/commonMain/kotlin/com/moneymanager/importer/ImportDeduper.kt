@@ -353,6 +353,21 @@ class ImportDeduper(
     private val consumedReconcileIds = mutableSetOf<TransferId>()
 
     /**
+     * Who claimed each leg in [consumedReconcileIds] through [sameAccounts]: the claiming row's own identity (its
+     * api id or unique key). Another row with that identity is the same movement again, so it may share the leg.
+     */
+    private val sameAccountsClaimants = mutableMapOf<TransferId, Any>()
+
+    /** The batch row [classify] is on, so [sameAccounts] can leave a leg to a later row nearer to it. */
+    private var classifyingIndex = 0
+
+    /**
+     * The batch's counted rows with an identity, by (from, to, amount): the rows [sameAccounts] lets claim a leg,
+     * each with its index and time.
+     */
+    private var claimingRows: Map<DirectedAmountKey, List<IndexedValue<ImportTransfer>>> = emptyMap()
+
+    /**
      * Existing legs an earlier row of this batch already matched (exactly or fuzzily). A persisted leg
      * records ONE movement, so it can be the twin of at most one incoming row: without this, an export
      * that gives every deposit the same description ("GBP Deposit (via FPS)") loses a genuine second
@@ -362,7 +377,21 @@ class ImportDeduper(
     private val matchedExistingIds = mutableSetOf<TransferId>()
 
     fun classify(transfers: List<ImportTransfer>): List<Classified> {
-        val classified = transfers.mapIndexed { index, transfer -> classifyOne(index, transfer) }.toMutableList()
+        claimingRows =
+            policy
+                .reconciledExclusionTypeId()
+                ?.let { exclusionTypeId ->
+                    transfers
+                        .withIndex()
+                        .filter { (_, t) -> t.identity() != null && t.timestamp != null && !t.isExcluded(exclusionTypeId) }
+                        .groupBy { (_, t) -> DirectedAmountKey(t.fromAccount.requireId(), t.toAccount.requireId(), t.amount) }
+                }.orEmpty()
+        val classified =
+            transfers
+                .mapIndexed { index, transfer ->
+                    classifyingIndex = index
+                    classifyOne(index, transfer)
+                }.toMutableList()
         reconcileSplitConduitMovements(classified)
         return classified
     }
@@ -902,7 +931,10 @@ class ImportDeduper(
         // An incoming leg the source itself excluded records nothing, so it supersedes nothing either.
         val found = if (transfer.isExcluded(exclusionTypeId)) matched.copy(supersedes = emptyList()) else matched
         // Nor does it claim the leg: a later counted record of the same movement must still find it.
-        if (!transfer.isExcluded(exclusionTypeId)) consumedReconcileIds += found.claims
+        if (!transfer.isExcluded(exclusionTypeId)) {
+            consumedReconcileIds += found.claims
+            transfer.identity()?.let { identity -> found.claims.forEach { sameAccountsClaimants[it] = identity } }
+        }
         pairedInBatch += found.id
         supersede(found.supersedes)
         // Superseded legs are linked too, so the exclusion they take on stays explained — and is lifted by
@@ -946,9 +978,11 @@ class ImportDeduper(
     }
 
     /**
-     * The same movement between the same two accounts, from a different source, within the window. Matches
-     * are not claimed, so two identical incoming rows within the window both link to the same existing
-     * transfer — balances stay correct, as both are excluded.
+     * The same movement between the same two accounts, from a different source, within the window. A row with
+     * its own identity (an api id or a unique key) is one movement, so it claims the nearest leg that no other
+     * identity claimed: two withdrawals of £1,000 a day apart, against a feed that records only one, must not
+     * both be excused by it. A row without one is matched as before, unclaimed, so two identical incoming rows
+     * within the window both link to the same existing transfer — balances stay correct, as both are excluded.
      *
      * An existing leg that is itself already excluded is never matched: it represents no counted movement,
      * so excluding this row against it would count the movement zero times (a third export of the same
@@ -957,10 +991,27 @@ class ImportDeduper(
     private val sameAccounts =
         ReconcileRule(Keeps.EXISTING) { transfer, window ->
             val key = DirectedAmountKey(transfer.fromAccount.requireId(), transfer.toAccount.requireId(), transfer.amount)
-            reconcileCandidatesByDirectedAmount[key]
-                ?.firstOrNull { (id, existing) -> standsForCountedMovement(id) && reconcileMatches(transfer, existing, window) }
-                ?.let { (id, existing) -> Found(id, existing, claims = emptyList()) }
+            val candidates =
+                reconcileCandidatesByDirectedAmount[key]
+                    ?.filter { (id, existing) -> standsForCountedMovement(id) && reconcileMatches(transfer, existing, window) }
+                    .orEmpty()
+            val identity = transfer.identity()
+            val timestamp = transfer.timestamp
+            if (identity == null || timestamp == null) {
+                return@ReconcileRule candidates.firstOrNull()?.let { (id, existing) -> Found(id, existing, claims = emptyList()) }
+            }
+            val laterRows = claimingRows[key].orEmpty().filter { (index, row) -> index > classifyingIndex && row.identity() != identity }
+            candidates
+                .filter { (id, existing) ->
+                    val distance = (timestamp - existing.timestamp).absoluteValue
+                    (id !in consumedReconcileIds || sameAccountsClaimants[id] == identity) &&
+                        laterRows.none { (_, row) -> (requireNotNull(row.timestamp) - existing.timestamp).absoluteValue < distance }
+                }.minByOrNull { (_, existing) -> (timestamp - existing.timestamp).absoluteValue }
+                ?.let { (id, existing) -> Found(id, existing, claims = listOf(id)) }
         }
+
+    /** What identifies [this] row as one movement, or null when nothing does. */
+    private fun ImportTransfer.identity(): Any? = apiId ?: uniqueKey?.takeIf { it.isNotEmpty() }
 
     /**
      * Whether pairing with existing leg [id] still leaves its movement counted once: it is counted, or it was
@@ -1642,5 +1693,14 @@ internal fun DedupePolicy.placeholderExclusionTypeId(): AttributeTypeId? =
         is DedupePolicy.FuzzyAllFields -> reconciledExclusionAttributeTypeId.takeIf { unidentifiedCounterpartyAttributeTypeId != null }
         is DedupePolicy.ApiMultiKey -> reconciledExclusionAttributeTypeId.takeIf { unidentifiedCounterpartyAttributeTypeId != null }
         is DedupePolicy.UniqueIdentifier -> reconciledExclusionAttributeTypeId.takeIf { unidentifiedCounterpartyAttributeTypeId != null }
+        DedupePolicy.None -> null
+    }
+
+/** The exclusion attribute a policy's reconciles write, or null when it reconciles nothing. */
+private fun DedupePolicy.reconciledExclusionTypeId(): AttributeTypeId? =
+    when (this) {
+        is DedupePolicy.FuzzyAllFields -> reconciledExclusionAttributeTypeId
+        is DedupePolicy.ApiMultiKey -> reconciledExclusionAttributeTypeId
+        is DedupePolicy.UniqueIdentifier -> reconciledExclusionAttributeTypeId
         DedupePolicy.None -> null
     }

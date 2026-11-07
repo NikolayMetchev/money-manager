@@ -205,6 +205,52 @@ class ImportDeduperTest {
         assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
     }
 
+    private val dayWindowUniqueIdPolicy =
+        DedupePolicy.UniqueIdentifier(
+            reconcileWindow = SettlementWindow.Elapsed(2 * 86_400L),
+            reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
+            reconciledRelationshipTypeId = RelationshipTypeId(1),
+        )
+
+    /**
+     * Two withdrawals of one amount a day apart, against another source's one record of the second: a savings
+     * statement whose first withdrawal bounced back. The record excuses only the row nearest it, whichever
+     * comes first in the batch, so the bounced withdrawal stays counted against its own return.
+     */
+    private fun assertOneRecordExcusesOnlyItsNearestRow(rowsNewestFirst: Boolean) {
+        val bounced = importTransfer(0, uniqueKey = mapOf("txid" to "bounced"), timestamp = baseTime - 1.days)
+        val paid = importTransfer(1, uniqueKey = mapOf("txid" to "paid"), timestamp = baseTime)
+        val rows = if (rowsNewestFirst) listOf(paid, bounced) else listOf(bounced, paid)
+        val deduper = ImportDeduper(dayWindowUniqueIdPolicy, existing = listOf(existing(9, timestamp = baseTime + 1.hours)))
+        val result = deduper.classify(rows).associateBy { it.transfer.uniqueKey?.getValue("txid") }
+        assertEquals(
+            listOf(TransferId(9)),
+            result
+                .getValue("paid")
+                .transfer.relationships
+                .map { it.relatedTransferId },
+        )
+        assertTrue(
+            result
+                .getValue("paid")
+                .transfer.attributes
+                .any { it.typeId == AttributeTypeId(-1) },
+        )
+        assertEquals(emptyList(), result.getValue("bounced").transfer.relationships)
+        assertTrue(
+            result
+                .getValue("bounced")
+                .transfer.attributes
+                .none { it.typeId == AttributeTypeId(-1) },
+        )
+    }
+
+    @Test
+    fun uniqueId_oneRecordExcusesOnlyItsNearestRow_oldestFirst() = assertOneRecordExcusesOnlyItsNearestRow(rowsNewestFirst = false)
+
+    @Test
+    fun uniqueId_oneRecordExcusesOnlyItsNearestRow_newestFirst() = assertOneRecordExcusesOnlyItsNearestRow(rowsNewestFirst = true)
+
     @Test
     fun uniqueId_inBatchDuplicateStaysDuplicateEvenWhenItAlsoMatchesAReconcileCandidate() {
         // A literal repeat of the same unique key within one batch must stay a plain in-batch DUPLICATE,
