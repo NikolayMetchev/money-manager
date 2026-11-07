@@ -517,7 +517,9 @@ source** (built-ins: Koinly, Accointing). Its data never touches real accounts:
   lists the rest as "needs attention" (link to an existing account or create one).
 - `reconcile()` (`app/reconciliation`) matches legs per link group on (asset, signed amount): exact
   second, then nearest within 24h, then summed per (group, asset, second) so a fee booked separately on
-  one side still matches the other side's gross leg. A match a person makes is stored first: a
+  one side still matches the other side's gross leg. Whatever is left is compared at the decimals both sides keep of that
+  asset (the most any leg shows), nearest within 24h: a source stops short of the 18 places a real leg can hold, truncating some assets and
+  rounding others, so the longer amount matches if cut or rounded to the shorter one. Below 4 places nothing is compared. A match a person makes is stored first: a
   `reconciliation-match` relationship (type 6, members of any transaction kind, written by `Source.Manual`), which
   `reconcile()` honours before computing anything (`LegMatch.matchId`), whatever its amounts and times. A transaction is in at most one match (a trigger enforces it, and `insertRelationship` merges an overlapping new match with the stored ones into one relationship), so a trade matched to two real rows is one relationship over all three. A transfer between two linked wallets is in the one relationship of both wallets' matches.
 - The External Account Reconciliation screen has two tabs. **Unmatched**: near matches (**Accept** stores one),
