@@ -433,4 +433,141 @@ class LegMatcherTest {
         assertEquals(listOf(ada("7"), ada("8")), result.unclaimedReal.map { it.leg.amount })
         assertEquals(listOf(ada("7")), result.missingInSource.map { it.leg.amount })
     }
+
+    /** A leg showing six places, which is how a source says it keeps that many. */
+    private fun sixPlaces(at: Instant) = leg(wallet, sourceRewards, "7.000001", at)
+
+    /** A leg showing all 18 places, so the real side keeps more than the source. */
+    private fun fullPrecision(at: Instant) = leg(binance, stakingRewards, "9.000000000000000001", at)
+
+    @Test
+    fun `a truncated source amount matches the full real amount and agrees to the second`() {
+        val truncated = leg(wallet, sourceRewards, "0.012345", t0)
+        val full = leg(binance, stakingRewards, "0.012345887766554433", t0)
+
+        val result = reconcile(listOf(truncated, sixPlaces(t0)), links, listOf(full, fullPrecision(t0)))
+
+        assertEquals(listOf(truncated to full), result.matched.map { it.sourceLeg to it.realLeg })
+    }
+
+    @Test
+    fun `a truncated real amount matches the full source amount`() {
+        val full = leg(wallet, sourceRewards, "0.012345887766554433", t0)
+        val truncated = leg(binance, stakingRewards, "0.012345", t0)
+
+        val result = reconcile(listOf(full), links, listOf(truncated, leg(binance, stakingRewards, "8.000002", t0)))
+
+        assertEquals(listOf(full to truncated), result.matched.map { it.sourceLeg to it.realLeg })
+    }
+
+    @Test
+    fun `outgoing amounts cut the same way and a different direction never matches`() {
+        val out = leg(wallet, sourceRewards, "-0.012345", t0)
+        val incoming = leg(binance, stakingRewards, "0.012345887766554433", t0)
+        val outgoing = leg(binance, stakingRewards, "-0.012345887766554433", t0 + 1.hours)
+
+        val result = reconcile(listOf(out, sixPlaces(t0)), links, listOf(incoming, outgoing, fullPrecision(t0)))
+
+        assertEquals(listOf(out to outgoing), result.matches.map { it.sourceLeg to it.realLeg })
+    }
+
+    @Test
+    fun `a round amount from a source keeping six places is not a prefix of a longer one`() {
+        val round = leg(wallet, sourceRewards, "0.5", t0)
+        val longer = leg(binance, stakingRewards, "0.532", t0)
+
+        val result = reconcile(listOf(round, sixPlaces(t0)), links, listOf(longer, fullPrecision(t0)))
+
+        assertEquals(emptyList(), result.matches)
+    }
+
+    @Test
+    fun `a wallet with only a few round legs is never cut`() {
+        val source = listOf(leg(wallet, sourceRewards, "0.532", t0))
+        val real = listOf(leg(binance, stakingRewards, "0.532887766554433221", t0), fullPrecision(t0))
+
+        assertEquals(emptyList(), reconcile(source, links, real).matches)
+    }
+
+    @Test
+    fun `an amount the source rounded up matches the full real amount`() {
+        val rounded = leg(wallet, sourceRewards, "0.012346", t0)
+        val full = leg(binance, stakingRewards, "0.012345887766554433", t0)
+
+        val result = reconcile(listOf(rounded, sixPlaces(t0)), links, listOf(full, fullPrecision(t0)))
+
+        assertEquals(listOf(rounded to full), result.matches.map { it.sourceLeg to it.realLeg })
+    }
+
+    @Test
+    fun `an amount a whole last place away does not match`() {
+        val source = leg(wallet, sourceRewards, "0.012347", t0)
+        val full = leg(binance, stakingRewards, "0.012345887766554433", t0)
+
+        val result = reconcile(listOf(source, sixPlaces(t0)), links, listOf(full, fullPrecision(t0)))
+
+        assertEquals(emptyList(), result.matches)
+    }
+
+    @Test
+    fun `rounding carries into the whole number`() {
+        val source = leg(wallet, sourceRewards, "1", t0)
+        val full = leg(binance, stakingRewards, "0.999999887766554433", t0)
+
+        val result = reconcile(listOf(source, sixPlaces(t0)), links, listOf(full, fullPrecision(t0)))
+
+        assertEquals(listOf(source to full), result.matches.map { it.sourceLeg to it.realLeg })
+    }
+
+    @Test
+    fun `dust that shortens to nothing does not match`() {
+        val source = leg(wallet, sourceRewards, "0", t0)
+        val dust = leg(binance, stakingRewards, "0.0000001", t0 + 1.minutes)
+
+        val result = reconcile(listOf(source, sixPlaces(t0)), links, listOf(dust, fullPrecision(t0)))
+
+        assertEquals(emptyList(), result.matches)
+    }
+
+    @Test
+    fun `the decimals kept are per asset`() {
+        val longAda = leg(wallet, sourceRewards, "1.0000000001", t0)
+        val truncated = leg(wallet, sourceRewards, "0.012345", t0, asset = spam)
+        val other = leg(wallet, sourceRewards, "7.000001", t0, asset = spam)
+        val full = leg(binance, stakingRewards, "0.012345887766554433", t0, asset = spam)
+        val fullOther = leg(binance, stakingRewards, "9.000000000000000001", t0, asset = spam)
+
+        val result = reconcile(listOf(longAda, truncated, other), links, listOf(full, fullOther))
+
+        assertEquals(listOf(truncated to full), result.matches.map { it.sourceLeg to it.realLeg })
+    }
+
+    @Test
+    fun `an exact partner wins over a nearer cut one`() {
+        val truncated = leg(wallet, sourceRewards, "0.012345", t0)
+        val exact = leg(binance, stakingRewards, "0.012345", t0 + 2.hours)
+        val full = leg(binance, stakingRewards, "0.012345887766554433", t0)
+
+        val result = reconcile(listOf(truncated, sixPlaces(t0)), links, listOf(exact, full, fullPrecision(t0)))
+
+        assertEquals(listOf(truncated to exact), result.matches.map { it.sourceLeg to it.realLeg })
+    }
+
+    @Test
+    fun `cut amounts pair nearest first within the window and each leg once`() {
+        val first = leg(wallet, sourceRewards, "0.012345", t0)
+        val second = leg(wallet, sourceRewards, "0.012345", t0 + 3.hours)
+        val nearSecond = leg(binance, stakingRewards, "0.012345887766554433", t0 + 3.hours + 1.minutes)
+        val nearFirst = leg(binance, stakingRewards, "0.012345887766554433", t0 + 1.minutes)
+        val tooFar = leg(binance, stakingRewards, "0.012345887766554433", t0 + 30.hours)
+
+        val result =
+            reconcile(listOf(first, second, sixPlaces(t0)), links, listOf(nearSecond, nearFirst, tooFar, fullPrecision(t0)))
+
+        assertEquals(
+            listOf(first to nearFirst, second to nearSecond),
+            result.nearMatches.map { it.sourceLeg to it.realLeg },
+        )
+        assertEquals(1, result.unclaimedReal.count { it.leg == tooFar })
+    }
 }

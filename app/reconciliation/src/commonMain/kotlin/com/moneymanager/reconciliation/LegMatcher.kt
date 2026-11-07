@@ -3,6 +3,7 @@ package com.moneymanager.reconciliation
 import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AssetId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.reconciliation.ReconciliationLink
@@ -91,6 +92,12 @@ val DEFAULT_FUZZY_WINDOW: Duration = 24.hours
  */
 val DEFAULT_SPLIT_WINDOW: Duration = 15.minutes
 
+/**
+ * The fewest decimal places two legs may be compared at. Below this a shared prefix says nothing about a movement, and
+ * an asset seen in only a few round legs would seem to be kept that short.
+ */
+private const val MIN_SHORTENED_DECIMALS = 4
+
 /** The most search steps spent on one source leg; there is no limit on how many legs it may be split into. */
 private const val MAX_SPLIT_STEPS = 200_000
 
@@ -103,6 +110,7 @@ private val STEPS =
         "Summing the legs of each movement",
         "Summing legs split across transactions",
         "Summing the fees of matched trades",
+        "Matching amounts at fewer decimals",
         "Collecting what is left",
     )
 
@@ -119,7 +127,8 @@ private val STEPS =
  * [fuzzyWindow]; each leg is used once, so repeated identical movements pair up one-to-one. A final pass
  * sums the leftover legs of each movement (see [ReconciliationLeg.movementKey]) per group and asset — how
  * a trade or withdrawal whose fee one side books separately and the other folds into the gross amount
- * still reconciles.
+ * still reconciles. What is left is then compared at the decimals both sides keep of the asset, so a source that
+ * truncates or rounds its amounts still pairs with the full ones (see [decimalsKept] and [shortenedTo]).
  *
  * Out of scope: legs on unlinked shadow accounts (counterparties, fees, wallets still to be linked), real
  * legs outside the source's date range, excluded legs on either side (already-reconciled duplicates,
@@ -349,6 +358,43 @@ fun reconcile(
         matches += LegMatch(bundle.legs, real.legs)
     }
 
+    nextStep()
+    // Pass 6: what no exact pass could pair, compared at the decimals both sides keep of that asset, nearest first.
+    // Koinly and Accointing stop short of the 18 places a real leg can hold, so they never equal it exactly.
+    val sourceDecimals = decimalsKept(inScopeSource) { groupOfSource(it.accountId)!! }
+    val realDecimals = decimalsKept(inScopeReal) { groupOfReal(it.accountId)!! }
+
+    fun shortenedKeys(
+        group: AccountId,
+        amount: Money,
+    ): List<ShortenedKey> {
+        val keptBySource = sourceDecimals[group to amount.asset.id] ?: return emptyList()
+        val keptByReal = realDecimals[group to amount.asset.id] ?: return emptyList()
+        val decimals = minOf(keptBySource, keptByReal).takeIf { it >= MIN_SHORTENED_DECIMALS } ?: return emptyList()
+        return amount.shortenedTo(decimals).map { ShortenedKey(group, amount.asset.id, it) }
+    }
+
+    val realByShortened =
+        inScopeReal
+            .filter { it !in consumed }
+            .flatMap { leg -> shortenedKeys(groupOfReal(leg.accountId)!!, leg.amount).map { it to leg } }
+            .groupBy({ it.first }, { it.second })
+    inScopeSource
+        .filter { it !in matchedSource }
+        .flatMap { leg ->
+            shortenedKeys(groupOfSource(leg.accountId)!!, leg.amount)
+                .flatMap { realByShortened[it].orEmpty() }
+                .filter { (it.timestamp - leg.timestamp).absoluteValue <= fuzzyWindow }
+                .map { Triple(leg, it, (it.timestamp - leg.timestamp).absoluteValue) }
+        }.sortedBy { it.third }
+        .forEach { (leg, real, _) ->
+            if (leg !in matchedSource && real !in consumed) {
+                consumed += real
+                matchedSource += leg
+                matches += LegMatch(leg, real)
+            }
+        }
+
     step = STEPS.size
     report()
 
@@ -461,6 +507,53 @@ private fun findSplit(
         return search(from + 1, remaining)
     }
     return if (search(0, goal)) chosen.toList() else null
+}
+
+private data class ShortenedKey(
+    val group: AccountId,
+    val assetId: AssetId,
+    val signedAmount: BigInteger,
+)
+
+/**
+ * The most decimal places any leg of each group and asset shows: what that side keeps of the asset, rather than what
+ * one leg happens to need. A source writing six places means 0.5 as 0.500000, which must not match a real 0.532 at one
+ * place. It is per asset because one source keeps different assets differently.
+ */
+private fun decimalsKept(
+    legs: List<ReconciliationLeg>,
+    groupOf: (ReconciliationLeg) -> AccountId,
+): Map<Pair<AccountId, AssetId>, Int> =
+    legs
+        .groupBy { groupOf(it) to it.amount.asset.id }
+        .mapValues { (_, groupLegs) -> groupLegs.maxOf { it.amount.decimalsShown() } }
+
+/** Stored amounts are in units of one over the asset's scale factor, a power of ten, so decimal places are digits to count. */
+private fun Money.scaleDigits(): Int = asset.scaleFactor.toString().length - 1
+
+private fun Money.decimalsShown(): Int {
+    val digits = amount.abs().toString()
+    return if (amount.sign() == 0) 0 else (scaleDigits() - (digits.length - digits.trimEnd('0').length)).coerceAtLeast(0)
+}
+
+/**
+ * The signed amount at [decimals] places, in units of the last one: both cut and rounded half up, as a source may do
+ * either. Empty when nothing is left of it.
+ */
+private fun Money.shortenedTo(decimals: Int): Set<BigInteger> {
+    val digits = amount.abs().toString()
+    val dropped = (scaleDigits() - decimals).coerceAtLeast(0)
+    val cut = BigInteger(digits.dropLast(dropped).ifEmpty { "0" })
+    val roundsUp =
+        digits
+            .takeLast(dropped)
+            .padStart(dropped, '0')
+            .firstOrNull()
+            ?.let { it >= '5' } == true
+    val rounded = if (roundsUp) cut + BigInteger(1L) else cut
+    return setOf(cut, rounded)
+        .filter { it.sign() != 0 }
+        .mapTo(mutableSetOf()) { if (amount.sign() < 0) -it else it }
 }
 
 private data class MatchKey(
