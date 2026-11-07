@@ -414,7 +414,7 @@ exchange pipelines read the same `RuleOutcome`, so an action means the same thin
 | `ExternalId` | the record's stable id (a `{path}` template joins several fields) | `idExtraction`, `compositeIdFields` |
 | `CounterpartyIsPerson`, `IgnoreCounterpartyId` | how the counterparty is identified | personal-beneficiary values, ephemeral id prefixes |
 | `Attribute` | tags the record (`uniqueIdentifier` identifies it across imports) | `AttributeColumnMapping`, `customFields`/`uniqueIdentifierFields` |
-| `Fee`, `Foreign` | a `FeeRule` / `ForeignAmount` the record reports | per-pipeline fee fields and their conditions, foreign-amount placement |
+| `Fee`, `Foreign` | a `FeeRule` / `ForeignAmount` the record reports; a fee is charged to the record's own account (on a CSV row, the `SOURCE` account before any flip, so a strategy whose deposits name the wallet as `TARGET` won't charge it) | per-pipeline fee fields and their conditions, foreign-amount placement |
 | `ThroughConduit` | the row `funder → payee` becomes `funder → conduit → payee` (Curve's own export) | `StrategyConduit` |
 | `TradeSide` | a trade or order buys or sells its base asset | `sideField`/`buyValues`/`fixedSideBuy` |
 | `Leg(group, role)` | the row is a debit/credit/by-sign leg of the named `LegGroupRule` | `legWhen`, `LegSide` |

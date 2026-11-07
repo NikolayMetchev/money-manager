@@ -2467,8 +2467,9 @@ object BuiltInCsvStrategies {
      *
      * One row per movement, typed by `Type`: a deposit fills only the To side, a withdrawal only the From
      * side, a transfer both (two of the user's wallets), a trade both with the same wallet and different
-     * assets. A preprocessing swap moves a deposit's amount/asset into the From columns so From always
-     * holds the primary leg; the To columns then only ever carry a trade's credited leg.
+     * assets. A preprocessing swap moves a deposit's amount/asset/wallet into the From columns so From always
+     * holds the primary leg and the row's own wallet; the To columns then only ever carry a trade's credited
+     * leg.
      */
     fun buildKoinlyCsvStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
@@ -2557,11 +2558,14 @@ object BuiltInCsvStrategies {
                             ),
                             // A row deleted in Koinly is kept but excluded, like a declined card payment.
                             excludeWhen("Deleted", "^true$", "deleted in Koinly"),
-                            // From always holds the primary leg: a deposit's amount and asset move there, so the To
-                            // columns only ever carry a trade's credited leg.
+                            // From always holds the primary leg and the row's own wallet: a deposit's amount, asset and
+                            // wallet move there, so the To columns only ever carry a trade's credited leg, and the flip
+                            // puts the money back into the wallet.
                             rule(
                                 RuleAction.SwapValues("From Amount", "To Amount"),
                                 RuleAction.SwapValues("From Currency", "To Currency"),
+                                RuleAction.SwapValues("From Wallet (read-only)", "To Wallet (read-only)"),
+                                RuleAction.Flip,
                                 conditions = listOf(Condition("Type", ConditionOp.EQUALS, value = "deposit")),
                             ),
                         ) + koinlySide(AccountSide.SOURCE, "From Wallet (read-only)") +
@@ -2637,22 +2641,31 @@ object BuiltInCsvStrategies {
     private const val ACCOINTING_PAIR_RELATIONSHIP = "transfer pair"
 
     /**
-     * The account candidates for one [side] of an Accointing row: the row's wallet, unless the row is a
-     * [counterpartyType] (a deposit's source, a withdrawal's target), whose other side the export doesn't name, so
-     * its classification ("income", "internal", …) does.
+     * The account candidates of an Accointing row: its source is always its wallet, and so is an order's target.
+     * The export doesn't name the other side of a deposit or a withdrawal, so its classification ("income",
+     * "internal", …) does.
      */
-    private fun accointingSide(
-        side: AccountSide,
-        counterpartyType: String,
-    ) = listOf(
-        accounts(
-            side,
-            naming("walletName", name = ACCOINTING_WALLET_PREFIX + AccountNaming.VALUE_PLACEHOLDER, trim = true),
-            conditions = listOf(Condition("type", ConditionOp.NOT_EQUALS, value = counterpartyType)),
-        ),
-        accounts(side, fixedNaming("type", "Accointing: External"), conditions = listOf(Condition("classification", ConditionOp.BLANK))),
-        accounts(side, naming("classification", pattern = "^(.+)$", name = "Accointing: $1")),
-    )
+    private fun accointingAccounts(): List<StrategyRule> {
+        val wallet = naming("walletName", name = ACCOINTING_WALLET_PREFIX + AccountNaming.VALUE_PLACEHOLDER, trim = true)
+        return listOf(
+            accounts(AccountSide.SOURCE, wallet),
+            accounts(
+                AccountSide.TARGET,
+                wallet,
+                conditions =
+                    listOf(
+                        Condition("type", ConditionOp.NOT_EQUALS, value = "deposit"),
+                        Condition("type", ConditionOp.NOT_EQUALS, value = "withdraw"),
+                    ),
+            ),
+            accounts(
+                AccountSide.TARGET,
+                fixedNaming("type", "Accointing: External"),
+                conditions = listOf(Condition("classification", ConditionOp.BLANK)),
+            ),
+            accounts(AccountSide.TARGET, naming("classification", pattern = "^(.+)$", name = "Accointing: $1")),
+        )
+    }
 
     /** An asset Accointing doesn't know has the ticker `???` and only a name of its own, so two of them stay apart. */
     private fun accointingNamedAsset(
@@ -2792,14 +2805,14 @@ object BuiltInCsvStrategies {
                             // A row ignored in Accointing is kept but excluded, like a row deleted in Koinly.
                             excludeWhen("classification", "^ignored$", "ignored in Accointing"),
                             // Sold always holds the primary leg: a deposit's amount and asset move there, so the bought
-                            // columns only ever carry an order's credited leg.
+                            // columns only ever carry an order's credited leg, and the flip puts the money into the wallet.
                             rule(
                                 RuleAction.SwapValues("soldQuantity", "boughtQuantity"),
                                 RuleAction.SwapValues("soldCurrency", "boughtCurrency"),
+                                RuleAction.Flip,
                                 conditions = listOf(Condition("type", ConditionOp.EQUALS, value = "deposit")),
                             ),
-                        ) + accointingSide(AccountSide.SOURCE, counterpartyType = "deposit") +
-                            accointingSide(AccountSide.TARGET, counterpartyType = "withdraw") +
+                        ) + accointingAccounts() +
                             fee(FeeRule(amount = ValueExpr(listOf("feeQuantity")), currency = ValueExpr(listOf("feeCurrency")))),
                     reconciliation = ReconciliationConfig(sourceName = "Accointing", linkableAccountPrefix = ACCOINTING_WALLET_PREFIX),
                 ),

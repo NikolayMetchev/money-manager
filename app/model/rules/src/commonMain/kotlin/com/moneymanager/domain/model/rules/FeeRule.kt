@@ -4,8 +4,9 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
 /**
- * A fee a row or item reports alongside its movement, booked as its own movement linked to it — the one
- * fee vocabulary for CSV amount mappings, API transactions and API trades.
+ * A fee a row or item reports alongside its movement, booked as its own movement linked to it and charged
+ * to the record's own account, whichever way the money moved — the one fee vocabulary for CSV amount
+ * mappings, API transactions and API trades.
  *
  * @property amount The fee's amount. Its sign is ignored except on an API transfer, where a negative fee
  *   is a refund of an earlier charge. Zero or blank means no fee.

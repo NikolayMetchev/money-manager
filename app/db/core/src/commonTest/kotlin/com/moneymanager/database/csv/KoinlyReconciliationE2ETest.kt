@@ -259,6 +259,30 @@ class KoinlyReconciliationE2ETest : DbTest() {
         }
 
     @Test
+    fun aDepositsFeeIsChargedToItsWallet() =
+        runDbTest {
+            val deposit =
+                row(
+                    "ID (read-only)" to "K9",
+                    "Date (UTC)" to "2021-06-23 10:02:14",
+                    "Type" to "deposit",
+                    "To Wallet (read-only)" to "Coinbase;coinbase",
+                    "To Amount" to "47.0",
+                    "To Currency" to "AMP;9984",
+                    "Fee Amount" to "0.5",
+                    "Fee Currency" to "BNB;1749",
+                )
+
+            applyAll(listOf(stage("transactions.csv", listOf(deposit))))
+
+            assertEquals("47", balanceOf("Koinly · Coinbase", "AMP"))
+            assertEquals("-47", balanceOf("Koinly: External", "AMP"))
+            assertEquals("-0.5", balanceOf("Koinly · Coinbase", "BNB"))
+            assertNull(balanceOf("Koinly: External", "BNB"))
+            assertEquals("0.5", balanceOf("Koinly Fees", "BNB"))
+        }
+
+    @Test
     fun `an export without Parent ID links no rows`() =
         runDbTest {
             applyAll(listOf(stage("transactions.csv", listOf(binanceReward, coinbaseDeposit, coinbaseTrade, walletTransfer, withdrawal))))

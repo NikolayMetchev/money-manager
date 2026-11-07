@@ -387,6 +387,34 @@ class AccointingReconciliationE2ETest : DbTest() {
         }
 
     @Test
+    fun `the fee on a deposit is charged to its wallet`() =
+        runDbTest {
+            val swapIn =
+                row(
+                    "timeExecuted" to "6/7/2021 10:00:00",
+                    "type" to "deposit",
+                    "boughtQuantity" to "2",
+                    "boughtCurrency" to "ETH",
+                    "feeQuantity" to "0.25",
+                    "feeCurrency" to "BTC",
+                    "classification" to "swap",
+                    "walletName" to "Binance",
+                    "id" to "9",
+                )
+
+            applyAll(listOf(stage("history.xlsx", listOf(swapIn))))
+
+            val all = transfers()
+            val deposit = all.byAmount("2")
+            assertEquals("Accointing: swap", accountName(deposit.sourceAccountId))
+            assertEquals("Accointing · Binance", accountName(deposit.targetAccountId))
+            val fee = all.byAmount("0.25")
+            assertEquals("BTC", fee.amount.asset.code)
+            assertEquals("Accointing · Binance", accountName(fee.sourceAccountId))
+            assertEquals("Accointing Fees", accountName(fee.targetAccountId))
+        }
+
+    @Test
     fun `an unknown fee asset takes its own name instead of the placeholder ticker`() =
         runDbTest {
             val unknownFee =

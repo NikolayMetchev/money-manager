@@ -1045,7 +1045,7 @@ class CsvTransferMapper(
     /**
      * The fee [fee] charges on this row: none when its conditions don't hold, it is charged on another
      * asset, or the amount is blank or zero. Its sign is ignored — a fee is a movement out of the
-     * transaction's source account. The fee is in [rowCurrency] unless the rule's currency reads a
+     * row's own account. The fee is in [rowCurrency] unless the rule's currency reads a
      * non-blank code of its own.
      */
     private fun chargedFee(
