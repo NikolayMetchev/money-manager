@@ -2641,15 +2641,14 @@ object BuiltInCsvStrategies {
     private const val ACCOINTING_PAIR_RELATIONSHIP = "transfer pair"
 
     /**
-     * The account candidates for one [side] of an Accointing row: the row's wallet, unless the row is a
-     * [counterpartyType] (a deposit's source, a withdrawal's target), whose other side the export doesn't name, so
-     * its classification ("income", "internal", …) does.
+     * The account candidates of an Accointing row: its source is always its wallet, and so is an order's target.
+     * The export doesn't name the other side of a deposit or a withdrawal, so its classification ("income",
+     * "internal", …) does.
      */
     private fun accointingAccounts(): List<StrategyRule> {
         val wallet = naming("walletName", name = ACCOINTING_WALLET_PREFIX + AccountNaming.VALUE_PLACEHOLDER, trim = true)
         return listOf(
             accounts(AccountSide.SOURCE, wallet),
-            // An order stays on its wallet; a deposit or withdrawal has a counterparty.
             accounts(
                 AccountSide.TARGET,
                 wallet,
