@@ -54,16 +54,15 @@ class CelsiusCsvE2ETest : DbTest() {
         id: String,
         time: String,
         type: String,
-        coin: String,
         amount: String,
         confirmed: String = "Yes",
-    ): List<String> = listOf(id, time, type, coin, amount, "1.5", if ("Reward" in type) coin else "", "", confirmed)
+    ): List<String> = listOf(id, time, type, "ETH", amount, "1.5", if ("Reward" in type) "ETH" else "", "", confirmed)
 
-    private val deposit = row("1", "June 11, 2022 10:38 PM", "Transfer", "ETH", "4")
-    private val reward = row("2", "July 14, 2022 12:00 AM", "Reward", "ETH", "0.000001206275885505")
-    private val promo = row("3", "July 15, 2022 12:30 PM", "Promo Code Reward", "ETH", "0.5")
-    private val unconfirmed = row("4", "April 28, 2022 11:28 PM", "Withdrawal", "ETH", "-3", confirmed = "No")
-    private val retried = row("5", "April 28, 2022 11:56 PM", "Withdrawal", "ETH", "-3")
+    private val deposit = row("1", "June 11, 2022 10:38 PM", "Transfer", "4")
+    private val reward = row("2", "July 14, 2022 12:00 AM", "Reward", "0.000001206275885505")
+    private val promo = row("3", "July 15, 2022 12:30 PM", "Promo Code Reward", "0.5")
+    private val unconfirmed = row("4", "April 28, 2022 11:28 PM", "Withdrawal", "-3", confirmed = "No")
+    private val retried = row("5", "April 28, 2022 11:56 PM", "Withdrawal", "-3")
 
     private suspend fun stage(rows: List<List<String>>): CsvImport {
         val id =
