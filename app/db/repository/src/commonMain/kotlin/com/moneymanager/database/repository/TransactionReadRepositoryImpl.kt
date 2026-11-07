@@ -151,6 +151,30 @@ class TransactionReadRepositoryImpl(
             loadAttributesForTransfers(rows.distinctBy { it.id })
         }
 
+    override suspend fun getOtherSideCandidates(
+        amounts: Set<Money>,
+        earliest: Instant,
+        latest: Instant,
+        exclusionTypeId: AttributeTypeId,
+    ): List<Transfer> =
+        withContext(Dispatchers.Default) {
+            val rows =
+                amounts.map { it.amount.toString() }.distinct().chunked(OTHER_SIDE_AMOUNTS_PER_QUERY).flatMap { chunk ->
+                    transferSelectQueries
+                        .selectOtherSideCandidates(
+                            amounts = chunk,
+                            earliest = earliest.toEpochMilliseconds(),
+                            latest = latest.toEpochMilliseconds(),
+                            exclusionTypeId = exclusionTypeId.id,
+                            partOfAnotherMovementTypeIds =
+                                listOf(WellKnownIds.FEE_RELATIONSHIP_TYPE_ID, WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID),
+                            shadowAccountTypeId = WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID,
+                            TransferMapper::mapRaw,
+                        ).awaitAsList()
+                }
+            loadAttributesForTransfers(rows.distinctBy { it.id })
+        }
+
     override suspend fun getUnreversedTransfersTouchingAccounts(
         accountIds: Set<AccountId>,
         amounts: Set<Money>,
@@ -353,3 +377,6 @@ class TransactionReadRepositoryImpl(
             )
         }
 }
+
+// The statement also binds three ids and two times and the relationship types; the amounts fill the rest of the limit.
+private const val OTHER_SIDE_AMOUNTS_PER_QUERY = MAX_IDS_PER_QUERY - 7

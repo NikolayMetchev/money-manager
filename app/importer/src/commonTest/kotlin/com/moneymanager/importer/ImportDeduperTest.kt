@@ -2,6 +2,7 @@ package com.moneymanager.importer
 
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
@@ -12,7 +13,9 @@ import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.calendar.testing.TestHolidayCalendars
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.rules.SettlementWindow
@@ -1427,6 +1430,80 @@ class ImportDeduperTest {
         ImportDeduper(policy, existing = listOf(bankCredit(40, timestamp = londonNoon(bankDate))), calendars = londonCalendars)
             .classify(listOf(placeholderDeposit(0, timestamp = londonNoon(cardDate)).copy(uniqueKey = mapOf("line" to "1"))))
             .single()
+
+    // A bank that names only the broker, and a broker that names no bank: no account in common.
+    private val brokerPayee = AccountId(70)
+
+    private val thursdayBankCredit = bankCredit(60, timestamp = londonNoon("2021-04-01"), tgt = brokerPayee).transfer
+
+    private fun easterMondayPlaceholder() =
+        placeholderDeposit(0, timestamp = londonNoon("2021-04-05")).copy(uniqueKey = mapOf("line" to "1"))
+
+    private fun placeholderAgainstOtherSide(window: SettlementWindow): Classified =
+        ImportDeduper(
+            businessDayPolicy(window),
+            existing = emptyList(),
+            calendars = londonCalendars,
+            otherSideLegs = listOf(thursdayBankCredit),
+        ).classify(listOf(easterMondayPlaceholder()))
+            .single()
+
+    private fun assertStaysOnItsPlaceholder(result: Classified) {
+        assertEquals(AccountRef.Existing(placeholder), result.transfer.fromAccount)
+        assertEquals(null, result.excludeExisting)
+    }
+
+    @Test
+    fun otherSide_joinsRecordsSharingNoAccountAcrossTheEasterWeekend() {
+        val result = placeholderAgainstOtherSide(SettlementWindow.BusinessDays(3))
+
+        assertEquals(AccountRef.Existing(bank), result.transfer.fromAccount)
+        assertEquals(AccountRef.Existing(wallet), result.transfer.toAccount)
+        assertEquals(null, result.transfer.unidentifiedCounterpartyAccountId)
+        assertEquals(TransferId(60), result.excludeExisting?.transfer?.id)
+        assertEquals(listOf(TransferId(60)), result.transfer.relationships.map { it.relatedTransferId })
+    }
+
+    @Test
+    fun otherSide_leavesTheRowAloneOutsideTheWindow() {
+        assertStaysOnItsPlaceholder(placeholderAgainstOtherSide(SettlementWindow.Elapsed(24 * 60 * 60L)))
+    }
+
+    private fun assertLeftAlone(deduper: ImportDeduper) =
+        assertStaysOnItsPlaceholder(deduper.classify(listOf(easterMondayPlaceholder())).single())
+
+    private fun otherSideDeduper(
+        otherSideLeg: Transfer = thursdayBankCredit,
+        claimedReconcileTargets: Set<TransferId> = emptySet(),
+        ownSourceLegs: Set<TransferId> = emptySet(),
+    ) = ImportDeduper(
+        businessDayPolicy(SettlementWindow.BusinessDays(3)),
+        existing = emptyList(),
+        calendars = londonCalendars,
+        claimedReconcileTargets = claimedReconcileTargets,
+        ownSourceLegs = ownSourceLegs,
+        otherSideLegs = listOf(otherSideLeg),
+    )
+
+    @Test
+    fun otherSide_neverTakesALegAnotherRecordAlreadyClaimed() =
+        assertLeftAlone(otherSideDeduper(claimedReconcileTargets = setOf(TransferId(60))))
+
+    @Test
+    fun otherSide_neverTakesALegOfTheRowsOwnSource() = assertLeftAlone(otherSideDeduper(ownSourceLegs = setOf(TransferId(60))))
+
+    @Test
+    fun otherSide_aPlaceholderNeverPairsWithAnotherPlaceholderWhateverItsMarkerSays() =
+        listOf("true", WellKnownIds.UNIDENTIFIED_SOURCE).forEach { marker ->
+            val marked =
+                TransferAttribute(
+                    id = 1,
+                    transactionId = thursdayBankCredit.id,
+                    attributeType = AttributeType(AttributeTypeId(-9), "unidentified-counterparty"),
+                    value = marker,
+                )
+            assertLeftAlone(otherSideDeduper(otherSideLeg = thursdayBankCredit.copy(attributes = listOf(marked))))
+        }
 
     @Test
     fun businessDays_placeholderReconcilesAcrossTheEasterWeekend() {

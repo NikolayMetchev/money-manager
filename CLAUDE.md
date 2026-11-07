@@ -480,6 +480,14 @@ per-card placeholder (`Curve card 7721`) that reconciles against the card's move
 reconciles its movement into the conduit, the conduit's onward legs stay counted and supersede the card chain's
 guessed ones, in either import order, so a conduit always nets to zero.
 
+**Two records of one transfer with no account in common:** a broker's `Freetrade Top Ups -> Freetrade ISA` and a bank's
+`Monzo -> Freetrade Limited`. When no other rule pairs a row, `ImportDeduper.otherSideOf` matches on asset, amount and time
+alone, inside the placeholder window (business days included), and the nearest record wins. One side must be a placeholder
+(`unidentified-counterparty`, whose value says which end it is: `source` or `target`). The incoming row becomes the whole
+transfer, real end to real end, and the other record is excluded and linked, so either import order books `Monzo -> ISA`.
+Fees, pass-through chain legs and shadow accounts are never candidates (`selectOtherSideCandidates`), and nor is anything on
+an account the batch itself books, a record of the same source, or a record another row already reconciled against.
+
 **Still separate, on purpose:** `TradeReconciler`, `ConversionTradeReconciler` and `ConversionGroupReconciler`
 use genuinely different assignment rules, and `app/reconciliation`'s `LegMatcher` is a read-only report.
 Merging any of them would change built-in outcomes.
