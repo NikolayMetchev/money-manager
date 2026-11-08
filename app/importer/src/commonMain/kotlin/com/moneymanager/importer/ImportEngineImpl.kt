@@ -675,11 +675,14 @@ class ImportEngineImpl(
         val calendars = settlementCalendars(batch.dedupePolicy)
         val existing = loadExisting(resolvedTransfers, batch, calendars)
         val existingRelationships = existingRelationships(existing)
+        val otherSideLegs = otherSideLegs(resolvedTransfers, batch, calendars)
         val classified =
             ImportDeduper(
                 batch.dedupePolicy,
                 existing,
-                existingRelationships
+                // The other-side candidates lie on any accounts, so their claims are read too: a record another source
+                // already reconciled against has both its ends named and stands in for no one.
+                (existingRelationships + otherSideRelationships(otherSideLegs, existing))
                     .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
                     .mapNotNullTo(mutableSetOf()) { it.transferPair?.second },
                 reconciledInto =
@@ -691,7 +694,7 @@ class ImportEngineImpl(
                 passThroughOnward = passThroughOnward(existing, existingRelationships),
                 ownSourceLegs = ownSourceLegs(resolvedTransfers, existing),
                 calendars = calendars,
-                otherSideLegs = otherSideLegs(resolvedTransfers, batch, calendars),
+                otherSideLegs = otherSideLegs,
             ).classify(resolvedTransfers)
 
         val toImport = resolveReversalLinks(classified.filter { it.status == ImportStatus.IMPORTED })
@@ -1504,6 +1507,17 @@ class ImportEngineImpl(
         val repository = relationshipRepository ?: return emptyList()
         if (existing.isEmpty()) return emptyList()
         return repository.getByTransactions(existing.map { it.transferId })
+    }
+
+    /** The relationships of the [otherSideLegs] that [existing] (whose own are read already) leaves out. */
+    private suspend fun otherSideRelationships(
+        otherSideLegs: List<Transfer>,
+        existing: List<ExistingTransferInfo>,
+    ): List<Relationship> {
+        val repository = relationshipRepository ?: return emptyList()
+        val loaded = existing.mapTo(mutableSetOf()) { it.transferId }
+        val ids = otherSideLegs.map { it.id }.filterNot { it in loaded }
+        return if (ids.isEmpty()) emptyList() else repository.getByTransactions(ids)
     }
 
     /**

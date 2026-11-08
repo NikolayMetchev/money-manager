@@ -497,6 +497,55 @@ class FreetradeCsvE2ETest : DbTest() {
             assertEquals(emptyMap(), balances("Freetrade Limited"))
         }
 
+    @Test
+    fun `a top-up never pairs with a payment both its ends record`() =
+        runDbTest {
+            val bank = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now))
+            val payee =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Freetrade Limited", openingDate = now),
+                )
+            val savings = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Savings", openingDate = now))
+            // Nearer the top-up than the broker payment, but both ends' statements record it: it names both its ends.
+            applyBankStatement(bank, savings, date = "2026-03-01", description = "SAVINGS")
+            applyBankStatement(bank, savings, date = "2026-03-01", description = "FROM BANK", statement = "savings")
+            applyBankStatement(bank, payee, date = "2026-03-02")
+
+            apply(listOf(stage(listOf(topUp))))
+
+            assertEquals(mapOf("GBP" to "1000"), balances())
+            assertEquals(mapOf("GBP" to "1000"), balances("Savings"))
+            assertEquals(mapOf("GBP" to "-2000"), balances("Bank"))
+            assertEquals(emptyMap(), balances("Freetrade Limited"))
+        }
+
+    @Test
+    fun `re-importing the bank statement keeps a top-up one transfer into the ISA`() =
+        runDbTest {
+            val bank = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now))
+            val payee =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Freetrade Limited", openingDate = now),
+                )
+            applyBankStatement(bank, payee)
+            apply(listOf(stage(listOf(topUp))))
+
+            val reimports = repositories.reimports(maintenance)
+            reimports.reimportAll(
+                reimports.planAll(
+                    repositories.csvImportRepository
+                        .getAllImports()
+                        .first()
+                        .filter { it.originalFileName == "bank.csv" },
+                ),
+                accountId = null,
+                currencyId = null,
+                onProgress = {},
+            )
+
+            assertOneTransferIntoTheIsa()
+        }
+
     private suspend fun assertOneTransferIntoTheIsa() {
         assertEquals(mapOf("GBP" to "1000"), balances())
         assertEquals(mapOf("GBP" to "-1000"), balances("Bank"))
@@ -509,12 +558,13 @@ class FreetradeCsvE2ETest : DbTest() {
         payee: AccountId,
         date: String = "2026-03-01",
         description: String = "FREETRADE",
+        statement: String = "bank",
     ) {
         val bankHeaders = listOf("Date", "Amount", "Currency", "Description")
         val bankStrategy =
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
-                name = "Bank $description",
+                name = "$statement $description",
                 config =
                     CsvStrategyConfig(
                         identificationColumns = bankHeaders.toSet(),
@@ -540,10 +590,10 @@ class FreetradeCsvE2ETest : DbTest() {
         repositories.csvImportStrategyRepository.createStrategy(bankStrategy, Source.Manual)
         val bankImportId =
             repositories.csvImportRepository.createImport(
-                fileName = "bank.csv",
+                fileName = "$statement.csv",
                 headers = bankHeaders,
                 rows = listOf(listOf(date, "1000.00", "GBP", description)),
-                fileChecksum = "bank-$description",
+                fileChecksum = "$statement-$description",
                 fileLastModified = now,
             )
         applyStagedCsv(
