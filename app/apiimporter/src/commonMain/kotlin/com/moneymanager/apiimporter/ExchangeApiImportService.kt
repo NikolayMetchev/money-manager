@@ -971,8 +971,7 @@ suspend fun importApiSessionExchange(
                         ImportAccountIntent(
                             key = feeKey,
                             source = source,
-                            match = AccountMatchKey.ByName("${synthetic.name} Fees"),
-                            name = "${synthetic.name} Fees",
+                            match = AccountMatchKey.FeeAccountOf(AccountRef.Local(syntheticKey)),
                             openingDate = openingDate,
                         ),
                         ImportAccountIntent(

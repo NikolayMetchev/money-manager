@@ -240,7 +240,8 @@ class KoinlyReconciliationE2ETest : DbTest() {
                     "Koinly · Coinbase Pro",
                     "Koinly: reward",
                     "Koinly: External",
-                    "Koinly Fees",
+                    "Koinly · Coinbase Fees",
+                    "Koinly · Coinbase Pro Fees",
                 ),
                 accounts.map { it.name }.toSet(),
             )
@@ -253,7 +254,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
             assertEquals("47", balanceOf("Koinly · Coinbase", "AMP"))
             // The transfer's fee was paid in a third asset.
             assertEquals("-0.5", balanceOf("Koinly · Coinbase Pro", "BNB"))
-            assertEquals("0.5", balanceOf("Koinly Fees", "BNB"))
+            assertEquals("0.5", balanceOf("Koinly · Coinbase Pro Fees", "BNB"))
             assertNotNull(repositories.cryptoRepository.getCryptoAssetByCode("KNC").first())
             assertNull(repositories.cryptoRepository.getCryptoAssetByCode("KNCL").first())
         }
@@ -279,7 +280,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
             assertEquals("-47", balanceOf("Koinly: External", "AMP"))
             assertEquals("-0.5", balanceOf("Koinly · Coinbase", "BNB"))
             assertNull(balanceOf("Koinly: External", "BNB"))
-            assertEquals("0.5", balanceOf("Koinly Fees", "BNB"))
+            assertEquals("0.5", balanceOf("Koinly · Coinbase Fees", "BNB"))
         }
 
     @Test
@@ -313,7 +314,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
             assertEquals("1000", balanceOf("Koinly · Coinbase", "GBP"))
             assertNull(balanceOf("Koinly · Coinbase", "KNC"))
             assertNull(balanceOf("Koinly · Coinbase", "AMP"))
-            assertNull(balanceOf("Koinly Fees", "BNB"))
+            assertNull(balanceOf("Koinly · Coinbase Pro Fees", "BNB"))
             val coinbase = assertNotNull(accountByName("Koinly · Coinbase")).id
             assertEquals(1, repositories.tradeRepository.countTradesByAccount(coinbase))
             // Deposit (live); trade debit + credit, trade fee, incoming transfer (all excluded).
@@ -329,13 +330,13 @@ class KoinlyReconciliationE2ETest : DbTest() {
                 listOf(stage("old.csv", listOf(coinbaseDeposit, coinbaseTrade.deleted(), withdrawal.deleted(), walletTransfer.deleted()))),
             )
             assertEquals("1000", balanceOf("Koinly · Coinbase", "GBP"))
-            assertNull(balanceOf("Koinly Fees", "BNB"))
+            assertNull(balanceOf("Koinly · Coinbase Pro Fees", "BNB"))
 
             // The newer export has the trade and the withdrawal back: they're re-imported as the same
             // trade/transfer, and their exclusion is lifted.
             applyAll(listOf(stage("new.csv", listOf(coinbaseDeposit, coinbaseTrade, withdrawal, walletTransfer))))
             // The transfer's fee leg follows it back into the balances.
-            assertEquals("0.5", balanceOf("Koinly Fees", "BNB"))
+            assertEquals("0.5", balanceOf("Koinly · Coinbase Pro Fees", "BNB"))
 
             assertEquals("400", balanceOf("Koinly · Coinbase", "GBP"))
             assertEquals("358.32414347", balanceOf("Koinly · Coinbase", "KNC"))
@@ -600,6 +601,24 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
             repositories.importEngine.setReconciliationLinks(shadow, setOf(binance))
             assertEquals(false, declined())
+        }
+
+    @Test
+    fun aWalletsFeeAccountIsNotAWalletToLink() =
+        runDbTest {
+            applyAll(listOf(stage("transactions.csv", listOf(coinbaseDeposit, coinbaseTrade))))
+            // A real account named like the fee account would be linked to it, were the fee account taken for a wallet.
+            repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Coinbase Fees", openingDate = now), Source.Manual)
+            val reconciliation = repositories.reconciliationLinkRepository
+            val shadows = reconciliation.getShadowAccounts().first()
+            val wallet = shadows.single { it.name == "Koinly · Coinbase" }
+            val feeAccount = shadows.single { it.name == "Koinly · Coinbase Fees" }
+
+            assertEquals(wallet.accountId, feeAccount.feeAccountFor)
+            val source = reconciliation.getSources().first().single { it.name == "Koinly" }
+            assertEquals(false, source.isLinkable(feeAccount))
+            val real = realAccounts(repositories.accountRepository.getAllAccounts().first(), shadows)
+            assertTrue(feeAccount.accountId !in planAutoLinks(source, shadows, reconciliation.getLinks().first(), real))
         }
 
     @Test

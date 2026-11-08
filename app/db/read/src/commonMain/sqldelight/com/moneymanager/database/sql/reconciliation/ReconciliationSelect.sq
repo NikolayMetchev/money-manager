@@ -1,13 +1,16 @@
--- Reconciliation reads: shadow accounts (carrying the 'reconciliation-source' attribute, -9), the
+-- Reconciliation reads: shadow accounts (carrying the 'reconciliation-source' attribute, -9; a fee account's
+-- 'fee-account-for', -12, names the account it belongs to), the
 -- shadow->real account links, and the per-account legs the reconciliation matcher compares.
 
 selectShadowAccounts:
 SELECT a.id, a.name, aa.attribute_value AS source_name,
     CASE WHEN EXISTS (
         SELECT 1 FROM account_attribute d WHERE d.account_id = a.id AND d.attribute_type_id = -10
-    ) THEN 1 ELSE 0 END AS auto_link_declined
+    ) THEN 1 ELSE 0 END AS auto_link_declined,
+    f.attribute_value AS fee_account_for
 FROM account a
 JOIN account_attribute aa ON aa.account_id = a.id AND aa.attribute_type_id = -9
+LEFT JOIN account_attribute f ON f.account_id = a.id AND f.attribute_type_id = -12
 ORDER BY a.name;
 
 selectLinks:

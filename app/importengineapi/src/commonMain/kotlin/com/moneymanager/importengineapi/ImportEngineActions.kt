@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 /*
@@ -164,6 +165,27 @@ suspend fun ImportEngine.createAccounts(
         }
     val result = import(ImportBatch(accountsToCreate = intents, shadowSource = shadowSource))
     return intents.map { requireNotNull(result.createdAccountIds[it.key]) { "Account ${it.name} was not created" } }
+}
+
+/** Gets or creates the fee account of each of [accounts] ([AccountMatchKey.FeeAccountOf]), by account. */
+suspend fun ImportEngine.feeAccounts(
+    accounts: Set<AccountId>,
+    source: Source,
+    shadowSource: String? = null,
+): Map<AccountId, AccountId> {
+    if (accounts.isEmpty()) return emptyMap()
+    val keys = accounts.associateWith { LocalAccountKey("fee-account-of-${it.id}") }
+    val intents =
+        keys.map { (account, key) ->
+            ImportAccountIntent(
+                key = key,
+                source = source,
+                match = AccountMatchKey.FeeAccountOf(AccountRef.Existing(account)),
+                openingDate = Clock.System.now(),
+            )
+        }
+    val result = import(ImportBatch(accountsToCreate = intents, shadowSource = shadowSource))
+    return keys.mapValues { (account, key) -> requireNotNull(result.createdAccountIds[key]) { "No fee account for $account" } }
 }
 
 /** Gets or creates a single account by name (see [createAccounts]) and returns its id. */

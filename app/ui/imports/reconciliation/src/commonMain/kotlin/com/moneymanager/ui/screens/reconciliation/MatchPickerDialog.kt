@@ -34,7 +34,6 @@ import androidx.compose.ui.window.DialogProperties
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
-import com.moneymanager.importengineapi.MANUAL_FEE_ACCOUNT_NAME
 import com.moneymanager.reconciliation.ReconciliationResult
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.formatAmount
@@ -113,10 +112,7 @@ fun MatchPickerDialog(
                     TextButton(onClick = { onConfirm(selected.toList()) }, enabled = selected.isNotEmpty()) {
                         Text("Match (${selected.size})")
                     }
-                    // A selected account named like the fee account would make the fee a transfer to itself.
-                    val fee =
-                        missingFee(movement, selected.toList())
-                            ?.takeIf { !accountNames[it.account].equals(MANUAL_FEE_ACCOUNT_NAME, ignoreCase = true) }
+                    val fee = missingFee(movement, selected.toList())
                     if (fee != null) {
                         TextButton(onClick = { onBookFee(fee, selected.toList()) }) {
                             Text("Add missing fee (${formatAmount(fee.fee)}) and match")

@@ -67,6 +67,7 @@ import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.createAccountMappings
 import com.moneymanager.importengineapi.createAccounts
 import com.moneymanager.importengineapi.createCrypto
+import com.moneymanager.importengineapi.feeAccounts
 import com.moneymanager.importengineapi.getOrCreateAttributeTypes
 import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.importengineapi.restagePdfImport
@@ -1114,24 +1115,14 @@ suspend fun runCsvImport(
     // dedupes, writes transfers, applies updates and records sources.
     val uniqueIdTypeNames = strategy.config.uniqueIdentifierAttributeTypes().toSet()
 
-    // Resolve a single consolidated "<strategy> Fees" account when any row carries a fee, so per-row
-    // fees are modelled as their own movements linked to the main transfer.
-    val feeAccountId: AccountId? =
-        if (finalPrep.validTransfers.any { it.feeAmount != null }) {
-            val feeAccountName = "${strategy.name} Fees"
-            accountsByName[feeAccountName]?.id
-                ?: importEngine.createAccount(
-                    Account(
-                        id = AccountId(0),
-                        name = feeAccountName,
-                        openingDate = Clock.System.now(),
-                    ),
-                    Source.Csv(csvImport.id),
-                    shadowSource = strategy.shadowSource,
-                )
-        } else {
-            null
-        }
+    // Each account a row charges a fee to pays it into its own fee account, so per-row fees are modelled as their own
+    // movements linked to the main transfer.
+    val feeAccountOf: Map<AccountId, AccountId> =
+        importEngine.feeAccounts(
+            finalPrep.validTransfers.filter { it.feeAmount != null }.mapTo(mutableSetOf()) { it.feePayerId() },
+            Source.Csv(csvImport.id),
+            shadowSource = strategy.shadowSource,
+        )
 
     // Sources that split one trade across several rows (Binance stamps every partial fill of both legs
     // with the same second) are assembled here: each resolvable group folds into one trade and its legs
@@ -1186,7 +1177,7 @@ suspend fun runCsvImport(
             }
 
     // A trade carries no fee field, so a conversion row that also has a fee would otherwise drop it.
-    // Emit each such fee as its own standalone movement (own account -> "<strategy> Fees") so the
+    // Emit each such fee as its own standalone movement (own account -> its fee account) so the
     // money isn't lost (e.g. Koinly trades). It carries the row's unique-id attributes, or re-importing
     // an overlapping export would book the fee again: the trade itself dedupes on its tuple, but a
     // key-less transfer never dedupes under a unique-id policy.
@@ -1194,14 +1185,14 @@ suspend fun runCsvImport(
         finalPrep.validTransfers.mapNotNull { row ->
             if (row.tradeTo == null) return@mapNotNull null
             val fee = row.feeAmount ?: return@mapNotNull null
-            val feeAcct = feeAccountId ?: return@mapNotNull null
+            val payer = row.feePayerId()
             val uniqueAttributes = row.attributes.filter { (name, _) -> name in uniqueIdTypeNames }
             // Excluded with its trade (e.g. a row the source marks deleted).
             val exclusion = attributesFor(row.attributes).filter { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
             ImportTransfer(
                 rowKey = ImportRowKey.CsvRow(row.rowIndex),
-                fromAccount = AccountRef.Existing(row.feePayerId()),
-                toAccount = AccountRef.Existing(feeAcct),
+                fromAccount = AccountRef.Existing(payer),
+                toAccount = AccountRef.Existing(feeAccountOf.getValue(payer)),
                 source = Source.Csv(csvImport.id),
                 timestamp = row.transfer.timestamp,
                 description = row.feeDescription ?: "${row.transfer.description} (fee)",
@@ -1261,7 +1252,7 @@ suspend fun runCsvImport(
                     row.feeAmount?.let { feeMoney ->
                         ImportFee(
                             source = AccountRef.Existing(row.feePayerId()),
-                            target = AccountRef.Existing(feeAccountId!!),
+                            target = AccountRef.Existing(feeAccountOf.getValue(row.feePayerId())),
                             amount = feeMoney,
                             description = row.feeDescription ?: "Fee",
                             relationshipTypeId = RelationshipTypeId(WellKnownIds.FEE_RELATIONSHIP_TYPE_ID),

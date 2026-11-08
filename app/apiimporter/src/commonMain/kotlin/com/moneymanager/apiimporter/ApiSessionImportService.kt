@@ -2008,8 +2008,8 @@ private data class ConduitRouting(
 
 /**
  * Builds the [ImportFee] for a transaction that carries a fee: resolves the fee currency (falling back
- * to the transaction currency), gets-or-creates the consolidated "<strategy> Fees" account, and pays the
- * fee from the own account into it. Returns null when the fee currency is unknown or the fee is zero.
+ * to the transaction currency) and pays it from the own account into that account's fee account. Returns null when
+ * the fee currency is unknown or the fee is zero.
  */
 private suspend fun buildImportFee(
     item: ApiTransactionPageItem,
@@ -2041,7 +2041,7 @@ private suspend fun buildImportFee(
             }
         }
     if (feeMoney.isZero()) return null
-    val feeAccountKey = setup.accountResolver.resolveNamedAccount("${setup.strategy.name} Fees", source = apiSource.toSource())
+    val feeAccountKey = setup.accountResolver.resolveFeeAccount(ownAccountRef, source = apiSource.toSource())
     // Point the fee's audit trail at the JSON object that holds the fee (e.g. `atm_fees_detailed`)
     // rather than the whole transaction or the bare amount leaf, by extending the transaction path with
     // the fee field's parent (its last `.`-segment dropped). A flat fee field (no parent) falls back to
@@ -2665,6 +2665,9 @@ private class BatchAccountResolver {
     // whose feed is always empty). Counterparty-only keys are never in here, so pruning can't touch them.
     private val sourceAccountKeys = mutableSetOf<LocalAccountKey>()
 
+    // The fee account intent of each own account, by that account.
+    private val feeAccounts = mutableMapOf<AccountRef, LocalAccountKey>()
+
     /** The accumulated intents, in allocation order, for [ImportBatch.accountsToCreate]. */
     suspend fun intents(): List<ImportAccountIntent> = mutex.withLock { intents.values.toList() }
 
@@ -2814,9 +2817,28 @@ private class BatchAccountResolver {
         mergeAttributes(key, listOf(attribute))
     }
 
+    /** The fee account of [account] ([AccountMatchKey.FeeAccountOf]), one intent per account. */
+    suspend fun resolveFeeAccount(
+        account: AccountRef,
+        source: Source,
+    ): LocalAccountKey =
+        mutex.withLock {
+            feeAccounts.getOrPut(account) {
+                allocateKey().also { key ->
+                    intents[key] =
+                        ImportAccountIntent(
+                            key = key,
+                            match = AccountMatchKey.FeeAccountOf(account),
+                            openingDate = Clock.System.now(),
+                            source = source,
+                        )
+                }
+            }
+        }
+
     /**
-     * Resolves the [LocalAccountKey] for a name-only account (no external id): the per-strategy "Fees"
-     * account and the per-strategy "Void" zero-amount account. Matched by [AccountMatchKey.ByName].
+     * Resolves the [LocalAccountKey] for a name-only account (no external id), such as the per-strategy "Void"
+     * zero-amount account. Matched by [AccountMatchKey.ByName].
      */
     suspend fun resolveNamedAccount(
         name: String,

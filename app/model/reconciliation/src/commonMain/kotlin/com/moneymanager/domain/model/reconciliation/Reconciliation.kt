@@ -17,6 +17,8 @@ data class ShadowAccount(
     val sourceName: String,
     /** The user removed this wallet's last link, so it is never linked automatically again. */
     val autoLinkDeclined: Boolean = false,
+    /** The account this one is the fee account of (`WellKnownIds.ACCOUNT_FEE_ACCOUNT_FOR_ATTR_TYPE_ID`), if it is one. */
+    val feeAccountFor: AccountId? = null,
 )
 
 /** The user's statement that [shadowAccountId] mirrors the real account [realAccountId]. */
@@ -35,9 +37,13 @@ data class ReconciliationSource(
     /** See `ReconciliationConfig.linkableAccountPrefix`; the first non-null among the source's strategies. */
     val linkableAccountPrefix: String?,
 ) {
-    /** Whether [account] is one of this source's wallets, i.e. mirrors a real account and needs a link. */
+    /**
+     * Whether [account] is one of this source's wallets, i.e. mirrors a real account and needs a link. A wallet's fee
+     * account isn't one, though it carries the wallet's name and so the prefix.
+     */
     fun isLinkable(account: ShadowAccount): Boolean =
-        account.sourceName == name && (linkableAccountPrefix == null || account.name.startsWith(linkableAccountPrefix))
+        account.sourceName == name && account.feeAccountFor == null &&
+            (linkableAccountPrefix == null || account.name.startsWith(linkableAccountPrefix))
 
     /** [account]'s name without [linkableAccountPrefix]: the name its real counterpart should carry. */
     fun walletName(account: ShadowAccount): String = linkableAccountPrefix?.let(account.name::removePrefix)?.trim() ?: account.name
