@@ -21,8 +21,9 @@ data class ManualEntryInput(
 /**
  * Records the amounts a person gave for transfers a manual-entry rule asked about: one transfer per input,
  * described [description] and linked to its original by a [relationshipType] relationship (the original is
- * the primary, so it stops being pending). It runs from the original's source to [counterpartyAccount]
- * (created by name if missing), or, when that is null, between the original's accounts reversed.
+ * the primary, so it stops being pending). With [toFeeAccount] it runs from the original's source to that account's
+ * fee account ([AccountMatchKey.FeeAccountOf]); otherwise to [counterpartyAccount] (created by name if missing), or,
+ * when that is null, between the original's accounts reversed.
  *
  * With [excludedFromBalances] the entry is written excluded: the original's amount already contains it, so
  * counting it again would double it. The entry still reconciles, which is what it is recorded for.
@@ -33,23 +34,44 @@ suspend fun ImportEngine.createManualEntries(
     relationshipType: String,
     counterpartyAccount: String?,
     excludedFromBalances: Boolean,
+    toFeeAccount: Boolean = false,
 ) {
     if (inputs.isEmpty()) return
     val counterpartyKey = LocalAccountKey("manual-entry-counterparty")
-    val counterparty = counterpartyAccount?.let { AccountRef.Local(counterpartyKey) }
+    val namedAccount = counterpartyAccount.takeUnless { toFeeAccount }
+    val feeAccountKeys =
+        if (toFeeAccount) {
+            inputs.map { it.original.sourceAccountId }.distinct().associateWith { LocalAccountKey("manual-entry-fee-account-of-${it.id}") }
+        } else {
+            emptyMap()
+        }
+
+    fun counterpartyOf(original: PendingManualEntry): AccountRef? =
+        feeAccountKeys[original.sourceAccountId]?.let { AccountRef.Local(it) } ?: namedAccount?.let { AccountRef.Local(counterpartyKey) }
+    val openingDate = inputs.minOf { input -> input.original.timestamp }
+    val feeAccounts =
+        feeAccountKeys.map { (account, key) ->
+            ImportAccountIntent(
+                key = key,
+                source = Source.Manual,
+                match = AccountMatchKey.FeeAccountOf(AccountRef.Existing(account)),
+                openingDate = openingDate,
+            )
+        }
     val accounts =
-        counterpartyAccount
-            ?.let {
-                listOf(
-                    ImportAccountIntent(
-                        key = counterpartyKey,
-                        source = Source.Manual,
-                        match = AccountMatchKey.ByName(it),
-                        name = it,
-                        openingDate = inputs.minOf { input -> input.original.timestamp },
-                    ),
-                )
-            }.orEmpty()
+        feeAccounts +
+            namedAccount
+                ?.let {
+                    listOf(
+                        ImportAccountIntent(
+                            key = counterpartyKey,
+                            source = Source.Manual,
+                            match = AccountMatchKey.ByName(it),
+                            name = it,
+                            openingDate = openingDate,
+                        ),
+                    )
+                }.orEmpty()
     val exclusion =
         if (excludedFromBalances) {
             listOf(NewAttribute(AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID), "included in the amount of the original"))
@@ -58,6 +80,7 @@ suspend fun ImportEngine.createManualEntries(
         }
     val transfers =
         inputs.mapIndexed { index, (original, amount) ->
+            val counterparty = counterpartyOf(original)
             ImportTransfer(
                 source = Source.Manual,
                 rowKey = ImportRowKey.Manual(index.toLong()),

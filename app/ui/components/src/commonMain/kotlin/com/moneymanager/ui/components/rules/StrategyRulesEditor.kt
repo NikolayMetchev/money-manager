@@ -509,8 +509,13 @@ private fun ActionFields(
             ) {
                 onActionChanged(action.copy(relationshipType = it))
             }
-            TextField("To account (blank = reverse the record)", action.counterpartyAccount.orEmpty(), enabled) {
-                onActionChanged(action.copy(counterpartyAccount = it.ifBlank { null }))
+            CheckRow("To the record's own account's fee account", action.feeAccount, enabled) {
+                onActionChanged(action.copy(feeAccount = it))
+            }
+            if (!action.feeAccount) {
+                TextField("To account (blank = reverse the record)", action.counterpartyAccount.orEmpty(), enabled) {
+                    onActionChanged(action.copy(counterpartyAccount = it.ifBlank { null }))
+                }
             }
             CheckRow("The record's amount already includes it", action.excludedFromBalances, enabled) {
                 onActionChanged(action.copy(excludedFromBalances = it))

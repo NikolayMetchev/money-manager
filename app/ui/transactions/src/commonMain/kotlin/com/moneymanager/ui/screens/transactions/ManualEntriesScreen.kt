@@ -200,6 +200,7 @@ private suspend fun createEntries(
     relationshipType = entry.relationshipType,
     counterpartyAccount = entry.counterpartyAccount,
     excludedFromBalances = entry.excludedFromBalances,
+    toFeeAccount = entry.feeAccount,
 )
 
 private fun parseAmount(text: String): BigDecimal? {
@@ -278,7 +279,9 @@ private fun PendingEntryCard(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text =
-                        if (entry.counterpartyAccount != null) {
+                        if (entry.feeAccount) {
+                            "Entry: ${matched.sourceAccountName} → its fee account"
+                        } else if (entry.counterpartyAccount != null) {
                             "Entry: ${matched.sourceAccountName} → ${entry.counterpartyAccount}"
                         } else {
                             "Entry: ${matched.targetAccountName} → ${matched.sourceAccountName}"

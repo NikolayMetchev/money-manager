@@ -117,7 +117,9 @@ fun RuleAction.summary(): String =
         }
 
         is RuleAction.ManualEntry -> {
-            "ask for \"${name.orMissing()}\"" + if (excludedFromBalances) " (already in the amount)" else ""
+            "ask for \"${name.orMissing()}\"" +
+                (if (feeAccount) " into the fee account" else "") +
+                if (excludedFromBalances) " (already in the amount)" else ""
         }
 
         is RuleAction.Fee -> {

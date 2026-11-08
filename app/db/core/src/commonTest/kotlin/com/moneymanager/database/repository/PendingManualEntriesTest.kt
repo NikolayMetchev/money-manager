@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.importengineapi.ManualEntryInput
 import com.moneymanager.importengineapi.createManualEntries
+import com.moneymanager.importengineapi.feeAccounts
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.hasDisplayValue
@@ -158,6 +159,10 @@ class PendingManualEntriesTest : DbTest() {
                 )
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("EUR", "Euro")
             val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
+            // Binance's fee account, renamed: the entry finds it by its tag, not by name.
+            val feeAccount = repositories.importEngine.feeAccounts(setOf(binance), Source.Manual).getValue(binance)
+            val feeAccountRow = repositories.accountRepository.getAccountById(feeAccount).first()!!
+            repositories.accountRepository.updateAccount(feeAccountRow.copy(name = "Exchange charges"), Source.Manual)
             createTransfer(transfer(now, "Withdraw", binance, funding, currency, "5.00"), "Withdrawal fee")
             val original =
                 repositories.transactionRepository
@@ -169,8 +174,9 @@ class PendingManualEntriesTest : DbTest() {
                 inputs = listOf(ManualEntryInput(original, Money.fromDisplayValue("0.10", currency))),
                 description = "Withdrawal fee",
                 relationshipType = "fee",
-                counterpartyAccount = "Binance Fees",
+                counterpartyAccount = null,
                 excludedFromBalances = true,
+                toFeeAccount = true,
             )
             repositories.maintenanceService.refreshMaterializedViews()
 
@@ -186,6 +192,7 @@ class PendingManualEntriesTest : DbTest() {
                     .first()
                     .single { it.description == "Withdrawal fee" }
             assertEquals(binance, fee.sourceAccountId)
+            assertEquals(feeAccount, fee.targetAccountId)
             assertTrue(fee.amount.hasDisplayValue("0.10"))
             assertTrue(fee.attributes.any { it.attributeType.id.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID })
             // The withdrawal already contains the fee, so Binance is down by the gross amount only.

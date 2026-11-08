@@ -267,12 +267,6 @@ object BuiltInCsvStrategies {
     private const val BINANCE_ACCOUNT = "Binance"
 
     /**
-     * The name the engine gives the Binance account's fee account. Fee rows find it by its tag (`feeAccountNaming`); only a
-     * manual entry still names its account, so the withdrawal-fee entry books here by name.
-     */
-    private const val BINANCE_FEES_ACCOUNT = "Binance Fees"
-
-    /**
      * Placeholder counterparty for a deposit or withdrawal. The export records that money arrived or
      * left but never whose account it was, so this account is not an assertion — it is where an
      * unidentified movement waits to be reconciled against a source that does name the counterparty
@@ -2221,8 +2215,8 @@ object BuiltInCsvStrategies {
                         name = "Withdrawal fee",
                         description = "Withdrawal fee",
                         relationshipType = "fee",
-                        counterpartyAccount = BINANCE_FEES_ACCOUNT,
                         excludedFromBalances = true,
+                        feeAccount = true,
                     ),
                     conditions = listOf(Condition("Remark", ConditionOp.MATCHES, "fee is included")),
                 ),
