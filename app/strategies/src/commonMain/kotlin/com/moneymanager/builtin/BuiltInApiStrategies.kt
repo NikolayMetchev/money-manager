@@ -2145,7 +2145,7 @@ object BuiltInApiStrategies {
         // A failed or reverted movement is kept on record but never counted; anything else not completed is skipped.
         val status =
             onlyWhen(Condition("status", ConditionOp.IN, "completed,failed,reverted")) +
-                listOf("failed", "reverted").map { excludeWhen("status", "^$it\$", reason = it) }
+                listOf("failed", "reverted").map { excludeWhen("status", "^$it$", reason = it) }
         val incomingTypes = "receive,reward,un_stake"
         val outgoingTypes = "send,stake"
 
