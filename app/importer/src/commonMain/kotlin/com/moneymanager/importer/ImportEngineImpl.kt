@@ -1024,7 +1024,7 @@ class ImportEngineImpl(
         val desired = "${requireNotNull(nameById[owner]) { "Fee account of unknown account $owner" }} Fees"
         val taggedFeeAccounts = byAttr.filterKeys { it.first == FEE_ACCOUNT_FOR_TYPE }.values.toSet()
         byName[desired]?.takeIf { it != owner && it !in taggedFeeAccounts }?.let { untagged ->
-            accountAttributeRepository.upsertInCreationMode(untagged, tag.typeId, tag.value, "")
+            accountAttributeRepository.upsertInCreationMode(untagged, tag.typeId, tag.value)
             byAttr[tag.typeId to tag.value] = untagged
             return ResolvedFeeAccount(untagged, created = false)
         }
