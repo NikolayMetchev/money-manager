@@ -9,11 +9,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import co.touchlab.kermit.Logger
+import com.moneymanager.browser.BrowserLaunchException
+import com.moneymanager.browser.BrowserLauncher
 import com.moneymanager.cryptodata.HttpCryptoCatalogRefresher
 import com.moneymanager.cryptodata.installCryptoCatalog
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
@@ -192,7 +196,10 @@ private fun MainWindow(onExit: () -> Unit) {
                     },
                 )
             }
-            CompositionLocalProvider(LocalStartupProbe provides startupProbe) {
+            // Every link in the app opens through the same launcher as the Google sign-in, so the browser also
+            // comes to the front where `xdg-open` alone leaves it behind (Hyprland).
+            val uriHandler = remember { BrowserUriHandler(params.browserLauncher) }
+            CompositionLocalProvider(LocalStartupProbe provides startupProbe, LocalUriHandler provides uriHandler) {
                 AppStartupHost(
                     databaseManager = databaseManager,
                     appVersion = appVersion,
@@ -210,6 +217,19 @@ private fun MainWindow(onExit: () -> Unit) {
                     onDatabaseReady = { database, _ -> openDatabase[0] = database },
                 )
             }
+        }
+    }
+}
+
+/** Compose's links, opened by [launcher]; a failure is logged rather than thrown into the click. */
+private class BrowserUriHandler(
+    private val launcher: BrowserLauncher,
+) : UriHandler {
+    override fun openUri(uri: String) {
+        try {
+            launcher.open(uri)
+        } catch (failed: BrowserLaunchException) {
+            logger.w(failed) { "Couldn't open $uri" }
         }
     }
 }

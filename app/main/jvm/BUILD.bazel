@@ -29,6 +29,7 @@ kmp_library(
         "//app/model/core",
         "//utils/files",
         "@maven_kmp//:kotlinx_io_core",
+        "//utils/browser",
     ],
     jvm_srcs = glob(["src/main/kotlin/**/*.kt"]),
     plugins = ["compose"],
