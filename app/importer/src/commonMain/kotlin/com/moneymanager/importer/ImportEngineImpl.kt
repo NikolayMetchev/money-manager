@@ -1003,9 +1003,9 @@ class ImportEngineImpl(
     )
 
     /**
-     * The fee account of an [AccountMatchKey.FeeAccountOf] intent's account: the one tagged as its fee account, else an
-     * untagged account named "<account> Fees" (one made before fee accounts were tagged, or by hand), which is tagged now,
-     * else a new one. [nameById] holds every account the batch can see, those it created included.
+     * The fee account of an [AccountMatchKey.FeeAccountOf] intent's account: the one tagged as its fee account, else a new one
+     * named "<account> Fees". Only the tag finds it: an untagged account of that name is not a fee account, and the new one
+     * takes a suffixed name beside it. [nameById] holds every account the batch can see, those it created included.
      */
     private suspend fun resolveFeeAccount(
         intent: ImportAccountIntent,
@@ -1022,12 +1022,6 @@ class ImportEngineImpl(
         val tag = NewAttribute(FEE_ACCOUNT_FOR_TYPE, owner.id.toString())
         byAttr[tag.typeId to tag.value]?.let { return ResolvedFeeAccount(it, created = false) }
         val desired = "${requireNotNull(nameById[owner]) { "Fee account of unknown account $owner" }} Fees"
-        val taggedFeeAccounts = byAttr.filterKeys { it.first == FEE_ACCOUNT_FOR_TYPE }.values.toSet()
-        byName[desired]?.takeIf { it != owner && it !in taggedFeeAccounts }?.let { untagged ->
-            accountAttributeRepository.upsertInCreationMode(untagged, tag.typeId, tag.value)
-            byAttr[tag.typeId to tag.value] = untagged
-            return ResolvedFeeAccount(untagged, created = false)
-        }
         val named = intent.copy(name = desired, attributes = intent.attributes + tag)
         val resolvedName = uniqueName(desired, named, byName)
         val id = createAccount(named, resolvedName)

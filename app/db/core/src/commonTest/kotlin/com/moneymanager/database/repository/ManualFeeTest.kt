@@ -17,6 +17,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 import kotlin.time.Clock
 
 class ManualFeeTest : DbTest() {
@@ -68,15 +69,16 @@ class ManualFeeTest : DbTest() {
         }
 
     @Test
-    fun `adopts an untagged account named after the account and tags it`() =
+    fun `an untagged account named after the account is not its fee account`() =
         runDbTest {
             val revolutX = account("Revolut X")
-            val existingFees = account("Revolut X Fees")
+            val namesake = account("Revolut X Fees")
 
-            val fee = repositories.importEngine.createManualFee(revolutX, Money.fromDisplayValue("1", euro()), now)
+            val feeAccount = feeAccountOf(repositories.importEngine.createManualFee(revolutX, Money.fromDisplayValue("1", euro()), now))
 
-            assertEquals(existingFees, feeAccountOf(fee).id)
-            assertEquals(revolutX.id.toString(), feeAccountForValue(existingFees))
+            assertNotEquals(namesake, feeAccount.id)
+            assertEquals(revolutX.id.toString(), feeAccountForValue(feeAccount.id))
+            assertNull(feeAccountForValue(namesake))
         }
 
     @Test
