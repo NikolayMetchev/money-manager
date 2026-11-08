@@ -1228,6 +1228,14 @@ data class ApiStrategyConfig(
     /** Whether a credential needs a secret besides its token: an api secret to sign with, or a client secret. */
     val needsApiSecret: Boolean get() = isSigned || tokenExchange != null
 
+    /**
+     * Whether the api secret is an asymmetric private key (an Ed25519 signature or a signed JWT) rather than a
+     * shared secret: a key file the person made or downloaded, so the connect screen calls it a private key and
+     * offers to load the file.
+     */
+    val secretIsPrivateKey: Boolean
+        get() = requestSigning?.let { it.jwt != null || it.algorithm == SigningAlgorithm.ED25519 } == true
+
     /** The bank transaction feed, when this is a bank strategy (accounts enumerated from an endpoint). */
     val bankTransactions: ApiDataEndpoint?
         get() = dataEndpoints.firstOrNull { it.kind == ApiEndpointKind.BANK_TRANSACTIONS }

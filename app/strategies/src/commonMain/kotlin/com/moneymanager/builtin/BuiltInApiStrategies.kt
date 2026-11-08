@@ -1793,7 +1793,7 @@ object BuiltInApiStrategies {
                                 "your Coinbase account.",
                             "Create a Secret API key (Ed25519, the default, or ECDSA) and grant only the View permission.",
                             "Paste the API key ID (or, for an older key, its name organizations/…/apiKeys/…) below as the API key.",
-                            "Paste the API secret (or the whole downloaded key file) below as the API secret.",
+                            "Paste the API secret below as the private key, or load the downloaded key file.",
                         ),
                 ),
             createdAt = now,
@@ -2255,7 +2255,7 @@ object BuiltInApiStrategies {
                             "On the Revolut X API keys page (sign in if asked), add a new key with the contents of public.pem " +
                                 "as its public key. Give it read-only access.",
                             "Copy the 64-character API key and paste it below as the API key.",
-                            "Paste the whole contents of private.pem below as the API secret.",
+                            "Load private.pem below as the private key (or paste its contents).",
                         ),
                 ),
             createdAt = now,

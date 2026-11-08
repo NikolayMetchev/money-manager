@@ -15,6 +15,7 @@ internal fun mimeTypesToExtensions(mimeTypes: List<String>): List<String> =
                 "application/vnd.ms-excel" -> listOf(".csv", ".xls")
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> listOf(".xlsx")
                 "application/pdf" -> listOf(".pdf")
+                "application/x-pem-file" -> listOf(".pem", ".key")
                 else -> emptyList()
             }
         }.distinct()

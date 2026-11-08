@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.moneymanager.apiimport.ApiImportService
 import com.moneymanager.apiimport.storeNewSigningKey
+import com.moneymanager.compose.filepicker.rememberFilePicker
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.StoredApiCredential
 import com.moneymanager.credentialvault.VaultState
@@ -307,6 +308,18 @@ private fun ApiCredentialForm(
     var secretInput by remember(strategy.id) { mutableStateOf("") }
     var isSaving by remember(strategy.id) { mutableStateOf(false) }
     var errorMessage by remember(strategy.id) { mutableStateOf<String?>(null) }
+    val secretIsPrivateKey = strategy.config.secretIsPrivateKey
+    var loadedKeyFile by remember(strategy.id) { mutableStateOf<String?>(null) }
+    // A key file is a PEM, or a provider's downloaded JSON wrapping one; octet-stream because a phone's file
+    // picker rarely knows the PEM type.
+    val keyFilePicker =
+        rememberFilePicker(mimeTypes = listOf("application/x-pem-file", "application/json", "application/octet-stream")) { picked ->
+            if (picked != null) {
+                secretInput = picked.content.trim()
+                loadedKeyFile = picked.fileName
+                errorMessage = null
+            }
+        }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         val instructions = strategy.config.connectInstructions
@@ -349,14 +362,27 @@ private fun ApiCredentialForm(
                 value = secretInput,
                 onValueChange = {
                     secretInput = it
+                    loadedKeyFile = null
                     errorMessage = null
                 },
-                label = { Text(if (usesTokenExchange) "Client secret" else "API secret") },
+                label = {
+                    Text(
+                        when {
+                            usesTokenExchange -> "Client secret"
+                            secretIsPrivateKey -> "Private key"
+                            else -> "API secret"
+                        },
+                    )
+                },
+                supportingText = loadedKeyFile?.let { name -> { Text("Loaded from $name") } },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 isError = errorMessage != null,
             )
+            if (secretIsPrivateKey) {
+                OutlinedButton(onClick = { keyFilePicker.launch() }) { Text("Load key file…") }
+            }
         }
 
         errorMessage?.let {

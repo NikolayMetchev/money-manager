@@ -133,4 +133,22 @@ class ApiConnectionsVaultE2ETest : DbTest() {
             assertEquals("binance-secret", saved?.apiSecret)
         }
     }
+
+    @Test
+    fun a_signing_key_is_asked_for_as_a_private_key_that_can_be_loaded_from_a_file() {
+        runMoneyManagerComposeUiTest {
+            val vault = runBlocking { unlockedCredentialVault() }
+            showConnections(vault)
+
+            waitUntil(timeoutMillis = 10_000) { onAllNodesWithText("Revolut X").fetchSemanticsNodes().isNotEmpty() }
+            // Rows sort by name and none is connected yet, so the Connect buttons follow that order.
+            val names = runBlocking { repositories.apiImportStrategyRepository.getAllStrategies().first() }.map { it.name }
+            onAllNodesWithText("Connect")[names.sortedBy { it.lowercase() }.indexOf("Revolut X")].performClick()
+
+            waitUntilAtLeastOneExists(hasText("Private key").and(hasSetTextAction()), timeoutMillis = 10_000)
+            onNodeWithText("Load key file…").assertExists()
+            assertEquals(0, onAllNodesWithText("API secret").fetchSemanticsNodes().size, "no shared-secret field")
+            waitForIdle()
+        }
+    }
 }
