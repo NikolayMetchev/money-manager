@@ -87,6 +87,8 @@ suspend fun reconciledPartnerUnhides(
  * excluded (`ImportDeduper.otherSideOf`). Once that record is deleted the end it lent stays behind, explained
  * by nothing, and the record's re-run counts it again, so these rows are re-run too. Told apart from other
  * reconciled pairs by their accounts: two records of one movement on the same two accounts lent nothing.
+ * A precise or named row that only outranked a placeholder record differs in accounts too: it is re-run as well, which
+ * changes nothing, as it reconciles against the re-created record just as before.
  */
 suspend fun borrowedEndKeepers(
     deletedIds: Set<TransferId>,
