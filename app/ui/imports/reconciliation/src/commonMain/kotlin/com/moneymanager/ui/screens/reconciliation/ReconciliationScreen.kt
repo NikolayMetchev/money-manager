@@ -65,9 +65,11 @@ import com.moneymanager.reconciliation.LegMatch
 import com.moneymanager.reconciliation.ReconciliationResult
 import com.moneymanager.reconciliation.UnlinkedWallet
 import com.moneymanager.reconciliation.applyAutoLinks
+import com.moneymanager.reconciliation.copyToMoneyManager
 import com.moneymanager.reconciliation.createAndLinkAccounts
 import com.moneymanager.reconciliation.planAccountCreation
 import com.moneymanager.reconciliation.planAutoLinks
+import com.moneymanager.reconciliation.planCopy
 import com.moneymanager.reconciliation.realAccounts
 import com.moneymanager.reconciliation.reconcile
 import com.moneymanager.reconciliation.unlinkedWallets
@@ -580,6 +582,11 @@ private fun SourceReconciliation(
             },
             onOpenLeg = onOpenLeg,
             onOpenSource = onOpenSource,
+            copyPlan = remember(movement, shadowAccounts, links, accountNames) { planCopy(movement, shadowAccounts, links, accountNames) },
+            onCopy = { plan ->
+                pickerState.close()
+                write("Copying to Money Manager") { importEngine.copyToMoneyManager(movement, plan) }
+            },
         )
     }
 }

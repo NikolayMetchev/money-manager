@@ -27,6 +27,9 @@ enum class SourceType(
 
     /** Deleted by merging the account into another */
     MERGE(8),
+
+    /** Copied from a reconciliation source onto real accounts */
+    RECONCILIATION(9),
     ;
 
     companion object {

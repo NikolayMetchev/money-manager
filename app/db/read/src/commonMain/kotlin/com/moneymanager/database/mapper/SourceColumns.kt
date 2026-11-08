@@ -106,6 +106,10 @@ private fun SourceColumns.reconstructSource(sourceType: SourceType): Pair<Source
             Source.Unmerge to null
         }
 
+        SourceType.RECONCILIATION -> {
+            Source.Reconciliation to null
+        }
+
         SourceType.CSV_IMPORT -> {
             Source.Csv(
                 importId = CsvImportId(Uuid.parse(checkNotNull(csvImportId) { "CSV source row missing csv_import_id" })),

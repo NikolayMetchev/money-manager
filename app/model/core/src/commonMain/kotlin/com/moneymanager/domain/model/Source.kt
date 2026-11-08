@@ -27,6 +27,12 @@ sealed interface Source {
     data object Unmerge : Source
 
     /**
+     * Copied from a reconciliation source (Koinly, Accointing) onto real accounts, for a record the real accounts' own
+     * sources lack. The copy is matched to the source's record by a `reconciliation-match` relationship.
+     */
+    data object Reconciliation : Source
+
+    /**
      * Created during a CSV import (a QIF, Excel or PDF file is staged as one too); [rowIndex] is the originating row when
      * known. [statementAccountId] is the account whose statement the row is (its own account): an importer sets it on
      * the transfers it writes, and it is recorded with their provenance, never read back into a [Csv].
@@ -59,6 +65,7 @@ fun Source.toSourceType(): SourceType =
         Source.System -> SourceType.SYSTEM
         Source.Merge -> SourceType.MERGE
         Source.Unmerge -> SourceType.MERGE_UNDO
+        Source.Reconciliation -> SourceType.RECONCILIATION
         is Source.Csv -> SourceType.CSV_IMPORT
         is Source.Api -> SourceType.API
     }

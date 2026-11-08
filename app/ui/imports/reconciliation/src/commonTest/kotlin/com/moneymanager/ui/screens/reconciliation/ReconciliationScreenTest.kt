@@ -316,6 +316,7 @@ class ReconciliationScreenTest {
     }
 
     private val ada = CryptoAsset(id = CryptoId(1), code = "ADA", name = "Cardano")
+    private val eth = CryptoAsset(id = CryptoId(2), code = "ETH", name = "Ether")
     private val t0 = Instant.parse("2024-01-10T12:00:00Z")
     private val wallet = ShadowAccount(AccountId(100), "Koinly · Binance", "Koinly")
     private val binance = AccountId(1)
@@ -641,6 +642,64 @@ class ReconciliationScreenTest {
                     .members
                     .map { it.transactionId },
             )
+        }
+    }
+
+    @Test
+    fun thePickerCopiesASourceOnlyTradeToTheLinkedAccountAndMatchesIt() {
+        runMoneyManagerComposeUiTest {
+            val batches = mutableListOf<ImportBatch>()
+            val engine =
+                importEngine { batch ->
+                    batches += batch
+                    ImportResult(createdTradeIds = batch.trades.associate { it.key to TradeId(77) })
+                }
+            showLegsWith(
+                engine,
+                listOf(
+                    leg(30, wallet.accountId, "-5", t0, trade = true),
+                    leg(30, wallet.accountId, "2", t0, trade = true).copy(amount = Money.fromDisplayValue(BigDecimal("2"), eth)),
+                ),
+                listOf(leg(40, binance, "1", t0 + 1.hours)),
+            )
+            expandAll()
+
+            reveal(hasText("Select matching transactions…"))
+            onAllNodesWithText("Select matching transactions…")[0].performClick()
+            waitForIdle()
+            onNodeWithTag(PICKER_COPY_TAG).performClick()
+            waitForIdle()
+
+            val trade = batches.first().trades.single()
+            assertEquals(Source.Reconciliation, trade.source)
+            assertEquals(binance, trade.fromAccountId)
+            assertEquals(binance, trade.toAccountId)
+            assertEquals(Money.fromDisplayValue(BigDecimal("5"), ada), trade.fromAmount)
+            assertEquals(Money.fromDisplayValue(BigDecimal("2"), eth), trade.toAmount)
+            assertEquals(
+                listOf(TradeId(30), TradeId(77)),
+                batches
+                    .last()
+                    .relationshipMutations
+                    .filterIsInstance<RelationshipMutation.Create>()
+                    .single()
+                    .members
+                    .map { it.transactionId },
+            )
+        }
+    }
+
+    @Test
+    fun thePickerSaysWhyAMovementCannotBeCopied() {
+        runMoneyManagerComposeUiTest {
+            val batches = showLegs(listOf(leg(10, wallet.accountId, "-5", t0)), listOf(leg(40, binance, "1", t0 + 1.hours)))
+            expandAll()
+
+            clickText("Select matching transactions…")
+
+            onNodeWithTag(PICKER_COPY_TAG).assertIsNotEnabled()
+            onNodeWithText("Can't copy: account 999 is linked to no Money Manager account").assertExists()
+            assertEquals(emptyList(), batches)
         }
     }
 
