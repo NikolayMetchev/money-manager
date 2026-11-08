@@ -562,7 +562,7 @@ re-imports the files that reference it.
 **Re-import is delete + re-run.** Re-importing a staged file (CSV, QIF, Excel or PDF: `Reimports`, `app/csvimporter`) or an API session (`executeApiReimport`) goes through `executeSourceRerun`
 (`app/importengineapi`): it un-hides the other sources' records the source had reconciled away (those created by a
 staged row are instead deleted and their rows re-run after the source, `RerunPartners`, since the source's re-run
-never reconciles them again), deletes every transfer and trade the source created, resets its records, runs the normal import again, re-runs other files'
+never reconciles them again; so are rows that took an end from a deleted record, `borrowedEndKeepers`), deletes every transfer and trade the source created, resets its records, runs the normal import again, re-runs other files'
 records that had matched against the deleted ones (found from provenance: a staged row linked to a
 transaction it didn't create is a `matched = 1` `entity_source` entry, kept in step with the row's link; readers
 asking who wrote a revision filter on `matched = 0`), re-applies hand edits (from the audit log) to the

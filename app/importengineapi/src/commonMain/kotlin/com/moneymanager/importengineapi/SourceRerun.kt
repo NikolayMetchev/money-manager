@@ -232,6 +232,7 @@ data class SourceRerunPlan(
  * them again (a card statement's placeholder reconciled against another statement's placeholder, which itself
  * lost to the bank's record), so they would count alongside what it re-creates. Instead they are deleted
  * with the source and their records re-run after it, exactly as if their file had been imported second.
+ * A row that took one end from a deleted record ([borrowedEndKeepers]) is re-run the same way.
  * Only a staged row can be re-run, so a partner from an API session (or a file that created trades) is
  * un-hidden as before.
  */
@@ -344,7 +345,8 @@ private suspend fun rerunPartners(
     val orphaned =
         reconciledPartnerUnhides(deletedIds, reads.relationshipRepository, reads.transactionRepository)
             .filter { it.isOrphanedBy(deletedIds) }
-            .mapNotNull { it.update.existingId }
+            .mapNotNull { it.update.existingId } +
+            borrowedEndKeepers(deletedIds, reads.relationshipRepository, reads.transactionRepository)
     if (orphaned.isEmpty()) return RerunPartners()
     val createdByFile = mutableMapOf<Source.Csv, Map<TransferId, Source>>()
 
