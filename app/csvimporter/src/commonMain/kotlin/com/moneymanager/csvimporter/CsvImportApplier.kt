@@ -22,7 +22,6 @@ import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
-import com.moneymanager.domain.model.csvstrategy.EXCLUDED_ATTRIBUTE_TYPE_NAME
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
@@ -32,6 +31,7 @@ import com.moneymanager.domain.model.csvstrategy.uniqueIdentifierAttributeTypes
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.resolveAssetCode
 import com.moneymanager.domain.model.rules.ColumnRecord
+import com.moneymanager.domain.model.rules.EXCLUDED_ATTRIBUTE_TYPE_NAME
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleEngine
 import com.moneymanager.domain.model.rules.RuleEvaluator

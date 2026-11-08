@@ -14,7 +14,9 @@ import com.moneymanager.domain.model.apistrategy.SigFieldLocation
 import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
+import dev.whyoleg.cryptography.CryptographyAlgorithmId
 import dev.whyoleg.cryptography.CryptographyProvider
+import dev.whyoleg.cryptography.algorithms.Digest
 import dev.whyoleg.cryptography.algorithms.EC
 import dev.whyoleg.cryptography.algorithms.ECDSA
 import dev.whyoleg.cryptography.algorithms.EdDSA
@@ -37,11 +39,11 @@ data class SignedRequest(
 
 /**
  * The provider-agnostic per-request signer. Interprets an [ApiRequestSigningConfig] to produce a
- * [SignedRequest] — computing an HMAC over a configurable message and placing the api key / nonce /
+ * [SignedRequest] — computing an HMAC or Ed25519 signature over a configurable message and placing the api key / nonce /
  * (optional) request id / method / signature into the right header, query param or body field; or,
  * when [ApiRequestSigningConfig.jwt] is set, attaching a freshly signed JWT instead.
  *
- * One implementation covers Crypto.com, Binance, Kraken and Coinbase with no per-provider branches —
+ * One implementation covers Crypto.com, Binance, Kraken, Bybit, Revolut X and Coinbase with no per-provider branches —
  * the exchanges differ only in their config values (see [ApiRequestSigningConfig] KDoc).
  */
 class ApiRequestSigner(
@@ -118,7 +120,7 @@ class ApiRequestSigner(
                 body = bodyString,
                 params = params,
             )
-        val signature = encodeSignature(hmac(apiSecret, messageBytes))
+        val signature = encodeSignature(signMessage(apiSecret, messageBytes))
 
         // 4. Place the signature (after signing, so it is not part of the signed message).
         place(signaturePlacement, signature, headers, queryParams, bodyFields)
@@ -360,20 +362,26 @@ class ApiRequestSigner(
             RequestIdFormat.INCREMENTING, RequestIdFormat.EPOCH_MS -> requestId.toString()
         }
 
+    private suspend fun signMessage(
+        secret: String,
+        message: ByteArray,
+    ): ByteArray =
+        when (config.algorithm) {
+            SigningAlgorithm.ED25519 -> decodeEd25519PrivateKey(secret).signatureGenerator().generateSignature(message)
+            SigningAlgorithm.HMAC_SHA256 -> hmac(secret, message, SHA256)
+            SigningAlgorithm.HMAC_SHA512 -> hmac(secret, message, SHA512)
+        }
+
     private suspend fun hmac(
         secret: String,
         message: ByteArray,
+        digest: CryptographyAlgorithmId<Digest>,
     ): ByteArray {
         val provider = CryptographyProvider.Default
         val secretBytes =
             when (config.secretEncoding) {
                 SecretEncoding.UTF8 -> secret.encodeToByteArray()
                 SecretEncoding.BASE64 -> Base64.decode(secret)
-            }
-        val digest =
-            when (config.algorithm) {
-                SigningAlgorithm.HMAC_SHA256 -> SHA256
-                SigningAlgorithm.HMAC_SHA512 -> SHA512
             }
         val key = provider.get(HMAC).keyDecoder(digest).decodeFromByteArray(HMAC.Key.Format.RAW, secretBytes)
         return key.signatureGenerator().generateSignature(message)
