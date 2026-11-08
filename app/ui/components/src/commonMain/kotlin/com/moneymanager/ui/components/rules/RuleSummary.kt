@@ -63,7 +63,11 @@ private fun AccountSide.summary(): String =
 
 /** The name an account naming gives: the value it read, or the name it writes out. */
 private fun AccountNaming.summary(): String =
-    if (name == AccountNaming.VALUE_PLACEHOLDER) "from ${value.summary()}" else "“${name.orMissing()}”"
+    when {
+        feeAccount -> "the own account's fee account"
+        name == AccountNaming.VALUE_PLACEHOLDER -> "from ${value.summary()}"
+        else -> "“${name.orMissing()}”"
+    }
 
 @Suppress("CyclomaticComplexMethod") // One phrase per action kind.
 fun RuleAction.summary(): String =

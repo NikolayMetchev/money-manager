@@ -1553,6 +1553,8 @@ private fun parseExchangeTransfer(
         val description =
             item.text(tm.descriptionField)?.takeIf { it.isNotBlank() }
                 ?: if (resolvedDirection == TransferDirection.IN) "Deposit $currency" else "Withdraw $currency"
+        val counterparty = rules.counterparty(outcome.accountsFor(AccountSide.COUNTERPARTY), item)
+        val toFeeAccount = counterparty?.second?.feeAccount == true
         result +=
             ParsedExchangeTransfer(
                 id = id,
@@ -1566,8 +1568,9 @@ private fun parseExchangeTransfer(
                 counterpartyAddress = tm.counterpartyAddressField?.let { item.text(it) }?.takeIf { it.isNotBlank() },
                 network = tm.counterpartyNetworkField?.let { item.text(it) }?.takeIf { it.isNotBlank() },
                 txid = tm.txidField?.let { item.text(it) }?.takeIf { it.isNotBlank() },
-                counterpartyAccountName = rules.counterpartyName(outcome.accountsFor(AccountSide.COUNTERPARTY), item),
+                counterpartyAccountName = counterparty?.first?.takeUnless { toFeeAccount },
                 joinKey = tm.joinKeyField?.let { item.text(it) },
+                isFeeOnly = toFeeAccount,
                 approximateUntil = approximateUntil,
                 excludedValue = outcome.excludedValue(),
             )
@@ -1810,8 +1813,15 @@ private fun RuleEngine.carries(
     evaluator.all(fee.conditions, item) &&
         fee.chargedOnAsset?.let { resolve(it, item).equals(itemAsset, ignoreCase = true) } != false
 
-/** The first of [namings] that names an account for [item], or null. */
-private fun RuleEngine.counterpartyName(
+/** The name the first of [namings] that names an account for [item] gives, with that naming, or null. */
+private fun RuleEngine.counterparty(
     namings: List<AccountNaming>,
     item: Record,
-): String? = namings.firstNotNullOfOrNull { naming -> evaluator.name(naming) { item.text(it) }?.name?.takeIf { it.isNotBlank() } }
+): Pair<String, AccountNaming>? =
+    namings.firstNotNullOfOrNull { naming ->
+        evaluator
+            .name(naming) { item.text(it) }
+            ?.name
+            ?.takeIf { it.isNotBlank() }
+            ?.let { it to naming }
+    }

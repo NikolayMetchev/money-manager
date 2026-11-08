@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
@@ -307,6 +308,27 @@ class BinanceCsvE2ETest : DbTest() {
             // group failed to resolve.
             assertNull(balanceOf("Binance Trading", "BTC"), "no leg fell through to the suspense account")
             assertNull(balanceOf("Binance Trading", "GBP"), "no leg fell through to the suspense account")
+        }
+
+    @Test
+    fun aFeeRowGoesToTheBinanceAccountsFeeAccountFoundByItsTag() =
+        runDbTest {
+            applyAll(listOf(stage("fee1.csv", listOf(row("2022-11-14 20:32:54", "Fee", "BNB", "-0.001")))))
+            val binance = assertNotNull(accountByName("Binance"))
+            val feeAccount = assertNotNull(accountByName("Binance Fees"))
+            val tag =
+                repositories.accountAttributeRepository
+                    .getByAccount(feeAccount.id)
+                    .first()
+                    .single { it.attributeType.id.id == WellKnownIds.ACCOUNT_FEE_ACCOUNT_FOR_ATTR_TYPE_ID }
+            assertEquals(binance.id.toString(), tag.value, "the fee account is tagged with the account it belongs to")
+
+            // Renamed, it is still Binance's fee account: the next fee row finds it by its tag.
+            repositories.accountRepository.updateAccount(feeAccount.copy(name = "Exchange charges"), Source.Manual)
+            applyAll(listOf(stage("fee2.csv", listOf(row("2022-11-15 20:32:54", "Fee", "BNB", "-0.002")))))
+
+            assertEquals("0.003", balanceOf("Exchange charges", "BNB"))
+            assertNull(accountByName("Binance Fees"), "no second fee account")
         }
 
     @Test

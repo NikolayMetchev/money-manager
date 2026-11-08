@@ -586,6 +586,10 @@ fun AccountNamingEditor(
     TextField("Only when the value matches (regex, optional)", naming.pattern.orEmpty(), enabled) {
         onNamingChanged(naming.copy(pattern = it.ifBlank { null }))
     }
+    CheckRow("The own account's fee account (a record that is itself a fee)", naming.feeAccount, enabled) {
+        onNamingChanged(naming.copy(feeAccount = it))
+    }
+    if (naming.feeAccount) return
     TextField($$"Account name ({value}, $1…)", naming.name, enabled, isError = naming.name.isBlank()) {
         onNamingChanged(naming.copy(name = it))
     }

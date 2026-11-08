@@ -72,6 +72,15 @@ internal fun fixedNaming(
 ): AccountNaming = naming(column, pattern = "^", name = name, unidentified = unidentified)
 
 /**
+ * The fee account of the record's own account ([AccountNaming.feeAccount]), when [column] matches [pattern]: a record that is
+ * itself a fee. The engine finds it by its `fee-account-for` tag, so it is the account fees charged on other records go to too.
+ */
+internal fun feeAccountNaming(
+    column: String,
+    pattern: String,
+): AccountNaming = AccountNaming(value = ValueExpr.of(column), pattern = pattern, feeAccount = true)
+
+/**
  * The built-in counterparty [name] (e.g. "ATM"): every record naming it consolidates into one account. It
  * reads [column], which every record has, only so that the naming applies.
  */

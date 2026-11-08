@@ -102,6 +102,10 @@ enum class AccountSide {
  *   the import engine reconciles it against a real record of the same movement.
  * @property builtIn A well-known counterparty such as "ATM": every record naming it consolidates into one
  *   account, whatever counterparty id or merchant the record carries (API transactions).
+ * @property feeAccount The account is the fee account of the record's own account (the one whose `fee-account-for`
+ *   attribute names it, else an untagged "<account> Fees", else a new one), so [name] and the options after it are
+ *   unused. Only on the side facing the own account (a CSV strategy's TARGET, an API one's COUNTERPARTY), for a record
+ *   that is itself a fee the bank or exchange charged.
  */
 @Serializable
 data class AccountNaming(
@@ -123,6 +127,8 @@ data class AccountNaming(
     val unidentified: Boolean = false,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val builtIn: Boolean = false,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val feeAccount: Boolean = false,
 ) {
     companion object {
         /** In [name], the (cleaned) value the naming read. */

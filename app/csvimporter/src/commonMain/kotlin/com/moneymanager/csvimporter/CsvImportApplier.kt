@@ -119,6 +119,29 @@ internal fun collapsePassThroughChain(
 private fun CsvTransferWithAttributes.feePayerId(): AccountId =
     statementAccountId?.takeIf { it != UNRESOLVED_ACCOUNT_ID } ?: transfer.sourceAccountId
 
+/** The account whose fee account the row names on its other side ([OWN_FEE_ACCOUNT_ID]), or null. */
+private fun CsvTransferWithAttributes.ownerOfFeeAccountSide(): AccountId? =
+    when (OWN_FEE_ACCOUNT_ID) {
+        transfer.targetAccountId -> transfer.sourceAccountId
+        transfer.sourceAccountId -> transfer.targetAccountId
+        else -> null
+    }
+
+/** The row with [OWN_FEE_ACCOUNT_ID] replaced by its owner's fee account from [feeAccountOf]. */
+private fun CsvTransferWithAttributes.withOwnFeeAccount(feeAccountOf: Map<AccountId, AccountId>): CsvTransferWithAttributes {
+    val owner = ownerOfFeeAccountSide() ?: return this
+    val feeAccount = checkNotNull(feeAccountOf[owner]) { "No fee account for $owner" }
+
+    fun AccountId.resolved() = if (this == OWN_FEE_ACCOUNT_ID) feeAccount else this
+    return copy(
+        transfer =
+            transfer.copy(
+                sourceAccountId = transfer.sourceAccountId.resolved(),
+                targetAccountId = transfer.targetAccountId.resolved(),
+            ),
+    )
+}
+
 /** Links each debit leg to the nearest credit leg of the same key within [window] (credits may be shared). */
 private fun pairDebitsToCredits(
     legs: List<CsvTransferWithAttributes>,
@@ -1063,7 +1086,18 @@ suspend fun runCsvImport(
         return CsvImportResult(successCount = 0, failedRows = emptyList())
     }
 
-    val finalPrep = mapper.prepareImport(rows).withUnresolvedAccountsAsErrors()
+    val mappedPrep = mapper.prepareImport(rows).withUnresolvedAccountsAsErrors()
+    // Each account a row charges a fee to pays it into its own fee account (per-row fees are their own movements, linked to
+    // the main transfer), and so does a row that is itself a fee ([AccountNaming.feeAccount]). The engine resolves them.
+    val feeAccountOf: Map<AccountId, AccountId> =
+        importEngine.feeAccounts(
+            mappedPrep.validTransfers.flatMapTo(mutableSetOf()) { row ->
+                listOfNotNull(row.feePayerId().takeIf { row.feeAmount != null }, row.ownerOfFeeAccountSide())
+            },
+            Source.Csv(csvImport.id),
+            shadowSource = strategy.shadowSource,
+        )
+    val finalPrep = mappedPrep.copy(validTransfers = mappedPrep.validTransfers.map { it.withOwnFeeAccount(feeAccountOf) })
     val validCount = finalPrep.validTransfers.size
     val errorCount = finalPrep.errorRows.size
     logger.i { "Prepared $validCount valid transfers, $errorCount error rows" }
@@ -1114,15 +1148,6 @@ suspend fun runCsvImport(
     // above, so transfers carry Existing refs and the central engine only
     // dedupes, writes transfers, applies updates and records sources.
     val uniqueIdTypeNames = strategy.config.uniqueIdentifierAttributeTypes().toSet()
-
-    // Each account a row charges a fee to pays it into its own fee account, so per-row fees are modelled as their own
-    // movements linked to the main transfer.
-    val feeAccountOf: Map<AccountId, AccountId> =
-        importEngine.feeAccounts(
-            finalPrep.validTransfers.filter { it.feeAmount != null }.mapTo(mutableSetOf()) { it.feePayerId() },
-            Source.Csv(csvImport.id),
-            shadowSource = strategy.shadowSource,
-        )
 
     // Sources that split one trade across several rows (Binance stamps every partial fill of both legs
     // with the same second) are assembled here: each resolvable group folds into one trade and its legs

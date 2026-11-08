@@ -142,6 +142,13 @@ sealed interface MappingResult {
 val UNRESOLVED_ACCOUNT_ID = AccountId(-1)
 
 /**
+ * Stand-in id for the fee account of a row's own account, which a counterparty naming with [AccountNaming.feeAccount]
+ * names. The engine resolves fee accounts, so the mapper leaves this for [runCsvImport] to replace, by own account,
+ * before anything books the row.
+ */
+val OWN_FEE_ACCOUNT_ID = AccountId(-2)
+
+/**
  * A new account that needs to be created during import.
  */
 data class NewAccount(
@@ -1157,6 +1164,7 @@ class CsvTransferMapper(
             }
 
             is AccountFromRulesMapping -> {
+                if (resolution.naming?.feeAccount == true) return OWN_FEE_ACCOUNT_ID
                 (if (applyPersistedMappings) findPersistedMapping(resolution.sourceValue) else null)
                     ?: resolution.attributeAccountId
                     ?: resolveExistingAccountId(resolution.accountName)
@@ -1182,6 +1190,7 @@ class CsvTransferMapper(
     ): Boolean =
         mapping is AccountFromRulesMapping &&
             resolution.naming?.unidentified == true &&
+            !resolution.naming.feeAccount &&
             resolution.accountName.isNotBlank() &&
             !(applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null)
 
@@ -1214,6 +1223,10 @@ class CsvTransferMapper(
     ): Pair<NewAccount, DiscoveredAccountMapping>? {
         val rulesMapping = mapping as? AccountFromRulesMapping ?: return null
         return when {
+            resolution.naming?.feeAccount == true -> {
+                null
+            }
+
             applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null -> {
                 null
             }

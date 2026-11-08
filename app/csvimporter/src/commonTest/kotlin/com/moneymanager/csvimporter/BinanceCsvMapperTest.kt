@@ -107,11 +107,19 @@ class BinanceCsvMapperTest {
                 "Simple Earn Locked Subscription" to "Binance Earn",
                 "Simple Earn Locked Rewards" to "Binance Earn Rewards",
                 "Simple Earn Flexible Airdrop" to "Binance Earn Rewards",
-                "Fee" to "Binance Fees",
-                "Transaction Fee" to "Binance Fees",
             )
         for ((operation, account) in expected) {
             assertEquals(account, counterpartyName(map(row(operation, "GBP", "-1.00"))), "routing for '$operation'")
+        }
+    }
+
+    @Test
+    fun feeRows_goToTheBinanceAccountsFeeAccount() {
+        for (operation in listOf("Fee", "Transaction Fee")) {
+            val r = map(row(operation, "BNB", "-0.01"))
+            assertEquals(binance.id, r.transfer.sourceAccountId, "$operation leaves Binance")
+            assertEquals(OWN_FEE_ACCOUNT_ID, r.transfer.targetAccountId, "$operation goes to Binance's fee account")
+            assertEquals(emptyList(), r.newAccounts, "$operation names no account to create")
         }
     }
 

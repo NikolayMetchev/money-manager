@@ -3,6 +3,7 @@ package com.moneymanager.database.csv
 import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.MappingResult
+import com.moneymanager.csvimporter.OWN_FEE_ACCOUNT_ID
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -121,9 +122,10 @@ class SantanderQifMapperTest {
     }
 
     @Test
-    fun `monthly account fee maps to a fixed counterparty via a non-template rule`() {
+    fun `monthly account fee goes to the account's fee account`() {
         val r = map("MONTHLY ACCOUNT FEE, 5.00GBP", "-5.00")
-        assertEquals("Santander Fees", newTargetName(r))
+        assertEquals(OWN_FEE_ACCOUNT_ID, r.transfer.targetAccountId)
+        assertTrue(r.newAccounts.isEmpty())
         assertEquals("ACCOUNT_FEE", r.attrs()["santander-transaction-type"])
     }
 
