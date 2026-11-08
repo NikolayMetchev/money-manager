@@ -247,7 +247,7 @@ private fun JwtFieldListEditor(
     }
 }
 
-/** Editor for [JwtSigningConfig]: per-request JWT authentication in place of an HMAC signature. */
+/** Editor for [JwtSigningConfig]: per-request JWT authentication in place of a signed message. */
 @Composable
 private fun JwtSigningEditor(
     jwt: JwtSigningConfig,
@@ -283,7 +283,7 @@ private fun JwtSigningEditor(
 
 /**
  * Editor for the optional proactive [ApiRequestSigningConfig] (its presence makes the strategy signed): the
- * complete provider-agnostic HMAC recipe (algorithm, message parts, field placements, body format), or
+ * complete provider-agnostic signing recipe (algorithm, message parts, field placements, body format), or
  * a JWT recipe in its place.
  */
 @Composable
@@ -301,7 +301,7 @@ internal fun RequestSigningEditor(
     val c = config ?: return
 
     ToggleRow(
-        label = "Authenticate with a signed JWT instead of an HMAC signature",
+        label = "Authenticate with a signed JWT instead of a signed message",
         checked = c.jwt != null,
         onCheckedChange = { on -> onChange(c.copy(jwt = if (on) JwtSigningConfig() else null)) },
         enabled = enabled,
@@ -325,14 +325,17 @@ internal fun RequestSigningEditor(
             optionLabel = { it.name },
             enabled = enabled,
         )
-        EnumDropdown(
-            label = "Secret encoding",
-            options = SecretEncoding.entries,
-            selected = c.secretEncoding,
-            onSelect = { onChange(c.copy(secretEncoding = it)) },
-            optionLabel = { it.name },
-            enabled = enabled,
-        )
+        // An Ed25519 key is read in its own formats (PEM or base64), never through a secret encoding.
+        if (c.algorithm != SigningAlgorithm.ED25519) {
+            EnumDropdown(
+                label = "Secret encoding",
+                options = SecretEncoding.entries,
+                selected = c.secretEncoding,
+                onSelect = { onChange(c.copy(secretEncoding = it)) },
+                optionLabel = { it.name },
+                enabled = enabled,
+            )
+        }
         EnumDropdown(
             label = "Signature encoding",
             options = SignatureEncoding.entries,

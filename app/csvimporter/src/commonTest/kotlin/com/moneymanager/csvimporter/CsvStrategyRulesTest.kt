@@ -1,8 +1,8 @@
 package com.moneymanager.csvimporter
 
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
-import com.moneymanager.domain.model.csvstrategy.EXCLUDED_ATTRIBUTE_TYPE_NAME
 import com.moneymanager.domain.model.csvstrategy.ownedAttributeValues
+import com.moneymanager.domain.model.rules.EXCLUDED_ATTRIBUTE_TYPE_NAME
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.StrategyRule

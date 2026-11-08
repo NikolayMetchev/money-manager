@@ -30,10 +30,14 @@ import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.resolveAssetCode
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
+import com.moneymanager.domain.model.rules.EXCLUDED_ATTRIBUTE_TYPE_NAME
 import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.Record
 import com.moneymanager.domain.model.rules.RuleEngine
+import com.moneymanager.domain.model.rules.RuleOutcome
 import com.moneymanager.domain.model.rules.ValueExpr
+import com.moneymanager.domain.model.rules.excludedAttributeValue
+import com.moneymanager.domain.model.rules.ownedAttributeValues
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
@@ -620,6 +624,8 @@ private data class ParsedTrade(
     val orderId: String?,
     val requestId: ApiRequestId,
     val jsonPath: String,
+    /** The value of the `excluded` attribute when the rules exclude this trade from balances. */
+    val excludedValue: String? = null,
 )
 
 private data class ParsedExchangeTransfer(
@@ -654,6 +660,8 @@ private data class ParsedExchangeTransfer(
     val isFeeOnly: Boolean = false,
     /** See [ImportTransfer.approximateUntil]: set when [timestamp] is only the fetch window's start. */
     val approximateUntil: Instant? = null,
+    /** The value of the `excluded` attribute when the rules exclude this movement from balances. */
+    val excludedValue: String? = null,
 )
 
 private data class ParsedOrder(
@@ -987,6 +995,24 @@ suspend fun importApiSessionExchange(
     // Fill-trade keys per order id, collected only for trades that actually became intents (a trade
     // skipped for an unresolvable asset must not surface as a dangling link key).
     val tradeKeysByOrderRef = mutableMapOf<String, MutableList<LocalTradeKey>>()
+    // Records the rules exclude are booked with an `excluded` attribute, which a re-download clears again once
+    // the rules stop excluding the record (only the values those rules can write, never a hand-set one).
+    val excludedAttr = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
+    val ownedExclusion =
+        strategy.config.dataEndpoints
+            .flatMap { it.transactionMappings?.rules.orEmpty() + it.tradeMappings?.rules.orEmpty() }
+            .ownedAttributeValues()
+            .let { owned ->
+                if (EXCLUDED_ATTRIBUTE_TYPE_NAME in
+                    owned
+                ) {
+                    mapOf(excludedAttr to owned[EXCLUDED_ATTRIBUTE_TYPE_NAME])
+                } else {
+                    emptyMap()
+                }
+            }
+
+    fun exclusion(value: String?) = listOfNotNull(value?.let { NewAttribute(excludedAttr, it) })
 
     trades.forEach forEachTrade@{ t ->
         val baseAsset = asset(t.baseCode)
@@ -1009,6 +1035,8 @@ suspend fun importApiSessionExchange(
                 fromAmount = fromAmount,
                 toAccountId = syntheticId,
                 toAmount = toAmount,
+                attributes = exclusion(t.excludedValue),
+                ownedAttributes = ownedExclusion,
             )
         t.orderId?.let { tradeKeysByOrderRef.getOrPut(it, ::mutableListOf).add(tradeKey) }
         // A trade carries no fee slot, so emit any fee as its own movement to the fee account.
@@ -1032,7 +1060,7 @@ suspend fun importApiSessionExchange(
                         requestId = t.requestId,
                         jsonPath = t.jsonPath,
                         txnIdAttr = txnIdAttr,
-                    )
+                    ).let { it.copy(attributes = it.attributes + exclusion(t.excludedValue), ownedAttributes = ownedExclusion) }
             }
         }
     }
@@ -1163,7 +1191,9 @@ suspend fun importApiSessionExchange(
                                 tx.approximateUntil?.let {
                                     NewAttribute(approximateTimestampAttr, it.toEpochMilliseconds().toString())
                                 },
-                            ),
+                            ) +
+                            exclusion(tx.excludedValue),
+                    ownedAttributes = ownedExclusion,
                 )
             }
     }
@@ -1282,6 +1312,9 @@ private fun exchangeTransfer(
         reconcileGrossAmount = grossMoney,
     )
 }
+
+/** The `excluded` attribute value these rules give the record, or null when they leave it counted. */
+private fun RuleOutcome.excludedValue(): String? = if (excluded) excludedAttributeValue(excludeReason) else null
 
 // No order-derived suffix: existing databases were imported with plain "<verb> BASE/QUOTE"
 // descriptions, and trade dedupe is a full-tuple match including description — changing this format
@@ -1421,6 +1454,7 @@ private fun parseTrade(
         orderId = tm.orderIdField?.let { item.text(it) },
         requestId = requestId,
         jsonPath = jsonPath,
+        excludedValue = outcome.excludedValue(),
     )
 }
 
@@ -1536,6 +1570,7 @@ private fun parseExchangeTransfer(
                 counterpartyAccountName = rules.counterpartyName(outcome.accountsFor(AccountSide.COUNTERPARTY), item),
                 joinKey = tm.joinKeyField?.let { item.text(it) },
                 approximateUntil = approximateUntil,
+                excludedValue = outcome.excludedValue(),
             )
     }
 
@@ -1568,6 +1603,8 @@ private fun parseExchangeTransfer(
                 joinKey = null,
                 isFeeOnly = true,
                 approximateUntil = approximateUntil,
+                // A fee charged for an excluded movement is excluded with it.
+                excludedValue = outcome.excludedValue(),
             )
     }
     return result

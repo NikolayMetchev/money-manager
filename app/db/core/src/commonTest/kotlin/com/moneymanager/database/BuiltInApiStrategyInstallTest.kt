@@ -21,6 +21,7 @@ import com.moneymanager.test.database.installBuiltInApiStrategies
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -40,7 +41,18 @@ class BuiltInApiStrategyInstallTest : DbTest() {
                     .map { it.name }
                     .toSet()
             assertEquals(
-                setOf("Monzo", "Wise", "Starling", "Crypto.com Exchange", "Kraken", "Binance", "Coinbase", "Bybit", "PayPal API"),
+                setOf(
+                    "Monzo",
+                    "Wise",
+                    "Starling",
+                    "Crypto.com Exchange",
+                    "Kraken",
+                    "Binance",
+                    "Coinbase",
+                    "Bybit",
+                    "PayPal API",
+                    "Revolut X",
+                ),
                 names,
             )
         }
@@ -138,6 +150,30 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             )
             val ledgers = bybit.config.dataEndpoints.filter { it.endpoint.path == "v5/account/transaction-log" }
             assertEquals(2, ledgers.size, "linear and inverse ledgers share a path, disambiguated by category")
+        }
+
+    @Test
+    fun `the Revolut X strategy installs with its Ed25519-signed exchange configuration`() =
+        runDbTest {
+            repositories.installBuiltInApiStrategies()
+            val revolutX =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .first { it.name == "Revolut X" }
+
+            assertTrue(revolutX.config.isSigned)
+            val signing = assertNotNull(revolutX.config.requestSigning, "signing recipe persisted")
+            assertEquals(SigningAlgorithm.ED25519, signing.algorithm)
+            assertEquals(SignatureEncoding.BASE64, signing.signatureEncoding)
+            assertTrue(revolutX.config.secretIsPrivateKey, "an Ed25519 key is asked for as a private key")
+            assertEquals("Revolut X", assertIs<ApiAccountsSource.Single>(revolutX.config.accounts).name)
+            val ledgers = revolutX.config.dataEndpoints.filter { it.endpoint.path == "1.0/transactions" }
+            assertEquals(
+                setOf(ApiEndpointKind.TRADES, ApiEndpointKind.DEPOSITS),
+                ledgers.map { it.kind }.toSet(),
+                "trades and transfers share the ledger, disambiguated by types",
+            )
         }
 
     @Test
@@ -250,6 +286,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             assertTrue(binance.config.isSigned)
             val signing = assertNotNull(binance.config.requestSigning, "signing recipe persisted")
             assertEquals(SigningAlgorithm.HMAC_SHA256, signing.algorithm)
+            assertFalse(binance.config.secretIsPrivateKey, "an HMAC secret is a shared secret, not a key file")
             assertEquals("Binance", assertIs<ApiAccountsSource.Single>(binance.config.accounts).name)
             assertTrue(binance.config.valueEndpoints.isNotEmpty(), "value endpoints persisted")
             val myTrades = binance.config.dataEndpoints.first { it.endpoint.path == "api/v3/myTrades" }

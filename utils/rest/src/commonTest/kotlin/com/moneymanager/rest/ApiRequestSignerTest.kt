@@ -20,8 +20,8 @@ import kotlin.test.assertTrue
 
 /**
  * Proves the single, provider-agnostic [ApiRequestSigner] reproduces the published signing vectors of
- * three exchanges whose schemes differ on every axis (algorithm, secret/output encoding, message shape,
- * field placement, body format) — validating that Crypto.com/Binance/Kraken are config-only, no code.
+ * the exchanges whose schemes differ on every axis (algorithm, secret/output encoding, message shape,
+ * field placement, body format) — validating that every exchange is config-only, no code.
  *
  * Binance and Kraken use each exchange's own published example signature. Crypto.com uses an
  * independently-computed HMAC (openssl) over its documented `method+id+apiKey+sortedConcat(params)+nonce`
@@ -196,5 +196,49 @@ class ApiRequestSignerTest {
             assertEquals("XXXXXXXXXX", signed.headers["X-BAPI-API-KEY"])
             assertEquals("1658384314791", signed.headers["X-BAPI-TIMESTAMP"])
             assertEquals("5000", signed.headers["X-BAPI-RECV-WINDOW"])
+        }
+
+    // Expected signature computed independently by openssl over the same message:
+    // `openssl pkeyutl -sign -rawin -inkey key.pem -in msg | base64` (Ed25519 is deterministic).
+    @Test
+    fun `revolut X Ed25519 base64 signature over timestamp verb path and query`() =
+        runTest {
+            val config =
+                ApiRequestSigningConfig(
+                    algorithm = SigningAlgorithm.ED25519,
+                    signatureEncoding = SignatureEncoding.BASE64,
+                    message = listOf(SigPart.Nonce, SigPart.Literal("GET"), SigPart.Path, SigPart.QueryString),
+                    apiKey = FieldPlacement(SigFieldLocation.HEADER, "X-Revx-API-Key"),
+                    nonce = NonceSpec(NonceFormat.EPOCH_MS, FieldPlacement(SigFieldLocation.HEADER, "X-Revx-Timestamp")),
+                    signature = FieldPlacement(SigFieldLocation.HEADER, "X-Revx-Signature"),
+                    bodyFormat = BodyFormat.NONE,
+                )
+            val signed =
+                ApiRequestSigner(config).sign(
+                    endpointUrl = "https://revx.revolut.com/api/1.0/transactions",
+                    path = "/api/1.0/transactions",
+                    methodName = "1.0/transactions",
+                    params = linkedMapOf("start_date" to "1697408000000", "end_date" to "1700000000000", "types" to "receive,send"),
+                    apiKey = "revx-api-key",
+                    // A throwaway key from `openssl genpkey -algorithm ed25519`, as Revolut X has its users make one.
+                    apiSecret =
+                        """
+                        -----BEGIN PRIVATE KEY-----
+                        MC4CAQAwBQYDK2VwBCIEIC6gzUgayGbzZtlgniUJVCCqMl5V76qfGXpcLdGT/t66
+                        -----END PRIVATE KEY-----
+                        """.trimIndent(),
+                    nonce = 1700000000000,
+                    requestId = 0,
+                )
+            assertEquals(
+                "K6xcQ/7fVG/HDVBzCwH7LQxJClvSGQuGLm56JrGkv4yz76YoMlAA0xjEsGuUw6wbvXeLK8HKBs2/IYBqOII0Ag==",
+                signed.headers["X-Revx-Signature"],
+            )
+            assertEquals("revx-api-key", signed.headers["X-Revx-API-Key"])
+            assertEquals("1700000000000", signed.headers["X-Revx-Timestamp"])
+            assertEquals(
+                "https://revx.revolut.com/api/1.0/transactions?start_date=1697408000000&end_date=1700000000000&types=receive%2Csend",
+                signed.url,
+            )
         }
 }

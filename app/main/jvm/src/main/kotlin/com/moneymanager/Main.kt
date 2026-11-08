@@ -1,5 +1,12 @@
 package com.moneymanager
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -9,11 +16,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import co.touchlab.kermit.Logger
+import com.moneymanager.browser.BrowserLaunchException
+import com.moneymanager.browser.BrowserLauncher
 import com.moneymanager.cryptodata.HttpCryptoCatalogRefresher
 import com.moneymanager.cryptodata.installCryptoCatalog
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
@@ -34,6 +46,7 @@ import com.moneymanager.ui.components.DatabaseProgressScreen
 import com.moneymanager.ui.foundation.CredentialVaultPromptHost
 import com.moneymanager.ui.foundation.LocalStartupProbe
 import com.moneymanager.ui.foundation.StartupMilestone
+import com.moneymanager.ui.util.setPlainText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.swing.Swing
@@ -192,7 +205,12 @@ private fun MainWindow(onExit: () -> Unit) {
                     },
                 )
             }
-            CompositionLocalProvider(LocalStartupProbe provides startupProbe) {
+            // Every link in the app opens through the same launcher as the Google sign-in, so the browser also
+            // comes to the front where `xdg-open` alone leaves it behind (Hyprland).
+            var unopenedUrl by remember { mutableStateOf<String?>(null) }
+            val uriHandler = remember { BrowserUriHandler(params.browserLauncher) { url -> unopenedUrl = url } }
+            unopenedUrl?.let { url -> UnopenedLinkDialog(url, onDismiss = { unopenedUrl = null }) }
+            CompositionLocalProvider(LocalStartupProbe provides startupProbe, LocalUriHandler provides uriHandler) {
                 AppStartupHost(
                     databaseManager = databaseManager,
                     appVersion = appVersion,
@@ -212,4 +230,47 @@ private fun MainWindow(onExit: () -> Unit) {
             }
         }
     }
+}
+
+/** Compose's links, opened by [launcher]; a link no browser opened goes to [onUnopened] rather than throwing into the click. */
+private class BrowserUriHandler(
+    private val launcher: BrowserLauncher,
+    private val onUnopened: (String) -> Unit,
+) : UriHandler {
+    override fun openUri(uri: String) {
+        try {
+            launcher.open(uri)
+        } catch (failed: BrowserLaunchException) {
+            logger.w(failed) { "Couldn't open $uri" }
+            onUnopened(uri)
+        }
+    }
+}
+
+/** No browser opened [url], so it is shown for the person to copy and open themselves. */
+@Composable
+@Suppress("FunctionName")
+private fun UnopenedLinkDialog(
+    url: String,
+    onDismiss: () -> Unit,
+) {
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Couldn't open a browser") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Open this link in your browser:")
+                SelectionContainer { Text(url, style = MaterialTheme.typography.bodySmall) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                scope.launch { clipboard.setPlainText(url) }
+                onDismiss()
+            }) { Text("Copy link") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
 }

@@ -503,18 +503,25 @@ data class ApiPersonImportConfig(
 )
 
 // ---------------------------------------------------------------------------------------------
-// Proactive request signing (ApiStrategyConfig.requestSigning) — a generic, provider-agnostic HMAC recipe.
-// One config shape expresses Crypto.com, Binance and Kraken signing without any per-provider code.
+// Proactive request signing (ApiStrategyConfig.requestSigning) — a generic, provider-agnostic recipe: one
+// signature (HMAC or Ed25519) over a configurable message. One config shape expresses Crypto.com, Binance,
+// Kraken, Bybit and Revolut X signing without any per-provider code.
 // ---------------------------------------------------------------------------------------------
 
-/** HMAC hash function used to sign a request. */
+/** How a request's message is signed. */
 @Serializable
 enum class SigningAlgorithm {
     HMAC_SHA256,
     HMAC_SHA512,
+
+    /**
+     * Ed25519, the api secret being the private key: a PKCS#8 PEM (`openssl genpkey -algorithm ed25519`),
+     * or the base64 of a 32-byte seed or a 64-byte seed + public key. [SecretEncoding] doesn't apply.
+     */
+    ED25519,
 }
 
-/** How the API secret is decoded before use as the HMAC key. */
+/** How the API secret is decoded before use as the HMAC key (an Ed25519 key is decoded by its own format). */
 @Serializable
 enum class SecretEncoding {
     /** The secret is used as raw UTF-8 bytes (Crypto.com, Binance). */
@@ -524,7 +531,7 @@ enum class SecretEncoding {
     BASE64,
 }
 
-/** How the computed HMAC digest is encoded for transmission. */
+/** How the computed signature is encoded for transmission. */
 @Serializable
 enum class SignatureEncoding {
     HEX,
@@ -663,7 +670,7 @@ sealed interface SigPart {
 
 /**
  * A complete, provider-agnostic recipe for signing a request. The engine computes
- * `sig = HMAC(secretEncoding(secret))` over the bytes produced by [message], encodes it via
+ * `sig = HMAC(secretEncoding(secret))` (or the Ed25519 signature, per [algorithm]) over the bytes produced by [message], encodes it via
  * [signatureEncoding], and places api key / nonce / (optional) id / signature per their placements.
  *
  * The three target exchanges map to three literal values of this type — no code branches per provider:
@@ -673,6 +680,8 @@ sealed interface SigPart {
  *   nonce = `timestamp` in QUERY, sig in QUERY `signature`; [bodyFormat] QUERY_ONLY.
  * - **Kraken**: HMAC_SHA512, BASE64 secret, BASE64 sig, message = [Path, Sha256([Nonce, Body])]; api key in
  *   HEADER `API-Key`, nonce in BODY_FIELD, sig in HEADER `API-Sign`; [bodyFormat] FORM_URLENCODED.
+ * - **Revolut X**: ED25519, BASE64 sig, message = [Nonce, Literal("GET"), Path, QueryString]; api key in HEADER
+ *   `X-Revx-API-Key`, nonce in HEADER `X-Revx-Timestamp`, sig in HEADER `X-Revx-Signature`; [bodyFormat] NONE.
  */
 @Serializable
 data class ApiRequestSigningConfig(
@@ -730,7 +739,7 @@ data class ApiRequestSigningConfig(
     @Serializable(with = SortedStringToStringMapSerializer::class)
     val staticHeaders: Map<String, String> = emptyMap(),
     /**
-     * When set, requests are authenticated with a freshly signed JWT instead of an HMAC signature, and
+     * When set, requests are authenticated with a freshly signed JWT instead of a signed message, and
      * [message]/[apiKey]/[nonce]/[signature]/[algorithm] are ignored. Same NEVER-encode rationale as
      * [signedParams].
      */
@@ -1218,6 +1227,14 @@ data class ApiStrategyConfig(
 
     /** Whether a credential needs a secret besides its token: an api secret to sign with, or a client secret. */
     val needsApiSecret: Boolean get() = isSigned || tokenExchange != null
+
+    /**
+     * Whether the api secret is an asymmetric private key (an Ed25519 signature or a signed JWT) rather than a
+     * shared secret: a key file the person made or downloaded, so the connect screen calls it a private key and
+     * offers to load the file.
+     */
+    val secretIsPrivateKey: Boolean
+        get() = requestSigning?.let { it.jwt != null || it.algorithm == SigningAlgorithm.ED25519 } == true
 
     /** The bank transaction feed, when this is a bank strategy (accounts enumerated from an endpoint). */
     val bankTransactions: ApiDataEndpoint?
