@@ -502,20 +502,12 @@ private fun ActionFields(
                 onActionChanged(action.copy(description = it))
             }
             TextField(
-                "Relationship to the record (e.g. fee)",
+                "Relationship to the record (fee: books to its fee account)",
                 action.relationshipType,
                 enabled,
                 isError = action.relationshipType.isBlank(),
             ) {
                 onActionChanged(action.copy(relationshipType = it))
-            }
-            CheckRow("To the record's own account's fee account", action.feeAccount, enabled) {
-                onActionChanged(action.copy(feeAccount = it))
-            }
-            if (!action.feeAccount) {
-                TextField("To account (blank = reverse the record)", action.counterpartyAccount.orEmpty(), enabled) {
-                    onActionChanged(action.copy(counterpartyAccount = it.ifBlank { null }))
-                }
             }
             CheckRow("The record's amount already includes it", action.excludedFromBalances, enabled) {
                 onActionChanged(action.copy(excludedFromBalances = it))
@@ -591,10 +583,6 @@ fun AccountNamingEditor(
     TextField("Only when the value matches (regex, optional)", naming.pattern.orEmpty(), enabled) {
         onNamingChanged(naming.copy(pattern = it.ifBlank { null }))
     }
-    CheckRow("The own account's fee account (a record that is itself a fee)", naming.feeAccount, enabled) {
-        onNamingChanged(naming.copy(feeAccount = it))
-    }
-    if (naming.feeAccount) return
     TextField($$"Account name ({value}, $1…)", naming.name, enabled, isError = naming.name.isBlank()) {
         onNamingChanged(naming.copy(name = it))
     }

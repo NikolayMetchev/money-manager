@@ -25,3 +25,9 @@ WHERE id = ?;
 
 deleteById:
 DELETE FROM account_attribute WHERE id = ?;
+
+retagFeeAccount:
+-- Points a fee-account-for attribute (-12) at another account, unless it no longer names :from.
+UPDATE account_attribute
+SET attribute_value = :to
+WHERE id = :id AND attribute_type_id = -12 AND attribute_value = :from;

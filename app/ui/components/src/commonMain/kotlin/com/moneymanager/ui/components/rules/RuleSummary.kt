@@ -1,5 +1,6 @@
 package com.moneymanager.ui.components.rules
 
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.CaptureTarget
@@ -64,7 +65,6 @@ private fun AccountSide.summary(): String =
 /** The name an account naming gives: the value it read, or the name it writes out. */
 private fun AccountNaming.summary(): String =
     when {
-        feeAccount -> "the own account's fee account"
         name == AccountNaming.VALUE_PLACEHOLDER -> "from ${value.summary()}"
         else -> "“${name.orMissing()}”"
     }
@@ -118,7 +118,7 @@ fun RuleAction.summary(): String =
 
         is RuleAction.ManualEntry -> {
             "ask for \"${name.orMissing()}\"" +
-                (if (feeAccount) " into the fee account" else "") +
+                (if (relationshipType == WellKnownIds.FEE_RELATIONSHIP_TYPE_NAME) " into the fee account" else "") +
                 if (excludedFromBalances) " (already in the amount)" else ""
         }
 

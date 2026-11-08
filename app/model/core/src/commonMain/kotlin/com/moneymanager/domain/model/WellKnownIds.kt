@@ -120,6 +120,9 @@ object WellKnownIds {
     /** "fee" relationship type: the primary member is the main transaction, the related one its fee transfer. */
     const val FEE_RELATIONSHIP_TYPE_ID: Long = 2
 
+    /** The "fee" relationship type's name. */
+    const val FEE_RELATIONSHIP_TYPE_NAME: String = "fee"
+
     /**
      * "pass-through" relationship type: the primary member is the funding leg (card → conduit), the related one the spend leg
      * (conduit → merchant) of a charge routed through a conduit account (e.g. Curve). See

@@ -32,3 +32,7 @@ CREATE TABLE account_attribute (
 CREATE INDEX idx_account_attribute_account ON account_attribute(account_id);
 CREATE INDEX idx_account_attribute_type ON account_attribute(attribute_type_id);
 CREATE INDEX idx_account_attribute_group ON account_attribute(account_id, group_key);
+
+-- An account has at most one fee account: the one whose fee-account-for attribute (-12, WellKnownIds) names it. Merging
+-- two accounts merges their fee accounts too (AccountWriteRepositoryImpl.mergeAccounts), so a merge never breaks this.
+CREATE UNIQUE INDEX idx_account_attribute_fee_account_for ON account_attribute(attribute_value) WHERE attribute_type_id = -12;

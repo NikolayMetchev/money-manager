@@ -1529,11 +1529,6 @@ object BuiltInCsvStrategies {
                 ),
                 naming(QifColumns.COL_PAYEE, pattern = "^INTEREST\\b", name = "Santander Interest"),
                 naming(QifColumns.COL_PAYEE, pattern = "^LOAN\\b", name = "Santander Loan"),
-                // The account-fee narratives are the account's own fees, booked to its fee account.
-                feeAccountNaming(
-                    QifColumns.COL_PAYEE,
-                    "^(MONTHLY ACCOUNT FEE|MAINTAINING THE ACCOUNT|UNARRANGED|NON-STERLING|PENDED|PENDING)\\b",
-                ),
             )
         val fieldMappings =
             mapOf(
@@ -1618,6 +1613,12 @@ object BuiltInCsvStrategies {
                         extraction = Extraction(pattern = "\\bON\\s+(\\d{2}-\\d{2}-\\d{4})", outputTemplate = "$1"),
                     ),
                     incomingWhenPositive(QifColumns.COL_AMOUNT),
+                    // The account-fee narratives are the account's own fees, booked to its fee account.
+                    wholeFeeWhen(
+                        QifColumns.COL_AMOUNT,
+                        QifColumns.COL_PAYEE,
+                        "^(MONTHLY ACCOUNT FEE|MAINTAINING THE ACCOUNT|UNARRANGED|NON-STERLING|PENDED|PENDING)\\b",
+                    ),
                     accounts(
                         AccountSide.TARGET,
                         *counterparties,
@@ -2167,7 +2168,6 @@ object BuiltInCsvStrategies {
                     pattern = "^Dual Savings (Purchase|Settlement)$",
                     name = BINANCE_DUAL_SAVINGS_ACCOUNT,
                 ),
-                feeAccountNaming("Operation", "^(Fee|Transaction Fee)$"),
                 // Dust legs are re-routed to the conversion account by the dust leg rule; this rule is
                 // the home for a leg that somehow escapes detection (a zero Change).
                 naming(
@@ -2216,10 +2216,10 @@ object BuiltInCsvStrategies {
                         description = "Withdrawal fee",
                         relationshipType = "fee",
                         excludedFromBalances = true,
-                        feeAccount = true,
                     ),
                     conditions = listOf(Condition("Remark", ConditionOp.MATCHES, "fee is included")),
                 ),
+                wholeFeeWhen("Change", "Operation", "^(Fee|Transaction Fee)$"),
                 // Change carries the direction: negative leaves the Binance account, positive arrives.
                 incomingWhenPositive("Change"),
                 // Account is "Spot" on every row; keying the naming off it rather than hard-coding an id keeps
@@ -2426,13 +2426,13 @@ object BuiltInCsvStrategies {
         val targets =
             arrayOf(
                 bybitFunding("^user(Deposit|Withdraw)"),
-                feeAccountNaming(BYBIT_TYPE_COLUMN, "^tradingFee$"),
                 naming(BYBIT_TYPE_COLUMN, pattern = internalTransfer, name = BYBIT_INTERNAL_TRANSFERS_ACCOUNT),
                 // Trade legs only reach here when their group did not resolve.
                 fixedNaming(BYBIT_TYPE_COLUMN, BYBIT_TRADING_ACCOUNT),
             )
         val rules =
             bybitRules("Amount", internalTransfer, targets) +
+                wholeFeeWhen("Amount", BYBIT_TYPE_COLUMN, "^tradingFee$") +
                 // An empty Type is a Convert leg; the pattern has to admit it explicitly.
                 rule(
                     RuleAction.Leg(BYBIT_TRADE_GROUP, LegRole.BySign("Amount")),

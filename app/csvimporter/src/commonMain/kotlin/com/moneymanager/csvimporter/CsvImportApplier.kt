@@ -1088,7 +1088,7 @@ suspend fun runCsvImport(
 
     val mappedPrep = mapper.prepareImport(rows).withUnresolvedAccountsAsErrors()
     // Each account a row charges a fee to pays it into its own fee account (per-row fees are their own movements, linked to
-    // the main transfer), and so does a row that is itself a fee ([AccountNaming.feeAccount]). The engine resolves them.
+    // the main transfer), and so does a row that is itself a fee (its `Fee` is all of its amount). The engine resolves them.
     val feeAccountOf: Map<AccountId, AccountId> =
         importEngine.feeAccounts(
             mappedPrep.validTransfers.flatMapTo(mutableSetOf()) { row ->

@@ -31,6 +31,7 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PendingManualEntry
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
@@ -198,9 +199,7 @@ private suspend fun createEntries(
     inputs = entries.map { (original, amount) -> ManualEntryInput(original, Money.fromDisplayValue(amount, original.amount.asset)) },
     description = entry.description,
     relationshipType = entry.relationshipType,
-    counterpartyAccount = entry.counterpartyAccount,
     excludedFromBalances = entry.excludedFromBalances,
-    toFeeAccount = entry.feeAccount,
 )
 
 private fun parseAmount(text: String): BigDecimal? {
@@ -279,10 +278,8 @@ private fun PendingEntryCard(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text =
-                        if (entry.feeAccount) {
+                        if (entry.relationshipType == WellKnownIds.FEE_RELATIONSHIP_TYPE_NAME) {
                             "Entry: ${matched.sourceAccountName} → its fee account"
-                        } else if (entry.counterpartyAccount != null) {
-                            "Entry: ${matched.sourceAccountName} → ${entry.counterpartyAccount}"
                         } else {
                             "Entry: ${matched.targetAccountName} → ${matched.sourceAccountName}"
                         },

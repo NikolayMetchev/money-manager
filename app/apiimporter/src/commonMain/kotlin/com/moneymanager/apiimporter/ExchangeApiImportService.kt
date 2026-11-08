@@ -1517,6 +1517,14 @@ private fun parseExchangeTransfer(
             }?.takeIf { it.isNotBlank() }
             ?.let { runCatching { BigDecimal(it) }.getOrNull() }
     val feeCurrency = fee?.currency?.let { rules.resolve(it, item) }?.takeIf { it.isNotBlank() } ?: currency
+    // A fee included in the amount that is all of it: the item is itself a fee, booked to the own account's fee account.
+    val wholeFee =
+        fee?.includedInAmount == true &&
+            rawAmount != null &&
+            rawFeeAmount != null &&
+            rawAmount.compareTo(BigDecimal.ZERO) != 0 &&
+            feeCurrency.equals(currency, ignoreCase = true) &&
+            rawFeeAmount.abs().compareTo(rawAmount.abs()) == 0
 
     val result = mutableListOf<ParsedExchangeTransfer>()
     if (outcome.ledgerTradeLeg) {
@@ -1545,7 +1553,7 @@ private fun parseExchangeTransfer(
         val resolvedDirection = outcome.incoming?.let { if (it) TransferDirection.IN else TransferDirection.OUT } ?: direction
         // A gross amount already includes its fee: carve a same-asset fee out so the two sum back to it.
         val amount =
-            if (fee?.includedInAmount == true && rawFeeAmount != null && feeCurrency.equals(currency, ignoreCase = true)) {
+            if (!wholeFee && fee?.includedInAmount == true && rawFeeAmount != null && feeCurrency.equals(currency, ignoreCase = true)) {
                 (rawAmount.abs() - rawFeeAmount.abs()).let { if (it < BigDecimal.ZERO) BigDecimal.ZERO else it }
             } else {
                 rawAmount.abs()
@@ -1554,7 +1562,6 @@ private fun parseExchangeTransfer(
             item.text(tm.descriptionField)?.takeIf { it.isNotBlank() }
                 ?: if (resolvedDirection == TransferDirection.IN) "Deposit $currency" else "Withdraw $currency"
         val counterparty = rules.counterparty(outcome.accountsFor(AccountSide.COUNTERPARTY), item)
-        val toFeeAccount = counterparty?.second?.feeAccount == true
         result +=
             ParsedExchangeTransfer(
                 id = id,
@@ -1568,9 +1575,9 @@ private fun parseExchangeTransfer(
                 counterpartyAddress = tm.counterpartyAddressField?.let { item.text(it) }?.takeIf { it.isNotBlank() },
                 network = tm.counterpartyNetworkField?.let { item.text(it) }?.takeIf { it.isNotBlank() },
                 txid = tm.txidField?.let { item.text(it) }?.takeIf { it.isNotBlank() },
-                counterpartyAccountName = counterparty?.first?.takeUnless { toFeeAccount },
+                counterpartyAccountName = counterparty?.first?.takeUnless { wholeFee },
                 joinKey = tm.joinKeyField?.let { item.text(it) },
-                isFeeOnly = toFeeAccount,
+                isFeeOnly = wholeFee,
                 approximateUntil = approximateUntil,
                 excludedValue = outcome.excludedValue(),
             )
@@ -1584,7 +1591,7 @@ private fun parseExchangeTransfer(
     // back, so the sign decides direction: negative -> refund (Fees -> exchange), positive -> charge
     // (exchange -> Fees).
     // A fee every leg of a fill repeats is charged once, on the leg in the pair's quote asset.
-    if (rawFeeAmount != null && rawFeeAmount != BigDecimal.ZERO) {
+    if (!wholeFee && rawFeeAmount != null && rawFeeAmount != BigDecimal.ZERO) {
         val isRefund = rawFeeAmount < BigDecimal.ZERO
         result +=
             ParsedExchangeTransfer(

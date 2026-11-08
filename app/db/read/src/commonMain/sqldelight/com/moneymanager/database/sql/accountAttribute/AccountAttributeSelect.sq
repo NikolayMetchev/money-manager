@@ -52,3 +52,7 @@ selectAccountIdsByTypeAndValue:
 SELECT DISTINCT account_id
 FROM account_attribute
 WHERE attribute_type_id = :typeId AND (:value IS NULL OR attribute_value = :value);
+
+-- The fee-account-for attribute (-12) naming :owner: its id and the fee account holding it.
+selectFeeAccountTag:
+SELECT id, account_id FROM account_attribute WHERE attribute_type_id = -12 AND attribute_value = :owner;

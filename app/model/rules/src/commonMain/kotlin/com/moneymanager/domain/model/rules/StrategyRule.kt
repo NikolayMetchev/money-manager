@@ -102,10 +102,6 @@ enum class AccountSide {
  *   the import engine reconciles it against a real record of the same movement.
  * @property builtIn A well-known counterparty such as "ATM": every record naming it consolidates into one
  *   account, whatever counterparty id or merchant the record carries (API transactions).
- * @property feeAccount The account is the fee account of the record's own account (the one whose `fee-account-for`
- *   attribute names it, else an untagged "<account> Fees", else a new one), so [name] and the options after it are
- *   unused. Only on the side facing the own account (a CSV strategy's TARGET, an API one's COUNTERPARTY), for a record
- *   that is itself a fee the bank or exchange charged.
  */
 @Serializable
 data class AccountNaming(
@@ -127,8 +123,6 @@ data class AccountNaming(
     val unidentified: Boolean = false,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val builtIn: Boolean = false,
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val feeAccount: Boolean = false,
 ) {
     companion object {
         /** In [name], the (cleaned) value the naming read. */
@@ -271,8 +265,8 @@ sealed interface RuleAction {
      * The record needs a person to supply an amount (Manual Entries): the engine tags it with the
      * [WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME] attribute = [name], and the entry the person types becomes a transfer
      * described [description] and linked to the record by a [relationshipType] relationship (the record is the
-     * primary). It runs from the record's source to its fee account when [feeAccount] (the one fees charged to that
-     * account go to), else to [counterpartyAccount], or, when that is null, between the record's accounts reversed. [excludedFromBalances] says the record's own amount already contains the
+     * primary). A "fee" entry runs from the record's source to that account's fee account (the one
+     * fees charged to it go to, found by its `fee-account-for` tag); any other runs between the record's accounts reversed. [excludedFromBalances] says the record's own amount already contains the
      * entry (a withdrawal whose fee is included), so the entry must not be counted a second time.
      */
     @Serializable
@@ -282,11 +276,7 @@ sealed interface RuleAction {
         val description: String,
         val relationshipType: String,
         @EncodeDefault(EncodeDefault.Mode.NEVER)
-        val counterpartyAccount: String? = null,
-        @EncodeDefault(EncodeDefault.Mode.NEVER)
         val excludedFromBalances: Boolean = false,
-        @EncodeDefault(EncodeDefault.Mode.NEVER)
-        val feeAccount: Boolean = false,
     ) : RuleAction
 
     /** A fee the record reports (see [FeeRule]). */

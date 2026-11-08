@@ -1486,7 +1486,7 @@ private data class ApiTransactionPageItem(
     val counterpartyAccountName: String? = null,
     /** The built-in counterparty (e.g. "ATM") the rules route this item to, consolidating every match. */
     val builtInCounterparty: String? = null,
-    /** Whether the rules name the own account's fee account as the counterparty (an [AccountNaming.feeAccount]). */
+    /** Whether the item is itself a fee (its fee included in the amount is all of it), paid into the own account's fee account. */
     val feeAccountCounterparty: Boolean = false,
     val rawJson: JsonObject? = null,
     // What the counterparty was paid when the own account settled in another currency (magnitude only).
@@ -2138,10 +2138,17 @@ private fun parseTransactionsWithPath(
             val counterparty = outcome.namedAccountWithNaming(AccountSide.COUNTERPARTY, engine)
             val counterpartyName = counterparty?.first?.name?.ifBlank { null }
             val builtIn = counterparty?.second?.builtIn == true
-            val toFeeAccount = counterparty?.second?.feeAccount == true
             val feeRule = outcome.fees.firstOrNull { obj.carriesFee(it, currency) }
             val fee = feeRule?.let { parseMagnitude(obj, it.amount, mappings.amountFormat) }
             val feeCurrency = feeRule?.currency?.let { obj.resolve(it) }
+            // A fee included in the amount that is all of it: the item is itself a fee, booked to the own account's fee account.
+            val toFeeAccount =
+                feeRule?.includedInAmount == true &&
+                    fee != null &&
+                    amount != null &&
+                    (feeCurrency.isNullOrBlank() || feeCurrency.equals(currency, ignoreCase = true)) &&
+                    fee.isMagnitudeOf(amount)
+            val chargedFee = fee?.takeUnless { toFeeAccount }
             val feeDescription = feeRule?.description?.let { obj.resolve(it) }
             if (created != null && amount != null && currency != null) {
                 ApiTransactionPageItem(
@@ -2165,9 +2172,9 @@ private fun parseTransactionsWithPath(
                     rawJson = obj,
                     foreignAmount = foreignAmount,
                     foreignCurrencyCode = foreignCurrency?.uppercase(),
-                    feeRule = feeRule,
-                    feeAmountMinorUnits = fee?.minorUnits,
-                    feeAmountDecimalMajor = fee?.decimalMajor,
+                    feeRule = feeRule.takeUnless { toFeeAccount },
+                    feeAmountMinorUnits = chargedFee?.minorUnits,
+                    feeAmountDecimalMajor = chargedFee?.decimalMajor,
                     feeCurrencyCode = feeCurrency?.uppercase(),
                     feeDescription = feeDescription,
                 )
@@ -2190,7 +2197,15 @@ private data class ParsedAmount(
     val minorUnits: Long?,
     val decimalMajor: BigDecimal?,
     val sign: Int,
-)
+) {
+    /** Whether this magnitude is the whole of [amount], whatever its sign. */
+    fun isMagnitudeOf(amount: ParsedAmount): Boolean =
+        if (minorUnits != null) {
+            minorUnits == amount.minorUnits?.absoluteValue
+        } else {
+            decimalMajor != null && amount.decimalMajor?.let { decimalMajor.compareTo(it.abs()) == 0 } == true
+        }
+}
 
 /**
  * Parses a transaction amount per the strategy's amount format. The sign is the direction the rules

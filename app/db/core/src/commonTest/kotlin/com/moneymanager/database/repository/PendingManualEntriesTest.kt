@@ -174,9 +174,7 @@ class PendingManualEntriesTest : DbTest() {
                 inputs = listOf(ManualEntryInput(original, Money.fromDisplayValue("0.10", currency))),
                 description = "Withdrawal fee",
                 relationshipType = "fee",
-                counterpartyAccount = null,
                 excludedFromBalances = true,
-                toFeeAccount = true,
             )
             repositories.maintenanceService.refreshMaterializedViews()
 
@@ -232,7 +230,6 @@ class PendingManualEntriesTest : DbTest() {
                     inputs = listOf(ManualEntryInput(vanished, Money.fromDisplayValue("0.10", currency))),
                     description = "Withdrawal fee",
                     relationshipType = "fee",
-                    counterpartyAccount = null,
                     excludedFromBalances = false,
                 )
             }
