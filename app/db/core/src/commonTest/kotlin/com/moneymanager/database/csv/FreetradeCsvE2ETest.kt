@@ -507,8 +507,8 @@ class FreetradeCsvE2ETest : DbTest() {
                 )
             val savings = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Savings", openingDate = now))
             // Nearer the top-up than the broker payment, but both ends' statements record it: it names both its ends.
-            applyBankStatement(bank, savings, date = "2026-03-01", description = "SAVINGS")
-            applyBankStatement(bank, savings, date = "2026-03-01", description = "FROM BANK", statement = "savings")
+            applyBankStatement(bank, savings, description = "SAVINGS")
+            applyBankStatement(bank, savings, description = "FROM BANK", statement = "savings")
             applyBankStatement(bank, payee, date = "2026-03-02")
 
             apply(listOf(stage(listOf(topUp))))
