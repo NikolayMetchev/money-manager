@@ -48,6 +48,7 @@ import com.moneymanager.importengineapi.DESCRIPTION_SIMILARITY_THRESHOLD
 import com.moneymanager.importengineapi.ImportConversion
 import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.StringSimilarity
+import com.moneymanager.importengineapi.normalizeNameKey
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
@@ -328,7 +329,16 @@ class CsvTransferMapper(
     private val attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
     /** The file the rows came from, which rules read as `FILE_NAME_COLUMN`. */
     private val fileName: String? = null,
+    /**
+     * The full names of each account's owners (see `AccountReadRepository.getAccountOwnerNames`). A personal
+     * counterparty who owns the row's own account is its holder paying themselves, from or to an account the row
+     * can't name, so the counterparty is a placeholder (see [isOwnHolder]).
+     */
+    accountOwnerNames: Map<AccountId, List<String>> = emptyMap(),
 ) {
+    private val ownerNameKeys: Map<AccountId, Set<String>> =
+        accountOwnerNames.mapValues { (_, names) -> names.mapTo(mutableSetOf(), ::normalizeNameKey) }
+
     // The file's columns, then any a rule sets that the file lacks (see CsvStrategyConfig.ruleColumns): those read
     // as absent until a rule sets them, and the mappings read them like any other.
     private val columnIndexByName: Map<String, Int> = columnIndexWithRuleColumns(columns, strategy.config)
@@ -732,7 +742,8 @@ class CsvTransferMapper(
 
                     else -> {
                         counterpartyAccountId.takeIf {
-                            isUnidentifiedCounterparty(targetMapping, targetResolution, targetUsedPersistedMappings)
+                            isUnidentifiedCounterparty(targetMapping, targetResolution, targetUsedPersistedMappings) ||
+                                isOwnHolder(personalCounterpartyName, ownAccountId)
                         }
                     }
                 }
@@ -1308,6 +1319,19 @@ class CsvTransferMapper(
         if (mapping !is AccountFromRulesMapping) return null
         return resolution.personName
             ?.takeIf { it.isNotBlank() && !(applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null) }
+    }
+
+    /**
+     * True when [personalCounterpartyName] names an owner of [ownAccountId]: a statement saying only "FROM ALEX
+     * SMITH" on Alex's own account records money moving between two of Alex's accounts without saying which, so
+     * the other end is as unknown as an unidentified counterparty's.
+     */
+    private fun isOwnHolder(
+        personalCounterpartyName: String?,
+        ownAccountId: AccountId,
+    ): Boolean {
+        val name = personalCounterpartyName?.takeIf { it.isNotBlank() } ?: return false
+        return ownerNameKeys[ownAccountId]?.contains(normalizeNameKey(name)) == true
     }
 
     private fun parseCurrency(

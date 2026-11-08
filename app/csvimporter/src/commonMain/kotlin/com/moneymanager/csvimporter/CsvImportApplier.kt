@@ -574,6 +574,7 @@ suspend fun applyStagedCsv(
             attributeAccountMatchers,
             assetAliases,
             stagedImport.originalFileName,
+            accountRepository.getAccountOwnerNames(),
         ).prepareImport(rows)
 
     return runCsvImport(
@@ -786,6 +787,7 @@ fun buildCsvMapper(
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
     assetAliases: Map<String, String> = emptyMap(),
     fileName: String? = null,
+    accountOwnerNames: Map<AccountId, List<String>> = emptyMap(),
 ): CsvTransferMapper =
     CsvTransferMapper(
         strategy = strategy,
@@ -801,6 +803,7 @@ fun buildCsvMapper(
         passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
         attributeAccountMatchers = attributeAccountMatchers,
         fileName = fileName,
+        accountOwnerNames = accountOwnerNames,
     )
 
 /**
@@ -1050,6 +1053,7 @@ suspend fun runCsvImport(
             passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
             attributeAccountMatchers = attributeAccountMatchers,
             fileName = csvImport.originalFileName,
+            accountOwnerNames = accountRepository.getAccountOwnerNames(),
         )
 
     // Handle case when all rows are already processed (rows is already filtered by the caller)

@@ -488,6 +488,11 @@ transfer, real end to real end, and the other record is excluded and linked, so 
 Fees, pass-through chain legs and shadow accounts are never candidates (`selectOtherSideCandidates`), and nor is anything on
 an account the batch itself books, a record of the same source, or a record another row already reconciled against.
 
+A person-named counterparty (an `Account` naming with `person`) who owns the row's own account is a placeholder too: a statement
+saying only "FROM <the holder>" moved money between two of the holder's accounts without saying which
+(`CsvTransferMapper.isOwnHolder`, from `AccountReadRepository.getAccountOwnerNames`). So a Santander receipt "FROM <holder>",
+on the holder's own account, reconciles against Marcus's "Withdrawal to <number>". A persisted mapping of the name still wins.
+
 **Still separate, on purpose:** `TradeReconciler`, `ConversionTradeReconciler` and `ConversionGroupReconciler`
 use genuinely different assignment rules, and `app/reconciliation`'s `LegMatcher` is a read-only report.
 Merging any of them would change built-in outcomes.

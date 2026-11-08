@@ -424,6 +424,16 @@ class StrategySelectorTest {
     }
 
     @Test
+    fun `a Marcus export selects the Marcus strategy by its columns`() {
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
+        val names = listOf("TransactionDate", "Description", "Value", "AccountBalance", "AccountName", "AccountNumber")
+        val csvColumns = names.mapIndexed { i, name -> CsvColumn(CsvColumnId(Uuid.random()), i, name) }
+        val row = CsvRow(rowIndex = 1L, values = listOf("20200505", "Transfer from 40005678", "22.50", "122.50", "Main", "40001234"))
+
+        assertEquals("Marcus CSV", builtIns.selectForCsv("Transactions 40001234 2020-05-10 11_04.csv", csvColumns, listOf(row))?.name)
+    }
+
+    @Test
     fun `a Celsius export selects the Celsius strategy by its spaced headers`() {
         val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
         val names =

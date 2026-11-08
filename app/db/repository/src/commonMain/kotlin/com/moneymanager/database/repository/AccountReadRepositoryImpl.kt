@@ -52,6 +52,15 @@ class AccountReadRepositoryImpl(
                 .toMap()
         }
 
+    override suspend fun getAccountOwnerNames(): Map<AccountId, List<String>> =
+        withContext(Dispatchers.Default) {
+            selectQueries
+                .selectAccountOwnerNames { accountId, first, middle, last ->
+                    AccountId(accountId) to listOfNotNull(first, middle, last).joinToString(" ")
+                }.awaitAsList()
+                .groupBy({ it.first }, { it.second })
+        }
+
     override suspend fun getAccountIdsByAttribute(
         attributeTypeId: Long,
         value: String?,
