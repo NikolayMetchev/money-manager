@@ -2247,13 +2247,13 @@ object BuiltInApiStrategies {
                         ),
                     rateLimitMillis = 2_000L,
                     rateLimitErrorSubstrings = listOf("HTTP 429"),
-                    tokenPageUrl = "https://exchange.revolut.com",
+                    tokenPageUrl = "https://exchange.revolut.com/account/api-keys",
                     connectInstructions =
                         listOf(
                             "Make an Ed25519 key pair on your computer: openssl genpkey -algorithm ed25519 -out private.pem, " +
                                 "then openssl pkey -in private.pem -pubout -out public.pem.",
-                            "Open Revolut X in your browser, sign in, and under your profile's API keys add a new key with " +
-                                "the contents of public.pem as its public key. Give it read-only access.",
+                            "On the Revolut X API keys page (sign in if asked), add a new key with the contents of public.pem " +
+                                "as its public key. Give it read-only access.",
                             "Copy the 64-character API key and paste it below as the API key.",
                             "Paste the whole contents of private.pem below as the API secret.",
                         ),
