@@ -1,5 +1,7 @@
 package com.moneymanager.domain.repository
 
+import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TradeId
@@ -52,6 +54,15 @@ interface TransferSourceReadRepository {
         transferIds: Set<TransferId>,
         tradeIds: Set<TradeId>,
     ): List<Source.Csv>
+
+    /**
+     * The staged files a re-import of [imports] and [sessions] takes along, transitively, with [imports] themselves:
+     * every file that depends on what they created (see `selectRerunClosure`). One query, however many files join.
+     */
+    suspend fun getRerunClosure(
+        imports: Set<CsvImportId>,
+        sessions: Set<ApiSessionId> = emptySet(),
+    ): Set<CsvImportId>
 
     /** Those of [ids] a person has edited by hand since they were created. */
     suspend fun getHandEditedTransferIds(ids: Collection<TransferId>): Set<TransferId>

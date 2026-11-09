@@ -285,6 +285,17 @@ fun ReimportAllDialog(
             ReimportProgressIndicator(planProgress ?: Progress(PREPARING_REIMPORT))
         }
         plan?.let { planned ->
+            if (planned.cascaded.isNotEmpty()) {
+                val count = planned.cascaded.size
+                Text(
+                    text =
+                        "$count other file${if (count == 1) "" else "s"} depend${if (count == 1) "s" else ""} on these " +
+                            "and will be re-imported too.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
             if (planned.skippedNoStrategy > 0) {
                 Text(
                     text =

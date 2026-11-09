@@ -267,12 +267,8 @@ class CsvReimportHistoricalSourceAccountE2ETest : DbTest() {
             assertEquals(1, result.filesNotStarted)
             assertFalse(progress.any { it.detail.startsWith("File 2 of 2") }, "the second file should never start")
             assertEquals("Statements / a.csv", progress.first { it.detail.startsWith("File 1 of 2") }.item?.name)
-            assertEquals(
-                2,
-                repositories.transactionRepository
-                    .getTransactionsByAccount(monzo)
-                    .first()
-                    .size,
-            )
+            // The run deleted what both files created before it started; the second file's rows wait for its re-import.
+            val transfers = repositories.transactionRepository.getTransactionsByAccount(monzo).first()
+            assertEquals(listOf("Coffee"), transfers.map { it.description })
         }
 }
