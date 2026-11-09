@@ -319,6 +319,8 @@ class SourceRerunE2ETest : DbTest() {
                 reimports.checkReimportable(plan, accountId = null, currencyId = null)
             }
             val refused = assertFailsWith<RerunBlockedException> { reimports.runPlan(plan) }
+            // An API session's re-import takes files along the same way, and refuses them the same way.
+            assertFailsWith<RerunBlockedException> { reimports.prepare(listOf(Source.Csv(second.id))) }
 
             assertEquals(listOf("MonzoDataExport-later.csv (nothing says which account it imports onto)"), refused.files)
             val secondRow = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0).first()
@@ -330,6 +332,7 @@ class SourceRerunE2ETest : DbTest() {
             assertEquals(1, result.cascadedFiles)
             val relinked = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0).first()
             assertEquals(createdBy(first.id, row = 0).id, relinked.transferId, "the other file's row points at the replacement")
+            assertEquals(emptySet(), reimports.prepare(listOf(Source.Csv(first.id)))(null), "a file that records its account runs")
         }
 
     @Test

@@ -43,7 +43,10 @@ class AccountsTabTest {
             updatedAt = now,
         )
 
-    private fun ComposeUiTest.show(state: CsvStrategyEditorState) {
+    private fun show(
+        test: ComposeUiTest,
+        state: CsvStrategyEditorState,
+    ) {
         val accounts: AccountReadRepository =
             mock {
                 every { getAllAccounts() } returns flowOf(emptyList())
@@ -51,7 +54,7 @@ class AccountsTabTest {
             }
         val categories: CategoryReadRepository = mock { every { getAllCategories() } returns flowOf(emptyList()) }
         val people: PersonReadRepository = mock { every { getAllPeople() } returns flowOf(emptyList()) }
-        setContent {
+        test.setContent {
             MaterialTheme {
                 AccountsTab(state, enabled = true, accountRepository = accounts, categoryRepository = categories, personRepository = people)
             }
@@ -63,7 +66,7 @@ class AccountsTabTest {
         runMoneyManagerComposeUiTest {
             val state = CsvStrategyEditorState(strategy(HardCodedAccountMapping(TransferField.SOURCE_ACCOUNT, AccountId(7))), setOf("Date"))
             state.selectedAccountId = null
-            show(state)
+            show(this, state)
 
             onNodeWithText("Source Account").assertIsDisplayed()
             onNodeWithText("can't be left for each import to choose", substring = true).assertIsDisplayed()
@@ -72,7 +75,7 @@ class AccountsTabTest {
     @Test
     fun `a strategy without one leaves it to each import`() =
         runMoneyManagerComposeUiTest {
-            show(CsvStrategyEditorState(strategy(null), setOf("Date")))
+            show(this, CsvStrategyEditorState(strategy(null), setOf("Date")))
 
             onNodeWithText("Source Account (Optional)").assertIsDisplayed()
             onNodeWithText("Can also be chosen each time you apply this strategy").assertIsDisplayed()
