@@ -125,7 +125,7 @@ fun ApiReimportDialog(
                                         reads = reimports.reads,
                                         maintenance = maintenance,
                                         importEngine = importEngine,
-                                        rerunAffected = reimports,
+                                        cascadeRerunner = reimports,
                                         onProgress = { executeProgress = it },
                                     )
                                 }

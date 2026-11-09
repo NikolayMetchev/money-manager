@@ -85,9 +85,9 @@ suspend fun reconciledPartnerUnhides(
  * Transfers outside [deletedIds] that took one end from a record in it: a row whose counterparty was only a
  * stand-in became the whole transfer by reading the far end off another source's record of it, which it
  * excluded (`ImportDeduper.otherSideOf`). Once that record is deleted the end it lent stays behind, explained
- * by nothing, and the record's re-run counts it again, so these rows are re-run too. Told apart from other
+ * by nothing, and the record's re-run counts it again, so their files are re-imported too. Told apart from other
  * reconciled pairs by their accounts: two records of one movement on the same two accounts lent nothing.
- * A precise or named row that only outranked a placeholder record differs in accounts too: it is re-run as well, which
+ * A precise or named row that only outranked a placeholder record differs in accounts too: its file is re-imported as well, which
  * changes nothing, as it reconciles against the re-created record just as before.
  */
 suspend fun borrowedEndKeepers(

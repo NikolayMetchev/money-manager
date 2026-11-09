@@ -17,8 +17,7 @@ import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
-import com.moneymanager.importengineapi.AffectedRecords
-import com.moneymanager.importengineapi.AffectedRecordsRerunner
+import com.moneymanager.importengineapi.CascadeRerunner
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
@@ -101,8 +100,8 @@ data class ReimportAllPlan(
 /**
  * The one way to re-import a staged file (CSV, QIF, Excel or PDF), one at a time or all at once: what the file created is
  * deleted and its records run through the normal import again, with the strategy, account and currency
- * it was imported with ([executeSourceRerun]). Also the [AffectedRecordsRerunner] every re-import (API
- * sessions included) hands the other files' records to that were matched against a deleted transaction.
+ * it was imported with ([executeSourceRerun]). Also the [CascadeRerunner] every re-import (API
+ * sessions included) re-imports the other files it takes along with, whole.
  * Each re-import holds [writeLock], the session's write lock, throughout: its delete, import, re-runs
  * and edits are separate writes, and an import between them would dedupe against a half-done state.
  */
@@ -118,7 +117,7 @@ class Reimports(
     private val maintenance: Maintenance,
     private val importEngine: ImportEngine,
     private val writeLock: Mutex = Mutex(),
-) : AffectedRecordsRerunner {
+) : CascadeRerunner {
     /** Runs [block] holding the session's write lock, for the re-imports that run outside this class (API sessions). */
     suspend fun <T> exclusively(block: suspend () -> T): T = writeLock.withLock { block() }
 
@@ -138,7 +137,7 @@ class Reimports(
             file = loaded,
             strategy = strategy,
             imported = loaded.importedSettings,
-            rerun = rerunPlan(loaded, progress.sink(base = PLAN_LOAD_SPAN, span = 1f - PLAN_LOAD_SPAN)),
+            rerun = rerunPlan(loaded, onProgress = progress.sink(base = PLAN_LOAD_SPAN, span = 1f - PLAN_LOAD_SPAN)),
         )
     }
 
@@ -169,7 +168,7 @@ class Reimports(
             resetRecords = resetBatch(plan.file),
             reads = reads,
             maintenance = maintenance,
-            rerunAffected = this,
+            cascadeRerunner = this,
             onProgress = onProgress,
             refreshViews = refreshViews,
         ) {
@@ -282,7 +281,7 @@ class Reimports(
                     cryptoRepository,
                 ) { index, _ -> onPrepared(index) }
             },
-        ) { _, file, _, onFileProgress ->
+        ) { index, file, _, onFileProgress ->
             val strategy = plan.strategies[file.source]
             when {
                 // An empty file has nothing to re-import, and (unlike a missing strategy) is not counted.
@@ -296,7 +295,7 @@ class Reimports(
 
                 else -> {
                     val filePlan =
-                        FileReimportPlan(file, strategy, plan.imported.getValue(file.source), rerunPlan(file))
+                        FileReimportPlan(file, strategy, plan.imported.getValue(file.source), rerunPlan(file, laterInRun(plan, index)))
                     val result = rerunFile(filePlan, accountId, currencyId, onFileProgress, refreshViews = false)
                     BulkReimportFileOutcome.Reimported(
                         result = result,
@@ -307,46 +306,50 @@ class Reimports(
             }
         }
 
-    /** Re-runs the reset records of the files in [affected], each as it was imported. */
-    override suspend fun prepare(affected: AffectedRecords): suspend (onProgress: (suspend (Progress) -> Unit)?) -> AffectedRecords {
-        val files =
-            affected.byFile.keys.mapNotNull { file ->
-                (file as? Source.Csv)?.let { reads.csvImportRepository.getImport(it.importId).first() }
-            }
+    /** Imports the [files] a re-import cascaded into again, whole and in order, each as it was last imported. */
+    override suspend fun prepare(files: List<Source>): suspend (onProgress: (suspend (Progress) -> Unit)?) -> Set<Source> {
+        val imports = files.mapNotNull { file -> (file as? Source.Csv)?.let { reads.csvImportRepository.getImport(it.importId).first() } }
         return { onProgress ->
             val strategies = csvImportStrategyRepository.getAllStrategies().first()
             val currencies = currencies()
-            val notRerun = mutableSetOf<Source>()
-            files.forEach { file ->
-                // One file failing leaves its reset records to its next import rather than failing the
-                // re-import that reset them, whose own work is already done.
+            val notRerun = files.toMutableSet()
+            imports.forEach { file ->
+                // One file failing leaves it to its next import rather than failing the re-import that took it
+                // along, whose own work is already done.
                 try {
                     val strategy = strategyFor(file, strategies)
                     val fileSettings = file.importedSettings
-                    // Without the account or currency nobody is asked here, so the records wait for the file's next import.
-                    if (strategy == null ||
-                        (strategy.needsSourceAccountOverride() && fileSettings.accountId == null) ||
-                        (strategy.needsCurrencyOverride() && fileSettings.currencyId == null)
+                    // Without the account or currency nobody is asked here, so the file waits for its next import.
+                    if (strategy != null &&
+                        !(strategy.needsSourceAccountOverride() && fileSettings.accountId == null) &&
+                        !(strategy.needsCurrencyOverride() && fileSettings.currencyId == null)
                     ) {
-                        notRerun += file.source
-                    } else {
                         runStaged(file, strategy, fileSettings, currencies, onProgress)
+                        notRerun -= file.source
                     }
                 } catch (expected: CancellationException) {
                     throw expected
                 } catch (expected: Exception) {
-                    logger.e(
-                        expected,
-                    ) { "Re-running the records of ${file.originalFileName} matched against a re-imported transaction failed" }
-                    notRerun += file.source
+                    logger.e(expected) { "Re-importing ${file.originalFileName} along with another re-import failed" }
                 }
             }
-            AffectedRecords(affected.byFile.filterKeys { it in notRerun })
+            notRerun
         }
     }
 
+    // The files after [index] that the run re-imports on their own turn, so no earlier file takes them along.
+    private fun laterInRun(
+        plan: ReimportAllPlan,
+        index: Int,
+    ): Set<Source> =
+        plan.files
+            .drop(index + 1)
+            .filter { it.rowCount > 0 && plan.strategies[it.source] != null }
+            .mapTo(mutableSetOf()) { it.source }
+
     private suspend fun rerunPlan(
         file: CsvImport,
+        exclude: Set<Source> = emptySet(),
         onProgress: (suspend (Progress) -> Unit)? = null,
     ): SourceRerunPlan =
         planSourceRerun(
@@ -354,6 +357,7 @@ class Reimports(
             tradeIds = reads.csvImportRepository.getTradeIdsCreatedByImport(file.id),
             createdAccountIds = reads.csvImportRepository.getAccountsCreatedByImport(file.id),
             reads = reads,
+            exclude = exclude,
             onProgress = onProgress,
         )
 

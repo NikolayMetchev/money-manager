@@ -152,7 +152,7 @@ class QifReimportE2ETest : DbTest() {
 
             val reimports = repositories.reimports(maintenance)
             val plan = reimports.plan(repositories.csvImportRepository.getImport(first.id).first()!!)
-            assertEquals(2, plan.rerun.affected.count, "the later file's duplicate records are re-run too")
+            assertEquals(1, plan.rerun.cascade.size, "the later file is re-imported too")
 
             reimports.reimport(plan, accountId = sourceAccountId(), currencyId = null)
 

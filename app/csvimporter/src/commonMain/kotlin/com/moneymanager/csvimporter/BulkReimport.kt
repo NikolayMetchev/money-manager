@@ -22,10 +22,10 @@ data class BulkReimportResult(
     override val filesSkippedNoStrategy: Int,
     override val filesFailed: Int,
     val emptyAccountsDeleted: Int = 0,
-    /** Rows of other files matched against a deleted transaction, re-run with their own strategy. */
-    val affectedRecords: Int = 0,
-    /** Rows of other files reset but not re-run (see `SourceRerunResult.notRerun`); their file's re-import runs them. */
-    val affectedRecordsNotRerun: Int = 0,
+    /** Times another file was re-imported along with one of the run's (see `SourceRerunResult.cascaded`). */
+    val cascadedFiles: Int = 0,
+    /** Files a re-import deleted but couldn't import again (see `SourceRerunResult.notRerun`); their own re-import runs them. */
+    val cascadedFilesNotRerun: Int = 0,
     val reappliedEdits: Int = 0,
     /** Hand edits whose transaction the re-import didn't create again, so they were dropped. */
     val unmatchedEdits: List<ManualEdit> = emptyList(),
@@ -39,9 +39,9 @@ data class BulkReimportResult(
             if (reappliedEdits > 0) append(" · $reappliedEdits manual edit${if (reappliedEdits == 1) "" else "s"} re-applied")
             if (unmatchedEdits.isNotEmpty()) append(" · ${unmatchedEdits.size} manual edits not re-applied")
             append(reappliedLinks.summary(" · "))
-            if (affectedRecords > 0) append(" · $affectedRecords rows of other files re-linked")
-            if (affectedRecordsNotRerun > 0) {
-                append(" · $affectedRecordsNotRerun rows of other files left for those files' own re-import")
+            if (cascadedFiles > 0) append(" · $cascadedFiles other file${if (cascadedFiles == 1) "" else "s"} re-imported along")
+            if (cascadedFilesNotRerun > 0) {
+                append(" · $cascadedFilesNotRerun other file${if (cascadedFilesNotRerun == 1) "" else "s"} left for their own re-import")
             }
             if (emptyAccountsDeleted > 0) append(" · $emptyAccountsDeleted empty removed")
             if (duplicatesSkipped > 0) append(" · $duplicatesSkipped duplicates skipped")
@@ -130,8 +130,8 @@ suspend fun <T, C> runBulkReimport(
                             transfersCreated = result.transfersCreated + outcome.successCount,
                             duplicatesSkipped = result.duplicatesSkipped + outcome.duplicateCount,
                             emptyAccountsDeleted = result.emptyAccountsDeleted + rerun.deletedEmptyAccounts.size,
-                            affectedRecords = result.affectedRecords + rerun.affected.count,
-                            affectedRecordsNotRerun = result.affectedRecordsNotRerun + rerun.notRerun.count,
+                            cascadedFiles = result.cascadedFiles + rerun.cascaded.size,
+                            cascadedFilesNotRerun = result.cascadedFilesNotRerun + rerun.notRerun.size,
                             reappliedEdits = result.reappliedEdits + rerun.reappliedEdits.size,
                             unmatchedEdits = result.unmatchedEdits + rerun.unmatchedEdits,
                             reappliedLinks = result.reappliedLinks + rerun.reappliedLinks,

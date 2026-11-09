@@ -9,8 +9,8 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.ApiSessionReadRepository
-import com.moneymanager.importengineapi.AffectedRecordsRerunner
 import com.moneymanager.importengineapi.ApiSessionMutation
+import com.moneymanager.importengineapi.CascadeRerunner
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ManualEdit
@@ -66,7 +66,7 @@ suspend fun executeApiReimport(
     reads: RerunReads,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    rerunAffected: AffectedRecordsRerunner?,
+    cascadeRerunner: CascadeRerunner,
     counterpartyAccountNames: Map<String, String> = emptyMap(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (suspend (Progress) -> Unit)? = null,
@@ -81,7 +81,7 @@ suspend fun executeApiReimport(
         resetRecords = ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.DeleteResponseTransactionsBySession(session.id))),
         reads = reads,
         maintenance = maintenance,
-        rerunAffected = rerunAffected,
+        cascadeRerunner = cascadeRerunner,
         onProgress = onProgress,
         refreshViews = refreshViews,
     ) {
@@ -145,7 +145,7 @@ suspend fun bulkReimportApiSessions(
     reads: RerunReads,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    rerunAffected: AffectedRecordsRerunner?,
+    cascadeRerunner: CascadeRerunner,
     counterpartyAccountNames: Map<String, String> = emptyMap(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (suspend (Progress) -> Unit)? = null,
@@ -171,7 +171,7 @@ suspend fun bulkReimportApiSessions(
                 reads = reads,
                 maintenance = maintenance,
                 importEngine = importEngine,
-                rerunAffected = rerunAffected,
+                cascadeRerunner = cascadeRerunner,
                 counterpartyAccountNames = counterpartyAccountNames,
                 passThroughAccounts = passThroughAccounts,
                 onProgress = sessionProgress,

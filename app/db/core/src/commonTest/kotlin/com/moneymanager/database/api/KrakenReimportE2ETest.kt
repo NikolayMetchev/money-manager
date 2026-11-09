@@ -192,7 +192,7 @@ class KrakenReimportE2ETest : DbTest() {
                 reads = reimports.reads,
                 maintenance = testMaintenance,
                 importEngine = repositories.importEngine,
-                rerunAffected = reimports,
+                cascadeRerunner = reimports,
             )
 
             val withdrawalsAfter =
@@ -248,7 +248,7 @@ class KrakenReimportE2ETest : DbTest() {
                 reads = reimports.reads,
                 maintenance = testMaintenance,
                 importEngine = repositories.importEngine,
-                rerunAffected = reimports,
+                cascadeRerunner = reimports,
             )
             val withdrawalsFinal =
                 repositories.transactionRepository
