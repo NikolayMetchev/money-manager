@@ -121,6 +121,10 @@ data class ApiBulkReimportResult(
     /** Hand edits whose transaction the re-import didn't create again, so they were dropped. */
     val unmatchedEdits: List<ManualEdit> = emptyList(),
     val reappliedLinks: ReappliedLinks = ReappliedLinks(),
+    /** Other staged files re-imported along with a session (see `SourceRerunResult.cascaded`). */
+    val cascadedFiles: Int = 0,
+    /** Files a session's re-import deleted but couldn't import again: they wait for their own re-import. */
+    val cascadedFilesNotRerun: Int = 0,
 )
 
 /**
@@ -161,6 +165,8 @@ suspend fun bulkReimportApiSessions(
     var reapplied = 0
     val unmatched = mutableListOf<ManualEdit>()
     var links = ReappliedLinks()
+    var cascaded = 0
+    var notRerun = 0
     return reimportSessionsResiliently(sessions, maintenance, onProgress) { session, sessionProgress ->
         val result =
             executeApiReimport(
@@ -180,7 +186,15 @@ suspend fun bulkReimportApiSessions(
         reapplied += result.reappliedEdits.size
         unmatched += result.unmatchedEdits
         links += result.reappliedLinks
-    }.copy(reappliedEdits = reapplied, unmatchedEdits = unmatched, reappliedLinks = links)
+        cascaded += result.cascaded.size
+        notRerun += result.notRerun.size
+    }.copy(
+        reappliedEdits = reapplied,
+        unmatchedEdits = unmatched,
+        reappliedLinks = links,
+        cascadedFiles = cascaded,
+        cascadedFilesNotRerun = notRerun,
+    )
 }
 
 /**

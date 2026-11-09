@@ -110,6 +110,21 @@ fun ApiReimportAllDialog(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
+            if (finished.cascadedFiles > 0) {
+                Text(
+                    text = "${finished.cascadedFiles} other file(s) re-imported along.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (finished.cascadedFilesNotRerun > 0) {
+                Text(
+                    text =
+                        "${finished.cascadedFilesNotRerun} other file(s) couldn't be re-imported along and are left for " +
+                            "their own re-import.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             UnmatchedEditsReport(finished.unmatchedEdits, accountName)
             UnmatchedLinksReport(finished.reappliedLinks)
             if (finished.failures.isNotEmpty()) {
