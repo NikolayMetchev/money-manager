@@ -273,6 +273,10 @@ so existing local databases are expected to be deleted/recreated rather than mig
 
 **Important**: Store booleans as INTEGER (0/1). Don't use `AS Boolean` in .sq files.
 
+**Nullable columns are a code smell**: don't add one. A column that only some rows have a value for means those rows
+are a different kind of thing. Put the value in its own table keyed by the row it describes, with every column
+`NOT NULL`, so a row exists exactly when the value does and readers join to it.
+
 **Drivers**: desktop JVM and native share `FileDatabaseManager` (`app/db/core`); only the driver differs
 (`CachingJdbcSqliteDriver` over sqlite-jdbc; SQLDelight's native driver over `utils/sqlite3`). Android keeps
 `AndroidDatabaseManager`. **Create-vs-open is decided by whether the file exists, never by `user_version`**:
