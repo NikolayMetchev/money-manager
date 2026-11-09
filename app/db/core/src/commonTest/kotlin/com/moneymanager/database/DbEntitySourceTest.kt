@@ -1,13 +1,16 @@
 package com.moneymanager.database
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.write.recordSource
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Source
 import com.moneymanager.test.database.DbTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.time.Clock
@@ -52,5 +55,25 @@ class DbEntitySourceTest : DbTest() {
             assertNotEquals(revisionOne.id, revisionTwo.id)
             assertNotNull(queries.selectApiEntitySourceId(id = revisionOne.id).awaitAsOneOrNull())
             assertNotNull(queries.selectApiEntitySourceId(id = revisionTwo.id).awaitAsOneOrNull())
+        }
+
+    @Test
+    fun `a statement account is kept only by the record that wrote the revision`() =
+        runDbTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
+            val sessionId = repositories.apiSessionRepository.createSession(deviceId, Clock.System.now(), null)
+            val transfer = 99L
+            database.recordSource(deviceId, EntityType.TRANSFER, transfer, 1L, Source.Api(sessionId))
+            // A later record of the same revision (a no-op update) keeps the first writer's row, which has no statement account.
+            database.recordSource(deviceId, EntityType.TRANSFER, transfer, 1L, Source.Api(sessionId, statementAccountId = AccountId(7)))
+            database.recordSource(deviceId, EntityType.TRANSFER, transfer, 2L, Source.Api(sessionId, statementAccountId = AccountId(8)))
+            database.recordSource(deviceId, EntityType.TRANSFER, 100L, 1L, Source.Api(sessionId, statementAccountId = AccountId(9)))
+
+            val statementAccounts =
+                database.entitySourceSelectQueries
+                    .selectStatementAccountsOfTransfers(listOf(transfer, 100L))
+                    .awaitAsList()
+                    .associate { it.entity_id to it.account_id }
+            assertEquals(mapOf(100L to 9L), statementAccounts)
         }
 }

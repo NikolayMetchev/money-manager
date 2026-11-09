@@ -27,6 +27,7 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
     source: Source,
 ) {
     // INSERT OR IGNORE: a source for this (entity, revision) may already exist (e.g. re-runs); keep it.
+    val existed = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).awaitAsOneOrNull() != null
     entitySourceWriteQueries.insertSource(
         entity_type_id = entityType.id,
         entity_id = entityId,
@@ -34,12 +35,11 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
         source_type_id = source.toSourceType().id.toLong(),
         device_id = deviceId.id,
     )
-    source.statementAccountId?.let { account ->
-        val entitySource = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).awaitAsOne()
-        // Only when this revision's source is this import (INSERT OR IGNORE above keeps an earlier writer's row).
-        if (entitySource.source_type_id == source.toSourceType().id.toLong()) {
-            entitySourceWriteQueries.insertStatementAccount(entitySource.id, account.id)
-        }
+    // Only on the row this call wrote: a kept row is an earlier writer's, and its statement account (or none) is its own.
+    val statementAccount = source.statementAccountId
+    if (!existed && statementAccount != null) {
+        val written = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).awaitAsOne()
+        entitySourceWriteQueries.insertStatementAccount(written.id, statementAccount.id)
     }
 
     when (source) {
