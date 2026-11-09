@@ -47,6 +47,7 @@ import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.RelationshipReadRepository
@@ -60,7 +61,7 @@ import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.components.csv.PdfLinesTable
 import com.moneymanager.ui.components.imports.ReimportDialog
-import com.moneymanager.ui.components.imports.ReimportPickerRepositories
+import com.moneymanager.ui.components.imports.ReimportRepositories
 import com.moneymanager.ui.components.imports.toSummary
 import com.moneymanager.ui.util.displayDateTime
 import kotlinx.coroutines.launch
@@ -79,6 +80,7 @@ fun CsvImportDetailScreen(
     personRepository: PersonReadRepository,
     passThroughAccountRepository: PassThroughAccountReadRepository,
     cryptoRepository: CryptoReadRepository,
+    importDirectoryRepository: ImportDirectoryReadRepository,
     maintenance: Maintenance,
     transactionRepository: TransactionReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
@@ -530,7 +532,14 @@ fun CsvImportDetailScreen(
         ReimportDialog(
             files = listOf(import!!),
             reimports = reimports,
-            pickers = ReimportPickerRepositories(accountRepository, categoryRepository, currencyRepository, personRepository),
+            repositories =
+                ReimportRepositories(
+                    importDirectoryRepository,
+                    accountRepository,
+                    categoryRepository,
+                    currencyRepository,
+                    personRepository,
+                ),
             onDismiss = { showReimportDialog = false },
             onComplete = {
                 showReimportDialog = false

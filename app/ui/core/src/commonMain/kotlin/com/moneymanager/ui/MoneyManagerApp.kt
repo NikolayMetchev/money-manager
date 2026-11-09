@@ -825,6 +825,7 @@ fun MoneyManagerApp(
                                                 personRepository = services.people.personRepository,
                                                 passThroughAccountRepository = services.imports.passThroughAccountRepository,
                                                 cryptoRepository = services.accounts.cryptoRepository,
+                                                importDirectoryRepository = services.imports.importDirectoryRepository,
                                                 maintenance = services.imports.maintenance,
                                                 transactionRepository = services.transactions.transactionRepository,
                                                 transferSourceRepository = services.transactions.transferSourceRepository,

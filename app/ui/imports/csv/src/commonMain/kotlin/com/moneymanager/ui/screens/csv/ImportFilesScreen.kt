@@ -56,7 +56,7 @@ import com.moneymanager.ui.components.imports.ImportSectionHeader
 import com.moneymanager.ui.components.imports.ImportStatusMessage
 import com.moneymanager.ui.components.imports.ImportsScreenHeader
 import com.moneymanager.ui.components.imports.ReimportDialog
-import com.moneymanager.ui.components.imports.ReimportPickerRepositories
+import com.moneymanager.ui.components.imports.ReimportRepositories
 import com.moneymanager.ui.components.imports.SectionAction
 import com.moneymanager.ui.components.imports.StagedImportCard
 import com.moneymanager.ui.components.imports.StagedImportFilter
@@ -212,10 +212,16 @@ fun ImportFilesScreen(
                 ReimportDialog(
                     files = scopedImported,
                     reimports = importDirectoryService.reimports,
-                    pickers = ReimportPickerRepositories(accountRepository, categoryRepository, currencyRepository, personRepository),
+                    repositories =
+                        ReimportRepositories(
+                            importDirectoryRepository,
+                            accountRepository,
+                            categoryRepository,
+                            currencyRepository,
+                            personRepository,
+                        ),
                     onDismiss = { reimportAllScope = null },
                     onComplete = { reimportAllScope = null },
-                    fileLabel = { stagedImportPath(it, data.importDirectories) },
                 )
             }
 

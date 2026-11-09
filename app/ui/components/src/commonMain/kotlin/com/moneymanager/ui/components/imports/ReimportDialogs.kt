@@ -33,8 +33,10 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.SourceRerunResult
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.AccountPicker
@@ -45,8 +47,9 @@ import kotlinx.coroutines.launch
 
 private val logger = Logger.withTag("ReimportDialogs")
 
-/** The repositories the re-import dialogs' account and currency pickers read. */
-data class ReimportPickerRepositories(
+/** What [ReimportDialog] reads: where each file came from (to name it by its path), and its pickers' lists. */
+data class ReimportRepositories(
+    val importDirectoryRepository: ImportDirectoryReadRepository,
     val accountRepository: AccountReadRepository,
     val categoryRepository: CategoryReadRepository,
     val currencyRepository: CurrencyReadRepository,
@@ -58,20 +61,28 @@ data class ReimportPickerRepositories(
  * changes take effect retroactively: what they created is deleted and they are imported again, together with every other
  * file that depends on what they created ([Reimports.planAll]), and the hand edits are put back. Each file keeps the strategy,
  * account and currency it was imported with; the pickers only appear for files that created nothing to read them from.
- * Progress names each file by [fileLabel], and Cancel stops the run once the file under way is done.
+ * Every file, the cascaded ones too, is named by its path (its import directory, then its name), whichever screen opened
+ * the dialog, and Cancel stops the run once the file under way is done.
  */
 @Suppress("LongMethod")
 @Composable
 fun ReimportDialog(
     files: List<CsvImport>,
     reimports: Reimports,
-    pickers: ReimportPickerRepositories,
+    repositories: ReimportRepositories,
     onDismiss: () -> Unit,
     onComplete: () -> Unit,
-    fileLabel: (CsvImport) -> String = { it.originalFileName },
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val accountName = rememberAccountNamer(pickers.accountRepository)
+    val accountName = rememberAccountNamer(repositories.accountRepository)
+    val directoryIds by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyMap()) {
+        repositories.importDirectoryRepository.csvImportDirectories()
+    }
+    val directories by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        repositories.importDirectoryRepository.getAllDirectories()
+    }
+    val importDirectories = remember(directoryIds, directories) { resolveImportDirectories(directoryIds, directories) }
+    val fileLabel: (CsvImport) -> String = { stagedImportPath(it, importDirectories) }
     var stopRequested by remember { mutableStateOf(false) }
 
     var accountId by remember { mutableStateOf<AccountId?>(null) }
@@ -198,7 +209,7 @@ fun ReimportDialog(
                 onAccountSelected = { accountId = it },
                 currencyId = currencyId,
                 onCurrencySelected = { currencyId = it },
-                pickers = pickers,
+                repositories = repositories,
                 enabled = !isRunning,
             )
             ManualEditsSection(
@@ -225,7 +236,7 @@ private fun ReimportSettingsPickers(
     onAccountSelected: (AccountId) -> Unit,
     currencyId: CurrencyId?,
     onCurrencySelected: (CurrencyId) -> Unit,
-    pickers: ReimportPickerRepositories,
+    repositories: ReimportRepositories,
     enabled: Boolean,
 ) {
     if (needsAccount) {
@@ -233,9 +244,9 @@ private fun ReimportSettingsPickers(
             selectedAccountId = accountId,
             onAccountSelected = onAccountSelected,
             label = "Source Account",
-            accountRepository = pickers.accountRepository,
-            categoryRepository = pickers.categoryRepository,
-            personRepository = pickers.personRepository,
+            accountRepository = repositories.accountRepository,
+            categoryRepository = repositories.categoryRepository,
+            personRepository = repositories.personRepository,
             enabled = enabled,
             isError = accountId == null,
         )
@@ -246,7 +257,7 @@ private fun ReimportSettingsPickers(
             selectedCurrencyId = currencyId,
             onCurrencySelected = onCurrencySelected,
             label = "Currency",
-            currencyRepository = pickers.currencyRepository,
+            currencyRepository = repositories.currencyRepository,
             enabled = enabled,
             isError = currencyId == null,
         )

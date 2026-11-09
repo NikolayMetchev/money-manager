@@ -34,7 +34,7 @@ import com.moneymanager.test.database.installBuiltInCsvStrategies
 import com.moneymanager.test.database.reimports
 import com.moneymanager.test.database.upsertCurrencyByCode
 import com.moneymanager.ui.components.imports.ReimportDialog
-import com.moneymanager.ui.components.imports.ReimportPickerRepositories
+import com.moneymanager.ui.components.imports.ReimportRepositories
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -61,8 +61,14 @@ class ReimportDialogsTest {
         val dc: DatabaseComponent,
         val csvImport: CsvImport,
     ) {
-        val pickers =
-            ReimportPickerRepositories(dc.accountRepository, dc.categoryRepository, dc.currencyRepository, dc.personRepository)
+        val repositories =
+            ReimportRepositories(
+                dc.importDirectoryRepository,
+                dc.accountRepository,
+                dc.categoryRepository,
+                dc.currencyRepository,
+                dc.personRepository,
+            )
 
         suspend fun reloaded() = dc.csvImportRepository.getImport(csvImport.id).first()!!
     }
@@ -132,7 +138,7 @@ class ReimportDialogsTest {
                     ReimportDialog(
                         files = listOf(fixture.csvImport),
                         reimports = fixture.dc.reimports(),
-                        pickers = fixture.pickers,
+                        repositories = fixture.repositories,
                         onDismiss = { },
                         onComplete = { },
                     )
@@ -183,7 +189,7 @@ class ReimportDialogsTest {
                     ReimportDialog(
                         files = listOf(fixture.csvImport),
                         reimports = fixture.dc.reimports(),
-                        pickers = fixture.pickers,
+                        repositories = fixture.repositories,
                         onDismiss = { },
                         onComplete = { completed = true },
                     )
