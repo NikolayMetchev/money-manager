@@ -23,3 +23,24 @@ VALUES (?, ?);
 
 markReversed:
 UPDATE account_merge SET reversed = 1 WHERE id = ?;
+
+-- A file imported onto the deleted account re-imports onto the survivor. Run before the delete, which would otherwise
+-- clear the file's account (ON DELETE SET NULL). The audit trail records the account it had.
+moveImportApplications:
+UPDATE csv_import_application SET account_id = :survivingAccount WHERE account_id = :deletedAccount;
+
+-- Points back the files whose last change of account moved them off the restored account, which is what
+-- moveImportApplications did (read from csv_import_application_audit's UPDATE entries, which keep the old value).
+restoreImportApplications:
+UPDATE csv_import_application SET account_id = :deletedAccount
+WHERE account_id = :survivingAccount
+  AND id IN (
+      SELECT change.csv_import_application_id
+      FROM csv_import_application_audit change
+      WHERE change.audit_type_id = 2
+        AND change.account_id = :deletedAccount
+        AND change.id = (
+            SELECT MAX(latest.id) FROM csv_import_application_audit latest
+            WHERE latest.csv_import_application_id = change.csv_import_application_id AND latest.audit_type_id = 2
+        )
+  );

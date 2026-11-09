@@ -193,6 +193,23 @@ class QifReimportE2ETest : DbTest() {
             assertEquals(BigDecimal("-2000"), countedBalance(sourceAccountId()), "re-importing every statement keeps both")
         }
 
+    @Test
+    fun mergingTheImportedAccount_movesTheAccountTheFileReimportsOnto() =
+        runDbTest {
+            val file = createImport()
+            apply(file)
+            val santander = sourceAccountId()
+            val current = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Santander Current", openingDate = now))
+
+            val merge = repositories.accountRepository.mergeAccounts(deletedAccount = santander, survivingAccount = current)
+            assertEquals(current, reload(file).lastAppliedAccountId, "the file re-imports onto the account its transactions moved to")
+
+            repositories.accountRepository.unmergeAccount(merge)
+            assertEquals(santander, reload(file).lastAppliedAccountId, "undoing the merge points it back")
+        }
+
+    private suspend fun reload(file: CsvImport): CsvImport = assertNotNull(repositories.csvImportRepository.getImport(file.id).first())
+
     private suspend fun countedBalance(accountId: AccountId): BigDecimal =
         repositories.transactionRepository
             .getTransactionsByAccount(accountId)
