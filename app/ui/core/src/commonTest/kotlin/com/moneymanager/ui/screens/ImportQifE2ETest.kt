@@ -4,6 +4,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isEnabled
@@ -337,12 +338,12 @@ class ImportQifE2ETest {
 
             // Re-import both through the bulk dialog; nothing changed, so it re-runs them in place.
             onNodeWithText("Re-import all (2)").performClick()
-            waitUntilExactlyOneExists(hasText("Re-import all imported files"), timeoutMillis = 15000)
-            waitUntilAtLeastOneExists(hasText("Re-import 2 files") and isEnabled(), timeoutMillis = 15000)
-            onNodeWithText("Re-import 2 files").performClick()
+            waitUntilExactlyOneExists(hasText("Deletes what the 2 files created", substring = true), timeoutMillis = 15000)
+            waitUntilAtLeastOneExists(hasText("Re-import 2 files") and hasClickAction() and isEnabled(), timeoutMillis = 15000)
+            onNode(hasText("Re-import 2 files") and hasClickAction()).performClick()
             waitUntilAtLeastOneExists(hasText("Re-imported 2 files", substring = true), timeoutMillis = 20000)
             onNodeWithText("Done").performClick()
-            waitUntilDoesNotExist(hasText("Re-import all imported files"), timeoutMillis = 15000)
+            waitUntilDoesNotExist(hasText("Deletes what the 2 files created", substring = true), timeoutMillis = 15000)
             waitForIdle()
         }
     }
