@@ -207,6 +207,23 @@ class Reimports(
         stopRequested: () -> Boolean = { false },
     ): BulkReimportResult = writeLock.withLock { reimportAllLocked(plan, accountId, currencyId, onProgress, fileLabel, stopRequested) }
 
+    /**
+     * Throws [RerunBlockedException] when some file of [plan] would be deleted but can't be imported again. [reimportAll]
+     * checks this itself; a caller with its own write to make first checks beforehand, so a refusal leaves that undone too.
+     */
+    fun checkReimportable(
+        plan: ReimportAllPlan,
+        accountId: AccountId?,
+        currencyId: CurrencyId?,
+    ) = refuseUnrunnable(
+        plan.runFiles().map { file ->
+            val imported = plan.imported.getValue(file.source)
+            Triple(file, plan.strategies[file.source], ImportedSettings(imported.accountId ?: accountId, imported.currencyId ?: currencyId))
+        },
+    )
+
+    private fun ReimportAllPlan.runFiles() = files.filter { file -> rerunFiles.any { it.file == file.source } }
+
     @Suppress("LongParameterList")
     private suspend fun reimportAllLocked(
         plan: ReimportAllPlan,
@@ -216,20 +233,8 @@ class Reimports(
         fileLabel: (CsvImport) -> String,
         stopRequested: () -> Boolean,
     ): BulkReimportResult {
-        val run = plan.files.filter { file -> plan.rerunFiles.any { it.file == file.source } }
-        refuseUnrunnable(
-            run.map { file ->
-                val imported = plan.imported.getValue(file.source)
-                Triple(
-                    file,
-                    plan.strategies[file.source],
-                    ImportedSettings(
-                        imported.accountId ?: accountId,
-                        imported.currencyId ?: currencyId,
-                    ),
-                )
-            },
-        )
+        val run = plan.runFiles()
+        checkReimportable(plan, accountId, currencyId)
         val skipped = plan.files.count { it.rowCount > 0 && plan.strategies[it.source] == null && it !in run }
         val rerun = mutableSetOf<Source>()
         val reimported = mutableSetOf<Source>()

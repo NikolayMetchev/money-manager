@@ -49,7 +49,8 @@ import kotlinx.coroutines.launch
 /**
  * Funding references (card last-4 digits and the like) that imported rows carry but no account owns yet.
  * Assigning one adds it to the picked account's attribute set — an account may own several cards — and
- * then [reimportFiles] re-imports the files that reference it, so their rows reconcile against the card's account.
+ * then re-imports the files that reference it, so their rows reconcile against the card's account. [prepareReimport] plans
+ * that re-import, refusing before the card is saved when one of the files can't be re-imported, and returns what runs it.
  * Which column and attribute type count is whatever a CSV strategy's funding match says, so this
  * screen knows nothing about any particular source.
  */
@@ -61,7 +62,7 @@ fun CardLast4Screen(
     accountRepository: AccountReadRepository,
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
-    reimportFiles: suspend (List<CsvImportId>) -> BulkReimportResult,
+    prepareReimport: suspend (List<CsvImportId>) -> suspend () -> BulkReimportResult,
 ) {
     val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
@@ -95,6 +96,8 @@ fun CardLast4Screen(
         message = null
         scope.launch {
             runCatchingUnlessCancelled {
+                // Planned first: a refusal must leave the card unassigned, so it stays in this list to retry.
+                val reimport = prepareReimport(reference.imports)
                 val typeId = importEngine.getOrCreateAttributeType(reference.attributeTypeName)
                 val existing =
                     accountAttributeRepository.getByAccount(accountId).first().firstOrNull {
@@ -106,7 +109,7 @@ fun CardLast4Screen(
                     value = addAttributeToken(existing?.value, reference.value),
                     existingAttributeId = existing?.id,
                 )
-                reimportFiles(reference.imports)
+                reimport()
             }.onSuccess { result ->
                 // The assigned card leaves this list, so a file that failed can only be retried from its import screen.
                 if (result.filesFailed > 0) {

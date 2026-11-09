@@ -528,7 +528,7 @@ class CurveCsvE2ETest : DbTest() {
                 value = addAttributeToken(existing.value, reference.value),
                 existingAttributeId = existing.id,
             )
-            // Assigning the card re-imports the files that reference it (Card Last-4's reimportFiles).
+            // Assigning the card re-imports the files that reference it (Card Last-4's prepareReimport).
             val reimports = repositories.reimports(maintenance)
             val files = reference.imports.map { repositories.csvImportRepository.getImport(it).first()!! }
             val rerun = reimports.reimportAll(reimports.planAll(files), accountId = null, currencyId = null, onProgress = {})
