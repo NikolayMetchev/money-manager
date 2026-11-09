@@ -83,6 +83,7 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
         Source.System,
         Source.Merge,
         Source.Unmerge,
+        Source.Reconciliation,
         -> {}
     }
 }

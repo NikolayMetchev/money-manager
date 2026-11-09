@@ -34,6 +34,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
+import com.moneymanager.reconciliation.CopyPlan
 import com.moneymanager.reconciliation.ReconciliationResult
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.formatAmount
@@ -43,6 +44,7 @@ import kotlin.time.Duration.Companion.days
 internal const val PICKER_CANDIDATES_TAG = "match-picker-candidates"
 internal const val PICKER_OPEN_TRANSACTION_TAG = "match-picker-open-transaction"
 internal const val PICKER_OPEN_SOURCE_TAG = "match-picker-open-source"
+internal const val PICKER_COPY_TAG = "match-picker-copy"
 
 /** How far either side of the source movement the picker looks. */
 internal val PICKER_WINDOWS: List<Duration> = listOf(1.days, 3.days, 7.days, 30.days)
@@ -57,7 +59,9 @@ private val CHECKBOX_SLOT = 48.dp
  * Picks the real transactions a source movement ([movement], on [wallet]) records, for a source row the matcher
  * couldn't pair. Only legs no match claims can be picked (see [pickerCandidates]); the totals show how far the
  * selection is from the source's, which may differ when the two sides book fees differently. When the only gap is a fee
- * the source took on top of what was entered, "Add missing fee" books it and matches in one go.
+ * the source took on top of what was entered, "Add missing fee" books it and matches in one go. When Money Manager lacks
+ * the movement altogether (its own source never reported it), "Copy to Money Manager" books [copyPlan] on the real
+ * accounts and matches it.
  */
 @Composable
 fun MatchPickerDialog(
@@ -73,6 +77,8 @@ fun MatchPickerDialog(
     onOpenLeg: (ReconciliationLeg) -> Unit = {},
     onBookFee: (MissingFee, List<ReconciliationLeg>) -> Unit = { _, _ -> },
     onOpenSource: (ReconciliationLeg) -> Unit = {},
+    copyPlan: CopyPlan = CopyPlan.Blocked("Nothing to copy"),
+    onCopy: (CopyPlan.Ready) -> Unit = {},
 ) {
     val window = state.window
     val sameAssetOnly = state.sameAssetOnly
@@ -117,6 +123,20 @@ fun MatchPickerDialog(
                         TextButton(onClick = { onBookFee(fee, selected.toList()) }) {
                             Text("Add missing fee (${formatAmount(fee.fee)}) and match")
                         }
+                    }
+                    TextButton(
+                        onClick = { (copyPlan as? CopyPlan.Ready)?.let(onCopy) },
+                        enabled = copyPlan is CopyPlan.Ready && selected.isEmpty(),
+                        modifier = Modifier.testTag(PICKER_COPY_TAG),
+                    ) {
+                        Text("Copy to Money Manager")
+                    }
+                    if (copyPlan is CopyPlan.Blocked) {
+                        Text(
+                            "Can't copy: ${copyPlan.reason}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
                 LazyColumn(

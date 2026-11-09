@@ -25,6 +25,7 @@ fun Source.forRow(rowKey: ImportRowKey): Source =
         Source.System,
         Source.Merge,
         Source.Unmerge,
+        Source.Reconciliation,
         -> {
             this
         }

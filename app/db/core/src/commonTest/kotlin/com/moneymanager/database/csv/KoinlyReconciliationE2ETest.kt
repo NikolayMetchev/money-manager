@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.RelationshipRole
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
@@ -24,7 +25,10 @@ import com.moneymanager.importengineapi.createReconciliationMatch
 import com.moneymanager.importengineapi.setReconciliationLinks
 import com.moneymanager.importengineapi.setTradeExcluded
 import com.moneymanager.importengineapi.setTransferExcluded
+import com.moneymanager.reconciliation.CopyPlan
+import com.moneymanager.reconciliation.copyToMoneyManager
 import com.moneymanager.reconciliation.planAutoLinks
+import com.moneymanager.reconciliation.planCopy
 import com.moneymanager.reconciliation.realAccounts
 import com.moneymanager.reconciliation.reconcile
 import com.moneymanager.test.database.DbTest
@@ -33,6 +37,7 @@ import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -619,6 +624,114 @@ class KoinlyReconciliationE2ETest : DbTest() {
             assertEquals(false, source.isLinkable(feeAccount))
             val real = realAccounts(repositories.accountRepository.getAllAccounts().first(), shadows)
             assertTrue(feeAccount.accountId !in planAutoLinks(source, shadows, reconciliation.getLinks().first(), real))
+        }
+
+    private suspend fun reconcileKoinly() =
+        repositories.reconciliationLinkRepository.let { reconciliation ->
+            val links = reconciliation.getLinks().first()
+            reconcile(
+                sourceLegs = reconciliation.getLegs(shadowIds()),
+                links = links,
+                realLegs = reconciliation.getLegs(links.map { it.realAccountId }.toSet()),
+            )
+        }
+
+    @Test
+    fun copyingATradeBooksItOnTheRealAccountWithItsFeeAndMatchesIt() =
+        runDbTest {
+            applyAll(listOf(stage("transactions.csv", listOf(coinbaseTrade))))
+            val coinbase =
+                repositories.importEngine.createAccount(
+                    Account(id = AccountId(0), name = "Coinbase", openingDate = now),
+                    Source.Manual,
+                )
+            val coinbaseFees =
+                repositories.importEngine.createAccount(
+                    Account(id = AccountId(0), name = "Coinbase Fees", openingDate = now),
+                    Source.Manual,
+                )
+            val wallet = assertNotNull(accountByName("Koinly · Coinbase")).id
+            repositories.importEngine.setReconciliationLinks(wallet, setOf(coinbase))
+            val reconciliation = repositories.reconciliationLinkRepository
+            val movement = reconcileKoinly().missingInMm.filter { it.walletAccountId == wallet }.map { it.leg }
+            // The trade's two legs and its fee.
+            assertEquals(3, movement.size)
+
+            val plan =
+                planCopy(
+                    movement,
+                    reconciliation.getShadowAccounts().first(),
+                    reconciliation.getLinks().first(),
+                    repositories.accountRepository
+                        .getAllAccounts()
+                        .first()
+                        .associate { it.id to it.name },
+                )
+            val copies = repositories.importEngine.copyToMoneyManager(movement, assertIs<CopyPlan.Ready>(plan))
+
+            val trade =
+                repositories.tradeRepository
+                    .getTradesByAccount(coinbase)
+                    .first()
+                    .single()
+            assertEquals(coinbase, trade.fromAccountId)
+            assertEquals("GBP" to "KNC", trade.from.asset.code to trade.to.asset.code)
+            assertEquals(0, trade.from.toDisplayValue().compareTo(BigDecimal("492.66")))
+            assertEquals(0, trade.to.toDisplayValue().compareTo(BigDecimal("358.32414347")))
+            // The fee goes to the account's existing fee account, which is now tagged as such.
+            assertEquals("7.34", balanceOf("Coinbase Fees", "GBP"))
+            assertEquals(
+                coinbase.id.toString(),
+                repositories.accountAttributeRepository
+                    .getByAccount(coinbaseFees)
+                    .first()
+                    .single { it.attributeType.id.id == WellKnownIds.ACCOUNT_FEE_ACCOUNT_FOR_ATTR_TYPE_ID }
+                    .value,
+            )
+            val fee = copies.filterIsInstance<TransferId>().single()
+            assertEquals(
+                listOf(Source.Reconciliation),
+                repositories.transferSourceRepository.getSourcesForTransaction(fee).map { it.source },
+            )
+            // The copy is stored as the source row's match, so nothing is left to reconcile.
+            val after = reconcileKoinly()
+            assertTrue(after.missingInMm.isEmpty())
+            assertTrue(after.missingInSource.isEmpty())
+            assertEquals(
+                1,
+                after.matches
+                    .mapNotNull { it.matchId }
+                    .distinct()
+                    .size,
+            )
+        }
+
+    @Test
+    fun aMovementThroughAnAccountWithNoRealCounterpartCannotBeCopied() =
+        runDbTest {
+            applyAll(listOf(stage("transactions.csv", listOf(withdrawal))))
+            val coinbase =
+                repositories.importEngine.createAccount(
+                    Account(id = AccountId(0), name = "Coinbase", openingDate = now),
+                    Source.Manual,
+                )
+            val wallet = assertNotNull(accountByName("Koinly · Coinbase")).id
+            repositories.importEngine.setReconciliationLinks(wallet, setOf(coinbase))
+            val reconciliation = repositories.reconciliationLinkRepository
+            val movement = reconcileKoinly().missingInMm.filter { it.walletAccountId == wallet }.map { it.leg }
+
+            val plan =
+                planCopy(
+                    movement,
+                    reconciliation.getShadowAccounts().first(),
+                    reconciliation.getLinks().first(),
+                    repositories.accountRepository
+                        .getAllAccounts()
+                        .first()
+                        .associate { it.id to it.name },
+                )
+
+            assertEquals(CopyPlan.Blocked("Koinly: External is linked to no Money Manager account"), plan)
         }
 
     @Test

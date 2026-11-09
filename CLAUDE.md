@@ -540,7 +540,7 @@ source** (built-ins: Koinly, Accointing). Its data never touches real accounts:
 - The External Account Reconciliation screen has two tabs. **Unmatched**: near matches (**Accept** stores one),
   the source's rows Money Manager lacks (**Ignore** excludes them with the reason `"ignored in reconciliation"`,
   outside the source's owned set; **Select matching transactions…** picks real legs from around that time that no
-  match claims, `pickerCandidates`), and real legs the source lacks (read-only). **Matched**: exact and stored
+  match claims, `pickerCandidates`; **Copy to Money Manager**, for a row the real accounts' own source never reported, books its trades and transfers on the real accounts as `Source.Reconciliation` (each wallet as its one linked account, a wallet's fee account as that account's fee account) and stores them as the row's match, `planCopy` and `copyToMoneyManager` in `app/reconciliation`), and real legs the source lacks (read-only). **Matched**: exact and stored
   matches (**Unmatch** deletes a stored one) and the ignored rows (**Un-ignore**).
 - Rows the source marks deleted are imported **excluded** (an `Exclude` rule), like
   declined card payments. Trades can be excluded too (`trade_attribute`, honoured by
