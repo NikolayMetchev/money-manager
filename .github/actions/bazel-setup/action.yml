@@ -20,7 +20,7 @@ runs:
     # The JDK, Kotlin/Native and every Maven library are Bazel repositories (hermetic, sha256-pinned), so
     # nothing else needs installing. The JVM version lives in .bazelrc.
     - name: Set up Bazel
-      uses: bazel-contrib/setup-bazel@0.19.1
+      uses: bazel-contrib/setup-bazel@0.19.2
       with:
         bazelisk-cache: true
         # Not with a BuildBuddy key: its remote cache holds every result, so restoring the disk cache
