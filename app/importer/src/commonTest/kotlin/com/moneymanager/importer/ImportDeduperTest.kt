@@ -4,6 +4,7 @@ import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.CurrencyScaleFactors
@@ -37,6 +38,7 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 class ImportDeduperTest {
     private val currency =
@@ -1538,6 +1540,7 @@ class ImportDeduperTest {
             existing = emptyList(),
             calendars = londonCalendars,
             otherSideLegs = listOf(thursdayBankCredit),
+            otherSideStatementAccounts = mapOf(thursdayBankCredit.id to bank),
         ).classify(listOf(easterMondayPlaceholder()))
             .single()
 
@@ -1569,6 +1572,7 @@ class ImportDeduperTest {
         otherSideLeg: Transfer = thursdayBankCredit,
         claimedReconcileTargets: Set<TransferId> = emptySet(),
         ownSourceLegs: Set<TransferId> = emptySet(),
+        statementAccount: AccountId? = bank,
     ) = ImportDeduper(
         businessDayPolicy(SettlementWindow.BusinessDays(3)),
         existing = emptyList(),
@@ -1576,6 +1580,7 @@ class ImportDeduperTest {
         claimedReconcileTargets = claimedReconcileTargets,
         ownSourceLegs = ownSourceLegs,
         otherSideLegs = listOf(otherSideLeg),
+        otherSideStatementAccounts = listOfNotNull(statementAccount?.let { otherSideLeg.id to it }).toMap(),
     )
 
     @Test
@@ -1584,6 +1589,60 @@ class ImportDeduperTest {
 
     @Test
     fun otherSide_neverTakesALegOfTheRowsOwnSource() = assertLeftAlone(otherSideDeduper(ownSourceLegs = setOf(TransferId(60))))
+
+    // The bank line names the broker as its far end and the bank as its own; a record on the broker's statement, or
+    // one whose statement isn't known, says nothing of where the bank's money went, so it never fills a placeholder.
+    @Test
+    fun otherSide_neverTakesAnEndThatIsntTheRecordsOwnAccount() = assertLeftAlone(otherSideDeduper(statementAccount = brokerPayee))
+
+    @Test
+    fun otherSide_neverTakesAnEndOfARecordWithNoStatementAccount() = assertLeftAlone(otherSideDeduper(statementAccount = null))
+
+    // The other import order: the wallet's placeholder record is already booked, and the bank's own line arrives.
+    private val easterMondayPlaceholderLeg =
+        bankCredit(61, timestamp = londonNoon("2021-04-05"), src = placeholder)
+            .transfer
+            .copy(
+                attributes =
+                    listOf(
+                        TransferAttribute(
+                            id = 1,
+                            transactionId = TransferId(61),
+                            attributeType = AttributeType(AttributeTypeId(-9), "unidentified-counterparty"),
+                            value = WellKnownIds.UNIDENTIFIED_SOURCE,
+                        ),
+                    ),
+            )
+
+    private fun bankLineAgainstBookedPlaceholder(statementAccount: AccountId): Classified =
+        ImportDeduper(
+            businessDayPolicy(SettlementWindow.BusinessDays(3)),
+            existing = emptyList(),
+            calendars = londonCalendars,
+            otherSideLegs = listOf(easterMondayPlaceholderLeg),
+        ).classify(
+            listOf(
+                importTransfer(0, timestamp = londonNoon("2021-04-01"), src = bank, tgt = brokerPayee, uniqueKey = mapOf("line" to "1"))
+                    .copy(source = Source.Csv(CsvImportId(Uuid.random()), statementAccountId = statementAccount)),
+            ),
+        ).single()
+
+    @Test
+    fun otherSide_anIdentifiedLineTakesABookedPlaceholdersRealEnd() {
+        val result = bankLineAgainstBookedPlaceholder(statementAccount = bank)
+
+        assertEquals(AccountRef.Existing(bank), result.transfer.fromAccount)
+        assertEquals(AccountRef.Existing(wallet), result.transfer.toAccount)
+        assertEquals(TransferId(61), result.excludeExisting?.transfer?.id)
+    }
+
+    @Test
+    fun otherSide_anIdentifiedLineFillsABookedPlaceholderOnlyWithItsOwnAccount() {
+        val result = bankLineAgainstBookedPlaceholder(statementAccount = brokerPayee)
+
+        assertEquals(AccountRef.Existing(brokerPayee), result.transfer.toAccount)
+        assertEquals(null, result.excludeExisting)
+    }
 
     @Test
     fun otherSide_aPlaceholderNeverPairsWithAnotherPlaceholderWhateverItsMarkerSays() =

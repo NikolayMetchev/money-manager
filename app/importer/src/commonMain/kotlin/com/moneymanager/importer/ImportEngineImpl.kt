@@ -31,6 +31,7 @@ import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.widen
+import com.moneymanager.domain.model.withStatementAccount
 import com.moneymanager.domain.repository.write.AccountAttributeWriteRepository
 import com.moneymanager.domain.repository.write.AccountMappingWriteRepository
 import com.moneymanager.domain.repository.write.AccountWriteRepository
@@ -660,6 +661,10 @@ class ImportEngineImpl(
                 val passThrough = transfer.passThrough
                 transfer.copy(
                     rowKey = transfer.rowKey ?: ImportRowKey.Manual(manualRowIndex++),
+                    source =
+                        transfer.statementAccount
+                            ?.let { transfer.source.withStatementAccount(requireId(resolveRef(it, accountKeyToId))) }
+                            ?: transfer.source,
                     fromAccount = resolveRef(requireNotNull(transfer.fromAccount), accountKeyToId),
                     toAccount = resolveRef(requireNotNull(transfer.toAccount), accountKeyToId),
                     fee =
@@ -699,6 +704,7 @@ class ImportEngineImpl(
                 ownSourceLegs = ownSourceLegs(resolvedTransfers, existing),
                 calendars = calendars,
                 otherSideLegs = otherSideLegs,
+                otherSideStatementAccounts = csvImportRepository.getStatementAccounts(otherSideLegs.map { it.id }),
             ).classify(resolvedTransfers)
 
         val toImport = resolveReversalLinks(classified.filter { it.status == ImportStatus.IMPORTED })

@@ -57,6 +57,17 @@ CREATE TABLE account_merge_attribute (
 
 CREATE INDEX idx_account_merge_attribute_merge ON account_merge_attribute(merge_id);
 
+-- The provenance rows whose statement account (entity_source.statement_account_id) the merge moved from the deleted
+-- account to the survivor, so unmerge gives the restored account back exactly its own statement lines and leaves the
+-- survivor's alone.
+CREATE TABLE account_merge_statement_source (
+    merge_id INTEGER NOT NULL,
+    entity_source_id INTEGER NOT NULL,
+    FOREIGN KEY (merge_id) REFERENCES account_merge(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_account_merge_statement_source_merge ON account_merge_statement_source(merge_id);
+
 -- Note: the deleted account's attributes and ownerships are not snapshotted here. The merge's cascade
 -- delete records each one as a DELETE in account_attribute_audit / person_account_ownership_audit (the
 -- attribute delete trigger uses the attribute's own stamped revision_id, so it fires even after the parent

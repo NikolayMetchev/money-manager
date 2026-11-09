@@ -535,6 +535,12 @@ data class ImportTransfer(
      */
     val unidentifiedCounterpartyAccountId: AccountId? = null,
     /**
+     * The account whose statement (or API feed) this record is: its own account, before any direction flip. The engine
+     * resolves it and records it with the transfer's provenance ([com.moneymanager.domain.model.statementAccountId]),
+     * which tells another import which end of this record is its own.
+     */
+    val statementAccount: AccountRef? = null,
+    /**
      * When set, [timestamp] is only the earliest this movement can have happened and this is the latest:
      * the provider reported no real instant (Bybit's oldest deposits carry `successAt = 0`), so the
      * importer booked it at the start of the date window it was fetched in. Cross-source reconciliation

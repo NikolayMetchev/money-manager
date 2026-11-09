@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.statementAccountId
 import com.moneymanager.domain.model.toSourceType
 
 /**
@@ -32,6 +33,7 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
         revision_id = revisionId,
         source_type_id = source.toSourceType().id.toLong(),
         device_id = deviceId.id,
+        statement_account_id = source.statementAccountId?.id,
     )
 
     when (source) {
@@ -47,7 +49,6 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
                     id = entitySource.id,
                     csv_import_id = source.importId.id.toString(),
                     csv_row_index = source.rowIndex,
-                    statement_account_id = source.statementAccountId?.id,
                 )
             }
         }
@@ -105,7 +106,7 @@ suspend fun MoneyManagerDatabaseWrapper.recordMatchedSource(
         return
     }
     val id = entitySourceWriteQueries.lastInsertedSourceId().awaitAsOne()
-    entitySourceWriteQueries.insertCsvSource(id, source.importId.id.toString(), source.rowIndex, source.statementAccountId?.id)
+    entitySourceWriteQueries.insertCsvSource(id, source.importId.id.toString(), source.rowIndex)
 }
 
 /**

@@ -95,6 +95,7 @@ private val EXCLUDED_FROM_AUDIT =
         "account_merge",
         "account_merge_transfer",
         "account_merge_attribute",
+        "account_merge_statement_source",
         "settings",
         "api_credential",
         "api_session",

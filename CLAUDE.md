@@ -486,7 +486,12 @@ alone, inside the placeholder window (business days included), and the nearest r
 (`unidentified-counterparty`, whose value says which end it is: `source` or `target`). The incoming row becomes the whole
 transfer, real end to real end, and the other record is excluded and linked, so either import order books `Monzo -> ISA`.
 Fees, pass-through chain legs and shadow accounts are never candidates (`selectOtherSideCandidates`), and nor is anything on
-an account the batch itself books, a record of the same source, or a record another row already reconciled against.
+an account the batch itself books, a record of the same source, or a record another row already reconciled against. The
+identified record must hold its own account where the placeholder stands in (`ownEndsMeet`): a bank line `Santander -> Marcus`
+is never PayPal's withdrawal to an unknown bank, whatever the amounts and times say. Every import records each transfer's own
+account, its statement account (`ImportTransfer.statementAccount`, stored in `entity_source.statement_account_id`; a merge
+moves it to the survivor and `account_merge_statement_source` lets the unmerge move it back), and a record with none is
+never a candidate.
 
 A person-named counterparty (an `Account` naming with `person`) who owns the row's own account is a placeholder too: a statement
 saying only "FROM <the holder>" moved money between two of the holder's accounts without saying which
