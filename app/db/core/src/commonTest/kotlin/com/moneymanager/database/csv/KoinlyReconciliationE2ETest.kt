@@ -1,6 +1,7 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
@@ -19,7 +20,6 @@ import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.RelationshipMutation
-import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createReconciliationMatch
 import com.moneymanager.importengineapi.feeAccounts
@@ -33,7 +33,10 @@ import com.moneymanager.reconciliation.planCopy
 import com.moneymanager.reconciliation.realAccounts
 import com.moneymanager.reconciliation.reconcile
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.planFile
+import com.moneymanager.test.database.reimportFile
 import com.moneymanager.test.database.reimports
+import com.moneymanager.test.database.runPlan
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -412,11 +415,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
                 0
         }
 
-    private suspend fun reimport(file: CsvImport): SourceRerunResult<*> {
-        val reimports = repositories.reimports(maintenance)
-        val reloaded = assertNotNull(repositories.csvImportRepository.getImport(file.id).first())
-        return reimports.reimport(reimports.plan(reloaded), accountId = null, currencyId = null)
-    }
+    private suspend fun reimport(file: CsvImport): BulkReimportResult = repositories.reimports(maintenance).reimportFile(file.id)
 
     private suspend fun excludedReason(trade: TradeId): String? =
         repositories.tradeRepository
@@ -433,9 +432,11 @@ class KoinlyReconciliationE2ETest : DbTest() {
             val trade = koinlyTrade()
             repositories.importEngine.setTradeExcluded(trade.id, "duplicate of another wallet")
 
-            val result = reimport(file)
+            val reimports = repositories.reimports(maintenance)
+            val plan = reimports.planFile(file.id)
+            assertEquals(1, plan.rerunFiles.sumOf { it.tradeIds.size })
+            val result = reimports.runPlan(plan)
 
-            assertEquals(1, result.deletedTrades)
             assertEquals(1, result.reappliedLinks.reapplied)
             val recreated = koinlyTrade()
             assertNotEquals(trade.id, recreated.id, "the re-import made the trade again")

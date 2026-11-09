@@ -52,6 +52,7 @@ kmp_library(
         "//app/csvimporter",
         "//app/db/schema",
         "//app/importengineapi",
+        "//app/model/csvstrategy",
         "//utils/bigdecimal",
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_coroutines_test",

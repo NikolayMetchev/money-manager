@@ -2,7 +2,7 @@ package com.moneymanager.database.csv
 
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.BulkApplyResult
-import com.moneymanager.csvimporter.CsvImportResult
+import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
@@ -14,10 +14,10 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
-import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.reimportFile
 import com.moneymanager.test.database.reimports
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
@@ -251,15 +251,14 @@ class CryptoComCsvE2ETest : DbTest() {
         }
 
     /** Re-imports an already-imported Crypto.com Fiat file with its built-in strategy. */
-    private suspend fun reimportFiat(importId: CsvImportId): SourceRerunResult<CsvImportResult?> {
+    private suspend fun reimportFiat(importId: CsvImportId): BulkReimportResult {
         val current = repositories.csvImportRepository.getImport(importId).first()!!
         val strategy =
             repositories.csvImportStrategyRepository
                 .getAllStrategies()
                 .first()
                 .first { it.name == "Crypto.com Fiat" }
-        val reimports = repositories.reimports(maintenance)
-        return reimports.reimport(reimports.plan(current).copy(strategy = strategy), accountId = null, currencyId = null)
+        return repositories.reimports(maintenance).reimportFile(current.id, strategy = strategy)
     }
 
     @Test
@@ -318,7 +317,7 @@ class CryptoComCsvE2ETest : DbTest() {
             )
 
             val result = reimportFiat(fiat.id)
-            assertEquals(0, result.rerun?.failedRows?.size, "the file is re-run")
+            assertEquals(1 to 0, result.filesImported to result.filesFailed, "the file is re-run")
             repositories.maintenanceService.refreshMaterializedViews()
 
             val deposits =

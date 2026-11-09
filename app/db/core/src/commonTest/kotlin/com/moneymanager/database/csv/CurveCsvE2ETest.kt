@@ -19,6 +19,7 @@ import com.moneymanager.importengineapi.setAccountAttributeValue
 import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.reimportFile
 import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -162,8 +163,7 @@ class CurveCsvE2ETest : DbTest() {
                 .getAllStrategies()
                 .first()
                 .first { it.name == strategyName }
-        val reimports = repositories.reimports(maintenance)
-        reimports.reimport(reimports.plan(current).copy(strategy = strategy), accountId = null, currencyId = null)
+        repositories.reimports(maintenance).reimportFile(current.id, strategy = strategy)
     }
 
     private suspend fun transfersBetween(

@@ -18,20 +18,15 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.CascadeRerunner
-import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ManualEdit
 import com.moneymanager.importengineapi.RerunFile
 import com.moneymanager.importengineapi.RerunLinks
 import com.moneymanager.importengineapi.RerunReads
-import com.moneymanager.importengineapi.SourceRerunPlan
-import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.captureRerunLinks
 import com.moneymanager.importengineapi.executeRerun
-import com.moneymanager.importengineapi.executeSourceRerun
 import com.moneymanager.importengineapi.manualEditsOf
-import com.moneymanager.importengineapi.planSourceRerun
 import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.CancellationException
@@ -71,18 +66,6 @@ fun CsvImportStrategy.withCurrency(currencyId: CurrencyId?): CsvImportStrategy {
 /** The source a staged file's records are recorded under. */
 val CsvImport.source: Source get() = Source.Csv(id)
 
-/** What re-importing one [file] will do; [needsAccount] and [needsCurrency] say what the person must pick. */
-data class FileReimportPlan(
-    val file: CsvImport,
-    /** The strategy it was last imported with, else the one its content selects; null when neither exists. */
-    val strategy: CsvImportStrategy?,
-    val imported: ImportedSettings,
-    val rerun: SourceRerunPlan,
-) {
-    val needsAccount: Boolean get() = strategy?.needsSourceAccountOverride() == true && imported.accountId == null
-    val needsCurrency: Boolean get() = strategy?.needsCurrencyOverride() == true && imported.currencyId == null
-}
-
 /**
  * What a "re-import all" will do: [files] are the files picked plus every file that depends on what they create
  * ([cascaded]), in the order they were imported.
@@ -110,9 +93,9 @@ data class ReimportAllPlan(
 }
 
 /**
- * The one way to re-import a staged file (CSV, QIF, Excel or PDF), one at a time or all at once: what the file created is
- * deleted and its records run through the normal import again, with the strategy, account and currency
- * it was imported with ([executeSourceRerun]). Also the [CascadeRerunner] every re-import (API
+ * The one way to re-import staged files (CSV, QIF, Excel or PDF), one or many: [planAll] finds every file that depends on
+ * them and [reimportAll] deletes what they all created and runs their records through the normal import again, each with
+ * the strategy, account and currency it was imported with. Also the [CascadeRerunner] every re-import (API
  * sessions included) re-imports the other files it takes along with, whole.
  * Each re-import holds [writeLock], the session's write lock, throughout: its delete, import, re-runs
  * and edits are separate writes, and an import between them would dedupe against a half-done state.
@@ -132,61 +115,6 @@ class Reimports(
 ) : CascadeRerunner {
     /** Runs [block] holding the session's write lock, for the re-imports that run outside this class (API sessions). */
     suspend fun <T> exclusively(block: suspend () -> T): T = writeLock.withLock { block() }
-
-    /**
-     * Plans re-importing [file]: what it created, the other files matched against that, and its hand edits.
-     * On a large database this takes a while, so [onProgress] hears each step.
-     */
-    suspend fun plan(
-        file: CsvImport,
-        onProgress: (suspend (Progress) -> Unit)? = null,
-    ): FileReimportPlan {
-        val progress = PhasedProgress(onProgress)
-        progress.emit(base = 0f, detail = "Loading ${file.originalFileName}")
-        val loaded = file.reloaded()
-        val strategy = strategyFor(loaded, csvImportStrategyRepository.getAllStrategies().first())
-        return FileReimportPlan(
-            file = loaded,
-            strategy = strategy,
-            imported = loaded.importedSettings,
-            rerun = rerunPlan(loaded, progress.sink(base = PLAN_LOAD_SPAN, span = 1f - PLAN_LOAD_SPAN)),
-        )
-    }
-
-    /**
-     * Re-imports per [plan]. [accountId] and [currencyId] are used only where the file's last
-     * import didn't record them ([FileReimportPlan.needsAccount], [FileReimportPlan.needsCurrency]).
-     */
-    suspend fun reimport(
-        plan: FileReimportPlan,
-        accountId: AccountId?,
-        currencyId: CurrencyId?,
-        onProgress: (suspend (Progress) -> Unit)? = null,
-        refreshViews: Boolean = true,
-    ): SourceRerunResult<CsvImportResult?> = writeLock.withLock { rerunFile(plan, accountId, currencyId, onProgress, refreshViews) }
-
-    private suspend fun rerunFile(
-        plan: FileReimportPlan,
-        accountId: AccountId?,
-        currencyId: CurrencyId?,
-        onProgress: (suspend (Progress) -> Unit)?,
-        refreshViews: Boolean,
-    ): SourceRerunResult<CsvImportResult?> {
-        val strategy = requireNotNull(plan.strategy) { "No strategy matches ${plan.file.originalFileName}" }
-        val settings =
-            ImportedSettings(plan.imported.accountId ?: accountId, plan.imported.currencyId ?: currencyId)
-        return importEngine.executeSourceRerun(
-            plan = plan.rerun,
-            resetRecords = resetBatch(plan.file),
-            reads = reads,
-            maintenance = maintenance,
-            cascadeRerunner = this,
-            onProgress = onProgress,
-            refreshViews = refreshViews,
-        ) {
-            runStaged(plan.file, strategy, settings, currencies(), onProgress)
-        }
-    }
 
     /**
      * Plans a "re-import all" over [files]: one query finds every other file that depends on what they create,
@@ -406,22 +334,6 @@ class Reimports(
         }
     }
 
-    private suspend fun rerunPlan(
-        file: CsvImport,
-        onProgress: (suspend (Progress) -> Unit)?,
-    ): SourceRerunPlan =
-        planSourceRerun(
-            source = file.source,
-            tradeIds = reads.csvImportRepository.getTradeIdsCreatedByImport(file.id),
-            createdAccountIds = reads.csvImportRepository.getAccountsCreatedByImport(file.id),
-            reads = reads,
-            onProgress = onProgress,
-        )
-
-    // Returns every record to never-imported, keeping the file's import history.
-    private fun resetBatch(file: CsvImport): ImportBatch =
-        ImportBatch(csvImportMutations = listOf(CsvImportMutation.ResetRowStatuses(file.id, null)))
-
     // A listed import may lack what strategy selection reads (getAllImports() doesn't populate columns).
     private suspend fun CsvImport.reloaded(): CsvImport = reads.csvImportRepository.getImport(id).first() ?: this
 
@@ -463,8 +375,6 @@ class Reimports(
 }
 
 private val REMOVAL_PHASE = Progress.Phase(1, 3, "Removing what the files created")
-
-private const val PLAN_LOAD_SPAN = 0.02f
 
 // Reading each file is nearly all of "re-import all" planning; finding them and their hand edits are the rest.
 private const val PLAN_ALL_CLOSURE_SPAN = 0.05f

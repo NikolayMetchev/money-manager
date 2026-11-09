@@ -14,7 +14,9 @@ import com.moneymanager.regex.compileRegex
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.installBuiltInCsvStrategies
+import com.moneymanager.test.database.planFile
 import com.moneymanager.test.database.reimports
+import com.moneymanager.test.database.runPlan
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -152,10 +154,10 @@ class QifReimportE2ETest : DbTest() {
             assertEquals(listOf(ImportStatus.DUPLICATE, ImportStatus.DUPLICATE), duplicates.map { it.importStatus })
 
             val reimports = repositories.reimports(maintenance)
-            val plan = reimports.plan(repositories.csvImportRepository.getImport(first.id).first()!!)
-            assertEquals(1, plan.rerun.cascade.size, "the later file is re-imported too")
+            val plan = reimports.planFile(first.id)
+            assertEquals(1, plan.cascaded.size, "the later file is re-imported too")
 
-            reimports.reimport(plan, accountId = sourceAccountId(), currencyId = null)
+            reimports.runPlan(plan, accountId = sourceAccountId())
 
             val relinked = repositories.csvImportRepository.getImportRows(overlap.id, limit = 10, offset = 0)
             assertTrue(

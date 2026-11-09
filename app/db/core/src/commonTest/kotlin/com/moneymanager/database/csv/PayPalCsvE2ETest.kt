@@ -19,7 +19,9 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.planFile
 import com.moneymanager.test.database.reimports
+import com.moneymanager.test.database.runPlan
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -617,9 +619,9 @@ class PayPalCsvE2ETest : DbTest() {
                 .first { it.name == "Crypto.com Card" }
         val strategy = installed.copy(config = changeConfig(installed.config))
         val reimports = repositories.reimports(maintenance)
-        val plan = reimports.plan(current).copy(strategy = strategy)
-        assertTrue(plan.rerun.createdTransfers.isNotEmpty(), "the re-import deletes the card chains it re-creates")
-        reimports.reimport(plan, accountId = null, currencyId = null)
+        val plan = reimports.planFile(current.id, strategy)
+        assertTrue(plan.rerunFiles.any { it.createdTransfers.isNotEmpty() }, "the re-import deletes the card chains it re-creates")
+        reimports.runPlan(plan)
     }
 
     @Test

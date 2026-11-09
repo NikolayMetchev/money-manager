@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
+import com.moneymanager.test.database.reimportFile
 import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -568,9 +569,9 @@ class FreetradeCsvE2ETest : DbTest() {
                     .getAllImports()
                     .first()
                     .single { it.originalFileName == "bank.csv" }
-            val result = reimports.reimport(reimports.plan(bankFile), accountId = null, currencyId = null)
+            val result = reimports.reimportFile(bankFile.id)
 
-            assertEquals(1, result.cascaded.size, "the Freetrade export is re-imported whole: ${result.cascaded}")
+            assertEquals(1, result.cascadedFiles, "the Freetrade export is re-imported whole: $result")
             assertEquals(before, before.keys.associateWith { balances(it) })
         }
 

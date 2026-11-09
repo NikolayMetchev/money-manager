@@ -1,6 +1,6 @@
 package com.moneymanager.ui.screens
 
-import com.moneymanager.csvimporter.CsvImportResult
+import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.database.di.DatabaseComponent
@@ -31,14 +31,16 @@ import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.createAccountMapping
+import com.moneymanager.importengineapi.createCsvStrategy
+import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.regex.compileRegex
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.reimportFile
 import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -112,7 +114,9 @@ class CsvReimportE2ETest {
 
         val currencies = dc.currencyRepository.getAllCurrencies().first()
         val gbp = currencies.first { it.code == "GBP" }
-        val strategy = createStrategy(sourceAccountId, gbp.id)
+        val unsaved = createStrategy(sourceAccountId, gbp.id)
+        // Saved, as the app's are: a re-import uses the strategy the file was last imported with.
+        val strategy = unsaved.copy(id = importEngine.createCsvStrategy(unsaved))
 
         val mapper =
             CsvTransferMapper(
@@ -154,11 +158,9 @@ class CsvReimportE2ETest {
             .firstOrNull { it.name == DUPLICATE_NAME }
             ?.id
 
-    private suspend fun Fixture.reimport(strategy: CsvImportStrategy = this.strategy): SourceRerunResult<CsvImportResult?> {
-        val reimports = dc.reimports()
-        val current = dc.csvImportRepository.getImport(csvImport.id).first()!!
-        val plan = reimports.plan(current).copy(strategy = strategy)
-        return reimports.reimport(plan, accountId = sourceAccountId, currencyId = null)
+    private suspend fun Fixture.reimport(strategy: CsvImportStrategy = this.strategy): BulkReimportResult {
+        importEngine.updateCsvStrategy(strategy)
+        return dc.reimports().reimportFile(csvImport.id, accountId = sourceAccountId)
     }
 
     @Test
@@ -178,9 +180,8 @@ class CsvReimportE2ETest {
 
             val result = fixture.reimport()
 
-            assertEquals(2, result.deletedTransfers)
-            assertEquals(2, result.rerun?.successCount)
-            assertEquals(listOf(DUPLICATE_NAME), result.deletedEmptyAccounts)
+            assertEquals(2, result.transfersCreated)
+            assertEquals(1, result.emptyAccountsDeleted)
             assertEquals(2L, dc.accountRepository.countTransfersByAccount(fixture.trueAccountId))
             assertNull(fixture.duplicateAccountId())
         }
@@ -216,7 +217,7 @@ class CsvReimportE2ETest {
 
             val result = fixture.reimport()
 
-            assertTrue(result.deletedEmptyAccounts.isEmpty())
+            assertEquals(0, result.emptyAccountsDeleted)
             // The imported rows moved to the true account; the hand-made transfer keeps the duplicate.
             assertEquals(duplicateId, fixture.duplicateAccountId())
             assertEquals(1L, dc.accountRepository.countTransfersByAccount(duplicateId))
@@ -258,8 +259,7 @@ class CsvReimportE2ETest {
                 )
 
             val result = fixture.reimport(changedStrategy)
-            assertEquals(2, result.deletedTransfers)
-            assertEquals(2, result.rerun?.successCount)
+            assertEquals(2, result.transfersCreated)
 
             val rowsAfter = dc.csvImportRepository.getImportRows(fixture.csvImport.id, limit = 1000, offset = 0)
             assertTrue(rowsAfter.all { it.importStatus == ImportStatus.IMPORTED })
@@ -278,7 +278,7 @@ class CsvReimportE2ETest {
             )
 
             // Re-importing again with the same strategy re-creates the same values.
-            assertEquals(2, fixture.reimport(changedStrategy).rerun?.successCount)
+            assertEquals(2, fixture.reimport(changedStrategy).transfersCreated)
         }
 
     private fun createImportEngine(dc: DatabaseComponent): ImportEngine =

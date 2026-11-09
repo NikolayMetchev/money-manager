@@ -7,6 +7,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.bulkApplyCsv
+import com.moneymanager.csvimporter.source
 import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.domain.model.Account
@@ -31,6 +32,7 @@ import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.test.database.installBuiltInCsvStrategies
+import com.moneymanager.test.database.planFile
 import com.moneymanager.test.database.reimports
 import com.moneymanager.test.database.upsertCurrencyByCode
 import com.moneymanager.ui.components.imports.ReimportDialog
@@ -166,12 +168,14 @@ class ReimportDialogsTest {
             val fixture = setUp()
             // The strategy now skips the edited row, so its transaction isn't created again.
             runBlocking {
+                val file = fixture.reloaded()
                 val strategy =
                     assertNotNull(
                         fixture.dc
                             .reimports()
-                            .plan(fixture.reloaded())
-                            .strategy,
+                            .planFile(file.id)
+                            .strategies
+                            .getValue(file.source),
                     )
                 val skipCoffee =
                     StrategyRule(
