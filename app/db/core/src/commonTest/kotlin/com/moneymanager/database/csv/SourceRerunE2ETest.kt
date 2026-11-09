@@ -364,6 +364,34 @@ class SourceRerunE2ETest : DbTest() {
         }
 
     // Planning reports each named step on a bar that never moves backwards.
+    @Test
+    fun reimportAll_reportsTheDeleteBatchOnItsOwnBar() =
+        runDbTest {
+            repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
+            val monzo = createMonzoAccount()
+            val first = stage("MonzoDataExport.csv", listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee")))
+            apply(first, monzo)
+            val second = stage("MonzoDataExport-later.csv", listOf(row("tx_2", "Bakery", "-2.00", "Bread")))
+            apply(second, monzo)
+
+            val reimports = repositories.reimports(maintenance)
+            val removal = mutableListOf<Progress>()
+            val files = mutableListOf<Progress>()
+            reimports.reimportAll(
+                reimports.planAll(listOf(reload(first.id), reload(second.id))),
+                accountId = null,
+                currencyId = null,
+                onProgress = { files += it },
+                onRemovalProgress = { removal += it },
+            )
+
+            assertProgressesTo(removal, "Removing what the import created", "Removed what the import created")
+            assertEquals(1f, removal.last().fraction, "the delete batch's bar ends full")
+            assertTrue(files.none { it.detail.startsWith("Removing") }, "the files' bar never shows the delete batch: $files")
+            assertProgressesTo(files, "Re-applying manual edits", "Refreshing views")
+            assertEquals(1f, files.last().fraction, "the steps after the last file keep the files' bar full")
+        }
+
     private fun assertProgressesTo(
         progress: List<Progress>,
         vararg details: String,

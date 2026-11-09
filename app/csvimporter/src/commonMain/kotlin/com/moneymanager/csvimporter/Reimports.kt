@@ -267,6 +267,7 @@ class Reimports(
      * [accountId] and [currencyId] are for the files whose last import didn't record them. Progress names each
      * file by [fileLabel], and once [stopRequested] says yes no further file starts (see [runBulkReimport]): what
      * those files created is already deleted, so their rows wait, reset, for their next import.
+     * [onRemovalProgress] follows the one delete batch, which runs before the first file, apart from [onProgress].
      */
     suspend fun reimportAll(
         plan: ReimportAllPlan,
@@ -275,7 +276,9 @@ class Reimports(
         onProgress: suspend (Progress) -> Unit,
         fileLabel: (CsvImport) -> String = { it.originalFileName },
         stopRequested: () -> Boolean = { false },
-    ): BulkReimportResult = writeLock.withLock { reimportAllLocked(plan, accountId, currencyId, onProgress, fileLabel, stopRequested) }
+        onRemovalProgress: suspend (Progress) -> Unit = {},
+    ): BulkReimportResult =
+        writeLock.withLock { reimportAllLocked(plan, accountId, currencyId, onProgress, onRemovalProgress, fileLabel, stopRequested) }
 
     @Suppress("LongParameterList")
     private suspend fun reimportAllLocked(
@@ -283,6 +286,7 @@ class Reimports(
         accountId: AccountId?,
         currencyId: CurrencyId?,
         onProgress: suspend (Progress) -> Unit,
+        onRemovalProgress: suspend (Progress) -> Unit,
         fileLabel: (CsvImport) -> String,
         stopRequested: () -> Boolean,
     ): BulkReimportResult {
@@ -290,6 +294,12 @@ class Reimports(
         val skipped = plan.files.count { it.rowCount > 0 && plan.strategies[it.source] == null && it !in run }
         val rerun = mutableSetOf<Source>()
         val reimported = mutableSetOf<Source>()
+        // The steps after the last file (hand edits, empty accounts, views) keep the files' bar where the run left it.
+        var lastFileProgress: Progress? = null
+        val onFileProgress: suspend (Progress) -> Unit = {
+            lastFileProgress = it
+            onProgress(it)
+        }
         val outcome =
             importEngine.executeRerun(
                 files = plan.rerunFiles,
@@ -298,7 +308,12 @@ class Reimports(
                 resetRecords = ImportBatch(),
                 reads = reads,
                 maintenance = maintenance,
-                onProgress = onProgress,
+                onProgress = { step ->
+                    lastFileProgress?.let { last ->
+                        onProgress(last.copy(detail = step.detail, item = last.item?.copy(step = step.detail)))
+                    }
+                },
+                onRemovalProgress = onRemovalProgress,
             ) {
                 val strategies = csvImportStrategyRepository.getAllStrategies().first()
                 val currencies = currencies()
@@ -308,7 +323,7 @@ class Reimports(
                     fileName = fileLabel,
                     stopRequested = stopRequested,
                     logLabel = "file",
-                    onProgress = onProgress,
+                    onProgress = onFileProgress,
                     startDetail = "Preparing",
                     prepare = { onPrepared ->
                         // Every crypto asset the run needs exists before the first file, at the run-wide precision.

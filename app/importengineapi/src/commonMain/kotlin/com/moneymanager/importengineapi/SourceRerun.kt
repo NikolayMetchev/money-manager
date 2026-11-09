@@ -418,7 +418,7 @@ suspend fun <R> ImportEngine.executeSourceRerun(
     // Prepared before anything is deleted, while each file still reads as it was imported.
     val rerunCascade = if (cascadeFiles.isEmpty()) null else cascadeRerunner.prepare(cascadeFiles)
     val outcome =
-        executeRerun(plan.files, plan.manualEdits, plan.links, resetRecords, reads, maintenance, onProgress, refreshViews) {
+        executeRerun(plan.files, plan.manualEdits, plan.links, resetRecords, reads, maintenance, onProgress, refreshViews = refreshViews) {
             val result = rerun()
             val notRerun =
                 rerunCascade
@@ -448,6 +448,8 @@ suspend fun <R> ImportEngine.executeSourceRerun(
  * of [files] created and returns every staged file's records to never-imported (plus [resetRecords], a session's
  * own). Then [run] imports the files again, the hand edits ([manualEdits], [links]) are put back, and the accounts
  * the files created that are left empty are deleted.
+ * [onRemovalProgress] follows the delete batch (by default [onProgress]), so a front end can show it as a bar of its own
+ * that stays full once the batch is done.
  *
  * Account merges are not undone: nothing ties a merge to a source, and a person's merge must stay.
  */
@@ -460,6 +462,7 @@ suspend fun <R> ImportEngine.executeRerun(
     reads: RerunReads,
     maintenance: Maintenance,
     onProgress: (suspend (Progress) -> Unit)? = null,
+    onRemovalProgress: (suspend (Progress) -> Unit)? = onProgress,
     refreshViews: Boolean = true,
     run: suspend () -> R,
 ): RerunOutcome<R> {
@@ -472,7 +475,7 @@ suspend fun <R> ImportEngine.executeRerun(
 
     // The un-hide updates ride in the delete batch (the engine applies updates before deletes), and so
     // do the record resets.
-    onProgress?.invoke(Progress("Removing what the import created"))
+    onRemovalProgress?.invoke(Progress(REMOVING, fraction = 0f))
     import(
         resetRecords.copy(
             transfers =
@@ -496,8 +499,9 @@ suspend fun <R> ImportEngine.executeRerun(
             dedupePolicy = DedupePolicy.None,
             csvImportMutations = resetRecords.csvImportMutations + resets,
         ),
-        onProgress = onProgress?.let { sink -> { sink(it.copy(detail = "Removing what the import created")) } },
+        onProgress = onRemovalProgress?.let { sink -> { sink(it.copy(detail = REMOVING)) } },
     )
+    onRemovalProgress?.invoke(Progress("Removed what the import created", fraction = 1f))
 
     onProgress?.invoke(Progress("Re-importing"))
     val result = run()
@@ -877,3 +881,5 @@ private fun ManualEdit.updateOf(replacement: Transfer): ImportTransfer {
         attributes = attributes.values.flatten(),
     )
 }
+
+private const val REMOVING = "Removing what the import created"
