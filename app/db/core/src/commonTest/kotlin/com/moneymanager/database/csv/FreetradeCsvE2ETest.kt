@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
+import com.moneymanager.test.database.reimportFile
 import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -149,7 +150,7 @@ class FreetradeCsvE2ETest : DbTest() {
 
     private suspend fun accounts(): List<Account> = repositories.accountRepository.getAllAccounts().first()
 
-    private suspend fun accountId(name: String): AccountId = accounts().single { it.name == name }.id
+    private suspend fun isaId(): AccountId = accounts().single { it.name == "Freetrade ISA" }.id
 
     private suspend fun transfers(): List<Transfer> =
         accounts()
@@ -159,7 +160,8 @@ class FreetradeCsvE2ETest : DbTest() {
     /** Every balance of [account], by asset code, as text. */
     private suspend fun balances(account: String = "Freetrade ISA"): Map<String, String> {
         repositories.maintenanceService.refreshMaterializedViews()
-        val id = accountId(account)
+        // An account a re-import emptied and deleted holds nothing.
+        val id = accounts().singleOrNull { it.name == account }?.id ?: return emptyMap()
         return repositories.transactionRepository
             .getAccountBalances()
             .first()
@@ -188,7 +190,7 @@ class FreetradeCsvE2ETest : DbTest() {
         runDbTest {
             apply(listOf(stage(listOf(buy))))
 
-            val isa = accountId("Freetrade ISA")
+            val isa = isaId()
             val trade =
                 repositories.tradeRepository
                     .getTradesByAccount(isa)
@@ -242,7 +244,7 @@ class FreetradeCsvE2ETest : DbTest() {
             assertEquals(
                 0,
                 repositories.tradeRepository
-                    .getTradesByAccount(accountId("Freetrade ISA"))
+                    .getTradesByAccount(isaId())
                     .first()
                     .size,
             )
@@ -544,6 +546,33 @@ class FreetradeCsvE2ETest : DbTest() {
             )
 
             assertOneTransferIntoTheIsa()
+        }
+
+    @Test
+    fun `re-importing the bank statement keeps both of two like top-ups`() =
+        runDbTest {
+            val bank = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now))
+            val payee =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Freetrade Limited", openingDate = now),
+                )
+            applyBankStatement(bank, payee)
+            // Only the first top-up takes its other side from the bank's record. Re-run on its own, it would claim its
+            // twin a day later as a duplicate of itself: only a run over the whole file knows the twin is its own row.
+            apply(listOf(stage(listOf(topUp, cash("Top up", "TOP_UP", "2026-03-02T10:28:23.178Z", "1000.00")))))
+            val before = listOf("Freetrade ISA", "Bank", "Freetrade Limited", "Freetrade Top Ups").associateWith { balances(it) }
+            assertEquals(mapOf("GBP" to "2000"), before.getValue("Freetrade ISA"))
+
+            val reimports = repositories.reimports(maintenance)
+            val bankFile =
+                repositories.csvImportRepository
+                    .getAllImports()
+                    .first()
+                    .single { it.originalFileName == "bank.csv" }
+            val result = reimports.reimportFile(bankFile.id)
+
+            assertEquals(1, result.cascadedFiles, "the Freetrade export is re-imported whole: $result")
+            assertEquals(before, before.keys.associateWith { balances(it) })
         }
 
     private suspend fun assertOneTransferIntoTheIsa() {

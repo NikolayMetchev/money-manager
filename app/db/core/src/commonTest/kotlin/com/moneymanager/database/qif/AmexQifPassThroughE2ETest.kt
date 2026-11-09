@@ -9,7 +9,9 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.installBuiltInCsvStrategies
 import com.moneymanager.test.database.installBuiltInPassThroughs
+import com.moneymanager.test.database.planFile
 import com.moneymanager.test.database.reimports
+import com.moneymanager.test.database.runPlan
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -120,15 +122,11 @@ class AmexQifPassThroughE2ETest : DbTest() {
             val statement = amexStatement()
             apply(statement)
             val reimports = repositories.reimports(maintenance)
-            val result =
-                reimports.reimport(
-                    reimports.plan(repositories.csvImportRepository.getImport(statement.id).first()!!),
-                    accountId = null,
-                    currencyId = null,
-                )
+            val plan = reimports.planFile(statement.id)
             // The chain's two legs and the ordinary row went, and both rows were imported again.
-            assertEquals(3, result.deletedTransfers)
-            assertEquals(2, result.rerun?.successCount, "${result.rerun}")
+            assertEquals(3, plan.rerunFiles.sumOf { it.createdTransfers.size })
+            val result = reimports.runPlan(plan)
+            assertEquals(2, result.transfersCreated, "$result")
             assertEquals(expected, transfers())
         }
 }

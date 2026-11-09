@@ -9,8 +9,8 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.ApiSessionReadRepository
-import com.moneymanager.importengineapi.AffectedRecordsRerunner
 import com.moneymanager.importengineapi.ApiSessionMutation
+import com.moneymanager.importengineapi.CascadeRerunner
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ManualEdit
@@ -66,7 +66,7 @@ suspend fun executeApiReimport(
     reads: RerunReads,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    rerunAffected: AffectedRecordsRerunner?,
+    cascadeRerunner: CascadeRerunner,
     counterpartyAccountNames: Map<String, String> = emptyMap(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (suspend (Progress) -> Unit)? = null,
@@ -81,7 +81,7 @@ suspend fun executeApiReimport(
         resetRecords = ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.DeleteResponseTransactionsBySession(session.id))),
         reads = reads,
         maintenance = maintenance,
-        rerunAffected = rerunAffected,
+        cascadeRerunner = cascadeRerunner,
         onProgress = onProgress,
         refreshViews = refreshViews,
     ) {
@@ -121,6 +121,10 @@ data class ApiBulkReimportResult(
     /** Hand edits whose transaction the re-import didn't create again, so they were dropped. */
     val unmatchedEdits: List<ManualEdit> = emptyList(),
     val reappliedLinks: ReappliedLinks = ReappliedLinks(),
+    /** Other staged files re-imported along with a session (see `SourceRerunResult.cascaded`). */
+    val cascadedFiles: Int = 0,
+    /** Files a session's re-import deleted but couldn't import again: they wait for their own re-import. */
+    val cascadedFilesNotRerun: Int = 0,
 )
 
 /**
@@ -145,7 +149,7 @@ suspend fun bulkReimportApiSessions(
     reads: RerunReads,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    rerunAffected: AffectedRecordsRerunner?,
+    cascadeRerunner: CascadeRerunner,
     counterpartyAccountNames: Map<String, String> = emptyMap(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (suspend (Progress) -> Unit)? = null,
@@ -161,6 +165,8 @@ suspend fun bulkReimportApiSessions(
     var reapplied = 0
     val unmatched = mutableListOf<ManualEdit>()
     var links = ReappliedLinks()
+    var cascaded = 0
+    var notRerun = 0
     return reimportSessionsResiliently(sessions, maintenance, onProgress) { session, sessionProgress ->
         val result =
             executeApiReimport(
@@ -171,7 +177,7 @@ suspend fun bulkReimportApiSessions(
                 reads = reads,
                 maintenance = maintenance,
                 importEngine = importEngine,
-                rerunAffected = rerunAffected,
+                cascadeRerunner = cascadeRerunner,
                 counterpartyAccountNames = counterpartyAccountNames,
                 passThroughAccounts = passThroughAccounts,
                 onProgress = sessionProgress,
@@ -180,7 +186,15 @@ suspend fun bulkReimportApiSessions(
         reapplied += result.reappliedEdits.size
         unmatched += result.unmatchedEdits
         links += result.reappliedLinks
-    }.copy(reappliedEdits = reapplied, unmatchedEdits = unmatched, reappliedLinks = links)
+        cascaded += result.cascaded.size
+        notRerun += result.notRerun.size
+    }.copy(
+        reappliedEdits = reapplied,
+        unmatchedEdits = unmatched,
+        reappliedLinks = links,
+        cascadedFiles = cascaded,
+        cascadedFilesNotRerun = notRerun,
+    )
 }
 
 /**

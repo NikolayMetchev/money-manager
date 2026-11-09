@@ -3,6 +3,7 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
@@ -108,6 +109,17 @@ class TransferSourceReadRepositoryImpl(
                 }
             }
             records.toList()
+        }
+
+    override suspend fun getRerunClosure(
+        imports: Set<CsvImportId>,
+        sessions: Set<ApiSessionId>,
+    ): Set<CsvImportId> =
+        withContext(Dispatchers.Default) {
+            queries
+                .selectRerunClosure(imports.map { it.id.toString() }, sessions.map { it.id })
+                .awaitAsList()
+                .mapTo(mutableSetOf()) { CsvImportId(Uuid.parse(it)) }
         }
 
     override suspend fun getHandEditedTransferIds(ids: Collection<TransferId>): Set<TransferId> =

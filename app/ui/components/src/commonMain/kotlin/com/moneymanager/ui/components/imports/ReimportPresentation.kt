@@ -18,7 +18,6 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.importengineapi.ManualEdit
 import com.moneymanager.importengineapi.ReappliedLinks
 import com.moneymanager.importengineapi.SourceRerunPlan
-import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.tasks.Progress
 
@@ -102,7 +101,7 @@ fun ReimportPlanSection(
 
 /**
  * The preview every re-import dialog shows (staged files and API sessions): what the source created and will create
- * again, the other files' rows matched against it, which are re-run too, and the hand edits that will be
+ * again, the other files that depend on it, which are re-imported too, and the hand edits that will be
  * put back. [recordNoun] names the source's records ("row", "record", "item").
  */
 @Composable
@@ -123,15 +122,14 @@ fun SourceRerunPreview(
                 },
             style = MaterialTheme.typography.bodySmall,
         )
-        if (!plan.affected.isEmpty) {
-            val files = plan.affected.byFile.size
+        if (plan.cascade.isNotEmpty()) {
+            val files = plan.cascade.size
             ReimportPlanSection(
-                title = "Rows of other files to re-run (${plan.affected.count}):",
+                title = "Other files to re-import too ($files):",
                 lines = emptyList(),
                 note =
-                    "${plan.affected.count} row${plural(plan.affected.count)} of $files other file${plural(files)} " +
-                        "were reconciled against these transactions. They are imported again too, so they " +
-                        "reconcile against the new ones.",
+                    "$files other file${plural(files)} matched or reconciled against these transactions. They are " +
+                        "re-imported whole after this one, so they reconcile against the new transactions.",
             )
         }
         ManualEditsSection(
@@ -209,23 +207,3 @@ fun rememberAccountNamer(accountRepository: AccountReadRepository): (AccountId) 
         return@remember { id: AccountId -> names[id] ?: "account ${id.id}" }
     }
 }
-
-/** One line for a finished re-import of one file or session, given how many of its records [imported]. */
-fun SourceRerunResult<*>.toSummary(imported: Int): String =
-    buildString {
-        append("Re-import complete: $deletedTransfers transaction${plural(deletedTransfers)} deleted")
-        if (deletedTrades > 0) append(" and $deletedTrades trade${plural(deletedTrades)}")
-        append(", $imported imported")
-        if (!affected.isEmpty) append(", ${affected.count} row${plural(affected.count)} of other files re-run")
-        if (!notRerun.isEmpty) {
-            append(", ${notRerun.count} row${plural(notRerun.count)} of other files left for those files' own re-import")
-        }
-        if (reappliedEdits.isNotEmpty()) append(", ${reappliedEdits.size} manual edit${plural(reappliedEdits.size)} re-applied")
-        if (unmatchedEdits.isNotEmpty()) {
-            append(", ${unmatchedEdits.size} manual edit${plural(unmatchedEdits.size)} not re-applied")
-        }
-        append(reappliedLinks.summary(", "))
-        if (deletedEmptyAccounts.isNotEmpty()) {
-            append(", ${deletedEmptyAccounts.size} empty account${plural(deletedEmptyAccounts.size)} deleted")
-        }
-    }

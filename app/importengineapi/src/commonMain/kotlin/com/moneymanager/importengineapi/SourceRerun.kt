@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.AuditType
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipId
@@ -27,6 +28,7 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
+import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
 
 /** The reads a re-import needs, whatever the source. */
@@ -42,9 +44,8 @@ class RerunReads(
 )
 
 /**
- * Rows of other staged files that were matched (DUPLICATE or UPDATED)
- * against a transaction a re-import deletes, found from their provenance. They are reset with it and re-run after it, so they match
- * the re-created transaction instead of pointing at a deleted one.
+ * Rows of other staged files that were matched (DUPLICATE or UPDATED) against some transactions, found from
+ * their provenance, grouped by file.
  */
 data class AffectedRecords(
     /** Each file's records, keyed by the whole file: a [Source.Csv] with no row. */
@@ -52,20 +53,6 @@ data class AffectedRecords(
 ) {
     val isEmpty: Boolean get() = byFile.isEmpty()
     val count: Int get() = byFile.values.sumOf { it.size }
-
-    operator fun plus(other: AffectedRecords): AffectedRecords =
-        AffectedRecords(
-            (byFile.keys + other.byFile.keys).associateWith { file ->
-                (byFile[file].orEmpty() + other.byFile[file].orEmpty()).distinct().sorted()
-            },
-        )
-
-    /** The mutations that return these records to never-imported. */
-    fun resetMutations(): ImportBatch =
-        ImportBatch(
-            csvImportMutations =
-                byFile.mapNotNull { (file, rows) -> (file as? Source.Csv)?.let { CsvImportMutation.ResetRowStatuses(it.importId, rows) } },
-        )
 
     companion object {
         /** Groups [records] (each a staged row) by file, leaving out [excluding]'s own. */
@@ -87,14 +74,17 @@ data class AffectedRecords(
     }
 }
 
-/** Re-runs [AffectedRecords] with each file's own strategy; supplied by a caller that can run both kinds. */
-fun interface AffectedRecordsRerunner {
+/**
+ * Re-imports the other files a re-import takes along ([SourceRerunPlan.cascade]), each whole and as it was
+ * last imported; supplied by a caller that can run staged files.
+ */
+fun interface CascadeRerunner {
     /**
-     * Called before the re-import deletes anything, while the records still point at what they matched
-     * (which is how a file's account is read); the returned function re-runs them after the re-import and
-     * returns the records it couldn't.
+     * Called before the re-import deletes anything, while each file still reads as it was imported; the
+     * returned function imports [files] again, in order, after the source's own re-run, and returns the files
+     * it couldn't (their strategy, account or currency is unknown, or their run failed).
      */
-    suspend fun prepare(affected: AffectedRecords): suspend (onProgress: (suspend (Progress) -> Unit)?) -> AffectedRecords
+    suspend fun prepare(files: List<Source>): suspend (onProgress: (suspend (Progress) -> Unit)?) -> Set<Source>
 }
 
 /** The values of a transfer that a person can edit by hand. */
@@ -207,8 +197,9 @@ data class ReappliedLinks(
 
 /**
  * What re-importing [source] does: delete what it created, return its records to never-imported, run
- * the normal import over them again and put the hand edits back. A preview for the confirmation dialog,
- * executed by [executeSourceRerun].
+ * the normal import over them again and put the hand edits back. The other files that depend on what it
+ * deletes ([cascade]) are re-imported whole along with it. A preview for the confirmation dialog, executed by
+ * [executeSourceRerun].
  */
 data class SourceRerunPlan(
     /** The whole import or session: `Source.Csv(importId)` or `Source.Api(sessionId)`. */
@@ -218,33 +209,44 @@ data class SourceRerunPlan(
     val tradeIds: Set<TradeId>,
     /** Accounts the source created; those the re-run leaves empty are deleted. */
     val createdAccountIds: Set<AccountId>,
-    val affected: AffectedRecords,
+    /** Hand edits of what the source and its [cascade] created. */
     val manualEdits: List<ManualEdit>,
-    val partners: RerunPartners = RerunPartners(),
+    /** Other files re-imported with the source, in the order they were imported. */
+    val cascade: List<RerunFile> = emptyList(),
     val manualTradeEdits: List<ManualTradeEdit> = emptyList(),
-    /** Hand-made relationships with a member among what the re-import deletes (partners' transfers included). */
+    /** Hand-made relationships with a member among what the re-import deletes. */
     val manualRelationships: List<ManualRelationship> = emptyList(),
-)
+) {
+    /** Everything the re-import deletes and runs again: the source, then its [cascade]. */
+    val files: List<RerunFile> get() = listOf(RerunFile(source, createdTransfers, tradeIds, createdAccountIds)) + cascade
+
+    val links: RerunLinks get() = RerunLinks(manualTradeEdits, manualRelationships)
+}
 
 /**
- * Other files' transfers that [SourceRerunPlan.source] had reconciled away and that deleting it would leave
- * with nothing to explain their exclusion. Un-hiding them isn't enough: the source's re-run never looks at
- * them again (a card statement's placeholder reconciled against another statement's placeholder, which itself
- * lost to the bank's record), so they would count alongside what it re-creates. Instead they are deleted
- * with the source and their records re-run after it, exactly as if their file had been imported second.
- * A row that took one end from a deleted record ([borrowedEndKeepers]) is re-run the same way.
- * Only a staged row can be re-run, so a partner from an API session (or a file that created trades) is
- * un-hidden as before.
+ * A staged file or API session a re-import deletes what it created from and runs again. Besides the files a person
+ * picks, every file that depends on what they create is re-imported too, transitively
+ * ([TransferSourceReadRepository.getRerunClosure]): a file with a row matched against a deleted transaction (left
+ * alone, the row would point at nothing and its movement would be lost), or one that created a transfer a deleted one
+ * had reconciled away or lent an end to (`ImportDeduper.otherSideOf`): un-hiding that alone isn't enough, as the re-run
+ * never looks at it again and would count the movement twice.
+ *
+ * Re-importing whole files, never single rows, matters: a file's rows claim the transactions they match one at a
+ * time, so a row run on its own can claim one its neighbour already explains.
  */
-data class RerunPartners(
-    /** Every transfer the partners' rows created (fee and pass-through legs too), with that row. */
-    val transfers: Map<TransferId, Source> = emptyMap(),
-    /** The partners' rows, and the other rows matched against any of [transfers]: reset and re-run. */
-    val records: AffectedRecords = AffectedRecords(),
-    val manualEdits: List<ManualEdit> = emptyList(),
-) {
-    val isEmpty: Boolean get() = transfers.isEmpty()
-}
+data class RerunFile(
+    val file: Source,
+    /** Every transfer the file created, with the row it came from. */
+    val createdTransfers: Map<TransferId, Source>,
+    val tradeIds: Set<TradeId>,
+    val createdAccountIds: Set<AccountId>,
+)
+
+/** The hand-set trade attributes and hand-made relationships a re-import puts back. */
+data class RerunLinks(
+    val tradeEdits: List<ManualTradeEdit> = emptyList(),
+    val relationships: List<ManualRelationship> = emptyList(),
+)
 
 /** The outcome of [executeSourceRerun]; [rerun] is what the source's own import returned. */
 data class SourceRerunResult<R>(
@@ -253,13 +255,14 @@ data class SourceRerunResult<R>(
     val deletedTrades: Int,
     /** Transfers from other sources the deleted ones had hidden as reconciled copies, shown again. */
     val unhiddenTransfers: Int,
-    /** Records of other files matched against a deleted transfer, reset and re-run. */
-    val affected: AffectedRecords,
+    /** Other files re-imported whole along with the source ([SourceRerunPlan.cascade]). */
+    val cascaded: List<Source>,
     /**
-     * Records of other files the re-import reset but couldn't re-run (their file's account or currency is
-     * unknown, or its run failed). Import-all skips an applied file, so they wait for that file's re-import.
+     * Files of the cascade whose transactions were deleted but that couldn't be imported again (their
+     * strategy, account or currency is unknown, or their run failed). Import-all skips an applied file, so
+     * they wait for that file's re-import.
      */
-    val notRerun: AffectedRecords,
+    val notRerun: List<Source>,
     val reappliedEdits: List<ManualEdit>,
     /** Hand edits whose transfer the re-run didn't create again (its record is now a duplicate, or skipped). */
     val unmatchedEdits: List<ManualEdit>,
@@ -268,9 +271,19 @@ data class SourceRerunResult<R>(
     val reappliedLinks: ReappliedLinks = ReappliedLinks(),
 )
 
+/** The outcome of [executeRerun]; [result] is what its run returned. */
+data class RerunOutcome<R>(
+    val result: R,
+    val unhiddenTransfers: Int,
+    val reappliedEdits: List<ManualEdit>,
+    val unmatchedEdits: List<ManualEdit>,
+    val reappliedLinks: ReappliedLinks,
+    val deletedEmptyAccounts: List<String>,
+)
+
 /**
- * Plans re-importing [source]: what it created (per `entity_source`, first revision), what other files
- * matched against that, and which of its transfers a person edited by hand.
+ * Plans re-importing [source]: what it created (per `entity_source`, first revision), the other files that
+ * depend on that ([RerunFile]), found in one query, and which of their transactions a person edited by hand.
  */
 suspend fun planSourceRerun(
     source: Source,
@@ -282,29 +295,76 @@ suspend fun planSourceRerun(
     val progress = PhasedProgress(onProgress)
     progress.emit(base = 0f, detail = "Finding what the import created")
     val created = reads.transferSourceRepository.getTransfersCreatedBy(source)
-    progress.emit(base = PLAN_CREATED_SPAN, detail = "Checking other files for records matched against it")
-    val affected =
-        AffectedRecords.of(reads.transferSourceRepository.getImportRecordsMatchedTo(created.keys, tradeIds), excluding = source)
-    val partners = rerunPartners(source, created.keys, reads)
+    progress.emit(base = PLAN_CREATED_SPAN, detail = "Finding other files that depend on it")
+    val closure =
+        when (source) {
+            is Source.Csv -> reads.transferSourceRepository.getRerunClosure(setOf(source.importId)) - source.importId
+            is Source.Api -> reads.transferSourceRepository.getRerunClosure(emptySet(), setOf(source.sessionId))
+            else -> emptySet()
+        }
+    val cascade = rerunFiles(closure, reads)
+    val own = RerunFile(source, created, tradeIds, createdAccountIds)
+    val links = captureRerunLinks(listOf(own) + cascade, reads)
     val manualEditsBase = PLAN_CREATED_SPAN + PLAN_OTHER_FILES_SPAN
-    val createdTrades = reads.transferSourceRepository.getTradesCreatedBy(source).filterKeys { it in tradeIds }
-    val manualTradeEdits =
-        reads.tradeRepository
-            ?.getHandSetAttributes(createdTrades.keys)
-            .orEmpty()
-            .map { (id, attributes) -> ManualTradeEdit(id, createdTrades.getValue(id), attributes) }
     return SourceRerunPlan(
         source = source,
         createdTransfers = created,
         tradeIds = tradeIds,
         createdAccountIds = createdAccountIds,
-        affected = affected,
         manualEdits =
-            captureManualEdits(created, reads, progress.sink(base = manualEditsBase, span = 1f - manualEditsBase)),
-        partners = partners,
-        manualTradeEdits = manualTradeEdits,
-        manualRelationships = captureManualRelationships(created + partners.transfers, createdTrades, reads),
+            captureManualEdits(
+                created + cascade.flatMap { it.createdTransfers.entries }.associate { it.key to it.value },
+                reads,
+                progress.sink(base = manualEditsBase, span = 1f - manualEditsBase),
+            ),
+        cascade = cascade,
+        manualTradeEdits = links.tradeEdits,
+        manualRelationships = links.relationships,
     )
+}
+
+/** [imports] as [RerunFile]s, in the order they were imported: the order a re-import runs them in. */
+suspend fun rerunFiles(
+    imports: Collection<CsvImportId>,
+    reads: RerunReads,
+): List<RerunFile> =
+    imports
+        .map { importId ->
+            val file = Source.Csv(importId)
+            reads.csvImportRepository
+                .getImport(importId)
+                .first()
+                ?.importTimestamp to
+                RerunFile(
+                    file = file,
+                    createdTransfers = reads.transferSourceRepository.getTransfersCreatedBy(file),
+                    tradeIds = reads.csvImportRepository.getTradeIdsCreatedByImport(importId),
+                    createdAccountIds = reads.csvImportRepository.getAccountsCreatedByImport(importId),
+                )
+        }.sortedWith(compareBy(nullsLast()) { it.first })
+        .map { it.second }
+
+/** The hand-set trade attributes and hand-made relationships over what re-importing [files] deletes. */
+suspend fun captureRerunLinks(
+    files: List<RerunFile>,
+    reads: RerunReads,
+): RerunLinks {
+    val createdTrades =
+        files
+            .filter { it.tradeIds.isNotEmpty() }
+            .flatMap { file ->
+                reads.transferSourceRepository
+                    .getTradesCreatedBy(file.file)
+                    .filterKeys { it in file.tradeIds }
+                    .entries
+            }.associate { it.key to it.value }
+    val tradeEdits =
+        reads.tradeRepository
+            ?.getHandSetAttributes(createdTrades.keys)
+            .orEmpty()
+            .map { (id, attributes) -> ManualTradeEdit(id, createdTrades.getValue(id), attributes) }
+    val createdTransfers = files.flatMap { it.createdTransfers.entries }.associate { it.key to it.value }
+    return RerunLinks(tradeEdits, captureManualRelationships(createdTransfers, createdTrades, reads))
 }
 
 /** The hand-made relationships over any of [transfers] or [trades] (what a re-import may delete), with each member's record. */
@@ -336,78 +396,12 @@ private suspend fun captureManualRelationships(
     }
 }
 
-/** The [RerunPartners] of deleting [deletedIds], which [source] created. */
-private suspend fun rerunPartners(
-    source: Source,
-    deletedIds: Set<TransferId>,
-    reads: RerunReads,
-): RerunPartners {
-    val orphaned =
-        reconciledPartnerUnhides(deletedIds, reads.relationshipRepository, reads.transactionRepository)
-            .filter { it.isOrphanedBy(deletedIds) }
-            .mapNotNull { it.update.existingId } +
-            borrowedEndKeepers(deletedIds, reads.relationshipRepository, reads.transactionRepository)
-    if (orphaned.isEmpty()) return RerunPartners()
-    val createdByFile = mutableMapOf<Source.Csv, Map<TransferId, Source>>()
-
-    // What [partner]'s file created, when another file's row created it and that file can be re-run row by row.
-    suspend fun createdAlongside(partner: TransferId): Pair<Source.Csv, Map<TransferId, Source>>? =
-        reads.transferSourceRepository
-            .getSourcesForTransaction(partner)
-            .mapNotNullTo(mutableSetOf()) { record ->
-                (record.source as? Source.Csv)
-                    ?.takeIf { record.revisionId == 1L }
-                    ?.let { Source.Csv(it.importId) }
-                    ?.takeIf { it != source }
-            }.firstNotNullOfOrNull { file ->
-                val created =
-                    createdByFile.getOrPut(file) {
-                        // A row that created a trade too can't be re-run without re-creating the trade, so such a
-                        // file offers none of its rows (empty, rather than null, so getOrPut keeps it).
-                        if (reads.csvImportRepository.getTradeIdsCreatedByImport(file.importId).isEmpty()) {
-                            reads.transferSourceRepository.getTransfersCreatedBy(file)
-                        } else {
-                            emptyMap()
-                        }
-                    }
-                created.takeIf { partner in it }?.let { file to it }
-            }
-
-    val transfers = mutableMapOf<TransferId, Source>()
-    val transfersByFile = mutableMapOf<Source, MutableMap<TransferId, Source>>()
-    for (partner in orphaned.asSequence().filterNot { it in transfers }) {
-        val (file, created) = createdAlongside(partner) ?: continue
-        val record = created.getValue(partner)
-        created.filterValues { it == record }.forEach { (id, row) ->
-            transfers[id] = row
-            transfersByFile.getOrPut(file) { mutableMapOf() }[id] = row
-        }
-    }
-    if (transfers.isEmpty()) return RerunPartners()
-    val records =
-        AffectedRecords.of(transfers.values.toList(), excluding = source) +
-            AffectedRecords.of(
-                reads.transferSourceRepository.getImportRecordsMatchedTo(transfers.keys, emptySet()),
-                excluding = source,
-            )
-    return RerunPartners(
-        transfers = transfers,
-        records = records,
-        manualEdits = manualEditsOf(transfersByFile, reads).values.flatten(),
-    )
-}
-
 private const val PLAN_CREATED_SPAN = 0.05f
 private const val PLAN_OTHER_FILES_SPAN = 0.05f
 
 /**
- * Re-imports per [plan]. One batch un-hides the partners the source's transfers had reconciled away,
- * deletes what it created and its [RerunPartners], and resets its own records ([resetRecords]), the
- * partners' and the [AffectedRecords]. Then [rerun] runs the source's normal import, [rerunAffected] runs
- * the affected and partner records again, the hand edits are re-applied, and import-created accounts left
- * empty are deleted. Without [rerunAffected] the partners are only un-hidden.
- *
- * Account merges are not undone: nothing ties a merge to a source, and a person's merge must stay.
+ * Re-imports per [plan]: [executeRerun] over the source and its cascade, where [rerun] runs the source's normal
+ * import and [cascadeRerunner] then imports the cascade's files again, in order.
  */
 @Suppress("LongParameterList")
 suspend fun <R> ImportEngine.executeSourceRerun(
@@ -415,102 +409,137 @@ suspend fun <R> ImportEngine.executeSourceRerun(
     resetRecords: ImportBatch,
     reads: RerunReads,
     maintenance: Maintenance,
-    rerunAffected: AffectedRecordsRerunner?,
+    cascadeRerunner: CascadeRerunner,
     onProgress: (suspend (Progress) -> Unit)? = null,
     refreshViews: Boolean = true,
     rerun: suspend () -> R,
 ): SourceRerunResult<R> {
-    val source = plan.source
-    val partners = if (rerunAffected == null) RerunPartners() else plan.partners
-    val deletedTransfers = plan.createdTransfers.keys + partners.transfers.keys
+    val cascadeFiles = plan.cascade.map { it.file }
+    // Prepared before anything is deleted, while each file still reads as it was imported.
+    val rerunCascade = if (cascadeFiles.isEmpty()) null else cascadeRerunner.prepare(cascadeFiles)
+    val outcome =
+        executeRerun(plan.files, plan.manualEdits, plan.links, resetRecords, reads, maintenance, onProgress, refreshViews = refreshViews) {
+            val result = rerun()
+            val notRerun =
+                rerunCascade
+                    ?.let {
+                        onProgress?.invoke(Progress("Re-importing the files that depend on it"))
+                        it(onProgress)
+                    }.orEmpty()
+            result to notRerun
+        }
+    val (result, notRerun) = outcome.result
+    return SourceRerunResult(
+        rerun = result,
+        deletedTransfers = plan.createdTransfers.size,
+        deletedTrades = plan.tradeIds.size,
+        unhiddenTransfers = outcome.unhiddenTransfers,
+        cascaded = cascadeFiles.filterNot { it in notRerun },
+        notRerun = cascadeFiles.filter { it in notRerun },
+        reappliedEdits = outcome.reappliedEdits,
+        unmatchedEdits = outcome.unmatchedEdits,
+        deletedEmptyAccounts = outcome.deletedEmptyAccounts,
+        reappliedLinks = outcome.reappliedLinks,
+    )
+}
+
+/**
+ * The one re-import: one batch un-hides the transfers the deleted ones had reconciled away, deletes what every one
+ * of [files] created and returns every staged file's records to never-imported (plus [resetRecords], a session's
+ * own). Then [run] imports the files again, the hand edits ([manualEdits], [links]) are put back, and the accounts
+ * the files created that are left empty are deleted.
+ * The delete batch reports as a step of its own, from an empty bar to a full one.
+ *
+ * Account merges are not undone: nothing ties a merge to a source, and a person's merge must stay.
+ */
+@Suppress("LongParameterList")
+suspend fun <R> ImportEngine.executeRerun(
+    files: List<RerunFile>,
+    manualEdits: List<ManualEdit>,
+    links: RerunLinks,
+    resetRecords: ImportBatch,
+    reads: RerunReads,
+    maintenance: Maintenance,
+    onProgress: (suspend (Progress) -> Unit)? = null,
+    refreshViews: Boolean = true,
+    run: suspend () -> R,
+): RerunOutcome<R> {
+    val deletedTransfers = files.flatMapTo(mutableSetOf()) { it.createdTransfers.keys }
+    val deletedTrades = files.flatMapTo(mutableSetOf()) { it.tradeIds }
     val unhideUpdates =
         reconciledPartnerUnhideUpdates(deletedTransfers, reads.relationshipRepository, reads.transactionRepository)
+    val resets =
+        files.mapNotNull { file -> (file.file as? Source.Csv)?.let { CsvImportMutation.ResetRowStatuses(it.importId, null) } }
 
-    val affected = plan.affected + partners.records
-    val rerunAffectedRecords = if (affected.isEmpty) null else rerunAffected?.prepare(affected)
-
-    val affectedResets = affected.resetMutations()
     // The un-hide updates ride in the delete batch (the engine applies updates before deletes), and so
-    // do the record resets: other files' links can't be found again once the transactions are gone.
-    onProgress?.invoke(Progress("Removing what the import created"))
+    // do the record resets.
+    onProgress?.invoke(Progress(REMOVING, fraction = 0f))
     import(
         resetRecords.copy(
             transfers =
                 unhideUpdates +
-                    deletedTransfers.map { id ->
-                        ImportTransfer(source = source, operation = ImportOperation.DELETE, existingId = id)
+                    files.flatMap { file ->
+                        file.createdTransfers.keys.map { id ->
+                            ImportTransfer(source = file.file, operation = ImportOperation.DELETE, existingId = id)
+                        }
                     },
             trades =
-                plan.tradeIds.map { id ->
-                    ImportTradeIntent(
-                        key = LocalTradeKey("reimport-delete-${id.id}"),
-                        source = source,
-                        operation = ImportOperation.DELETE,
-                        existingId = id,
-                    )
+                files.flatMap { file ->
+                    file.tradeIds.map { id ->
+                        ImportTradeIntent(
+                            key = LocalTradeKey("reimport-delete-${id.id}"),
+                            source = file.file,
+                            operation = ImportOperation.DELETE,
+                            existingId = id,
+                        )
+                    }
                 },
             dedupePolicy = DedupePolicy.None,
-            csvImportMutations = resetRecords.csvImportMutations + affectedResets.csvImportMutations,
+            csvImportMutations = resetRecords.csvImportMutations + resets,
         ),
-        onProgress = onProgress?.let { sink -> { sink(it.copy(detail = "Removing what the import created")) } },
+        onProgress = onProgress?.let { sink -> { sink(it.copy(detail = REMOVING)) } },
     )
+    onProgress?.invoke(Progress("Removed what the import created", fraction = 1f))
 
     onProgress?.invoke(Progress("Re-importing"))
-    val result = rerun()
-
-    val notRerun =
-        when {
-            !affected.isEmpty && rerunAffectedRecords == null -> {
-                affected
-            }
-
-            rerunAffectedRecords == null -> {
-                AffectedRecords()
-            }
-
-            else -> {
-                onProgress?.invoke(Progress("Re-linking other files"))
-                rerunAffectedRecords(onProgress)
-            }
-        }
+    val result = run()
 
     onProgress?.invoke(Progress("Re-applying manual edits"))
-    val deletedIds = deletedTransfers.mapTo(mutableSetOf()) { it.id } + plan.tradeIds.map { it.id }
+    val deletedIds = deletedTransfers.mapTo(mutableSetOf()) { it.id } + deletedTrades.map { it.id }
     val reapplication =
         reapplyManualEdits(
-            manualEdits = plan.manualEdits + partners.manualEdits,
-            tradeEdits = plan.manualTradeEdits,
-            // A relationship none of whose members is deleted (its only deleted one was a partner the re-run keeps) is untouched.
-            relationships = plan.manualRelationships.filter { r -> r.members.any { it.transactionId.id in deletedIds } },
+            manualEdits = manualEdits,
+            tradeEdits = links.tradeEdits,
+            relationships = links.relationships.filter { r -> r.members.any { it.transactionId.id in deletedIds } },
             deletedIds = deletedIds,
             reads = reads,
         )
 
     onProgress?.invoke(Progress("Cleaning up empty accounts"))
     val deletedEmptyAccounts =
-        deleteEmptyImportCreatedAccounts(
-            createdAccountIds = plan.createdAccountIds,
-            source = source,
-            accountRepository = reads.accountRepository,
-            tradeRepository = reads.tradeRepository,
-        )
+        files
+            .firstOrNull()
+            ?.let { first ->
+                deleteEmptyImportCreatedAccounts(
+                    createdAccountIds = files.flatMap { it.createdAccountIds },
+                    source = first.file,
+                    accountRepository = reads.accountRepository,
+                    tradeRepository = reads.tradeRepository,
+                )
+            }.orEmpty()
 
     if (refreshViews) {
         onProgress?.invoke(Progress("Refreshing views"))
         maintenance.refreshMaterializedViews()
     }
 
-    return SourceRerunResult(
-        rerun = result,
-        deletedTransfers = plan.createdTransfers.size,
-        deletedTrades = plan.tradeIds.size,
+    return RerunOutcome(
+        result = result,
         unhiddenTransfers = unhideUpdates.size,
-        affected = AffectedRecords(affected.byFile - notRerun.byFile.keys),
-        notRerun = notRerun,
         reappliedEdits = reapplication.reapplied,
         unmatchedEdits = reapplication.unmatched,
-        deletedEmptyAccounts = deletedEmptyAccounts,
         reappliedLinks = reapplication.links,
+        deletedEmptyAccounts = deletedEmptyAccounts,
     )
 }
 
@@ -850,3 +879,5 @@ private fun ManualEdit.updateOf(replacement: Transfer): ImportTransfer {
         attributes = attributes.values.flatten(),
     )
 }
+
+private const val REMOVING = "Removing what the import created"

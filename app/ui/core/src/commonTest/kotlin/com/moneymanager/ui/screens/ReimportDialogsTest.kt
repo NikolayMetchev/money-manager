@@ -6,8 +6,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import com.moneymanager.csvimporter.AttributeAccountMatcher
-import com.moneymanager.csvimporter.CsvImportResult
 import com.moneymanager.csvimporter.bulkApplyCsv
+import com.moneymanager.csvimporter.source
 import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.domain.model.Account
@@ -24,7 +24,6 @@ import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportTransfer
-import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.updateCsvStrategy
@@ -33,12 +32,11 @@ import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.test.database.installBuiltInCsvStrategies
+import com.moneymanager.test.database.planFile
 import com.moneymanager.test.database.reimports
 import com.moneymanager.test.database.upsertCurrencyByCode
-import com.moneymanager.ui.components.imports.ReimportAllDialog
 import com.moneymanager.ui.components.imports.ReimportDialog
-import com.moneymanager.ui.components.imports.ReimportPickerRepositories
-import com.moneymanager.ui.components.imports.toSummary
+import com.moneymanager.ui.components.imports.ReimportRepositories
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -65,8 +63,14 @@ class ReimportDialogsTest {
         val dc: DatabaseComponent,
         val csvImport: CsvImport,
     ) {
-        val pickers =
-            ReimportPickerRepositories(dc.accountRepository, dc.categoryRepository, dc.currencyRepository, dc.personRepository)
+        val repositories =
+            ReimportRepositories(
+                dc.importDirectoryRepository,
+                dc.accountRepository,
+                dc.categoryRepository,
+                dc.currencyRepository,
+                dc.personRepository,
+            )
 
         suspend fun reloaded() = dc.csvImportRepository.getImport(csvImport.id).first()!!
     }
@@ -127,51 +131,51 @@ class ReimportDialogsTest {
         }
 
     @Test
-    fun reimportDialog_previewsTheHandEdit_andReappliesIt() =
+    fun reimportDialog_oneFile_previewsTheHandEdit_andReappliesIt() =
         runMoneyManagerComposeUiTest {
             val fixture = setUp()
-            var result: SourceRerunResult<CsvImportResult?>? = null
 
             setContent {
                 ProvideSchemaAwareScope {
                     ReimportDialog(
-                        file = fixture.csvImport,
+                        files = listOf(fixture.csvImport),
                         reimports = fixture.dc.reimports(),
-                        pickers = fixture.pickers,
+                        repositories = fixture.repositories,
                         onDismiss = { },
-                        onComplete = { result = it },
+                        onComplete = { },
                     )
                 }
             }
 
             waitUntilAtLeastOneExists(hasText("Manual edits to re-apply (1):"), timeoutMillis = 15_000)
-            onNodeWithText("Deletes the 2 transactions", substring = true).assertExists()
+            onNodeWithText("Re-import MonzoDataExport.csv").assertExists()
+            onNodeWithText("Strategy: ", substring = true).assertExists()
+            onNodeWithText("Deletes the 2 transactions they created.").assertExists()
             onNodeWithText("Description → \"Flat white\"", substring = true).assertExists()
             onNodeWithText("note → work trip", substring = true).assertExists()
 
-            onNodeWithText("Re-import").performClick()
-            waitUntil(timeoutMillis = 15_000) { result != null }
+            onNodeWithText("Re-import 1 file").performClick()
 
-            val finished = result!!
-            assertEquals(1, finished.reappliedEdits.size)
-            assertEquals(
-                "Re-import complete: 2 transactions deleted, 2 imported, 1 manual edit re-applied",
-                finished.toSummary(imported = finished.rerun?.successCount ?: 0),
+            waitUntilAtLeastOneExists(
+                hasText("Re-imported 1 file · 2 imported · 1 manual edit re-applied", substring = true),
+                timeoutMillis = 15_000,
             )
         }
 
     @Test
-    fun reimportAllDialog_reportsAHandEditItCouldNotReapply() =
+    fun reimportDialog_reportsAHandEditItCouldNotReapply() =
         runMoneyManagerComposeUiTest {
             val fixture = setUp()
             // The strategy now skips the edited row, so its transaction isn't created again.
             runBlocking {
+                val file = fixture.reloaded()
                 val strategy =
                     assertNotNull(
                         fixture.dc
                             .reimports()
-                            .plan(fixture.reloaded())
-                            .strategy,
+                            .planFile(file.id)
+                            .strategies
+                            .getValue(file.source),
                     )
                 val skipCoffee =
                     StrategyRule(
@@ -186,10 +190,10 @@ class ReimportDialogsTest {
 
             setContent {
                 ProvideSchemaAwareScope {
-                    ReimportAllDialog(
+                    ReimportDialog(
                         files = listOf(fixture.csvImport),
                         reimports = fixture.dc.reimports(),
-                        pickers = fixture.pickers,
+                        repositories = fixture.repositories,
                         onDismiss = { },
                         onComplete = { completed = true },
                     )

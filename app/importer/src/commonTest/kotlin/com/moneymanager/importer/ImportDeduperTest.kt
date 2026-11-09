@@ -565,6 +565,53 @@ class ImportDeduperTest {
     }
 
     @Test
+    fun fuzzy_neverTakesTheRecordALaterRowOfTheBatchMatchesExactly() {
+        // A statement listing two like £1,000 payments three days apart, newest first, after an earlier statement
+        // booked only the first. The later payment is within the fuzzy tolerance of the booked one, but the
+        // booked one is the earlier row's own record, so the later payment is a movement of its own.
+        val payment = "BILL PAYMENT VIA FASTER PAYMENT TO COINBASE REFERENCE CBAGBPUALDWLZXEXC , MANDATE NO 91"
+        val deduper =
+            ImportDeduper(DedupePolicy.FuzzyAllFields(), existing = listOf(existing(9, description = payment, amount = 1000)))
+        val result =
+            deduper.classify(
+                listOf(
+                    importTransfer(0, description = payment, amount = 1000, timestamp = baseTime + 3.days),
+                    importTransfer(1, description = payment, amount = 1000),
+                ),
+            )
+        assertEquals(ImportStatus.IMPORTED, result[0].status, "the later payment is not the earlier one again")
+        assertEquals(ImportStatus.DUPLICATE, result[1].status)
+        assertEquals(TransferId(9), result[1].existing)
+    }
+
+    @Test
+    fun fuzzy_neverReconcilesAgainstTheRecordALaterRowOfTheBatchMatchesExactly() {
+        // As above, with cross-source reconciliation on and a window spanning both payments: the later payment must
+        // not reconcile against the record the earlier row matches exactly, or it would be excluded and the earlier
+        // row dropped as its duplicate, counting the two payments once.
+        val payment = "BILL PAYMENT VIA FASTER PAYMENT TO COINBASE REFERENCE CBAGBPUALDWLZXEXC , MANDATE NO 91"
+        val policy =
+            DedupePolicy.FuzzyAllFields(
+                reconcileWindow = SettlementWindow.Elapsed(4 * 86_400L),
+                reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
+                reconciledRelationshipTypeId = RelationshipTypeId(1),
+            )
+        val deduper = ImportDeduper(policy, existing = listOf(existing(9, description = payment, amount = 1000)))
+        val result =
+            deduper.classify(
+                listOf(
+                    importTransfer(0, description = payment, amount = 1000, timestamp = baseTime + 3.days),
+                    importTransfer(1, description = payment, amount = 1000),
+                ),
+            )
+        assertEquals(ImportStatus.IMPORTED, result[0].status, "the later payment is a movement of its own")
+        assertTrue(result[0].transfer.attributes.none { it.typeId == AttributeTypeId(-1) }, "and is counted")
+        assertTrue(result[0].transfer.relationships.isEmpty())
+        assertEquals(ImportStatus.DUPLICATE, result[1].status)
+        assertEquals(TransferId(9), result[1].existing)
+    }
+
+    @Test
     fun fuzzy_doesNotReconcileAgainstAnAlreadyExcludedLeg() {
         // A third export of the same movement must not chain-exclude: reconciling onto an already-excluded
         // leg would leave the movement counted zero times.

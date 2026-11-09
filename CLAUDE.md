@@ -560,15 +560,21 @@ adds the value to the account's token set (`addAttributeToken`, so an account ca
 re-imports the files that reference it.
 
 **Re-import is delete + re-run.** Re-importing a staged file (CSV, QIF, Excel or PDF: `Reimports`, `app/csvimporter`) or an API session (`executeApiReimport`) goes through `executeSourceRerun`
-(`app/importengineapi`): it un-hides the other sources' records the source had reconciled away (those created by a
-staged row are instead deleted and their rows re-run after the source, `RerunPartners`, since the source's re-run
-never reconciles them again; so are rows that took an end from a deleted record, `borrowedEndKeepers`), deletes every transfer and trade the source created, resets its records, runs the normal import again, re-runs other files'
-records that had matched against the deleted ones (found from provenance: a staged row linked to a
-transaction it didn't create is a `matched = 1` `entity_source` entry, kept in step with the row's link; readers
-asking who wrote a revision filter on `matched = 0`), re-applies hand edits (from the audit log) to the
-re-created transfers, hand-set trade attributes to the re-created trades and hand-made (`Source.Manual`)
-relationships to their re-created members (reporting those it can't match), and deletes accounts the source created that are now
-empty. There is no separate re-import logic: no merges, no in-place updates, no detectors.
+(`app/importengineapi`): it deletes every transfer and trade the source created, resets its records, runs the normal
+import again, re-applies hand edits (from the audit log) to the re-created transfers, hand-set trade attributes to the
+re-created trades and hand-made (`Source.Manual`) relationships to their re-created members (reporting those it can't
+match), and deletes accounts the source created that are now empty. Other staged files that depend on what it deletes
+are re-imported **whole** with it, after it, in their import order (`RerunFile`, run by the `CascadeRerunner`, which is
+`Reimports`), all found up front by one recursive query (`selectRerunClosure`, `getRerunClosure`): a file with a row matched against a deleted transaction (found from provenance: a staged row linked to a
+transaction it didn't create is a `matched = 1` `entity_source` entry, kept in step with the row's link; readers asking
+who wrote a revision filter on `matched = 0`), a file that created a transfer a deleted one had reconciled away (the
+source's re-run never reconciles it again) or that took an end from a deleted record (the pair's primary, on other accounts), and then
+those files' own dependants. Never re-run single rows: a file's rows claim the records they match one at a time, so a
+row run alone can claim the record its neighbour explains (two like £800 payments became one). "Re-import all" takes the closure of every file
+it was given, deletes what all of them created in one batch (`executeRerun`), imports each again in import order, then
+puts the hand edits back and deletes empty accounts once; stopping it leaves the files not yet started reset, waiting
+for their re-import. A transfer an API session created is only un-hidden. There is no separate
+re-import logic: no merges, no in-place updates, no detectors, no row-level re-runs.
 
 ## Dependency Injection
 

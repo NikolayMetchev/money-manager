@@ -12,7 +12,9 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.planFile
 import com.moneymanager.test.database.reimports
+import com.moneymanager.test.database.runPlan
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -167,10 +169,10 @@ class CsvReimportHistoricalSourceAccountE2ETest : DbTest() {
                 importMonzo(listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee")), checksum = "checksum-monzo-single")
 
             val reimports = repositories.reimports(maintenance)
-            val plan = reimports.plan(imported)
+            val plan = reimports.planFile(imported.id)
             assertFalse(plan.needsAccount, "A re-import should use the account the file was imported with")
 
-            reimports.reimport(plan, accountId = null, currencyId = null)
+            reimports.runPlan(plan)
             val transfers = repositories.transactionRepository.getTransactionsByAccount(monzoAccount).first()
             assertEquals(1, transfers.size, "The transfer should still be on the Monzo account after re-import")
             val reimported = repositories.csvImportRepository.getImport(imported.id).first()!!
@@ -267,12 +269,8 @@ class CsvReimportHistoricalSourceAccountE2ETest : DbTest() {
             assertEquals(1, result.filesNotStarted)
             assertFalse(progress.any { it.detail.startsWith("File 2 of 2") }, "the second file should never start")
             assertEquals("Statements / a.csv", progress.first { it.detail.startsWith("File 1 of 2") }.item?.name)
-            assertEquals(
-                2,
-                repositories.transactionRepository
-                    .getTransactionsByAccount(monzo)
-                    .first()
-                    .size,
-            )
+            // The run deleted what both files created before it started; the second file's rows wait for its re-import.
+            val transfers = repositories.transactionRepository.getTransactionsByAccount(monzo).first()
+            assertEquals(listOf("Coffee"), transfers.map { it.description })
         }
 }

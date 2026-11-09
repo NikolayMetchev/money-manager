@@ -81,34 +81,6 @@ suspend fun reconciledPartnerUnhides(
     }
 }
 
-/**
- * Transfers outside [deletedIds] that took one end from a record in it: a row whose counterparty was only a
- * stand-in became the whole transfer by reading the far end off another source's record of it, which it
- * excluded (`ImportDeduper.otherSideOf`). Once that record is deleted the end it lent stays behind, explained
- * by nothing, and the record's re-run counts it again, so these rows are re-run too. Told apart from other
- * reconciled pairs by their accounts: two records of one movement on the same two accounts lent nothing.
- * A precise or named row that only outranked a placeholder record differs in accounts too: it is re-run as well, which
- * changes nothing, as it reconciles against the re-created record just as before.
- */
-suspend fun borrowedEndKeepers(
-    deletedIds: Set<TransferId>,
-    relationshipRepository: RelationshipReadRepository,
-    transactionRepository: TransactionReadRepository,
-): Set<TransferId> {
-    if (deletedIds.isEmpty()) return emptySet()
-    val pairs =
-        reconciledRelationships(deletedIds, relationshipRepository)
-            .filter { (keeper, lender) -> keeper !in deletedIds && lender in deletedIds }
-    if (pairs.isEmpty()) return emptySet()
-    val transfers = transactionRepository.getTransactionsByIds(pairs.flatMap { it.toList() }.distinct())
-    return pairs
-        .filter { (keeper, lender) ->
-            val kept = transfers[keeper] ?: return@filter false
-            val lent = transfers[lender] ?: return@filter false
-            setOf(kept.sourceAccountId, kept.targetAccountId) != setOf(lent.sourceAccountId, lent.targetAccountId)
-        }.mapTo(mutableSetOf()) { it.first }
-}
-
 private suspend fun reconciledRelationships(
     ids: Set<TransferId>,
     relationshipRepository: RelationshipReadRepository,

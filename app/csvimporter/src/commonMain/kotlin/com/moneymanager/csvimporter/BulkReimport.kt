@@ -1,10 +1,8 @@
 package com.moneymanager.csvimporter
 
 import co.touchlab.kermit.Logger
-import com.moneymanager.domain.Maintenance
 import com.moneymanager.importengineapi.ManualEdit
 import com.moneymanager.importengineapi.ReappliedLinks
-import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.tasks.Progress
 import com.moneymanager.tasks.WeightedProgress
 import kotlinx.coroutines.CancellationException
@@ -22,10 +20,10 @@ data class BulkReimportResult(
     override val filesSkippedNoStrategy: Int,
     override val filesFailed: Int,
     val emptyAccountsDeleted: Int = 0,
-    /** Rows of other files matched against a deleted transaction, re-run with their own strategy. */
-    val affectedRecords: Int = 0,
-    /** Rows of other files reset but not re-run (see `SourceRerunResult.notRerun`); their file's re-import runs them. */
-    val affectedRecordsNotRerun: Int = 0,
+    /** Files nobody picked that the run re-imported because they depend on what the picked ones create. */
+    val cascadedFiles: Int = 0,
+    /** Such files whose transactions the run deleted but couldn't import again (no strategy, a failed or stopped run). */
+    val cascadedFilesNotRerun: Int = 0,
     val reappliedEdits: Int = 0,
     /** Hand edits whose transaction the re-import didn't create again, so they were dropped. */
     val unmatchedEdits: List<ManualEdit> = emptyList(),
@@ -39,9 +37,9 @@ data class BulkReimportResult(
             if (reappliedEdits > 0) append(" · $reappliedEdits manual edit${if (reappliedEdits == 1) "" else "s"} re-applied")
             if (unmatchedEdits.isNotEmpty()) append(" · ${unmatchedEdits.size} manual edits not re-applied")
             append(reappliedLinks.summary(" · "))
-            if (affectedRecords > 0) append(" · $affectedRecords rows of other files re-linked")
-            if (affectedRecordsNotRerun > 0) {
-                append(" · $affectedRecordsNotRerun rows of other files left for those files' own re-import")
+            if (cascadedFiles > 0) append(" · $cascadedFiles other file${if (cascadedFiles == 1) "" else "s"} re-imported along")
+            if (cascadedFilesNotRerun > 0) {
+                append(" · $cascadedFilesNotRerun other file${if (cascadedFilesNotRerun == 1) "" else "s"} left for their own re-import")
             }
             if (emptyAccountsDeleted > 0) append(" · $emptyAccountsDeleted empty removed")
             if (duplicatesSkipped > 0) append(" · $duplicatesSkipped duplicates skipped")
@@ -53,9 +51,8 @@ data class BulkReimportResult(
 
 /** What one file's turn in a bulk re-import produced; see [runBulkReimport]. */
 sealed interface BulkReimportFileOutcome {
-    /** The file was re-imported; its [result] is folded into the run totals. */
+    /** The file was re-imported. */
     data class Reimported(
-        val result: SourceRerunResult<*>,
         val successCount: Int,
         val duplicateCount: Int,
     ) : BulkReimportFileOutcome
@@ -70,9 +67,8 @@ sealed interface BulkReimportFileOutcome {
 /**
  * Runs [reimportFile] over every file in [imports] and folds the outcomes into one [BulkReimportResult]
  * — the machinery re-imports need: row-weighted run-wide progress via
- * a [WeightedProgress], a per-file try/catch that logs and counts a failure instead of aborting the run,
- * and a single closing [Maintenance.refreshMaterializedViews] (each file's own re-import is expected to
- * be called with `refreshViews = false`).
+ * a [WeightedProgress], and a per-file try/catch that logs and counts a failure instead of aborting the run.
+ * The caller refreshes the materialized views once, after the run.
  *
  * [prepare] runs once after the bar appears and before the first file, producing the run-wide context
  * [reimportFile] needs. It prepares each file (weighted by its rows, at the start of the bar) and reports each,
@@ -88,7 +84,6 @@ suspend fun <T, C> runBulkReimport(
     rowCount: (T) -> Int,
     fileName: (T) -> String,
     logLabel: String,
-    maintenance: Maintenance,
     onProgress: suspend (Progress) -> Unit,
     startDetail: String? = null,
     stopRequested: () -> Boolean = { false },
@@ -102,6 +97,7 @@ suspend fun <T, C> runBulkReimport(
             weights = imports.map(rowCount),
             preparation = imports.map(rowCount),
             preparationNoun = "files",
+            itemsPhase = "Re-importing files",
             onProgress = onProgress,
         )
     tracker.started(detail = startDetail)
@@ -123,18 +119,11 @@ suspend fun <T, C> runBulkReimport(
                 }
 
                 is BulkReimportFileOutcome.Reimported -> {
-                    val rerun = outcome.result
                     result =
                         result.copy(
                             filesImported = result.filesImported + 1,
                             transfersCreated = result.transfersCreated + outcome.successCount,
                             duplicatesSkipped = result.duplicatesSkipped + outcome.duplicateCount,
-                            emptyAccountsDeleted = result.emptyAccountsDeleted + rerun.deletedEmptyAccounts.size,
-                            affectedRecords = result.affectedRecords + rerun.affected.count,
-                            affectedRecordsNotRerun = result.affectedRecordsNotRerun + rerun.notRerun.count,
-                            reappliedEdits = result.reappliedEdits + rerun.reappliedEdits.size,
-                            unmatchedEdits = result.unmatchedEdits + rerun.unmatchedEdits,
-                            reappliedLinks = result.reappliedLinks + rerun.reappliedLinks,
                         )
                 }
             }
@@ -147,6 +136,5 @@ suspend fun <T, C> runBulkReimport(
     }
 
     tracker.done(imports.size - result.filesNotStarted)
-    maintenance.refreshMaterializedViews()
     return result
 }

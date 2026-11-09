@@ -1,7 +1,7 @@
 package com.moneymanager.database.qif
 
 import com.moneymanager.bigdecimal.BigDecimal
-import com.moneymanager.csvimporter.CsvImportResult
+import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.stageQifImport
 import com.moneymanager.domain.Maintenance
@@ -14,12 +14,12 @@ import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportTransfer
-import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.setDefaultLocation
 import com.moneymanager.importengineapi.upsertHolidayCalendar
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.installBuiltInCsvStrategies
+import com.moneymanager.test.database.reimportFile
 import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -209,14 +209,8 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
         return card to secondCard
     }
 
-    private suspend fun reimport(file: CsvImport): SourceRerunResult<CsvImportResult?> {
-        val reimports = repositories.reimports(maintenance)
-        return reimports.reimport(
-            reimports.plan(repositories.csvImportRepository.getImport(file.id).first()!!),
-            accountId = accountId(AMEX),
-            currencyId = null,
-        )
-    }
+    private suspend fun reimport(file: CsvImport): BulkReimportResult =
+        repositories.reimports(maintenance).reimportFile(file.id, accountId = accountId(AMEX))
 
     // Two equal purchases from one shop two days apart, the earlier posted onto the next month's statement: two lines
     // of the card's statements, each with its own reference, never two sources' records of one purchase.
@@ -292,7 +286,7 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
 
             val result = reimport(card)
 
-            assertEquals(listOf("Paid from Santander"), result.reappliedEdits.map { it.description }, "unmatched: ${result.unmatchedEdits}")
+            assertEquals(1, result.reappliedEdits, "unmatched: ${result.unmatchedEdits}")
             val recreated =
                 repositories.transferSourceRepository
                     .getTransfersCreatedBy(Source.Csv(secondCard.id))

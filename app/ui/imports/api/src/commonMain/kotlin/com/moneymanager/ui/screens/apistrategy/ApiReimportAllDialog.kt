@@ -76,7 +76,7 @@ fun ApiReimportAllDialog(
                                 reads = reimports.reads,
                                 maintenance = maintenance,
                                 importEngine = importEngine,
-                                rerunAffected = reimports,
+                                cascadeRerunner = reimports,
                                 onProgress = { progress = it },
                             )
                         }
@@ -108,6 +108,21 @@ fun ApiReimportAllDialog(
                 Text(
                     text = "${finished.reappliedLinks.reapplied} manual link(s) or trade edit(s) re-applied.",
                     style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (finished.cascadedFiles > 0) {
+                Text(
+                    text = "${finished.cascadedFiles} other file(s) re-imported along.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (finished.cascadedFilesNotRerun > 0) {
+                Text(
+                    text =
+                        "${finished.cascadedFilesNotRerun} other file(s) couldn't be re-imported along and are left for " +
+                            "their own re-import.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
             UnmatchedEditsReport(finished.unmatchedEdits, accountName)

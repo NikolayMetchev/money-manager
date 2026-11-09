@@ -1,5 +1,6 @@
 package com.moneymanager.database.qif
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.stageQifImport
 import com.moneymanager.domain.Maintenance
@@ -13,7 +14,9 @@ import com.moneymanager.regex.compileRegex
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.installBuiltInCsvStrategies
+import com.moneymanager.test.database.planFile
 import com.moneymanager.test.database.reimports
+import com.moneymanager.test.database.runPlan
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -151,10 +154,10 @@ class QifReimportE2ETest : DbTest() {
             assertEquals(listOf(ImportStatus.DUPLICATE, ImportStatus.DUPLICATE), duplicates.map { it.importStatus })
 
             val reimports = repositories.reimports(maintenance)
-            val plan = reimports.plan(repositories.csvImportRepository.getImport(first.id).first()!!)
-            assertEquals(2, plan.rerun.affected.count, "the later file's duplicate records are re-run too")
+            val plan = reimports.planFile(first.id)
+            assertEquals(1, plan.cascaded.size, "the later file is re-imported too")
 
-            reimports.reimport(plan, accountId = sourceAccountId(), currencyId = null)
+            reimports.runPlan(plan, accountId = sourceAccountId())
 
             val relinked = repositories.csvImportRepository.getImportRows(overlap.id, limit = 10, offset = 0)
             assertTrue(
@@ -165,6 +168,40 @@ class QifReimportE2ETest : DbTest() {
             )
             assertEquals(3L, repositories.accountRepository.countTransfersByAccount(sourceAccountId()))
         }
+
+    @Test
+    fun overlappingStatements_keepTwoLikePaymentsDaysApart() =
+        runDbTest {
+            val payment = "BILL PAYMENT VIA FASTER PAYMENT TO COINBASE REFERENCE CBAGBPUALDWLZXEXC , MANDATE NO 91"
+            // Statements overlap and list newest first, as Santander's do: one ends on the first payment, the next
+            // starts after it with the second, and a long one has both. The second is within the fuzzy tolerance of
+            // the first, but each statement gives both their own dates.
+            val statements =
+                listOf(
+                    createImport("early.qif", "early-checksum", listOf(rec("03/12/2020", "-1000.00", payment))),
+                    createImport("late.qif", "late-checksum", listOf(rec("06/12/2020", "-1000.00", payment))),
+                    createImport(
+                        "long.qif",
+                        "long-checksum",
+                        listOf(rec("06/12/2020", "-1000.00", payment), rec("03/12/2020", "-1000.00", payment)),
+                    ),
+                )
+            statements.forEach { apply(it) }
+
+            assertEquals(BigDecimal("-2000"), countedBalance(sourceAccountId()))
+            reimport()
+            assertEquals(BigDecimal("-2000"), countedBalance(sourceAccountId()), "re-importing every statement keeps both")
+        }
+
+    private suspend fun countedBalance(accountId: AccountId): BigDecimal =
+        repositories.transactionRepository
+            .getTransactionsByAccount(accountId)
+            .first()
+            .filter { transfer -> transfer.attributes.none { it.attributeType.name == "excluded" } }
+            .fold(BigDecimal.ZERO) { sum, t ->
+                val amount = t.amount.toDisplayValue()
+                if (t.targetAccountId == accountId) sum + amount else sum - amount
+            }
 
     @Test
     fun reimportWithNoChange_isNoOp() =

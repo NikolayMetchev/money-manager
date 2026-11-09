@@ -32,7 +32,10 @@ fun BulkImportProgressIndicator(progress: Progress) {
     }
 }
 
-/** The indicator's five lines: files, rows, its folder, current file name, current step (blank where unknown). */
+/**
+ * The indicator's six lines: the phase, files, rows, its folder, current file name, current step (blank where unknown).
+ */
+
 fun bulkProgressLines(progress: Progress): List<String> {
     val item = progress.item
     val files = item?.let { "${it.done} of ${it.count} ${it.noun} (${percent(it.done, it.count)}%)" }.orEmpty()
@@ -50,7 +53,8 @@ fun bulkProgressLines(progress: Progress): List<String> {
     // Trimmed because a Drive path joins its parts with " / ", so the name would otherwise start with a space.
     val fileName = path.substring(separator + 1).trim()
     val folder = if (separator >= 0) path.substring(0, separator).trim() else ""
-    return listOf(files, rows, folder, fileName, item?.step ?: progress.detail)
+    val phase = progress.phase?.let { "Phase ${it.number} of ${it.count}: ${it.name}" }.orEmpty()
+    return listOf(phase, files, rows, folder, fileName, item?.step ?: progress.detail)
 }
 
 @Composable
@@ -75,4 +79,4 @@ private fun percent(
 
 private const val PERCENT = 100
 
-private const val PATH_LINE = 2
+private const val PATH_LINE = 3
