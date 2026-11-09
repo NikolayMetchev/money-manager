@@ -87,7 +87,6 @@ class ImportTimelineRepositoryImplTest : DbTest() {
             id = source.id,
             csv_import_id = importId.id.toString(),
             csv_row_index = rowIndex,
-            statement_account_id = null,
         )
     }
 
@@ -166,7 +165,6 @@ class ImportTimelineRepositoryImplTest : DbTest() {
                 id = reimportSource.id,
                 csv_import_id = importId.id.toString(),
                 csv_row_index = 0,
-                statement_account_id = null,
             )
 
             val range =

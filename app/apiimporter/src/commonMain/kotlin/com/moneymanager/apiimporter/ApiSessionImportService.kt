@@ -1527,6 +1527,8 @@ private data class PreparedApiTransaction(
     val item: ApiTransactionPageItem,
     val source: AccountRef,
     val target: AccountRef,
+    /** The account whose feed this is: its own end. */
+    val ownAccount: AccountRef,
     val timestamp: Instant,
     val description: String,
     val amount: Money,
@@ -1664,6 +1666,7 @@ private suspend fun runImportEngine(
                 fromAccount = p.source,
                 toAccount = p.target,
                 source = Source.Api(setup.sessionId),
+                statementAccount = p.ownAccount,
                 timestamp = p.timestamp,
                 description = p.description,
                 amount = p.amount,
@@ -1977,6 +1980,7 @@ private suspend fun prepareValidTransactionItem(
         responseId = responseId,
         requestId = context.requestId,
         item = item,
+        ownAccount = ownAccountRef,
         // Pass-through: funding leg own -> conduit (or conduit -> own for an incoming
         // refund/cancellation). Otherwise the normal own/counterparty pairing.
         source =

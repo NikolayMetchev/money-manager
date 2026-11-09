@@ -44,3 +44,13 @@ WHERE account_id = :survivingAccount
             WHERE latest.csv_import_application_id = change.csv_import_application_id AND latest.audit_type_id = 2
         )
   );
+
+-- Remembers the provenance rows naming the deleted account as their statement account, before the merge repoints them.
+insertMergeStatementSources:
+INSERT INTO account_merge_statement_source (merge_id, entity_source_id)
+SELECT :mergeId, entity_source_id FROM entity_source_statement_account WHERE account_id = :deletedAccount;
+
+-- Gives the restored account back the statement lines the merge moved to the survivor.
+restoreStatementSources:
+UPDATE entity_source_statement_account SET account_id = :deletedAccount
+WHERE entity_source_id IN (SELECT entity_source_id FROM account_merge_statement_source WHERE merge_id = :mergeId);

@@ -53,6 +53,19 @@ CREATE INDEX IF NOT EXISTS idx_entity_source_entity ON entity_source(entity_type
 CREATE INDEX IF NOT EXISTS idx_entity_source_type ON entity_source(source_type_id);
 CREATE INDEX IF NOT EXISTS idx_entity_source_device ON entity_source(device_id);
 
+-- The account whose statement (or API feed) an import's record is: its own account, before any direction flip.
+-- Reconciliation reads it to tell two of one account's statement lines from two accounts' records of one movement, and
+-- to know which end of a record is its own. Only an import's provenance has a row. No foreign key to account: provenance
+-- outlives the transfers it describes, and an account merge repoints account_id (account_merge_statement_source remembers
+-- which rows, for the unmerge).
+CREATE TABLE entity_source_statement_account (
+    entity_source_id INTEGER PRIMARY KEY,
+    account_id INTEGER NOT NULL,
+    FOREIGN KEY (entity_source_id) REFERENCES entity_source(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_source_statement_account_account ON entity_source_statement_account(account_id);
+
 -- api_entity_source: API-specific data for API sources (source_type_id = 5)
 -- 1:1 relationship with entity_source
 -- Sessions and requests must not be deleted while entity sources reference them (ON DELETE RESTRICT),
@@ -75,14 +88,10 @@ CREATE INDEX IF NOT EXISTS idx_api_entity_source_request ON api_entity_source(ap
 -- new account), so the audit trail can link back to that row in the CSV import detail.
 -- csv_row_index is nullable: an entity created from the import as a whole (e.g. an account derived
 -- from many rows) has a known import id but no single originating row.
--- statement_account_id is the account whose statement the row is (its own account, before any direction
--- flip), so reconciliation can tell two of one account's statement lines from two accounts' records of one
--- movement. No foreign key: an account merge repoints it, and only a transfer's provenance carries it.
 CREATE TABLE csv_entity_source (
     id INTEGER PRIMARY KEY,  -- Same as entity_source.id
     csv_import_id TEXT NOT NULL,
     csv_row_index INTEGER,
-    statement_account_id INTEGER,
     FOREIGN KEY (id) REFERENCES entity_source(id),
     FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id)
 );

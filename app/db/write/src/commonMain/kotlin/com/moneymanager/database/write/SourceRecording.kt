@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.statementAccountId
 import com.moneymanager.domain.model.toSourceType
 
 /**
@@ -26,6 +27,7 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
     source: Source,
 ) {
     // INSERT OR IGNORE: a source for this (entity, revision) may already exist (e.g. re-runs); keep it.
+    val existed = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).awaitAsOneOrNull() != null
     entitySourceWriteQueries.insertSource(
         entity_type_id = entityType.id,
         entity_id = entityId,
@@ -33,6 +35,12 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
         source_type_id = source.toSourceType().id.toLong(),
         device_id = deviceId.id,
     )
+    // Only on the row this call wrote: a kept row is an earlier writer's, and its statement account (or none) is its own.
+    val statementAccount = source.statementAccountId
+    if (!existed && statementAccount != null) {
+        val written = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).awaitAsOne()
+        entitySourceWriteQueries.insertStatementAccount(written.id, statementAccount.id)
+    }
 
     when (source) {
         // Record the import detail row so the import id (and thus the audit trail's link back to the
@@ -47,7 +55,6 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
                     id = entitySource.id,
                     csv_import_id = source.importId.id.toString(),
                     csv_row_index = source.rowIndex,
-                    statement_account_id = source.statementAccountId?.id,
                 )
             }
         }
@@ -105,7 +112,7 @@ suspend fun MoneyManagerDatabaseWrapper.recordMatchedSource(
         return
     }
     val id = entitySourceWriteQueries.lastInsertedSourceId().awaitAsOne()
-    entitySourceWriteQueries.insertCsvSource(id, source.importId.id.toString(), source.rowIndex, source.statementAccountId?.id)
+    entitySourceWriteQueries.insertCsvSource(id, source.importId.id.toString(), source.rowIndex)
 }
 
 /**

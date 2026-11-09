@@ -34,8 +34,8 @@ sealed interface Source {
 
     /**
      * Created during a CSV import (a QIF, Excel or PDF file is staged as one too); [rowIndex] is the originating row when
-     * known. [statementAccountId] is the account whose statement the row is (its own account): an importer sets it on
-     * the transfers it writes, and it is recorded with their provenance, never read back into a [Csv].
+     * known. [statementAccountId] is the account whose statement the row is (see [Source.statementAccountId]), which the
+     * engine sets from the transfer's `statementAccount`.
      */
     data class Csv(
         val importId: CsvImportId,
@@ -46,11 +46,14 @@ sealed interface Source {
     /**
      * Created during an API import. [requestId]/[jsonPath] pinpoint the originating response node when
      * known; when absent only the API source type is recorded (no clickable request/JSON-path detail).
+     * [statementAccountId] is the account whose feed the record is (see [Source.statementAccountId]), which the engine
+     * sets from the transfer's `statementAccount`.
      */
     data class Api(
         val sessionId: ApiSessionId,
         val requestId: ApiRequestId? = null,
         val jsonPath: JsonPath? = null,
+        val statementAccountId: AccountId? = null,
     ) : Source
 }
 
@@ -68,4 +71,26 @@ fun Source.toSourceType(): SourceType =
         Source.Reconciliation -> SourceType.RECONCILIATION
         is Source.Csv -> SourceType.CSV_IMPORT
         is Source.Api -> SourceType.API
+    }
+
+/**
+ * The account whose statement (or API feed) an imported record is: its own account, before any direction flip. An
+ * importer sets it on the transactions it writes, and it is recorded with their provenance (never read back into a
+ * [Source]): reconciliation reads it to tell which end of another source's record is that record's own account, and
+ * two of one account's statement lines from two accounts' records of one movement.
+ */
+val Source.statementAccountId: AccountId?
+    get() =
+        when (this) {
+            is Source.Csv -> statementAccountId
+            is Source.Api -> statementAccountId
+            else -> null
+        }
+
+/** This source with [account] as its [statementAccountId]; only an import's sources carry one. */
+fun Source.withStatementAccount(account: AccountId): Source =
+    when (this) {
+        is Source.Csv -> copy(statementAccountId = account)
+        is Source.Api -> copy(statementAccountId = account)
+        else -> this
     }

@@ -1179,6 +1179,8 @@ suspend fun importApiSessionExchange(
                 txidAttr = txidAttr,
             ).let { transfer ->
                 transfer.copy(
+                    // The exchange account is every movement's own end: the feed is its statement.
+                    statementAccount = exchangeRef,
                     // A bank export naming this exchange records the same deposit/withdrawal with its real far
                     // end (the user's own bank account); this lets it reconcile against that record instead of
                     // both debiting (or crediting) the exchange.

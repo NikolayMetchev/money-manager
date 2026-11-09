@@ -233,6 +233,7 @@ class AccountWriteRepositoryImpl(
             targetAccount = survivingAccount.id,
             accountToDelete = deletedAccount.id,
         )
+        mergeWriteQueries.insertMergeStatementSources(mergeId = mergeId, deletedAccount = deletedAccount.id)
         database.entitySourceWriteQueries.reassignStatementAccount(
             survivingAccountId = survivingAccount.id,
             deletedAccountId = deletedAccount.id,
@@ -426,6 +427,7 @@ class AccountWriteRepositoryImpl(
             deletedAccount = merge.deleted_account_id,
             survivingAccount = merge.surviving_account_id,
         )
+        mergeWriteQueries.restoreStatementSources(deletedAccount = merge.deleted_account_id, mergeId = mergeId.id)
 
         mergeWriteQueries.markReversed(mergeId.id)
     }

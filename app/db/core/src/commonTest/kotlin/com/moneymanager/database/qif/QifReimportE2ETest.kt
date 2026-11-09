@@ -204,12 +204,15 @@ class QifReimportE2ETest : DbTest() {
                 repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Santander Current", openingDate = now),
                 )
+            assertEquals(setOf(santander), statementAccounts(file), "each row is a line of the imported account's statement")
 
             val merge = repositories.accountRepository.mergeAccounts(deletedAccount = santander, survivingAccount = current)
             assertEquals(current, reload(file).lastAppliedAccountId, "the file re-imports onto the account its transactions moved to")
+            assertEquals(setOf(current), statementAccounts(file), "its lines are the surviving account's statement")
 
             repositories.accountRepository.unmergeAccount(merge)
             assertEquals(santander, reload(file).lastAppliedAccountId, "undoing the merge points it back")
+            assertEquals(setOf(santander), statementAccounts(file), "and gives the statement back")
         }
 
     @Test
@@ -227,6 +230,12 @@ class QifReimportE2ETest : DbTest() {
             assertEquals(1, result.filesSkippedNoStrategy)
             assertEquals(transfers, repositories.accountRepository.countTransfersByAccount(sourceAccountId()), "nothing was deleted")
         }
+
+    private suspend fun statementAccounts(file: CsvImport): Set<AccountId> =
+        repositories.csvImportRepository
+            .getStatementAccounts(repositories.csvImportRepository.getTransferIdsCreatedByImport(file.id))
+            .values
+            .toSet()
 
     private suspend fun reload(file: CsvImport): CsvImport = assertNotNull(repositories.csvImportRepository.getImport(file.id).first())
 

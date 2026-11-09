@@ -17,6 +17,7 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.contains
 import com.moneymanager.domain.model.rules.meets
+import com.moneymanager.domain.model.statementAccountId
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportTransfer
@@ -174,6 +175,11 @@ class ImportDeduper(
      * whichever accounts they are on: the rest of [existing] only covers the batch's own.
      */
     otherSideLegs: List<Transfer> = emptyList(),
+    /**
+     * The account whose statement each of [otherSideLegs] is (its own account), for those an import recorded one:
+     * [otherSideOf] takes only a record's own end.
+     */
+    private val otherSideStatementAccounts: Map<TransferId, AccountId> = emptyMap(),
 ) {
     /**
      * Exact-match key over a transfer's core fields. Incoming-side fields are nullable, so an
@@ -766,6 +772,8 @@ class ImportDeduper(
      * incoming row becomes the whole transfer, real end to real end, and the other record is excluded; either
      * import order reaches the same `Monzo -> ISA`. This row's placeholder may meet an identified record, or the
      * other way round; two placeholders say nothing of where the money came from.
+     * The identified record must hold its own account where the placeholder stands ([ownEndsMeet]), or the two are records
+     * of different transfers that only share an amount.
      */
     private fun otherSideOf(
         transfer: ImportTransfer,
@@ -780,7 +788,11 @@ class ImportDeduper(
                 .orEmpty()
                 .filter { leg ->
                     val otherSideKnown = if (placeholder != null) !isPlaceholder(leg) else placeholderSide(leg) != null
-                    otherSideKnown && leg.id !in pairedInBatch && leg.id !in claimedReconcileTargets && leg.id !in ownSourceLegs
+                    otherSideKnown &&
+                        leg.id !in pairedInBatch &&
+                        leg.id !in claimedReconcileTargets &&
+                        leg.id !in ownSourceLegs &&
+                        ownEndsMeet(transfer, leg)
                 }.map { it.id to it }
         val matchId =
             selectNearestUnconsumedLeg(candidates, timestamp, consumedReconcileIds) { existing ->
@@ -788,14 +800,8 @@ class ImportDeduper(
             } ?: return null
         val other = candidates.first { it.first == matchId }.second
         consumedReconcileIds += matchId
-        val replaceSource =
-            if (placeholder != null) {
-                placeholder == transfer.fromAccount.requireId()
-            } else {
-                placeholderSide(other) != WellKnownIds.UNIDENTIFIED_SOURCE
-            }
         val whole =
-            if (replaceSource) {
+            if (replacesSource(transfer, other)) {
                 transfer.copy(fromAccount = AccountRef.Existing(other.sourceAccountId))
             } else {
                 transfer.copy(toAccount = AccountRef.Existing(other.targetAccountId))
@@ -810,6 +816,33 @@ class ImportDeduper(
             existing = null,
             excludeExisting = ExcludeExistingLeg(other, settings.exclusionTypeId),
         )
+    }
+
+    /** Whether the incoming [transfer] takes [other]'s source (else its target): the end its placeholder stands for. */
+    private fun replacesSource(
+        transfer: ImportTransfer,
+        other: Transfer,
+    ): Boolean =
+        transfer.unidentifiedCounterpartyAccountId?.let { it == transfer.fromAccount.requireId() }
+            ?: (placeholderSide(other) != WellKnownIds.UNIDENTIFIED_SOURCE)
+
+    /**
+     * Whether the identified record's end that stands where the placeholder record's stand-in does is its own account:
+     * the one end its statement can vouch for. A bank line "Santander -> Marcus" moved money between two accounts, so a
+     * PayPal withdrawal to an unknown bank is never that transfer seen from PayPal, though their amounts and times
+     * agree; only "PayPal -> Santander" on Santander's statement is. A record without a known statement account isn't
+     * paired.
+     */
+    private fun ownEndsMeet(
+        transfer: ImportTransfer,
+        other: Transfer,
+    ): Boolean {
+        val replaceSource = replacesSource(transfer, other)
+        return if (transfer.unidentifiedCounterpartyAccountId != null) {
+            otherSideStatementAccounts[other.id] == if (replaceSource) other.sourceAccountId else other.targetAccountId
+        } else {
+            transfer.source.statementAccountId == if (replaceSource) transfer.toAccount.requireId() else transfer.fromAccount.requireId()
+        }
     }
 
     private fun isPlaceholder(leg: Transfer): Boolean = leg.attributes.any { it.attributeType.id == unidentifiedCounterpartyTypeId }
