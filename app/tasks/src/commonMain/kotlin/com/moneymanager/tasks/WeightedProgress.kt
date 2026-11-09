@@ -16,8 +16,11 @@ import kotlin.math.roundToLong
  * [Progress.item] also carries in parts (files finished, the file, the phase; [itemsNoun] names the items).
  *
  * [preparation] weights the steps a run takes before its first item (staging each PDF a bulk import must
- * assemble rows for, say), which come first on the bar. They may finish in any order (they can run in
- * parallel), and [prepared] reports each as it does: `Staged 2 of 3 PDFs — b.pdf`.
+ * assemble rows for, say). They are a phase of their own: the bar fills once over them, then empties and fills
+ * again over the items, so a quick preparation never shows as most of the run. They may finish in any order
+ * (they can run in parallel), and [prepared] reports each as it does: `Staged 2 of 3 PDFs — b.pdf`. While
+ * preparing there are no rows to count, so [Progress.processed]/[Progress.total] are null.
+ * With a preparation every emission names its phase, [preparationPhase] then [itemsPhase].
  */
 class WeightedProgress(
     private val weights: List<Int>,
@@ -25,15 +28,17 @@ class WeightedProgress(
     private val itemsNoun: String = "${itemNoun.lowercase()}s",
     private val preparation: List<Int> = emptyList(),
     private val preparationNoun: String = "steps",
+    private val preparationPhase: String = "Preparing $preparationNoun",
+    private val itemsPhase: String = "Importing $itemsNoun",
     private val onProgress: suspend (Progress) -> Unit,
 ) {
     private val itemCount = weights.size
     private val preparationUnits = preparation.sumOf { it.toLong() }
     private var preparedUnits = 0L
     private var preparedCount = 0
-    private val unitsBefore = weights.runningFold(preparationUnits) { acc, weight -> acc + weight }
-    private val unitsTotal = unitsBefore.last()
-    private val itemUnits = unitsTotal - preparationUnits
+    private val unitsBefore = weights.runningFold(0L) { acc, weight -> acc + weight }
+    private val itemUnits = unitsBefore.last()
+    private var preparing = preparation.isNotEmpty()
     private var lastFraction = 0f
     private var itemUnitsDone = 0f
 
@@ -51,7 +56,7 @@ class WeightedProgress(
     ) {
         preparedUnits += preparation[index]
         preparedCount++
-        advanceTo(preparedUnits)
+        lastFraction = maxOf(lastFraction, (preparedUnits.toFloat() / preparationUnits.coerceAtLeast(1)).coerceIn(0f, 1f))
         onProgress(
             progress(
                 "$verb $preparedCount of ${preparation.size} $preparationNoun — $name",
@@ -82,6 +87,7 @@ class WeightedProgress(
      * it actually reached, so a stopped run never claims the files it didn't start.
      */
     suspend fun done(itemsDone: Int = itemCount) {
+        startItems()
         if (itemsDone >= itemCount) {
             lastFraction = 1f
             itemUnitsDone = itemUnits.toFloat()
@@ -99,6 +105,7 @@ class WeightedProgress(
         phaseFraction: Float,
         phaseDetail: String?,
     ) {
+        startItems()
         advanceTo(unitsBefore[index] + phaseFraction.coerceIn(0f, 1f) * weights[index])
         val detail =
             buildString {
@@ -108,16 +115,21 @@ class WeightedProgress(
         onProgress(progress(detail, Progress.Item(index, itemCount, itemsNoun, name, step = phaseDetail ?: "Starting")))
     }
 
-    private fun advanceTo(unitsDone: Float) {
-        val overall = (unitsDone / unitsTotal.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
-        lastFraction = maxOf(lastFraction, overall)
-        itemUnitsDone = maxOf(itemUnitsDone, unitsDone - preparationUnits)
+    // The items' phase starts its own sweep of the bar, from empty.
+    private fun startItems() {
+        if (preparing) {
+            preparing = false
+            lastFraction = 0f
+        }
     }
 
-    private fun advanceTo(unitsDone: Long) = advanceTo(unitsDone.toFloat())
+    private fun advanceTo(unitsDone: Float) {
+        val overall = (unitsDone / itemUnits.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
+        lastFraction = maxOf(lastFraction, overall)
+        itemUnitsDone = maxOf(itemUnitsDone, unitsDone)
+    }
 
-    // The counter counts the items' units (rows) only, clamped monotonic like the bar: preparation takes its
-    // share of the bar, but it isn't more rows, so the counter stays at 0 until the first item's rows move.
+    // The counter counts the items' units (rows) only, clamped monotonic like the bar.
     private fun progress(
         detail: String,
         item: Progress.Item,
@@ -125,8 +137,14 @@ class WeightedProgress(
         Progress(
             detail = detail,
             fraction = lastFraction,
-            processed = itemUnitsDone.roundToLong().coerceIn(0L, itemUnits).toInt(),
-            total = itemUnits.toInt(),
+            processed = if (preparing) null else itemUnitsDone.roundToLong().coerceIn(0L, itemUnits).toInt(),
+            total = if (preparing) null else itemUnits.toInt(),
             item = item,
+            phase =
+                when {
+                    preparing -> Progress.Phase(1, 2, preparationPhase)
+                    preparation.isNotEmpty() -> Progress.Phase(2, 2, itemsPhase)
+                    else -> null
+                },
         )
 }

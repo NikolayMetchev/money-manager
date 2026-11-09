@@ -10,6 +10,7 @@ package com.moneymanager.tasks
  * @property item Which of several items (files of a bulk import) the work is on, for a view that lays the
  *   counter, the item's name and its current step out on lines of their own. [detail] still says all of it on one
  *   line, for views that show a single line.
+ * @property phase Which of a run's phases the bar is on, for a run whose phases each fill the bar from empty.
  */
 data class Progress(
     val detail: String,
@@ -17,7 +18,15 @@ data class Progress(
     val processed: Int? = null,
     val total: Int? = null,
     val item: Item? = null,
+    val phase: Phase? = null,
 ) {
+    /** Phase [number] of [count] (from 1), named [name]: `Preparing files`. */
+    data class Phase(
+        val number: Int,
+        val count: Int,
+        val name: String,
+    )
+
     /**
      * @property done Items finished so far.
      * @property count Items in all.

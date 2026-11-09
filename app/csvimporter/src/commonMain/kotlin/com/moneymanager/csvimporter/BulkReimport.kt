@@ -97,6 +97,7 @@ suspend fun <T, C> runBulkReimport(
             weights = imports.map(rowCount),
             preparation = imports.map(rowCount),
             preparationNoun = "files",
+            itemsPhase = "Re-importing files",
             onProgress = onProgress,
         )
     tracker.started(detail = startDetail)

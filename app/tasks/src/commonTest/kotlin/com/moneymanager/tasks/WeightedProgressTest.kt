@@ -38,7 +38,7 @@ class WeightedProgressTest {
         }
 
     @Test
-    fun preparationComesFirstAndCreditsStepsAsTheyFinish() =
+    fun preparationIsAPhaseOfItsOwn_andCreditsStepsAsTheyFinish() =
         runTest {
             val tracker =
                 WeightedProgress(listOf(100, 100), preparation = listOf(100, 300), preparationNoun = "PDFs") { emitted += it }
@@ -49,10 +49,13 @@ class WeightedProgressTest {
             tracker.itemStarted(0, "a.pdf")
             tracker.item(0, "a.pdf", Progress("Importing transactions", fraction = 0.5f))
 
-            assertEquals(listOf(0.5f, 4f / 6, 4f / 6, 0.75f), emitted.map { it.fraction })
-            // Preparation takes its share of the bar but isn't counted as rows: only half of a.pdf's 100 are done.
-            assertTrue(emitted.all { it.total == 200 })
-            assertEquals(listOf(0, 0, 0, 50), emitted.map { it.processed })
+            // Preparation fills the bar by itself, then the items fill it again from empty: a.pdf half done is a quarter.
+            assertEquals(listOf(0.75f, 1f, 0f, 0.25f), emitted.map { it.fraction })
+            // Preparing counts no rows.
+            assertEquals(listOf(null, null, 200, 200), emitted.map { it.total })
+            assertEquals(listOf(null, null, 0, 50), emitted.map { it.processed })
+            assertEquals(listOf(1, 1, 2, 2), emitted.map { it.phase?.number })
+            assertEquals(listOf("Preparing PDFs", "Importing files"), emitted.mapNotNull { it.phase?.name }.distinct())
             assertEquals(
                 listOf("Staged 1 of 2 PDFs — b.pdf", "Staged 2 of 2 PDFs — a.pdf"),
                 emitted.take(2).map { it.detail },

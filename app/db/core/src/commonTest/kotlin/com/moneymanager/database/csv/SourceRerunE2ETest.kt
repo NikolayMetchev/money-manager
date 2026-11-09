@@ -365,7 +365,7 @@ class SourceRerunE2ETest : DbTest() {
 
     // Planning reports each named step on a bar that never moves backwards.
     @Test
-    fun reimportAll_reportsTheDeleteBatchOnItsOwnBar() =
+    fun reimportAll_reportsEachPhaseAsItsOwnSweepOfTheBar() =
         runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val monzo = createMonzoAccount()
@@ -375,19 +375,27 @@ class SourceRerunE2ETest : DbTest() {
             apply(second, monzo)
 
             val reimports = repositories.reimports(maintenance)
-            val removal = mutableListOf<Progress>()
-            val files = mutableListOf<Progress>()
+            val progress = mutableListOf<Progress>()
             reimports.reimportAll(
                 reimports.planAll(listOf(reload(first.id), reload(second.id))),
                 accountId = null,
                 currencyId = null,
-                onProgress = { files += it },
-                onRemovalProgress = { removal += it },
+                onProgress = { progress += it },
             )
 
-            assertProgressesTo(removal, "Removing what the import created", "Removed what the import created")
-            assertEquals(1f, removal.last().fraction, "the delete batch's bar ends full")
-            assertTrue(files.none { it.detail.startsWith("Removing") }, "the files' bar never shows the delete batch: $files")
+            // The delete batch, preparing the files and re-importing them each fill the bar from empty, in that order.
+            assertEquals(
+                listOf("Removing what the files created", "Preparing files", "Re-importing files"),
+                progress.mapNotNull { it.phase }.map { it.name }.distinct(),
+            )
+            assertTrue(progress.all { it.phase?.count == 3 }, "every emission names its phase of three: $progress")
+            (1..3).forEach { number ->
+                val phase = progress.filter { it.phase?.number == number }
+                assertProgressesTo(phase)
+                assertEquals(1f, phase.last().fraction, "phase $number fills the bar: $phase")
+            }
+            val files = progress.filter { it.phase?.number == 3 }
+            assertEquals(0f, files.first().fraction, "the files start the bar again: $files")
             assertProgressesTo(files, "Re-applying manual edits", "Refreshing views")
             assertEquals(1f, files.last().fraction, "the steps after the last file keep the files' bar full")
         }

@@ -38,8 +38,7 @@ fun ReimportProgressIndicator(progress: Progress) {
                     progress.total?.let { total -> " — $processed of $total" }
                 }.orEmpty()
         Text(
-            // A finished step (a full bar) is no longer under way.
-            text = "${progress.detail}$counts${if (progress.fraction == 1f) "" else "…"}",
+            text = "${progress.detail}$counts…",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

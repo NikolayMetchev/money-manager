@@ -267,7 +267,6 @@ class Reimports(
      * [accountId] and [currencyId] are for the files whose last import didn't record them. Progress names each
      * file by [fileLabel], and once [stopRequested] says yes no further file starts (see [runBulkReimport]): what
      * those files created is already deleted, so their rows wait, reset, for their next import.
-     * [onRemovalProgress] follows the one delete batch, which runs before the first file, apart from [onProgress].
      */
     suspend fun reimportAll(
         plan: ReimportAllPlan,
@@ -276,9 +275,7 @@ class Reimports(
         onProgress: suspend (Progress) -> Unit,
         fileLabel: (CsvImport) -> String = { it.originalFileName },
         stopRequested: () -> Boolean = { false },
-        onRemovalProgress: suspend (Progress) -> Unit = {},
-    ): BulkReimportResult =
-        writeLock.withLock { reimportAllLocked(plan, accountId, currencyId, onProgress, onRemovalProgress, fileLabel, stopRequested) }
+    ): BulkReimportResult = writeLock.withLock { reimportAllLocked(plan, accountId, currencyId, onProgress, fileLabel, stopRequested) }
 
     @Suppress("LongParameterList")
     private suspend fun reimportAllLocked(
@@ -286,7 +283,6 @@ class Reimports(
         accountId: AccountId?,
         currencyId: CurrencyId?,
         onProgress: suspend (Progress) -> Unit,
-        onRemovalProgress: suspend (Progress) -> Unit,
         fileLabel: (CsvImport) -> String,
         stopRequested: () -> Boolean,
     ): BulkReimportResult {
@@ -294,11 +290,14 @@ class Reimports(
         val skipped = plan.files.count { it.rowCount > 0 && plan.strategies[it.source] == null && it !in run }
         val rerun = mutableSetOf<Source>()
         val reimported = mutableSetOf<Source>()
-        // The steps after the last file (hand edits, empty accounts, views) keep the files' bar where the run left it.
+        // Three phases, each filling the bar from empty: the one delete batch, then runBulkReimport's two (preparing
+        // the files, re-importing them). The steps after the last file (hand edits, empty accounts, views) keep the
+        // files' bar where the run left it.
         var lastFileProgress: Progress? = null
-        val onFileProgress: suspend (Progress) -> Unit = {
-            lastFileProgress = it
-            onProgress(it)
+        val onFileProgress: suspend (Progress) -> Unit = { inner ->
+            val shifted = inner.copy(phase = inner.phase?.let { it.copy(number = it.number + 1, count = it.count + 1) })
+            lastFileProgress = shifted
+            onProgress(shifted)
         }
         val outcome =
             importEngine.executeRerun(
@@ -309,11 +308,14 @@ class Reimports(
                 reads = reads,
                 maintenance = maintenance,
                 onProgress = { step ->
-                    lastFileProgress?.let { last ->
-                        onProgress(last.copy(detail = step.detail, item = last.item?.copy(step = step.detail)))
+                    val last = lastFileProgress
+                    when {
+                        last != null -> onProgress(last.copy(detail = step.detail, item = last.item?.copy(step = step.detail)))
+
+                        // The delete batch; its closing "Re-importing" (no fraction) is the next phase's to say.
+                        step.fraction != null -> onProgress(step.copy(phase = REMOVAL_PHASE))
                     }
                 },
-                onRemovalProgress = onRemovalProgress,
             ) {
                 val strategies = csvImportStrategyRepository.getAllStrategies().first()
                 val currencies = currencies()
@@ -458,6 +460,8 @@ class Reimports(
 
     private suspend fun currencies(): List<Currency> = currencyRepository.getAllCurrencies().first()
 }
+
+private val REMOVAL_PHASE = Progress.Phase(1, 3, "Removing what the files created")
 
 private const val PLAN_LOAD_SPAN = 0.02f
 

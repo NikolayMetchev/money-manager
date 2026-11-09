@@ -17,7 +17,7 @@ class BulkImportProgressIndicatorTest {
             )
 
         assertEquals(
-            listOf("2 of 8 files (25%)", "127.5K of 300K rows (42%)", "", "statement.csv", "Importing transactions"),
+            listOf("", "2 of 8 files (25%)", "127.5K of 300K rows (42%)", "", "statement.csv", "Importing transactions"),
             bulkProgressLines(progress),
         )
     }
@@ -27,7 +27,7 @@ class BulkImportProgressIndicatorTest {
         val progress = Progress("x", item = Progress.Item(0, 1, "files", "/home/me/bank/statement.csv", "Reading"))
 
         assertEquals(
-            listOf("0 of 1 files (0%)", "", "/home/me/bank", "statement.csv", "Reading"),
+            listOf("", "0 of 1 files (0%)", "", "/home/me/bank", "statement.csv", "Reading"),
             bulkProgressLines(progress),
         )
     }
@@ -36,11 +36,18 @@ class BulkImportProgressIndicatorTest {
     fun aSpacedSeparatorLeavesNoSpaceBeforeTheFileName() {
         val progress = Progress("x", item = Progress.Item(0, 1, "files", "Drive / Bank / statement.csv", "Reading"))
 
-        assertEquals(listOf("Drive / Bank", "statement.csv"), bulkProgressLines(progress).slice(2..3))
+        assertEquals(listOf("Drive / Bank", "statement.csv"), bulkProgressLines(progress).slice(3..4))
+    }
+
+    @Test
+    fun thePhaseIsTheFirstLine() {
+        val progress = Progress("Prepared 1 of 4 files — a.csv", fraction = 0.25f, phase = Progress.Phase(2, 3, "Preparing files"))
+
+        assertEquals("Phase 2 of 3: Preparing files", bulkProgressLines(progress).first())
     }
 
     @Test
     fun withoutCountsTheLinesStayButAreBlank() {
-        assertEquals(listOf("", "", "", "", "Starting"), bulkProgressLines(Progress("Starting")))
+        assertEquals(listOf("", "", "", "", "", "Starting"), bulkProgressLines(Progress("Starting")))
     }
 }

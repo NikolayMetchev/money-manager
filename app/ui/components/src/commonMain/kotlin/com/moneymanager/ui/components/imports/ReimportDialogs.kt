@@ -210,7 +210,6 @@ fun ReimportAllDialog(
     var currencyId by remember { mutableStateOf<CurrencyId?>(null) }
     var isRunning by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<Progress?>(null) }
-    var removalProgress by remember { mutableStateOf<Progress?>(null) }
     var result by remember { mutableStateOf<BulkReimportResult?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -252,7 +251,6 @@ fun ReimportAllDialog(
                             onProgress = { progress = it },
                             fileLabel = fileLabel,
                             stopRequested = { stopRequested },
-                            onRemovalProgress = { removalProgress = it },
                         )
                 } catch (expected: CancellationException) {
                     throw expected
@@ -324,11 +322,6 @@ fun ReimportAllDialog(
                 accountName = accountName,
                 note = "Edits whose transaction isn't imported again are dropped and listed afterwards.",
             )
-        }
-        // The one delete batch runs before the first file, so it gets its own bar above the files' one.
-        removalProgress?.let {
-            Spacer(modifier = Modifier.height(12.dp))
-            ReimportProgressIndicator(it)
         }
         progress?.let {
             Spacer(modifier = Modifier.height(12.dp))
