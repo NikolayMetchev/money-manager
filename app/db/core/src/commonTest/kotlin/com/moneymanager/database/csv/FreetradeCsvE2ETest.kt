@@ -149,7 +149,7 @@ class FreetradeCsvE2ETest : DbTest() {
 
     private suspend fun accounts(): List<Account> = repositories.accountRepository.getAllAccounts().first()
 
-    private suspend fun accountId(name: String): AccountId = accounts().single { it.name == name }.id
+    private suspend fun isaId(): AccountId = accounts().single { it.name == "Freetrade ISA" }.id
 
     private suspend fun transfers(): List<Transfer> =
         accounts()
@@ -189,7 +189,7 @@ class FreetradeCsvE2ETest : DbTest() {
         runDbTest {
             apply(listOf(stage(listOf(buy))))
 
-            val isa = accountId("Freetrade ISA")
+            val isa = isaId()
             val trade =
                 repositories.tradeRepository
                     .getTradesByAccount(isa)
@@ -243,7 +243,7 @@ class FreetradeCsvE2ETest : DbTest() {
             assertEquals(
                 0,
                 repositories.tradeRepository
-                    .getTradesByAccount(accountId("Freetrade ISA"))
+                    .getTradesByAccount(isaId())
                     .first()
                     .size,
             )
