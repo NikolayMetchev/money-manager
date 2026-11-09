@@ -1,12 +1,17 @@
 -- Insert source for an entity
 insertSource:
-INSERT OR IGNORE INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id, statement_account_id)
-VALUES (?, ?, ?, ?, ?, ?);
+INSERT OR IGNORE INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id)
+VALUES (?, ?, ?, ?, ?);
 
 -- Insert API-specific details for an entity source (must be called after insertSource)
 insertApiSource:
 INSERT INTO api_entity_source (id, api_session_id, api_request_id, json_path)
 VALUES (?, ?, ?, ?);
+
+-- Records the account whose statement an import's record is (must be called after insertSource)
+insertStatementAccount:
+INSERT OR IGNORE INTO entity_source_statement_account (entity_source_id, account_id)
+VALUES (?, ?);
 
 -- Insert CSV-specific details for an entity source (must be called after insertSource)
 insertCsvSource:
@@ -16,7 +21,7 @@ VALUES (?, ?, ?);
 -- An account merge moves the deleted account's statement lines to the surviving account, like its transfers
 -- (insertMergeStatementSources first, so the unmerge can move them back).
 reassignStatementAccount:
-UPDATE entity_source SET statement_account_id = :survivingAccountId WHERE statement_account_id = :deletedAccountId;
+UPDATE entity_source_statement_account SET account_id = :survivingAccountId WHERE account_id = :deletedAccountId;
 
 -- Records an import record that links to a transaction from another record (a duplicate, or an update)
 -- as a matched source of the transaction's current revision. Transfers and trades share one id space, so whichever

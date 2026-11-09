@@ -64,6 +64,7 @@ private val EXCLUDED_FROM_AUDIT =
         "source_type",
         "entity_source",
         "csv_entity_source",
+        "entity_source_statement_account",
         "entity_type",
         "api_entity_source",
         "platform",

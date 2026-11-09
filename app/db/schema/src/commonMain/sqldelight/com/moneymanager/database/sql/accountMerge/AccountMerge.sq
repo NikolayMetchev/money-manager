@@ -57,7 +57,7 @@ CREATE TABLE account_merge_attribute (
 
 CREATE INDEX idx_account_merge_attribute_merge ON account_merge_attribute(merge_id);
 
--- The provenance rows whose statement account (entity_source.statement_account_id) the merge moved from the deleted
+-- The provenance rows whose statement account (entity_source_statement_account.account_id) the merge moved from the deleted
 -- account to the survivor, so unmerge gives the restored account back exactly its own statement lines and leaves the
 -- survivor's alone.
 CREATE TABLE account_merge_statement_source (

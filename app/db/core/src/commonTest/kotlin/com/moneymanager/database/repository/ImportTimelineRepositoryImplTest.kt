@@ -154,7 +154,6 @@ class ImportTimelineRepositoryImplTest : DbTest() {
                 revision_id = transfer.revisionId + 1,
                 source_type_id = 3,
                 device_id = repositories.deviceId.id,
-                statement_account_id = null,
             )
             val reimportSource =
                 repositories.transferSourceRepository.getSourceByRevision(
@@ -253,7 +252,6 @@ class ImportTimelineRepositoryImplTest : DbTest() {
                 revision_id = imported.revisionId + 1,
                 source_type_id = 1,
                 device_id = repositories.deviceId.id,
-                statement_account_id = null,
             )
 
             val manual = repositories.importTimelineRepository.getManualDateRange().first()

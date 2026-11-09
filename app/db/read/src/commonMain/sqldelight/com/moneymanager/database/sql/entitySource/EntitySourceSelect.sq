@@ -28,13 +28,13 @@ WHERE csv_entity_source.csv_import_id = ?
 
 -- The account whose statement (or API feed) each of the given transfers came from: their creating records' own accounts.
 selectStatementAccountsOfTransfers:
-SELECT entity_source.entity_id, entity_source.statement_account_id
+SELECT entity_source.entity_id, entity_source_statement_account.account_id
 FROM entity_source
+CROSS JOIN entity_source_statement_account ON entity_source_statement_account.entity_source_id = entity_source.id
 WHERE entity_source.entity_id IN ?
   AND entity_source.entity_type_id = 7
   AND entity_source.revision_id = 1
-  AND entity_source.matched = 0
-  AND entity_source.statement_account_id IS NOT NULL;
+  AND entity_source.matched = 0;
 
 -- Trades (entity_type_id = 11) created by the given CSV import, still-existing only — see
 -- selectTransferIdsCreatedByCsvImport.

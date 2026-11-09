@@ -127,7 +127,7 @@ class CsvImportReadRepositoryImpl(
                     entitySourceSelectQueries
                         .selectStatementAccountsOfTransfers(chunk)
                         .awaitAsList()
-                        .map { TransferId(it.entity_id) to AccountId(requireNotNull(it.statement_account_id)) }
+                        .map { TransferId(it.entity_id) to AccountId(it.account_id) }
                 }.toMap()
         }
 

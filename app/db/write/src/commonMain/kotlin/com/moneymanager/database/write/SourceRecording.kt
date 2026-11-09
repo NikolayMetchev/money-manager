@@ -33,8 +33,14 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
         revision_id = revisionId,
         source_type_id = source.toSourceType().id.toLong(),
         device_id = deviceId.id,
-        statement_account_id = source.statementAccountId?.id,
     )
+    source.statementAccountId?.let { account ->
+        val entitySource = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).awaitAsOne()
+        // Only when this revision's source is this import (INSERT OR IGNORE above keeps an earlier writer's row).
+        if (entitySource.source_type_id == source.toSourceType().id.toLong()) {
+            entitySourceWriteQueries.insertStatementAccount(entitySource.id, account.id)
+        }
+    }
 
     when (source) {
         // Record the import detail row so the import id (and thus the audit trail's link back to the

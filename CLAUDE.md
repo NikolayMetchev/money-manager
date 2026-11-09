@@ -493,7 +493,7 @@ Fees, pass-through chain legs and shadow accounts are never candidates (`selectO
 an account the batch itself books, a record of the same source, or a record another row already reconciled against. The
 identified record must hold its own account where the placeholder stands in (`ownEndsMeet`): a bank line `Santander -> Marcus`
 is never PayPal's withdrawal to an unknown bank, whatever the amounts and times say. Every import records each transfer's own
-account, its statement account (`ImportTransfer.statementAccount`, stored in `entity_source.statement_account_id`; a merge
+account, its statement account (`ImportTransfer.statementAccount`, stored in `entity_source_statement_account`; a merge
 moves it to the survivor and `account_merge_statement_source` lets the unmerge move it back), and a record with none is
 never a candidate.
 
