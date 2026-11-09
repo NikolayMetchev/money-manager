@@ -111,6 +111,7 @@ import com.moneymanager.tasks.formatElapsedTime
 import com.moneymanager.tasks.isRunning
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.tasks.LocalTaskManager
 import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.displayDate
@@ -120,6 +121,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -169,8 +172,8 @@ fun ApiSessionsScreen(
     var transactionsBlockReasonByCredential by remember { mutableStateOf<Map<ApiCredentialId, String>>(emptyMap()) }
     var strategies by remember { mutableStateOf<List<ApiImportStrategy>>(emptyList()) }
     var strategyIdByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiImportStrategyId?>>(emptyMap()) }
-    var selectedStrategyId by remember { mutableStateOf<ApiImportStrategyId?>(null) }
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedStrategyId by rememberPersistedState("apiSessions.strategy", ApiImportStrategyId.serializer().nullable) { null }
+    var selectedTab by rememberPersistedState("apiSessions.tab", Int.serializer()) { 0 }
     var isLoading by remember { mutableStateOf(true) }
     // Per-session import state
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportResult>>(emptyMap()) }

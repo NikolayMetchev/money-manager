@@ -70,6 +70,7 @@ import com.moneymanager.ui.components.DefaultCurrencyInitDialog
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalDeviceId
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.navigation.NavigationHistory
 import com.moneymanager.ui.navigation.Screen
@@ -149,6 +150,7 @@ fun MoneyManagerApp(
         val importDirectoryService = sessionImports.directories
         val apiImportService = sessionImports.apis
         val backStack = rememberNavBackStack(ScreenSavedStateConfiguration, Screen.Accounts())
+        var lastImportTab by rememberPersistedState("imports.tab", ImportTab.serializer()) { ImportTab.FILES }
         val navigationHistory = remember(backStack) { NavigationHistory(backStack) }
         val currentScreen = navigationHistory.currentScreen
         var showTransactionDialog by remember { mutableStateOf(false) }
@@ -330,7 +332,7 @@ fun MoneyManagerApp(
 
                                                 is Screen.Imports -> currentScreen.tab
 
-                                                else -> ImportTab.FILES
+                                                else -> lastImportTab
                                             },
                                         ),
                                     )
@@ -631,6 +633,7 @@ fun MoneyManagerApp(
                                             ImportsScreen(
                                                 selectedTab = screen.tab,
                                                 onTabSelected = { tab ->
+                                                    lastImportTab = tab
                                                     navigationHistory.replaceCurrentScreen(Screen.Imports(tab))
                                                 },
                                                 importDirectoryRepository = services.imports.importDirectoryRepository,

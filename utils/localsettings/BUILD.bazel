@@ -28,6 +28,7 @@ kmp_library(
         "//utils/files",
         "@maven_kmp//:atomicfu",
         "@maven_kmp//:kermit",
+        "@maven_kmp//:kotlinx_serialization_core",
         "@maven_kmp//:kotlinx_serialization_json",
     ],
 )
@@ -48,9 +49,13 @@ kmp_test(
         "macosArm64",
         "mingwX64",
     ],
+    plugins = ["serialization"],
     web_targets = [
         "wasmJs",
         "js",
     ],
-    deps = ["//bazel/kmp/deps:kotlin_test"],
+    deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:kotlinx_serialization_core",
+    ],
 )

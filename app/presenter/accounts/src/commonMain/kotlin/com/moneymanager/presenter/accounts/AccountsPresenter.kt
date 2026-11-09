@@ -18,6 +18,7 @@ import com.moneymanager.query.AssetRef
 import com.moneymanager.query.NameMatch
 import com.moneymanager.query.OwnerRef
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.Serializable
 
 /** The filters the person has set on the accounts list. An empty owner or asset set means "any". */
 data class AccountsFilter(
@@ -25,6 +26,20 @@ data class AccountsFilter(
     val nameIsRegex: Boolean = false,
     val ownerIds: Set<PersonId> = emptySet(),
     val assetIds: Set<AssetId> = emptySet(),
+    val includeShadow: Boolean = false,
+    val nonZeroOnly: Boolean = false,
+)
+
+/**
+ * [AccountsFilter] in the form a front end stores between visits. Assets are raw ids because [AssetId] is an
+ * interface; [presentAccounts] resolves them against the assets that exist once the accounts have loaded.
+ */
+@Serializable
+data class SavedAccountsFilter(
+    val nameText: String = "",
+    val nameIsRegex: Boolean = false,
+    val ownerIds: Set<Long> = emptySet(),
+    val assetIds: Set<Long> = emptySet(),
     val includeShadow: Boolean = false,
     val nonZeroOnly: Boolean = false,
 )
@@ -86,10 +101,15 @@ data class AccountsModel(
  * locally, so changing a filter never re-subscribes.
  */
 @Composable
-fun presentAccounts(snapshots: Flow<AccountSnapshot>): AccountsModel {
+fun presentAccounts(
+    snapshots: Flow<AccountSnapshot>,
+    initial: SavedAccountsFilter = SavedAccountsFilter(),
+    onFilterChange: (SavedAccountsFilter) -> Unit = {},
+): AccountsModel {
     val snapshot by snapshots.collectAsStateWithSchemaErrorHandling(initial = null)
     // One state value, so a model never pairs a new name with the previous name's match.
-    var state by remember { mutableStateOf(FilterState()) }
+    var state by remember { mutableStateOf(FilterState.restored(initial)) }
+    var pendingAssetIds by remember { mutableStateOf(initial.assetIds) }
 
     val current = snapshot ?: EMPTY
 
@@ -100,8 +120,15 @@ fun presentAccounts(snapshots: Flow<AccountSnapshot>): AccountsModel {
     }
     val availableAssetIds = current.availableAssets.mapTo(mutableSetOf()) { it.id }
     LaunchedEffect(availableAssetIds) {
+        if (snapshot != null && pendingAssetIds.isNotEmpty()) {
+            val restored = current.availableAssets.map { it.id }.filter { it.id in pendingAssetIds }
+            pendingAssetIds = emptySet()
+            state = state.copy(filter = state.filter.copy(assetIds = state.filter.assetIds + restored))
+        }
         state = state.copy(filter = state.filter.copy(assetIds = state.filter.assetIds intersect availableAssetIds))
     }
+
+    LaunchedEffect(state.filter, pendingAssetIds) { onFilterChange(state.filter.saved(pendingAssetIds)) }
 
     val displayed =
         remember(current, state) {
@@ -161,6 +188,23 @@ private data class FilterState(
     val nameMatch: NameMatch? = null,
     val nameError: String? = null,
 ) {
+    companion object {
+        fun restored(saved: SavedAccountsFilter): FilterState {
+            val filter =
+                AccountsFilter(
+                    nameText = saved.nameText,
+                    nameIsRegex = saved.nameIsRegex,
+                    ownerIds = saved.ownerIds.mapTo(mutableSetOf()) { PersonId(it) },
+                    includeShadow = saved.includeShadow,
+                    nonZeroOnly = saved.nonZeroOnly,
+                )
+            return parseName(filter).fold(
+                onSuccess = { FilterState(filter, it) },
+                onFailure = { FilterState(filter, nameError = it.message ?: "Invalid regular expression") },
+            )
+        }
+    }
+
     fun on(event: AccountsEvent): FilterState {
         val next =
             when (event) {
@@ -178,6 +222,16 @@ private data class FilterState(
         )
     }
 }
+
+private fun AccountsFilter.saved(pendingAssetIds: Set<Long>) =
+    SavedAccountsFilter(
+        nameText = nameText,
+        nameIsRegex = nameIsRegex,
+        ownerIds = ownerIds.mapTo(mutableSetOf()) { it.id },
+        assetIds = assetIds.mapTo(mutableSetOf()) { it.id } + pendingAssetIds,
+        includeShadow = includeShadow,
+        nonZeroOnly = nonZeroOnly,
+    )
 
 private val EMPTY = AccountSnapshot(accounts = emptyList(), people = emptyList())
 

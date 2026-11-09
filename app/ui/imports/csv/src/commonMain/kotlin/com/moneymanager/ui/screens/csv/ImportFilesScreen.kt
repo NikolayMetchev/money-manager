@@ -69,6 +69,7 @@ import com.moneymanager.ui.components.imports.stagedImportDirectoryOptions
 import com.moneymanager.ui.components.imports.stagedImportKinds
 import com.moneymanager.ui.components.imports.stagedImportPath
 import com.moneymanager.ui.components.imports.stagedImportStrategyOptions
+import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.tasks.LocalTaskManager
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -127,7 +128,7 @@ fun ImportFilesScreen(
     var isImporting by remember { mutableStateOf(false) }
     var importMessage by remember { mutableStateOf<String?>(null) }
     var importMessageIsError by remember { mutableStateOf(false) }
-    var filter by remember { mutableStateOf(StagedImportFilter()) }
+    var filter by rememberPersistedState("importFiles.filter", StagedImportFilter.serializer()) { StagedImportFilter() }
     val taskManager = LocalTaskManager.current
     val tasks by taskManager.tasks.collectAsState()
     // Null until the person opens or closes it or starts a download: then open only while there are no files yet.

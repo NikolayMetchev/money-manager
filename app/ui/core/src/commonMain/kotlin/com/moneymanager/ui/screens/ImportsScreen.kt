@@ -49,6 +49,7 @@ import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.importfilesource.DriveFolderBrowser
+import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.screens.accountmapping.AccountMappingsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiSessionsScreen
@@ -61,6 +62,8 @@ import com.moneymanager.ui.screens.reconciliation.ReconciliationScreen
 import com.moneymanager.ui.screens.timeline.ImportTimelineScreen
 import com.moneymanager.ui.screens.transactions.ManualEntriesScreen
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.serializer
 
 @Composable
 fun ImportsScreen(
@@ -276,6 +279,7 @@ fun ImportsScreen(
     }
 }
 
+@Serializable
 private enum class ReconciliationSubTab(
     val label: String,
 ) {
@@ -295,7 +299,10 @@ private fun ReconciliationImportsTab(
     manualEntries: @Composable () -> Unit,
     cards: @Composable () -> Unit,
 ) {
-    var subTab by remember { mutableStateOf(ReconciliationSubTab.EXTERNAL) }
+    var subTab by rememberPersistedState(
+        "imports.reconciliationSubTab",
+        ReconciliationSubTab.serializer(),
+    ) { ReconciliationSubTab.EXTERNAL }
     Column(modifier = Modifier.fillMaxSize()) {
         SecondaryTabRow(selectedTabIndex = subTab.ordinal) {
             ReconciliationSubTab.entries.forEach { entry ->
@@ -323,7 +330,7 @@ private fun MiscImportsTab(
     importEngine: ImportEngine,
     onBrowsePassThroughCatalog: () -> Unit,
 ) {
-    var subTab by remember { mutableStateOf(0) }
+    var subTab by rememberPersistedState("imports.miscSubTab", Int.serializer()) { 0 }
     Column(modifier = Modifier.fillMaxSize()) {
         SecondaryTabRow(selectedTabIndex = subTab) {
             Tab(selected = subTab == 0, onClick = { subTab = 0 }, text = { Text("Pass-through") })

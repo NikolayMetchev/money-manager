@@ -38,7 +38,9 @@ import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandli
 import com.moneymanager.ui.components.CreateCryptoDialog
 import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.foundation.rememberPersistedState
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.serializer
 
 /**
  * The Assets screen: two tabs, Currencies (fiat) and Crypto, each listing the relevant assets and
@@ -53,7 +55,7 @@ fun AssetsScreen(
     appVersion: AppVersion,
     onCurrencyAuditClick: (Currency) -> Unit = {},
 ) {
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by rememberPersistedState("assets.tab", Int.serializer()) { 0 }
     val currencies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         currencyRepository.getAllCurrencies()
     }
