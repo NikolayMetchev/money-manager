@@ -212,7 +212,8 @@ class Reimports(
         // dispatcher (a dialog's is the UI thread); the hand edits across them all are then loaded in one go.
         val progressLock = Mutex()
         var filesRead = 0
-        val ids = closure + files.map { it.id }.filterNot { it in closure }
+        // The caller's files first: files imported at the same instant keep the order they were given.
+        val ids = files.map { it.id } + closure.filterNot { it in selected }
         val count = ids.size
         val fileReads =
             withContext(Dispatchers.Default) {
