@@ -1409,6 +1409,8 @@ object BuiltInCsvStrategies {
         // First-match-wins rules over the Payee field; ${cp} extracts the clean counterparty name.
         // Tuned against a full Santander statement history (~7k records, ~99.9% parsed). The middle
         // rules use ".*?\bTO/\bFROM" to skip "VIA FASTER PAYMENT" / "REF.<x>" preludes that vary per row.
+        // A pended payment to someone is theirs; any other PENDED narrative is an account fee.
+        val pendedPayment = "PENDED\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|,)"
         val counterparties =
             arrayOf(
                 // Cashback summary lines ("1 Direct Debit Payment for Water at 1,00% Cashback, 0.36").
@@ -1477,7 +1479,7 @@ object BuiltInCsvStrategies {
                 ),
                 naming(
                     QifColumns.COL_PAYEE,
-                    pattern = "^PENDED\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|,)",
+                    pattern = "^$pendedPayment",
                     name = "$1",
                     fallbackName = "Santander Pended Payment",
                     person = true,
@@ -1617,7 +1619,7 @@ object BuiltInCsvStrategies {
                     wholeFeeWhen(
                         QifColumns.COL_AMOUNT,
                         QifColumns.COL_PAYEE,
-                        "^(MONTHLY ACCOUNT FEE|MAINTAINING THE ACCOUNT|UNARRANGED|NON-STERLING|PENDED|PENDING)\\b",
+                        "^(?!$pendedPayment)(MONTHLY ACCOUNT FEE|MAINTAINING THE ACCOUNT|UNARRANGED|NON-STERLING|PENDED|PENDING)\\b",
                     ),
                     accounts(
                         AccountSide.TARGET,

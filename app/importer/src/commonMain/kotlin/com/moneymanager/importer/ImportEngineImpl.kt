@@ -1005,7 +1005,8 @@ class ImportEngineImpl(
     /**
      * The fee account of an [AccountMatchKey.FeeAccountOf] intent's account: the one tagged as its fee account, else a new one
      * named "<account> Fees". Only the tag finds it: an untagged account of that name is not a fee account, and the new one
-     * takes a suffixed name beside it. [nameById] holds every account the batch can see, those it created included.
+     * takes a suffixed name beside it. A shadow account's new fee account is a shadow account of the same source. [nameById]
+     * holds every account the batch can see, those it created included.
      */
     private suspend fun resolveFeeAccount(
         intent: ImportAccountIntent,
@@ -1022,7 +1023,17 @@ class ImportEngineImpl(
         val tag = NewAttribute(FEE_ACCOUNT_FOR_TYPE, owner.id.toString())
         byAttr[tag.typeId to tag.value]?.let { return ResolvedFeeAccount(it, created = false) }
         val desired = "${requireNotNull(nameById[owner]) { "Fee account of unknown account $owner" }} Fees"
-        val named = intent.copy(name = desired, attributes = intent.attributes + tag)
+        // A shadow account's fee account belongs to the same reconciliation source, whichever batch creates it.
+        val shadowType = AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID)
+        val shadowTag =
+            if (intent.attributes.any { it.typeId == shadowType }) {
+                null
+            } else {
+                accountAttributeRepository.getByAccount(owner).first().firstOrNull { it.attributeType.id == shadowType }?.let {
+                    NewAttribute(shadowType, it.value)
+                }
+            }
+        val named = intent.copy(name = desired, attributes = intent.attributes + tag + listOfNotNull(shadowTag))
         val resolvedName = uniqueName(desired, named, byName)
         val id = createAccount(named, resolvedName)
         byName[resolvedName] = id

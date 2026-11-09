@@ -130,6 +130,19 @@ class SantanderQifMapperTest {
     }
 
     @Test
+    fun `a pended payment to someone goes to them - not to the fee account`() {
+        val r = map("PENDED PAYMENT TO JOHN SMITH, 12.00GBP", "-12.00")
+        assertEquals("JOHN SMITH", newTargetName(r))
+        assertEquals("JOHN SMITH", r.personalCounterpartyName)
+    }
+
+    @Test
+    fun `any other pended narrative is an account fee`() {
+        val r = map("PENDED CHARGE, 3.00GBP", "-3.00")
+        assertEquals(OWN_FEE_ACCOUNT_ID, r.transfer.targetAccountId)
+    }
+
+    @Test
     fun `description is cleaned of the trailing amount`() {
         val r = map("FASTER PAYMENTS RECEIPT REF.OLGA FROM ZAKHARENKO O, 250.00", "250.00")
         assertEquals("FASTER PAYMENTS RECEIPT REF.OLGA FROM ZAKHARENKO O", r.transfer.description)

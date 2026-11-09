@@ -2,6 +2,7 @@ package com.moneymanager.database.repository
 
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
@@ -108,6 +109,26 @@ class ManualFeeTest : DbTest() {
 
             assertEquals("Wise GBP Fees", gbpFee.name)
             assertEquals("Wise EUR Fees", eurFee.name)
+        }
+
+    @Test
+    fun `the fee account of a shadow account belongs to the same reconciliation source`() =
+        runDbTest {
+            val wallet = account("Koinly · Binance")
+            val shadowType = AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID)
+            repositories.accountAttributeRepository.insertInCreationMode(wallet, shadowType, "Koinly")
+
+            val fee = repositories.importEngine.createManualFee(wallet, Money.fromDisplayValue("0.30", euro()), now)
+
+            val feeAccount = feeAccountOf(fee)
+            assertEquals(
+                "Koinly",
+                repositories.accountAttributeRepository
+                    .getByAccount(feeAccount.id)
+                    .first()
+                    .single { it.attributeType.id == shadowType }
+                    .value,
+            )
         }
 
     @Test
