@@ -20,6 +20,7 @@ import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.RerunBlockedException
 import com.moneymanager.importengineapi.applyCsvImportMutations
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.getOrCreateAttributeType
@@ -34,6 +35,7 @@ import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -284,7 +286,7 @@ class SourceRerunE2ETest : DbTest() {
         }
 
     @Test
-    fun reimport_asksForTheAccountAnotherFileDidNotRecord() =
+    fun reimport_refusesBeforeDeleting_whenAFileItTakesAlongCanNotBeReimported() =
         runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val monzo = createMonzoAccount()
@@ -309,15 +311,22 @@ class SourceRerunE2ETest : DbTest() {
                 ),
             )
 
+            val secondRowBefore = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0).first()
             val reimports = repositories.reimports(maintenance)
             val plan = reimports.planFile(first.id)
             assertTrue(plan.needsAccount, "the dialog asks which account the other file's row moves money on")
-            val result = reimports.runPlan(plan, accountId = monzo)
+            val refused = assertFailsWith<RerunBlockedException> { reimports.runPlan(plan) }
 
-            assertEquals(1, result.cascadedFiles)
-            assertEquals(0, result.cascadedFilesNotRerun)
+            assertEquals(listOf("MonzoDataExport-later.csv (nothing says which account it imports onto)"), refused.files)
             val secondRow = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0).first()
-            assertEquals(createdBy(first.id, row = 0).id, secondRow.transferId, "the other file's row points at the replacement")
+            assertEquals(secondRowBefore.transferId, secondRow.transferId, "nothing was deleted")
+            assertNotNull(secondRow.transferId)
+
+            // Given the account, as the dialog asks for it, the other file is re-imported too.
+            val result = reimports.runPlan(reimports.planFile(first.id), accountId = monzo)
+            assertEquals(1, result.cascadedFiles)
+            val relinked = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0).first()
+            assertEquals(createdBy(first.id, row = 0).id, relinked.transferId, "the other file's row points at the replacement")
         }
 
     @Test

@@ -82,10 +82,19 @@ fun interface CascadeRerunner {
     /**
      * Called before the re-import deletes anything, while each file still reads as it was imported; the
      * returned function imports [files] again, in order, after the source's own re-run, and returns the files
-     * it couldn't (their strategy, account or currency is unknown, or their run failed).
+     * it couldn't (their run failed). A file that can't be re-imported at all (its strategy, account or currency is
+     * unknown) throws [RerunBlockedException] here, before anything is deleted.
      */
     suspend fun prepare(files: List<Source>): suspend (onProgress: (suspend (Progress) -> Unit)?) -> Set<Source>
 }
+
+/**
+ * A re-import refused before it deleted anything, because these files it would take along can't be imported again: each
+ * of [files] is a file name and why (its strategy is gone, or nothing says which account or currency it imports with).
+ */
+class RerunBlockedException(
+    val files: List<String>,
+) : IllegalStateException("Can't re-import ${files.joinToString()}, so nothing was re-imported")
 
 /** The values of a transfer that a person can edit by hand. */
 data class TransferValues(
@@ -258,8 +267,8 @@ data class SourceRerunResult<R>(
     /** Other files re-imported whole along with the source ([SourceRerunPlan.cascade]). */
     val cascaded: List<Source>,
     /**
-     * Files of the cascade whose transactions were deleted but that couldn't be imported again (their
-     * strategy, account or currency is unknown, or their run failed). Import-all skips an applied file, so
+     * Files of the cascade whose transactions were deleted but whose run failed. (A file that couldn't run at all stops the
+     * re-import before it deletes anything: [RerunBlockedException].) Import-all skips an applied file, so
      * they wait for that file's re-import.
      */
     val notRerun: List<Source>,

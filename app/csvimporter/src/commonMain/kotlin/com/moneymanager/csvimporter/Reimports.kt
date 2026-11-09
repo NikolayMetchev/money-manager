@@ -21,6 +21,7 @@ import com.moneymanager.importengineapi.CascadeRerunner
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ManualEdit
+import com.moneymanager.importengineapi.RerunBlockedException
 import com.moneymanager.importengineapi.RerunFile
 import com.moneymanager.importengineapi.RerunLinks
 import com.moneymanager.importengineapi.RerunReads
@@ -216,6 +217,12 @@ class Reimports(
         stopRequested: () -> Boolean,
     ): BulkReimportResult {
         val run = plan.files.filter { file -> plan.rerunFiles.any { it.file == file.source } }
+        refuseUnrunnable(
+            run.map { file ->
+                val imported = plan.imported.getValue(file.source)
+                Triple(file, plan.strategies[file.source], ImportedSettings(imported.accountId ?: accountId, imported.currencyId ?: currencyId))
+            },
+        )
         val skipped = plan.files.count { it.rowCount > 0 && plan.strategies[it.source] == null && it !in run }
         val rerun = mutableSetOf<Source>()
         val reimported = mutableSetOf<Source>()
@@ -305,23 +312,22 @@ class Reimports(
 
     /** Imports the [files] a re-import cascaded into again, whole and in order, each as it was last imported. */
     override suspend fun prepare(files: List<Source>): suspend (onProgress: (suspend (Progress) -> Unit)?) -> Set<Source> {
-        val imports = files.mapNotNull { file -> (file as? Source.Csv)?.let { reads.csvImportRepository.getImport(it.importId).first() } }
+        val strategies = csvImportStrategyRepository.getAllStrategies().first()
+        val imports =
+            files.mapNotNull { file -> (file as? Source.Csv)?.let { reads.csvImportRepository.getImport(it.importId).first() } }.map { file ->
+                file to strategyFor(file, strategies)
+            }
+        // Nobody is asked about a file taken along, so one that can't run stops the re-import before it deletes anything.
+        refuseUnrunnable(imports.map { (file, strategy) -> Triple(file, strategy, file.importedSettings) })
         return { onProgress ->
-            val strategies = csvImportStrategyRepository.getAllStrategies().first()
             val currencies = currencies()
             val notRerun = files.toMutableSet()
-            imports.forEach { file ->
+            imports.forEach { (file, strategy) ->
                 // One file failing leaves it to its next import rather than failing the re-import that took it
                 // along, whose own work is already done.
                 try {
-                    val strategy = strategyFor(file, strategies)
-                    val fileSettings = file.importedSettings
-                    // Without the account or currency nobody is asked here, so the file waits for its next import.
-                    if (strategy != null &&
-                        !(strategy.needsSourceAccountOverride() && fileSettings.accountId == null) &&
-                        !(strategy.needsCurrencyOverride() && fileSettings.currencyId == null)
-                    ) {
-                        runStaged(file, strategy, fileSettings, currencies, onProgress)
+                    if (strategy != null) {
+                        runStaged(file, strategy, file.importedSettings, currencies, onProgress)
                         notRerun -= file.source
                     }
                 } catch (expected: CancellationException) {
@@ -332,6 +338,25 @@ class Reimports(
             }
             notRerun
         }
+    }
+
+    /**
+     * Throws [RerunBlockedException], naming each file and why, when some file of [files] (a file, its strategy and the
+     * settings it would run with) was imported but can't be imported again: its transactions would be deleted and
+     * nothing would put them back.
+     */
+    private fun refuseUnrunnable(files: List<Triple<CsvImport, CsvImportStrategy?, ImportedSettings>>) {
+        val blocked =
+            files.mapNotNull { (file, strategy, settings) ->
+                when {
+                    file.lastAppliedAt == null -> null
+                    strategy == null -> "its strategy no longer exists"
+                    strategy.needsSourceAccountOverride() && settings.accountId == null -> "nothing says which account it imports onto"
+                    strategy.needsCurrencyOverride() && settings.currencyId == null -> "nothing says which currency it imports in"
+                    else -> null
+                }?.let { reason -> "${file.originalFileName} ($reason)" }
+            }
+        if (blocked.isNotEmpty()) throw RerunBlockedException(blocked)
     }
 
     // A listed import may lack what strategy selection reads (getAllImports() doesn't populate columns).
