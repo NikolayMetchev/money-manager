@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
 import com.moneymanager.csvimporter.BulkReimportResult
@@ -53,148 +54,15 @@ data class ReimportPickerRepositories(
 )
 
 /**
- * Re-imports one staged [file] (CSV, QIF, Excel or PDF) so strategy and mapping changes take effect retroactively: shows
- * what it created, the other files' records matched against that and the hand edits it will put back,
- * then (on confirm) deletes it all and imports the file again ([Reimports.reimport]). The account and
- * currency come from what the file created; the person picks them only when it created nothing.
- */
-@Suppress("LongMethod", "CyclomaticComplexMethod")
-@Composable
-fun ReimportDialog(
-    file: CsvImport,
-    reimports: Reimports,
-    pickers: ReimportPickerRepositories,
-    onDismiss: () -> Unit,
-    onComplete: (SourceRerunResult<CsvImportResult?>) -> Unit,
-) {
-    val scope = rememberSchemaAwareCoroutineScope()
-    val accountName = rememberAccountNamer(pickers.accountRepository)
-
-    var plan by remember { mutableStateOf<FileReimportPlan?>(null) }
-    var accountId by remember { mutableStateOf<AccountId?>(null) }
-    var currencyId by remember { mutableStateOf<CurrencyId?>(null) }
-    var isRunning by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var executeProgress by remember { mutableStateOf<Progress?>(null) }
-    var planProgress by remember { mutableStateOf<Progress?>(null) }
-
-    LaunchedEffect(file.source) {
-        try {
-            plan = reimports.plan(file, onProgress = { planProgress = it })
-        } catch (expected: CancellationException) {
-            throw expected
-        } catch (expected: Exception) {
-            logger.e(expected) { "Re-import preview failed: ${expected.message}" }
-            errorMessage = "Failed to prepare re-import: ${expected.message}"
-        }
-    }
-
-    val ready = plan?.let { (!it.needsAccount || accountId != null) && (!it.needsCurrency || currencyId != null) } == true
-
-    AlertDialog(
-        onDismissRequest = { if (!isRunning) onDismiss() },
-        title = { Text("Re-import ${file.originalFileName}") },
-        text = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-            ) {
-                val currentPlan = plan
-                when {
-                    currentPlan == null -> {
-                        if (errorMessage == null) ReimportProgressIndicator(planProgress ?: Progress(PREPARING_REIMPORT))
-                    }
-
-                    currentPlan.strategy == null -> {
-                        Text(
-                            text = "No strategy matches this import. Create or restore a matching strategy first.",
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-
-                    else -> {
-                        Text(
-                            text = "Strategy: ${currentPlan.strategy?.name}",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        ReimportSettingsPickers(
-                            needsAccount = currentPlan.needsAccount,
-                            needsCurrency = currentPlan.needsCurrency,
-                            accountId = accountId,
-                            onAccountSelected = { accountId = it },
-                            currencyId = currencyId,
-                            onCurrencySelected = { currencyId = it },
-                            pickers = pickers,
-                            enabled = !isRunning,
-                        )
-                        if (isRunning) {
-                            ReimportProgressIndicator(executeProgress ?: Progress("Starting re-import"))
-                            Spacer(modifier = Modifier.height(12.dp))
-                        }
-                        SourceRerunPreview(currentPlan.rerun, recordNoun = "record", accountName = accountName)
-                    }
-                }
-
-                errorMessage?.let {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            LoadingTextButton(
-                onClick = {
-                    val currentPlan = plan ?: return@LoadingTextButton
-                    isRunning = true
-                    errorMessage = null
-                    scope.launch {
-                        try {
-                            onComplete(reimports.reimport(currentPlan, accountId, currencyId, onProgress = { executeProgress = it }))
-                        } catch (expected: CancellationException) {
-                            throw expected
-                        } catch (expected: Exception) {
-                            logger.e(expected) { "Re-import failed: ${expected.message}" }
-                            errorMessage = "Re-import failed: ${expected.message}"
-                            isRunning = false
-                        } finally {
-                            executeProgress = null
-                        }
-                    }
-                },
-                enabled = !isRunning && plan?.strategy != null && ready,
-                loading = isRunning,
-                label = "Re-import",
-                loadingIndicatorModifier = Modifier.padding(end = 8.dp),
-                showLabelWhenLoading = true,
-            )
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isRunning,
-            ) {
-                Text("Cancel")
-            }
-        },
-    )
-}
-
-/**
- * Re-imports every staged file in [files] in one go, each as [ReimportDialog] would, with one
- * confirm and an aggregated summary. Each file keeps the strategy, account and currency it was
- * imported with; the shared pickers only appear for files that created nothing to read them from.
+ * Re-imports the staged [files] (CSV, QIF, Excel or PDF; one or many, the same dialog either way) so strategy and mapping
+ * changes take effect retroactively: what they created is deleted and they are imported again, together with every other
+ * file that depends on what they created ([Reimports.planAll]), and the hand edits are put back. Each file keeps the strategy,
+ * account and currency it was imported with; the pickers only appear for files that created nothing to read them from.
  * Progress names each file by [fileLabel], and Cancel stops the run once the file under way is done.
  */
 @Suppress("LongMethod")
 @Composable
-fun ReimportAllDialog(
+fun ReimportDialog(
     files: List<CsvImport>,
     reimports: Reimports,
     pickers: ReimportPickerRepositories,
@@ -230,12 +98,13 @@ fun ReimportAllDialog(
     val ready = plan?.let { (!it.needsAccount || accountId != null) && (!it.needsCurrency || currencyId != null) } == true
 
     BulkImportDialogScaffold(
-        pendingTitle = "Re-import all imported files",
+        pendingTitle = files.singleOrNull()?.let { "Re-import ${fileLabel(it)}" } ?: "Re-import ${files.size} files",
         completeTitle = "Re-import complete",
         result = result,
         isRunning = isRunning,
-        confirmLabel = "Re-import ${files.size} file${if (files.size == 1) "" else "s"}",
-        confirmEnabled = ready,
+        confirmLabel = (plan?.rerunFiles?.size ?: files.size).let { "Re-import $it file${if (it == 1) "" else "s"}" },
+        // A file with no strategy is skipped, so a run of nothing but such files has nothing to do.
+        confirmEnabled = ready && plan?.rerunFiles?.isNotEmpty() == true,
         onRun = {
             val planned = plan ?: return@BulkImportDialogScaffold
             isRunning = true
@@ -274,8 +143,8 @@ fun ReimportAllDialog(
     ) {
         Text(
             text =
-                "Deletes what the ${files.size} imported file${if (files.size == 1) "" else "s"} created and " +
-                    "imports them again with the current strategies and account mappings.",
+                "Deletes what ${if (files.size == 1) "the file" else "the ${files.size} files"} created and imports " +
+                    "${if (files.size == 1) "it" else "them"} again with the current strategies and account mappings.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -285,12 +154,28 @@ fun ReimportAllDialog(
             ReimportProgressIndicator(planProgress ?: Progress(PREPARING_REIMPORT))
         }
         plan?.let { planned ->
+            files.singleOrNull()?.let { file ->
+                Text(
+                    text =
+                        planned.strategies[file.source]?.let { "Strategy: ${it.name}" }
+                            ?: "No strategy matches this import. Create or restore a matching strategy first.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (planned.strategies[file.source] == null) MaterialTheme.colorScheme.error else Color.Unspecified,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+            val deleted = planned.rerunFiles.sumOf { it.createdTransfers.size }
+            Text(
+                text = "Deletes the $deleted transaction${if (deleted == 1) "" else "s"} they created.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
             if (planned.cascaded.isNotEmpty()) {
                 val count = planned.cascaded.size
                 Text(
                     text =
-                        "$count other file${if (count == 1) "" else "s"} depend${if (count == 1) "s" else ""} on these " +
-                            "and will be re-imported too.",
+                        "$count other file${if (count == 1) "" else "s"} depend${if (count == 1) "s" else ""} on " +
+                            "${if (files.size == 1) "it" else "these"} and will be re-imported too.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -55,7 +55,7 @@ import com.moneymanager.ui.components.imports.FolderDownload
 import com.moneymanager.ui.components.imports.ImportSectionHeader
 import com.moneymanager.ui.components.imports.ImportStatusMessage
 import com.moneymanager.ui.components.imports.ImportsScreenHeader
-import com.moneymanager.ui.components.imports.ReimportAllDialog
+import com.moneymanager.ui.components.imports.ReimportDialog
 import com.moneymanager.ui.components.imports.ReimportPickerRepositories
 import com.moneymanager.ui.components.imports.SectionAction
 import com.moneymanager.ui.components.imports.StagedImportCard
@@ -209,7 +209,7 @@ fun ImportFilesScreen(
             }
 
             reimportAllScope?.let { scopedImported ->
-                ReimportAllDialog(
+                ReimportDialog(
                     files = scopedImported,
                     reimports = importDirectoryService.reimports,
                     pickers = ReimportPickerRepositories(accountRepository, categoryRepository, currencyRepository, personRepository),

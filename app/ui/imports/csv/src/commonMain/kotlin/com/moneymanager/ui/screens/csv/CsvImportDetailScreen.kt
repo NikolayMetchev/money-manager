@@ -528,26 +528,12 @@ fun CsvImportDetailScreen(
     // changes apply retroactively.
     if (showReimportDialog && import != null) {
         ReimportDialog(
-            file = import!!,
+            files = listOf(import!!),
             reimports = reimports,
             pickers = ReimportPickerRepositories(accountRepository, categoryRepository, currencyRepository, personRepository),
             onDismiss = { showReimportDialog = false },
-            onComplete = { result ->
+            onComplete = {
                 showReimportDialog = false
-                val imported = result.rerun
-                importSuccessMessage = result.toSummary(imported?.successCount ?: 0)
-                importFailedRows =
-                    result.unmatchedEdits.map { edit -> "Manual edit not re-applied: ${edit.imported.description}" } +
-                    result.reappliedLinks.notReapplied.map { "Not re-applied: $it" } +
-                    imported?.failedRows.orEmpty().map { failed ->
-                        "Row ${failed.rowIndex}: ${failed.errorMessage}"
-                    }
-                failedRowIndexes =
-                    imported
-                        ?.failedRows
-                        .orEmpty()
-                        .map { it.rowIndex }
-                        .toSet()
                 rowsRefreshTrigger++
             },
         )
