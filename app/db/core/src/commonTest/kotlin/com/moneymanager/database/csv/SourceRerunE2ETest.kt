@@ -315,6 +315,9 @@ class SourceRerunE2ETest : DbTest() {
             val reimports = repositories.reimports(maintenance)
             val plan = reimports.planFile(first.id)
             assertTrue(plan.needsAccount, "the dialog asks which account the other file's row moves money on")
+            assertFailsWith<RerunBlockedException>("checked before a caller's own write") {
+                reimports.checkReimportable(plan, accountId = null, currencyId = null)
+            }
             val refused = assertFailsWith<RerunBlockedException> { reimports.runPlan(plan) }
 
             assertEquals(listOf("MonzoDataExport-later.csv (nothing says which account it imports onto)"), refused.files)
