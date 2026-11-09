@@ -377,12 +377,15 @@ class ImportDeduper(
     private val matchedExistingIds = mutableSetOf<TransferId>()
 
     /**
-     * Each existing leg some row of this batch matches exactly, with that row's index. The fuzzy pass leaves
-     * these to their own row: a statement lists two like payments days apart newest first, so the later one
-     * would otherwise take the earlier one's record before the earlier row reaches it, and the earlier row,
-     * finding its record gone, would book the payment again.
+     * Each existing leg some row of this batch matches exactly, with that row's index. The fuzzy pass and
+     * same-accounts reconciliation leave these to their own row: a statement lists two like payments days apart
+     * newest first, so the later one would otherwise take (or reconcile against) the earlier one's record before the
+     * earlier row reaches it, and the earlier row, finding its record gone, would book the payment again.
      */
     private var exactRows: Map<TransferId, Int> = emptyMap()
+
+    /** Whether existing leg [id] is not the one some other row of this batch matches exactly ([exactRows]). */
+    private fun isFreeForThisRow(id: TransferId): Boolean = exactRows[id].let { it == null || it == classifyingIndex }
 
     fun classify(transfers: List<ImportTransfer>): List<Classified> {
         exactRows = exactMatchesByRow(transfers)
@@ -1013,8 +1016,10 @@ class ImportDeduper(
             val key = DirectedAmountKey(transfer.fromAccount.requireId(), transfer.toAccount.requireId(), transfer.amount)
             val candidates =
                 reconcileCandidatesByDirectedAmount[key]
-                    ?.filter { (id, existing) -> standsForCountedMovement(id) && reconcileMatches(transfer, existing, window) }
-                    .orEmpty()
+                    ?.filter { (id, existing) ->
+                        standsForCountedMovement(id) && isFreeForThisRow(id) &&
+                            reconcileMatches(transfer, existing, window)
+                    }.orEmpty()
             val identity = transfer.identity()
             val timestamp = transfer.timestamp
             if (identity == null || timestamp == null) {
@@ -1591,7 +1596,7 @@ class ImportDeduper(
                     // An excluded leg counts nowhere, so a row dropped as its duplicate would count nowhere either —
                     // unless the leg is this same file's earlier record of the row, which keeps its exclusion.
                     existing.transferId !in matchedExistingIds &&
-                        exactRows[existing.transferId].let { it == null || it == classifyingIndex } &&
+                        isFreeForThisRow(existing.transferId) &&
                         (existing.transferId !in existingExcludedLegs || existing.transferId in ownSourceLegs) &&
                         isFuzzyDuplicate(transfer, existing.transfer, policy)
                 }?.minByOrNull { (it.transfer.timestamp - timestamp).absoluteValue }
