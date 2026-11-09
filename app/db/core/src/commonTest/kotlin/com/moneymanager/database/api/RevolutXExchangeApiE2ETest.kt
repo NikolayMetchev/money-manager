@@ -78,6 +78,8 @@ class RevolutXExchangeApiE2ETest : DbTest() {
             "receive,reward,un_stake,send,stake",
             listOf(
                 item("d-in", "receive", 1_736_000_000_000, leg("1000", "EUR", "revolut"), leg("1000", "EUR", "revolut_x")),
+                // A top-up from the Revolut app is a `send` too, into Revolut X.
+                item("d-topup", "send", 1_736_000_050_000, leg("5", "EUR", "revolut"), leg("5", "EUR", "revolut_x")),
                 item(
                     "d-out",
                     "send",
@@ -142,11 +144,11 @@ class RevolutXExchangeApiE2ETest : DbTest() {
             importApi()
 
             val balances = balances()
-            // 1000 in, -500 +250 from the trades; 0.01 bought, -0.004 sold, -0.002 sent, -0.001 staked,
+            // 1000 + 5 in, -500 +250 from the trades; 0.01 bought, -0.004 sold, -0.002 sent, -0.001 staked,
             // +0.0004 unstaked, +0.00001 rewarded. The failed buy and the reverted send are booked
             // excluded, so they change nothing; the pending send is skipped.
-            assertEquals(mapOf("EUR" to "750", "BTC" to "0.00341"), balances["Revolut X"])
-            assertEquals(mapOf("EUR" to "-1000"), balances["Revolut"])
+            assertEquals(mapOf("EUR" to "755", "BTC" to "0.00341"), balances["Revolut X"])
+            assertEquals(mapOf("EUR" to "-1005"), balances["Revolut"])
             assertEquals(mapOf("BTC" to "0.002"), balances["Revolut X Funding"])
             assertEquals(mapOf("BTC" to "0.0006"), balances["Revolut X Staking"])
             assertEquals(mapOf("BTC" to "-0.00001"), balances["Revolut X Staking Rewards"])
@@ -179,6 +181,6 @@ class RevolutXExchangeApiE2ETest : DbTest() {
                 transfers.map { it.attributes.excludedValues() }.filter { it.isNotEmpty() },
                 "only the reverted send is excluded, with its status as the reason",
             )
-            assertEquals(6, transfers.size, "the pending send is not imported")
+            assertEquals(7, transfers.size, "the pending send is not imported")
         }
 }
