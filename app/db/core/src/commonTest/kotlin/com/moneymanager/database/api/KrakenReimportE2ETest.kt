@@ -1,12 +1,14 @@
 package com.moneymanager.database.api
 
 import com.moneymanager.apiimporter.ApiImportReads
+import com.moneymanager.apiimporter.bulkReimportApiSessions
 import com.moneymanager.apiimporter.executeApiReimport
 import com.moneymanager.apiimporter.importApiSessionExchange
 import com.moneymanager.apiimporter.planApiReimport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
@@ -16,6 +18,8 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiAccountBridge
 import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
 import com.moneymanager.domain.model.rules.SettlementWindow
+import com.moneymanager.importengineapi.ensureApiCredential
+import com.moneymanager.importengineapi.markApiSessionImported
 import com.moneymanager.importengineapi.updateApiStrategy
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.reimports
@@ -69,11 +73,11 @@ class KrakenReimportE2ETest : DbTest() {
         ]}
         """.trimIndent()
 
-    private suspend fun stageAndImport(): ApiSessionId {
+    private suspend fun stageAndImport(credentialId: ApiCredentialId? = null): ApiSessionId {
         val strategy = repositories.apiImportStrategyRepository.getStrategyByName("Kraken").first()
         assertNotNull(strategy, "built-in Kraken strategy should be installed")
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
-        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
+        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null, credentialId)
 
         suspend fun stage(
             markerKey: String,
@@ -263,5 +267,84 @@ class KrakenReimportE2ETest : DbTest() {
                 withdrawalsFinal.count { it.targetAccountId == monzoId && it.attributes.none { attr -> attr.attributeType.id.id == -1L } },
                 "a second re-import must remain idempotent — still exactly one movement counted into Monzo's balance",
             )
+        }
+
+    @Test
+    fun `re-importing every session of a connection rewrites each onto a bridge configured after the fact`() =
+        runDbTest {
+            val strategyBeforeBridge = repositories.apiImportStrategyRepository.getStrategyByName("Kraken").first()!!
+            val credentialId = repositories.importEngine.ensureApiCredential(strategyBeforeBridge.id, now)
+            val sessionId = stageAndImport(credentialId)
+            // As the API screens do once a session imports, so re-import all finds it.
+            repositories.importEngine.markApiSessionImported(sessionId, strategyBeforeBridge.revisionId, now)
+            val monzoId =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Monzo", openingDate = now),
+                    Source.SampleGenerator,
+                )
+            val funding =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .first { it.name == "Kraken Funding" }
+            val gbp = assertNotNull(repositories.currencyRepository.getCurrencyByCode("GBP").first())
+            repositories.transactionRepository.createTransfers(
+                transfers =
+                    listOf(
+                        Transfer(
+                            id = TransferId(0),
+                            timestamp = Instant.fromEpochMilliseconds(1_700_000_003_000L),
+                            description = "Kraken FPS credit",
+                            sourceAccountId = funding.id,
+                            targetAccountId = monzoId,
+                            amount = Money.fromDisplayValue("1998.05", gbp),
+                        ),
+                    ),
+                sources = listOf(Source.SampleGenerator),
+            )
+            repositories.importEngine.updateApiStrategy(
+                strategyBeforeBridge.copy(
+                    config =
+                        strategyBeforeBridge.config.copy(
+                            internalTransferReconcile =
+                                ApiInternalTransferReconcile(
+                                    bridges = listOf(ApiAccountBridge(otherAccountName = "Monzo")),
+                                    window = SettlementWindow.Elapsed(86_400),
+                                ),
+                        ),
+                ),
+            )
+            val reimports = repositories.reimports(testMaintenance)
+
+            val result =
+                bulkReimportApiSessions(
+                    credentialId = credentialId,
+                    strategy = repositories.apiImportStrategyRepository.getStrategyByName("Kraken").first()!!,
+                    apiReads =
+                        ApiImportReads(
+                            apiSessionRepository = repositories.apiSessionRepository,
+                            accountRepository = repositories.accountRepository,
+                            accountAttributeRepository = repositories.accountAttributeRepository,
+                            currencyRepository = repositories.currencyRepository,
+                            cryptoRepository = repositories.cryptoRepository,
+                        ),
+                    reads = reimports.reads,
+                    maintenance = testMaintenance,
+                    importEngine = repositories.importEngine,
+                    cascadeRerunner = reimports,
+                )
+
+            assertEquals(1, result.sessionsReimported, "the connection's one imported session should be re-imported")
+            assertEquals(emptyList(), result.failures)
+            assertEquals(0, result.cascadedFiles, "no staged file depends on the session")
+            val intoMonzo =
+                repositories.transactionRepository
+                    .getTransactionsByDateRange(
+                        startDate = Instant.fromEpochMilliseconds(1_700_000_003_000L),
+                        endDate = Instant.fromEpochMilliseconds(1_700_000_004_000L),
+                    ).first()
+                    .filter { it.amount.asset.code == "GBP" && it.targetAccountId == monzoId }
+            assertEquals(2, intoMonzo.size, "the re-imported withdrawal should land on the bridged account, beside the bank's credit")
+            assertEquals(1, intoMonzo.count { it.attributes.none { attr -> attr.attributeType.id.id == -1L } }, "only one of them counts")
         }
 }

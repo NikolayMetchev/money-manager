@@ -18,7 +18,6 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.importengineapi.ManualEdit
 import com.moneymanager.importengineapi.ReappliedLinks
 import com.moneymanager.importengineapi.SourceRerunPlan
-import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.tasks.Progress
 
@@ -208,23 +207,3 @@ fun rememberAccountNamer(accountRepository: AccountReadRepository): (AccountId) 
         return@remember { id: AccountId -> names[id] ?: "account ${id.id}" }
     }
 }
-
-/** One line for a finished re-import of one file or session, given how many of its records [imported]. */
-fun SourceRerunResult<*>.toSummary(imported: Int): String =
-    buildString {
-        append("Re-import complete: $deletedTransfers transaction${plural(deletedTransfers)} deleted")
-        if (deletedTrades > 0) append(" and $deletedTrades trade${plural(deletedTrades)}")
-        append(", $imported imported")
-        if (cascaded.isNotEmpty()) append(", ${cascaded.size} other file${plural(cascaded.size)} re-imported along")
-        if (notRerun.isNotEmpty()) {
-            append(", ${notRerun.size} other file${plural(notRerun.size)} left for their own re-import")
-        }
-        if (reappliedEdits.isNotEmpty()) append(", ${reappliedEdits.size} manual edit${plural(reappliedEdits.size)} re-applied")
-        if (unmatchedEdits.isNotEmpty()) {
-            append(", ${unmatchedEdits.size} manual edit${plural(unmatchedEdits.size)} not re-applied")
-        }
-        append(reappliedLinks.summary(", "))
-        if (deletedEmptyAccounts.isNotEmpty()) {
-            append(", ${deletedEmptyAccounts.size} empty account${plural(deletedEmptyAccounts.size)} deleted")
-        }
-    }

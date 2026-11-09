@@ -88,6 +88,7 @@ kmp_test(
         "//app/model/timeline",
         "//app/tasks",
         "@maven_kmp//:kotlinx_datetime",
+        "//app/importengineapi",
     ],
     device_manifest = "src/androidDeviceTest/AndroidManifest.xml",
     device_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
@@ -100,6 +101,7 @@ kmp_test(
     keep_deps = ["//bazel/kmp/deps:compose_desktop_current_os"],
     plugins = ["compose"],
     deps = [
+        "//app/importengineapi",
         "//app/model/core",
         "//app/model/csv",
         "//app/model/csvstrategy",
