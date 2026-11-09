@@ -656,8 +656,8 @@ CREATE TRIGGER trigger_csv_import_application_delete_audit
 AFTER DELETE ON csv_import_application
 FOR EACH ROW
 BEGIN
-    INSERT INTO csv_import_application_audit (audit_timestamp, audit_type_id, csv_import_application_id, csv_import_id, strategy_id, strategy_name, applied_at)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.csv_import_id, old.strategy_id, old.strategy_name, old.applied_at);
+    INSERT INTO csv_import_application_audit (audit_timestamp, audit_type_id, csv_import_application_id, csv_import_id, strategy_id, strategy_name, applied_at, account_id, currency_id)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.csv_import_id, old.strategy_id, old.strategy_name, old.applied_at, old.account_id, old.currency_id);
 END;
 
 -- trigger_csv_import_application_insert_audit
@@ -665,6 +665,16 @@ CREATE TRIGGER trigger_csv_import_application_insert_audit
 AFTER INSERT ON csv_import_application
 FOR EACH ROW
 BEGIN
-    INSERT INTO csv_import_application_audit (audit_timestamp, audit_type_id, csv_import_application_id, csv_import_id, strategy_id, strategy_name, applied_at)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.csv_import_id, new.strategy_id, new.strategy_name, new.applied_at);
+    INSERT INTO csv_import_application_audit (audit_timestamp, audit_type_id, csv_import_application_id, csv_import_id, strategy_id, strategy_name, applied_at, account_id, currency_id)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.csv_import_id, new.strategy_id, new.strategy_name, new.applied_at, new.account_id, new.currency_id);
+END;
+
+-- trigger_csv_import_application_update_audit
+CREATE TRIGGER trigger_csv_import_application_update_audit
+AFTER UPDATE ON csv_import_application
+FOR EACH ROW
+WHEN old.account_id IS NOT new.account_id OR old.currency_id IS NOT new.currency_id
+BEGIN
+    INSERT INTO csv_import_application_audit (audit_timestamp, audit_type_id, csv_import_application_id, csv_import_id, strategy_id, strategy_name, applied_at, account_id, currency_id)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, old.csv_import_id, old.strategy_id, old.strategy_name, old.applied_at, old.account_id, old.currency_id);
 END;

@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.moneymanager.apiimport.ApiImportService
+import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.executeCsvUnimport
 import com.moneymanager.csvimporter.planCsvUnimport
 import com.moneymanager.database.service.AccountMappingExportService
@@ -253,14 +254,19 @@ fun ImportsScreen(
                             accountRepository = accountRepository,
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
-                            reimportFiles = { ids ->
+                            prepareReimport = { ids ->
                                 val reimports = importDirectoryService.reimports
                                 val files =
                                     ids.mapNotNull { id -> csvImportRepository.getImport(id).first() }
                                 // The files keep the account and currency they were imported with.
-                                reimports
-                                    .reimportAll(reimports.planAll(files), accountId = null, currencyId = null, onProgress = {})
-                                    .also { if (it.transfersCreated > 0) onTransactionsImported() }
+                                val plan = reimports.planAll(files)
+                                reimports.checkReimportable(plan, accountId = null, currencyId = null)
+                                val run: suspend () -> BulkReimportResult = {
+                                    reimports
+                                        .reimportAll(plan, accountId = null, currencyId = null, onProgress = {})
+                                        .also { if (it.transfersCreated > 0) onTransactionsImported() }
+                                }
+                                run
                             },
                         )
                     },

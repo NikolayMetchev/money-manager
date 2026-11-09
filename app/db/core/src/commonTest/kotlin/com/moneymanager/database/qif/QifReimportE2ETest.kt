@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.deleteAccountMapping
+import com.moneymanager.importengineapi.deleteCsvStrategy
 import com.moneymanager.regex.compileRegex
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
@@ -192,6 +193,42 @@ class QifReimportE2ETest : DbTest() {
             reimport()
             assertEquals(BigDecimal("-2000"), countedBalance(sourceAccountId()), "re-importing every statement keeps both")
         }
+
+    @Test
+    fun mergingTheImportedAccount_movesTheAccountTheFileReimportsOnto() =
+        runDbTest {
+            val file = createImport()
+            apply(file)
+            val santander = sourceAccountId()
+            val current =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Santander Current", openingDate = now),
+                )
+
+            val merge = repositories.accountRepository.mergeAccounts(deletedAccount = santander, survivingAccount = current)
+            assertEquals(current, reload(file).lastAppliedAccountId, "the file re-imports onto the account its transactions moved to")
+
+            repositories.accountRepository.unmergeAccount(merge)
+            assertEquals(santander, reload(file).lastAppliedAccountId, "undoing the merge points it back")
+        }
+
+    @Test
+    fun reimportAll_leavesAPickedFileWithNoStrategyAsItIs() =
+        runDbTest {
+            val file = createImport()
+            apply(file)
+            val transfers = repositories.accountRepository.countTransfersByAccount(sourceAccountId())
+            repositories.importEngine.deleteCsvStrategy(assertNotNull(reload(file).lastAppliedStrategyId))
+
+            val reimports = repositories.reimports(maintenance)
+            val result =
+                reimports.reimportAll(reimports.planAll(listOf(reload(file))), accountId = null, currencyId = null, onProgress = { })
+
+            assertEquals(1, result.filesSkippedNoStrategy)
+            assertEquals(transfers, repositories.accountRepository.countTransfersByAccount(sourceAccountId()), "nothing was deleted")
+        }
+
+    private suspend fun reload(file: CsvImport): CsvImport = assertNotNull(repositories.csvImportRepository.getImport(file.id).first())
 
     private suspend fun countedBalance(accountId: AccountId): BigDecimal =
         repositories.transactionRepository

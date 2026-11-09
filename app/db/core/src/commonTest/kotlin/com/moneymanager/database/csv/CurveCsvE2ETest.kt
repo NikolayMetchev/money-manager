@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.setAccountAttributeValue
@@ -24,6 +25,8 @@ import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -525,7 +528,7 @@ class CurveCsvE2ETest : DbTest() {
                 value = addAttributeToken(existing.value, reference.value),
                 existingAttributeId = existing.id,
             )
-            // Assigning the card re-imports the files that reference it (Card Last-4's reimportFiles).
+            // Assigning the card re-imports the files that reference it (Card Last-4's prepareReimport).
             val reimports = repositories.reimports(maintenance)
             val files = reference.imports.map { repositories.csvImportRepository.getImport(it).first()!! }
             val rerun = reimports.reimportAll(reimports.planAll(files), accountId = null, currencyId = null, onProgress = {})
@@ -586,6 +589,31 @@ class CurveCsvE2ETest : DbTest() {
                 assertTrue(transfersBetween("Curve", "Sainsburys London").single().isExcluded())
                 assertCurveNetsToZero()
             }
+        }
+
+    @Test
+    fun aStrategyCanNotStopSettingItsSourceAccountOrCurrency() =
+        runDbTest {
+            val builtIn =
+                repositories.csvImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .first { it.name == "Curve CSV" }
+            for (field in listOf(TransferField.SOURCE_ACCOUNT, TransferField.CURRENCY)) {
+                assertNotNull(builtIn.config.fieldMappings[field], "Curve CSV sets $field")
+                assertFailsWith<IllegalArgumentException>("dropping $field") {
+                    repositories.importEngine.updateCsvStrategy(
+                        builtIn.copy(config = builtIn.config.copy(fieldMappings = builtIn.config.fieldMappings - field)),
+                    )
+                }
+            }
+            assertEquals(
+                builtIn.config,
+                repositories.csvImportStrategyRepository
+                    .getStrategyById(builtIn.id)
+                    .first()
+                    ?.config,
+            )
         }
 
     @Test

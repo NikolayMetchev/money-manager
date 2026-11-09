@@ -248,6 +248,8 @@ class AccountWriteRepositoryImpl(
         // import sees an unknown sort code / account number pair and re-creates the very account
         // just merged away ("merge loses identity, account resurrects").
         carryAttributeGroups(deletedAccount, survivingAccount, mergeId)
+        // Before the delete clears it: a file imported onto the deleted account re-imports onto the survivor.
+        mergeWriteQueries.moveImportApplications(survivingAccount = survivingAccount.id, deletedAccount = deletedAccount.id)
 
         writeQueries.delete(deletedAccount.id)
         // Source the deleted account's DELETE audit entry (recorded at revision_id + 1 by the
@@ -420,6 +422,10 @@ class AccountWriteRepositoryImpl(
             // Moving a transfer back bumped its revision; source that new revision as a merge-undo.
             recordTransferMergeSource(row.transfer_id, Source.Unmerge)
         }
+        mergeWriteQueries.restoreImportApplications(
+            deletedAccount = merge.deleted_account_id,
+            survivingAccount = merge.surviving_account_id,
+        )
 
         mergeWriteQueries.markReversed(mergeId.id)
     }

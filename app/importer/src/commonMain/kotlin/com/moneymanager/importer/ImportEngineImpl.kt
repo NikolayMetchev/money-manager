@@ -2513,6 +2513,10 @@ class ImportEngineImpl(
                 }
 
                 is CsvStrategyMutation.Update -> {
+                    val previous = csvImportStrategyRepository.getStrategyById(m.strategy.id).first()
+                    require(previous == null || m.strategy.keepsImportSettingsOf(previous)) {
+                        "\"${m.strategy.name}\" can't stop setting its source account or currency: the files imported with it re-import with them"
+                    }
                     csvImportStrategyRepository.updateStrategy(m.strategy, m.source)
                 }
 

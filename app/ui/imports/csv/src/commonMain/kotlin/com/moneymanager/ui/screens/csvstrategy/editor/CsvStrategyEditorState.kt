@@ -231,8 +231,18 @@ internal class CsvStrategyEditorState(
     private val targetAccountValid: Boolean
         get() = rulesName(AccountSide.TARGET)
 
+    /**
+     * Whether the strategy being edited sets its source account. It has to keep doing so (the engine refuses a version
+     * that stops: see [CsvImportStrategy.keepsImportSettingsOf]), so a fixed account must then be picked.
+     */
+    val sourceAccountRequired: Boolean = sourceMapping != null
+
     private val sourceAccountValid: Boolean
-        get() = sourceAccountMode != SourceAccountMode.RULES || rulesName(AccountSide.SOURCE)
+        get() =
+            when (sourceAccountMode) {
+                SourceAccountMode.RULES -> rulesName(AccountSide.SOURCE)
+                SourceAccountMode.FIXED_ACCOUNT -> !sourceAccountRequired || selectedAccountId != null
+            }
 
     private val rulesValid: Boolean
         get() = rules.isComplete() && pdfLineRules?.isComplete() != false

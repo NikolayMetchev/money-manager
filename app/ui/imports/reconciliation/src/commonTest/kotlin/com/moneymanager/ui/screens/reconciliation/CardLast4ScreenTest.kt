@@ -116,7 +116,7 @@ class CardLast4ScreenTest {
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
-                        reimportFiles = { BulkReimportResult(0, 0, 0, 0, 0) },
+                        prepareReimport = { { BulkReimportResult(0, 0, 0, 0, 0) } },
                     )
                 }
             }
