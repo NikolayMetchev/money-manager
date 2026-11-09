@@ -115,17 +115,24 @@ fun presentAccounts(
 
     // Drop selections for owners that no longer exist (a person was deleted) and assets no account holds any more.
     val availableOwnerIds = current.people.mapTo(mutableSetOf()) { it.id }
-    LaunchedEffect(availableOwnerIds) {
-        state = state.copy(filter = state.filter.copy(ownerIds = state.filter.ownerIds intersect availableOwnerIds))
+    LaunchedEffect(availableOwnerIds, snapshot != null) {
+        // Until the snapshot loads there are no people, which would wipe the owners restored from the last visit.
+        // Read the snapshot now, not the captured set: the effect can start after the snapshot arrived.
+        val people = snapshot?.people ?: return@LaunchedEffect
+        val ids = people.mapTo(mutableSetOf()) { it.id }
+        state = state.copy(filter = state.filter.copy(ownerIds = state.filter.ownerIds intersect ids))
     }
     val availableAssetIds = current.availableAssets.mapTo(mutableSetOf()) { it.id }
     LaunchedEffect(availableAssetIds) {
-        if (snapshot != null && pendingAssetIds.isNotEmpty()) {
-            val restored = current.availableAssets.map { it.id }.filter { it.id in pendingAssetIds }
+        // Read the snapshot now, not the captured one: the effect can start after the snapshot arrived.
+        val loaded = snapshot ?: return@LaunchedEffect
+        val available = loaded.availableAssets.mapTo(mutableSetOf()) { it.id }
+        if (pendingAssetIds.isNotEmpty()) {
+            val restored = available.filter { it.id in pendingAssetIds }
             pendingAssetIds = emptySet()
             state = state.copy(filter = state.filter.copy(assetIds = state.filter.assetIds + restored))
         }
-        state = state.copy(filter = state.filter.copy(assetIds = state.filter.assetIds intersect availableAssetIds))
+        state = state.copy(filter = state.filter.copy(assetIds = state.filter.assetIds intersect available))
     }
 
     LaunchedEffect(state.filter, pendingAssetIds) { onFilterChange(state.filter.saved(pendingAssetIds)) }
