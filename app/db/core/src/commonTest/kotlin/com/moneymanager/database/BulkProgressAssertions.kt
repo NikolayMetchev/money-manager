@@ -32,9 +32,11 @@ fun assertBulkProgress(
         assertTrue(nextPhase >= previousPhase, "phases went backwards: $previousPhase -> $nextPhase")
         if (nextPhase == previousPhase) {
             assertTrue(next.fraction!! >= previous.fraction!!, "progress went backwards: ${previous.fraction} -> ${next.fraction}")
-            if (previous.processed != null && next.processed != null) {
+            val previousRows = previous.processed
+            val nextRows = next.processed
+            if (previousRows != null && nextRows != null) {
                 assertTrue(
-                    next.processed!! >= previous.processed!!,
+                    nextRows >= previousRows,
                     "row counter went backwards: ${previous.processed} -> ${next.processed}",
                 )
             }

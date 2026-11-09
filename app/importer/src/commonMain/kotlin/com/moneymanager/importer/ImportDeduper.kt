@@ -376,7 +376,16 @@ class ImportDeduper(
      */
     private val matchedExistingIds = mutableSetOf<TransferId>()
 
+    /**
+     * Each existing leg some row of this batch matches exactly, with that row's index. The fuzzy pass leaves
+     * these to their own row: a statement lists two like payments days apart newest first, so the later one
+     * would otherwise take the earlier one's record before the earlier row reaches it, and the earlier row,
+     * finding its record gone, would book the payment again.
+     */
+    private var exactRows: Map<TransferId, Int> = emptyMap()
+
     fun classify(transfers: List<ImportTransfer>): List<Classified> {
+        exactRows = exactMatchesByRow(transfers)
         claimingRows =
             policy
                 .reconciledExclusionTypeId()
@@ -394,6 +403,17 @@ class ImportDeduper(
                 }.toMutableList()
         reconcileSplitConduitMovements(classified)
         return classified
+    }
+
+    private fun exactMatchesByRow(transfers: List<ImportTransfer>): Map<TransferId, Int> {
+        if (policy !is DedupePolicy.FuzzyAllFields) return emptyMap()
+        val rows = mutableMapOf<TransferId, Int>()
+        transfers.forEachIndexed { index, transfer ->
+            existingByCoreKey[transfer.coreKey()]
+                ?.firstOrNull { it.transferId !in rows }
+                ?.let { rows[it.transferId] = index }
+        }
+        return rows
     }
 
     private val otherSideLegsByAmount: Map<Money, List<Transfer>> =
@@ -1571,6 +1591,7 @@ class ImportDeduper(
                     // An excluded leg counts nowhere, so a row dropped as its duplicate would count nowhere either —
                     // unless the leg is this same file's earlier record of the row, which keeps its exclusion.
                     existing.transferId !in matchedExistingIds &&
+                        exactRows[existing.transferId].let { it == null || it == classifyingIndex } &&
                         (existing.transferId !in existingExcludedLegs || existing.transferId in ownSourceLegs) &&
                         isFuzzyDuplicate(transfer, existing.transfer, policy)
                 }?.minByOrNull { (it.transfer.timestamp - timestamp).absoluteValue }

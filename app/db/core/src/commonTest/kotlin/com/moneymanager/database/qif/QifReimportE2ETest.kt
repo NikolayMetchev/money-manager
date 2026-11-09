@@ -1,5 +1,6 @@
 package com.moneymanager.database.qif
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.stageQifImport
 import com.moneymanager.domain.Maintenance
@@ -165,6 +166,40 @@ class QifReimportE2ETest : DbTest() {
             )
             assertEquals(3L, repositories.accountRepository.countTransfersByAccount(sourceAccountId()))
         }
+
+    @Test
+    fun overlappingStatements_keepTwoLikePaymentsDaysApart() =
+        runDbTest {
+            val payment = "BILL PAYMENT VIA FASTER PAYMENT TO COINBASE REFERENCE CBAGBPUALDWLZXEXC , MANDATE NO 91"
+            // Statements overlap and list newest first, as Santander's do: one ends on the first payment, the next
+            // starts after it with the second, and a long one has both. The second is within the fuzzy tolerance of
+            // the first, but each statement gives both their own dates.
+            val statements =
+                listOf(
+                    createImport("early.qif", "early-checksum", listOf(rec("03/12/2020", "-1000.00", payment))),
+                    createImport("late.qif", "late-checksum", listOf(rec("06/12/2020", "-1000.00", payment))),
+                    createImport(
+                        "long.qif",
+                        "long-checksum",
+                        listOf(rec("06/12/2020", "-1000.00", payment), rec("03/12/2020", "-1000.00", payment)),
+                    ),
+                )
+            statements.forEach { apply(it) }
+
+            assertEquals(BigDecimal("-2000"), countedBalance(sourceAccountId()))
+            reimport()
+            assertEquals(BigDecimal("-2000"), countedBalance(sourceAccountId()), "re-importing every statement keeps both")
+        }
+
+    private suspend fun countedBalance(accountId: AccountId): BigDecimal =
+        repositories.transactionRepository
+            .getTransactionsByAccount(accountId)
+            .first()
+            .filter { transfer -> transfer.attributes.none { it.attributeType.name == "excluded" } }
+            .fold(BigDecimal.ZERO) { sum, t ->
+                val amount = t.amount.toDisplayValue()
+                if (t.targetAccountId == accountId) sum + amount else sum - amount
+            }
 
     @Test
     fun reimportWithNoChange_isNoOp() =
