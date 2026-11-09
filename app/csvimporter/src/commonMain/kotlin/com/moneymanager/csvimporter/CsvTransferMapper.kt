@@ -142,6 +142,13 @@ sealed interface MappingResult {
 val UNRESOLVED_ACCOUNT_ID = AccountId(-1)
 
 /**
+ * Stand-in id for the fee account of a row's own account, the counterparty of a row that is itself a fee (its `Fee` is
+ * included in the amount and is all of it). The engine resolves fee accounts, so the mapper leaves this for [runCsvImport] to replace, by own account,
+ * before anything books the row.
+ */
+val OWN_FEE_ACCOUNT_ID = AccountId(-2)
+
+/**
  * A new account that needs to be created during import.
  */
 data class NewAccount(
@@ -487,6 +494,23 @@ class CsvTransferMapper(
                 parseCurrency(currencyMapping, values)
                     ?: return MappingResult.Error(row.rowIndex, "Currency not found")
 
+            // A fee is modelled as its own movement (linked to this transfer), not folded into the amount.
+            val rowFee =
+                when (val parsed = parseFee(outcome.fees, values, currency)) {
+                    FeeParse.UnknownCurrency -> return MappingResult.Error(row.rowIndex, "Fee currency not found")
+                    is FeeParse.Charged -> parsed
+                    FeeParse.None -> null
+                }
+            // A fee included in the amount that is all of it: the row is itself a fee (Binance's fee rows, a bank's
+            // account fee), so it moves between the own account and that account's fee account, with no fee of its own.
+            val wholeFee =
+                rowFee != null &&
+                    rowFee.includedInAmount &&
+                    rowFee.amount.asset.id == currency.id &&
+                    rawAmount.compareTo(BigDecimal.ZERO) != 0 &&
+                    rowFee.magnitude.compareTo(rawAmount.abs()) == 0
+            val feeAmount = rowFee?.amount?.takeUnless { wholeFee }
+
             // Cross-asset conversion: when the strategy maps a TO_CURRENCY/TO_AMOUNT and the credited
             // asset differs from the debited one, this row is a trade — the credited leg is captured
             // here and the importer emits a `trade` (debit `amount`, credit `tradeTo`) instead of a
@@ -536,7 +560,7 @@ class CsvTransferMapper(
 
             // Parse accounts with potential flipping
             var sourceAccountId = resolvedSourceAccountId
-            var targetAccountId = parseAccount(targetMapping, targetResolution)
+            var targetAccountId = if (wholeFee) OWN_FEE_ACCOUNT_ID else parseAccount(targetMapping, targetResolution)
 
             // Asset-conversion leg: route the counterparty side to the shared conversion account so both
             // the debit and credit legs parse as valid single-asset transfers (owner account <-> conversion
@@ -712,7 +736,7 @@ class CsvTransferMapper(
             // account flip — the counterparty is the same account on whichever side it ends up). A
             // pass-through merchant / conversion counterparty is never a person, so skip it there.
             val personalCounterpartyName =
-                if (passThroughMatch != null || conversionDetection != null) {
+                if (passThroughMatch != null || conversionDetection != null || wholeFee) {
                     null
                 } else {
                     resolvePersonalCounterparty(targetMapping, targetResolution, targetUsedPersistedMappings)
@@ -740,6 +764,10 @@ class CsvTransferMapper(
                         null
                     }
 
+                    wholeFee -> {
+                        null
+                    }
+
                     else -> {
                         counterpartyAccountId.takeIf {
                             isUnidentifiedCounterparty(targetMapping, targetResolution, targetUsedPersistedMappings) ||
@@ -748,18 +776,10 @@ class CsvTransferMapper(
                     }
                 }
 
-            // A fee is modelled as its own movement (linked to this transfer), not folded into the amount.
-            val rowFee =
-                when (val parsed = parseFee(outcome.fees, values, currency)) {
-                    FeeParse.UnknownCurrency -> return MappingResult.Error(row.rowIndex, "Fee currency not found")
-                    is FeeParse.Charged -> parsed
-                    FeeParse.None -> null
-                }
-            val feeAmount = rowFee?.amount
             // A gross amount already includes its fee: carve the fee out so the two sum back to it. Only a
             // fee in the row's own asset can be carved out of it.
             val netMagnitude =
-                if (rowFee?.includedInAmount == true && rowFee.amount.asset.id == currency.id) {
+                if (!wholeFee && rowFee?.includedInAmount == true && rowFee.amount.asset.id == currency.id) {
                     (rawAmount.abs() - rowFee.magnitude).coerceAtLeast(BigDecimal.ZERO)
                 } else {
                     rawAmount.abs()
@@ -819,7 +839,8 @@ class CsvTransferMapper(
                     // A conversion leg's counterparty is the shared conversion account (added below), not
                     // the description-derived account the target mapping would discover, so skip it here.
                     if (passThroughMatch == null &&
-                        conversionDetection == null
+                        conversionDetection == null &&
+                        !wholeFee
                     ) {
                         add(discoverNewAccount(targetMapping, targetResolution, applyPersistedMappings = targetUsedPersistedMappings))
                     }
@@ -856,7 +877,7 @@ class CsvTransferMapper(
                 personalCounterpartyName = personalCounterpartyName,
                 passThrough = passThrough,
                 groupLeg = legDetection?.leg,
-                feeDescription = rowFee?.description,
+                feeDescription = rowFee?.description?.takeUnless { wholeFee },
                 fundingMatchValue =
                     strategy.config.fundingAttributeMatch?.let {
                         getColumnValueOrNull(it.column, values)?.trim()?.takeIf { v -> v.isNotBlank() }

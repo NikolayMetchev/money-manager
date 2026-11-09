@@ -72,6 +72,20 @@ internal fun fixedNaming(
 ): AccountNaming = naming(column, pattern = "^", name = name, unidentified = unidentified)
 
 /**
+ * The record is itself a fee when [column] matches [pattern]: its whole [amountColumn] is the fee, so it books to the fee
+ * account of the record's own account, the one fees charged on other records go to too.
+ */
+internal fun wholeFeeWhen(
+    amountColumn: String,
+    column: String,
+    pattern: String,
+): StrategyRule =
+    fee(
+        FeeRule(amount = ValueExpr.of(amountColumn), includedInAmount = true),
+        conditions = listOf(Condition(column, ConditionOp.MATCHES, pattern)),
+    )
+
+/**
  * The built-in counterparty [name] (e.g. "ATM"): every record naming it consolidates into one account. It
  * reads [column], which every record has, only so that the naming applies.
  */

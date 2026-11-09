@@ -265,8 +265,8 @@ sealed interface RuleAction {
      * The record needs a person to supply an amount (Manual Entries): the engine tags it with the
      * [WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME] attribute = [name], and the entry the person types becomes a transfer
      * described [description] and linked to the record by a [relationshipType] relationship (the record is the
-     * primary). It runs from the record's source to [counterpartyAccount], or, when that is null, between the
-     * record's accounts reversed. [excludedFromBalances] says the record's own amount already contains the
+     * primary). A "fee" entry runs from the record's source to that account's fee account (the one
+     * fees charged to it go to, found by its `fee-account-for` tag); any other runs between the record's accounts reversed. [excludedFromBalances] says the record's own amount already contains the
      * entry (a withdrawal whose fee is included), so the entry must not be counted a second time.
      */
     @Serializable
@@ -275,8 +275,6 @@ sealed interface RuleAction {
         val name: String,
         val description: String,
         val relationshipType: String,
-        @EncodeDefault(EncodeDefault.Mode.NEVER)
-        val counterpartyAccount: String? = null,
         @EncodeDefault(EncodeDefault.Mode.NEVER)
         val excludedFromBalances: Boolean = false,
     ) : RuleAction

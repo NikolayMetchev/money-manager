@@ -17,10 +17,18 @@ CREATE TABLE account_merge (
     deleted_account_category_id INTEGER NOT NULL,
     deleted_account_revision_id INTEGER NOT NULL,
     reversed INTEGER NOT NULL DEFAULT 0,
-    FOREIGN KEY (surviving_account_id) REFERENCES account(id) ON DELETE CASCADE
+    -- Merging two accounts that each have a fee account merges the fee accounts too, as a merge of its own whose
+    -- parent is the accounts' merge: undoing the parent undoes it, and the unmerge list shows only the parent.
+    parent_merge_id INTEGER,
+    -- When only the deleted account had a fee account, the merge re-tags it as the survivor's: the id of that
+    -- fee-account-for attribute, which unmerge points back at the restored account.
+    retagged_fee_attribute_id INTEGER,
+    FOREIGN KEY (surviving_account_id) REFERENCES account(id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_merge_id) REFERENCES account_merge(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_account_merge_surviving ON account_merge(surviving_account_id);
+CREATE INDEX idx_account_merge_parent ON account_merge(parent_merge_id);
 
 -- The transfers reassigned by the merge and which side (source/target) pointed at the deleted
 -- account, so unmerge moves back exactly those references.

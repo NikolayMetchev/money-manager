@@ -929,7 +929,7 @@ private suspend fun linkCounterpartyOwner(
     request: ApiRequest,
     item: ApiTransactionPageItem,
 ) {
-    if (item.isZeroAmount || item.builtInCounterparty != null) return
+    if (item.isZeroAmount || item.hasFixedCounterparty) return
     val owner = item.personalCounterpartyOwner(setup.strategy.config.peopleMappings) ?: return
     val identity = owner.personalCounterpartyIdentity()
     val counterpartyId = item.counterpartyIdentity(setup.counterpartyIdField, setup.strategy.config.peopleMappings)
@@ -1080,7 +1080,7 @@ private suspend fun precreateCounterparties(
                     async {
                         val request = requestsById[response.requestId] ?: return@async emptyList()
                         parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
-                            if (item.builtInCounterparty != null) return@mapNotNull null
+                            if (item.hasFixedCounterparty) return@mapNotNull null
                             val counterpartyId =
                                 item.counterpartyIdentity(counterpartyIdField, config.peopleMappings)
                                     ?: return@mapNotNull null
@@ -1128,7 +1128,7 @@ private suspend fun collectCounterpartiesFromResponses(
             parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
                 // Skip transactions handled by built-in type logic — their counterpartyId is
                 // irrelevant because they all route to a single built-in account.
-                if (item.builtInCounterparty != null) return@mapNotNull null
+                if (item.hasFixedCounterparty) return@mapNotNull null
                 val counterpartyId =
                     item.counterpartyIdentity(counterpartyIdField, strategy.config.peopleMappings)
                         ?: return@mapNotNull null
@@ -1486,6 +1486,8 @@ private data class ApiTransactionPageItem(
     val counterpartyAccountName: String? = null,
     /** The built-in counterparty (e.g. "ATM") the rules route this item to, consolidating every match. */
     val builtInCounterparty: String? = null,
+    /** Whether the item is itself a fee (its fee included in the amount is all of it), paid into the own account's fee account. */
+    val feeAccountCounterparty: Boolean = false,
     val rawJson: JsonObject? = null,
     // What the counterparty was paid when the own account settled in another currency (magnitude only).
     val foreignAmount: ParsedAmount? = null,
@@ -1500,6 +1502,9 @@ private data class ApiTransactionPageItem(
     val isZeroAmount: Boolean get() = amountSign == 0
     val isIncoming: Boolean get() = amountSign > 0
     val hasFee: Boolean get() = feeAmountMinorUnits != null || feeAmountDecimalMajor != null
+
+    /** Whether the counterparty is a fixed account (built-in or the fee account), not one the counterparty id identifies. */
+    val hasFixedCounterparty: Boolean get() = builtInCounterparty != null || feeAccountCounterparty
 
     /** Why the item was declined (imported, but excluded from balances), or null when it wasn't. */
     val declineReason: String? get() = if (outcome.excluded) outcome.excludeReason?.ifBlank { null } ?: "excluded" else null
@@ -1852,6 +1857,8 @@ private suspend fun prepareValidTransactionItem(
                 "Void",
                 source = counterpartyApiSource.toSource(),
             )
+        } else if (item.feeAccountCounterparty) {
+            setup.accountResolver.resolveFeeAccount(ownAccountRef, source = counterpartyApiSource.toSource())
         } else {
             val builtInCounterpartyType = item.builtInCounterparty
             val counterpartyId = item.counterpartyIdentity(setup.counterpartyIdField, setup.strategy.config.peopleMappings)
@@ -2134,6 +2141,14 @@ private fun parseTransactionsWithPath(
             val feeRule = outcome.fees.firstOrNull { obj.carriesFee(it, currency) }
             val fee = feeRule?.let { parseMagnitude(obj, it.amount, mappings.amountFormat) }
             val feeCurrency = feeRule?.currency?.let { obj.resolve(it) }
+            // A fee included in the amount that is all of it: the item is itself a fee, booked to the own account's fee account.
+            val toFeeAccount =
+                feeRule?.includedInAmount == true &&
+                    fee != null &&
+                    amount != null &&
+                    (feeCurrency.isNullOrBlank() || feeCurrency.equals(currency, ignoreCase = true)) &&
+                    fee.isMagnitudeOf(amount)
+            val chargedFee = fee?.takeUnless { toFeeAccount }
             val feeDescription = feeRule?.description?.let { obj.resolve(it) }
             if (created != null && amount != null && currency != null) {
                 ApiTransactionPageItem(
@@ -2151,14 +2166,15 @@ private fun parseTransactionsWithPath(
                             index,
                         ),
                     outcome = outcome,
-                    counterpartyAccountName = counterpartyName.takeUnless { builtIn },
-                    builtInCounterparty = counterpartyName.takeIf { builtIn },
+                    counterpartyAccountName = counterpartyName.takeUnless { builtIn || toFeeAccount },
+                    builtInCounterparty = counterpartyName.takeIf { builtIn && !toFeeAccount },
+                    feeAccountCounterparty = toFeeAccount,
                     rawJson = obj,
                     foreignAmount = foreignAmount,
                     foreignCurrencyCode = foreignCurrency?.uppercase(),
-                    feeRule = feeRule,
-                    feeAmountMinorUnits = fee?.minorUnits,
-                    feeAmountDecimalMajor = fee?.decimalMajor,
+                    feeRule = feeRule.takeUnless { toFeeAccount },
+                    feeAmountMinorUnits = chargedFee?.minorUnits,
+                    feeAmountDecimalMajor = chargedFee?.decimalMajor,
                     feeCurrencyCode = feeCurrency?.uppercase(),
                     feeDescription = feeDescription,
                 )
@@ -2181,7 +2197,15 @@ private data class ParsedAmount(
     val minorUnits: Long?,
     val decimalMajor: BigDecimal?,
     val sign: Int,
-)
+) {
+    /** Whether this magnitude is the whole of [amount], whatever its sign. */
+    fun isMagnitudeOf(amount: ParsedAmount): Boolean =
+        if (minorUnits != null) {
+            minorUnits == amount.minorUnits?.absoluteValue
+        } else {
+            decimalMajor != null && amount.decimalMajor?.let { decimalMajor.compareTo(it.abs()) == 0 } == true
+        }
+}
 
 /**
  * Parses a transaction amount per the strategy's amount format. The sign is the direction the rules

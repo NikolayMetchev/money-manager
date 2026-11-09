@@ -7,7 +7,7 @@ SELECT
     account_merge.deleted_account_name,
     (SELECT COUNT(*) FROM account_merge_transfer WHERE account_merge_transfer.merge_id = account_merge.id) AS transfer_count
 FROM account_merge
-WHERE account_merge.reversed = 0
+WHERE account_merge.reversed = 0 AND account_merge.parent_merge_id IS NULL
 ORDER BY account_merge.merged_at DESC;
 
 selectById:
@@ -47,3 +47,7 @@ SELECT transfer_id, moved_source, moved_target FROM account_merge_transfer WHERE
 -- The attribute rows this merge grafted onto the surviving account; unmerge deletes exactly these.
 selectAttributeIdsForMerge:
 SELECT attribute_id FROM account_merge_attribute WHERE merge_id = ?;
+
+-- The merges made by this one (its accounts' fee accounts), which undoing it undoes too.
+selectChildMerges:
+SELECT id FROM account_merge WHERE parent_merge_id = ? AND reversed = 0;

@@ -267,13 +267,6 @@ object BuiltInCsvStrategies {
     private const val BINANCE_ACCOUNT = "Binance"
 
     /**
-     * Binance counterparty accounts the API strategy also creates (its endpoints' counterparty
-     * `Account` rules). Naming them identically is what makes the CSV's and the API's
-     * versions of the same deposit/withdrawal/earn movement reconcilable.
-     */
-    private const val BINANCE_FEES_ACCOUNT = "Binance Fees"
-
-    /**
      * Placeholder counterparty for a deposit or withdrawal. The export records that money arrived or
      * left but never whose account it was, so this account is not an assertion — it is where an
      * unidentified movement waits to be reconciled against a source that does name the counterparty
@@ -1416,6 +1409,8 @@ object BuiltInCsvStrategies {
         // First-match-wins rules over the Payee field; ${cp} extracts the clean counterparty name.
         // Tuned against a full Santander statement history (~7k records, ~99.9% parsed). The middle
         // rules use ".*?\bTO/\bFROM" to skip "VIA FASTER PAYMENT" / "REF.<x>" preludes that vary per row.
+        // A pended payment to someone is theirs; any other PENDED narrative is an account fee.
+        val pendedPayment = "PENDED\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|,)"
         val counterparties =
             arrayOf(
                 // Cashback summary lines ("1 Direct Debit Payment for Water at 1,00% Cashback, 0.36").
@@ -1484,7 +1479,7 @@ object BuiltInCsvStrategies {
                 ),
                 naming(
                     QifColumns.COL_PAYEE,
-                    pattern = "^PENDED\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|,)",
+                    pattern = "^$pendedPayment",
                     name = "$1",
                     fallbackName = "Santander Pended Payment",
                     person = true,
@@ -1536,12 +1531,6 @@ object BuiltInCsvStrategies {
                 ),
                 naming(QifColumns.COL_PAYEE, pattern = "^INTEREST\\b", name = "Santander Interest"),
                 naming(QifColumns.COL_PAYEE, pattern = "^LOAN\\b", name = "Santander Loan"),
-                // Fixed-name rules (no template) for the various account-fee narratives.
-                naming(
-                    QifColumns.COL_PAYEE,
-                    pattern = "^(MONTHLY ACCOUNT FEE|MAINTAINING THE ACCOUNT|UNARRANGED|NON-STERLING|PENDED|PENDING)\\b",
-                    name = "Santander Fees",
-                ),
             )
         val fieldMappings =
             mapOf(
@@ -1626,6 +1615,12 @@ object BuiltInCsvStrategies {
                         extraction = Extraction(pattern = "\\bON\\s+(\\d{2}-\\d{2}-\\d{4})", outputTemplate = "$1"),
                     ),
                     incomingWhenPositive(QifColumns.COL_AMOUNT),
+                    // The account-fee narratives are the account's own fees, booked to its fee account.
+                    wholeFeeWhen(
+                        QifColumns.COL_AMOUNT,
+                        QifColumns.COL_PAYEE,
+                        "^(?!$pendedPayment)(MONTHLY ACCOUNT FEE|MAINTAINING THE ACCOUNT|UNARRANGED|NON-STERLING|PENDED|PENDING)\\b",
+                    ),
                     accounts(
                         AccountSide.TARGET,
                         *counterparties,
@@ -2083,7 +2078,7 @@ object BuiltInCsvStrategies {
      * (a single order can produce a dozen `Transaction Sold`/`Transaction Revenue` rows).
      * A trade [LegGroupRule]
      * folds each such group into one `trade`. Fee rows stay out of the group on purpose — a `trade` row
-     * has no fee field — and route to [BINANCE_FEES_ACCOUNT] as their own transfers, as the API does.
+     * has no fee field — and route to the Binance account's fee account as their own transfers, as the API does.
      *
      * A `Withdraw` row remarked "Withdraw fee is included" asks (a `ManualEntry` rule) for its fee in Manual Entries.
      * Such a row (and every `Fiat Withdrawal`) is the
@@ -2175,7 +2170,6 @@ object BuiltInCsvStrategies {
                     pattern = "^Dual Savings (Purchase|Settlement)$",
                     name = BINANCE_DUAL_SAVINGS_ACCOUNT,
                 ),
-                naming("Operation", pattern = "^(Fee|Transaction Fee)$", name = BINANCE_FEES_ACCOUNT),
                 // Dust legs are re-routed to the conversion account by the dust leg rule; this rule is
                 // the home for a leg that somehow escapes detection (a zero Change).
                 naming(
@@ -2223,11 +2217,11 @@ object BuiltInCsvStrategies {
                         name = "Withdrawal fee",
                         description = "Withdrawal fee",
                         relationshipType = "fee",
-                        counterpartyAccount = BINANCE_FEES_ACCOUNT,
                         excludedFromBalances = true,
                     ),
                     conditions = listOf(Condition("Remark", ConditionOp.MATCHES, "fee is included")),
                 ),
+                wholeFeeWhen("Change", "Operation", "^(Fee|Transaction Fee)$"),
                 // Change carries the direction: negative leaves the Binance account, positive arrives.
                 incomingWhenPositive("Change"),
                 // Account is "Spot" on every row; keying the naming off it rather than hard-coding an id keeps
@@ -2311,9 +2305,6 @@ object BuiltInCsvStrategies {
 
     /** Binance's leg group folding a fill's rows into one trade. */
     private const val BINANCE_TRADE_GROUP = "trade"
-
-    /** Counterparty accounts the Bybit API strategy also creates; see [BINANCE_FEES_ACCOUNT] for why. */
-    private const val BYBIT_FEES_ACCOUNT = "Bybit Fees"
 
     /** Placeholder counterparty for a deposit or withdrawal, as [BINANCE_FUNDING_ACCOUNT]. */
     private const val BYBIT_FUNDING_ACCOUNT = "Bybit Funding"
@@ -2427,7 +2418,7 @@ object BuiltInCsvStrategies {
      * A trade is split into one row per fill per leg, every row of an order stamped with the same second
      * (a convert's two legs may straddle a second boundary). A trade [LegGroupRule] folds
      * each group into one `trade`, classifying legs by the sign of `Amount`; fees stay their own
-     * transfers to [BYBIT_FEES_ACCOUNT], which is also where the API books them.
+     * transfers to the Bybit account's fee account, which is also where the API books them.
      *
      * Deposits book against the [BYBIT_FUNDING_ACCOUNT] placeholder so they reconcile against the API's
      * record of the same deposit, which names the on-chain address when it has one.
@@ -2437,13 +2428,13 @@ object BuiltInCsvStrategies {
         val targets =
             arrayOf(
                 bybitFunding("^user(Deposit|Withdraw)"),
-                naming(BYBIT_TYPE_COLUMN, pattern = "^tradingFee$", name = BYBIT_FEES_ACCOUNT),
                 naming(BYBIT_TYPE_COLUMN, pattern = internalTransfer, name = BYBIT_INTERNAL_TRANSFERS_ACCOUNT),
                 // Trade legs only reach here when their group did not resolve.
                 fixedNaming(BYBIT_TYPE_COLUMN, BYBIT_TRADING_ACCOUNT),
             )
         val rules =
             bybitRules("Amount", internalTransfer, targets) +
+                wholeFeeWhen("Amount", BYBIT_TYPE_COLUMN, "^tradingFee$") +
                 // An empty Type is a Convert leg; the pattern has to admit it explicitly.
                 rule(
                     RuleAction.Leg(BYBIT_TRADE_GROUP, LegRole.BySign("Amount")),

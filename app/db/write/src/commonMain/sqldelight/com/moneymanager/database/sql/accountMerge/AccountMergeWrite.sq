@@ -1,9 +1,12 @@
 insertMerge:
 INSERT INTO account_merge(
     merged_at, surviving_account_id, deleted_account_id, deleted_account_name,
-    deleted_account_opening_date, deleted_account_category_id, deleted_account_revision_id
+    deleted_account_opening_date, deleted_account_category_id, deleted_account_revision_id, parent_merge_id
 )
-VALUES (?, ?, ?, ?, ?, ?, ?);
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+setRetaggedFeeAttribute:
+UPDATE account_merge SET retagged_fee_attribute_id = :attributeId WHERE id = :mergeId;
 
 lastInsertRowId:
 SELECT last_insert_rowid();

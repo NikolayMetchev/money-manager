@@ -160,181 +160,269 @@ class AccountWriteRepositoryImpl(
         survivingAccount: AccountId,
     ): MergeId =
         withContext(Dispatchers.Default) {
-            database.transactionWithResult {
-                // Merging an account into itself would reassign its transfers to itself and then delete
-                // it, destroying the "surviving" account; refuse it.
-                require(deletedAccount != survivingAccount) { "Cannot merge an account into itself" }
-
-                // Guard: transfers directly between the two accounts would become invalid
-                // self-transfers (CHECK source != target) once reassigned, so refuse the merge.
-                val between =
-                    transferSelectQueries
-                        .selectTransfersBetweenAccounts(
-                            accountA = deletedAccount.id,
-                            accountB = survivingAccount.id,
-                            TransferMapper::mapRaw,
-                        ).awaitAsList()
-                require(between.isEmpty()) {
-                    "Cannot merge: ${between.size} transaction(s) exist between the accounts"
-                }
-
-                // Snapshot only the deleted account's core fields (name/opening date/category/revision),
-                // which the cascade delete leaves no trace of. Attributes and ownerships are NOT
-                // snapshotted: the cascade delete records each one as a DELETE in account_attribute_audit
-                // / person_account_ownership_audit, so unmerge reconstructs them from the audit trail.
-                val account = selectQueries.selectById(deletedAccount.id).awaitAsOne()
-                val sourceTransferIds = transferSelectQueries.selectTransferIdsBySourceAccount(deletedAccount.id).awaitAsList()
-                val targetTransferIds = transferSelectQueries.selectTransferIdsByTargetAccount(deletedAccount.id).awaitAsList()
-
-                mergeWriteQueries.insertMerge(
-                    merged_at = Clock.System.now().toEpochMilliseconds(),
-                    surviving_account_id = survivingAccount.id,
-                    deleted_account_id = deletedAccount.id,
-                    deleted_account_name = account.name,
-                    deleted_account_opening_date = account.opening_date,
-                    deleted_account_category_id = account.category_id,
-                    // The delete is recorded as its own revision (OLD.revision_id + 1, see the custom
-                    // account delete trigger); store that so the merge note matches the DELETE entry and
-                    // unmerge recreates the account at the next revision after it.
-                    deleted_account_revision_id = account.revision_id + 1,
-                )
-                val mergeId = mergeWriteQueries.lastInsertRowId().awaitAsOne()
-
-                val sourceSet = sourceTransferIds.toSet()
-                val targetSet = targetTransferIds.toSet()
-                (sourceSet + targetSet).forEach { transferId ->
-                    mergeWriteQueries.insertMergeTransfer(
-                        merge_id = mergeId,
-                        transfer_id = transferId,
-                        moved_source = if (transferId in sourceSet) 1 else 0,
-                        moved_target = if (transferId in targetSet) 1 else 0,
-                    )
-                }
-                transferWriteQueries.moveTransfersSourceAccount(
-                    targetAccount = survivingAccount.id,
-                    accountToDelete = deletedAccount.id,
-                )
-                transferWriteQueries.moveTransfersTargetAccount(
-                    targetAccount = survivingAccount.id,
-                    accountToDelete = deletedAccount.id,
-                )
-                database.entitySourceWriteQueries.reassignStatementAccount(
-                    survivingAccountId = survivingAccount.id,
-                    deletedAccountId = deletedAccount.id,
-                )
-                // The reassignment bumped each affected transfer's revision; source those new revisions
-                // as a merge so the transaction audit trail isn't left with "source data missing".
-                (sourceSet + targetSet).forEach { transferId ->
-                    recordTransferMergeSource(transferId, Source.Merge)
-                }
-
-                // Carry the deleted account's attribute groups onto the survivor BEFORE the cascade delete
-                // takes them away. Without this the merge destroys the loser's bank identity, so the next
-                // import sees an unknown sort code / account number pair and re-creates the very account
-                // just merged away ("merge loses identity, account resurrects").
-                carryAttributeGroups(deletedAccount, survivingAccount, mergeId)
-
-                writeQueries.delete(deletedAccount.id)
-                // Source the deleted account's DELETE audit entry (recorded at revision_id + 1 by the
-                // custom account delete trigger) as a merge, so the trail shows where it went rather than
-                // "source data missing". entity_source is independent of the now-deleted account row.
-                database.recordSource(
-                    deviceId,
-                    EntityType.ACCOUNT,
-                    deletedAccount.id,
-                    account.revision_id + 1,
-                    Source.Merge,
-                )
-
-                MergeId(mergeId)
-            }
+            database.transactionWithResult { MergeId(merge(deletedAccount, survivingAccount, parentMergeId = null)) }
         }
+
+    /**
+     * Merges [deletedAccount] into [survivingAccount] inside the caller's transaction, then their fee accounts the
+     * same way (see [followFeeAccounts]), and returns the merge's id. [parentMergeId] is the merge this one was made
+     * by, for a fee accounts' merge.
+     */
+    private suspend fun merge(
+        deletedAccount: AccountId,
+        survivingAccount: AccountId,
+        parentMergeId: Long?,
+    ): Long {
+        // Merging an account into itself would reassign its transfers to itself and then delete
+        // it, destroying the "surviving" account; refuse it.
+        require(deletedAccount != survivingAccount) { "Cannot merge an account into itself" }
+
+        // Guard: transfers directly between the two accounts would become invalid
+        // self-transfers (CHECK source != target) once reassigned, so refuse the merge.
+        val between =
+            transferSelectQueries
+                .selectTransfersBetweenAccounts(
+                    accountA = deletedAccount.id,
+                    accountB = survivingAccount.id,
+                    TransferMapper::mapRaw,
+                ).awaitAsList()
+        require(between.isEmpty()) {
+            "Cannot merge: ${between.size} transaction(s) exist between the accounts"
+        }
+
+        // Snapshot only the deleted account's core fields (name/opening date/category/revision),
+        // which the cascade delete leaves no trace of. Attributes and ownerships are NOT
+        // snapshotted: the cascade delete records each one as a DELETE in account_attribute_audit
+        // / person_account_ownership_audit, so unmerge reconstructs them from the audit trail.
+        val account = selectQueries.selectById(deletedAccount.id).awaitAsOne()
+        val sourceTransferIds = transferSelectQueries.selectTransferIdsBySourceAccount(deletedAccount.id).awaitAsList()
+        val targetTransferIds = transferSelectQueries.selectTransferIdsByTargetAccount(deletedAccount.id).awaitAsList()
+
+        mergeWriteQueries.insertMerge(
+            merged_at = Clock.System.now().toEpochMilliseconds(),
+            surviving_account_id = survivingAccount.id,
+            deleted_account_id = deletedAccount.id,
+            deleted_account_name = account.name,
+            deleted_account_opening_date = account.opening_date,
+            deleted_account_category_id = account.category_id,
+            // The delete is recorded as its own revision (OLD.revision_id + 1, see the custom
+            // account delete trigger); store that so the merge note matches the DELETE entry and
+            // unmerge recreates the account at the next revision after it.
+            deleted_account_revision_id = account.revision_id + 1,
+            parent_merge_id = parentMergeId,
+        )
+        val mergeId = mergeWriteQueries.lastInsertRowId().awaitAsOne()
+        // Read before the delete: the cascade takes the deleted account's own fee-account-for tag with it.
+        val deletedOwnFeeTag = feeAccountForValue(deletedAccount)
+
+        val sourceSet = sourceTransferIds.toSet()
+        val targetSet = targetTransferIds.toSet()
+        (sourceSet + targetSet).forEach { transferId ->
+            mergeWriteQueries.insertMergeTransfer(
+                merge_id = mergeId,
+                transfer_id = transferId,
+                moved_source = if (transferId in sourceSet) 1 else 0,
+                moved_target = if (transferId in targetSet) 1 else 0,
+            )
+        }
+        transferWriteQueries.moveTransfersSourceAccount(
+            targetAccount = survivingAccount.id,
+            accountToDelete = deletedAccount.id,
+        )
+        transferWriteQueries.moveTransfersTargetAccount(
+            targetAccount = survivingAccount.id,
+            accountToDelete = deletedAccount.id,
+        )
+        database.entitySourceWriteQueries.reassignStatementAccount(
+            survivingAccountId = survivingAccount.id,
+            deletedAccountId = deletedAccount.id,
+        )
+        // The reassignment bumped each affected transfer's revision; source those new revisions
+        // as a merge so the transaction audit trail isn't left with "source data missing".
+        (sourceSet + targetSet).forEach { transferId ->
+            recordTransferMergeSource(transferId, Source.Merge)
+        }
+
+        // Carry the deleted account's attribute groups onto the survivor BEFORE the cascade delete
+        // takes them away. Without this the merge destroys the loser's bank identity, so the next
+        // import sees an unknown sort code / account number pair and re-creates the very account
+        // just merged away ("merge loses identity, account resurrects").
+        carryAttributeGroups(deletedAccount, survivingAccount, mergeId)
+
+        writeQueries.delete(deletedAccount.id)
+        // Source the deleted account's DELETE audit entry (recorded at revision_id + 1 by the
+        // custom account delete trigger) as a merge, so the trail shows where it went rather than
+        // "source data missing". entity_source is independent of the now-deleted account row.
+        database.recordSource(
+            deviceId,
+            EntityType.ACCOUNT,
+            deletedAccount.id,
+            account.revision_id + 1,
+            Source.Merge,
+        )
+        // Only now, with the deleted account gone, can its fee-account-for tag move: the index allows one
+        // fee account per account, so two accounts can't hold the same tag even for a moment.
+        deletedOwnFeeTag?.let { carryFeeAccountTag(it, survivingAccount, mergeId) }
+        followFeeAccounts(deletedAccount, survivingAccount, mergeId)
+
+        return mergeId
+    }
+
+    /** The account [account] is the fee account of: the value of its fee-account-for attribute, if it has one. */
+    private suspend fun feeAccountForValue(account: AccountId): String? =
+        attributeSelectQueries
+            .selectByAccount(account.id)
+            .awaitAsList()
+            .firstOrNull { it.attribute_type_id == WellKnownIds.ACCOUNT_FEE_ACCOUNT_FOR_ATTR_TYPE_ID }
+            ?.attribute_value
+
+    /**
+     * The merged-away account was the fee account of [owner]; the survivor takes that role, unless it is a fee account
+     * already (a fee account belongs to one account) or [owner] is the survivor itself.
+     */
+    private suspend fun carryFeeAccountTag(
+        owner: String,
+        survivingAccount: AccountId,
+        mergeId: Long,
+    ) {
+        if (owner == survivingAccount.id.toString() || feeAccountForValue(survivingAccount) != null) return
+        database.beginCreationMode()
+        try {
+            insertCarriedAttribute(survivingAccount, WellKnownIds.ACCOUNT_FEE_ACCOUNT_FOR_ATTR_TYPE_ID, owner, "", mergeId)
+        } finally {
+            database.endCreationMode()
+        }
+    }
+
+    /**
+     * An account has at most one fee account, so the survivor of a merge keeps one. When both accounts had one, the
+     * deleted account's is merged into the survivor's (a merge of its own, under [mergeId]); when only the deleted
+     * account had one, it is re-tagged as the survivor's, recorded so unmerge can point it back.
+     */
+    private suspend fun followFeeAccounts(
+        deletedAccount: AccountId,
+        survivingAccount: AccountId,
+        mergeId: Long,
+    ) {
+        val deletedFee = attributeSelectQueries.selectFeeAccountTag(deletedAccount.id.toString()).awaitAsOneOrNull() ?: return
+        // The survivor was the deleted account's fee account: unmerge brings the account back to it, so leave its tag.
+        if (deletedFee.account_id == survivingAccount.id) return
+        val survivingFee = attributeSelectQueries.selectFeeAccountTag(survivingAccount.id.toString()).awaitAsOneOrNull()
+        if (survivingFee == null) {
+            database.beginCreationMode()
+            try {
+                attributeWriteQueries.retagFeeAccount(
+                    to = survivingAccount.id.toString(),
+                    id = deletedFee.id,
+                    from = deletedAccount.id.toString(),
+                )
+            } finally {
+                database.endCreationMode()
+            }
+            mergeWriteQueries.setRetaggedFeeAttribute(attributeId = deletedFee.id, mergeId = mergeId)
+        } else {
+            merge(AccountId(deletedFee.account_id), AccountId(survivingFee.account_id), parentMergeId = mergeId)
+        }
+    }
 
     override suspend fun unmergeAccount(mergeId: MergeId): Unit =
         withContext(Dispatchers.Default) {
-            database.transaction {
-                val merge = mergeSelectQueries.selectById(mergeId.id).awaitAsOneOrNull() ?: return@transaction
-                if (merge.reversed != 0L) return@transaction
-
-                // Recreate the merged-away account with its original id so the transfers reassigned
-                // during the merge can be pointed back at it. Restore at the revision AFTER the one it
-                // was deleted at, so the undo is recorded as a new forward revision in the audit trail
-                // (rather than colliding with the merge's delete revision and looking like a fresh
-                // account / wiped history).
-                val restoredRevision = merge.deleted_account_revision_id + 1
-                // account.name is UNIQUE: another account may have taken the deleted account's name since
-                // the merge. Disambiguate with a counter rather than let insertWithId throw a raw
-                // constraint violation.
-                val takenNames =
-                    selectQueries
-                        .selectAll()
-                        .awaitAsList()
-                        .map { it.name }
-                        .toSet()
-                val restoredName = uniqueRestoreName(merge.deleted_account_name, takenNames)
-                writeQueries.insertWithId(
-                    id = merge.deleted_account_id,
-                    revision_id = restoredRevision,
-                    name = restoredName,
-                    opening_date = merge.deleted_account_opening_date,
-                    category_id = merge.deleted_account_category_id,
-                )
-                // Source the recreated account's INSERT audit entry as a merge-undo so the trail shows
-                // where it came from (rather than "source data missing").
-                database.recordSource(
-                    deviceId,
-                    EntityType.ACCOUNT,
-                    merge.deleted_account_id,
-                    restoredRevision,
-                    Source.Unmerge,
-                )
-
-                // Restore attributes from the audit trail (no bump): the merge's cascade delete recorded
-                // each attribute as a DELETE in account_attribute_audit, and the latest such batch for
-                // this account is exactly the set removed by this merge. group_key is restored with the
-                // value — an account that owned two bank identities would otherwise come back with both
-                // pairs collapsed into the ungrouped slot, violating the UNIQUE constraint.
-                database.beginCreationMode()
-                try {
-                    auditQueries.selectDeletedAttributesForAccount(merge.deleted_account_id).awaitAsList().forEach {
-                        attributeWriteQueries.insert(
-                            account_id = merge.deleted_account_id,
-                            attribute_type_id = it.attribute_type_id,
-                            attribute_value = it.attribute_value,
-                            group_key = it.group_key,
-                        )
-                    }
-                    // Remove the attributes the merge grafted onto the SURVIVOR. Leaving them would have
-                    // both accounts claiming the same bank identity, making the next import's lookup
-                    // non-deterministic (whichever account id the index happens to see first wins).
-                    mergeSelectQueries.selectAttributeIdsForMerge(mergeId.id).awaitAsList().forEach { attributeId ->
-                        attributeWriteQueries.deleteById(attributeId)
-                    }
-                } finally {
-                    database.endCreationMode()
-                }
-
-                // Restore ownerships from the audit trail: the merge's cascade delete recorded each
-                // ownership as a DELETE in person_account_ownership_audit, and the latest such batch for
-                // this account is exactly the set deleted by this merge.
-                auditQueries.selectDeletedOwnershipPersonIds(merge.deleted_account_id).awaitAsList().forEach { personId ->
-                    personWriteQueries.ownershipInsert(person_id = personId, account_id = merge.deleted_account_id)
-                }
-
-                mergeSelectQueries.selectTransfersForMerge(mergeId.id).awaitAsList().forEach { row ->
-                    if (row.moved_source != 0L) {
-                        transferWriteQueries.setTransferSourceAccount(sourceAccount = merge.deleted_account_id, id = row.transfer_id)
-                    }
-                    if (row.moved_target != 0L) {
-                        transferWriteQueries.setTransferTargetAccount(targetAccount = merge.deleted_account_id, id = row.transfer_id)
-                    }
-                    // Moving a transfer back bumped its revision; source that new revision as a merge-undo.
-                    recordTransferMergeSource(row.transfer_id, Source.Unmerge)
-                }
-
-                mergeWriteQueries.markReversed(mergeId.id)
-            }
+            database.transaction { unmerge(mergeId) }
         }
+
+    /** Undoes [mergeId] inside the caller's transaction, after the fee accounts' merges it made. */
+    private suspend fun unmerge(mergeId: MergeId) {
+        val merge = mergeSelectQueries.selectById(mergeId.id).awaitAsOneOrNull() ?: return
+        if (merge.reversed != 0L) return
+        mergeSelectQueries.selectChildMerges(mergeId.id).awaitAsList().forEach { unmerge(MergeId(it)) }
+
+        // Recreate the merged-away account with its original id so the transfers reassigned
+        // during the merge can be pointed back at it. Restore at the revision AFTER the one it
+        // was deleted at, so the undo is recorded as a new forward revision in the audit trail
+        // (rather than colliding with the merge's delete revision and looking like a fresh
+        // account / wiped history).
+        val restoredRevision = merge.deleted_account_revision_id + 1
+        // account.name is UNIQUE: another account may have taken the deleted account's name since
+        // the merge. Disambiguate with a counter rather than let insertWithId throw a raw
+        // constraint violation.
+        val takenNames =
+            selectQueries
+                .selectAll()
+                .awaitAsList()
+                .map { it.name }
+                .toSet()
+        val restoredName = uniqueRestoreName(merge.deleted_account_name, takenNames)
+        writeQueries.insertWithId(
+            id = merge.deleted_account_id,
+            revision_id = restoredRevision,
+            name = restoredName,
+            opening_date = merge.deleted_account_opening_date,
+            category_id = merge.deleted_account_category_id,
+        )
+        // Source the recreated account's INSERT audit entry as a merge-undo so the trail shows
+        // where it came from (rather than "source data missing").
+        database.recordSource(
+            deviceId,
+            EntityType.ACCOUNT,
+            merge.deleted_account_id,
+            restoredRevision,
+            Source.Unmerge,
+        )
+
+        // Restore attributes from the audit trail (no bump): the merge's cascade delete recorded
+        // each attribute as a DELETE in account_attribute_audit, and the latest such batch for
+        // this account is exactly the set removed by this merge. group_key is restored with the
+        // value — an account that owned two bank identities would otherwise come back with both
+        // pairs collapsed into the ungrouped slot, violating the UNIQUE constraint.
+        database.beginCreationMode()
+        try {
+            // Remove the attributes the merge grafted onto the SURVIVOR. Leaving them would have
+            // both accounts claiming the same bank identity, making the next import's lookup
+            // non-deterministic (whichever account id the index happens to see first wins). First, because
+            // a fee-account-for tag may be held by one account only: the restored account takes it back.
+            mergeSelectQueries.selectAttributeIdsForMerge(mergeId.id).awaitAsList().forEach { attributeId ->
+                attributeWriteQueries.deleteById(attributeId)
+            }
+            auditQueries.selectDeletedAttributesForAccount(merge.deleted_account_id).awaitAsList().forEach {
+                attributeWriteQueries.insert(
+                    account_id = merge.deleted_account_id,
+                    attribute_type_id = it.attribute_type_id,
+                    attribute_value = it.attribute_value,
+                    group_key = it.group_key,
+                )
+            }
+            // The deleted account's fee account, re-tagged as the survivor's, is the restored account's again.
+            merge.retagged_fee_attribute_id?.let { attributeId ->
+                attributeWriteQueries.retagFeeAccount(
+                    to = merge.deleted_account_id.toString(),
+                    id = attributeId,
+                    from = merge.surviving_account_id.toString(),
+                )
+            }
+        } finally {
+            database.endCreationMode()
+        }
+
+        // Restore ownerships from the audit trail: the merge's cascade delete recorded each
+        // ownership as a DELETE in person_account_ownership_audit, and the latest such batch for
+        // this account is exactly the set deleted by this merge.
+        auditQueries.selectDeletedOwnershipPersonIds(merge.deleted_account_id).awaitAsList().forEach { personId ->
+            personWriteQueries.ownershipInsert(person_id = personId, account_id = merge.deleted_account_id)
+        }
+
+        mergeSelectQueries.selectTransfersForMerge(mergeId.id).awaitAsList().forEach { row ->
+            if (row.moved_source != 0L) {
+                transferWriteQueries.setTransferSourceAccount(sourceAccount = merge.deleted_account_id, id = row.transfer_id)
+            }
+            if (row.moved_target != 0L) {
+                transferWriteQueries.setTransferTargetAccount(targetAccount = merge.deleted_account_id, id = row.transfer_id)
+            }
+            // Moving a transfer back bumped its revision; source that new revision as a merge-undo.
+            recordTransferMergeSource(row.transfer_id, Source.Unmerge)
+        }
+
+        mergeWriteQueries.markReversed(mergeId.id)
+    }
 
     /**
      * Moves [deletedAccount]'s attributes onto [survivingAccount], recording each row actually inserted in
@@ -354,7 +442,12 @@ class AccountWriteRepositoryImpl(
         survivingAccount: AccountId,
         mergeId: Long,
     ) {
-        val loserAttrs = attributeSelectQueries.selectByAccount(deletedAccount.id).awaitAsList()
+        val loserAttrs =
+            attributeSelectQueries
+                .selectByAccount(deletedAccount.id)
+                .awaitAsList()
+                // A fee-account-for tag moves after the account is deleted (carryFeeAccountTag): two accounts can't hold one.
+                .filter { it.attribute_type_id != WellKnownIds.ACCOUNT_FEE_ACCOUNT_FOR_ATTR_TYPE_ID }
         if (loserAttrs.isEmpty()) return
         val survivor = SurvivorAttributes(attributeSelectQueries.selectByAccount(survivingAccount.id).awaitAsList())
 

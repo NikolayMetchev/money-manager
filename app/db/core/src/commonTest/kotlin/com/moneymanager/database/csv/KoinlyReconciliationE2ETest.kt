@@ -22,6 +22,7 @@ import com.moneymanager.importengineapi.RelationshipMutation
 import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createReconciliationMatch
+import com.moneymanager.importengineapi.feeAccounts
 import com.moneymanager.importengineapi.setReconciliationLinks
 import com.moneymanager.importengineapi.setTradeExcluded
 import com.moneymanager.importengineapi.setTransferExcluded
@@ -645,11 +646,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
                     Account(id = AccountId(0), name = "Coinbase", openingDate = now),
                     Source.Manual,
                 )
-            val coinbaseFees =
-                repositories.importEngine.createAccount(
-                    Account(id = AccountId(0), name = "Coinbase Fees", openingDate = now),
-                    Source.Manual,
-                )
+            val coinbaseFees = repositories.importEngine.feeAccounts(setOf(coinbase), Source.Manual).getValue(coinbase)
             val wallet = assertNotNull(accountByName("Koinly · Coinbase")).id
             repositories.importEngine.setReconciliationLinks(wallet, setOf(coinbase))
             val reconciliation = repositories.reconciliationLinkRepository
@@ -678,7 +675,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
             assertEquals("GBP" to "KNC", trade.from.asset.code to trade.to.asset.code)
             assertEquals(0, trade.from.toDisplayValue().compareTo(BigDecimal("492.66")))
             assertEquals(0, trade.to.toDisplayValue().compareTo(BigDecimal("358.32414347")))
-            // The fee goes to the account's existing fee account, which is now tagged as such.
+            // The fee goes to the account's existing fee account, found by its tag.
             assertEquals("7.34", balanceOf("Coinbase Fees", "GBP"))
             assertEquals(
                 coinbase.id.toString(),

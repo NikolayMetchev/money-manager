@@ -254,7 +254,6 @@ class CsvStrategyExportCodecTest {
                 name = "Withdrawal fee",
                 description = "Withdrawal fee",
                 relationshipType = "fee",
-                counterpartyAccount = "Binance Fees",
                 excludedFromBalances = true,
             )
         val export =
