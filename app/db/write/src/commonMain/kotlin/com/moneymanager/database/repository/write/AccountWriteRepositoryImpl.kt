@@ -422,7 +422,10 @@ class AccountWriteRepositoryImpl(
             // Moving a transfer back bumped its revision; source that new revision as a merge-undo.
             recordTransferMergeSource(row.transfer_id, Source.Unmerge)
         }
-        mergeWriteQueries.restoreImportApplications(deletedAccount = merge.deleted_account_id, survivingAccount = merge.surviving_account_id)
+        mergeWriteQueries.restoreImportApplications(
+            deletedAccount = merge.deleted_account_id,
+            survivingAccount = merge.surviving_account_id,
+        )
 
         mergeWriteQueries.markReversed(mergeId.id)
     }

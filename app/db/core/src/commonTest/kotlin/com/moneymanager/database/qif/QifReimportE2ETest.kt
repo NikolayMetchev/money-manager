@@ -200,7 +200,10 @@ class QifReimportE2ETest : DbTest() {
             val file = createImport()
             apply(file)
             val santander = sourceAccountId()
-            val current = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Santander Current", openingDate = now))
+            val current =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Santander Current", openingDate = now),
+                )
 
             val merge = repositories.accountRepository.mergeAccounts(deletedAccount = santander, survivingAccount = current)
             assertEquals(current, reload(file).lastAppliedAccountId, "the file re-imports onto the account its transactions moved to")

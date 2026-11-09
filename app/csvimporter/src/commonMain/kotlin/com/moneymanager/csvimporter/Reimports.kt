@@ -220,7 +220,14 @@ class Reimports(
         refuseUnrunnable(
             run.map { file ->
                 val imported = plan.imported.getValue(file.source)
-                Triple(file, plan.strategies[file.source], ImportedSettings(imported.accountId ?: accountId, imported.currencyId ?: currencyId))
+                Triple(
+                    file,
+                    plan.strategies[file.source],
+                    ImportedSettings(
+                        imported.accountId ?: accountId,
+                        imported.currencyId ?: currencyId,
+                    ),
+                )
             },
         )
         val skipped = plan.files.count { it.rowCount > 0 && plan.strategies[it.source] == null && it !in run }
@@ -314,9 +321,12 @@ class Reimports(
     override suspend fun prepare(files: List<Source>): suspend (onProgress: (suspend (Progress) -> Unit)?) -> Set<Source> {
         val strategies = csvImportStrategyRepository.getAllStrategies().first()
         val imports =
-            files.mapNotNull { file -> (file as? Source.Csv)?.let { reads.csvImportRepository.getImport(it.importId).first() } }.map { file ->
-                file to strategyFor(file, strategies)
-            }
+            files
+                .mapNotNull { file ->
+                    (file as? Source.Csv)?.let { reads.csvImportRepository.getImport(it.importId).first() }
+                }.map { file ->
+                    file to strategyFor(file, strategies)
+                }
         // Nobody is asked about a file taken along, so one that can't run stops the re-import before it deletes anything.
         refuseUnrunnable(imports.map { (file, strategy) -> Triple(file, strategy, file.importedSettings) })
         return { onProgress ->

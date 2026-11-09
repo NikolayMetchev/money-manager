@@ -31,7 +31,10 @@ internal fun AccountsTab(
     personRepository: PersonReadRepository,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(if (state.sourceAccountRequired) "Source Account" else "Source Account (Optional)", style = MaterialTheme.typography.titleSmall)
+        Text(
+            if (state.sourceAccountRequired) "Source Account" else "Source Account (Optional)",
+            style = MaterialTheme.typography.titleSmall,
+        )
         Text(
             if (state.sourceAccountRequired) {
                 "This strategy names its source account, and the files imported with it re-import with it, so it can't be left " +

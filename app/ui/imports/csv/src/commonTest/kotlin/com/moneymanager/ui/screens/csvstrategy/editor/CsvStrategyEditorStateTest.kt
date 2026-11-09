@@ -122,6 +122,7 @@ class CsvStrategyEditorStateTest {
     @Test
     fun `a strategy naming its source account can not be saved without one`() {
         val now = Instant.fromEpochMilliseconds(1_000)
+
         fun strategy(source: FieldMapping?) =
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
