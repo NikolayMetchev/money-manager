@@ -1,5 +1,6 @@
 package com.moneymanager.ui.screens.csvstrategy.editor
 
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
@@ -8,6 +9,8 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
+import com.moneymanager.domain.model.csvstrategy.FieldMapping
+import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
@@ -114,5 +117,31 @@ class CsvStrategyEditorStateTest {
         val columns = setOf("A", "B", "C")
         val state = CsvStrategyEditorState(strategy = null, availableColumnNames = columns)
         assertEquals(columns, state.identificationColumns)
+    }
+
+    @Test
+    fun `a strategy naming its source account can not be saved without one`() {
+        val now = Instant.fromEpochMilliseconds(1_000)
+        fun strategy(source: FieldMapping?) =
+            CsvImportStrategy(
+                id = CsvImportStrategyId(Uuid.random()),
+                name = "Bank",
+                config =
+                    CsvStrategyConfig(
+                        identificationColumns = setOf("Date"),
+                        fieldMappings = listOfNotNull(source).associateBy { it.fieldType },
+                    ),
+                createdAt = now,
+                updatedAt = now,
+            )
+
+        val named = CsvStrategyEditorState(strategy(HardCodedAccountMapping(TransferField.SOURCE_ACCOUNT, AccountId(7))), setOf("Date"))
+        assertFalse(named.tabHasError(EditorTab.ACCOUNTS))
+        named.selectedAccountId = null
+        assertTrue(named.tabHasError(EditorTab.ACCOUNTS), "files imported with it re-import with its account")
+
+        val chosenEachImport = CsvStrategyEditorState(strategy(null), setOf("Date"))
+        assertFalse(chosenEachImport.sourceAccountRequired)
+        assertFalse(chosenEachImport.tabHasError(EditorTab.ACCOUNTS))
     }
 }

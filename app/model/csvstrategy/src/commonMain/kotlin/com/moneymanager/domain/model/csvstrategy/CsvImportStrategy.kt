@@ -50,4 +50,17 @@ data class CsvImportStrategy(
     fun matchesColumns(csvHeadings: Set<String>): Boolean =
         csvHeadings.containsAll(config.identificationColumns) &&
             (config.identificationColumns + config.optionalColumns).containsAll(csvHeadings)
+
+    /**
+     * Whether this version of a strategy still sets everything [previous] set of a file's import settings: the source
+     * account and the currency. A file imported under a strategy that reads one from its rows records none of its own, so
+     * a version that stopped setting it would leave the file without one, and its re-import would have nothing to run
+     * with. No version may stop, as the files a strategy imported are what a re-import runs.
+     */
+    fun keepsImportSettingsOf(previous: CsvImportStrategy): Boolean =
+        IMPORT_SETTINGS.all { previous.config.fieldMappings[it] == null || config.fieldMappings[it] != null }
+
+    private companion object {
+        val IMPORT_SETTINGS = listOf(TransferField.SOURCE_ACCOUNT, TransferField.CURRENCY)
+    }
 }

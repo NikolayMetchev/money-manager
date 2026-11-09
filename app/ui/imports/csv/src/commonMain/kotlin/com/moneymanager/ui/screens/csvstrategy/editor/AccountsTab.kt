@@ -31,11 +31,16 @@ internal fun AccountsTab(
     personRepository: PersonReadRepository,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text("Source Account (Optional)", style = MaterialTheme.typography.titleSmall)
+        Text(if (state.sourceAccountRequired) "Source Account" else "Source Account (Optional)", style = MaterialTheme.typography.titleSmall)
         Text(
-            "Can also be chosen each time you apply this strategy",
+            if (state.sourceAccountRequired) {
+                "This strategy names its source account, and the files imported with it re-import with it, so it can't be left " +
+                    "for each import to choose"
+            } else {
+                "Can also be chosen each time you apply this strategy"
+            },
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (state.accountsHasError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             RadioButton(
