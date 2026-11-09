@@ -123,6 +123,8 @@ private const val MAX_PASS_THROUGH_CHAIN_LEGS = 16
  * Attribute types that tie an account to a specific real bank account/counterparty identity. An
  * existing account carrying none of these is "unclaimed" — see [ImportEngineImpl.matchAccount].
  */
+private val FEE_ACCOUNT_FOR_TYPE = AttributeTypeId(WellKnownIds.ACCOUNT_FEE_ACCOUNT_FOR_ATTR_TYPE_ID)
+
 private val IDENTITY_ATTR_TYPE_IDS =
     setOf(
         AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID),
@@ -538,7 +540,9 @@ class ImportEngineImpl(
         batch.accountsToCreate.forEach {
             when (it.operation) {
                 ImportOperation.CREATE -> {
-                    require(it.name != null && it.openingDate != null) { "CREATE account requires name/openingDate" }
+                    require((it.name != null || it.match is AccountMatchKey.FeeAccountOf) && it.openingDate != null) {
+                        "CREATE account requires name/openingDate"
+                    }
                 }
 
                 ImportOperation.UPDATE, ImportOperation.DELETE -> {
@@ -947,7 +951,9 @@ class ImportEngineImpl(
         var created = 0
         val shadowTag =
             batch.shadowSource?.let { NewAttribute(AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID), it) }
-        for (rawIntent in batch.accountsToCreate) {
+        // A fee account names the account it belongs to, which may be another intent of this batch: resolve it last.
+        val (feeIntents, otherIntents) = batch.accountsToCreate.partition { it.match is AccountMatchKey.FeeAccountOf }
+        for (rawIntent in otherIntents) {
             val intent =
                 if (shadowTag == null || rawIntent.attributes.any { it.typeId == shadowTag.typeId }) {
                     rawIntent
@@ -979,7 +985,56 @@ class ImportEngineImpl(
             // pre-existing account's UNIQUE collision.
             batchCreatedByName.getOrPut(requestedName) { newId }
         }
+        if (feeIntents.isNotEmpty()) {
+            val nameById = byName.entries.associate { (name, id) -> id to name }.toMutableMap()
+            for (rawIntent in feeIntents) {
+                val intent = if (shadowTag == null) rawIntent else rawIntent.copy(attributes = rawIntent.attributes + shadowTag)
+                val resolved = resolveFeeAccount(intent, keyToId, byName, byAttr, nameById)
+                if (resolved.created) created++
+                keyToId[intent.key] = resolved.id
+            }
+        }
         return AccountResolution(keyToId, created)
+    }
+
+    private class ResolvedFeeAccount(
+        val id: AccountId,
+        val created: Boolean,
+    )
+
+    /**
+     * The fee account of an [AccountMatchKey.FeeAccountOf] intent's account: the one tagged as its fee account, else an
+     * untagged account named "<account> Fees" (one made before fee accounts were tagged, or by hand), which is tagged now,
+     * else a new one. [nameById] holds every account the batch can see, those it created included.
+     */
+    private suspend fun resolveFeeAccount(
+        intent: ImportAccountIntent,
+        keyToId: Map<LocalAccountKey, AccountId>,
+        byName: MutableMap<String, AccountId>,
+        byAttr: MutableMap<Pair<AttributeTypeId, String>, AccountId>,
+        nameById: MutableMap<AccountId, String>,
+    ): ResolvedFeeAccount {
+        val owner =
+            when (val ref = (intent.match as AccountMatchKey.FeeAccountOf).account) {
+                is AccountRef.Existing -> ref.id
+                is AccountRef.Local -> requireNotNull(keyToId[ref.key]) { "Fee account of an unresolved account ${ref.key}" }
+            }
+        val tag = NewAttribute(FEE_ACCOUNT_FOR_TYPE, owner.id.toString())
+        byAttr[tag.typeId to tag.value]?.let { return ResolvedFeeAccount(it, created = false) }
+        val desired = "${requireNotNull(nameById[owner]) { "Fee account of unknown account $owner" }} Fees"
+        val taggedFeeAccounts = byAttr.filterKeys { it.first == FEE_ACCOUNT_FOR_TYPE }.values.toSet()
+        byName[desired]?.takeIf { it != owner && it !in taggedFeeAccounts }?.let { untagged ->
+            accountAttributeRepository.upsertInCreationMode(untagged, tag.typeId, tag.value)
+            byAttr[tag.typeId to tag.value] = untagged
+            return ResolvedFeeAccount(untagged, created = false)
+        }
+        val named = intent.copy(name = desired, attributes = intent.attributes + tag)
+        val resolvedName = uniqueName(desired, named, byName)
+        val id = createAccount(named, resolvedName)
+        byName[resolvedName] = id
+        nameById[id] = resolvedName
+        byAttr[tag.typeId to tag.value] = id
+        return ResolvedFeeAccount(id, created = true)
     }
 
     /**
@@ -1053,6 +1108,7 @@ class ImportEngineImpl(
                 is AccountMatchKey.ByBuiltInType -> byAttr[match.typeId to match.value]
                 is AccountMatchKey.ByPersonalCounterparty -> byPersonalKey[match.key]
                 is AccountMatchKey.AlwaysCreate -> null
+                is AccountMatchKey.FeeAccountOf -> error("A fee account is resolved by resolveFeeAccount")
             }
         if (primary != null) return AccountMatch(primary, adopted = false)
         val bankKeys = intentBankKeys(intent)
@@ -1235,6 +1291,7 @@ class ImportEngineImpl(
                     when (val m = intent.match) {
                         is AccountMatchKey.ByExternalId -> m.typeId
                         is AccountMatchKey.ByBuiltInType -> m.typeId
+                        is AccountMatchKey.FeeAccountOf -> FEE_ACCOUNT_FOR_TYPE
                         else -> null
                     }
                 }.toSet()

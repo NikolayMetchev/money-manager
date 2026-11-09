@@ -229,7 +229,7 @@ class PayPalImportE2ETest : DbTest() {
             val usd = accounts.single { it.name == "PayPal USD" }
             val alice = accounts.single { it.name == "Alice Buyer" }
             val coffee = accounts.single { it.name == "Coffee Roasters" }
-            val fees = accounts.single { it.name == "PayPal API Fees" }
+            val fees = accounts.single { it.name == "PayPal GBP Fees" }
             val conversion = accounts.single { it.name == "PayPal Currency Conversion" }
 
             val gbpTransfers = repositories.transactionRepository.getTransactionsByAccount(gbp.id).first()

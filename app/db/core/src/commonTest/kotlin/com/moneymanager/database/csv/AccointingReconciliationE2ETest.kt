@@ -208,7 +208,7 @@ class AccointingReconciliationE2ETest : DbTest() {
                     "Accointing · Coinbase Wallet",
                     "Accointing: income",
                     "Accointing: internal",
-                    "Accointing Fees",
+                    "Accointing · Binance Fees",
                 ),
                 accounts().map { it.name }.toSet(),
             )
@@ -263,7 +263,7 @@ class AccointingReconciliationE2ETest : DbTest() {
             assertEquals("ETH", trade.to.asset.code)
             assertEquals("1", trade.to.toDisplayValue().toString())
             val fee = transfers().single()
-            assertEquals("Accointing Fees", accountName(fee.targetAccountId))
+            assertEquals("Accointing · Binance Fees", accountName(fee.targetAccountId))
             assertEquals("5", fee.amount.toDisplayValue().toString())
         }
 
@@ -411,7 +411,7 @@ class AccointingReconciliationE2ETest : DbTest() {
             val fee = all.byAmount("0.25")
             assertEquals("BTC", fee.amount.asset.code)
             assertEquals("Accointing · Binance", accountName(fee.sourceAccountId))
-            assertEquals("Accointing Fees", accountName(fee.targetAccountId))
+            assertEquals("Accointing · Binance Fees", accountName(fee.targetAccountId))
         }
 
     @Test

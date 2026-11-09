@@ -49,7 +49,15 @@ class ReconciliationReadRepositoryImpl(
             .asFlow()
             .mapToList(coroutineContext)
             .map { rows ->
-                rows.map { ShadowAccount(AccountId(it.id), it.name, it.source_name, autoLinkDeclined = it.auto_link_declined == 1L) }
+                rows.map {
+                    ShadowAccount(
+                        AccountId(it.id),
+                        it.name,
+                        it.source_name,
+                        autoLinkDeclined = it.auto_link_declined == 1L,
+                        feeAccountFor = it.fee_account_for?.toLongOrNull()?.let(::AccountId),
+                    )
+                }
             }
 
     override fun getLinks(): Flow<List<ReconciliationLink>> =

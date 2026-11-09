@@ -106,6 +106,16 @@ sealed interface AccountMatchKey {
         val key: String,
     ) : AccountMatchKey
 
+    /**
+     * The fee account of [account]: the account whose `fee-account-for` attribute
+     * ([com.moneymanager.domain.model.WellKnownIds.ACCOUNT_FEE_ACCOUNT_FOR_ATTR_TYPE_ID]) names it. When none does, an
+     * account named "<account's name> Fees" that is no other account's fee account is tagged and reused, else one is
+     * created under that name. The intent needs no name; [account] may be a [AccountRef.Local] of the same batch.
+     */
+    data class FeeAccountOf(
+        val account: AccountRef,
+    ) : AccountMatchKey
+
     /** Never reuse — always create a new account. */
     data object AlwaysCreate : AccountMatchKey
 }

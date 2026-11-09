@@ -70,6 +70,13 @@ object WellKnownIds {
     const val ACCOUNT_LOCATION_ATTR_TYPE_ID: Long = -11
 
     /**
+     * "fee-account-for" account attribute: marks an account as the fee account of another account, whose id is the value.
+     * Fees an account is charged go to the account carrying this attribute for it, and one is created only when none
+     * does (`AccountMatchKey.FeeAccountOf`).
+     */
+    const val ACCOUNT_FEE_ACCOUNT_FOR_ATTR_TYPE_ID: Long = -12
+
+    /**
      * "unidentified-counterparty" transfer attribute: this leg's counterparty account is only the raw
      * description the export carried (no strategy rule, persisted mapping or bank identity resolved it),
      * so the account is a placeholder standing in for whoever the real other end was. Marks the leg as
