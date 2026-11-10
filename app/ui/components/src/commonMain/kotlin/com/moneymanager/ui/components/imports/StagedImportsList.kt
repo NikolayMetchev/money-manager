@@ -23,7 +23,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -35,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.StagedImport
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
+import com.moneymanager.ui.foundation.rememberPersistedState
+import kotlinx.serialization.builtins.serializer
 import kotlin.time.Instant
 
 private val TREE_INDENT = 20.dp
@@ -87,7 +88,7 @@ fun <K : Any, F : StagedImport<K>> StagedImportsTabs(
     val unimported = remember(kept) { kept.filter { !it.ignored && it.lastAppliedAt == null } }
     val importedList = remember(kept) { kept.filter { !it.ignored && it.lastAppliedAt != null } }
     val ignoredList = remember(kept) { kept.filter { it.ignored } }
-    var selectedTab by remember { mutableStateOf(ImportTab.UNIMPORTED) }
+    var selectedTab by rememberPersistedState("imports.stagedTab", Int.serializer()) { ImportTab.UNIMPORTED }
     val shown =
         when (selectedTab) {
             ImportTab.UNIMPORTED -> unimported

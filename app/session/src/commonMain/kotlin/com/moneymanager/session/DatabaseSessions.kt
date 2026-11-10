@@ -15,6 +15,7 @@ import com.moneymanager.importengineapi.EditingLockedException
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.localsettings.KEY_LAST_DATABASE
 import com.moneymanager.localsettings.LocalSettings
+import com.moneymanager.localsettings.UiStateStore
 import com.moneymanager.remotestorage.sync.RemoteDatabaseBinding
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.tasks.Progress
@@ -63,6 +64,9 @@ class DatabaseSessions(
     private val credentialVault: CredentialVault,
     private val remoteController: RemoteDatabaseController? = null,
 ) {
+    /** Where views remember their filters and selected tabs, in the same settings file. */
+    val uiState: UiStateStore = UiStateStore(localSettings)
+
     /** Refuses writes while the cloud copy holds changes this device hasn't pulled. */
     val editGate: EditGate =
         EditGate {

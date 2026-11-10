@@ -28,6 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.ui.foundation.rememberPersistedState
+import kotlinx.serialization.builtins.serializer
 
 /**
  * The list screen shared by the fiat and crypto tabs: a headline, the items (or an empty-state
@@ -45,7 +47,7 @@ internal fun <T> AssetListTab(
     itemContent: @Composable (T) -> Unit,
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
-    var search by remember { mutableStateOf("") }
+    var search by rememberPersistedState("assets.search.$title", String.serializer()) { "" }
     val shown =
         // searchTexts is a key because it reads the aliases, which change without the items changing.
         remember(items, search, searchTexts) {

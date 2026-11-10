@@ -75,7 +75,10 @@ import com.moneymanager.apiimporter.ApiCounterpartySuggestion
 import com.moneymanager.apiimporter.ApiImportReads
 import com.moneymanager.apiimporter.ApiSessionDownloadResult
 import com.moneymanager.apiimporter.ApiSessionImportResult
+import com.moneymanager.apiimporter.ApiSessionsArchive
 import com.moneymanager.apiimporter.displaySummary
+import com.moneymanager.compose.filepicker.rememberFilePicker
+import com.moneymanager.compose.filepicker.rememberFileSaver
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.StoredApiCredential
@@ -111,6 +114,7 @@ import com.moneymanager.tasks.formatElapsedTime
 import com.moneymanager.tasks.isRunning
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.tasks.LocalTaskManager
 import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.displayDate
@@ -120,6 +124,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -169,9 +175,18 @@ fun ApiSessionsScreen(
     var transactionsBlockReasonByCredential by remember { mutableStateOf<Map<ApiCredentialId, String>>(emptyMap()) }
     var strategies by remember { mutableStateOf<List<ApiImportStrategy>>(emptyList()) }
     var strategyIdByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiImportStrategyId?>>(emptyMap()) }
-    var selectedStrategyId by remember { mutableStateOf<ApiImportStrategyId?>(null) }
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedStrategyId by rememberPersistedState<ApiImportStrategyId?>(
+        "apiSessions.strategy",
+        ApiImportStrategyId.serializer().nullable,
+    ) {
+        null
+    }
+    var selectedTab by rememberPersistedState("apiSessions.tab", Int.serializer()) { 0 }
     var isLoading by remember { mutableStateOf(true) }
+    // A saved strategy may have been deleted since, which would filter to an empty list under "All strategies".
+    LaunchedEffect(strategies, isLoading) {
+        if (!isLoading && selectedStrategyId != null && strategies.none { it.id == selectedStrategyId }) selectedStrategyId = null
+    }
     // Per-session import state
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportResult>>(emptyMap()) }
     var importErrorBySession by remember { mutableStateOf<Map<ApiSessionId, String>>(emptyMap()) }
@@ -305,6 +320,28 @@ fun ApiSessionsScreen(
         }
     }
 
+    var archiveMessage by remember { mutableStateOf<String?>(null) }
+    val exportSaver = rememberFileSaver(onResult = {})
+    val importPicker =
+        rememberFilePicker(
+            mimeTypes = listOf("application/json"),
+            onResult = { result ->
+                if (result != null) {
+                    scope.launch {
+                        archiveMessage =
+                            ApiSessionsArchive.importAndDescribe(
+                                result.content,
+                                deviceId,
+                                apiSessionRepository,
+                                apiImportStrategyRepository,
+                                importEngine,
+                            )
+                        refresh()
+                    }
+                }
+            },
+        )
+
     LaunchedEffect(Unit) { refresh() }
     EnsureApiConnectionRows(
         apiImportService = apiImportService,
@@ -323,12 +360,27 @@ fun ApiSessionsScreen(
         ) {
             Text(text = "API Sessions", style = MaterialTheme.typography.headlineMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = {
+                    // Built at click time: a snapshot taken when the session list changed would miss the
+                    // requests a download records after its session appears.
+                    scope.launch {
+                        runCatching { ApiSessionsArchive.export(apiSessionRepository, apiImportStrategyRepository) }
+                            .onSuccess { exportSaver.launch("api-sessions.json", it) }
+                            .onFailure { archiveMessage = "Failed to export API sessions: ${it.message}" }
+                    }
+                }) { Text("Export") }
+                TextButton(onClick = { importPicker.launch() }) { Text("Import") }
                 TextButton(onClick = onApiStrategiesClick) { Text("Strategies") }
                 TextButton(onClick = onAddCredentialClick) { Text("+ Connect") }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        archiveMessage?.let {
+            Text(text = it, style = MaterialTheme.typography.bodyMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
         if (LocalApiDownloadNotice.current != null) {
             ApiDownloadNoticeBanner()

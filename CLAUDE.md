@@ -711,6 +711,8 @@ the presenter directly).
   downloading reopens the database, so the front end owns it), which the TUI renders; the desktop's `CloudStorageCard`
   doesn't use it yet. `RemoteDatabaseController.bindingFor` (`app/session`) is the one "is this the cloud copy?" check.
 
+**Remembered view state**: a filter or selected tab that should survive navigation and restarts is `rememberPersistedState(key, serializer) { default }` (`app/ui/foundation`), never a plain `remember`. It stores JSON under `ui.<key>` in `LocalSettings` through `UiStateStore` (provided by `AppStartupHost` as `LocalUiStateStore`; with no host it is per-view memory, so tests don't share state). A presenter takes the saved value and an `onFilterChange` callback (`presentAccounts`) rather than reading settings, so the TUI can ignore it. Drop ids that no longer exist on restore.
+
 **Schema Error Handling**: Always use `collectAsStateWithSchemaErrorHandling()` instead of `collectAsState()` for repository Flows to catch and display database schema errors gracefully.
 
 ## Setup Wizard

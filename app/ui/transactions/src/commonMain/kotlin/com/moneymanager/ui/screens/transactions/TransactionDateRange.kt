@@ -4,6 +4,7 @@ import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
 import com.moneymanager.domain.model.TransferId
+import kotlinx.serialization.Serializable
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Instant
 
@@ -13,6 +14,7 @@ import kotlin.time.Instant
  * It is applied on top of the repository's `(timestamp, id)` keyset paging rather than in SQL, so the
  * paginated statements keep using the `(account_id, timestamp)` index.
  */
+@Serializable
 internal data class TransactionDateRange(
     val from: Instant? = null,
     val to: Instant? = null,

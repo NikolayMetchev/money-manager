@@ -408,6 +408,9 @@ exclude:
       # [5] — `sources` and `queries` are read by every method of the file; the linter reaches its SQLDelight queries as
       # compiled classes and reported both properties unused on two scans in a row.
       - app/db/repository/src/commonMain/kotlin/com/moneymanager/database/repository/TransferSourceReadRepositoryImpl.kt
+      # [5] — the same for this file: once the linter fails to resolve one of its SQLDelight queries, every member that
+      # reads them (the query properties and the row mappers) is reported unused, and the Kotlin sanity check flags the file.
+      - app/db/repository/src/commonMain/kotlin/com/moneymanager/database/repository/ApiSessionReadRepositoryImpl.kt
       # [5] — openInSystemBrowser's jvm and android actuals: no JVM module links them to the expect in commonMain.
       - utils/browser/src/androidMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.android.kt
       - utils/browser/src/jvmMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.jvm.kt

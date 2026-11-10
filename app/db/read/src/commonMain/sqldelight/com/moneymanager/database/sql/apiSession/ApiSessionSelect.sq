@@ -31,6 +31,9 @@ WHERE api_session.credential_id = ?
   AND api_session.id != ?
 GROUP BY api_download_coverage.endpoint_key;
 
+selectDownloadCoverageBySession:
+SELECT endpoint_key, covers_until FROM api_download_coverage WHERE session_id = ? ORDER BY endpoint_key;
+
 selectHeadersByRequestIds:
 SELECT * FROM api_request_header WHERE request_id IN ? ORDER BY request_id, id;
 

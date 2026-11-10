@@ -47,6 +47,7 @@ import com.moneymanager.ui.components.DatabaseProgressScreen
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.foundation.CredentialVaultPromptHost
 import com.moneymanager.ui.foundation.LocalCredentialVault
+import com.moneymanager.ui.foundation.LocalUiStateStore
 import com.moneymanager.ui.screens.FirstRunDatabaseSetupScreen
 import com.moneymanager.ui.screens.settings.CredentialBackupSyncHost
 import com.moneymanager.ui.screens.settings.LocalCredentialSyncController
@@ -108,6 +109,7 @@ fun AppStartupHost(
     CompositionLocalProvider(
         LocalCredentialVault provides vault,
         LocalCredentialSyncController provides credentialSyncController,
+        LocalUiStateStore provides sessions.uiState,
     ) {
         AppStartupContent(
             databaseManager = databaseManager,

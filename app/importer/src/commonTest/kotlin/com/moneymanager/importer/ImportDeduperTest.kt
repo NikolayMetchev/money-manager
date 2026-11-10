@@ -37,6 +37,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -765,6 +766,32 @@ class ImportDeduperTest {
         assertTrue(result[0].transfer.attributes.any { it.typeId == AttributeTypeId(-1) }, "first reconciles")
         assertTrue(result[1].transfer.attributes.none { it.typeId == AttributeTypeId(-1) }, "second is a plain import")
     }
+
+    private fun reconciledWith(result: Classified): TransferId? =
+        result.transfer.relationships
+            .singleOrNull { it.typeId == RelationshipTypeId(1) }
+            ?.relatedTransferId
+
+    private fun pairsNearestPayment(newestFirst: Boolean) {
+        // One payment funds a deposit seconds later; the next day's same-amount deposit has only that payment as a
+        // candidate, 7.5 hours away. Whichever order the file lists them in, the deposit seconds away must get it.
+        val policy = unidentifiedPolicy.copy(reconcileWindow = SettlementWindow.Elapsed(12 * 60 * 60L))
+        val payment = bankCredit(40, timestamp = baseTime)
+        val near = placeholderDeposit(0, timestamp = baseTime + 8.seconds)
+        val far = placeholderDeposit(1, timestamp = baseTime + 7.hours + 30.minutes + 26.seconds)
+        val rows = if (newestFirst) listOf(far, near) else listOf(near, far)
+        val result = ImportDeduper(policy, existing = listOf(payment)).classify(rows)
+        val nearResult = result[rows.indexOf(near)]
+        val farResult = result[rows.indexOf(far)]
+        assertEquals(TransferId(40), reconciledWith(nearResult))
+        assertEquals(null, reconciledWith(farResult))
+    }
+
+    @Test
+    fun unidentifiedCounterparty_pairsEachRowWithItsNearestLeg_newestFirst() = pairsNearestPayment(newestFirst = true)
+
+    @Test
+    fun unidentifiedCounterparty_pairsEachRowWithItsNearestLeg_oldestFirst() = pairsNearestPayment(newestFirst = false)
 
     // Conduit statements: [wallet] is a conduit (PayPal) and [bank] the card side of a pass-through chain
     // (card -> bank -> wallet -> merchant) another import already booked. The wallet's own export records

@@ -39,6 +39,7 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.presenter.accounts.AccountsEvent
+import com.moneymanager.presenter.accounts.SavedAccountsFilter
 import com.moneymanager.presenter.accounts.presentAccounts
 import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
@@ -51,6 +52,7 @@ import com.moneymanager.ui.components.MultiSelectFilterDropdown
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.foundation.LocalStartupProbe
 import com.moneymanager.ui.foundation.StartupMilestone
+import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.launch
 
@@ -90,7 +92,8 @@ fun AccountsScreen(
             )
         }
     val snapshots = remember(accountQuery) { accountQuery.snapshot() }
-    val model = presentAccounts(snapshots)
+    var savedFilter by rememberPersistedState("accounts.filter", SavedAccountsFilter.serializer()) { SavedAccountsFilter() }
+    val model = presentAccounts(snapshots, savedFilter) { savedFilter = it }
     val startupProbe = LocalStartupProbe.current
     if (startupProbe != null) {
         LaunchedEffect(model.loaded) {

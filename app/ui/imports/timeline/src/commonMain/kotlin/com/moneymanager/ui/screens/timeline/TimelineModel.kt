@@ -9,9 +9,11 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
 /** Which dimension timeline rows are grouped by. */
+@Serializable
 enum class TimelineGroupMode {
     STRATEGY,
     ACCOUNT,

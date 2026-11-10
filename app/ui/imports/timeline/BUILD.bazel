@@ -18,7 +18,10 @@ kmp_library(
     js_deps = ["@maven_kmp//:compose_material3"],
     jvm_deps = ["@maven_kmp//:compose_material3_desktop"],
     metadata_deps = ["@maven_kmp//:compose_material3"],
-    plugins = ["compose"],
+    plugins = [
+        "compose",
+        "serialization",
+    ],
     visibility = ["//visibility:public"],
     wasm_js_deps = ["@maven_kmp//:compose_material3"],
     web_targets = [
@@ -36,6 +39,7 @@ kmp_library(
         "@maven_kmp//:compose_foundation",
         "@maven_kmp//:compose_ui",
         "@maven_kmp//:kotlinx_datetime",
+        "@maven_kmp//:kotlinx_serialization_core",
         "@maven_kmp//:org_jetbrains_compose_foundation_foundation_layout",
         "@maven_kmp//:org_jetbrains_compose_ui_ui_geometry",
         "@maven_kmp//:org_jetbrains_compose_ui_ui_text",
@@ -66,7 +70,10 @@ kmp_test(
         "-Dskiko.test.harness=true",
     ],
     keep_deps = ["//bazel/kmp/deps:compose_desktop_current_os"],
-    plugins = ["compose"],
+    plugins = [
+        "compose",
+        "serialization",
+    ],
     deps = [
         "//app/model/core",
         "//app/model/repository/read",

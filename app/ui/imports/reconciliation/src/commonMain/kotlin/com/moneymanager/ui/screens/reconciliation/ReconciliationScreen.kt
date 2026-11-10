@@ -77,6 +77,7 @@ import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.tasks.LocalTaskManager
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.formatAmount
@@ -84,12 +85,15 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.serializer
 import kotlin.time.Clock
 import kotlin.time.Duration
 
 /** Rows a bulk run writes per engine call: one transaction each, with the progress bar moving between them. */
 private const val BULK_CHUNK = 50
 
+@Serializable
 private enum class ResultTab(
     val label: String,
 ) {
@@ -132,7 +136,12 @@ fun ReconciliationScreen(
         )
         return
     }
-    var selectedName by remember { mutableStateOf(loadedSources.first().name) }
+    var selectedName by
+        rememberPersistedState(
+            "reconciliation.source",
+            String.serializer(),
+            restore = { name -> if (loadedSources.any { it.name == name }) name else loadedSources.first().name },
+        ) { loadedSources.first().name }
     val source = loadedSources.firstOrNull { it.name == selectedName } ?: loadedSources.first()
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -233,8 +242,8 @@ private fun SourceReconciliation(
         remember(source, unlinked, accounts) {
             planAccountCreation(source, unlinked.filterNot { it.wallet.autoLinkDeclined }.map { it.wallet }, accounts)
         }
-    var hideUnknownAssets by remember { mutableStateOf(true) }
-    var tab by remember { mutableStateOf(ResultTab.UNMATCHED) }
+    var hideUnknownAssets by rememberPersistedState("reconciliation.hideUnknownAssets", Boolean.serializer()) { true }
+    var tab by rememberPersistedState("reconciliation.tab", ResultTab.serializer()) { ResultTab.UNMATCHED }
     val expanded = remember(source) { mutableStateMapOf<String, Boolean>() }
 
     fun setLinks(
