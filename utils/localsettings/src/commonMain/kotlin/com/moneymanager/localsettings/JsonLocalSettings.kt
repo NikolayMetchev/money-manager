@@ -9,11 +9,9 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.io.IOException
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 private val logger = Logger.withTag("JsonLocalSettings")
 
@@ -82,8 +80,11 @@ class JsonLocalSettings(
             if (after == before) return@synchronized true
             try {
                 // Sorted so the file diffs cleanly between writes.
-                val json = JsonObject(after.entries.sortedBy { it.key }.associate { it.key to JsonPrimitive(it.value) })
-                val encoded = prettyJson.encodeToString(JsonObject.serializer(), json)
+                val encoded =
+                    prettyJson.encodeToString(
+                        settingsSerializer,
+                        after.entries.sortedBy { it.key }.associate { it.key to it.value },
+                    )
                 text.write(encoded)
                 cachedText = encoded
                 cached = after
@@ -113,18 +114,15 @@ class JsonLocalSettings(
 
     private fun parse(json: String): Map<String, String> =
         try {
-            Json.parseToJsonElement(json).jsonObject.mapValues { (key, value) ->
-                val primitive = value.jsonPrimitive
-                require(primitive.isString) { "Setting $key is not a string" }
-                primitive.content
-            }
+            Json.decodeFromString(settingsSerializer, json)
         } catch (e: IllegalArgumentException) {
-            // Malformed JSON (SerializationException is one), or a value that isn't a string.
+            // Malformed JSON, or a value that isn't a string (both are SerializationExceptions).
             logger.w(e) { "Ignoring unreadable settings in $text" }
             emptyMap()
         }
 
     private companion object {
         val prettyJson = Json { prettyPrint = true }
+        val settingsSerializer = MapSerializer(String.serializer(), String.serializer())
     }
 }
