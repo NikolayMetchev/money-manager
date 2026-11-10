@@ -1,6 +1,6 @@
 package com.moneymanager.tools.repo
 
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -18,8 +18,7 @@ class DependencySnapshotTest {
         assertEquals(setOf("g:a"), mavenInstallArtifacts(module, "tools"))
         val lock =
             """{"__INPUT_ARTIFACTS_HASH":{},"artifacts":{"g:a":{"version":"1"},"g:b":{"version":"2"}},"dependencies":{"g:a":["g:b"]}}"""
-        val result: JsonObject = manifest("bazel/maven/tools_install.json", lock, module)
-        val resolved = result.toString()
+        val resolved = Json.encodeToString(manifest("bazel/maven/tools_install.json", lock, module))
         assertEquals(
             true,
             resolved.contains(
@@ -43,8 +42,7 @@ class DependencySnapshotMoreTest {
             """{"inputs":{"libraries":{"core":"g:a:1"}},"artifacts":{
               "g:a":{"jvm":{"version":"1","deps":["g:b"]},"native":{"version":"1","deps":["g:b"]}},
               "g:b":{"jvm":{"version":"2"},"native":{"version":"3"}}}}"""
-        val result: JsonObject = manifest("bazel/kmp/deps/maven_kmp.lock.json", lock, "")
-        val text = result.toString()
+        val text = Json.encodeToString(manifest("bazel/kmp/deps/maven_kmp.lock.json", lock, ""))
         assertTrue(text.contains(""""scope":"runtime""""))
         assertTrue(text.contains(""""dependencies":["pkg:maven/g/b@2","pkg:maven/g/b@3"]"""))
         assertTrue(text.contains(""""package_url":"pkg:maven/g/b@3","relationship":"indirect""""))
@@ -60,8 +58,14 @@ class DependencySnapshotMoreTest {
                 "GITHUB_JOB" to "job",
                 "GITHUB_WORKFLOW" to "wf",
             )
-        val result = snapshot(mapOf("a.json" to JsonObject(emptyMap())), "2026-01-01T00:00:00Z") { env.getValue(it) }.toString()
+        val result =
+            Json.encodeToString(
+                snapshot(
+                    mapOf("a.json" to Manifest("a.json", ManifestFile("a.json"), emptyMap())),
+                    "2026-01-01T00:00:00Z",
+                ) { env.getValue(it) },
+            )
         assertTrue(result.contains(""""correlator":"wf_job""""))
-        assertTrue(result.contains(""""manifests":{"a.json":{}}"""))
+        assertTrue(result.contains(""""manifests":{"a.json":{"name":"a.json""""))
     }
 }

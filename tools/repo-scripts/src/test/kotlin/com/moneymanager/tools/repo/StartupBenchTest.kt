@@ -1,8 +1,6 @@
 package com.moneymanager.tools.repo
 
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
@@ -54,22 +52,22 @@ class StartupBenchTest {
                 out.path,
             ),
         )
-        val records = out.readLines().map { Json.parseToJsonElement(it).jsonObject }
-        val runtimes = records.map { it.getValue("runtime").jsonPrimitive.content }.toSet()
+        val records = out.readLines().map { Json.decodeFromString<BenchRecord>(it) }
+        val runtimes = records.map { it.runtime }.toSet()
         assertEquals(setOf("desktop", "mm-jvm", "mm"), runtimes)
         assertTrue(
             records.any {
-                it.getValue("metric").jsonPrimitive.content == "window" &&
-                    it.getValue("median_ms").jsonPrimitive.content == "12.5"
+                it.metric == "window" &&
+                    it.medianMs == 12.5
             },
         )
-        assertTrue(records.all { it.getValue("sha").jsonPrimitive.content == "abc" && it.getValue("runs").jsonPrimitive.content == "2" })
+        assertTrue(records.all { it.sha == "abc" && it.runs == 2 })
         assertEquals(
             listOf("native"),
             records
                 .filter {
-                    it.getValue("runtime").jsonPrimitive.content == "mm"
-                }.map { it.getValue("variant").jsonPrimitive.content }
+                    it.runtime == "mm"
+                }.map { it.variant }
                 .distinct(),
         )
     }
