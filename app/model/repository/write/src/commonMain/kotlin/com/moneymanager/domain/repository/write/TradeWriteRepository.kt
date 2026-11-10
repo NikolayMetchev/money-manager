@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.repository.TradeReadRepository
 import kotlin.time.Instant
@@ -51,6 +52,9 @@ interface TradeWriteRepository : TradeReadRepository {
      */
     suspend fun createTrades(trades: List<NewTrade>): List<TradeCreateResult>
 
+    /** Applies [edits] in one database transaction, recording one revision and provenance per trade. */
+    suspend fun updateTrades(edits: List<TradeEdit>)
+
     /** Deletes [ids] in one database transaction: one commit for the lot rather than one per trade. */
     suspend fun deleteTrades(ids: Collection<TradeId>)
 
@@ -73,3 +77,8 @@ interface TradeWriteRepository : TradeReadRepository {
         typeId: AttributeTypeId,
     )
 }
+
+data class TradeEdit(
+    val trade: Trade,
+    val source: Source,
+)

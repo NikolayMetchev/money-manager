@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -40,10 +41,13 @@ import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.Trade
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.ExchangeOrderReadRepository
 import com.moneymanager.domain.repository.write.AccountAttributeWriteRepository
 import com.moneymanager.domain.repository.write.AccountWriteRepository
@@ -87,6 +91,62 @@ import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 class AccountTransactionsScreenTest {
+    @Test
+    fun tradeEditor_displaysAssociatedFees() {
+        runMoneyManagerComposeUiTest {
+            val now = Clock.System.now()
+            val usd =
+                Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
+            val eur =
+                Currency(id = CurrencyId(2L), code = "EUR", name = "Euro", scaleFactor = 100)
+            val trade =
+                Trade(
+                    id = TradeId(42L),
+                    timestamp = now,
+                    description = "Buy crypto",
+                    fromAccountId = AccountId(1L),
+                    from = Money.fromDisplayValue("50", usd),
+                    toAccountId = AccountId(2L),
+                    to = Money.fromDisplayValue("45", eur),
+                )
+            val fee =
+                Transfer(
+                    id = TransferId(43L),
+                    timestamp = now,
+                    description = "Service fee",
+                    sourceAccountId = AccountId(1L),
+                    targetAccountId = AccountId(3L),
+                    amount = Money.fromDisplayValue("1", usd),
+                )
+            val cryptoRepository =
+                mock<CryptoReadRepository>(MockMode.autoUnit) {
+                    every { getAllCryptoAssets() } returns flowOf(emptyList())
+                }
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    TradeEntryDialog(
+                        accountRepository = createAccountRepository(emptyList()),
+                        categoryRepository = createCategoryRepository(),
+                        personRepository = createPersonRepository(),
+                        currencyRepository = createCurrencyRepository(listOf(usd, eur)),
+                        cryptoRepository = cryptoRepository,
+                        maintenance = createMaintenance(),
+                        trade = trade,
+                        feeTransfers = listOf(fee),
+                        onDismiss = {},
+                    )
+                }
+            }
+
+            waitUntilExactlyOneExists(hasText("Edit Trade"))
+            waitForIdle()
+            onNodeWithText("Associated fees").assertIsDisplayed()
+            onNodeWithText("Service fee", substring = true).assertExists()
+            onNodeWithText("Save trade").assertIsDisplayed()
+        }
+    }
+
     @Test
     fun accountMatrix_rendersWhenTotalColumnWidthExceedsComposeConstraintsLimit() {
         runMoneyManagerComposeUiTest {
@@ -1506,6 +1566,7 @@ class AccountTransactionsScreenTest {
         mock(MockMode.autoUnit) {
             every { getAllAccounts() } returns flowOf(accounts)
             every { getAccountById(any()) } calls { (id: AccountId) -> flowOf(accounts.find { it.id == id }) }
+            everySuspend { getAccountIdsByAttribute(any(), any()) } returns emptySet()
             everySuspend { createAccount(any(), any()) } returns AccountId(999L)
             everySuspend { createAccountsBatch(any(), any()) } returns emptyList()
             everySuspend { updateAccount(any(), any()) } returns 1L

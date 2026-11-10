@@ -64,20 +64,24 @@ import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ExchangeOrderId
+import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ExchangeOrderReadRepository
 import com.moneymanager.domain.repository.HolidayCalendarReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
@@ -199,8 +203,10 @@ fun AccountTransactionsScreen(
     holidayCalendarRepository: HolidayCalendarReadRepository? = null,
     exchangeOrderRepository: ExchangeOrderReadRepository,
     maintenance: Maintenance,
-    // Null disables trade editing (the exclusion toggle); tests of transfer behaviour needn't supply it.
+    // Null disables trade editing; transfer-only callers needn't supply trade repositories.
     tradeRepository: TradeReadRepository? = null,
+    relationshipRepository: RelationshipReadRepository? = null,
+    cryptoRepository: CryptoReadRepository? = null,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
     onAccountClick: (AccountId, String, CurrencyId?, TransferId?) -> Unit = { _, _, _, _ -> },
@@ -237,6 +243,8 @@ fun AccountTransactionsScreen(
     var transactionIdToEdit by remember { mutableStateOf<TransferId?>(null) }
     var transactionToEdit by remember { mutableStateOf<Transfer?>(null) }
     var tradeIdToEdit by remember { mutableStateOf<TradeId?>(null) }
+    var tradeToEdit by remember { mutableStateOf<Trade?>(null) }
+    var tradeFees by remember { mutableStateOf<List<Transfer>>(emptyList()) }
 
     // Edit account state - stores the account selected for editing
     var accountToEdit by remember { mutableStateOf<Account?>(null) }
@@ -253,6 +261,26 @@ fun AccountTransactionsScreen(
             } else {
                 null
             }
+    }
+
+    LaunchedEffect(tradeIdToEdit, tradeRepository, relationshipRepository) {
+        val id = tradeIdToEdit
+        val trades = tradeRepository
+        if (id == null || trades == null) {
+            tradeToEdit = null
+            tradeFees = emptyList()
+        } else {
+            tradeToEdit = trades.getTradeById(id).first()
+            val feeIds =
+                relationshipRepository
+                    ?.getByTransaction(id)
+                    ?.first()
+                    .orEmpty()
+                    .filter { it.relationshipType.id.id == WellKnownIds.FEE_RELATIONSHIP_TYPE_ID }
+                    .flatMap { it.othersThan(id) }
+                    .filterIsInstance<TransferId>()
+            tradeFees = feeIds.mapNotNull { transactionRepository.getTransactionById(it.id).first() }
+        }
     }
 
     // Coroutine scope for scroll animations and pagination
@@ -1318,14 +1346,21 @@ fun AccountTransactionsScreen(
     }
 
     val editedTradeId = tradeIdToEdit
-    if (editedTradeId != null && tradeRepository != null) {
-        TradeExclusionDialog(
-            tradeId = editedTradeId,
-            tradeRepository = tradeRepository,
-            maintenance = maintenance,
-            onDismiss = { tradeIdToEdit = null },
-            onSaved = { refreshTrigger++ },
-        )
+    if (editedTradeId != null && tradeRepository != null && cryptoRepository != null) {
+        tradeToEdit?.let { trade ->
+            TradeEntryDialog(
+                accountRepository = accountRepository,
+                categoryRepository = categoryRepository,
+                personRepository = personRepository,
+                currencyRepository = currencyRepository,
+                cryptoRepository = cryptoRepository,
+                maintenance = maintenance,
+                trade = trade,
+                feeTransfers = tradeFees,
+                onDismiss = { tradeIdToEdit = null },
+                onSaved = { refreshTrigger++ },
+            )
+        }
     }
 
     // Show edit dialog if a transaction is selected for editing

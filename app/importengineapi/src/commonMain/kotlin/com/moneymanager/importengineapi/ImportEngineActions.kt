@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -107,6 +108,29 @@ suspend fun ImportEngine.createTrade(
             ),
         )
     return requireNotNull(result.createdTradeIds[key]) { "Trade was not created" }
+}
+
+/** Applies a person's edit to an existing trade, preserving its id and audit history. */
+suspend fun ImportEngine.updateTrade(trade: Trade) {
+    import(
+        ImportBatch.manualEdits(
+            trades =
+                listOf(
+                    ImportTradeIntent(
+                        key = LocalTradeKey("manual-${trade.id}"),
+                        source = Source.Manual,
+                        operation = ImportOperation.UPDATE,
+                        existingId = trade.id,
+                        timestamp = trade.timestamp,
+                        description = trade.description,
+                        fromAccountId = trade.fromAccountId,
+                        fromAmount = trade.from,
+                        toAccountId = trade.toAccountId,
+                        toAmount = trade.to,
+                    ),
+                ),
+        ),
+    )
 }
 
 /** Deletes a currency by id. */

@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.write.NewTrade
 import com.moneymanager.domain.repository.write.TradeCreateResult
+import com.moneymanager.domain.repository.write.TradeEdit
 import com.moneymanager.domain.repository.write.TradeWriteRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -89,6 +90,33 @@ class TradeWriteRepositoryImpl(
         withContext(Dispatchers.Default) {
             writeQueries.transaction {
                 ids.forEach { writeQueries.delete(it.id) }
+            }
+        }
+
+    override suspend fun updateTrades(edits: List<TradeEdit>): Unit =
+        withContext(Dispatchers.Default) {
+            writeQueries.transaction {
+                edits.forEach { edit ->
+                    val trade = edit.trade
+                    require(trade.from.asset.id != trade.to.asset.id) {
+                        "A trade must exchange two different assets " +
+                            "(from and to assets are both ${trade.from.asset.code})"
+                    }
+                    writeQueries.bumpRevision(trade.id.id)
+                    val revision = selectQueries.selectRevision(trade.id.id).awaitAsOneOrNull() ?: return@forEach
+                    writeQueries.update(
+                        timestamp = trade.timestamp.toEpochMilliseconds(),
+                        description = trade.description,
+                        from_account_id = trade.fromAccountId.id,
+                        from_asset_id = trade.from.asset.id.id,
+                        from_amount = trade.from.amount.toString(),
+                        to_account_id = trade.toAccountId.id,
+                        to_asset_id = trade.to.asset.id.id,
+                        to_amount = trade.to.amount.toString(),
+                        id = trade.id.id,
+                    )
+                    database.recordSource(deviceId, EntityType.TRADE, trade.id.id, revision, edit.source)
+                }
             }
         }
 

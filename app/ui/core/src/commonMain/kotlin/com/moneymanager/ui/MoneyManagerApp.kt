@@ -546,6 +546,8 @@ fun MoneyManagerApp(
                                                 exchangeOrderRepository = services.transactions.exchangeOrderRepository,
                                                 maintenance = services.imports.maintenance,
                                                 tradeRepository = services.transactions.tradeRepository,
+                                                relationshipRepository = services.transactions.relationshipRepository,
+                                                cryptoRepository = services.accounts.cryptoRepository,
                                                 onAccountIdChange = { accountId ->
                                                     currentlyViewedAccountId = accountId
                                                 },
