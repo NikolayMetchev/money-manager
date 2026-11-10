@@ -50,7 +50,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
-import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -102,7 +101,7 @@ fun ImportTimelineScreen(
     val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         accountRepository.getAllAccounts()
     }
-    val loadedPeople by rememberFlowAsStateWithSchemaErrorHandling<List<Person>?>(initial = null) {
+    val loadedPeople by rememberFlowAsStateWithSchemaErrorHandling(initial = null) {
         personRepository.getAllPeople()
     }
     val people = loadedPeople ?: emptyList()
