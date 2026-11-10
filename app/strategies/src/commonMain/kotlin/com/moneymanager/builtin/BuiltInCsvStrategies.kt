@@ -376,8 +376,8 @@ object BuiltInCsvStrategies {
     /** A column the Revolut strategy's rules write: the row's identity, which the export lacks. */
     private const val REVOLUT_ROW_ID_COLUMN = "Row ID"
 
-    /** Account name prefix of a Revolut balance ("Revolut: GBP"). */
-    private const val REVOLUT_ACCOUNT_PREFIX = "Revolut: "
+    /** The one account every Revolut currency balance lives in (an account holds one balance per currency). */
+    private const val REVOLUT_ACCOUNT = "Revolut"
 
     /** Both sides of a currency exchange, which sit in two currencies' files, go through this account. */
     private const val REVOLUT_EXCHANGE_ACCOUNT = "Revolut Exchange"
@@ -2075,9 +2075,9 @@ object BuiltInCsvStrategies {
     /**
      * Built-in strategy for Revolut's account statement export (`account-statement_2018-05-01_2026-11-08_en-gb_3e1b0f.csv`):
      * `Type, Product, Started Date, Completed Date, Description, Amount, Fee, Currency, State, Balance`. One file
-     * holds one currency's balance, and `Amount` is signed and excludes `Fee` (the running balance falls by both).
+     * holds one currency, and `Amount` is signed and excludes `Fee` (the running balance falls by both).
      *
-     * Each balance is the account "Revolut: <Currency>". The counterparty comes from the description: the
+     * Every file books to the one account "Revolut", which holds a balance per currency. The counterparty comes from the description: the
      * name after "To", "Transfer from", "SWIFT Transfer to" or "Payment from"; ATM withdrawals consolidate into the
      * built-in "ATM"; `REVX_TRANSFER` goes to the "Revolut X" account the exchange API strategy creates. A top-up
      * (a card, or open banking) never says where the money came from, so its counterparty is a placeholder that
@@ -2141,10 +2141,7 @@ object BuiltInCsvStrategies {
                 incomingWhenPositive("Amount"),
                 fee(FeeRule(amount = ValueExpr.of("Fee")), conditions = listOf(Condition("Fee", ConditionOp.POSITIVE))),
                 wholeFeeWhen("Amount", "Type", "^Fee$"),
-                accounts(
-                    AccountSide.SOURCE,
-                    naming("Currency", trim = true, name = REVOLUT_ACCOUNT_PREFIX + AccountNaming.VALUE_PLACEHOLDER),
-                ),
+                accounts(AccountSide.SOURCE, fixedNaming("Currency", REVOLUT_ACCOUNT)),
                 accounts(
                     AccountSide.TARGET,
                     fixedNaming("Description", REVOLUT_EXCHANGE_ACCOUNT),
