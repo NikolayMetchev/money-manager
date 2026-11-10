@@ -787,6 +787,7 @@ class ImportDeduperTest {
         assertEquals(null, reconciledWith(farResult))
     }
 
+    @Test
     fun unidentifiedCounterparty_pairsEachRowWithItsNearestLeg_newestFirst() = pairsNearestPayment(newestFirst = true)
 
     @Test
