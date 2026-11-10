@@ -101,6 +101,14 @@ class ApiSessionReadRepositoryImpl(
                 .associate { row -> row.endpoint_key to Instant.fromEpochMilliseconds(row.covers_until) }
         }
 
+    override suspend fun getDownloadCoverageBySession(sessionId: ApiSessionId): Map<String, Instant> =
+        withContext(Dispatchers.Default) {
+            selectQueries
+                .selectDownloadCoverageBySession(sessionId.id)
+                .awaitAsList()
+                .associate { row -> row.endpoint_key to Instant.fromEpochMilliseconds(row.covers_until) }
+        }
+
     override suspend fun getResponsesBySession(sessionId: ApiSessionId): List<ApiResponse> =
         withContext(Dispatchers.Default) {
             selectQueries.selectResponsesBySession(sessionId.id).awaitAsList().map { it.toApiResponse() }

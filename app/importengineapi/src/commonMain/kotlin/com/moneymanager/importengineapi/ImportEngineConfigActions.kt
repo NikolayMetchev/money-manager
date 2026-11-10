@@ -424,6 +424,10 @@ suspend fun ImportEngine.createApiSession(
     )
 }
 
+suspend fun ImportEngine.deleteApiSession(id: ApiSessionId) {
+    import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.DeleteSession(id))))
+}
+
 suspend fun ImportEngine.insertApiRequest(
     sessionId: ApiSessionId,
     method: String,

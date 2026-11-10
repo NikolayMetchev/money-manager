@@ -75,7 +75,10 @@ import com.moneymanager.apiimporter.ApiCounterpartySuggestion
 import com.moneymanager.apiimporter.ApiImportReads
 import com.moneymanager.apiimporter.ApiSessionDownloadResult
 import com.moneymanager.apiimporter.ApiSessionImportResult
+import com.moneymanager.apiimporter.ApiSessionsArchive
 import com.moneymanager.apiimporter.displaySummary
+import com.moneymanager.compose.filepicker.rememberFilePicker
+import com.moneymanager.compose.filepicker.rememberFileSaver
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.StoredApiCredential
@@ -317,6 +320,28 @@ fun ApiSessionsScreen(
         }
     }
 
+    var archiveMessage by remember { mutableStateOf<String?>(null) }
+    val exportSaver = rememberFileSaver(onResult = {})
+    val importPicker =
+        rememberFilePicker(
+            mimeTypes = listOf("application/json"),
+            onResult = { result ->
+                if (result != null) {
+                    scope.launch {
+                        archiveMessage =
+                            ApiSessionsArchive.importAndDescribe(
+                                result.content,
+                                deviceId,
+                                apiSessionRepository,
+                                apiImportStrategyRepository,
+                                importEngine,
+                            )
+                        refresh()
+                    }
+                }
+            },
+        )
+
     LaunchedEffect(Unit) { refresh() }
     EnsureApiConnectionRows(
         apiImportService = apiImportService,
@@ -335,12 +360,27 @@ fun ApiSessionsScreen(
         ) {
             Text(text = "API Sessions", style = MaterialTheme.typography.headlineMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = {
+                    // Built at click time: a snapshot taken when the session list changed would miss the
+                    // requests a download records after its session appears.
+                    scope.launch {
+                        runCatching { ApiSessionsArchive.export(apiSessionRepository, apiImportStrategyRepository) }
+                            .onSuccess { exportSaver.launch("api-sessions.json", it) }
+                            .onFailure { archiveMessage = "Failed to export API sessions: ${it.message}" }
+                    }
+                }) { Text("Export") }
+                TextButton(onClick = { importPicker.launch() }) { Text("Import") }
                 TextButton(onClick = onApiStrategiesClick) { Text("Strategies") }
                 TextButton(onClick = onAddCredentialClick) { Text("+ Connect") }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        archiveMessage?.let {
+            Text(text = it, style = MaterialTheme.typography.bodyMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
         if (LocalApiDownloadNotice.current != null) {
             ApiDownloadNoticeBanner()

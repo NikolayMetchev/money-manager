@@ -1,3 +1,4 @@
+# gazelle:kmp_plugins serialization
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_forbid_deps //app/db/core //app/di/core //app/ui/core
@@ -28,6 +29,7 @@ kmp_library(
         "macosArm64",
         "mingwX64",
     ],
+    plugins = ["serialization"],
     visibility = ["//visibility:public"],
     web_targets = [
         "wasmJs",
@@ -70,6 +72,7 @@ kmp_test(
         "macosArm64",
         "mingwX64",
     ],
+    plugins = ["serialization"],
     web_targets = [
         "wasmJs",
         "js",

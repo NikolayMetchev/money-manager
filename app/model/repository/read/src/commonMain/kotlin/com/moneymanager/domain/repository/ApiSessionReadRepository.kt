@@ -66,6 +66,12 @@ interface ApiSessionReadRepository {
     ): Map<String, Instant>
 
     /**
+     * How far each endpoint got within [sessionId] itself, keyed by endpoint key — what a session export
+     * carries so a re-imported session resumes later downloads from the same watermark.
+     */
+    suspend fun getDownloadCoverageBySession(sessionId: ApiSessionId): Map<String, Instant>
+
+    /**
      * Returns all responses for the given session, newest first.
      */
     suspend fun getResponsesBySession(sessionId: ApiSessionId): List<ApiResponse>
