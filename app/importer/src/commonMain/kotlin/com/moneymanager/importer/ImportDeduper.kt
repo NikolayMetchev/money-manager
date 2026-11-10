@@ -384,10 +384,15 @@ class ImportDeduper(
         isRival: (ImportTransfer) -> Boolean,
     ): Boolean {
         val distance = (timestamp - existing.timestamp).absoluteValue
-        val seenKeys = batchRows.take(classifyingIndex + 1).mapNotNullTo(mutableSetOf()) { it.uniqueKey?.takeIf { it.isNotEmpty() } }
+        val seenKeys =
+            batchRows.take(classifyingIndex + 1).mapNotNullTo(mutableSetOf()) { earlier ->
+                earlier.uniqueKey?.takeIf { key ->
+                    key.isNotEmpty()
+                }
+            }
         return batchRows.drop(classifyingIndex + 1).any { row ->
             val rowTimestamp = row.timestamp
-            val key = row.uniqueKey?.takeIf { it.isNotEmpty() }
+            val key = row.uniqueKey?.takeIf { value -> value.isNotEmpty() }
             val duplicate = key != null && !seenKeys.add(key)
             !duplicate &&
                 rowTimestamp != null &&
