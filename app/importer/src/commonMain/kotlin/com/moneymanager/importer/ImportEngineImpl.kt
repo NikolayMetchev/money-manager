@@ -23,6 +23,7 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Relationship
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -57,6 +58,7 @@ import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipWrite
 import com.moneymanager.domain.repository.write.RelationshipWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
+import com.moneymanager.domain.repository.write.TradeEdit
 import com.moneymanager.domain.repository.write.TradeWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
 import com.moneymanager.domain.repository.write.TransferEdit
@@ -401,6 +403,23 @@ class ImportEngineImpl(
                 )
             },
         )
+        tradeRepository.updateTrades(
+            batch.trades.updates().map { intent ->
+                TradeEdit(
+                    trade =
+                        Trade(
+                            id = requireNotNull(intent.existingId),
+                            timestamp = requireNotNull(intent.timestamp),
+                            description = requireNotNull(intent.description),
+                            fromAccountId = requireNotNull(intent.fromAccountId),
+                            from = requireNotNull(intent.fromAmount),
+                            toAccountId = requireNotNull(intent.toAccountId),
+                            to = requireNotNull(intent.toAmount),
+                        ),
+                    source = intent.source,
+                )
+            },
+        )
         for (intent in batch.accountsToCreate.updates()) {
             accountRepository.updateAccountWithAttributes(
                 account = intent.account,
@@ -535,6 +554,27 @@ class ImportEngineImpl(
 
                 ImportOperation.UPDATE, ImportOperation.DELETE -> {
                     require(it.existingId != null) { "${it.operation} transfer requires existingId" }
+                }
+            }
+        }
+        batch.trades.forEach {
+            when (it.operation) {
+                ImportOperation.CREATE, ImportOperation.UPDATE -> {
+                    require(
+                        it.timestamp != null && it.description != null &&
+                            it.fromAccountId != null && it.fromAmount != null &&
+                            it.toAccountId != null && it.toAmount != null,
+                    ) {
+                        "${it.operation} trade requires timestamp/description/fromAccountId/" +
+                            "fromAmount/toAccountId/toAmount"
+                    }
+                    if (it.operation == ImportOperation.UPDATE) {
+                        require(it.existingId != null) { "UPDATE trade requires existingId" }
+                    }
+                }
+
+                ImportOperation.DELETE -> {
+                    require(it.existingId != null) { "DELETE trade requires existingId" }
                 }
             }
         }

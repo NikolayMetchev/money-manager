@@ -41,6 +41,7 @@ import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.createTrade
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.personalCounterpartyKey
+import com.moneymanager.importengineapi.updateTrade
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
@@ -90,6 +91,43 @@ class ImportEngineDbTest : DbTest() {
             .getAllCurrencies()
             .first()
             .first { it.code == "GBP" }
+
+    @Test
+    fun manualTradeEditUpdatesTheExistingTrade() =
+        runDbTest {
+            val accountId = createSourceAccount()
+            val currencies = repositories.currencyRepository.getAllCurrencies().first()
+            val gbp = currencies.first { it.code == "GBP" }
+            val eur = currencies.first { it.code == "EUR" }
+            val engine = engine()
+            val tradeId =
+                engine.createTrade(
+                    timestamp = baseTime,
+                    description = "Original trade",
+                    fromAccountId = accountId,
+                    fromAmount = Money(500, gbp),
+                    toAccountId = accountId,
+                    toAmount = Money(200, eur),
+                )
+            val original = repositories.tradeRepository.getTradeById(tradeId).first()!!
+
+            engine.updateTrade(
+                original.copy(
+                    timestamp = baseTime + 1.hours,
+                    description = "Edited trade",
+                    from = Money(600, gbp),
+                    to = Money(250, eur),
+                ),
+            )
+
+            val updated = repositories.tradeRepository.getTradeById(tradeId).first()!!
+            assertEquals(tradeId, updated.id)
+            assertEquals(baseTime + 1.hours, updated.timestamp)
+            assertEquals("Edited trade", updated.description)
+            assertEquals(Money(600, gbp), updated.from)
+            assertEquals(Money(250, eur), updated.to)
+            assertEquals(2L, updated.revisionId)
+        }
 
     private suspend fun createSourceAccount(): AccountId {
         repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Checking", openingDate = baseTime))

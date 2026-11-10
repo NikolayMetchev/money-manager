@@ -641,6 +641,7 @@ data class ImportBatch(
          */
         fun manualEdits(
             transfers: List<ImportTransfer> = emptyList(),
+            trades: List<ImportTradeIntent> = emptyList(),
             accounts: List<ImportAccountIntent> = emptyList(),
             people: List<ImportPersonIntent> = emptyList(),
             ownerships: List<ImportOwnershipIntent> = emptyList(),
@@ -651,6 +652,7 @@ data class ImportBatch(
         ): ImportBatch =
             ImportBatch(
                 transfers = transfers,
+                trades = trades,
                 dedupePolicy = DedupePolicy.None,
                 accountsToCreate = accounts,
                 peopleToCreate = people,
