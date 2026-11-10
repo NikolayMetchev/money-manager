@@ -434,6 +434,36 @@ class StrategySelectorTest {
     }
 
     @Test
+    fun `a Revolut statement selects the Revolut strategy by its columns`() {
+        val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
+        val names =
+            listOf("Type", "Product", "Started Date", "Completed Date", "Description", "Amount", "Fee", "Currency", "State", "Balance")
+        val csvColumns = names.mapIndexed { i, name -> CsvColumn(CsvColumnId(Uuid.random()), i, name) }
+        val row =
+            CsvRow(
+                rowIndex = 1L,
+                values =
+                    listOf(
+                        "Card Payment",
+                        "Current",
+                        "2018-05-30 15:23:24",
+                        "2018-05-30 15:23:24",
+                        "Deichmann",
+                        "-22.35",
+                        "0.00",
+                        "GBP",
+                        "COMPLETED",
+                        "348.12",
+                    ),
+            )
+
+        assertEquals(
+            "Revolut CSV",
+            builtIns.selectForCsv("account-statement_2018-05-01_2026-11-08_en-gb_3e1b0f.csv", csvColumns, listOf(row))?.name,
+        )
+    }
+
+    @Test
     fun `a Celsius export selects the Celsius strategy by its spaced headers`() {
         val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
         val names =
