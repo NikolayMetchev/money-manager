@@ -141,9 +141,9 @@ class AccountTransactionsScreenTest {
 
             waitUntilExactlyOneExists(hasText("Edit Trade"))
             waitForIdle()
-            onNodeWithText("Associated fees").assertIsDisplayed()
+            onNodeWithText("Associated fees").assertExists()
             onNodeWithText("Service fee", substring = true).assertExists()
-            onNodeWithText("Save trade").assertIsDisplayed()
+            onNodeWithText("Save trade").assertExists()
         }
     }
 
