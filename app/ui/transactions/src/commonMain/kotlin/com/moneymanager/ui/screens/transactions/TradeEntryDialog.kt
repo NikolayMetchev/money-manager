@@ -24,8 +24,6 @@ import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.Maintenance
-import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.Transfer
