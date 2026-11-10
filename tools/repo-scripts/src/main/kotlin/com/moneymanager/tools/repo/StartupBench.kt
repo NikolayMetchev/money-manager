@@ -92,7 +92,7 @@ private fun isolatedEnv(
     for (name in listOf("MM_STARTUP_PROBE", "MM_STARTUP_PROBE_ACCOUNT", "MM_VAULT_PASSWORD", "MM_REMOTE_PASSWORD")) env.remove(name)
 }
 
-private fun makeHome(
+internal fun makeHome(
     root: File,
     db: String,
 ): File {
@@ -221,7 +221,7 @@ private fun archName(): String {
 
 /** The part of `settings.json` the benchmark's home needs: the database the launchers open. */
 @Serializable
-private class BenchSettings(
+internal class BenchSettings(
     val lastDatabase: String,
 )
 

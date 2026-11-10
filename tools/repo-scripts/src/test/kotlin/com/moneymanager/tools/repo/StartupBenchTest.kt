@@ -8,6 +8,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class StartupBenchTest {
+    @Test
+    fun `a run's home holds a copy of the database as its last database`() {
+        val root = Files.createTempDirectory("bench-root").toFile()
+        val db = File(root, "bench.db").also { it.writeText("db") }
+        val home = makeHome(root, db.path)
+        val settings = Json.decodeFromString<BenchSettings>(File(home, ".moneymanager/settings.json").readText())
+        assertEquals(File(home, ".moneymanager/bench.db").path, settings.lastDatabase)
+        assertEquals("db", File(settings.lastDatabase).readText())
+    }
+
     private fun launcher(
         dir: File,
         name: String,
