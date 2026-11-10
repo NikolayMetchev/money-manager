@@ -151,6 +151,46 @@ class AccountTransactionsScreenTest {
     }
 
     @Test
+    fun tradeRow_editButtonOpensTradeEditorForTradeId() {
+        runMoneyManagerComposeUiTest {
+            val now = Clock.System.now()
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
+            val own = Account(id = AccountId(1L), name = "Exchange", openingDate = now)
+            val other = Account(id = AccountId(2L), name = "Other", openingDate = now)
+            val row =
+                AccountRow(
+                    transactionId = TransferId(42L),
+                    timestamp = now,
+                    description = "Buy crypto",
+                    accountId = own.id,
+                    transactionAmount = Money(-500, usd),
+                    runningBalance = Money(-500, usd),
+                    sourceAccountId = own.id,
+                    targetAccountId = other.id,
+                    kind = TransactionKind.TRADE,
+                )
+            var editedTrade: TradeId? = null
+            var editedTransfer: Transfer? = null
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountTransactionCard(
+                        runningBalance = row,
+                        accounts = listOf(own, other),
+                        screenSizeClass = ScreenSizeClass.Expanded,
+                        onEditClick = { editedTransfer = it },
+                        onEditTradeClick = { editedTrade = it },
+                    )
+                }
+            }
+            waitForIdle()
+            onNodeWithText("✏️").performClick()
+            waitForIdle()
+            assertEquals(TradeId(42L), editedTrade)
+            assertEquals(null, editedTransfer)
+        }
+    }
+
+    @Test
     fun tradeEditor_savesEditedDescriptionThroughImportEngine() {
         runMoneyManagerComposeUiTest {
             val now = Clock.System.now()

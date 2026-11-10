@@ -324,8 +324,8 @@ fun AccountTransactionCard(
             ) {
                 IconButton(
                     onClick = onClick@{
-                        (runningBalance.transactionId as? TradeId)?.let {
-                            onEditTradeClick(it)
+                        if (runningBalance.kind == TransactionKind.TRADE) {
+                            onEditTradeClick(TradeId(runningBalance.transactionId.id))
                             return@onClick
                         }
                         // Reconstruct Transfer object from AccountRow fields
