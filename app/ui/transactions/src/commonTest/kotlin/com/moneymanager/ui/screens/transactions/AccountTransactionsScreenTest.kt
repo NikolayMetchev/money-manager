@@ -149,7 +149,6 @@ class AccountTransactionsScreenTest {
     }
 
     @Test
-    @Test
     fun accountTransactionsScreen_showsDateFilterAndBackButtonWithoutAccountMatrix() {
         runMoneyManagerComposeUiTest {
             val now = Clock.System.now()
