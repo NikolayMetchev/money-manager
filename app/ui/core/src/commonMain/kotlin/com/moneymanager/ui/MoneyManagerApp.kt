@@ -579,6 +579,7 @@ fun MoneyManagerApp(
                                                 scrollToTransferId = screen.scrollToTransferId,
                                                 initialCurrencyId = screen.selectedCurrencyId,
                                                 externalRefreshTrigger = transactionRefreshTrigger,
+                                                onBack = { navigationHistory.navigateBack() },
                                             )
                                         }
                                         entry<Screen.ExchangeOrders> { screen ->

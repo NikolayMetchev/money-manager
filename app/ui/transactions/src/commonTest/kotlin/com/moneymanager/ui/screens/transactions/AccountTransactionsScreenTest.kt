@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -88,45 +89,40 @@ import kotlin.time.Instant
 @OptIn(ExperimentalTestApi::class)
 class AccountTransactionsScreenTest {
     @Test
-    fun accountMatrix_rendersWhenTotalColumnWidthExceedsComposeConstraintsLimit() {
+    fun accountTransactionsScreen_showsDateFilterAndBackButtonWithoutAccountMatrix() {
         runMoneyManagerComposeUiTest {
-            // Given: enough accounts that the matrix's total scrollable width (~120dp per column)
-            // exceeds the ~262k px a Compose Constraints value can represent. The virtualization
-            // fillers standing in for the off-screen columns must not crash the measure pass
-            // ("Can't represent a width of X and height of 0 in Constraints").
             val now = Clock.System.now()
-            val usdCurrency =
-                Currency(
-                    id = CurrencyId(1L),
-                    code = "USD",
-                    name = "US Dollar",
-                    scaleFactor = 100,
-                )
-            val accounts =
-                (1L..3000L).map { Account(id = AccountId(it), name = "Account $it", openingDate = now) }
+            val account = Account(id = AccountId(1L), name = "Primary", openingDate = now)
+            val otherAccount = Account(id = AccountId(2L), name = "Other", openingDate = now)
+            var backClicked = false
 
             setContent {
                 ProvideSchemaAwareScope {
                     AccountTransactionsScreen(
-                        accountId = accounts.first().id,
+                        accountId = account.id,
                         transactionRepository = createTransactionRepository(emptyList()),
-                        accountRepository = createAccountRepository(accounts),
+                        accountRepository = createAccountRepository(listOf(account, otherAccount)),
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = createCategoryRepository(),
-                        currencyRepository = createCurrencyRepository(listOf(usdCurrency)),
+                        currencyRepository = createCurrencyRepository(),
                         attributeTypeRepository = createAttributeTypeRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
                         exchangeOrderRepository = createExchangeOrderRepository(),
                         maintenance = createMaintenance(),
-                        onAccountIdChange = {},
-                        onCurrencyIdChange = {},
+                        onBack = { backClicked = true },
                     )
                 }
             }
 
-            // Then: the screen measures without throwing and the selected account's column is composed
-            waitUntilExactlyOneExists(hasText("Account 1"))
+            waitUntilExactlyOneExists(hasText("Primary"))
+            onAllNodesWithText("Other").assertCountEquals(0)
+            onNodeWithContentDescription("Filter transactions by date").performClick()
+            onNodeWithText("Transactions from (date)").assertIsDisplayed()
+            onNodeWithText("Transactions to (date)").assertIsDisplayed()
+
+            onNodeWithText("← Back").performClick()
+            assertTrue(backClicked)
         }
     }
 
@@ -198,31 +194,21 @@ class AccountTransactionsScreenTest {
                 }
             }
 
-            // Then: When viewing Checking's transactions, should show:
-            // - 1 "Checking" in matrix header
-            // - 1 "Savings" in matrix header
-            // - 1 "Savings" in transaction row (the OTHER account from Checking's perspective)
+            // Then: the title shows the selected account and the transaction row shows the other side.
             waitForIdle()
 
-            onAllNodesWithText("Checking").assertCountEquals(1) // Matrix header only
-            onAllNodesWithText("Savings").assertCountEquals(2) // Matrix header + transaction row
+            onAllNodesWithText("Checking").assertCountEquals(1)
+            onAllNodesWithText("Savings").assertCountEquals(1)
 
-            // When: Click on "Savings" in the transaction row to switch to Savings perspective
-            // Use index [1] (the second node) since [0] is in the matrix
-            onAllNodesWithText("Savings")[1].performClick()
+            onAllNodesWithText("Savings")[0].performClick()
 
             // Wait for state to update and recomposition to occur
             waitForIdle()
             // Wait a bit more to ensure all state updates have propagated
             mainClock.advanceTimeBy(100)
 
-            // Then: After flipping to Savings perspective, should show:
-            // - 1 "Checking" in matrix header
-            // - 1 "Savings" in matrix header
-            // - 1 "Checking" in transaction row (the OTHER account from Savings' perspective)
-            // THIS IS THE BUG: It's probably still showing "Savings" instead of "Checking"
-            onAllNodesWithText("Savings").assertCountEquals(1) // Matrix header only (NOT in transaction row anymore!)
-            onAllNodesWithText("Checking").assertCountEquals(2) // Matrix header + transaction row
+            onAllNodesWithText("Savings").assertCountEquals(1)
+            onAllNodesWithText("Checking").assertCountEquals(2)
         }
     }
 
@@ -295,23 +281,16 @@ class AccountTransactionsScreenTest {
 
             waitForIdle()
 
-            // Find all "Savings" text nodes - should be:
-            // [0] = Matrix header
-            // [1] = Transaction row (the "other" account from Checking's view)
             val savingsNodesBeforeClick = onAllNodesWithText("Savings")
-            savingsNodesBeforeClick.assertCountEquals(2)
+            savingsNodesBeforeClick.assertCountEquals(1)
 
-            savingsNodesBeforeClick[1].performClick()
+            savingsNodesBeforeClick[0].performClick()
 
             waitForIdle()
             mainClock.advanceTimeBy(200)
 
-            // Verify "Savings" only appears once (in matrix header, NOT in transaction row)
             onAllNodesWithText("Savings").assertCountEquals(1)
 
-            // Verify "Checking" appears twice:
-            // [0] = Matrix header
-            // [1] = Transaction row (the "other" account from Savings' view)
             onAllNodesWithText("Checking").assertCountEquals(2)
         }
     }
@@ -365,8 +344,8 @@ class AccountTransactionsScreenTest {
 
             waitForIdle()
 
-            // When: clicking the other account ("Savings") in the transaction row (index [1]; [0] is the matrix).
-            onAllNodesWithText("Savings")[1].performClick()
+            // When: clicking the other account ("Savings") in the transaction row.
+            onAllNodesWithText("Savings")[0].performClick()
             waitForIdle()
 
             // Then: navigation targets the other account AND carries this transfer's id, so the destination
