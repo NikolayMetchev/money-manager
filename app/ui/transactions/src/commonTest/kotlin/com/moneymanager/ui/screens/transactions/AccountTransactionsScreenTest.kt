@@ -104,7 +104,7 @@ class AccountTransactionsScreenTest {
                         accountRepository = createAccountRepository(listOf(account, otherAccount)),
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = createCategoryRepository(),
-                        currencyRepository = createCurrencyRepository(),
+                        currencyRepository = createCurrencyRepository(emptyList()),
                         attributeTypeRepository = createAttributeTypeRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
