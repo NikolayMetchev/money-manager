@@ -11,17 +11,8 @@ import com.moneymanager.importengineapi.insertApiRequest
 import com.moneymanager.importengineapi.insertApiResponse
 import com.moneymanager.importengineapi.recordApiDownloadCoverage
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.long
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -45,6 +36,37 @@ data class ApiSessionsArchiveImportResult(
         }
 }
 
+/** The export file's shape: what [ApiSessionsArchive] writes and reads. */
+@Serializable
+private data class ArchiveFile(
+    val version: Long,
+    val strategies: List<ArchiveStrategy>,
+)
+
+@Serializable
+private data class ArchiveStrategy(
+    val name: String,
+    val sessions: List<ArchiveSession>,
+)
+
+@Serializable
+private data class ArchiveSession(
+    val createdAt: Long,
+    /** Endpoint key to the epoch millisecond it is downloaded up to. */
+    val coverage: Map<String, Long>,
+    /** In the order they were made. */
+    val requests: List<ArchiveRequest>,
+)
+
+@Serializable
+private data class ArchiveRequest(
+    val method: String,
+    val url: String,
+    val headers: Map<String, String>,
+    /** Null for a request that never received a response. */
+    val response: String?,
+)
+
 /**
  * Exports every API session's recorded traffic (requests, response bodies, download coverage) to one JSON
  * document and re-imports it, so a development database can be thrown away without re-downloading
@@ -54,7 +76,12 @@ data class ApiSessionsArchiveImportResult(
  */
 object ApiSessionsArchive {
     private const val VERSION = 1L
-    private val json = Json { prettyPrint = true }
+    private val json =
+        Json {
+            prettyPrint = true
+            encodeDefaults = true
+            ignoreUnknownKeys = true
+        }
 
     suspend fun export(
         sessions: ApiSessionReadRepository,
@@ -66,55 +93,34 @@ object ApiSessionsArchive {
                 val strategy = credential.strategyId?.let(strategyById::get) ?: return@mapNotNull null
                 val sessionRows = sessions.getSessionsByCredential(credential.id).sortedBy { it.createdAt }
                 if (sessionRows.isEmpty()) return@mapNotNull null
-                strategy.name to
-                    sessionRows.map { session ->
-                        val responseByRequest = sessions.getResponsesBySession(session.id).associateBy { it.requestId }
-                        val requests =
-                            sessions.getRequestsBySession(session.id).sortedWith(compareBy({ it.requestedAt }, { it.id.id }))
-                        JsonObject(
-                            mapOf(
-                                "createdAt" to JsonPrimitive(session.createdAt.toEpochMilliseconds()),
-                                "coverage" to
-                                    JsonObject(
-                                        sessions
-                                            .getDownloadCoverageBySession(session.id)
-                                            .mapValues { JsonPrimitive(it.value.toEpochMilliseconds()) },
-                                    ),
-                                "requests" to
-                                    JsonArray(
-                                        requests.map { request ->
-                                            JsonObject(
-                                                mapOf(
-                                                    "method" to JsonPrimitive(request.method),
-                                                    "url" to JsonPrimitive(request.url),
-                                                    "headers" to
-                                                        JsonObject(
-                                                            request.headers.associate { it.key to JsonPrimitive(it.value) },
-                                                        ),
-                                                    "response" to
-                                                        (responseByRequest[request.id]?.let { JsonPrimitive(it.json) } ?: JsonNull),
-                                                ),
+                ArchiveStrategy(
+                    name = strategy.name,
+                    sessions =
+                        sessionRows.map { session ->
+                            val responseByRequest = sessions.getResponsesBySession(session.id).associateBy { it.requestId }
+                            ArchiveSession(
+                                createdAt = session.createdAt.toEpochMilliseconds(),
+                                coverage =
+                                    sessions
+                                        .getDownloadCoverageBySession(session.id)
+                                        .mapValues { it.value.toEpochMilliseconds() },
+                                requests =
+                                    sessions
+                                        .getRequestsBySession(session.id)
+                                        .sortedWith(compareBy({ it.requestedAt }, { it.id.id }))
+                                        .map { request ->
+                                            ArchiveRequest(
+                                                method = request.method,
+                                                url = request.url,
+                                                headers = request.headers.associate { it.key to it.value },
+                                                response = responseByRequest[request.id]?.json,
                                             )
                                         },
-                                    ),
-                            ),
-                        )
-                    }
+                            )
+                        },
+                )
             }
-        return json.encodeToString(
-            JsonElement.serializer(),
-            JsonObject(
-                mapOf(
-                    "version" to JsonPrimitive(VERSION),
-                    "strategies" to
-                        JsonArray(
-                            exported.map { (name, sessionList) ->
-                                JsonObject(mapOf("name" to JsonPrimitive(name), "sessions" to JsonArray(sessionList)))
-                            },
-                        ),
-                ),
-            ),
-        )
+        return json.encodeToString(ArchiveFile.serializer(), ArchiveFile(VERSION, exported))
     }
 
     /** [import] for the UI: the outcome, or why the file couldn't be imported, as one message to show. */
@@ -139,40 +145,32 @@ object ApiSessionsArchive {
         strategies: ApiImportStrategyReadRepository,
         engine: ImportEngine,
     ): ApiSessionsArchiveImportResult {
-        val root = json.parseToJsonElement(content).jsonObject
-        val version = root["version"]?.jsonPrimitive?.long
-        require(version == VERSION) { "Unsupported API sessions export version: $version" }
+        val file = json.decodeFromString(ArchiveFile.serializer(), content)
+        require(file.version == VERSION) { "Unsupported API sessions export version: ${file.version}" }
         var imported = 0
         var present = 0
         val missing = mutableSetOf<String>()
-        for (entry in root.getValue("strategies").jsonArray.map { it.jsonObject }) {
-            val name = entry.getValue("name").jsonPrimitive.content
-            val strategy: ApiImportStrategy? = strategies.getStrategyByName(name).first()
+        for (entry in file.strategies) {
+            val strategy: ApiImportStrategy? = strategies.getStrategyByName(entry.name).first()
             if (strategy == null) {
-                missing += name
+                missing += entry.name
                 continue
             }
             val credentialId = engine.ensureApiCredential(strategy.id, Clock.System.now())
             val existing = sessions.getSessionsByCredential(credentialId).map { it.createdAt }.toSet()
-            for (session in entry.getValue("sessions").jsonArray.map { it.jsonObject }) {
-                val createdAt = Instant.fromEpochMilliseconds(session.getValue("createdAt").jsonPrimitive.long)
+            for (session in entry.sessions) {
+                val createdAt = Instant.fromEpochMilliseconds(session.createdAt)
                 if (createdAt in existing) {
                     present++
                     continue
                 }
                 val sessionId = engine.createApiSession(deviceId, createdAt, credentialId)
-                for (request in session.getValue("requests").jsonArray.map { it.jsonObject }) {
-                    val requestId =
-                        engine.insertApiRequest(
-                            sessionId,
-                            request.getValue("method").jsonPrimitive.content,
-                            request.getValue("url").jsonPrimitive.content,
-                            request.getValue("headers").jsonObject.mapValues { it.value.jsonPrimitive.content },
-                        )
-                    request["response"]?.jsonPrimitive?.contentOrNull?.let { engine.insertApiResponse(requestId, sessionId, it) }
+                for (request in session.requests) {
+                    val requestId = engine.insertApiRequest(sessionId, request.method, request.url, request.headers)
+                    request.response?.let { engine.insertApiResponse(requestId, sessionId, it) }
                 }
-                for ((endpoint, until) in session.getValue("coverage").jsonObject) {
-                    engine.recordApiDownloadCoverage(sessionId, endpoint, Instant.fromEpochMilliseconds(until.jsonPrimitive.long))
+                for ((endpoint, until) in session.coverage) {
+                    engine.recordApiDownloadCoverage(sessionId, endpoint, Instant.fromEpochMilliseconds(until))
                 }
                 imported++
             }
