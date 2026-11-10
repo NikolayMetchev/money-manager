@@ -110,6 +110,16 @@ class AccountsPresenterTest {
         }
 
     @Test
+    fun aSavedFilterSurvivesTheSnapshotLoading() =
+        runTest {
+            val saved = SavedAccountsFilter(ownerIds = setOf(bob.id.id), assetIds = setOf(btc.id.id))
+            moleculeFlow(RecompositionMode.Immediate) { presentAccounts(snapshots, saved) }.test {
+                val restored = awaitUntil { it.loaded && btc.id in it.filter.assetIds }
+                assertEquals(setOf(bob.id), restored.filter.ownerIds)
+            }
+        }
+
+    @Test
     fun updatesLiveWhenTheSnapshotChanges() =
         runTest {
             present().test {

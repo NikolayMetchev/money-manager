@@ -70,6 +70,8 @@ import com.moneymanager.ui.components.DefaultCurrencyInitDialog
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalDeviceId
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.foundation.LocalUiStateStore
+import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.navigation.NavigationHistory
 import com.moneymanager.ui.navigation.Screen
@@ -118,6 +120,20 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
+private const val LAST_SCREEN_KEY = "lastScreen"
+
+/** The screen to reopen on the next start: a top-level one, since the others name rows that may be gone. */
+private fun Screen.restorable(): Screen? =
+    when (this) {
+        is Screen.Accounts -> Screen.Accounts()
+
+        is Screen.Imports, Screen.Currencies, Screen.Categories, Screen.People, Screen.CsvStrategies,
+        Screen.ApiStrategies, Screen.Settings,
+        -> this
+
+        else -> null
+    }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoneyManagerApp(
@@ -148,9 +164,13 @@ fun MoneyManagerApp(
             }
         val importDirectoryService = sessionImports.directories
         val apiImportService = sessionImports.apis
-        val backStack = rememberNavBackStack(ScreenSavedStateConfiguration, Screen.Accounts())
+        val uiStateStore = LocalUiStateStore.current
+        val startScreen = remember { uiStateStore?.get(LAST_SCREEN_KEY, Screen.serializer())?.restorable() ?: Screen.Accounts() }
+        val backStack = rememberNavBackStack(ScreenSavedStateConfiguration, startScreen)
+        var lastImportTab by rememberPersistedState("imports.tab", ImportTab.serializer()) { ImportTab.FILES }
         val navigationHistory = remember(backStack) { NavigationHistory(backStack) }
         val currentScreen = navigationHistory.currentScreen
+        LaunchedEffect(currentScreen) { currentScreen.restorable()?.let { uiStateStore?.put(LAST_SCREEN_KEY, Screen.serializer(), it) } }
         var showTransactionDialog by remember { mutableStateOf(false) }
         var showTradeDialog by remember { mutableStateOf(false) }
         var showAddMenu by remember { mutableStateOf(false) }
@@ -330,7 +350,7 @@ fun MoneyManagerApp(
 
                                                 is Screen.Imports -> currentScreen.tab
 
-                                                else -> ImportTab.FILES
+                                                else -> lastImportTab
                                             },
                                         ),
                                     )
@@ -632,6 +652,7 @@ fun MoneyManagerApp(
                                             ImportsScreen(
                                                 selectedTab = screen.tab,
                                                 onTabSelected = { tab ->
+                                                    lastImportTab = tab
                                                     navigationHistory.replaceCurrentScreen(Screen.Imports(tab))
                                                 },
                                                 importDirectoryRepository = services.imports.importDirectoryRepository,

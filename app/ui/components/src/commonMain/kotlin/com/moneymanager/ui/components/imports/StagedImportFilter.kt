@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.fileKind
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
+import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
 internal const val NO_STRATEGY_LABEL = "No strategy"
@@ -17,6 +18,7 @@ internal const val NO_STRATEGY_LABEL = "No strategy"
  * [strategies] (null: no strategy) and from one of [directories] (null: added by hand). An empty set keeps
  * every file. A directory also keeps the files of the folders beneath it, as the folder tree nests them.
  */
+@Serializable
 data class StagedImportFilter(
     val text: String = "",
     val kinds: Set<ImportFileKind> = emptySet(),

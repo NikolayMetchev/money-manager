@@ -75,9 +75,11 @@ import com.moneymanager.ui.components.DateRangeFilterFields
 import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.foundation.LocalStartupProbe
 import com.moneymanager.ui.foundation.StartupMilestone
+import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.util.ScreenSizeClass
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.serializer
 
 @Composable
 fun AccountTransactionsScreen(
@@ -208,8 +210,8 @@ fun AccountTransactionsScreen(
 
     // Pages are already filtered to the selected currency by the repository queries.
     // Whether to show transactions marked as excluded
-    var showExcluded by remember { mutableStateOf(false) }
-    var dateRange by remember { mutableStateOf(TransactionDateRange()) }
+    var showExcluded by rememberPersistedState("transactions.showExcluded", Boolean.serializer()) { false }
+    var dateRange by rememberPersistedState("transactions.dateRange", TransactionDateRange.serializer()) { TransactionDateRange() }
     var showDates by rememberSaveable { mutableStateOf(false) }
 
     // Jumping to a particular transfer shows it in full context, so it drops the date range.
