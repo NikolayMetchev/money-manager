@@ -72,10 +72,10 @@ fun TradeEntryDialog(
     onSaved: () -> Unit = {},
 ) {
     val timeZone = TimeZone.currentSystemDefault()
-    var fromAccountId by remember(trade?.id) { mutableStateOf<AccountId?>(trade?.fromAccountId) }
-    var toAccountId by remember(trade?.id) { mutableStateOf<AccountId?>(trade?.toAccountId) }
-    var fromAsset by remember(trade?.id) { mutableStateOf<Asset?>(trade?.from?.asset) }
-    var toAsset by remember(trade?.id) { mutableStateOf<Asset?>(trade?.to?.asset) }
+    var fromAccountId by remember(trade?.id) { mutableStateOf(trade?.fromAccountId) }
+    var toAccountId by remember(trade?.id) { mutableStateOf(trade?.toAccountId) }
+    var fromAsset by remember(trade?.id) { mutableStateOf(trade?.from?.asset) }
+    var toAsset by remember(trade?.id) { mutableStateOf(trade?.to?.asset) }
     var fromAmount by remember(trade?.id) {
         mutableStateOf(
             trade
@@ -157,8 +157,7 @@ fun TradeEntryDialog(
                 isSaving = true
                 scope.launch {
                     try {
-                        val editedTrade = trade
-                        if (editedTrade == null) {
+                        if (trade == null) {
                             importEngine.createTrade(
                                 timestamp = dateTime.toInstant(timeZone),
                                 description = description.trim(),
@@ -169,7 +168,7 @@ fun TradeEntryDialog(
                             )
                         } else {
                             importEngine.updateTrade(
-                                editedTrade.copy(
+                                trade.copy(
                                     timestamp = dateTime.toInstant(timeZone),
                                     description = description.trim(),
                                     fromAccountId = from,

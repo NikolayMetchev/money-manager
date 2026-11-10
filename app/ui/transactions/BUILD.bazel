@@ -88,6 +88,7 @@ kmp_test(
         "@maven_kmp//:androidx_compose_ui_test",
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:mokkery_runtime",
+        "//app/importengineapi",
     ],
     device_manifest = "src/androidDeviceTest/AndroidManifest.xml",
     device_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
@@ -106,6 +107,7 @@ kmp_test(
     deps = [
         "//app/db/di",
         "//app/db/write",
+        "//app/importengineapi",
         "//app/model/core",
         "//app/model/repository/read",
         "//app/model/repository/write:write_for_tests",

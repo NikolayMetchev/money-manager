@@ -159,12 +159,11 @@ fun AccountTransactionsScreen(
 
     LaunchedEffect(tradeIdToEdit, tradeRepository, relationshipRepository) {
         val id = tradeIdToEdit
-        val trades = tradeRepository
-        if (id == null || trades == null) {
+        if (id == null || tradeRepository == null) {
             tradeToEdit = null
             tradeFees = emptyList()
         } else {
-            tradeToEdit = trades.getTradeById(id).first()
+            tradeToEdit = tradeRepository.getTradeById(id).first()
             val feeIds =
                 relationshipRepository
                     ?.getByTransaction(id)

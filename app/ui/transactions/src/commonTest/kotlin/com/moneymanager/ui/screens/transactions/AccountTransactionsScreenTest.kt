@@ -57,6 +57,8 @@ import com.moneymanager.domain.repository.write.CurrencyWriteRepository
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
@@ -75,6 +77,7 @@ import dev.mokkery.every
 import dev.mokkery.everySuspend
 import dev.mokkery.matcher.any
 import dev.mokkery.mock
+import dev.mokkery.verifySuspend
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -144,6 +147,61 @@ class AccountTransactionsScreenTest {
             onNodeWithText("Associated fees").assertExists()
             onNodeWithText("Service fee", substring = true).assertExists()
             onNodeWithText("Save trade").assertExists()
+        }
+    }
+
+    @Test
+    fun tradeEditor_savesEditedDescriptionThroughImportEngine() {
+        runMoneyManagerComposeUiTest {
+            val now = Clock.System.now()
+            val usd =
+                Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
+            val eur =
+                Currency(id = CurrencyId(2L), code = "EUR", name = "Euro", scaleFactor = 100)
+            val trade =
+                Trade(
+                    id = TradeId(42L),
+                    timestamp = now,
+                    description = "Buy crypto",
+                    fromAccountId = AccountId(1L),
+                    from = Money.fromDisplayValue("50", usd),
+                    toAccountId = AccountId(2L),
+                    to = Money.fromDisplayValue("45", eur),
+                )
+            val cryptoRepository =
+                mock<CryptoReadRepository>(MockMode.autoUnit) {
+                    every { getAllCryptoAssets() } returns flowOf(emptyList())
+                }
+            val importEngine = mock<ImportEngine>(MockMode.autoUnit)
+            everySuspend { importEngine.import(any()) } returns ImportResult()
+            var saved = false
+            var dismissed = false
+
+            setContent {
+                CompositionLocalProvider(LocalImportEngine provides importEngine) {
+                    ProvideSchemaAwareScope {
+                        TradeEntryDialog(
+                            accountRepository = createAccountRepository(emptyList()),
+                            categoryRepository = createCategoryRepository(),
+                            personRepository = createPersonRepository(),
+                            currencyRepository = createCurrencyRepository(listOf(usd, eur)),
+                            cryptoRepository = cryptoRepository,
+                            maintenance = createMaintenance(),
+                            trade = trade,
+                            onDismiss = { dismissed = true },
+                            onSaved = { saved = true },
+                        )
+                    }
+                }
+            }
+
+            waitUntilExactlyOneExists(hasText("Edit Trade"))
+            onNodeWithText("Buy crypto").performTextReplacement("Sell crypto")
+            onNodeWithText("Save trade").performClick()
+            waitUntil(timeoutMillis = 5_000) { saved }
+            waitForIdle()
+            assertTrue(dismissed)
+            verifySuspend { importEngine.import(any()) }
         }
     }
 
