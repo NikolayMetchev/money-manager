@@ -367,6 +367,26 @@ class ImportDeduper(
     /** The batch row [classify] is on, so [sameAccounts] can leave a leg to a later row nearer to it. */
     private var classifyingIndex = 0
 
+    /** The batch being classified, so a rule can see the rows still to come ([closerLaterRowExists]). */
+    private var batchRows: List<ImportTransfer> = emptyList()
+
+    /**
+     * Whether a row after the current one, for which [isRival] holds, is strictly closer in time to [existing] than
+     * [timestamp] is. Claiming row by row in file order would otherwise hand the leg to the earlier row even when its
+     * true twin, seconds away, is still to come (and that twin would then fall to a weaker rule and cross the pairs).
+     */
+    private fun closerLaterRowExists(
+        existing: Transfer,
+        timestamp: Instant,
+        isRival: (ImportTransfer) -> Boolean,
+    ): Boolean {
+        val distance = (timestamp - existing.timestamp).absoluteValue
+        return batchRows.drop(classifyingIndex + 1).any { row ->
+            val rowTimestamp = row.timestamp
+            rowTimestamp != null && isRival(row) && (rowTimestamp - existing.timestamp).absoluteValue < distance
+        }
+    }
+
     /**
      * The batch's counted rows with an identity, by (from, to, amount): the rows [sameAccounts] lets claim a leg,
      * each with its index and time.
@@ -395,6 +415,7 @@ class ImportDeduper(
 
     fun classify(transfers: List<ImportTransfer>): List<Classified> {
         exactRows = exactMatchesByRow(transfers)
+        batchRows = transfers
         claimingRows =
             policy
                 .reconciledExclusionTypeId()
@@ -796,7 +817,11 @@ class ImportDeduper(
                 }.map { it.id to it }
         val matchId =
             selectNearestUnconsumedLeg(candidates, timestamp, consumedReconcileIds) { existing ->
-                settings.window.holds(timestamp, existing.timestamp, transfer.accounts() + existing.accounts())
+                settings.window.holds(timestamp, existing.timestamp, transfer.accounts() + existing.accounts()) &&
+                    !closerLaterRowExists(existing, timestamp) { row ->
+                        row.amount == amount && (row.unidentifiedCounterpartyAccountId != null) == (placeholder != null) &&
+                            row.passThrough == null && row.conversion == null && ownEndsMeet(row, existing)
+                    }
             } ?: return null
         val other = candidates.first { it.first == matchId }.second
         consumedReconcileIds += matchId
@@ -1025,10 +1050,12 @@ class ImportDeduper(
         transfer: ImportTransfer,
         timestamp: Instant,
         window: SettlementWindow,
+        isRival: ((ImportTransfer) -> Boolean)? = null,
     ): Found? {
         val id =
             selectNearestUnconsumedLeg(candidates, timestamp, consumedReconcileIds) { existing ->
-                window.holds(timestamp, existing.timestamp, transfer.accounts() + existing.accounts())
+                window.holds(timestamp, existing.timestamp, transfer.accounts() + existing.accounts()) &&
+                    (isRival == null || !closerLaterRowExists(existing, timestamp, isRival))
             } ?: return null
         return Found(id, candidates.first { it.first == id }.second, claims = listOf(id))
     }
@@ -1067,6 +1094,18 @@ class ImportDeduper(
                 }.minByOrNull { (_, existing) -> (timestamp - existing.timestamp).absoluteValue }
                 ?.let { (id, existing) -> Found(id, existing, claims = listOf(id)) }
         }
+
+    /** The account a placeholder row owns and whether money flows into it, or null when it has no placeholder end. */
+    private fun ImportTransfer.ownedFlow(): Pair<AccountId, Boolean>? {
+        val placeholder = unidentifiedCounterpartyAccountId ?: return null
+        val from = fromAccount.requireId()
+        val to = toAccount.requireId()
+        return when (placeholder) {
+            from -> to to true
+            to -> from to false
+            else -> null
+        }
+    }
 
     /** What identifies [this] row as one movement, or null when nothing does. */
     private fun ImportTransfer.identity(): Any? = apiId ?: uniqueKey?.takeIf { it.isNotEmpty() }
@@ -1148,7 +1187,12 @@ class ImportDeduper(
                             counterparty != placeholder &&
                             counterparty !in ownBatchAccounts
                     }.orEmpty()
-            nearestUnclaimed(candidates, transfer, timestamp, window)?.let { it.copy(supersedes = onwardLegsFrom(it.id, owned)) }
+            val rivalFlow = owned to inflow
+            val isRival = { row: ImportTransfer ->
+                row.unidentifiedCounterpartyAccountId != null && row.amount == transfer.amount &&
+                    row.ownedFlow() == rivalFlow
+            }
+            nearestUnclaimed(candidates, transfer, timestamp, window, isRival)?.let { it.copy(supersedes = onwardLegsFrom(it.id, owned)) }
         }
 
     /**
