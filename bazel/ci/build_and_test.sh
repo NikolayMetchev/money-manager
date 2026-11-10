@@ -53,8 +53,12 @@ else
   extra=()
   skip=($(bazel query "${flags[@]}" "attr(name, '$native_pattern', //...)" | sed 's/^/-/')) || exit 1
 fi
-bazel test "${flags[@]}" -- //... //app/main/jvm:release_service_providers_test //app/main/jvm:installer \
-  //tools/repo-scripts:repo-scripts-tool_deploy.jar "${extra[@]}" "${skip[@]}" 2>&1 | tee "$out/test.log"
+# Pull requests without the `installer` label skip the installer and the tool that times it (build.yml).
+INSTALLER=${INSTALLER:-true}
+if [ "$INSTALLER" = true ]; then
+  extra+=(//app/main/jvm:installer //tools/repo-scripts:repo-scripts-tool_deploy.jar)
+fi
+bazel test "${flags[@]}" -- //... //app/main/jvm:release_service_providers_test "${extra[@]}" "${skip[@]}" 2>&1 | tee "$out/test.log"
 status=${PIPESTATUS[0]}
 
 # The JVM and Android host tests' coverage reports, merged into one XML report. It credits code to every test that
@@ -65,10 +69,12 @@ bazel/kmp/testing/coverage.sh "$out/coverage.xml" "${flags[@]}" 2>&1 | tee "$out
 (cd -P bazel-testlogs && find . -name test.xml -print0 | tar --null -cf "$out/testlogs.tar" -T -)
 
 if [ "$status" -eq 0 ]; then
-  mkdir -p "$out/installer" && cp bazel-bin/app/main/jvm/installer/* "$out/installer/"
-  mkdir -p "$out/bench-dbs" && cp bazel-bin/tools/bench-db/bench.db bazel-bin/tools/bench-db/empty.db \
-    bazel-bin/tools/repo-scripts/repo-scripts-tool_deploy.jar "$out/bench-dbs/"
-    if [ "$NATIVE" = true ]; then
+  if [ "$INSTALLER" = true ]; then
+    mkdir -p "$out/installer" && cp bazel-bin/app/main/jvm/installer/* "$out/installer/"
+    mkdir -p "$out/bench-dbs" && cp bazel-bin/tools/bench-db/bench.db bazel-bin/tools/bench-db/empty.db \
+      bazel-bin/tools/repo-scripts/repo-scripts-tool_deploy.jar "$out/bench-dbs/"
+  fi
+  if [ "$NATIVE" = true ]; then
     for target in linuxArm64 mingwX64; do
       for binary in $(bazel cquery "${flags[@]}" --output=files "attr(name, \"_${target}_cross\$\", //...)"); do
         dir="native-tests/$target/$(dirname "${binary#bazel-out/*/bin/}")"
@@ -76,8 +82,8 @@ if [ "$status" -eq 0 ]; then
       done
       cp bazel-bin/bazel/kmp/testing/native_launcher_deploy.jar "native-tests/$target/"
     done
-  # 1.6 GB as they are, a quarter of that compressed.
-  tar --zstd -cf "$out/native-tests.tar.zst" native-tests && rm -rf native-tests
+    # 1.6 GB as they are, a quarter of that compressed.
+    tar --zstd -cf "$out/native-tests.tar.zst" native-tests && rm -rf native-tests
   fi
 fi
 exit "$status"
