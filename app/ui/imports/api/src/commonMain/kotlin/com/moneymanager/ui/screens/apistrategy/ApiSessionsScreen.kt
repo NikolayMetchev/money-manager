@@ -75,7 +75,10 @@ import com.moneymanager.apiimporter.ApiCounterpartySuggestion
 import com.moneymanager.apiimporter.ApiImportReads
 import com.moneymanager.apiimporter.ApiSessionDownloadResult
 import com.moneymanager.apiimporter.ApiSessionImportResult
+import com.moneymanager.apiimporter.ApiSessionsArchive
 import com.moneymanager.apiimporter.displaySummary
+import com.moneymanager.compose.filepicker.rememberFilePicker
+import com.moneymanager.compose.filepicker.rememberFileSaver
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.StoredApiCredential
@@ -305,7 +308,35 @@ fun ApiSessionsScreen(
         }
     }
 
+    // The export is built ahead of the click: the save launcher takes its content up front.
+    var exportContent by remember { mutableStateOf<String?>(null) }
+    var archiveMessage by remember { mutableStateOf<String?>(null) }
+    val exportSaver = rememberFileSaver(onResult = {})
+    val importPicker =
+        rememberFilePicker(
+            mimeTypes = listOf("application/json"),
+            onResult = { result ->
+                if (result != null) {
+                    scope.launch {
+                        @Suppress("TooGenericExceptionCaught")
+                        try {
+                            archiveMessage =
+                                ApiSessionsArchive
+                                    .import(result.content, deviceId, apiSessionRepository, apiImportStrategyRepository, importEngine)
+                                    .summary()
+                            refresh()
+                        } catch (expected: Exception) {
+                            archiveMessage = "Failed to import API sessions: ${expected.message}"
+                        }
+                    }
+                }
+            },
+        )
+
     LaunchedEffect(Unit) { refresh() }
+    LaunchedEffect(sessionsByCredential) {
+        exportContent = ApiSessionsArchive.export(apiSessionRepository, apiImportStrategyRepository)
+    }
     EnsureApiConnectionRows(
         apiImportService = apiImportService,
         strategies = strategies,
@@ -323,12 +354,19 @@ fun ApiSessionsScreen(
         ) {
             Text(text = "API Sessions", style = MaterialTheme.typography.headlineMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = { exportSaver.launch("api-sessions.json", exportContent ?: return@TextButton) }) { Text("Export") }
+                TextButton(onClick = { importPicker.launch() }) { Text("Import") }
                 TextButton(onClick = onApiStrategiesClick) { Text("Strategies") }
                 TextButton(onClick = onAddCredentialClick) { Text("+ Connect") }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        archiveMessage?.let {
+            Text(text = it, style = MaterialTheme.typography.bodyMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
         if (LocalApiDownloadNotice.current != null) {
             ApiDownloadNoticeBanner()
