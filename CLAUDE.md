@@ -122,6 +122,8 @@ way) are their own jobs. Auto-format PR runs `//:format` on every PR and pushes 
 regenerated, not reported. Dependency submission reads the lockfiles (`repo-scripts dependency-snapshot`), and
 `renovate-pins.yml` re-pins Renovate's PRs.
 
+**Native**: on a pull request every Kotlin/Native job and Bazel target (the `_linuxX64`, `_linuxArm64`, `_mingwX64`, `_macosArm64` compiles and tests, the native `mm`, `bundle_native_cli`) is skipped, in `bazel/ci/build_and_test.sh` too (`NATIVE=false`). Label the PR `native` to run them; main and manual runs always do. Another label's event skips every job.
+
 **Qodana** (`qodana.yml`, inspections in `qodana.yaml`) scans a PR in PR mode: it reports only problems in the files the
 PR changes. It doesn't run on main; a manual run (`workflow_dispatch`) scans a branch in full. A change whose
 effects reach other modules (a shared API, the DI graph, `qodana.yaml`, the inspection profile) should carry the

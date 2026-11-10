@@ -42,9 +42,19 @@ fi
 # - the Linux desktop installer.
 # - the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`) and the launcher that turns their output
 #   into JUnit XML, for Native Tests to run on their own runners.
-cross=$(bazel query "${flags[@]}" 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') || exit 1
+NATIVE=${NATIVE:-true}
+native_pattern='_(linuxX64|linuxArm64|mingwX64|macosArm64)(_|$)|^mm($|-linux|-macos|-windows)'
+if [ "$NATIVE" = true ]; then
+  cross=$(bazel query "${flags[@]}" 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') || exit 1
+  extra=(//bazel/kmp/testing:native_launcher_deploy.jar $cross)
+  skip=()
+else
+  # Pull requests without the `native` label build and test no Kotlin/Native target (build.yml).
+  extra=()
+  skip=($(bazel query "${flags[@]}" "attr(name, '$native_pattern', //...)" | sed 's/^/-/')) || exit 1
+fi
 bazel test "${flags[@]}" -- //... //app/main/jvm:release_service_providers_test //app/main/jvm:installer \
-  //bazel/kmp/testing:native_launcher_deploy.jar //tools/repo-scripts:repo-scripts-tool_deploy.jar $cross 2>&1 | tee "$out/test.log"
+  //tools/repo-scripts:repo-scripts-tool_deploy.jar "${extra[@]}" "${skip[@]}" 2>&1 | tee "$out/test.log"
 status=${PIPESTATUS[0]}
 
 # The JVM and Android host tests' coverage reports, merged into one XML report. It credits code to every test that
@@ -58,14 +68,16 @@ if [ "$status" -eq 0 ]; then
   mkdir -p "$out/installer" && cp bazel-bin/app/main/jvm/installer/* "$out/installer/"
   mkdir -p "$out/bench-dbs" && cp bazel-bin/tools/bench-db/bench.db bazel-bin/tools/bench-db/empty.db \
     bazel-bin/tools/repo-scripts/repo-scripts-tool_deploy.jar "$out/bench-dbs/"
-  for target in linuxArm64 mingwX64; do
-    for binary in $(bazel cquery "${flags[@]}" --output=files "attr(name, \"_${target}_cross\$\", //...)"); do
-      dir="native-tests/$target/$(dirname "${binary#bazel-out/*/bin/}")"
-      mkdir -p "$dir" && cp "$binary" "$dir/"
+    if [ "$NATIVE" = true ]; then
+    for target in linuxArm64 mingwX64; do
+      for binary in $(bazel cquery "${flags[@]}" --output=files "attr(name, \"_${target}_cross\$\", //...)"); do
+        dir="native-tests/$target/$(dirname "${binary#bazel-out/*/bin/}")"
+        mkdir -p "$dir" && cp "$binary" "$dir/"
+      done
+      cp bazel-bin/bazel/kmp/testing/native_launcher_deploy.jar "native-tests/$target/"
     done
-    cp bazel-bin/bazel/kmp/testing/native_launcher_deploy.jar "native-tests/$target/"
-  done
   # 1.6 GB as they are, a quarter of that compressed.
   tar --zstd -cf "$out/native-tests.tar.zst" native-tests && rm -rf native-tests
+  fi
 fi
 exit "$status"
