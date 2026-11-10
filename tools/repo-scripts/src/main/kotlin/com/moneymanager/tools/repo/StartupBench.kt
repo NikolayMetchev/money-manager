@@ -1,11 +1,8 @@
 package com.moneymanager.tools.repo
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.double
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.nio.file.Files
 import java.time.Instant
@@ -95,7 +92,7 @@ private fun isolatedEnv(
     for (name in listOf("MM_STARTUP_PROBE", "MM_STARTUP_PROBE_ACCOUNT", "MM_VAULT_PASSWORD", "MM_REMOTE_PASSWORD")) env.remove(name)
 }
 
-private fun makeHome(
+internal fun makeHome(
     root: File,
     db: String,
 ): File {
@@ -103,7 +100,7 @@ private fun makeHome(
     val data = File(home, ".moneymanager").also { it.mkdirs() }
     val copy = File(data, "bench.db")
     File(db).copyTo(copy)
-    File(data, "settings.json").writeText(JsonObject(mapOf("lastDatabase" to JsonPrimitive(copy.path))).toString())
+    File(data, "settings.json").writeText(Json.encodeToString(BenchSettings(lastDatabase = copy.path)))
     return home
 }
 
@@ -156,7 +153,7 @@ private fun timeDesktop(
     if (account != null) extra["MM_STARTUP_PROBE_ACCOUNT"] = account
     val (elapsed, code, output) = run(listOf(launcher), home, javaFlags, DESKTOP_TIMEOUT_S, extra)
     check(probe.exists()) { "$launcher exited $code without writing the probe:\n${output.takeLast(4000)}" }
-    val metrics = Json.parseToJsonElement(probe.readText()).jsonObject.mapValues { it.value.jsonPrimitive.double }
+    val metrics = Json.decodeFromString<Map<String, Double>>(probe.readText())
     return metrics + ("wall" to elapsed)
 }
 
@@ -222,6 +219,31 @@ private fun archName(): String {
     }
 }
 
+/** The part of `settings.json` the benchmark's home needs: the database the launchers open. */
+@Serializable
+internal class BenchSettings(
+    val lastDatabase: String,
+)
+
+/** One line of the results: the shape `bazel/perf/record.sh` appends to `startup.jsonl` and `performance.html` graphs. */
+@Serializable
+internal data class BenchRecord(
+    val sha: String,
+    @SerialName("commit_date") val commitDate: String,
+    val date: String,
+    val os: String,
+    val arch: String,
+    val label: String,
+    val runtime: String,
+    val scenario: String,
+    val variant: String,
+    val metric: String,
+    @SerialName("median_ms") val medianMs: Double,
+    @SerialName("min_ms") val minMs: Double,
+    @SerialName("max_ms") val maxMs: Double,
+    val runs: Int,
+)
+
 private fun record(
     args: BenchArgs,
     date: String,
@@ -229,25 +251,22 @@ private fun record(
     variant: String,
     metric: String,
     values: List<Double>,
-): JsonObject =
-    JsonObject(
-        sortedMapOf(
-            "sha" to JsonPrimitive(args.sha),
-            "commit_date" to JsonPrimitive(args.commitDate),
-            "date" to JsonPrimitive(date),
-            "os" to JsonPrimitive(osName()),
-            "arch" to JsonPrimitive(archName()),
-            "label" to JsonPrimitive(args.label),
-            "runtime" to JsonPrimitive(scenario.runtime),
-            "scenario" to JsonPrimitive(scenario.name),
-            "variant" to JsonPrimitive(variant),
-            "metric" to JsonPrimitive(metric),
-            "median_ms" to JsonPrimitive(round1(median(values))),
-            "min_ms" to JsonPrimitive(round1(values.min())),
-            "max_ms" to JsonPrimitive(round1(values.max())),
-            "runs" to JsonPrimitive(values.size),
-        ),
-    )
+) = BenchRecord(
+    sha = args.sha,
+    commitDate = args.commitDate,
+    date = date,
+    os = osName(),
+    arch = archName(),
+    label = args.label,
+    runtime = scenario.runtime,
+    scenario = scenario.name,
+    variant = variant,
+    metric = metric,
+    medianMs = round1(median(values)),
+    minMs = round1(values.min()),
+    maxMs = round1(values.max()),
+    runs = values.size,
+)
 
 /** One warm-up run, discarded, then [BenchArgs.runs] measured ones, each in a home of its own. */
 private fun sample(
@@ -276,7 +295,7 @@ fun startupBench(argv: List<String>) {
         for (scenario in scenarios(args)) {
             for (variant in scenario.variants) {
                 for ((metric, values) in sample(args, root, scenario, variant)) {
-                    lines.append(record(args, date, scenario, variant, metric, values)).append('\n')
+                    lines.append(Json.encodeToString(record(args, date, scenario, variant, metric, values))).append('\n')
                     System.err.println(
                         "%-8s %-20s %-8s %-18s median %8.0f ms  (min %.0f, max %.0f)".format(
                             scenario.runtime,

@@ -1,12 +1,8 @@
 package com.moneymanager.tools.repo
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.w3c.dom.Element
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -80,9 +76,21 @@ private val JDK_PLATFORMS =
         "windows_x86_64" to Triple("windows", "x64", "zip"),
     )
 
-private fun fetchJson(url: String) = Json.parseToJsonElement(String(httpGet(url)))
+private val apiJson = Json { ignoreUnknownKeys = true }
 
-private fun JsonArray.ints() = map { it.jsonPrimitive.int }
+/** The fields of Azul's package listing that choose the newest JDK. */
+@Serializable
+private class AzulPackage(
+    val name: String,
+    @SerialName("java_version") val javaVersion: List<Int>,
+    @SerialName("distro_version") val distroVersion: List<Int>,
+    @SerialName("package_uuid") val packageUuid: String,
+)
+
+@Serializable
+private class AzulPackageDetail(
+    @SerialName("sha256_hash") val sha256: String,
+)
 
 private val intListOrder =
     Comparator<List<Int>> { a, b ->
@@ -108,23 +116,16 @@ private fun azulArchive(
             "page_size" to "100",
         ).entries.joinToString("&") { (k, v) -> "$k=${URLEncoder.encode(v, "UTF-8")}" }
     val packages =
-        fetchJson("$AZUL?$query").jsonArray.map { it.jsonObject }.filter {
-            "musl" !in it.getValue("name").jsonPrimitive.content &&
-                it
-                    .getValue("java_version")
-                    .jsonArray
-                    .ints()
-                    .take(3)
-                    .joinToString(".") == version
+        apiJson.decodeFromString<List<AzulPackage>>(String(httpGet("$AZUL?$query"))).filter {
+            "musl" !in it.name && it.javaVersion.take(3).joinToString(".") == version
         }
     if (packages.isEmpty()) fail("Azul publishes no Zulu $version JDK for $os $arch ($type)")
     val newest =
         packages.maxWith(
-            compareBy<JsonObject, List<Int>>(intListOrder) { it.getValue("java_version").jsonArray.ints() }
-                .thenBy(intListOrder) { it.getValue("distro_version").jsonArray.ints() },
+            compareBy<AzulPackage, List<Int>>(intListOrder) { it.javaVersion }.thenBy(intListOrder) { it.distroVersion },
         )
-    val sha = fetchJson(AZUL + newest.getValue("package_uuid").jsonPrimitive.content).jsonObject.getValue("sha256_hash")
-    return newest.getValue("name").jsonPrimitive.content to sha.jsonPrimitive.content
+    val sha = apiJson.decodeFromString<AzulPackageDetail>(String(httpGet(AZUL + newest.packageUuid))).sha256
+    return newest.name to sha
 }
 
 private val JDK_ENTRY = Regex("""^( {4}"([a-z0-9_]+)": \[)"([^"]+)", "([0-9a-f]{64})"(],)$""", MULTILINE)
@@ -220,6 +221,29 @@ fun repinBytecode(
 
 // --- Skiko: the release Compose was built against, read from Compose's ui-graphics Gradle module.
 
+/** The slice of a Gradle module file that names a dependency's required version. */
+@Serializable
+private class GradleModule(
+    val variants: List<GradleVariant>,
+)
+
+@Serializable
+private class GradleVariant(
+    val dependencies: List<GradleDependency> = emptyList(),
+)
+
+@Serializable
+private class GradleDependency(
+    val group: String,
+    val module: String,
+    val version: GradleVersion,
+)
+
+@Serializable
+private class GradleVersion(
+    val requires: String? = null,
+)
+
 fun repinSkiko(
     file: File,
     gradleModule: (String) -> String = {
@@ -229,24 +253,13 @@ fun repinSkiko(
     val module = file.readText()
     val compose = constant(module, "COMPOSE_PLUGIN")
     val skiko =
-        Json
-            .parseToJsonElement(gradleModule(compose))
-            .jsonObject
-            .getValue("variants")
-            .jsonArray
-            .asSequence()
-            .flatMap { it.jsonObject["dependencies"]?.jsonArray ?: JsonArray(emptyList()) }
-            .map { it.jsonObject }
-            .filter {
-                it.getValue("group").jsonPrimitive.content == "org.jetbrains.skiko" &&
-                    it.getValue("module").jsonPrimitive.content == "skiko"
-            }.map {
-                it
-                    .getValue("version")
-                    .jsonObject
-                    .getValue("requires")
-                    .jsonPrimitive.content
-            }.toSet()
+        apiJson
+            .decodeFromString<GradleModule>(gradleModule(compose))
+            .variants
+            .flatMap { it.dependencies }
+            .filter { it.group == "org.jetbrains.skiko" && it.module == "skiko" }
+            .map { it.version.requires ?: fail("Compose $compose's skiko dependency requires no version") }
+            .toSet()
     if (skiko.size != 1) fail("Compose $compose's ui-graphics names Skiko ${skiko.sorted()}, want one release")
     val version = skiko.single()
     val (updated, count) =

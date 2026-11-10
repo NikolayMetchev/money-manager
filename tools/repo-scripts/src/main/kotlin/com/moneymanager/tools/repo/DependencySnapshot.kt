@@ -1,18 +1,19 @@
 package com.moneymanager.tools.repo
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 import java.io.File
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+
+private val prettyJson =
+    Json {
+        prettyPrint = true
+        prettyPrintIndent = " "
+    }
 
 /**
  * GitHub's dependency-graph snapshot from the Maven lockfiles (#1028).
@@ -32,41 +33,73 @@ fun dependencySnapshot(paths: List<String>) {
     val manifests = paths.sorted().associateWith { manifest(it, workspaceFile(it).readText(), module) }
     val scanned = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneOffset.UTC).format(Instant.now())
     val snapshot = snapshot(manifests, scanned) { System.getenv(it) ?: fail("$it isn't set") }
-    println(
-        Json {
-            prettyPrint = true
-            prettyPrintIndent = " "
-        }.encodeToString(JsonObject.serializer(), snapshot),
-    )
+    println(prettyJson.encodeToString(Snapshot.serializer(), snapshot))
 }
 
+/** GitHub's dependency-snapshot document; the field names are its REST API's. */
+@Serializable
+internal data class Snapshot(
+    val version: Int,
+    val sha: String,
+    val ref: String,
+    val job: SnapshotJob,
+    val detector: SnapshotDetector,
+    val scanned: String,
+    val manifests: Map<String, Manifest>,
+)
+
+@Serializable
+internal data class SnapshotJob(
+    val correlator: String,
+    val id: String,
+)
+
+@Serializable
+internal data class SnapshotDetector(
+    val name: String,
+    val version: String,
+    val url: String,
+)
+
+@Serializable
+internal data class Manifest(
+    val name: String,
+    val file: ManifestFile,
+    val resolved: Map<String, ResolvedPackage>,
+)
+
+@Serializable
+internal data class ManifestFile(
+    @SerialName("source_location") val sourceLocation: String,
+)
+
+@Serializable
+internal data class ResolvedPackage(
+    @SerialName("package_url") val packageUrl: String,
+    val relationship: String,
+    val scope: String,
+    val dependencies: List<String>,
+)
+
 internal fun snapshot(
-    manifests: Map<String, JsonObject>,
+    manifests: Map<String, Manifest>,
     scanned: String,
     env: (String) -> String,
-): JsonObject =
-    buildJsonObject {
-        put("version", 0)
-        put("sha", env("GITHUB_SHA"))
-        put("ref", env("GITHUB_REF"))
-        put(
-            "job",
-            buildJsonObject {
-                put("correlator", "${env("GITHUB_WORKFLOW")}_${env("GITHUB_JOB")}")
-                put("id", env("GITHUB_RUN_ID"))
-            },
-        )
-        put(
-            "detector",
-            buildJsonObject {
-                put("name", "money-manager maven_kmp")
-                put("version", "1")
-                put("url", "https://github.com/NikolayMetchev/money-manager/tree/main/bazel/kmp/deps")
-            },
-        )
-        put("scanned", scanned)
-        put("manifests", JsonObject(manifests))
-    }
+): Snapshot =
+    Snapshot(
+        version = 0,
+        sha = env("GITHUB_SHA"),
+        ref = env("GITHUB_REF"),
+        job = SnapshotJob(correlator = "${env("GITHUB_WORKFLOW")}_${env("GITHUB_JOB")}", id = env("GITHUB_RUN_ID")),
+        detector =
+            SnapshotDetector(
+                name = "money-manager maven_kmp",
+                version = "1",
+                url = "https://github.com/NikolayMetchev/money-manager/tree/main/bazel/kmp/deps",
+            ),
+        scanned = scanned,
+        manifests = manifests,
+    )
 
 private fun purl(
     coordinate: String,
@@ -95,43 +128,67 @@ private fun entry(
     direct: Boolean,
     scope: String,
     dependencies: Collection<String>,
-): JsonObject =
-    buildJsonObject {
-        put("package_url", packageUrl)
-        put("relationship", if (direct) "direct" else "indirect")
-        put("scope", scope)
-        put("dependencies", JsonArray(dependencies.sorted().map(::JsonPrimitive)))
-    }
+) = ResolvedPackage(packageUrl, if (direct) "direct" else "indirect", scope, dependencies.sorted())
+
+/** What the two lockfile kinds share: rules_jvm_external's alone carries this hash. */
+@Serializable
+private class LockKind(
+    @SerialName("__INPUT_ARTIFACTS_HASH") val inputArtifactsHash: JsonElement? = null,
+)
+
+/** A rules_jvm_external lockfile: one version per library, its dependencies by coordinate. */
+@Serializable
+private class MavenInstallLock(
+    val artifacts: Map<String, LockedVersion>,
+    val dependencies: Map<String, List<String>> = emptyMap(),
+)
+
+@Serializable
+private class LockedVersion(
+    val version: String,
+)
+
+/** The `maven_kmp` lockfile: each library's artifact per platform. */
+@Serializable
+private class MavenKmpLock(
+    val inputs: MavenKmpInputs,
+    val artifacts: Map<String, Map<String, MavenKmpArtifact>>,
+)
+
+@Serializable
+private class MavenKmpInputs(
+    val libraries: Map<String, String>,
+)
+
+@Serializable
+private class MavenKmpArtifact(
+    val version: String,
+    val deps: List<String> = emptyList(),
+)
+
+private val lockfileJson = Json { ignoreUnknownKeys = true }
 
 internal fun manifest(
     path: String,
     text: String,
     module: String,
-): JsonObject {
-    val lock = Json.parseToJsonElement(text).jsonObject
-    val resolved: Map<String, JsonElement> =
-        if ("__INPUT_ARTIFACTS_HASH" in lock) mavenInstallResolved(path, lock, module) else mavenKmpResolved(path, lock)
-    return buildJsonObject {
-        put("name", path)
-        put("file", buildJsonObject { put("source_location", path) })
-        put("resolved", JsonObject(resolved))
-    }
+): Manifest {
+    val resolved =
+        if (lockfileJson.decodeFromString<LockKind>(text).inputArtifactsHash != null) {
+            mavenInstallResolved(path, lockfileJson.decodeFromString<MavenInstallLock>(text), module)
+        } else {
+            mavenKmpResolved(path, lockfileJson.decodeFromString<MavenKmpLock>(text))
+        }
+    return Manifest(name = path, file = ManifestFile(path), resolved = resolved)
 }
 
-/** A rules_jvm_external lockfile: one version per library, its dependencies by coordinate. */
 private fun mavenInstallResolved(
     path: String,
-    lock: JsonObject,
+    lock: MavenInstallLock,
     module: String,
-): Map<String, JsonElement> {
-    val dependencies = lock["dependencies"]?.jsonObject ?: JsonObject(emptyMap())
+): Map<String, ResolvedPackage> {
     val direct = mavenInstallArtifacts(module, File(path).name.removeSuffix("_install.json"))
-    val version =
-        lock.getValue("artifacts").jsonObject.mapValues {
-            it.value.jsonObject
-                .getValue("version")
-                .jsonPrimitive.content
-        }
+    val version = lock.artifacts.mapValues { it.value.version }
     return version.keys.sorted().associate { coordinate ->
         val packageUrl = purl(coordinate, version.getValue(coordinate))
         packageUrl to
@@ -139,9 +196,8 @@ private fun mavenInstallResolved(
                 packageUrl,
                 coordinate in direct,
                 "development",
-                (dependencies[coordinate] as? JsonArray)
+                lock.dependencies[coordinate]
                     .orEmpty()
-                    .map { it.jsonPrimitive.content }
                     .filter { it in version }
                     .map { purl(it, version.getValue(it)) },
             )
@@ -150,49 +206,29 @@ private fun mavenInstallResolved(
 
 private fun mavenKmpResolved(
     path: String,
-    lock: JsonObject,
-): Map<String, JsonElement> {
+    lock: MavenKmpLock,
+): Map<String, ResolvedPackage> {
     val direct =
-        lock
-            .getValue("inputs")
-            .jsonObject
-            .getValue("libraries")
-            .jsonObject.values
-            .map { ga(it.jsonPrimitive.content) }
+        lock.inputs.libraries.values
+            .map(::ga)
             .toSet()
     val scope = if (File(path).name == "maven_kmp.lock.json") "runtime" else "development"
-    val artifacts = lock.getValue("artifacts").jsonObject
 
     class Pending(
         val coordinate: String,
         val dependencies: MutableSet<String> = sortedSetOf(),
     )
     val resolved = linkedMapOf<String, Pending>()
-    for ((coordinate, platforms) in artifacts) {
-        for ((platform, artifact) in platforms.jsonObject) {
-            val version =
-                artifact.jsonObject
-                    .getValue("version")
-                    .jsonPrimitive.content
-            val pending = resolved.getOrPut(purl(coordinate, version)) { Pending(coordinate) }
-            for (dependency in (artifact.jsonObject["deps"] as? JsonArray).orEmpty()) {
-                val name = dependency.jsonPrimitive.content
+    for ((coordinate, platforms) in lock.artifacts) {
+        for ((platform, artifact) in platforms) {
+            val pending = resolved.getOrPut(purl(coordinate, artifact.version)) { Pending(coordinate) }
+            for (name in artifact.deps) {
                 // A dependency's version can differ per platform: take the one this platform resolved.
-                val candidates = artifacts[name]?.jsonObject
+                val candidates = lock.artifacts[name]
                 val chosen = candidates?.get(platform) ?: candidates?.values?.firstOrNull()
-                if (chosen != null) {
-                    pending.dependencies +=
-                        purl(
-                            name,
-                            chosen.jsonObject
-                                .getValue("version")
-                                .jsonPrimitive.content,
-                        )
-                }
+                if (chosen != null) pending.dependencies += purl(name, chosen.version)
             }
         }
     }
     return resolved.toSortedMap().mapValues { (packageUrl, p) -> entry(packageUrl, p.coordinate in direct, scope, p.dependencies) }
 }
-
-private fun JsonArray?.orEmpty(): JsonArray = this ?: JsonArray(emptyList())

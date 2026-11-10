@@ -5,8 +5,12 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 kmp_library(
     name = "repo-scripts",
-    jvm_deps = ["@maven_kmp//:kotlinx_serialization_json"],
+    jvm_deps = [
+        "@maven_kmp//:kotlinx_serialization_json",
+        "@maven_kmp//:kotlinx_serialization_core",
+    ],
     jvm_srcs = glob(["src/main/kotlin/**/*.kt"]),
+    plugins = ["serialization"],
     visibility = ["//visibility:public"],
 )
 
@@ -26,4 +30,5 @@ kmp_test(
         "@maven_kmp//:kotlinx_serialization_json",
     ],
     jvm_srcs = glob(["src/test/kotlin/**/*.kt"]),
+    plugins = ["serialization"],
 )
