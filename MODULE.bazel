@@ -163,49 +163,49 @@ filegroup(
 http_archive(
     name = "pdfium_android_arm64",
     build_file_content = PDFIUM_BUILD,
-    sha256 = "fc73c8020d7204e52f7a9d8153489b3cac2e9c5dc5d70d3a37a976a7398c1a86",
+    sha256 = "97085db0665639f2c7d5453d3b982b16c6bbb450f4c5170a3cf7ec0df7575ab9",
     url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F" + PDFIUM + "/pdfium-android-arm64.tgz",
 )
 
 http_archive(
     name = "pdfium_android_x64",
     build_file_content = PDFIUM_BUILD,
-    sha256 = "cf71ceb527d72a64b3e8bf36e9b15b326984f56d33bb8b74350a92ab8706ba87",
+    sha256 = "25436b6e5a761b92faae592edcf6c355a802860e842bd34c73cf9f519c9c3e43",
     url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F" + PDFIUM + "/pdfium-android-x64.tgz",
 )
 
 http_archive(
     name = "pdfium_linux_arm64",
     build_file_content = PDFIUM_BUILD,
-    sha256 = "c70b1ce4d13257f741af19e0aeee575890875995eb81370a65be942e601a1862",
+    sha256 = "c6ed1a91234aede0cfafdc09c401b83bd44ac69deafc4599fda75d511c36403e",
     url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F" + PDFIUM + "/pdfium-linux-arm64.tgz",
 )
 
 http_archive(
     name = "pdfium_linux_x64",
     build_file_content = PDFIUM_BUILD,
-    sha256 = "d6b1e28950a0392590d79bbdbb7eb19686872b688f8a36f170acb19e41473113",
+    sha256 = "384ab5c51882408a143a21f9c14dcd2caf1f75280ae41c554d0489b46c3dba9f",
     url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F" + PDFIUM + "/pdfium-linux-x64.tgz",
 )
 
 http_archive(
     name = "pdfium_mac_arm64",
     build_file_content = PDFIUM_BUILD,
-    sha256 = "21a1567b397b571f4f77f21ca91eac7b892774219c3c715a5127a20950ccb18b",
+    sha256 = "30b0c3f55448840f0947b54bedbe35185bbaccbadd35b8cd960270d6fa6caf80",
     url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F" + PDFIUM + "/pdfium-mac-arm64.tgz",
 )
 
 http_archive(
     name = "pdfium_mac_x64",
     build_file_content = PDFIUM_BUILD,
-    sha256 = "72662ac8eff7bf5381ef82ceebd0a0ad5bddb051b303981115114e6972fd201c",
+    sha256 = "acb975e637ffa1f41430205c62baacac70e34b60811e22fc0e0274dfcd601fcc",
     url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F" + PDFIUM + "/pdfium-mac-x64.tgz",
 )
 
 http_archive(
     name = "pdfium_win_x64",
     build_file_content = PDFIUM_BUILD,
-    sha256 = "8d48973e3eb472dda0f5f2435e595ac043f9f2219dd71883392f549445afa8a5",
+    sha256 = "cee2b0e9990bc67c0721774932961b9dbf2766046c10eec925acd4cfba6fdfe3",
     url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F" + PDFIUM + "/pdfium-win-x64.tgz",
 )
 
