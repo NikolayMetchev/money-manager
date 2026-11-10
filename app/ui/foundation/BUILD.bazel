@@ -25,7 +25,6 @@ kmp_library(
     ],
     jvm_android_srcs = glob(["src/jvmAndroidMain/kotlin/**/*.kt"]),
     jvm_deps = [
-        "//utils/localsettings",
         "@maven_kmp//:kermit",
         "@maven_kmp//:compose_material3_desktop",
         "@maven_kmp//:compose_material_icons_core_desktop",
@@ -60,6 +59,7 @@ kmp_library(
         "//utils/bigdecimal",
         "//utils/credentialvault",
         "//utils/currency",
+        "//utils/localsettings",
         "@maven_kmp//:androidx_compose_runtime",
         "@maven_kmp//:androidx_navigation3_runtime",
         "@maven_kmp//:androidx_savedstate",

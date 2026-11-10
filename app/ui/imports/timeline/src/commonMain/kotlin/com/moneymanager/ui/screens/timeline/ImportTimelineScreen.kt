@@ -29,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,10 +58,13 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.components.MultiSelectFilterDropdown
+import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.util.displayDate
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.builtins.SetSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlin.math.roundToInt
 import kotlin.time.Clock
 
@@ -84,9 +88,9 @@ fun ImportTimelineScreen(
     personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     onOpenFile: (ImportFileDateRange) -> Unit = {},
 ) {
-    var groupMode by remember { mutableStateOf(TimelineGroupMode.STRATEGY) }
-    var accountNameFilter by remember { mutableStateOf("") }
-    var selectedOwnerIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var groupMode by rememberPersistedState("timeline.groupMode", TimelineGroupMode.serializer()) { TimelineGroupMode.STRATEGY }
+    var accountNameFilter by rememberPersistedState("timeline.accountName", String.serializer()) { "" }
+    var selectedOwnerIds by rememberPersistedState("timeline.owners", SetSerializer(Long.serializer())) { emptySet() }
 
     val strategyRanges by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         importTimelineRepository.getAllDateRanges()
@@ -97,8 +101,14 @@ fun ImportTimelineScreen(
     val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         accountRepository.getAllAccounts()
     }
-    val people by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+    val loadedPeople by rememberFlowAsStateWithSchemaErrorHandling(initial = null) {
         personRepository.getAllPeople()
+    }
+    val people = loadedPeople ?: emptyList()
+    // A saved owner may have been deleted since, which would leave no account matching and no way to clear it.
+    LaunchedEffect(loadedPeople) {
+        val loaded = loadedPeople ?: return@LaunchedEffect
+        selectedOwnerIds = selectedOwnerIds intersect loaded.mapTo(mutableSetOf()) { it.id.id }
     }
     val ownerships by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         personAccountOwnershipRepository.getAllOwnerships()

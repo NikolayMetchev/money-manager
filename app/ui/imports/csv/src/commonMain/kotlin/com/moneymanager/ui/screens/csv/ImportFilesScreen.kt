@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +70,7 @@ import com.moneymanager.ui.components.imports.stagedImportDirectoryOptions
 import com.moneymanager.ui.components.imports.stagedImportKinds
 import com.moneymanager.ui.components.imports.stagedImportPath
 import com.moneymanager.ui.components.imports.stagedImportStrategyOptions
+import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.tasks.LocalTaskManager
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -127,7 +129,7 @@ fun ImportFilesScreen(
     var isImporting by remember { mutableStateOf(false) }
     var importMessage by remember { mutableStateOf<String?>(null) }
     var importMessageIsError by remember { mutableStateOf(false) }
-    var filter by remember { mutableStateOf(StagedImportFilter()) }
+    var filter by rememberPersistedState("importFiles.filter", StagedImportFilter.serializer()) { StagedImportFilter() }
     val taskManager = LocalTaskManager.current
     val tasks by taskManager.tasks.collectAsState()
     // Null until the person opens or closes it or starts a download: then open only while there are no files yet.
@@ -379,6 +381,20 @@ private fun StagedImportFilters(
         remember(imports, data.importDirectories, data.directories) {
             stagedImportDirectoryOptions(imports, data.importDirectories, data.directories)
         }
+    // A saved filter can name a strategy or folder deleted since; it would hide every file with no way to see why.
+    // Matching finishing is the sign the options are complete.
+    LaunchedEffect(strategies, folders, data.matchedStrategies != null) {
+        if (data.matchedStrategies == null) return@LaunchedEffect
+        val knownStrategies = strategies.mapTo(mutableSetOf()) { it.id }
+        val knownFolders = folders.mapTo(mutableSetOf()) { it.first }
+        val pruned =
+            filter.copy(
+                strategies = filter.strategies intersect knownStrategies,
+                directories =
+                    filter.directories intersect knownFolders,
+            )
+        if (pruned != filter) onFilterChange(pruned)
+    }
     var showDates by rememberSaveable { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(

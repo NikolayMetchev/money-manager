@@ -35,7 +35,10 @@ kmp_library(
         "@maven_kmp//:compose_material3",
         "@maven_kmp//:jetbrains_navigation3_ui",
     ],
-    plugins = ["compose"],
+    plugins = [
+        "compose",
+        "serialization",
+    ],
     visibility = ["//visibility:public"],
     wasm_js_deps = [
         "@maven_kmp//:compose_material3",
@@ -91,6 +94,7 @@ kmp_library(
         "@maven_kmp//:compose_foundation",
         "@maven_kmp//:compose_ui",
         "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_serialization_core",
         "@maven_kmp//:org_jetbrains_compose_foundation_foundation_layout",
         "@maven_kmp//:org_jetbrains_compose_ui_ui_text",
     ],

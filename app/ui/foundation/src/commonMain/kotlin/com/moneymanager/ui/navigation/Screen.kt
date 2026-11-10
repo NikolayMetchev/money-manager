@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.strategy.StrategyKind
 import kotlinx.serialization.Serializable
 
+@Serializable
 enum class ImportTab { FILES, API, MISC, TIMELINE, RECONCILIATION }
 
 /**
