@@ -308,8 +308,6 @@ fun ApiSessionsScreen(
         }
     }
 
-    // The export is built ahead of the click: the save launcher takes its content up front.
-    var exportContent by remember { mutableStateOf<String?>(null) }
     var archiveMessage by remember { mutableStateOf<String?>(null) }
     val exportSaver = rememberFileSaver(onResult = {})
     val importPicker =
@@ -333,9 +331,6 @@ fun ApiSessionsScreen(
         )
 
     LaunchedEffect(Unit) { refresh() }
-    LaunchedEffect(sessionsByCredential) {
-        exportContent = ApiSessionsArchive.export(apiSessionRepository, apiImportStrategyRepository)
-    }
     EnsureApiConnectionRows(
         apiImportService = apiImportService,
         strategies = strategies,
@@ -353,7 +348,16 @@ fun ApiSessionsScreen(
         ) {
             Text(text = "API Sessions", style = MaterialTheme.typography.headlineMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = { exportSaver.launch("api-sessions.json", exportContent ?: return@TextButton) }) { Text("Export") }
+                TextButton(onClick = {
+                    // Built at click time: a snapshot taken when the session list changed would miss the
+                    // requests a download records after its session appears.
+                    scope.launch {
+                        exportSaver.launch(
+                            "api-sessions.json",
+                            ApiSessionsArchive.export(apiSessionRepository, apiImportStrategyRepository),
+                        )
+                    }
+                }) { Text("Export") }
                 TextButton(onClick = { importPicker.launch() }) { Text("Import") }
                 TextButton(onClick = onApiStrategiesClick) { Text("Strategies") }
                 TextButton(onClick = onAddCredentialClick) { Text("+ Connect") }
