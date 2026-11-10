@@ -15,12 +15,12 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-    # `labeled`/`unlabeled` are for the `native` label; any other label's run skips every job.
+    # `labeled`/`unlabeled` are for the `native` and `installer` labels; any other label's run skips every job.
     types: [ opened, synchronize, reopened, labeled, unlabeled ]
 
 concurrency:
   # A run for another label is a no-op, so it gets its own group instead of cancelling the real run in progress.
-  group: ${{ github.workflow }}-${{ github.ref }}${{ contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) && github.event.label.name != 'native' && github.run_id || '' }}
+  group: ${{ github.workflow }}-${{ github.ref }}${{ contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) && !contains(fromJSON('["native", "installer"]'), github.event.label.name) && github.run_id || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -38,12 +38,15 @@ jobs:
       # Kotlin/Native (the native compiles and tests, the native mm) runs on main, manual runs and a PR labelled
       # `native`; any other PR skips it, in the jobs below and in the Bazel commands they share.
       native: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'native') }}
+      # The desktop installers (Build and Test's deb, Desktop Installer's dmg and msi) run on main, manual runs and a PR
+      # labelled `installer`; any other PR leaves them out of the jobs and the shared Bazel commands.
+      installer: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'installer') }}
       noise: ${{ steps.label.outputs.noise }}
     steps:
-      - name: Ignore labels other than native
+      - name: Ignore labels other than native and installer
         id: label
         env:
-          NOISE: ${{ contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) && github.event.label.name != 'native' }}
+          NOISE: ${{ contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) && !contains(fromJSON('["native", "installer"]'), github.event.label.name) }}
         run: echo "noise=$NOISE" >> "$GITHUB_OUTPUT"
       # Needed so paths-filter can diff against the previous commit on push
       # events (on pull_request it uses the API and the checkout is unused).
@@ -88,6 +91,7 @@ jobs:
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       NATIVE: ${{ needs.changes.outputs.native }}
+      INSTALLER: ${{ needs.changes.outputs.installer }}
       # On every command, so they share one analysis cache; they only change ProGuard, the installer and the JVM
       # tests. Shrink only: the keep rules and ServiceLoader providers don't depend on ProGuard's optimizer, which
       # takes most of its time (release builds optimize). The installer bundles the native mm, as release.yml's does.
@@ -96,7 +100,7 @@ jobs:
       # that step is most of the installer's build); main, releases and the macOS and Windows jobs on main keep them.
       BAZEL_FLAGS: >-
         --define=proguard_optimize=false --config=coverage
-        ${{ needs.changes.outputs.native == 'true' && '--define=bundle_native_cli=true' || '' }}
+        ${{ needs.changes.outputs.native == 'true' && needs.changes.outputs.installer == 'true' && '--define=bundle_native_cli=true' || '' }}
         ${{ github.event_name == 'pull_request' && '--define=aot=false' || '' }}
     # `shell: bash` runs with pipefail; the default shell doesn't, so `bazel … | tee` would take tee's exit code and
     # pass with failing tests.
@@ -213,6 +217,7 @@ jobs:
 
       # On main (and manual runs) it also times the installed app's startup, which perf-record keeps (#1254).
       - name: Install and start the desktop installer
+        if: needs.changes.outputs.installer == 'true'
         env:
           MEASURE: ${{ github.event_name != 'pull_request' }}
           NATIVE: ${{ needs.changes.outputs.native }}
@@ -580,6 +585,7 @@ jobs:
     needs: changes
     if: >-
       needs.changes.outputs.code == 'true' &&
+      needs.changes.outputs.installer == 'true' &&
       (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     strategy:
