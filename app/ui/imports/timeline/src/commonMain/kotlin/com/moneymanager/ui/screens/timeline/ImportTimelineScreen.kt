@@ -29,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
+import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -100,8 +102,14 @@ fun ImportTimelineScreen(
     val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         accountRepository.getAllAccounts()
     }
-    val people by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+    val loadedPeople by rememberFlowAsStateWithSchemaErrorHandling<List<Person>?>(initial = null) {
         personRepository.getAllPeople()
+    }
+    val people = loadedPeople ?: emptyList()
+    // A saved owner may have been deleted since, which would leave no account matching and no way to clear it.
+    LaunchedEffect(loadedPeople) {
+        val loaded = loadedPeople ?: return@LaunchedEffect
+        selectedOwnerIds = selectedOwnerIds intersect loaded.mapTo(mutableSetOf()) { it.id.id }
     }
     val ownerships by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         personAccountOwnershipRepository.getAllOwnerships()

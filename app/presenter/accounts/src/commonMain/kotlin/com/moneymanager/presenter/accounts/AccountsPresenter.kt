@@ -123,7 +123,7 @@ fun presentAccounts(
         state = state.copy(filter = state.filter.copy(ownerIds = state.filter.ownerIds intersect ids))
     }
     val availableAssetIds = current.availableAssets.mapTo(mutableSetOf()) { it.id }
-    LaunchedEffect(availableAssetIds) {
+    LaunchedEffect(availableAssetIds, snapshot != null) {
         // Read the snapshot now, not the captured one: the effect can start after the snapshot arrived.
         val loaded = snapshot ?: return@LaunchedEffect
         val available = loaded.availableAssets.mapTo(mutableSetOf()) { it.id }

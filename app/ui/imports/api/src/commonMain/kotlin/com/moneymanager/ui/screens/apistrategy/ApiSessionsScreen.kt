@@ -172,9 +172,18 @@ fun ApiSessionsScreen(
     var transactionsBlockReasonByCredential by remember { mutableStateOf<Map<ApiCredentialId, String>>(emptyMap()) }
     var strategies by remember { mutableStateOf<List<ApiImportStrategy>>(emptyList()) }
     var strategyIdByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiImportStrategyId?>>(emptyMap()) }
-    var selectedStrategyId by rememberPersistedState("apiSessions.strategy", ApiImportStrategyId.serializer().nullable) { null }
+    var selectedStrategyId by rememberPersistedState<ApiImportStrategyId?>(
+        "apiSessions.strategy",
+        ApiImportStrategyId.serializer().nullable,
+    ) {
+        null
+    }
     var selectedTab by rememberPersistedState("apiSessions.tab", Int.serializer()) { 0 }
     var isLoading by remember { mutableStateOf(true) }
+    // A saved strategy may have been deleted since, which would filter to an empty list under "All strategies".
+    LaunchedEffect(strategies, isLoading) {
+        if (!isLoading && selectedStrategyId != null && strategies.none { it.id == selectedStrategyId }) selectedStrategyId = null
+    }
     // Per-session import state
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportResult>>(emptyMap()) }
     var importErrorBySession by remember { mutableStateOf<Map<ApiSessionId, String>>(emptyMap()) }
