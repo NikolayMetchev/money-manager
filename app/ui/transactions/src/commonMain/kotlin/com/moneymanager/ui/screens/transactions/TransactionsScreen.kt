@@ -633,7 +633,6 @@ fun AccountTransactionsScreen(
                             // list), otherwise auto-pagination would stay gated forever.
                             hasScrolledToTarget = true
                         }
-
                     }
                 }
 

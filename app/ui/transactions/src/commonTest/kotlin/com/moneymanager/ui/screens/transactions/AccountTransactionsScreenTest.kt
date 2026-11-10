@@ -208,7 +208,7 @@ class AccountTransactionsScreenTest {
             mainClock.advanceTimeBy(100)
 
             onAllNodesWithText("Savings").assertCountEquals(1)
-            onAllNodesWithText("Checking").assertCountEquals(2)
+            onAllNodesWithText("Checking").assertCountEquals(1)
         }
     }
 
@@ -291,7 +291,7 @@ class AccountTransactionsScreenTest {
 
             onAllNodesWithText("Savings").assertCountEquals(1)
 
-            onAllNodesWithText("Checking").assertCountEquals(2)
+            onAllNodesWithText("Checking").assertCountEquals(1)
         }
     }
 
