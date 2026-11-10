@@ -1,16 +1,20 @@
 package com.moneymanager.apiimporter
 
+import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createApiSession
+import com.moneymanager.importengineapi.deleteApiSession
 import com.moneymanager.importengineapi.ensureApiCredential
 import com.moneymanager.importengineapi.insertApiRequest
 import com.moneymanager.importengineapi.insertApiResponse
 import com.moneymanager.importengineapi.recordApiDownloadCoverage
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
@@ -164,17 +168,35 @@ object ApiSessionsArchive {
                     present++
                     continue
                 }
-                val sessionId = engine.createApiSession(deviceId, createdAt, credentialId)
-                for (request in session.requests) {
-                    val requestId = engine.insertApiRequest(sessionId, request.method, request.url, request.headers)
-                    request.response?.let { engine.insertApiResponse(requestId, sessionId, it) }
-                }
-                for ((endpoint, until) in session.coverage) {
-                    engine.recordApiDownloadCoverage(sessionId, endpoint, Instant.fromEpochMilliseconds(until))
-                }
+                restoreSession(session, createdAt, deviceId, credentialId, engine)
                 imported++
             }
         }
         return ApiSessionsArchiveImportResult(imported, present, missing)
+    }
+
+    /** Writes one session; a failure partway removes it again, so it is never left half imported. */
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun restoreSession(
+        session: ArchiveSession,
+        createdAt: Instant,
+        deviceId: DeviceId,
+        credentialId: ApiCredentialId,
+        engine: ImportEngine,
+    ) {
+        val sessionId = engine.createApiSession(deviceId, createdAt, credentialId)
+        try {
+            for (request in session.requests) {
+                val requestId = engine.insertApiRequest(sessionId, request.method, request.url, request.headers)
+                request.response?.let { engine.insertApiResponse(requestId, sessionId, it) }
+            }
+            for ((endpoint, until) in session.coverage) {
+                engine.recordApiDownloadCoverage(sessionId, endpoint, Instant.fromEpochMilliseconds(until))
+            }
+        } catch (failure: Throwable) {
+            // A half-written session would later read as "already present" and never be completed.
+            withContext(NonCancellable) { engine.deleteApiSession(sessionId) }
+            throw failure
+        }
     }
 }

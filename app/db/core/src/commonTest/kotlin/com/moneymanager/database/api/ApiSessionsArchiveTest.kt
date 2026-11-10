@@ -112,4 +112,26 @@ class ApiSessionsArchiveTest : DbTest() {
                 )
             assertTrue("Unsupported" in message, message)
         }
+
+    @Test
+    fun `a session that fails partway is removed rather than left half imported`() =
+        runDbTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val credentialId = apiConnection("Monzo", now)
+            // A blank header name violates the table's CHECK, after the session and a first request exist.
+            val content =
+                """{"version":1,"strategies":[{"name":"Monzo","sessions":[{"createdAt":1700000000000,"coverage":{},"requests":[
+                    {"method":"GET","url":"https://api.example/a","headers":{},"response":null},
+                    {"method":"GET","url":"https://api.example/b","headers":{" ":"x"},"response":null}]}]}]}"""
+            val message =
+                ApiSessionsArchive.importAndDescribe(
+                    content,
+                    deviceId,
+                    repositories.apiSessionRepository,
+                    repositories.apiImportStrategyRepository,
+                    repositories.importEngine,
+                )
+            assertTrue(message.startsWith("Failed to import API sessions"), message)
+            assertTrue(repositories.apiSessionRepository.getSessionsByCredential(credentialId).isEmpty())
+        }
 }

@@ -352,10 +352,9 @@ fun ApiSessionsScreen(
                     // Built at click time: a snapshot taken when the session list changed would miss the
                     // requests a download records after its session appears.
                     scope.launch {
-                        exportSaver.launch(
-                            "api-sessions.json",
-                            ApiSessionsArchive.export(apiSessionRepository, apiImportStrategyRepository),
-                        )
+                        runCatching { ApiSessionsArchive.export(apiSessionRepository, apiImportStrategyRepository) }
+                            .onSuccess { exportSaver.launch("api-sessions.json", it) }
+                            .onFailure { archiveMessage = "Failed to export API sessions: ${it.message}" }
                     }
                 }) { Text("Export") }
                 TextButton(onClick = { importPicker.launch() }) { Text("Import") }
