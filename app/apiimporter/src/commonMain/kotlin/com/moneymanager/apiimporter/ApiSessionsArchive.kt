@@ -117,6 +117,21 @@ object ApiSessionsArchive {
         )
     }
 
+    /** [import] for the UI: the outcome, or why the file couldn't be imported, as one message to show. */
+    suspend fun importAndDescribe(
+        content: String,
+        deviceId: DeviceId,
+        sessions: ApiSessionReadRepository,
+        strategies: ApiImportStrategyReadRepository,
+        engine: ImportEngine,
+    ): String =
+        @Suppress("TooGenericExceptionCaught")
+        try {
+            import(content, deviceId, sessions, strategies, engine).summary()
+        } catch (expected: Exception) {
+            "Failed to import API sessions: ${expected.message}"
+        }
+
     suspend fun import(
         content: String,
         deviceId: DeviceId,

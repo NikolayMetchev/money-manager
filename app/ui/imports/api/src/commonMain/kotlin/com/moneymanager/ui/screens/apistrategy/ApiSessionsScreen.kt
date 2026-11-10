@@ -318,16 +318,15 @@ fun ApiSessionsScreen(
             onResult = { result ->
                 if (result != null) {
                     scope.launch {
-                        @Suppress("TooGenericExceptionCaught")
-                        try {
-                            archiveMessage =
-                                ApiSessionsArchive
-                                    .import(result.content, deviceId, apiSessionRepository, apiImportStrategyRepository, importEngine)
-                                    .summary()
-                            refresh()
-                        } catch (expected: Exception) {
-                            archiveMessage = "Failed to import API sessions: ${expected.message}"
-                        }
+                        archiveMessage =
+                            ApiSessionsArchive.importAndDescribe(
+                                result.content,
+                                deviceId,
+                                apiSessionRepository,
+                                apiImportStrategyRepository,
+                                importEngine,
+                            )
+                        refresh()
                     }
                 }
             },

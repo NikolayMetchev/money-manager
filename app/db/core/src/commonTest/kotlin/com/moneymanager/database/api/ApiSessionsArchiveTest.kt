@@ -67,4 +67,49 @@ class ApiSessionsArchiveTest : DbTest() {
             assertEquals(setOf("No Such Strategy"), result.missingStrategies)
             assertEquals(0, result.sessionsImported)
         }
+
+    @Test
+    fun `importAndDescribe reports a bad file instead of throwing`() =
+        runDbTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val message =
+                ApiSessionsArchive.importAndDescribe(
+                    "not json",
+                    deviceId,
+                    repositories.apiSessionRepository,
+                    repositories.apiImportStrategyRepository,
+                    repositories.importEngine,
+                )
+            assertTrue(message.startsWith("Failed to import API sessions"), message)
+        }
+
+    @Test
+    fun `importAndDescribe summarises what happened`() =
+        runDbTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val message =
+                ApiSessionsArchive.importAndDescribe(
+                    """{"version":1,"strategies":[{"name":"No Such Strategy","sessions":[]}]}""",
+                    deviceId,
+                    repositories.apiSessionRepository,
+                    repositories.apiImportStrategyRepository,
+                    repositories.importEngine,
+                )
+            assertEquals("Imported 0 session(s). Skipped sessions for unknown strategies: No Such Strategy", message)
+        }
+
+    @Test
+    fun `an unsupported version is refused`() =
+        runDbTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val message =
+                ApiSessionsArchive.importAndDescribe(
+                    """{"version":99,"strategies":[]}""",
+                    deviceId,
+                    repositories.apiSessionRepository,
+                    repositories.apiImportStrategyRepository,
+                    repositories.importEngine,
+                )
+            assertTrue("Unsupported" in message, message)
+        }
 }
