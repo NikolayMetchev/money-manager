@@ -374,16 +374,26 @@ class ImportDeduper(
      * Whether a row after the current one, for which [isRival] holds, is strictly closer in time to [existing] than
      * [timestamp] is. Claiming row by row in file order would otherwise hand the leg to the earlier row even when its
      * true twin, seconds away, is still to come (and that twin would then fall to a weaker rule and cross the pairs).
+     * A rival must also sit inside [window] of [existing], and must not repeat the unique key of an earlier row: such a
+     * row is a duplicate of that one and never claims anything.
      */
     private fun closerLaterRowExists(
         existing: Transfer,
         timestamp: Instant,
+        window: SettlementWindow,
         isRival: (ImportTransfer) -> Boolean,
     ): Boolean {
         val distance = (timestamp - existing.timestamp).absoluteValue
+        val seenKeys = batchRows.take(classifyingIndex + 1).mapNotNullTo(mutableSetOf()) { it.uniqueKey?.takeIf { it.isNotEmpty() } }
         return batchRows.drop(classifyingIndex + 1).any { row ->
             val rowTimestamp = row.timestamp
-            rowTimestamp != null && isRival(row) && (rowTimestamp - existing.timestamp).absoluteValue < distance
+            val key = row.uniqueKey?.takeIf { it.isNotEmpty() }
+            val duplicate = key != null && !seenKeys.add(key)
+            !duplicate &&
+                rowTimestamp != null &&
+                isRival(row) &&
+                (rowTimestamp - existing.timestamp).absoluteValue < distance &&
+                window.holds(rowTimestamp, existing.timestamp, row.accounts() + existing.accounts())
         }
     }
 
@@ -818,7 +828,7 @@ class ImportDeduper(
         val matchId =
             selectNearestUnconsumedLeg(candidates, timestamp, consumedReconcileIds) { existing ->
                 settings.window.holds(timestamp, existing.timestamp, transfer.accounts() + existing.accounts()) &&
-                    !closerLaterRowExists(existing, timestamp) { row ->
+                    !closerLaterRowExists(existing, timestamp, settings.window) { row ->
                         row.amount == amount && (row.unidentifiedCounterpartyAccountId != null) == (placeholder != null) &&
                             row.passThrough == null && row.conversion == null && ownEndsMeet(row, existing)
                     }
@@ -1055,7 +1065,7 @@ class ImportDeduper(
         val id =
             selectNearestUnconsumedLeg(candidates, timestamp, consumedReconcileIds) { existing ->
                 window.holds(timestamp, existing.timestamp, transfer.accounts() + existing.accounts()) &&
-                    (isRival == null || !closerLaterRowExists(existing, timestamp, isRival))
+                    (isRival == null || !closerLaterRowExists(existing, timestamp, window, isRival))
             } ?: return null
         return Found(id, candidates.first { it.first == id }.second, claims = listOf(id))
     }
