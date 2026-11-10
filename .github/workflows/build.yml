@@ -15,9 +15,12 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+    # `labeled`/`unlabeled` are for the `native` label; any other label's run skips every job.
+    types: [ opened, synchronize, reopened, labeled, unlabeled ]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # A run for another label is a no-op, so it gets its own group instead of cancelling the real run in progress.
+  group: ${{ github.workflow }}-${{ github.ref }}${{ contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) && github.event.label.name != 'native' && github.run_id || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -31,8 +34,17 @@ jobs:
       # Default to 'true' (run everything) when the filter doesn't run, e.g. on
       # workflow_dispatch where there is no diff base. A non-empty 'false' from
       # the filter is truthy and wins over the fallback.
-      code: ${{ steps.filter.outputs.code || 'true' }}
+      code: ${{ steps.label.outputs.noise != 'true' && (steps.filter.outputs.code || 'true') || 'false' }}
+      # Kotlin/Native (the native compiles and tests, the native mm) runs on main, manual runs and a PR labelled
+      # `native`; any other PR skips it, in the jobs below and in the Bazel commands they share.
+      native: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'native') }}
+      noise: ${{ steps.label.outputs.noise }}
     steps:
+      - name: Ignore labels other than native
+        id: label
+        env:
+          NOISE: ${{ contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) && github.event.label.name != 'native' }}
+        run: echo "noise=$NOISE" >> "$GITHUB_OUTPUT"
       # Needed so paths-filter can diff against the previous commit on push
       # events (on pull_request it uses the API and the checkout is unused).
       - name: Checkout code
@@ -75,6 +87,7 @@ jobs:
     env:
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+      NATIVE: ${{ needs.changes.outputs.native }}
       # On every command, so they share one analysis cache; they only change ProGuard, the installer and the JVM
       # tests. Shrink only: the keep rules and ServiceLoader providers don't depend on ProGuard's optimizer, which
       # takes most of its time (release builds optimize). The installer bundles the native mm, as release.yml's does.
@@ -82,7 +95,8 @@ jobs:
       # A pull request also skips training the installer's AOT caches (the app starts under Xvfb on the runner, and
       # that step is most of the installer's build); main, releases and the macOS and Windows jobs on main keep them.
       BAZEL_FLAGS: >-
-        --define=proguard_optimize=false --define=bundle_native_cli=true --config=coverage
+        --define=proguard_optimize=false --config=coverage
+        ${{ needs.changes.outputs.native == 'true' && '--define=bundle_native_cli=true' || '' }}
         ${{ github.event_name == 'pull_request' && '--define=aot=false' || '' }}
     # `shell: bash` runs with pipefail; the default shell doesn't, so `bazel … | tee` would take tee's exit code and
     # pass with failing tests.
@@ -201,6 +215,7 @@ jobs:
       - name: Install and start the desktop installer
         env:
           MEASURE: ${{ github.event_name != 'pull_request' }}
+          NATIVE: ${{ needs.changes.outputs.native }}
         run: |
           if [ "$MEASURE" = true ]; then
             export STARTUP_BENCH_DBS=ci-out/bench-dbs STARTUP_BENCH_OUT=$PWD/startup-Linux.jsonl
@@ -208,6 +223,7 @@ jobs:
           else
             export INSTALLER_AOT=false
           fi
+          [ "$NATIVE" = true ] || export INSTALLER_NATIVE_CLI=false
           bazel/kmp/jpackage/install_smoke_test.sh ci-out/installer "$(cat VERSION)"
 
       - name: Upload the startup times
@@ -228,9 +244,11 @@ jobs:
           retention-days: 7
 
       - name: Unpack native test binaries
+        if: needs.changes.outputs.native == 'true'
         run: tar --zstd -xf ci-out/native-tests.tar.zst && find native-tests -type f | sort
 
       - name: Upload linuxArm64 test binaries
+        if: needs.changes.outputs.native == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: linuxArm64-test-binaries
@@ -239,6 +257,7 @@ jobs:
           retention-days: 1
 
       - name: Upload mingwX64 test binaries
+        if: needs.changes.outputs.native == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: mingwX64-test-binaries
@@ -279,7 +298,8 @@ jobs:
   native-cross:
     name: Native Tests (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
-    needs: build
+    needs: [ changes, build ]
+    if: needs.changes.outputs.native == 'true' && needs.build.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -361,6 +381,7 @@ jobs:
     needs: changes
     if: >-
       needs.changes.outputs.code == 'true' &&
+      needs.changes.outputs.native == 'true' &&
       (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     defaults:
@@ -765,7 +786,7 @@ jobs:
     name: CI Passed
     runs-on: ubuntu-latest
     needs: [ changes, build, native-cross, native-macos ]
-    if: always()
+    if: always() && needs.changes.outputs.noise != 'true'
     permissions:
       checks: read
     steps:
