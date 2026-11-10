@@ -573,7 +573,9 @@ class ImportEngineImpl(
                     }
                 }
 
-                ImportOperation.DELETE -> require(it.existingId != null) { "DELETE trade requires existingId" }
+                ImportOperation.DELETE -> {
+                    require(it.existingId != null) { "DELETE trade requires existingId" }
+                }
             }
         }
         batch.accountsToCreate.forEach {

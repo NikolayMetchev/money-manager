@@ -76,8 +76,24 @@ fun TradeEntryDialog(
     var toAccountId by remember(trade?.id) { mutableStateOf<AccountId?>(trade?.toAccountId) }
     var fromAsset by remember(trade?.id) { mutableStateOf<Asset?>(trade?.from?.asset) }
     var toAsset by remember(trade?.id) { mutableStateOf<Asset?>(trade?.to?.asset) }
-    var fromAmount by remember(trade?.id) { mutableStateOf(trade?.from?.toDisplayValue()?.toString().orEmpty()) }
-    var toAmount by remember(trade?.id) { mutableStateOf(trade?.to?.toDisplayValue()?.toString().orEmpty()) }
+    var fromAmount by remember(trade?.id) {
+        mutableStateOf(
+            trade
+                ?.from
+                ?.toDisplayValue()
+                ?.toString()
+                .orEmpty(),
+        )
+    }
+    var toAmount by remember(trade?.id) {
+        mutableStateOf(
+            trade
+                ?.to
+                ?.toDisplayValue()
+                ?.toString()
+                .orEmpty(),
+        )
+    }
     var description by remember(trade?.id) { mutableStateOf(trade?.description.orEmpty()) }
     var dateTime by remember(trade?.id) {
         mutableStateOf((trade?.timestamp ?: Clock.System.now()).toLocalDateTime(timeZone))
