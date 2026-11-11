@@ -605,7 +605,7 @@ private suspend fun loadSuggestions(
 }
 
 /**
- * The wallet links taking [accepted] implies: a person using a source's record of a placeholder has said its wallet is the
+ * The wallet links taking a suggestion implies: a person using a source's record of a placeholder has said its wallet is the
  * account the placeholder is on, which [planAutoLinks] confirms only where the names agree and nothing else is in the way.
  */
 private suspend fun linksFor(

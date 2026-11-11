@@ -81,7 +81,7 @@ class ManualEntriesScreenTest {
                 CsvStrategyConfig(
                     identificationColumns = emptySet(),
                     fieldMappings = emptyMap(),
-                    rules = listOfNotNull(entry?.let { StrategyRule(name = null, conditions = emptyList(), actions = listOf(it)) }),
+                    rules = listOfNotNull(entry?.let { StrategyRule(conditions = emptyList(), actions = listOf(it)) }),
                     legGroups =
                         listOf(
                             LegGroupRule(
