@@ -141,8 +141,10 @@ jobs:
           cache-name: linux
 
       # The installer smoke test's display is Xvfb. jpackage's deb needs fakeroot where the build runs (a
-      # BuildBuddy runner installs its own).
+      # BuildBuddy runner installs its own). Nothing else here needs either, and the apt update and install is minutes of every
+      # run, so a run without the installer (every pull request that isn't labelled `installer`) leaves it out.
       - name: Install packaging tools
+        if: needs.changes.outputs.installer == 'true'
         run: >-
           sudo apt-get update && sudo apt-get install -y xvfb
           ${{ steps.where.outputs.remote == 'false' && 'fakeroot' || '' }}
