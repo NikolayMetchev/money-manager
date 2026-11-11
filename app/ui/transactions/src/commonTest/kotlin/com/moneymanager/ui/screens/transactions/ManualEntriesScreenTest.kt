@@ -18,6 +18,7 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
@@ -64,6 +65,7 @@ class ManualEntriesScreenTest {
     private val unknown = currency(3, "UNKNOWN")
     private val revolut = AccountId(1)
     private val wallet = AccountId(20)
+    private val walletFees = AccountId(21)
 
     private fun strategy(): CsvImportStrategy =
         CsvImportStrategy(
