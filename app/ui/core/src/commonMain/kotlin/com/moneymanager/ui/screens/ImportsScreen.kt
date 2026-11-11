@@ -7,7 +7,6 @@ import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -66,7 +65,6 @@ import com.moneymanager.ui.screens.timeline.ImportTimelineScreen
 import com.moneymanager.ui.screens.transactions.ManualEntriesScreen
 import com.moneymanager.ui.screens.transactions.ManualEntrySuggestionCache
 import kotlinx.coroutines.flow.first
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 
 @Composable
