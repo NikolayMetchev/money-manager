@@ -63,11 +63,17 @@ sealed interface LegAssembly {
      *
      * @property description The trade's description: `{from}` and `{to}` become the debited and credited
      *   asset codes. Cosmetic only — a trade's identity never includes its description.
+     * @property acrossFiles The two sides of one event sit in different staged files (Revolut keeps each currency
+     *   in its own statement): the legs of the other staged files that match the same strategy join the event, so
+     *   whichever file is applied first books the trade and the other dedupes onto it. A leg with no partner yet
+     *   is held back, not booked, until its partner's file is staged, so it never double-counts with the trade.
      */
     @Serializable
     @SerialName("trade")
     data class Trade(
         val description: String = "Buy {to}/{from}",
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        val acrossFiles: Boolean = false,
     ) : LegAssembly
 
     /**

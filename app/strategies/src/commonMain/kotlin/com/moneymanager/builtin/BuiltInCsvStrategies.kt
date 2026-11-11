@@ -379,8 +379,8 @@ object BuiltInCsvStrategies {
     /** The one account every Revolut currency balance lives in (an account holds one balance per currency). */
     private const val REVOLUT_ACCOUNT = "Revolut"
 
-    /** Both sides of a currency exchange, which sit in two currencies' files, go through this account. */
-    private const val REVOLUT_EXCHANGE_ACCOUNT = "Revolut Exchange"
+    /** The leg group of a currency exchange, whose two sides sit in two currencies' files. */
+    private const val REVOLUT_EXCHANGE_GROUP = "exchange"
 
     /** A transfer's description, capturing who the other end is. */
     private const val REVOLUT_COUNTERPARTY_PATTERN = "^(?:(?:International |SWIFT )?Transfer (?:to|from) |To |Payment from )(.+)$"
@@ -2084,8 +2084,9 @@ object BuiltInCsvStrategies {
      * reconciles against the paying bank's record of the same movement.
      *
      * The two sides of a currency exchange are rows in two different files ("Exchanged to USD" out of the GBP
-     * balance, the same words into the USD one), so no one file can pair them. Both go through "Revolut Exchange",
-     * which keeps every balance exact and holds the mixed-currency residual in that one account.
+     * balance, the same words into the USD one). A cross-file trade group pairs them by their instant, so an
+     * exchange is one trade on the Revolut account whichever file is applied first. Until the other currency's file
+     * is staged the row waits, rather than being booked as a transfer the trade would then double.
      *
      * The export has no transaction id, but its running balance makes a row unique, so the product, start time, type,
      * description, amount and balance together identify it. A pending row (no balance yet) is skipped until a later
@@ -2139,12 +2140,17 @@ object BuiltInCsvStrategies {
                     name = "Money that never moved",
                 ),
                 incomingWhenPositive("Amount"),
+                rule(
+                    RuleAction.Leg(REVOLUT_EXCHANGE_GROUP, LegRole.BySign("Amount")),
+                    conditions = listOf(Condition("Description", ConditionOp.STARTS_WITH, value = "Exchanged to ")),
+                    name = "Both sides of an exchange are legs of one trade",
+                ),
                 fee(FeeRule(amount = ValueExpr.of("Fee")), conditions = listOf(Condition("Fee", ConditionOp.POSITIVE))),
                 wholeFeeWhen("Amount", "Type", "^Fee$"),
                 accounts(AccountSide.SOURCE, fixedNaming("Currency", REVOLUT_ACCOUNT)),
                 accounts(
                     AccountSide.TARGET,
-                    fixedNaming("Description", REVOLUT_EXCHANGE_ACCOUNT),
+                    fixedNaming("Description", REVOLUT_ACCOUNT),
                     conditions = listOf(Condition("Description", ConditionOp.STARTS_WITH, value = "Exchanged to ")),
                 ),
                 accounts(
@@ -2189,6 +2195,15 @@ object BuiltInCsvStrategies {
                     rules = rules,
                     crossSourceReconcileWindow = SettlementWindow.Elapsed(QIF_STATEMENT_RECONCILE_WINDOW_SECONDS),
                     placeholderReconcileWindow = STATEMENT_PLACEHOLDER_WINDOW,
+                    legGroups =
+                        listOf(
+                            LegGroupRule(
+                                name = REVOLUT_EXCHANGE_GROUP,
+                                // Revolut stamps both sides of an exchange with the same second.
+                                windowSeconds = 1,
+                                assembly = LegAssembly.Trade(description = "Exchange {from} to {to}", acrossFiles = true),
+                            ),
+                        ),
                 ),
             createdAt = now,
             updatedAt = now,

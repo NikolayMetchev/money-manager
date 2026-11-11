@@ -625,6 +625,7 @@ suspend fun applyStagedCsv(
         unprocessedRowIndexes = unprocessedRowIndexes,
         tradeRepository = tradeRepository,
         visibleAccounts = accounts,
+        foreignRows = crossFileLegRows(stagedImport, strategy, csvImportRepository),
     )
 }
 
@@ -1010,6 +1011,9 @@ suspend fun runCsvImport(
     unprocessedRowIndexes: Set<Long> = rows.mapTo(mutableSetOf()) { it.rowIndex },
     tradeRepository: TradeReadRepository? = null,
     // The accounts the strategy sees, when the caller has just read them to build [basePrep].
+    // Legs of the other staged files that pair with this file's (see [LegAssembly.Trade.acrossFiles]), their row
+    // indexes shifted out of this file's range. They only ever join a trade; nothing else is booked for them here.
+    foreignRows: List<CsvRow> = emptyList(),
     visibleAccounts: List<Account>? = null,
 ): CsvImportResult {
     logger.i { "Starting CSV import with ${basePrep.validTransfers.size} valid transfers" }
@@ -1098,6 +1102,20 @@ suspend fun runCsvImport(
             shadowSource = strategy.shadowSource,
         )
     val finalPrep = mappedPrep.copy(validTransfers = mappedPrep.validTransfers.map { it.withOwnFeeAccount(feeAccountOf) })
+    // The other staged files' legs of a cross-file trade group, mapped with the accounts this file just resolved.
+    val foreignLegs: List<CsvTransferWithAttributes> =
+        if (foreignRows.isEmpty()) {
+            emptyList()
+        } else {
+            val crossFileRules =
+                strategy.config.legGroups
+                    .withIndex()
+                    .filter { (_, rule) ->
+                        rule.isCrossFileTrade()
+                    }.map { it.index }
+                    .toSet()
+            mapper.prepareImport(foreignRows).validTransfers.filter { it.groupLeg?.ruleIndex in crossFileRules }
+        }
     val validCount = finalPrep.validTransfers.size
     val errorCount = finalPrep.errorRows.size
     logger.i { "Prepared $validCount valid transfers, $errorCount error rows" }
@@ -1156,9 +1174,23 @@ suspend fun runCsvImport(
     val assembledTrades =
         strategy.config.legGroups.withIndex().flatMap { (index, rule) ->
             val assembly = rule.assembly as? LegAssembly.Trade ?: return@flatMap emptyList()
-            groupTradeLegs(finalPrep.validTransfers, index, rule).mapNotNull { it.assemble(assembly) }
+            // A cross-file group is only this file's to book when one of its legs is this file's.
+            groupTradeLegs(finalPrep.validTransfers + foreignLegs, index, rule)
+                .filter { group -> group.ownRowIndexes.isNotEmpty() }
+                .mapNotNull { it.assemble(assembly) }
         }
     val assembledRowIndexes: Set<Long> = assembledTrades.flatMapTo(mutableSetOf()) { it.group.rowIndexes }
+    // A leg whose partner is in a file not staged yet waits: booking it alone would count the exchange twice once
+    // the partner arrives and the trade is booked.
+    val crossFileRuleIndexes =
+        strategy.config.legGroups
+            .withIndex()
+            .filter { (_, rule) -> rule.isCrossFileTrade() }
+            .mapTo(mutableSetOf()) { it.index }
+    val heldBackRowIndexes: Set<Long> =
+        finalPrep.validTransfers
+            .filter { it.groupLeg?.ruleIndex in crossFileRuleIndexes && it.rowIndex !in assembledRowIndexes }
+            .mapTo(mutableSetOf()) { it.rowIndex }
 
     // Conversion groups another source already recorded as trades (Binance's dust API reports the same
     // sweep the export splits into unpairable legs). They are matched and dropped as whole groups: see
@@ -1168,7 +1200,7 @@ suspend fun runCsvImport(
         reconcileConversionGroups(strategy, finalPrep.validTransfers, tradeRepository)
     val assembledTradeRowIndexes: Map<LocalTradeKey, List<Long>> =
         assembledTrades.associate { assembled ->
-            assembled.tradeKey(csvImport.id) to assembled.group.rowIndexes
+            assembled.tradeKey(csvImport.id) to assembled.group.ownRowIndexes
         }
 
     // Rows carrying a credited leg (Currency != To Currency) are cross-asset conversions → trades.
@@ -1263,6 +1295,7 @@ suspend fun runCsvImport(
                 it.tradeTo == null &&
                     it.rowIndex !in assembledRowIndexes &&
                     it.rowIndex !in reconciledConversionRows &&
+                    it.rowIndex !in heldBackRowIndexes &&
                     it.rowIndex in unprocessedRowIndexes
             }.map { row ->
                 val uniqueKey =

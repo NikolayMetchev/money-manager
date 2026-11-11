@@ -4,9 +4,14 @@ import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
+import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.importengineapi.LocalTradeKey
+import kotlinx.coroutines.flow.first
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -16,6 +21,16 @@ import kotlin.time.Instant
  * the row index, so a key decodes back to the row whose outcome must be written.
  */
 const val CSV_TRADE_KEY_PREFIX = "csv-"
+
+/**
+ * Row indexes at or above this belong to another staged file whose legs join this file's trade groups (see
+ * `LegAssembly.Trade.acrossFiles`); file `k` (from 1) uses `k * FOREIGN_ROW_INDEX_BASE + rowIndex`. Such a row is only ever
+ * a leg of a trade: it has no status to write and no transfer to book here.
+ */
+const val FOREIGN_ROW_INDEX_BASE = 1_000_000_000L
+
+/** True for a row of this file (see [FOREIGN_ROW_INDEX_BASE]). */
+fun isOwnRow(rowIndex: Long): Boolean = rowIndex < FOREIGN_ROW_INDEX_BASE
 
 /**
  * Rows a source split across one trade, chained by timestamp (see [LegAssembly.Trade]). A group holds
@@ -29,6 +44,9 @@ data class TradeGroup(
 
     /** Row indexes of every leg, for writing the assembled trade's outcome back to all of them. */
     val rowIndexes: List<Long> get() = rows.map { it.rowIndex }
+
+    /** Row indexes of the legs in this file, which are the ones whose status the trade's outcome is written to. */
+    val ownRowIndexes: List<Long> get() = rowIndexes.filter(::isOwnRow)
 }
 
 /**
@@ -52,7 +70,7 @@ data class AssembledTrade(
  * across re-imports of the same file and decodes back to a real row for status write-back.
  */
 fun AssembledTrade.tradeKey(csvImportId: CsvImportId): LocalTradeKey =
-    LocalTradeKey("$CSV_TRADE_KEY_PREFIX${csvImportId.id}-${group.rowIndexes.min()}")
+    LocalTradeKey("$CSV_TRADE_KEY_PREFIX${csvImportId.id}-${group.ownRowIndexes.min()}")
 
 /**
  * The legs of rule [ruleIndex] among [rows], split into events: within each key, a leg joins the current
@@ -135,4 +153,37 @@ fun TradeGroup.assemble(assembly: LegAssembly.Trade): AssembledTrade? {
                 .replace("{from}", fromAsset.code)
                 .replace("{to}", toAsset.code),
     )
+}
+
+/** Whether this rule assembles trades whose legs may sit in different staged files (see [LegAssembly.Trade.acrossFiles]). */
+fun LegGroupRule.isCrossFileTrade(): Boolean = (assembly as? LegAssembly.Trade)?.acrossFiles == true
+
+/**
+ * The rows of the other staged files that can pair with [csvImport]'s legs in a cross-file trade rule
+ * ([LegAssembly.Trade.acrossFiles]): every other, non-ignored file with the same column names, its row indexes
+ * shifted out of [csvImport]'s range by [FOREIGN_ROW_INDEX_BASE]. Empty when the strategy has no such rule.
+ * Only files with identical columns are read, because a row's values are matched to columns by position.
+ */
+suspend fun crossFileLegRows(
+    csvImport: CsvImport,
+    strategy: CsvImportStrategy,
+    csvImportRepository: CsvImportReadRepository,
+): List<CsvRow> {
+    if (strategy.config.legGroups.none { it.isCrossFileTrade() }) return emptyList()
+    val names = csvImport.columns.sortedBy { it.columnIndex }.map { it.originalName }
+    val siblings =
+        csvImportRepository
+            .getAllImports()
+            .first()
+            .filter { it.id != csvImport.id && !it.ignored && it.columnCount == names.size && it.rowCount > 0 }
+            .sortedBy { it.id.toString() }
+    return siblings
+        .mapNotNull { csvImportRepository.getImport(it.id).first() }
+        .filter { sibling -> sibling.columns.sortedBy { it.columnIndex }.map { it.originalName } == names }
+        .flatMapIndexed { index, sibling ->
+            val offset = (index + 1) * FOREIGN_ROW_INDEX_BASE
+            csvImportRepository
+                .getImportRows(sibling.id, limit = sibling.rowCount.coerceAtLeast(1), offset = 0)
+                .map { it.copy(rowIndex = offset + it.rowIndex) }
+        }
 }
