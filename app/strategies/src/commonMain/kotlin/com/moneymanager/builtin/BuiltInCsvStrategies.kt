@@ -63,6 +63,7 @@ object BuiltInCsvStrategies {
     val celsiusCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000017")
     val freetradeCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000018")
     val marcusCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000019")
+    val revolutCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000001a")
 
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
@@ -370,6 +371,20 @@ object BuiltInCsvStrategies {
     /** Who pays a Marcus account its interest. */
     private const val MARCUS_INTEREST_ACCOUNT = "Marcus Interest"
 
+    private const val REVOLUT_STARTED_COLUMN = "Started Date"
+
+    /** A column the Revolut strategy's rules write: the row's identity, which the export lacks. */
+    private const val REVOLUT_ROW_ID_COLUMN = "Row ID"
+
+    /** The one account every Revolut currency balance lives in (an account holds one balance per currency). */
+    private const val REVOLUT_ACCOUNT = "Revolut"
+
+    /** Both sides of a currency exchange, which sit in two currencies' files, go through this account. */
+    private const val REVOLUT_EXCHANGE_ACCOUNT = "Revolut Exchange"
+
+    /** A transfer's description, capturing who the other end is. */
+    private const val REVOLUT_COUNTERPARTY_PATTERN = "^(?:(?:International |SWIFT )?Transfer (?:to|from) |To |Payment from )(.+)$"
+
     /**
      * An American Express payee recording a payment INTO the card ("PAYMENT RECEIVED - THANK YOU"). It never
      * says who paid, so the payer is a placeholder that reconciles against the paying bank's own record.
@@ -404,6 +419,7 @@ object BuiltInCsvStrategies {
             buildWiseCsvStrategy(now),
             buildMonzoCsvStrategy(now),
             buildMarcusCsvStrategy(now, qifCurrencyId),
+            buildRevolutCsvStrategy(now),
             buildCryptoComCardStrategy(now),
             buildCryptoComFiatStrategy(now),
             buildCryptoComCryptoStrategy(now),
@@ -2055,6 +2071,129 @@ object BuiltInCsvStrategies {
             createdAt = now,
             updatedAt = now,
         )
+
+    /**
+     * Built-in strategy for Revolut's account statement export (`account-statement_2018-05-01_2026-11-08_en-gb_3e1b0f.csv`):
+     * `Type, Product, Started Date, Completed Date, Description, Amount, Fee, Currency, State, Balance`. One file
+     * holds one currency, and `Amount` is signed and excludes `Fee` (the running balance falls by both).
+     *
+     * Every file books to the one account "Revolut", which holds a balance per currency. The counterparty comes from the description: the
+     * name after "To", "Transfer from", "SWIFT Transfer to" or "Payment from"; ATM withdrawals consolidate into the
+     * built-in "ATM"; `REVX_TRANSFER` goes to the "Revolut X" account the exchange API strategy creates. A top-up
+     * (a card, or open banking) never says where the money came from, so its counterparty is a placeholder that
+     * reconciles against the paying bank's record of the same movement.
+     *
+     * The two sides of a currency exchange are rows in two different files ("Exchanged to USD" out of the GBP
+     * balance, the same words into the USD one), so no one file can pair them. Both go through "Revolut Exchange",
+     * which keeps every balance exact and holds the mixed-currency residual in that one account.
+     *
+     * The export has no transaction id, but its running balance makes a row unique, so the product, start time, type,
+     * description, amount and balance together identify it. A pending row (no balance yet) is skipped until a later
+     * export holds it settled; a reverted, declined or failed one is imported excluded.
+     */
+    fun buildRevolutCsvStrategy(now: Instant): CsvImportStrategy {
+        val fieldMappings =
+            mapOf(
+                accountFromRules(TransferField.SOURCE_ACCOUNT),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = REVOLUT_STARTED_COLUMN,
+                        dateFormat = "yyyy-MM-dd",
+                        dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
+                    ),
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = ValueExpr(listOf("Description", "Type"))),
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = "Amount",
+                    ),
+                TransferField.CURRENCY to
+                    CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr(listOf("Currency"))),
+                TransferField.TIMEZONE to HardCodedTimezoneMapping(fieldType = TransferField.TIMEZONE, timezoneId = "UTC"),
+            )
+        val rules =
+            listOf(
+                rule(
+                    RuleAction.SetValue(
+                        REVOLUT_ROW_ID_COLUMN,
+                        RuleValue.constant(
+                            "{Product} {$REVOLUT_STARTED_COLUMN} {Type} {Description} {Currency} {Amount} {Balance}",
+                        ),
+                    ),
+                    name = "Product, start time, type, description, amount and balance identify a row",
+                ),
+                attribute(REVOLUT_ROW_ID_COLUMN, "revolut-row-id", unique = true),
+                attribute("Type", "revolut-type"),
+                rule(
+                    RuleAction.Skip,
+                    conditions = listOf(Condition("State", ConditionOp.EQUALS, value = "PENDING")),
+                    name = "A pending row has no balance yet: the next export holds it settled",
+                ),
+                rule(
+                    RuleAction.Exclude(RuleValue.constant("Revolut state {State}")),
+                    conditions = listOf(Condition("State", ConditionOp.NOT_EQUALS, value = "COMPLETED")),
+                    name = "Money that never moved",
+                ),
+                incomingWhenPositive("Amount"),
+                fee(FeeRule(amount = ValueExpr.of("Fee")), conditions = listOf(Condition("Fee", ConditionOp.POSITIVE))),
+                wholeFeeWhen("Amount", "Type", "^Fee$"),
+                accounts(AccountSide.SOURCE, fixedNaming("Currency", REVOLUT_ACCOUNT)),
+                accounts(
+                    AccountSide.TARGET,
+                    fixedNaming("Description", REVOLUT_EXCHANGE_ACCOUNT),
+                    conditions = listOf(Condition("Description", ConditionOp.STARTS_WITH, value = "Exchanged to ")),
+                ),
+                accounts(
+                    AccountSide.TARGET,
+                    builtInNaming("Description", "ATM"),
+                    conditions = listOf(Condition("Type", ConditionOp.EQUALS, value = "ATM")),
+                ),
+                accounts(
+                    AccountSide.TARGET,
+                    fixedNaming("Description", "Revolut X"),
+                    conditions = listOf(Condition("Type", ConditionOp.EQUALS, value = "REVX_TRANSFER")),
+                ),
+                accounts(
+                    AccountSide.TARGET,
+                    naming("Description", pattern = "^Top-up by \\*(\\d+)$", name = "Card *$1", unidentified = true),
+                    naming("Description", pattern = "^Open banking top-up$", name = "Open banking top-up", unidentified = true),
+                    naming("Description", pattern = REVOLUT_COUNTERPARTY_PATTERN, name = "$1", trim = true),
+                    conditions = listOf(Condition("Type", ConditionOp.EQUALS, value = "Topup")),
+                ),
+                accounts(AccountSide.TARGET, naming("Description", pattern = REVOLUT_COUNTERPARTY_PATTERN, name = "$1", trim = true)),
+                accounts(AccountSide.TARGET, naming("Description", "Type")),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(revolutCsvStrategyId),
+            name = "Revolut CSV",
+            config =
+                CsvStrategyConfig(
+                    identificationColumns =
+                        setOf(
+                            "Type",
+                            "Product",
+                            REVOLUT_STARTED_COLUMN,
+                            "Completed Date",
+                            "Description",
+                            "Amount",
+                            "Fee",
+                            "Currency",
+                            "State",
+                            "Balance",
+                        ),
+                    fieldMappings = fieldMappings,
+                    rules = rules,
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(QIF_STATEMENT_RECONCILE_WINDOW_SECONDS),
+                    placeholderReconcileWindow = STATEMENT_PLACEHOLDER_WINDOW,
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
 
     /**
      * Built-in strategy for Binance's "transaction history" export — one signed row per movement:
