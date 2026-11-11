@@ -129,7 +129,7 @@ class AcceptSuggestionsTest {
             fromAccountId = AccountId(2),
             from = btc("1"),
             toAccountId = AccountId(2),
-            to = btc("1"),
+            to = money(unknown, "1"),
         )
     private val sourceTrade =
         Trade(
@@ -139,7 +139,7 @@ class AcceptSuggestionsTest {
             fromAccountId = AccountId(20),
             from = btc("1"),
             toAccountId = AccountId(20),
-            to = btc("2"),
+            to = money(gbp, "20000"),
         )
     private val tradeSuggestion = OtherSideSuggestion(placeholder, "UNKNOWN", sourceTrade, money(gbp, "20000"))
 
