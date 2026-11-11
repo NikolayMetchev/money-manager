@@ -648,7 +648,7 @@ jobs:
           MEASURE: ${{ github.event_name != 'pull_request' }}
         run: |
           if [ "$MEASURE" = true ]; then
-            flags=(--define=bundle_native_cli=true)
+            flags=(--config=native --define=bundle_native_cli=true)
             targets=(//tools/bench-db:bench_db //tools/bench-db:empty_db //tools/repo-scripts:repo-scripts-tool_deploy.jar)
           else
             flags=(--define=aot=false)
