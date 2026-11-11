@@ -56,18 +56,18 @@ timeout; use at least 20 minutes.
 
 | Command | Description |
 |---------|-------------|
-| `bazel build //...` | Build everything: every platform's compile, the commonMain metadata checks, the host's `mm`, the module and dependency checks |
-| `bazel test //...` | Every test the host can run: JVM, Android host, the host's native tests, ktlint, detekt, Android lint, the lockfile tests |
+| `bazel build //...` | Build the JVM and common code: the JVM compiles, the commonMain metadata checks, the module and dependency checks. Android, Kotlin/Native and the browser are optional (see **Optional platforms**); `--config=all-platforms` builds everything, including every platform's compile and the host's `mm` |
+| `bazel test //...` | The JVM tests, ktlint, detekt, the lockfile tests and the other checks; `--config=all-platforms` adds the Android host tests, the host's native tests, the browser tests and Android lint |
 | `bazel run //app/main/jvm:app` | Run the desktop app |
 | `bazel run //app/main/jvm:app_jfr` | Run the desktop app under Java Flight Recorder (method sampling); writes `profile.jfr` in the repo root on exit |
-| `bazel run //app/main/web:serve -- 8080` | Serve the browser app (`//app/main/web:dist`) on http://127.0.0.1:8080 |
-| `bazel build //app/main/android:debug` | Debug APK (`bazel-bin/app/main/android/debug.apk`; `adb install` it) |
-| `bazel build //app/main/cli:mm` / `:mm-jvm` | The host's native `mm` / the JVM `mm-jvm` (`bazel-bin/app/main/cli/mm-jvm/bin/mm-jvm`) |
-| `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')` | Android device tests, on the device adb picks (an API 36 emulator) |
+| `bazel run --config=web //app/main/web:serve -- 8080` | Serve the browser app (`//app/main/web:dist`) on http://127.0.0.1:8080 |
+| `bazel build --config=android //app/main/android:debug` | Debug APK (`bazel-bin/app/main/android/debug.apk`; `adb install` it) |
+| `bazel build --config=native //app/main/cli:mm` / `bazel build //app/main/cli:mm-jvm` | The host's native `mm` / the JVM `mm-jvm` (`bazel-bin/app/main/cli/mm-jvm/bin/mm-jvm`) |
+| `bazel test --config=android $(bazel query 'attr(tags, android_device, tests(//...))')` | Android device tests, on the device adb picks (an API 36 emulator) |
 | `bazel run //:format` | Regenerate the BUILD files (Gazelle), then ktlint -F |
 | `bazel run //:gazelle` | Regenerate the BUILD files only |
 | `bazel/renovate/repin.sh` | Re-pin every lockfile (after changing `MODULE.bazel`) |
-| `bazel test --config=coverage $(bazel query 'attr(name, "^test_(jvm\|android)$", tests(//...))')`, then `bazel/kmp/testing/coverage.sh coverage.xml` | Coverage (the IntelliJ engine), one JaCoCo-format XML report |
+| `bazel test --config=coverage --config=android $(bazel query 'attr(name, "^test_(jvm\|android)$", tests(//...))')`, then `bazel/kmp/testing/coverage.sh coverage.xml` | Coverage (the IntelliJ engine), one JaCoCo-format XML report |
 
 Target naming: a module `//utils/files:files` builds as `:files_jvm`, `:files_android` and `:files_<target>`
 (`_linuxX64`, `_linuxArm64`, `_macosArm64`, `_mingwX64`); its tests are `:test_jvm`, `:test_android` (host),
@@ -75,6 +75,14 @@ Target naming: a module `//utils/files:files` builds as `:files_jvm`, `:files_an
 to one module with `bazel test //utils/files/...`.
 
 Flags and configs:
+- **Optional platforms**: Android, Kotlin/Native and the browser (wasmJs, js) are off by default. Each is a flag (`//bazel/kmp/platforms:android|native|web`,
+  `jvm` is on) and a target only one of them builds is `target_compatible_with = <PLATFORM>_ONLY` (`bazel/kmp/optional.bzl`): incompatible
+  unless its flag is on. A wildcard skips an incompatible target, so a plain `bazel build //...` or `bazel test //...` does the JVM alone, and
+  naming one (`bazel build //app/main/android:debug`) fails as incompatible without `--config=android`. The configs combine:
+  `--config=android`, `--config=native`, `--config=web`, `--config=all-platforms`, and `--config=no-jvm` to leave the JVM out
+  (`--config=no-jvm --config=android` is Android alone). Incompatibility spreads to whatever depends on a target, so only a platform's roots need
+  it: the `kmp_*` macros add it to what they emit, so Gazelle needs no change, and a hand-written Android, native or browser target adds
+  `target_compatible_with = ANDROID_ONLY` (and so on) itself.
 - `--config=rbe` runs every action on BuildBuddy (Linux), `--config=cache` only uses its cache (any OS), and
   `--config=rbe-mac` (macOS) runs only the Kotlin/Native klib compiles there, on its Linux toolchain. Copy
   `user.bazelrc.example` to `user.bazelrc` and put your API key in `~/.bazelrc`
@@ -122,9 +130,13 @@ way) are their own jobs. Auto-format PR runs `//:format` on every PR and pushes 
 regenerated, not reported. Dependency submission reads the lockfiles (`repo-scripts dependency-snapshot`), and
 `renovate-pins.yml` re-pins Renovate's PRs.
 
-**Native**: on a pull request every Kotlin/Native job and Bazel target (the `_linuxX64`, `_linuxArm64`, `_mingwX64`, `_macosArm64` compiles and tests, the native `mm`, `bundle_native_cli`) is skipped, in `bazel/ci/build_and_test.sh` too (`NATIVE=false`). Label the PR `native` to run them; main and manual runs always do. Another label's event skips every job.
+**Native**: on a pull request every Kotlin/Native job and Bazel target (the `_linuxX64`, `_linuxArm64`, `_mingwX64`, `_macosArm64` compiles and tests, the native `mm`, `bundle_native_cli`) is skipped: `bazel/ci/build_and_test.sh` leaves the native flag off (`NATIVE=false`). Label the PR `native` to run them; main and manual runs always do. Another label's event skips every job.
 
 **Installer**: likewise on a pull request no desktop installer is built: not Build and Test's deb (and its smoke test and the startup tool, `INSTALLER=false` in `bazel/ci/build_and_test.sh`) and not the Desktop Installer jobs (dmg, msi). Label the PR `installer` to run them; main and manual runs always do. Another label's event skips every job.
+
+**Android**: likewise on a pull request no Android target is built or tested: the `_android` compiles and host tests, the device tests' APKs, the app, its lint and the smoke test (`ANDROID=false` in `bazel/ci/build_and_test.sh` leaves the android flag off, and `coverage.sh` leaves them out too) and not the Android Instrumented Tests job. Label the PR `android` to run them; main and manual runs always do. Another label's event skips every job.
+
+**Web**: likewise the browser targets (`_wasmJs`, `_js`, their Node tests, `//app/main/web`) are left out of a pull request (`WEB=false` leaves the web flag off). Label the PR `web` to run them; main and manual runs always do. Another label's event skips every job.
 
 **Qodana** (`qodana.yml`, inspections in `qodana.yaml`) scans a PR in PR mode: it reports only problems in the files the
 PR changes. It doesn't run on main; a manual run (`workflow_dispatch`) scans a branch in full. A change whose

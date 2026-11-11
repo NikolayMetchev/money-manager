@@ -141,15 +141,32 @@ The main modules (see [`CLAUDE.md`](CLAUDE.md) for the full table and the
 > shows it and asks. Android device tests also need an emulator of your own. On a Mac, install the Xcode Command Line
 > Tools (`xcode-select --install`); Xcode itself isn't needed.
 
+Android, Kotlin/Native and the browser (wasmJs, js) are optional, so a plain `bazel build //...` or `bazel test //...`
+builds and tests the JVM alone (and skips the others, without an error). Turn the rest on with a config; they combine:
+
+| Command | What it builds and tests |
+|---------|--------------------------|
+| `bazel build //...` | JVM only |
+| `bazel build --config=android //...` | JVM + Android |
+| `bazel build --config=android --config=native //...` | JVM + Android + Kotlin/Native |
+| `bazel build --config=android --config=native --config=web //...` | Everything (the same as `--config=all-platforms`) |
+| `bazel build --config=no-jvm --config=native //...` | Kotlin/Native only |
+| `bazel build --config=no-jvm --config=android //...` | Android only |
+| `bazel test --config=web //...` | JVM + browser tests (`bazel test` takes the same configs) |
+
+`--config=android`, `--config=native` and `--config=web` each add one platform, and `--config=no-jvm` leaves the JVM out.
+The targets in the table below that belong to one platform need its config: `bazel build //app/main/android:debug`
+fails as incompatible until you add `--config=android`.
+
 | Command | Description |
 |---------|-------------|
-| `bazel build //...` | Build everything |
-| `bazel test //...` | Run every test this machine can run (plus ktlint, detekt and Android lint) |
+| `bazel build //...` | Build the JVM targets (see above for the other platforms) |
+| `bazel test //...` | Run the JVM tests (plus ktlint and detekt) |
 | `bazel run //app/main/jvm:app` | Run the desktop application |
-| `bazel run //app/main/web:serve -- 8080` | Serve the browser app on http://127.0.0.1:8080 (wasmJs, or js where the browser lacks WasmGC) |
-| `bazel build //app/main/android:debug` | Build the Android debug APK (`bazel-bin/app/main/android/debug.apk`) |
+| `bazel run --config=web //app/main/web:serve -- 8080` | Serve the browser app on http://127.0.0.1:8080 (wasmJs, or js where the browser lacks WasmGC) |
+| `bazel build --config=android //app/main/android:debug` | Build the Android debug APK (`bazel-bin/app/main/android/debug.apk`) |
 | `bazel build //app/main/cli:mm-jvm` | Build the JVM `mm` into `bazel-bin/app/main/cli/mm-jvm/bin/mm-jvm` |
-| `bazel build //app/main/cli:mm` | Link the native `mm` for this machine (`bazel-bin/app/main/cli/mm_<target>/mm.kexe`) |
+| `bazel build --config=native //app/main/cli:mm` | Link the native `mm` for this machine (`bazel-bin/app/main/cli/mm_<target>/mm.kexe`) |
 | `bazel build //app/main/jvm:installer` | Build this OS's desktop installer (deb, dmg or msi) |
 | `bazel run //:format` | Regenerate the BUILD files (Gazelle) and format the code (ktlint) |
 

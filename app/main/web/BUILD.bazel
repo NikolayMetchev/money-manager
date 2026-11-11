@@ -1,5 +1,6 @@
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp:optional.bzl", "WEB_ONLY")
 load("//bazel/kmp:web.bzl", "WEB_TARGETS", "kt_web_dist", "kt_web_executable")
 
 # The browser app (#84): src/main compiles for wasmJs and js, and :dist is the site that loads one of them.
@@ -43,6 +44,7 @@ kmp_library(
         base_name = "money-manager",
         library = ":web_" + target,
         target = target,
+        target_compatible_with = WEB_ONLY,
     )
     for target in WEB_TARGETS
 ]
@@ -53,6 +55,7 @@ kt_web_dist(
     srcs = glob(["site/*"]),
     programs = [":program_" + target for target in WEB_TARGETS],
     runtime_jars = ["@maven_kmp//:skiko_js_wasm_runtime_jvm"],
+    target_compatible_with = WEB_ONLY,
     # Pages publishes it at app/.
     visibility = ["//webpage:__pkg__"],
 )
@@ -71,4 +74,5 @@ sh_binary(
         "//bazel/kmp/testing/web:node",
         "//bazel/kmp/web:serve.mjs",
     ],
+    target_compatible_with = WEB_ONLY,
 )

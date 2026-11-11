@@ -1,0 +1,26 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+
+# Android, Kotlin/Native and the browser are optional (bazel/kmp/optional.bzl): each is a flag that is off unless
+# `.bazelrc`'s `--config=android|native|web|all-platforms` (or CI, for a labelled pull request) turns it on.
+# The JVM is the one platform that is on by default; `--config=no-jvm` leaves it out (with `--config=android`, only Android).
+PLATFORM_DEFAULTS = {
+    "jvm": True,
+    "android": False,
+    "native": False,
+    "web": False,
+}
+
+[
+    [
+        bool_flag(
+            name = platform,
+            build_setting_default = PLATFORM_DEFAULTS[platform],
+        ),
+        config_setting(
+            name = platform + "_enabled",
+            flag_values = {":" + platform: "True"},
+            visibility = ["//visibility:public"],
+        ),
+    ]
+    for platform in PLATFORM_DEFAULTS
+]

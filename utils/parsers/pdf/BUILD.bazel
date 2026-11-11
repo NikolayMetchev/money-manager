@@ -12,6 +12,7 @@
 load("@rules_java//java:java_import.bzl", "java_import")
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_import")
 load("//bazel/kmp:defs.bzl", "kmp_cinterop", "kmp_library", "kmp_static_library", "kmp_test")
+load("//bazel/kmp:optional.bzl", "ANDROID_ONLY", "NATIVE_ONLY")
 load("//bazel/kmp:resources.bzl", "file_resource_jar")
 load("//bazel/kmp/android:aar.bzl", "aar_import")
 
@@ -78,6 +79,7 @@ ANDROID_PDFIUM = [
         srcs = ["@pdfium_%s//:lib/libpdfium.so" % archive],
         outs = ["pdfium_android/jni/%s/libpdfium.so" % abi],
         cmd = "cp $< $@",
+        target_compatible_with = ANDROID_ONLY,
     )
     for abi, archive in ANDROID_PDFIUM
 ]
@@ -87,12 +89,14 @@ genrule(
     srcs = [":pdfium_licenses_android_arm64"],
     outs = ["pdfium_android/assets/pdfium/LICENSES.txt"],
     cmd = "cp $< $@",
+    target_compatible_with = ANDROID_ONLY,
 )
 
 genrule(
     name = "pdfium_android_manifest",
     outs = ["pdfium_android/AndroidManifest.xml"],
     cmd = "echo '<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"com.moneymanager.pdf.pdfium\" />' > $@",
+    target_compatible_with = ANDROID_ONLY,
 )
 
 genrule(
@@ -104,12 +108,14 @@ genrule(
         "'-keep class com.sun.jna.** { *; }'",
         "'-keep interface * extends com.sun.jna.Library { *; }'",
     ]) + " > $@",
+    target_compatible_with = ANDROID_ONLY,
 )
 
 genrule(
     name = "pdfium_android_classes",
     outs = ["pdfium_android/classes.jar"],
     cmd = "$(execpath @bazel_tools//tools/jdk:singlejar) --exclude_build_data --output $@",
+    target_compatible_with = ANDROID_ONLY,
     tools = ["@bazel_tools//tools/jdk:singlejar"],
 )
 
@@ -120,12 +126,14 @@ aar_import(
     jni = [":pdfium_android_" + abi.replace("-", "_") for abi, _ in ANDROID_PDFIUM],
     manifest = ":pdfium_android_manifest",
     proguard = [":pdfium_android_keep"],
+    target_compatible_with = ANDROID_ONLY,
 )
 
 # `_android`, as kmp_library resolves `android_deps` to each label's Android target.
 kt_jvm_import(
     name = "pdfium_library_android",
     jars = [":pdfium_android"],
+    target_compatible_with = ANDROID_ONLY,
 )
 
 # Native binaries (#1191): pdfium.def's loader, which embeds its target's library, VERSION and license notices
@@ -147,6 +155,7 @@ NATIVE_PDFIUM = [
         ],
         outs = ["pdfium_licenses_%s.txt" % archive],
         cmd = "for f in $(SRCS); do echo \"==> $$(basename $$f) <==\"; cat $$f; echo; done > $@",
+        target_compatible_with = ANDROID_ONLY if archive.startswith("android") else NATIVE_ONLY,
     )
     for archive in [archive for _, archive, _, _ in NATIVE_PDFIUM] + [archive for _, archive in ANDROID_PDFIUM]
 ]
@@ -177,6 +186,7 @@ genrule(
             "echo '#endif'",
         ]
     ]) + ") > $@",
+    target_compatible_with = NATIVE_ONLY,
 )
 
 kmp_static_library(

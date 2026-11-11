@@ -1,11 +1,12 @@
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("//bazel/kmp:optional.bzl", "NATIVE_ONLY")
 load(":smoke.bzl", "konan_smoke_program")
 
 # The toolchain compiles and links with nothing but what the repository downloaded (#998).
 konan_smoke_program(
     name = "hello_linux_x64",
     srcs = ["Hello.kt"],
-    target_compatible_with = ["@platforms//os:linux"],
+    target_compatible_with = ["@platforms//os:linux"] + NATIVE_ONLY,
 )
 
 sh_test(
@@ -16,7 +17,7 @@ sh_test(
     target_compatible_with = [
         "@platforms//os:linux",
         "@platforms//cpu:x86_64",
-    ],
+    ] + NATIVE_ONLY,
 )
 
 # Cross-compiled for the other Linux and Windows targets: they only have to link.
@@ -24,10 +25,12 @@ konan_smoke_program(
     name = "hello_linux_arm64",
     srcs = ["Hello.kt"],
     target = "linuxArm64",
+    target_compatible_with = NATIVE_ONLY,
 )
 
 konan_smoke_program(
     name = "hello_mingw_x64",
     srcs = ["Hello.kt"],
     target = "mingwX64",
+    target_compatible_with = NATIVE_ONLY,
 )

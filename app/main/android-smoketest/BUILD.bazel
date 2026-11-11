@@ -1,5 +1,6 @@
 load("@android_sdk//:versions.bzl", "COMPILE_SDK", "MIN_SDK", "TARGET_SDK")
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("//bazel/kmp:optional.bzl", "ANDROID_ONLY")
 load("//bazel/kmp/android:apk.bzl", "android_apk")
 load("//bazel/kmp/android:device_test.bzl", "INSTRUMENTATION_RUNNER", "android_device_test")
 load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
@@ -13,6 +14,7 @@ kt_jvm_library(
     name = "smoketest_lib",
     testonly = True,
     srcs = glob(["src/main/kotlin/**/*.kt"]),
+    target_compatible_with = ANDROID_ONLY,
     deps = [
         "//bazel/kmp/android:android_jar",
         "@maven_kmp//:androidx_test_runner_android",
@@ -25,6 +27,7 @@ kt_jvm_library(
 kmp_lint(
     name = "smoketest",
     srcs = glob(["src/main/kotlin/**/*.kt"]),
+    only = ANDROID_ONLY,
 )
 
 # The module's release build type: debug-signed, not debuggable, not minified.
@@ -38,6 +41,7 @@ android_apk(
     manifest = "src/main/AndroidManifest.xml",
     min_sdk = MIN_SDK,
     namespace = "com.moneymanager.android.smoketest",
+    target_compatible_with = ANDROID_ONLY,
     target_sdk = TARGET_SDK,
     test_runner = INSTRUMENTATION_RUNNER,
 )
@@ -48,4 +52,5 @@ android_device_test(
     apk = ":smoketest_apk",
     install = {"com.moneymanager": "//app/main/android:release_debug_signed"},
     package = "com.moneymanager.android.smoketest",
+    target_compatible_with = ANDROID_ONLY,
 )

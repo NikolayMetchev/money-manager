@@ -28,6 +28,7 @@ load("@bazel_skylib//lib:structs.bzl", "structs")
 load("//bazel/kmp/dokka:dokka.bzl", "dokka_module")
 load("//bazel/kmp/checks:checks.bzl", "kmp_forbidden_deps", "kmp_reference_check", "kmp_unused_deps")
 load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
+load(":optional.bzl", "ANDROID_ONLY", "JVM_ONLY", "NATIVE_ONLY", "WEB_ONLY")
 load(":resources.bzl", "kmp_resource_jar")
 load(":web.bzl", "kt_web_klib", "kt_web_test_program")
 load(":native.bzl", "BUILDS_ON", "CROSS_PLATFORMS", "FAMILIES", "RUNS_ON", "konan_static_library", "kt_native_cinterop", "kt_native_cross_test_binary", "kt_native_executable", "kt_native_klib", "kt_native_test_binary")
@@ -105,7 +106,7 @@ def _resource_jars(name, kind, resources):
     )
     return [":" + name + "_resources"]
 
-def _unused_deps(name, target, declared, keep_deps, platform = "jvm"):
+def _unused_deps(name, target, declared, keep_deps, platform = "jvm", only = []):
     """`:<name>_unused_deps`: what the BUILD file declares, less what directives keep, against the JVM compile
     (an Android app's Android one)."""
     names = []
@@ -119,11 +120,24 @@ def _unused_deps(name, target, declared, keep_deps, platform = "jvm"):
         names = names,
         module = "//" + native.package_name(),
         testonly = True,
+        target_compatible_with = only,
     )
 
 def _family(target, linux, apple, mingw):
     """What a target's family source set (linuxMain, appleMain, mingwMain) has: its sources or its deps."""
     return {"apple": apple, "linux": linux, "mingw": mingw}[FAMILIES[target]]
+
+def _platform_only(platform):
+    """What makes an optional platform's target (`linuxX64`, `wasmJs`, `metadataWeb`, `android`) compatible; nothing for the JVM and common metadata."""
+    if platform == "jvm":
+        return JVM_ONLY
+    if platform == "android":
+        return ANDROID_ONLY
+    if platform in FAMILIES:
+        return NATIVE_ONLY
+    if platform in ("wasmJs", "js", "metadataWeb"):
+        return WEB_ONLY
+    return []
 
 def _forbidden_deps(name, forbidden, jvm, natives, compatible):
     """`jvm` holds the JVM-bytecode compiles (`jvm`, `android`), `natives` the native ones, by platform."""
@@ -135,7 +149,7 @@ def _forbidden_deps(name, forbidden, jvm, natives, compatible):
             forbidden = forbidden,
             targets = [":" + target],
             testonly = True,
-            target_compatible_with = compatible.get(platform, []),
+            target_compatible_with = compatible.get(platform, []) + _platform_only(platform),
         )
 
 def _module_name(native_targets, jvm):
@@ -304,7 +318,11 @@ def kmp_library(
     """
     hand_written = (common_srcs + jvm_android_srcs + jvm_srcs + android_srcs + native_srcs + linux_srcs + apple_srcs +
                     mingw_srcs + non_jvm_srcs + web_srcs + wasm_js_srcs + js_srcs)
-    kmp_lint(name, hand_written)
+    # A module no JVM compile covers is an optional platform's alone: its lint and module description are incompatible with it off.
+    module_only = JVM_ONLY if jvm else []
+    if not jvm:
+        module_only = (ANDROID_ONLY if android else []) + (NATIVE_ONLY if native_targets else []) + (WEB_ONLY if web_targets else [])
+    kmp_lint(name, hand_written, module_only)
     module_info(name, None, {
         "deps": deps,
         "exports": exports,
@@ -367,6 +385,7 @@ def kmp_library(
                 deps = _on(platform, exports),
                 exports = _on(platform, exports),
                 tags = tags,
+                target_compatible_with = ANDROID_ONLY if platform == "android" else JVM_ONLY,
                 visibility = ["//visibility:private"],
             )
         jvm_android_exports = jvm_android_exports + [":" + name + "_sqldelight"]
@@ -388,6 +407,7 @@ def kmp_library(
             # Dispatchers.Main on every JVM runtime classpath.
             runtime_deps = [Label("@maven_kmp//:kotlinx_coroutines_swing_jvm")],
             tags = tags,
+            target_compatible_with = JVM_ONLY,
             visibility = visibility,
         )
         if fragments.srcs:
@@ -408,10 +428,11 @@ def kmp_library(
             module_name = module_name,
             plugins = plugin_labels(plugins, "jvm"),
             tags = tags,
+            target_compatible_with = ANDROID_ONLY,
             visibility = visibility,
         )
         if not jvm and android_fragments.srcs:
-            _unused_deps(name, name + "_android", declared, keep_deps, "android")
+            _unused_deps(name, name + "_android", declared, keep_deps, "android", ANDROID_ONLY)
     if native_targets or web_targets:
         package = native.package_name()
         kt_metadata_library(
@@ -422,6 +443,7 @@ def kmp_library(
             deps = _on("metadataWeb" if web_targets else "metadata", deps + metadata_deps + exports),
             plugins = plugin_labels(plugins, "native"),
             web = bool(web_targets),
+            target_compatible_with = module_only,
             visibility = visibility,
         )
     if web_targets:
@@ -445,7 +467,7 @@ def kmp_library(
             deps = _on(target, deps + non_jvm_deps + native_deps + _family(target, linux_deps, apple_deps, mingw_deps) + exports),
             plugins = plugin_labels(plugins, "native"),
             exec_compatible_with = ["//bazel/platforms:compiles_klibs"],
-            target_compatible_with = BUILDS_ON.get(target, []),
+            target_compatible_with = BUILDS_ON.get(target, []) + NATIVE_ONLY,
             visibility = visibility,
         )
     for target in web_targets:
@@ -460,6 +482,7 @@ def kmp_library(
             target_srcs = wasm_js_srcs if target == "wasmJs" else js_srcs,
             deps = _on(target, deps + non_jvm_deps + web_deps + (wasm_js_deps if target == "wasmJs" else js_deps) + exports),
             plugins = plugin_labels(plugins, "native"),
+            target_compatible_with = WEB_ONLY,
             visibility = visibility,
         )
     if jvm:
@@ -597,7 +620,7 @@ def kmp_test(
         device_resources: the test APK's Java resources (`src/androidDeviceTest/resources` and shared dirs).
     """
     srcs = common_srcs + jvm_android_srcs + jvm_srcs + android_srcs + native_srcs + linux_srcs + apple_srcs + mingw_srcs
-    kmp_lint(name, srcs + [s for s in device_srcs if s not in srcs])
+    kmp_lint(name, srcs + [s for s in device_srcs if s not in srcs], JVM_ONLY if jvm_android_srcs or jvm_srcs else [])
     module_info(name, name, {
         "deps": deps,
         "jvm_android_deps": jvm_android_deps,
@@ -632,9 +655,10 @@ def kmp_test(
             deps = _on("jvm", deps + jvm_deps),
             plugins = plugin_labels(plugins, "jvm"),
             resource_jars = _resource_jars(name, "Test", resources),
+            target_compatible_with = JVM_ONLY,
         )
         _unused_deps(name, lib, declared, keep_deps)
-        _jvm_test(name + "_jvm", lib, size, flaky, jvm_flags, data, [])
+        _jvm_test(name + "_jvm", lib, size, flaky, jvm_flags, data, [], JVM_ONLY)
     android_fragments = _jvm_fragments("Test", common_srcs, jvm_android_srcs, android_srcs, "androidHost")
     if android and android_fragments.srcs:
         lib = name + "_android_lib"
@@ -648,13 +672,14 @@ def kmp_test(
             # As AGP: compiled against android.jar, run on the mockable one.
             deps = _on("android", deps + android_deps) + [Label("//bazel/kmp/android:android_jar")],
             plugins = plugin_labels(plugins, "jvm"),
+            target_compatible_with = ANDROID_ONLY,
             resource_jars = _resource_jars(
                 name + "_android",
                 "Test",
                 [r for r in resources if "/src/jvmTest/" not in "/" + r],
             ),
         )
-        _jvm_test(name + "_android", lib, size, flaky, [], data, [Label("//bazel/kmp/android:mockable_android_jar")])
+        _jvm_test(name + "_android", lib, size, flaky, [], data, [Label("//bazel/kmp/android:mockable_android_jar")], ANDROID_ONLY)
     if device_srcs:
         _device_test(name, associate, device_srcs, deps_of_plugins = brought, plugins = plugins, deps = device_deps,
                      manifest = device_manifest, resources = device_resources)
@@ -681,7 +706,7 @@ def kmp_test(
             family_srcs = _family(target, linux_srcs, apple_srcs, mingw_srcs),
             deps = _on(target, deps + non_jvm_deps + native_deps + _family(target, linux_deps, apple_deps, mingw_deps)),
             plugins = plugin_labels(plugins, "native"),
-            target_compatible_with = RUNS_ON[target],
+            target_compatible_with = RUNS_ON[target] + NATIVE_ONLY,
         )
         java_test(
             name = "%s_%s" % (name, target),
@@ -690,7 +715,7 @@ def kmp_test(
             use_testrunner = False,
             args = ["$(rootpath :%s)" % binary],
             data = [":" + binary] + data,
-            target_compatible_with = RUNS_ON[target],
+            target_compatible_with = RUNS_ON[target] + NATIVE_ONLY,
             runtime_deps = [Label("//bazel/kmp/testing:native_launcher_lib")],
         )
         if target in CROSS_PLATFORMS:
@@ -715,6 +740,7 @@ def kmp_test(
             target_srcs = wasm_js_srcs if target == "wasmJs" else js_srcs,
             deps = _on(target, deps + non_jvm_deps + web_deps + (wasm_js_deps if target == "wasmJs" else js_deps)),
             plugins = plugin_labels(plugins, "native"),
+            target_compatible_with = WEB_ONLY,
         )
         java_test(
             name = "%s_%s" % (name, target),
@@ -733,6 +759,7 @@ def kmp_test(
                 Label("//bazel/kmp/testing/web:runner.mjs"),
             ] + data,
             runtime_deps = [Label("//bazel/kmp/testing:native_launcher_lib")],
+            target_compatible_with = WEB_ONLY,
         )
 
 def _device_test(name, associate, srcs, deps_of_plugins, plugins, deps, manifest, resources):
@@ -745,6 +772,7 @@ def _device_test(name, associate, srcs, deps_of_plugins, plugins, deps, manifest
             srcs = resources,
             roots = ["src/commonTest/resources", "src/androidDeviceTest/resources"],
             testonly = True,
+            target_compatible_with = ANDROID_ONLY,
             visibility = ["//visibility:private"],
         )
         resource_jars = [":" + name + "_device_resources"]
@@ -757,6 +785,7 @@ def _device_test(name, associate, srcs, deps_of_plugins, plugins, deps, manifest
                [Label("//bazel/kmp/android:android_jar")],
         plugins = plugin_labels(plugins, "jvm"),
         resource_jars = resource_jars,
+        target_compatible_with = ANDROID_ONLY,
     )
 
     # The Android convention's namespace (`com.moneymanager.<group>`), and AGP's test application id after it.
@@ -773,18 +802,20 @@ def _device_test(name, associate, srcs, deps_of_plugins, plugins, deps, manifest
         # The library convention sets no targetSdk, and AGP's test APK then takes compileSdk.
         target_sdk = COMPILE_SDK,
         test_runner = INSTRUMENTATION_RUNNER,
+        target_compatible_with = ANDROID_ONLY,
     )
     android_device_test(
         name = name + "_device",
         size = "large",
         apk = ":%s_device_apk" % name,
         package = application_id,
+        target_compatible_with = ANDROID_ONLY,
     )
 
 _COVERAGE_AGENT = str(Label("//bazel/kmp/testing:coverage_agent_deploy.jar"))
 _KOVER_AGENT = str(Label("@kover//:org_jetbrains_kotlinx_kover_jvm_agent"))
 
-def _jvm_test(name, lib, size, flaky, jvm_flags, data, runtime_deps):
+def _jvm_test(name, lib, size, flaky, jvm_flags, data, runtime_deps, only):
     """A JUnit 4 test over `lib`'s classes, run by KmpJUnitRunner (the JVM tests and the Android host tests)."""
     java_test(
         name = name,
@@ -819,6 +850,7 @@ def _jvm_test(name, lib, size, flaky, jvm_flags, data, runtime_deps):
             ":" + lib,
             Label("//bazel/kmp/testing:runner"),
         ] + runtime_deps,
+        target_compatible_with = only,
     )
 
 def kmp_static_library(name, srcs, native_targets, hdrs = [], embeds = [], defines = [], library_name = None, visibility = None):
@@ -843,7 +875,7 @@ def kmp_static_library(name, srcs, native_targets, hdrs = [], embeds = [], defin
             defines = defines,
             library_name = library_name or name,
             target = target,
-            target_compatible_with = BUILDS_ON.get(target, []),
+            target_compatible_with = BUILDS_ON.get(target, []) + NATIVE_ONLY,
             visibility = visibility,
         )
 
@@ -866,7 +898,7 @@ def kmp_cinterop(name, def_file, native_targets, static_libraries = [], deps = [
             static_libraries = _on(target, static_libraries),
             deps = _on(target, deps),
             target = target,
-            target_compatible_with = BUILDS_ON.get(target, []),
+            target_compatible_with = BUILDS_ON.get(target, []) + NATIVE_ONLY,
             visibility = visibility,
         )
 
@@ -895,7 +927,7 @@ def kmp_native_executable(name, library, entry_point, base_name, native_targets,
             base_name = base_name,
             target = target,
             tags = ["manual"],
-            target_compatible_with = BUILDS_ON.get(target, []),
+            target_compatible_with = BUILDS_ON.get(target, []) + NATIVE_ONLY,
             visibility = visibility,
         )
         asset = release_assets.get(target)
@@ -907,7 +939,7 @@ def kmp_native_executable(name, library, entry_point, base_name, native_targets,
                 src = name + "_" + target,
                 out = asset + ".exe",
                 tags = ["manual"],
-                target_compatible_with = BUILDS_ON.get(target, []),
+                target_compatible_with = BUILDS_ON.get(target, []) + NATIVE_ONLY,
                 visibility = visibility,
             )
         else:
@@ -917,14 +949,14 @@ def kmp_native_executable(name, library, entry_point, base_name, native_targets,
                 attributes = pkg_attributes(mode = "0755"),
                 renames = {name + "_" + target: base_name},
                 tags = ["manual"],
-                target_compatible_with = BUILDS_ON.get(target, []),
+                target_compatible_with = BUILDS_ON.get(target, []) + NATIVE_ONLY,
             )
             pkg_tar(
                 name = asset,
                 srcs = [asset + "_files"],
                 extension = "tar.gz",
                 tags = ["manual"],
-                target_compatible_with = BUILDS_ON.get(target, []),
+                target_compatible_with = BUILDS_ON.get(target, []) + NATIVE_ONLY,
                 visibility = visibility,
             )
     native.alias(

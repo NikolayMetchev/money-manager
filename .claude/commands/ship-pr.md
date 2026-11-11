@@ -24,6 +24,12 @@ lower PR restacks and re-runs CI on everything above it.
 3. Run `bazel build //... && bazel test //...` locally **on the top branch** (it contains every branch
    below it) and make sure it passes (pre-push rule from CLAUDE.md). If it fails, fix on the branch that owns
    the failure, restack (below), and run it again.
+   `//...` builds and tests the JVM alone: Android, Kotlin/Native and the browser are optional (**Build Commands** in
+   CLAUDE.md). Run only the JVM locally unless the change touches another platform, and then add just that platform's
+   config on top (`--config=android`, `--config=native`, `--config=web`; they combine). A change to the build itself
+   (`bazel/`, `.bazelrc`, `MODULE.bazel`, the `kmp_*` macros, Gazelle) or to shared platform code, such as
+   `androidMain` or `nativeMain` sources, counts as touching them. CI runs the other platforms on `main` and on a
+   PR with the matching label (`native`, `android`, `web`, `installer`), so label the PR when the change needs them.
 4. `gh stack push` and `submit` force-push the **whole** stack, so a branch with commits on origin that you
    don't have would be rolled back. Note each branch's `git rev-parse origin/<b>` before you commit or rebase
    anything (a branch with no origin ref is new: nothing to check). Right before pushing, `git fetch origin`
@@ -113,7 +119,7 @@ sections):
 - Never silently ignore a comment — every one gets either a code change or a reply.
 
 After implementing a PR's fixes: run the relevant tests, commit (same trailer), restack and push (Phase 0),
-then run `bazel build //... && bazel test //...` on the top. If CodeRabbit re-reviews and raises NEW substantive comments,
+then run the same local check (step 3) on the top. If CodeRabbit re-reviews and raises NEW substantive comments,
 repeat this phase for that PR (cap at 3 rounds; after that summarise what's still open instead of looping).
 
 ## Phase 6 — Final green

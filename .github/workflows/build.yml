@@ -15,12 +15,12 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-    # `labeled`/`unlabeled` are for the `native` and `installer` labels; any other label's run skips every job.
+    # `labeled`/`unlabeled` are for the `native`, `installer`, `android` and `web` labels; any other label's run skips every job.
     types: [ opened, synchronize, reopened, labeled, unlabeled ]
 
 concurrency:
   # A run for another label is a no-op, so it gets its own group instead of cancelling the real run in progress.
-  group: ${{ github.workflow }}-${{ github.ref }}${{ contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) && !contains(fromJSON('["native", "installer"]'), github.event.label.name) && github.run_id || '' }}
+  group: ${{ github.workflow }}-${{ github.ref }}${{ contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) && !contains(fromJSON('["native", "installer", "android", "web"]'), github.event.label.name) && github.run_id || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -41,12 +41,19 @@ jobs:
       # The desktop installers (Build and Test's deb, Desktop Installer's dmg and msi) run on main, manual runs and a PR
       # labelled `installer`; any other PR leaves them out of the jobs and the shared Bazel commands.
       installer: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'installer') }}
+      # Android (its compiles, host tests, the app and lint in Build and Test, and the instrumented tests on an emulator)
+      # runs on main, manual runs and a PR labelled `android`; any other PR leaves it out of the job and the shared Bazel
+      # commands.
+      android: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'android') }}
+      # The browser targets (wasmJs and js: their compiles, Node tests and the web app) run on main, manual runs and a PR
+      # labelled `web`; any other PR leaves them out of the shared Bazel commands.
+      web: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'web') }}
       noise: ${{ steps.label.outputs.noise }}
     steps:
-      - name: Ignore labels other than native and installer
+      - name: Ignore labels other than native, installer, android and web
         id: label
         env:
-          NOISE: ${{ contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) && !contains(fromJSON('["native", "installer"]'), github.event.label.name) }}
+          NOISE: ${{ contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) && !contains(fromJSON('["native", "installer", "android", "web"]'), github.event.label.name) }}
         run: echo "noise=$NOISE" >> "$GITHUB_OUTPUT"
       # Needed so paths-filter can diff against the previous commit on push
       # events (on pull_request it uses the API and the checkout is unused).
@@ -92,6 +99,8 @@ jobs:
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       NATIVE: ${{ needs.changes.outputs.native }}
       INSTALLER: ${{ needs.changes.outputs.installer }}
+      ANDROID: ${{ needs.changes.outputs.android }}
+      WEB: ${{ needs.changes.outputs.web }}
       # On every command, so they share one analysis cache; they only change ProGuard, the installer and the JVM
       # tests. Shrink only: the keep rules and ServiceLoader providers don't depend on ProGuard's optimizer, which
       # takes most of its time (release builds optimize). The installer bundles the native mm, as release.yml's does.
@@ -417,10 +426,10 @@ jobs:
       - name: Build
         env:
           MM: ${{ github.event_name == 'pull_request' && ' ' || '//app/main/cli:mm' }}
-        run: bazel build $(bazel query 'attr(name, "_macosArm64", //...) except attr(tags, manual, //...)') $MM 2>&1 | tee build.log
+        run: bazel build --config=native $(bazel query 'attr(name, "_macosArm64", //...) except attr(tags, manual, //...)') $MM 2>&1 | tee build.log
 
       - name: Test
-        run: bazel test $(bazel query 'attr(name, "_macosArm64$", tests(//...))') 2>&1 | tee test.log
+        run: bazel test --config=native $(bazel query 'attr(name, "_macosArm64$", tests(//...))') 2>&1 | tee test.log
 
       - name: Build results
         if: always()
@@ -458,6 +467,7 @@ jobs:
     needs: changes
     if: >-
       needs.changes.outputs.code == 'true' &&
+      needs.changes.outputs.android == 'true' &&
       (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'push' && github.ref == 'refs/heads/main'))
 
@@ -488,7 +498,7 @@ jobs:
 
       # Building first keeps the emulator's time limit for the tests.
       - name: Build the test APKs
-        run: bazel build $(bazel query 'attr(tags, android_device, tests(//...))')
+        run: bazel build --config=android $(bazel query 'attr(tags, android_device, tests(//...))')
 
       # Restore on every ref, save only from main (below): a ~2 GB snapshot saved from a PR's merge
       # ref can't be restored by main or any other PR, and only pushes the shared entries out.
@@ -544,7 +554,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
-          script: bazel test $(bazel query 'attr(tags, android_device, tests(//...))') --test_output=errors
+          script: bazel test --config=android $(bazel query 'attr(tags, android_device, tests(//...))') --test_output=errors
 
       # Codecov's `files` takes paths, not globs, so list the reports.
       - name: List test reports
@@ -638,7 +648,7 @@ jobs:
           MEASURE: ${{ github.event_name != 'pull_request' }}
         run: |
           if [ "$MEASURE" = true ]; then
-            flags=(--define=bundle_native_cli=true)
+            flags=(--config=native --define=bundle_native_cli=true)
             targets=(//tools/bench-db:bench_db //tools/bench-db:empty_db //tools/repo-scripts:repo-scripts-tool_deploy.jar)
           else
             flags=(--define=aot=false)
@@ -731,7 +741,7 @@ jobs:
           cache-name: android-release
 
       - name: Build release APK
-        run: bazel build --stamp //app/main/android:release
+        run: bazel build --config=android --stamp //app/main/android:release
 
   lint-format:
     name: Auto-format PR

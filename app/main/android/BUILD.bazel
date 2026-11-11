@@ -1,5 +1,6 @@
 load("@android_sdk//:versions.bzl", "AGP_VERSION", "COMPILE_SDK", "MIN_SDK", "TARGET_SDK")
 load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp:optional.bzl", "ANDROID_ONLY")
 load("//bazel/kmp/android:apk.bzl", "android_apk")
 load("//bazel/kmp/android:lint.bzl", "android_lint")
 
@@ -51,6 +52,7 @@ kmp_library(
     proguard_specs = ["proguard-rules.pro"],
     release = release,
     signed = signed,
+    target_compatible_with = ANDROID_ONLY,
     target_sdk = TARGET_SDK,
     version_code = 1,
     version_name = "1.0.0",
@@ -74,4 +76,5 @@ android_lint(
         "OldTargetApi",
     ],
     java_source_level = "25",
+    target_compatible_with = ANDROID_ONLY,
 )
