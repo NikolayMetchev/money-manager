@@ -35,16 +35,24 @@ data class ManualTradeInput(
 }
 
 /**
+ * The trades [createManualTradeEntries] made: [ids] are the replacement of each input, in order, and [inserted] those of them that
+ * are new (an identical trade already there is its own replacement, and is not new).
+ */
+data class ManualTradeEntries(
+    val ids: List<TradeId>,
+    val inserted: List<TradeId>,
+)
+
+/**
  * Replaces each placeholder trade with the trade the person described: the same instant, accounts and known leg, with the
  * placeholder's leg now [ManualTradeInput.amount]. The placeholder is excluded once the replacement exists, so the two are
  * never both counted, and it leaves Manual Entries with the exclusion. The replacement keeps the `manual-entry` tag, so the
  * statement's own record of the trade, should it turn up, retires it.
  *
- * If excluding fails the replacements are deleted again, leaving the placeholder pending to try once more. Returns the
- * replacements' ids, in the order of [inputs].
+ * If excluding fails the replacements that were new are deleted again, leaving the placeholder pending to try once more.
  */
-suspend fun ImportEngine.createManualTradeEntries(inputs: List<ManualTradeInput>): List<TradeId> {
-    if (inputs.isEmpty()) return emptyList()
+suspend fun ImportEngine.createManualTradeEntries(inputs: List<ManualTradeInput>): ManualTradeEntries {
+    if (inputs.isEmpty()) return ManualTradeEntries(emptyList(), emptyList())
     inputs.forEach { require(it.problem() == null) { checkNotNull(it.problem()) } }
     val entryTypeId = getOrCreateAttributeType(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME)
     val keys = inputs.indices.map { LocalTradeKey("manual-trade-entry-$it") }
@@ -70,6 +78,8 @@ suspend fun ImportEngine.createManualTradeEntries(inputs: List<ManualTradeInput>
             ),
         )
     val createdIds = keys.map { requireNotNull(created.createdTradeIds[it]) { "Manual trade entry $it was not created" } }
+    // A trade identical to one already there is that one, not a new one, and rolling back must leave it alone.
+    val inserted = keys.filter { it !in created.dedupedTradeKeys }.map { requireNotNull(created.createdTradeIds[it]) }
     var excluded = false
     try {
         import(
@@ -91,7 +101,7 @@ suspend fun ImportEngine.createManualTradeEntries(inputs: List<ManualTradeInput>
                 import(
                     ImportBatch(
                         trades =
-                            createdIds.map {
+                            inserted.map {
                                 ImportTradeIntent(
                                     key = LocalTradeKey("manual-trade-entry-undo-${it.id}"),
                                     source = Source.Manual,
@@ -104,5 +114,30 @@ suspend fun ImportEngine.createManualTradeEntries(inputs: List<ManualTradeInput>
             }
         }
     }
-    return createdIds
+    return ManualTradeEntries(createdIds, inserted)
+}
+
+/**
+ * Takes back [createManualTradeEntries]: deletes the trades it made ([created]) and lifts the exclusion from the
+ * placeholders ([placeholders]) they replaced, so those are pending in Manual Entries again.
+ */
+suspend fun ImportEngine.undoManualTradeEntries(
+    created: List<TradeId>,
+    placeholders: List<TradeId>,
+) {
+    import(
+        ImportBatch(
+            trades =
+                created.map {
+                    ImportTradeIntent(
+                        key = LocalTradeKey("manual-trade-entry-undo-${it.id}"),
+                        source = Source.Manual,
+                        operation = ImportOperation.DELETE,
+                        existingId = it,
+                    )
+                },
+            tradeAttributeMutations =
+                placeholders.map { TradeAttributeMutation.Remove(it, AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)) },
+        ),
+    )
 }

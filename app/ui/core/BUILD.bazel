@@ -35,10 +35,7 @@ kmp_library(
         "@maven_kmp//:compose_material3",
         "@maven_kmp//:jetbrains_navigation3_ui",
     ],
-    plugins = [
-        "compose",
-        "serialization",
-    ],
+    plugins = ["compose"],
     visibility = ["//visibility:public"],
     wasm_js_deps = [
         "@maven_kmp//:compose_material3",

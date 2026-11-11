@@ -147,6 +147,9 @@ class ManualEntriesTradesTest {
                         currencyRepository = currencies,
                         reconciliationRepository = reconciliation,
                         accountRepository = accounts,
+                        suggestionCache = ManualEntrySuggestionCache(),
+                        onOpenSource = {},
+                        onOpenReconciliation = {},
                         maintenance = maintenance,
                         onTransactionsImported = {},
                     )

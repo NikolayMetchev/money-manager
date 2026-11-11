@@ -9,7 +9,10 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ManualEntryInput
 import com.moneymanager.importengineapi.createManualEntries
 import com.moneymanager.importengineapi.createReconciliationMatches
+import com.moneymanager.importengineapi.deleteManualEntries
 import com.moneymanager.importengineapi.setReconciliationLinks
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -35,15 +38,20 @@ data class FeeSuggestion(
  * The fee of each withdrawal in [pending], read off [sourceTransfers] (transfers on a source's shadow accounts around them):
  * a transfer from a source wallet to one of its fee accounts ([feeAccountIds]) in the withdrawal's asset, within
  * [FEE_SUGGESTION_WINDOW] of it, for which the same wallet sent, within seconds, a net transfer such that net plus fee is
- * exactly the withdrawal's amount. Requiring that sum means a coincidental fee of the same asset is never taken. Nothing is
- * suggested when two such pairs fit one withdrawal, or one pair fits two.
+ * exactly the withdrawal's amount. Requiring that sum means a coincidental fee of the same asset is never taken, and
+ * [mirrors] that the wallet is the account the withdrawal was made from (linked to it, or named for it), so another
+ * exchange's withdrawal of the same size is never taken either. A fee in [claimedFeeTransfers] is already matched to another
+ * fee. Nothing is suggested when two such pairs fit one withdrawal, or one pair fits two.
  */
 fun suggestFees(
     pending: List<PendingManualEntry>,
     sourceTransfers: List<Transfer>,
     feeAccountIds: Set<AccountId>,
+    claimedFeeTransfers: Set<TransferId> = emptySet(),
+    mirrors: (wallet: AccountId, real: AccountId) -> Boolean = { _, _ -> true },
 ): Map<TransferId, FeeSuggestion> {
-    val fees = sourceTransfers.filter { it.targetAccountId in feeAccountIds }
+    // A fee a person already matched to a real fee is spoken for.
+    val fees = sourceTransfers.filter { it.targetAccountId in feeAccountIds && it.id !in claimedFeeTransfers }
     val nets = sourceTransfers.filter { it.targetAccountId !in feeAccountIds }
     val fits =
         pending.associateWith { withdrawal ->
@@ -51,6 +59,7 @@ fun suggestFees(
                 nets
                     .filter { net ->
                         net.sourceAccountId == fee.sourceAccountId &&
+                            mirrors(net.sourceAccountId, withdrawal.sourceAccountId) &&
                             net.amount.asset.id == withdrawal.amount.asset.id &&
                             fee.amount.asset.id == withdrawal.amount.asset.id &&
                             net.amount.amount + fee.amount.amount == withdrawal.amount.amount &&
@@ -89,6 +98,13 @@ suspend fun ImportEngine.acceptFeeSuggestions(
             relationshipType = relationshipType,
             excludedFromBalances = excludedFromBalances,
         )
-    createReconciliationMatches(suggestions.mapIndexed { index, suggestion -> listOf(entries[index], suggestion.feeTransfer.id) })
+    // The matches are a second write: were it to fail, the entries would leave Manual Entries with nothing to show for it.
+    var matched = false
+    try {
+        createReconciliationMatches(suggestions.mapIndexed { index, suggestion -> listOf(entries[index], suggestion.feeTransfer.id) })
+        matched = true
+    } finally {
+        if (!matched) withContext(NonCancellable) { deleteManualEntries(entries) }
+    }
     links.forEach { (wallet, real) -> setReconciliationLinks(wallet, setOf(real)) }
 }

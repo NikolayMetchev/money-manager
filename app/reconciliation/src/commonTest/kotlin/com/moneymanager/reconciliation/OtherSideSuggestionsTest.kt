@@ -84,6 +84,44 @@ class OtherSideSuggestionsTest {
     }
 
     @Test
+    fun `a wallet that is not the placeholder account is not taken`() {
+        val wrongWallet: (AccountId, AccountId) -> Boolean = { _, _ -> false }
+        val rightWallet: (AccountId, AccountId) -> Boolean = { wallet, real -> wallet == AccountId(9) && real == AccountId(1) }
+
+        assertNull(suggestOtherSides(listOf(buy to "UNKNOWN"), listOf(koinlyBuy()), wrongWallet)[buy.id])
+        assertEquals(
+            TradeId(10),
+            suggestOtherSides(listOf(buy to "UNKNOWN"), listOf(koinlyBuy()), rightWallet).getValue(buy.id).shadowTrade.id,
+        )
+    }
+
+    @Test
+    fun `the wallet and account checked are those of the known leg when a trade has legs on two accounts`() {
+        // Placeholder: UNKNOWN in, GBP out of account 1. The source trade has its GBP leg on wallet 9 and the other leg on wallet 8.
+        val placeholder =
+            trade(
+                5,
+                "2020-05-30T08:10:18Z",
+                money(unknown, "1097.87"),
+                money(gbp, "1097.87"),
+            ).copy(fromAccountId = AccountId(7), toAccountId = AccountId(1))
+        val source =
+            trade(
+                6,
+                "2020-05-30T08:10:18Z",
+                money(btc, "0.1330735"),
+                money(gbp, "1097.87"),
+                account = 9,
+            ).copy(fromAccountId = AccountId(8))
+        val knownLegOnly: (AccountId, AccountId) -> Boolean = { wallet, real -> wallet == AccountId(9) && real == AccountId(1) }
+
+        assertEquals(
+            TradeId(6),
+            suggestOtherSides(listOf(placeholder to "UNKNOWN"), listOf(source), knownLegOnly).getValue(placeholder.id).shadowTrade.id,
+        )
+    }
+
+    @Test
     fun `two source trades fitting one placeholder is left to a person`() {
         val twin = koinlyBuy().copy(id = TradeId(12))
 

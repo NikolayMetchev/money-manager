@@ -18,6 +18,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class ImportTab { FILES, API, MISC, TIMELINE, RECONCILIATION }
 
+/** The sub-tabs of the Reconciliation import tab; part of the destination so Back returns to the one that was showing. */
+@Serializable
+enum class ReconciliationSubTab { EXTERNAL, MANUAL, CARDS }
+
 /**
  * Navigation destinations. Serializable [NavKey]s so the back stack survives process death via
  * `rememberNavBackStack` (titles are computed properties, not serialized state).
@@ -58,6 +62,7 @@ sealed class Screen : NavKey {
     @Serializable
     data class Imports(
         val tab: ImportTab = ImportTab.FILES,
+        val reconciliationSubTab: ReconciliationSubTab = ReconciliationSubTab.EXTERNAL,
     ) : Screen() {
         override val title: String get() = "Imports"
     }

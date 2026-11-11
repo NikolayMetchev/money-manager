@@ -18,6 +18,7 @@ import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
@@ -38,10 +39,12 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
 import com.moneymanager.domain.model.reconciliation.LegTransactionKind
+import com.moneymanager.domain.model.reconciliation.ReconciliationFocus
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.reconciliation.ReconciliationLink
 import com.moneymanager.domain.model.reconciliation.ReconciliationSource
 import com.moneymanager.domain.model.reconciliation.ShadowAccount
+import com.moneymanager.domain.model.reconciliation.reconciliationMonth
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -57,6 +60,7 @@ import com.moneymanager.importengineapi.TradeAttributeMutation
 import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.tasks.TaskManager
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.foundation.ReconciliationFocusState
 import com.moneymanager.ui.tasks.LocalTaskManager
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.answering.calls
@@ -72,8 +76,10 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
@@ -345,6 +351,7 @@ class ReconciliationScreenTest {
         realLegs: List<ReconciliationLeg>,
         opened: MutableList<ReconciliationLeg> = mutableListOf(),
         openedSources: MutableList<ReconciliationLeg> = mutableListOf(),
+        focus: ReconciliationFocusState = ReconciliationFocusState(),
     ): List<ImportBatch> {
         val batches = mutableListOf<ImportBatch>()
         val engine =
@@ -352,7 +359,7 @@ class ReconciliationScreenTest {
                 batches += batch
                 ImportResult()
             }
-        showLegsWith(engine, sourceLegs, realLegs, opened, openedSources)
+        showLegsWith(engine, sourceLegs, realLegs, opened, openedSources, focus)
         return batches
     }
 
@@ -362,6 +369,7 @@ class ReconciliationScreenTest {
         realLegs: List<ReconciliationLeg>,
         opened: MutableList<ReconciliationLeg> = mutableListOf(),
         openedSources: MutableList<ReconciliationLeg> = mutableListOf(),
+        focus: ReconciliationFocusState = ReconciliationFocusState(),
     ) {
         val accounts =
             listOf(
@@ -384,6 +392,7 @@ class ReconciliationScreenTest {
                         transactionRepository = transactionRepository,
                         onOpenLeg = { opened += it },
                         onOpenSource = { openedSources += it },
+                        focus = focus,
                     )
                 }
             }
@@ -434,6 +443,55 @@ class ReconciliationScreenTest {
                 ),
                 batches.single().relationshipMutations,
             )
+        }
+    }
+
+    @Test
+    fun aFocusRequestOpensTheWalletAndMonthItNamesAndIsConsumed() {
+        runMoneyManagerComposeUiTest {
+            val focus = ReconciliationFocusState()
+            focus.request = ReconciliationFocus(koinly.name, wallet.accountId, reconciliationMonth(t0), 10)
+
+            // A real leg of the same asset, far away, so the source's movement is not hidden as an asset Money Manager never saw.
+            showLegs(listOf(leg(10, wallet.accountId, "5", t0)), listOf(leg(20, binance, "9", t0 + 100.days)), focus = focus)
+
+            // Nothing was expanded by hand, yet the movement is in view.
+            reveal(hasText("leg 10", substring = true))
+            onNodeWithText("leg 10", substring = true).assertIsDisplayed()
+            assertEquals(null, focus.request)
+        }
+    }
+
+    @Test
+    fun aFocusRequestOnASettledMovementOpensTheMatchedTab() {
+        runMoneyManagerComposeUiTest {
+            val focus = ReconciliationFocusState()
+            focus.request = ReconciliationFocus(koinly.name, wallet.accountId, reconciliationMonth(t0), 10)
+
+            showLegs(listOf(leg(10, wallet.accountId, "5", t0)), listOf(leg(20, binance, "5", t0)), focus = focus)
+
+            onNodeWithText("leg 10", substring = true).assertIsDisplayed()
+            onNodeWithTag(HIGHLIGHTED_TAG).assertIsDisplayed()
+            assertEquals(null, focus.request)
+        }
+    }
+
+    @Test
+    fun aFocusRequestScrollsToTheMovementFarDownTheList() {
+        runMoneyManagerComposeUiTest {
+            val focus = ReconciliationFocusState()
+            val sourceLegs = (10L..59L).map { leg(it, wallet.accountId, it.toString(), t0 + it.hours) }
+            focus.request = ReconciliationFocus(koinly.name, wallet.accountId, reconciliationMonth(t0), 35)
+
+            showLegs(sourceLegs, listOf(leg(900, binance, "9999", t0 + 100.days)), focus = focus)
+            waitForIdle()
+
+            // Fifty rows are open, and the one asked for is marked and in the middle of the screen.
+            onNodeWithText("leg 35", substring = true).assertIsDisplayed()
+            val row = onNodeWithTag(HIGHLIGHTED_TAG).fetchSemanticsNode().boundsInRoot
+            val screen = onRoot().fetchSemanticsNode().boundsInRoot
+            val offCentre = abs((row.top + row.bottom) / 2 - (screen.top + screen.bottom) / 2)
+            assertTrue(offCentre < screen.height / 4, "the row is $offCentre px from the middle of a ${screen.height} px screen")
         }
     }
 

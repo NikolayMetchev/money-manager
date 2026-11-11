@@ -22,6 +22,7 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.domain.model.reconciliation.ReconciliationFocus
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
@@ -48,8 +49,10 @@ import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.importfilesource.DriveFolderBrowser
+import com.moneymanager.ui.foundation.ReconciliationFocusState
 import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.navigation.ImportTab
+import com.moneymanager.ui.navigation.ReconciliationSubTab
 import com.moneymanager.ui.screens.accountmapping.AccountMappingsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiSessionsScreen
 import com.moneymanager.ui.screens.csv.ImportFilesScreen
@@ -60,14 +63,17 @@ import com.moneymanager.ui.screens.reconciliation.ReconciliationCache
 import com.moneymanager.ui.screens.reconciliation.ReconciliationScreen
 import com.moneymanager.ui.screens.timeline.ImportTimelineScreen
 import com.moneymanager.ui.screens.transactions.ManualEntriesScreen
+import com.moneymanager.ui.screens.transactions.ManualEntrySuggestionCache
 import kotlinx.coroutines.flow.first
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 
 @Composable
 fun ImportsScreen(
     selectedTab: ImportTab,
     onTabSelected: (ImportTab) -> Unit,
+    reconciliationSubTab: ReconciliationSubTab,
+    onReconciliationSubTabSelected: (ReconciliationSubTab) -> Unit,
+    onOpenReconciliation: (ReconciliationFocus) -> Unit,
     importDirectoryRepository: ImportDirectoryReadRepository,
     importTimelineRepository: ImportTimelineReadRepository,
     reconciliationRepository: ReconciliationReadRepository,
@@ -109,6 +115,8 @@ fun ImportsScreen(
     onReconciliationSourceClick: (ReconciliationLeg) -> Unit = {},
     matchPickerState: MatchPickerState = remember { MatchPickerState() },
     reconciliationCache: ReconciliationCache = remember { ReconciliationCache() },
+    manualEntrySuggestionCache: ManualEntrySuggestionCache = remember { ManualEntrySuggestionCache() },
+    reconciliationFocus: ReconciliationFocusState,
     showImportDirectories: Boolean = true,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -227,6 +235,8 @@ fun ImportsScreen(
 
             ImportTab.RECONCILIATION -> {
                 ReconciliationImportsTab(
+                    subTab = reconciliationSubTab,
+                    onSubTabSelected = onReconciliationSubTabSelected,
                     reconciliation = {
                         ReconciliationScreen(
                             reconciliationRepository = reconciliationRepository,
@@ -238,6 +248,7 @@ fun ImportsScreen(
                             onOpenSource = onReconciliationSourceClick,
                             pickerState = matchPickerState,
                             cache = reconciliationCache,
+                            focus = reconciliationFocus,
                         )
                     },
                     manualEntries = {
@@ -248,6 +259,9 @@ fun ImportsScreen(
                             currencyRepository = currencyRepository,
                             reconciliationRepository = reconciliationRepository,
                             accountRepository = accountRepository,
+                            suggestionCache = manualEntrySuggestionCache,
+                            onOpenSource = onReconciliationSourceClick,
+                            onOpenReconciliation = onOpenReconciliation,
                             maintenance = maintenance,
                             onTransactionsImported = onTransactionsImported,
                         )
@@ -282,14 +296,12 @@ fun ImportsScreen(
     }
 }
 
-@Serializable
-private enum class ReconciliationSubTab(
-    val label: String,
-) {
-    EXTERNAL("External Account Reconciliation"),
-    MANUAL("Manual Entries"),
-    CARDS("Card Last-4"),
-}
+private fun ReconciliationSubTab.label(): String =
+    when (this) {
+        ReconciliationSubTab.EXTERNAL -> "External Account Reconciliation"
+        ReconciliationSubTab.MANUAL -> "Manual Entries"
+        ReconciliationSubTab.CARDS -> "Card Last-4"
+    }
 
 /**
  * Sub-tabs under the "Reconciliation" import tab — everything an import leaves for a person to resolve:
@@ -298,18 +310,16 @@ private enum class ReconciliationSubTab(
  */
 @Composable
 private fun ReconciliationImportsTab(
+    subTab: ReconciliationSubTab,
+    onSubTabSelected: (ReconciliationSubTab) -> Unit,
     reconciliation: @Composable () -> Unit,
     manualEntries: @Composable () -> Unit,
     cards: @Composable () -> Unit,
 ) {
-    var subTab by rememberPersistedState(
-        "imports.reconciliationSubTab",
-        ReconciliationSubTab.serializer(),
-    ) { ReconciliationSubTab.EXTERNAL }
     Column(modifier = Modifier.fillMaxSize()) {
         SecondaryTabRow(selectedTabIndex = subTab.ordinal) {
             ReconciliationSubTab.entries.forEach { entry ->
-                Tab(selected = subTab == entry, onClick = { subTab = entry }, text = { Text(entry.label) })
+                Tab(selected = subTab == entry, onClick = { onSubTabSelected(entry) }, text = { Text(entry.label()) })
             }
         }
         when (subTab) {

@@ -3,11 +3,16 @@
 package com.moneymanager.ui.screens.transactions
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
+import androidx.compose.ui.test.waitUntilDoesNotExist
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CsvImportStrategyId
@@ -25,6 +30,9 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
+import com.moneymanager.domain.model.reconciliation.ReconciliationFocus
+import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
+import com.moneymanager.domain.model.reconciliation.ReconciliationLink
 import com.moneymanager.domain.model.reconciliation.ReconciliationSource
 import com.moneymanager.domain.model.reconciliation.ShadowAccount
 import com.moneymanager.domain.model.rules.RuleAction
@@ -44,11 +52,15 @@ import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.MockMode
+import dev.mokkery.answering.calls
 import dev.mokkery.answering.returns
 import dev.mokkery.every
 import dev.mokkery.everySuspend
 import dev.mokkery.matcher.any
 import dev.mokkery.mock
+import dev.mokkery.verify.VerifyMode.Companion.exactly
+import dev.mokkery.verifySuspend
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -137,7 +149,7 @@ class ManualEntriesScreenTest {
         mock(MockMode.autoUnit) { every { getAllStrategies() } returns flowOf(listOf(strategy)) }
     }
 
-    private val reconciliation: ReconciliationReadRepository =
+    private fun reconciliation(links: List<ReconciliationLink> = emptyList()): ReconciliationReadRepository =
         mock(MockMode.autoUnit) {
             every { getShadowAccounts() } returns
                 flowOf(
@@ -146,12 +158,21 @@ class ManualEntriesScreenTest {
                         ShadowAccount(walletFees, "Koinly · Binance Fees", "Koinly", feeAccountFor = wallet),
                     ),
                 )
-            every { getLinks() } returns flowOf(emptyList())
+            every { getLinks() } returns flowOf(links)
+            everySuspend { getLegs(any()) } returns emptyList()
             every { getSources() } returns flowOf(listOf(ReconciliationSource("Koinly", listOf("Koinly CSV"), "Koinly · ")))
         }
 
     private val accounts: AccountReadRepository =
-        mock(MockMode.autoUnit) { every { getAllAccounts() } returns flowOf(emptyList()) }
+        mock(MockMode.autoUnit) {
+            every { getAllAccounts() } returns
+                flowOf(
+                    listOf(
+                        Account(revolut, name = "Revolut", openingDate = epoch),
+                        Account(AccountId(2), name = "Binance", openingDate = epoch),
+                    ),
+                )
+        }
 
     private val currencies: CurrencyReadRepository =
         mock(MockMode.autoUnit) { every { getAllCurrencies() } returns flowOf(listOf(gbp, btc, unknown)) }
@@ -187,6 +208,9 @@ class ManualEntriesScreenTest {
             val transactions: TransactionReadRepository =
                 mock(MockMode.autoUnit) { every { getPendingManualEntries(any(), any()) } returns flowOf(emptyList()) }
             val engine = RecordingEngine()
+            val cache = ManualEntrySuggestionCache()
+            val opened = mutableListOf<ReconciliationLeg>()
+            val focused = mutableListOf<ReconciliationFocus>()
 
             setContent {
                 ProvideSchemaAwareScope {
@@ -196,15 +220,24 @@ class ManualEntriesScreenTest {
                             transactionRepository = transactions,
                             tradeRepository = trades,
                             currencyRepository = currencies,
-                            reconciliationRepository = reconciliation,
+                            reconciliationRepository = reconciliation(listOf(ReconciliationLink(wallet, revolut))),
                             accountRepository = accounts,
+                            suggestionCache = cache,
+                            onOpenSource = { opened += it },
+                            onOpenReconciliation = { focused += it },
                             maintenance = maintenance,
                             onTransactionsImported = {},
                         )
                     }
                 }
             }
-            waitUntilAtLeastOneExists(hasText("A reconciliation source records the other side", substring = true))
+            waitUntilAtLeastOneExists(hasText("Koinly (Koinly · Binance) records the other side", substring = true))
+
+            onNodeWithText("Open the Koinly file row").performClick()
+            onNodeWithText("Show in Reconciliation").performClick()
+            waitForIdle()
+            assertEquals(listOf(koinly.id.id), opened.map { it.transactionId })
+            assertEquals(listOf(ReconciliationFocus("Koinly", wallet, "2021-05", koinly.id.id)), focused)
 
             onNodeWithText("and match it", substring = true).performClick()
             waitUntil(timeoutMillis = 5_000) { engine.batches.any { it.relationshipMutations.isNotEmpty() } }
@@ -215,6 +248,137 @@ class ManualEntriesScreenTest {
             assertEquals(koinly.to, created.toAmount)
             val match = engine.batches.flatMap { it.relationshipMutations }.single() as RelationshipMutation.Create
             assertEquals(setOf(500L, 2L), match.members.map { it.transactionId.id }.toSet())
+        }
+
+    @Test
+    fun `reopening Manual Entries shows the suggestions found before without looking again`() =
+        runMoneyManagerComposeUiTest {
+            val placeholder =
+                Trade(
+                    TradeId(1),
+                    timestamp = epoch,
+                    description = "Transfer to Revolut Ltd",
+                    fromAccountId = revolut,
+                    from = Money.fromDisplayValue("1000", gbp),
+                    toAccountId = revolut,
+                    to = Money.fromDisplayValue("1000", unknown),
+                )
+            val koinly =
+                Trade(
+                    TradeId(2),
+                    timestamp = epoch,
+                    description = "trade",
+                    fromAccountId = wallet,
+                    from = Money.fromDisplayValue("1000.0", gbp),
+                    toAccountId = wallet,
+                    to = Money.fromDisplayValue("0.1330735", btc),
+                )
+            val trades: TradeReadRepository =
+                mock(MockMode.autoUnit) {
+                    every { getPendingManualTrades(any(), any()) } returns flowOf(listOf(placeholder))
+                    everySuspend { getTradesByAccountsAndDateRange(any(), any(), any()) } returns listOf(koinly)
+                }
+            val transactions: TransactionReadRepository =
+                mock(MockMode.autoUnit) { every { getPendingManualEntries(any(), any()) } returns flowOf(emptyList()) }
+            val engine = RecordingEngine()
+            val cache = ManualEntrySuggestionCache()
+            var showing by mutableStateOf(true)
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    CompositionLocalProvider(LocalImportEngine provides engine) {
+                        if (showing) {
+                            ManualEntriesScreen(
+                                csvImportStrategyRepository = strategies(strategy()),
+                                transactionRepository = transactions,
+                                tradeRepository = trades,
+                                currencyRepository = currencies,
+                                reconciliationRepository = reconciliation(listOf(ReconciliationLink(wallet, revolut))),
+                                accountRepository = accounts,
+                                suggestionCache = cache,
+                                onOpenSource = {},
+                                onOpenReconciliation = {},
+                                maintenance = maintenance,
+                                onTransactionsImported = {},
+                            )
+                        }
+                    }
+                }
+            }
+            waitUntilAtLeastOneExists(hasText("records the other side", substring = true))
+
+            // Leave the tab and come back: the suggestions are shown from memory.
+            showing = false
+            waitForIdle()
+            showing = true
+            waitUntilAtLeastOneExists(hasText("records the other side", substring = true))
+
+            verifySuspend(exactly(1)) { trades.getTradesByAccountsAndDateRange(any(), any(), any()) }
+        }
+
+    @Test
+    fun `a bar with the step shows while the suggestions are being found and goes when they are`() =
+        runMoneyManagerComposeUiTest {
+            val placeholder =
+                Trade(
+                    TradeId(1),
+                    timestamp = epoch,
+                    description = "Transfer to Revolut Ltd",
+                    fromAccountId = revolut,
+                    from = Money.fromDisplayValue("1000", gbp),
+                    toAccountId = revolut,
+                    to = Money.fromDisplayValue("1000", unknown),
+                )
+            val koinly =
+                Trade(
+                    TradeId(2),
+                    timestamp = epoch,
+                    description = "trade",
+                    fromAccountId = wallet,
+                    from = Money.fromDisplayValue("1000.0", gbp),
+                    toAccountId = wallet,
+                    to = Money.fromDisplayValue("0.1330735", btc),
+                )
+            // The lookup of the sources' trades waits here, so the screen is caught part way through finding them.
+            val release = CompletableDeferred<Unit>()
+            val trades: TradeReadRepository =
+                mock(MockMode.autoUnit) {
+                    every { getPendingManualTrades(any(), any()) } returns flowOf(listOf(placeholder))
+                    everySuspend { getTradesByAccountsAndDateRange(any(), any(), any()) } calls
+                        {
+                            release.await()
+                            listOf(koinly)
+                        }
+                }
+            val transactions: TransactionReadRepository =
+                mock(MockMode.autoUnit) { every { getPendingManualEntries(any(), any()) } returns flowOf(emptyList()) }
+            val engine = RecordingEngine()
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    CompositionLocalProvider(LocalImportEngine provides engine) {
+                        ManualEntriesScreen(
+                            csvImportStrategyRepository = strategies(strategy()),
+                            transactionRepository = transactions,
+                            tradeRepository = trades,
+                            currencyRepository = currencies,
+                            reconciliationRepository = reconciliation(listOf(ReconciliationLink(wallet, revolut))),
+                            accountRepository = accounts,
+                            suggestionCache = ManualEntrySuggestionCache(),
+                            onOpenSource = {},
+                            onOpenReconciliation = {},
+                            maintenance = maintenance,
+                            onTransactionsImported = {},
+                        )
+                    }
+                }
+            }
+            waitUntilAtLeastOneExists(hasText("Finding suggestions from the reconciliation sources", substring = true))
+            onNodeWithText("Looking for the sources' record of exchange 1 of 1", substring = true).assertExists()
+
+            release.complete(Unit)
+            waitUntilAtLeastOneExists(hasText("records the other side", substring = true))
+            waitUntilDoesNotExist(hasText("Finding suggestions from the reconciliation sources", substring = true))
         }
 
     @Test
@@ -256,6 +420,9 @@ class ManualEntriesScreenTest {
             val trades: TradeReadRepository =
                 mock(MockMode.autoUnit) { every { getPendingManualTrades(any(), any()) } returns flowOf(emptyList()) }
             val engine = RecordingEngine()
+            val cache = ManualEntrySuggestionCache()
+            val opened = mutableListOf<ReconciliationLeg>()
+            val focused = mutableListOf<ReconciliationFocus>()
 
             setContent {
                 ProvideSchemaAwareScope {
@@ -265,15 +432,22 @@ class ManualEntriesScreenTest {
                             transactionRepository = transactions,
                             tradeRepository = trades,
                             currencyRepository = currencies,
-                            reconciliationRepository = reconciliation,
+                            reconciliationRepository = reconciliation(),
                             accountRepository = accounts,
+                            suggestionCache = cache,
+                            onOpenSource = { opened += it },
+                            onOpenReconciliation = { focused += it },
                             maintenance = maintenance,
                             onTransactionsImported = {},
                         )
                     }
                 }
             }
-            waitUntilAtLeastOneExists(hasText("A reconciliation source charged", substring = true))
+            waitUntilAtLeastOneExists(hasText("Koinly (Koinly · Binance) charged", substring = true))
+
+            onNodeWithText("Open the Koinly file row").performClick()
+            waitForIdle()
+            assertEquals(listOf(net.id.id), opened.map { it.transactionId })
 
             onNodeWithText("and match it", substring = true).performClick()
             waitUntil(timeoutMillis = 5_000) { engine.batches.flatMap { it.relationshipMutations }.size >= 2 }
