@@ -77,6 +77,7 @@ import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.foundation.ReconciliationFocusState
 import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.tasks.LocalTaskManager
 import com.moneymanager.ui.util.displayDateTime
@@ -121,6 +122,7 @@ fun ReconciliationScreen(
     onOpenSource: (ReconciliationLeg) -> Unit = {},
     pickerState: MatchPickerState = remember { MatchPickerState() },
     cache: ReconciliationCache = remember { ReconciliationCache() },
+    focus: ReconciliationFocusState = remember { ReconciliationFocusState() },
 ) {
     val sources by rememberFlowAsStateWithSchemaErrorHandling(initial = null) { reconciliationRepository.getSources() }
     val loadedSources = sources
@@ -143,6 +145,10 @@ fun ReconciliationScreen(
             restore = { name -> if (loadedSources.any { it.name == name }) name else loadedSources.first().name },
         ) { loadedSources.first().name }
     val source = loadedSources.firstOrNull { it.name == selectedName } ?: loadedSources.first()
+    // A link elsewhere asked for a source: show it, and SourceReconciliation then opens the wallet and month.
+    LaunchedEffect(focus.request, loadedSources) {
+        focus.request?.let { request -> if (loadedSources.any { it.name == request.sourceName }) selectedName = request.sourceName }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         if (loadedSources.size > 1) {
@@ -163,6 +169,7 @@ fun ReconciliationScreen(
             onOpenSource = onOpenSource,
             pickerState = pickerState,
             cache = cache,
+            focus = focus,
         )
     }
 }
@@ -179,6 +186,7 @@ private fun SourceReconciliation(
     onOpenSource: (ReconciliationLeg) -> Unit,
     pickerState: MatchPickerState,
     cache: ReconciliationCache,
+    focus: ReconciliationFocusState,
 ) {
     val importEngine = LocalImportEngine.current
     val writeVersion by importEngine.writeVersion.collectAsState()
@@ -245,6 +253,18 @@ private fun SourceReconciliation(
     var hideUnknownAssets by rememberPersistedState("reconciliation.hideUnknownAssets", Boolean.serializer()) { true }
     var tab by rememberPersistedState("reconciliation.tab", ResultTab.serializer()) { ResultTab.UNMATCHED }
     val expanded = remember(source) { mutableStateMapOf<String, Boolean>() }
+    // The movement a link named: its wallet and month open in every list it could be in, on the tab it is waiting on.
+    LaunchedEffect(focus.request, source) {
+        val request = focus.request ?: return@LaunchedEffect
+        if (request.sourceName != source.name) return@LaunchedEffect
+        tab = ResultTab.UNMATCHED
+        listOf("near", "source-only", "mm-only", "matched", "ignored").forEach { prefix ->
+            val wallet = "$prefix-${request.walletAccountId.id}"
+            expanded[wallet] = true
+            expanded["$wallet-${request.month}"] = true
+        }
+        focus.clear()
+    }
 
     fun setLinks(
         shadow: AccountId,

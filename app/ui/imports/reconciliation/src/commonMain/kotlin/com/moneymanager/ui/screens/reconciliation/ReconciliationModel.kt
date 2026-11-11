@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
+import com.moneymanager.domain.model.reconciliation.reconciliationMonth
 import com.moneymanager.reconciliation.LegMatch
 import com.moneymanager.reconciliation.ReconciliationResult
 import com.moneymanager.reconciliation.UnmatchedSourceLeg
@@ -50,10 +51,7 @@ fun <T> groupByWalletAndMonth(
             )
         }.sortedBy { it.walletName.lowercase() }
 
-internal fun monthKey(instant: Instant): String {
-    val date = instant.toLocalDateTime(TimeZone.UTC).date
-    return "${date.year}-${date.month.ordinal.plus(1).toString().padStart(2, '0')}"
-}
+internal fun monthKey(instant: Instant): String = reconciliationMonth(instant)
 
 /** Per-wallet unmatched counts for the links section. */
 data class WalletCounts(

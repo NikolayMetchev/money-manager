@@ -20,4 +20,5 @@ kmp_library(
         "js",
     ],
     exports = ["//app/model/core"],
+    deps = ["@maven_kmp//:kotlinx_datetime"],
 )

@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +41,8 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
+import com.moneymanager.domain.model.reconciliation.ReconciliationFocus
+import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
@@ -101,6 +104,9 @@ fun ManualEntriesScreen(
     currencyRepository: CurrencyReadRepository,
     reconciliationRepository: ReconciliationReadRepository,
     accountRepository: AccountReadRepository,
+    suggestionCache: ManualEntrySuggestionCache,
+    onOpenSource: (ReconciliationLeg) -> Unit,
+    onOpenReconciliation: (ReconciliationFocus) -> Unit,
     maintenance: Maintenance,
     onTransactionsImported: () -> Unit,
 ) {
@@ -164,10 +170,6 @@ fun ManualEntriesScreen(
     val tradeAmounts = remember { mutableStateMapOf<TradeId, String>() }
     var isSaving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var suggestions by remember { mutableStateOf<Map<TradeId, OtherSideSuggestion>>(emptyMap()) }
-    LaunchedEffect(pendingTrades) {
-        suggestions = loadSuggestions(pendingTrades.map { it.trade to it.placeholderAssetCode }, reconciliationRepository, tradeRepository)
-    }
     // Every save runs the same way: block the screen, do the work, refresh, and say what failed.
     val runSave: (String, suspend () -> Unit) -> Unit = { failure, work ->
         isSaving = true
@@ -186,15 +188,24 @@ fun ManualEntriesScreen(
             }
         }
     }
-    var feeSuggestions by remember { mutableStateOf<Map<TransferId, FeeSuggestion>>(emptyMap()) }
-    LaunchedEffect(groups) {
-        feeSuggestions =
-            loadFeeSuggestions(
-                groups.filter { it.entry.relationshipType == WellKnownIds.FEE_RELATIONSHIP_TYPE_NAME }.flatMap { it.pending },
-                reconciliationRepository,
-                transactionRepository,
-            )
+    // What the sources say, kept above the screen: found again only when what is pending or the database changes.
+    val writeVersion by importEngine.writeVersion.collectAsState()
+    val withdrawals = groups.filter { it.entry.relationshipType == WellKnownIds.FEE_RELATIONSHIP_TYPE_NAME }.flatMap { it.pending }
+    var found by remember { mutableStateOf(suggestionCache.peek(writeVersion) ?: ManualEntrySuggestions()) }
+    LaunchedEffect(pendingTrades, withdrawals, writeVersion) {
+        val waiting = pendingTrades.mapTo(mutableSetOf()) { it.trade.id.id } + withdrawals.map { it.transferId.id }
+        found =
+            suggestionCache.get(waiting, writeVersion)
+                ?: loadManualEntrySuggestions(
+                    pendingTrades.map { it.trade to it.placeholderAssetCode },
+                    withdrawals,
+                    reconciliationRepository,
+                    tradeRepository,
+                    transactionRepository,
+                ).also { suggestionCache.put(waiting, writeVersion, it) }
     }
+    val suggestions = found.trades
+    val feeSuggestions = found.fees
     val acceptSuggestions: (List<OtherSideSuggestion>) -> Unit = { accepted ->
         runSave("Failed to use the suggestions") {
             importEngine.acceptOtherSideSuggestions(
@@ -284,6 +295,9 @@ fun ManualEntriesScreen(
                             matched = matched,
                             entry = group.entry,
                             suggestion = feeSuggestions[matched.transferId],
+                            origin = feeSuggestions[matched.transferId]?.origin(found.shadowAccounts),
+                            onOpenSource = onOpenSource,
+                            onOpenReconciliation = onOpenReconciliation,
                             busy = isSaving,
                             onUseSuggestion = {
                                 feeSuggestions[matched.transferId]?.let { suggestion ->
@@ -351,6 +365,9 @@ fun ManualEntriesScreen(
                             entry = entry,
                             currencyRepository = currencyRepository,
                             suggestion = suggestions[entry.trade.id],
+                            origin = suggestions[entry.trade.id]?.origin(found.shadowAccounts),
+                            onOpenSource = onOpenSource,
+                            onOpenReconciliation = onOpenReconciliation,
                             onUseSuggestion = { suggestions[entry.trade.id]?.let { acceptSuggestions(listOf(it)) } },
                             busy = isSaving,
                             currencyId = tradeCurrencies[entry.trade.id],
@@ -437,6 +454,9 @@ private fun PendingEntryCard(
     matched: PendingManualEntry,
     entry: RuleAction.ManualEntry,
     suggestion: FeeSuggestion?,
+    origin: SuggestionOrigin?,
+    onOpenSource: (ReconciliationLeg) -> Unit,
+    onOpenReconciliation: (ReconciliationFocus) -> Unit,
     busy: Boolean,
     onUseSuggestion: () -> Unit,
     amountText: String,
@@ -479,10 +499,11 @@ private fun PendingEntryCard(
                 suggestion?.let {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "A reconciliation source charged ${formatAmount(it.fee)} on this movement",
+                        text = "${origin?.label ?: "A reconciliation source"} charged ${formatAmount(it.fee)} on this movement",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     TextButton(onClick = onUseSuggestion, enabled = !busy) { Text("Use ${formatAmount(it.fee)} and match it") }
+                    origin?.let { source -> SuggestionLinks(source, onOpenSource, onOpenReconciliation) }
                 }
             }
             Spacer(modifier = Modifier.width(16.dp))
@@ -509,6 +530,9 @@ private fun PendingTradeCard(
     entry: PendingTradeEntry,
     currencyRepository: CurrencyReadRepository,
     suggestion: OtherSideSuggestion?,
+    origin: SuggestionOrigin?,
+    onOpenSource: (ReconciliationLeg) -> Unit,
+    onOpenReconciliation: (ReconciliationFocus) -> Unit,
     onUseSuggestion: () -> Unit,
     busy: Boolean,
     currencyId: CurrencyId?,
@@ -543,10 +567,11 @@ private fun PendingTradeCard(
                 suggestion?.let {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "A reconciliation source records the other side as ${formatAmount(it.otherSide)}",
+                        text = "${origin?.label ?: "A reconciliation source"} records the other side as ${formatAmount(it.otherSide)}",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     TextButton(onClick = onUseSuggestion, enabled = !busy) { Text("Use ${formatAmount(it.otherSide)} and match it") }
+                    origin?.let { source -> SuggestionLinks(source, onOpenSource, onOpenReconciliation) }
                 }
             }
             CurrencyPicker(
@@ -587,23 +612,6 @@ private fun tradeAnswer(
     return input.problem()?.let { null to it } ?: (input to null)
 }
 
-/** What the reconciliation sources' own trades say the unnamed side of each placeholder was (see [suggestOtherSides]). */
-private suspend fun loadSuggestions(
-    placeholders: List<Pair<Trade, String>>,
-    reconciliationRepository: ReconciliationReadRepository,
-    tradeRepository: TradeReadRepository,
-): Map<TradeId, OtherSideSuggestion> {
-    if (placeholders.isEmpty()) return emptyMap()
-    val shadowIds = reconciliationRepository.getShadowAccounts().first().map { it.accountId }
-    if (shadowIds.isEmpty()) return emptyMap()
-    val shadowTrades =
-        placeholders
-            .flatMap { (trade, _) ->
-                tradeRepository.getTradesByAccountsAndDateRange(shadowIds, trade.timestamp - 1.seconds, trade.timestamp + 1.seconds)
-            }.distinctBy { it.id }
-    return suggestOtherSides(placeholders, shadowTrades)
-}
-
 /**
  * The wallet links taking a suggestion implies: a person using a source's record of a placeholder has said its wallet is the
  * account the placeholder is on, which [planAutoLinks] confirms only where the names agree and nothing else is in the way.
@@ -622,25 +630,4 @@ private suspend fun linksFor(
         .flatMap { source -> planAutoLinks(source, shadow, links, real).entries }
         .filter { it.key in wallets }
         .associate { it.key to it.value }
-}
-
-/** What the reconciliation sources' own fee transfers say the fee of each withdrawal in [pending] was (see [suggestFees]). */
-private suspend fun loadFeeSuggestions(
-    pending: List<PendingManualEntry>,
-    reconciliationRepository: ReconciliationReadRepository,
-    transactionRepository: TransactionReadRepository,
-): Map<TransferId, FeeSuggestion> {
-    if (pending.isEmpty()) return emptyMap()
-    val shadow = reconciliationRepository.getShadowAccounts().first()
-    if (shadow.isEmpty()) return emptyMap()
-    val shadowIds = shadow.mapTo(mutableSetOf()) { it.accountId }
-    val feeAccountIds = shadow.filter { it.feeAccountFor != null }.mapTo(mutableSetOf()) { it.accountId }
-    val sourceTransfers =
-        pending
-            .flatMap { withdrawal ->
-                val slack = FEE_SUGGESTION_WINDOW + 5.seconds
-                transactionRepository.getTransactionsByDateRange(withdrawal.timestamp - slack, withdrawal.timestamp + slack).first()
-            }.filter { it.sourceAccountId in shadowIds }
-            .distinctBy { it.id }
-    return suggestFees(pending, sourceTransfers, feeAccountIds)
 }

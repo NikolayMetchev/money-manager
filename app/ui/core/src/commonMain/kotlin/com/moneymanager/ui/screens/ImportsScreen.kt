@@ -7,6 +7,7 @@ import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,6 +49,7 @@ import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.importfilesource.DriveFolderBrowser
+import com.moneymanager.ui.foundation.ReconciliationFocusState
 import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.screens.accountmapping.AccountMappingsScreen
@@ -60,6 +62,7 @@ import com.moneymanager.ui.screens.reconciliation.ReconciliationCache
 import com.moneymanager.ui.screens.reconciliation.ReconciliationScreen
 import com.moneymanager.ui.screens.timeline.ImportTimelineScreen
 import com.moneymanager.ui.screens.transactions.ManualEntriesScreen
+import com.moneymanager.ui.screens.transactions.ManualEntrySuggestionCache
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
@@ -109,6 +112,8 @@ fun ImportsScreen(
     onReconciliationSourceClick: (ReconciliationLeg) -> Unit = {},
     matchPickerState: MatchPickerState = remember { MatchPickerState() },
     reconciliationCache: ReconciliationCache = remember { ReconciliationCache() },
+    manualEntrySuggestionCache: ManualEntrySuggestionCache = remember { ManualEntrySuggestionCache() },
+    reconciliationFocus: ReconciliationFocusState = remember { ReconciliationFocusState() },
     showImportDirectories: Boolean = true,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -227,6 +232,7 @@ fun ImportsScreen(
 
             ImportTab.RECONCILIATION -> {
                 ReconciliationImportsTab(
+                    focus = reconciliationFocus,
                     reconciliation = {
                         ReconciliationScreen(
                             reconciliationRepository = reconciliationRepository,
@@ -238,6 +244,7 @@ fun ImportsScreen(
                             onOpenSource = onReconciliationSourceClick,
                             pickerState = matchPickerState,
                             cache = reconciliationCache,
+                            focus = reconciliationFocus,
                         )
                     },
                     manualEntries = {
@@ -248,6 +255,9 @@ fun ImportsScreen(
                             currencyRepository = currencyRepository,
                             reconciliationRepository = reconciliationRepository,
                             accountRepository = accountRepository,
+                            suggestionCache = manualEntrySuggestionCache,
+                            onOpenSource = onReconciliationSourceClick,
+                            onOpenReconciliation = { reconciliationFocus.request = it },
                             maintenance = maintenance,
                             onTransactionsImported = onTransactionsImported,
                         )
@@ -298,6 +308,7 @@ private enum class ReconciliationSubTab(
  */
 @Composable
 private fun ReconciliationImportsTab(
+    focus: ReconciliationFocusState,
     reconciliation: @Composable () -> Unit,
     manualEntries: @Composable () -> Unit,
     cards: @Composable () -> Unit,
@@ -306,6 +317,10 @@ private fun ReconciliationImportsTab(
         "imports.reconciliationSubTab",
         ReconciliationSubTab.serializer(),
     ) { ReconciliationSubTab.EXTERNAL }
+    // A link to the Reconciliation tab (from a Manual Entries suggestion) lands on the external comparison.
+    LaunchedEffect(focus.request) {
+        if (focus.request != null) subTab = ReconciliationSubTab.EXTERNAL
+    }
     Column(modifier = Modifier.fillMaxSize()) {
         SecondaryTabRow(selectedTabIndex = subTab.ordinal) {
             ReconciliationSubTab.entries.forEach { entry ->

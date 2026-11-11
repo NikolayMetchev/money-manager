@@ -107,6 +107,7 @@ import com.moneymanager.ui.screens.settings.SettingsScreen
 import com.moneymanager.ui.screens.settings.StrategyCatalogScreen
 import com.moneymanager.ui.screens.setup.SetupWizardScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
+import com.moneymanager.ui.screens.transactions.ManualEntrySuggestionCache
 import com.moneymanager.ui.screens.transactions.TradeEntryDialog
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
 import com.moneymanager.ui.screens.transactions.TransactionEditDialog
@@ -154,6 +155,7 @@ fun MoneyManagerApp(
         val scope = rememberSchemaAwareCoroutineScope()
         val matchPicker = remember { MatchPickerState() }
         val reconciliationCache = remember { ReconciliationCache() }
+        val manualEntrySuggestionCache = remember { ManualEntrySuggestionCache() }
         val taskManager = rememberTaskManager(scope)
         // One per database: its two services share a write lock, since directory and API runs (which outlive any
         // screen) can run at once and the engine doesn't serialize their writes itself.
@@ -705,6 +707,7 @@ fun MoneyManagerApp(
                                                 },
                                                 matchPickerState = matchPicker,
                                                 reconciliationCache = reconciliationCache,
+                                                manualEntrySuggestionCache = manualEntrySuggestionCache,
                                                 onReconciliationSourceClick = { leg ->
                                                     scope.launch {
                                                         val sources =

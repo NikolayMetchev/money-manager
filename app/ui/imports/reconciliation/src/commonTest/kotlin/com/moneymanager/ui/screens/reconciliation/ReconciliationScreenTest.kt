@@ -38,10 +38,12 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
 import com.moneymanager.domain.model.reconciliation.LegTransactionKind
+import com.moneymanager.domain.model.reconciliation.ReconciliationFocus
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.reconciliation.ReconciliationLink
 import com.moneymanager.domain.model.reconciliation.ReconciliationSource
 import com.moneymanager.domain.model.reconciliation.ShadowAccount
+import com.moneymanager.domain.model.reconciliation.reconciliationMonth
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -57,6 +59,7 @@ import com.moneymanager.importengineapi.TradeAttributeMutation
 import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.tasks.TaskManager
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.foundation.ReconciliationFocusState
 import com.moneymanager.ui.tasks.LocalTaskManager
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.answering.calls
@@ -345,6 +348,7 @@ class ReconciliationScreenTest {
         realLegs: List<ReconciliationLeg>,
         opened: MutableList<ReconciliationLeg> = mutableListOf(),
         openedSources: MutableList<ReconciliationLeg> = mutableListOf(),
+        focus: ReconciliationFocusState = ReconciliationFocusState(),
     ): List<ImportBatch> {
         val batches = mutableListOf<ImportBatch>()
         val engine =
@@ -352,7 +356,7 @@ class ReconciliationScreenTest {
                 batches += batch
                 ImportResult()
             }
-        showLegsWith(engine, sourceLegs, realLegs, opened, openedSources)
+        showLegsWith(engine, sourceLegs, realLegs, opened, openedSources, focus)
         return batches
     }
 
@@ -362,6 +366,7 @@ class ReconciliationScreenTest {
         realLegs: List<ReconciliationLeg>,
         opened: MutableList<ReconciliationLeg> = mutableListOf(),
         openedSources: MutableList<ReconciliationLeg> = mutableListOf(),
+        focus: ReconciliationFocusState = ReconciliationFocusState(),
     ) {
         val accounts =
             listOf(
@@ -384,6 +389,7 @@ class ReconciliationScreenTest {
                         transactionRepository = transactionRepository,
                         onOpenLeg = { opened += it },
                         onOpenSource = { openedSources += it },
+                        focus = focus,
                     )
                 }
             }
@@ -434,6 +440,22 @@ class ReconciliationScreenTest {
                 ),
                 batches.single().relationshipMutations,
             )
+        }
+    }
+
+    @Test
+    fun aFocusRequestOpensTheWalletAndMonthItNamesAndIsConsumed() {
+        runMoneyManagerComposeUiTest {
+            val focus = ReconciliationFocusState()
+            focus.request = ReconciliationFocus(koinly.name, wallet.accountId, reconciliationMonth(t0))
+
+            // A real leg of the same asset, far away, so the source's movement is not hidden as an asset Money Manager never saw.
+            showLegs(listOf(leg(10, wallet.accountId, "5", t0)), listOf(leg(20, binance, "9", t0 + 100.days)), focus = focus)
+
+            // Nothing was expanded by hand, yet the movement is in view.
+            reveal(hasText("leg 10", substring = true))
+            onNodeWithText("leg 10", substring = true).assertIsDisplayed()
+            assertEquals(null, focus.request)
         }
     }
 

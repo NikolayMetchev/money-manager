@@ -47,6 +47,7 @@ kmp_library(
         "//app/importengineapi",
         "//app/model/core",
         "//app/model/csvstrategy",
+        "//app/model/reconciliation",
         "//app/model/repository/read",
         "//app/model/rules",
         "//app/presenter/core",

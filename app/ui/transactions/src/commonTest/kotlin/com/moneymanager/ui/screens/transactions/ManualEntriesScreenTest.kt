@@ -25,6 +25,8 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
+import com.moneymanager.domain.model.reconciliation.ReconciliationFocus
+import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.reconciliation.ReconciliationSource
 import com.moneymanager.domain.model.reconciliation.ShadowAccount
 import com.moneymanager.domain.model.rules.RuleAction
@@ -187,6 +189,9 @@ class ManualEntriesScreenTest {
             val transactions: TransactionReadRepository =
                 mock(MockMode.autoUnit) { every { getPendingManualEntries(any(), any()) } returns flowOf(emptyList()) }
             val engine = RecordingEngine()
+            val cache = ManualEntrySuggestionCache()
+            val opened = mutableListOf<ReconciliationLeg>()
+            val focused = mutableListOf<ReconciliationFocus>()
 
             setContent {
                 ProvideSchemaAwareScope {
@@ -198,13 +203,21 @@ class ManualEntriesScreenTest {
                             currencyRepository = currencies,
                             reconciliationRepository = reconciliation,
                             accountRepository = accounts,
+                            suggestionCache = cache,
+                            onOpenSource = { opened += it },
+                            onOpenReconciliation = { focused += it },
                             maintenance = maintenance,
                             onTransactionsImported = {},
                         )
                     }
                 }
             }
-            waitUntilAtLeastOneExists(hasText("A reconciliation source records the other side", substring = true))
+            waitUntilAtLeastOneExists(hasText("Koinly (Koinly · Binance) records the other side", substring = true))
+
+            onNodeWithText("Open the Koinly file row").performClick()
+            onNodeWithText("Show in Reconciliation").performClick()
+            assertEquals(listOf(koinly.id.id), opened.map { it.transactionId })
+            assertEquals(listOf(ReconciliationFocus("Koinly", wallet, "2021-05")), focused)
 
             onNodeWithText("and match it", substring = true).performClick()
             waitUntil(timeoutMillis = 5_000) { engine.batches.any { it.relationshipMutations.isNotEmpty() } }
@@ -256,6 +269,9 @@ class ManualEntriesScreenTest {
             val trades: TradeReadRepository =
                 mock(MockMode.autoUnit) { every { getPendingManualTrades(any(), any()) } returns flowOf(emptyList()) }
             val engine = RecordingEngine()
+            val cache = ManualEntrySuggestionCache()
+            val opened = mutableListOf<ReconciliationLeg>()
+            val focused = mutableListOf<ReconciliationFocus>()
 
             setContent {
                 ProvideSchemaAwareScope {
@@ -267,13 +283,19 @@ class ManualEntriesScreenTest {
                             currencyRepository = currencies,
                             reconciliationRepository = reconciliation,
                             accountRepository = accounts,
+                            suggestionCache = cache,
+                            onOpenSource = { opened += it },
+                            onOpenReconciliation = { focused += it },
                             maintenance = maintenance,
                             onTransactionsImported = {},
                         )
                     }
                 }
             }
-            waitUntilAtLeastOneExists(hasText("A reconciliation source charged", substring = true))
+            waitUntilAtLeastOneExists(hasText("Koinly (Koinly · Binance) charged", substring = true))
+
+            onNodeWithText("Open the Koinly file row").performClick()
+            assertEquals(listOf(net.id.id), opened.map { it.transactionId })
 
             onNodeWithText("and match it", substring = true).performClick()
             waitUntil(timeoutMillis = 5_000) { engine.batches.flatMap { it.relationshipMutations }.size >= 2 }
