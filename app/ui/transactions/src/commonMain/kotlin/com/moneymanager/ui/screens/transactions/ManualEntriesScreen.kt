@@ -17,7 +17,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
@@ -38,8 +41,10 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.ImportEngine
@@ -49,6 +54,11 @@ import com.moneymanager.importengineapi.createManualEntries
 import com.moneymanager.importengineapi.createManualTradeEntries
 import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.reconciliation.OtherSideSuggestion
+import com.moneymanager.reconciliation.acceptOtherSideSuggestions
+import com.moneymanager.reconciliation.planAutoLinks
+import com.moneymanager.reconciliation.realAccounts
+import com.moneymanager.reconciliation.suggestOtherSides
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.displayDateTime
@@ -56,10 +66,12 @@ import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Transfers one strategy's manual-entry rule asked about, still waiting for the amount.
@@ -83,6 +95,8 @@ fun ManualEntriesScreen(
     transactionRepository: TransactionReadRepository,
     tradeRepository: TradeReadRepository,
     currencyRepository: CurrencyReadRepository,
+    reconciliationRepository: ReconciliationReadRepository,
+    accountRepository: AccountReadRepository,
     maintenance: Maintenance,
     onTransactionsImported: () -> Unit,
 ) {
@@ -146,6 +160,27 @@ fun ManualEntriesScreen(
     val tradeAmounts = remember { mutableStateMapOf<TradeId, String>() }
     var isSaving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var suggestions by remember { mutableStateOf<Map<TradeId, OtherSideSuggestion>>(emptyMap()) }
+    LaunchedEffect(pendingTrades) {
+        suggestions = loadSuggestions(pendingTrades.map { it.trade to it.placeholderAssetCode }, reconciliationRepository, tradeRepository)
+    }
+    val acceptSuggestions: (List<OtherSideSuggestion>) -> Unit = { accepted ->
+        isSaving = true
+        errorMessage = null
+        scope.launch {
+            try {
+                importEngine.acceptOtherSideSuggestions(accepted, linksFor(accepted, reconciliationRepository, accountRepository))
+                maintenance.refreshMaterializedViews()
+                onTransactionsImported()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (expected: Exception) {
+                errorMessage = "Failed to use the suggestions: ${expected.message}"
+            } finally {
+                isSaving = false
+            }
+        }
+    }
 
     val visibleGroups = groups.filter { it.pending.isNotEmpty() }
 
@@ -242,6 +277,12 @@ fun ManualEntriesScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(text = "Exchanges with no named currency", style = MaterialTheme.typography.titleLarge)
+                            val usable = pendingTrades.mapNotNull { suggestions[it.trade.id] }
+                            if (usable.isNotEmpty()) {
+                                Button(onClick = { acceptSuggestions(usable) }, enabled = !isSaving) {
+                                    Text("Use ${usable.size} suggestion${if (usable.size == 1) "" else "s"}")
+                                }
+                            }
                             Button(
                                 onClick = {
                                     isSaving = true
@@ -274,6 +315,9 @@ fun ManualEntriesScreen(
                         PendingTradeCard(
                             entry = entry,
                             currencyRepository = currencyRepository,
+                            suggestion = suggestions[entry.trade.id],
+                            onUseSuggestion = { suggestions[entry.trade.id]?.let { acceptSuggestions(listOf(it)) } },
+                            busy = isSaving,
                             currencyId = tradeCurrencies[entry.trade.id],
                             problem =
                                 tradeAnswer(
@@ -411,6 +455,9 @@ private data class PendingTradeEntry(
 private fun PendingTradeCard(
     entry: PendingTradeEntry,
     currencyRepository: CurrencyReadRepository,
+    suggestion: OtherSideSuggestion?,
+    onUseSuggestion: () -> Unit,
+    busy: Boolean,
     currencyId: CurrencyId?,
     onCurrencyChange: (CurrencyId) -> Unit,
     problem: String?,
@@ -440,6 +487,14 @@ private fun PendingTradeCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                suggestion?.let {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "A reconciliation source records the other side as ${formatAmount(it.otherSide)}",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    TextButton(onClick = onUseSuggestion, enabled = !busy) { Text("Use ${formatAmount(it.otherSide)} and match it") }
+                }
             }
             CurrencyPicker(
                 selectedCurrencyId = currencyId,
@@ -477,4 +532,42 @@ private fun tradeAnswer(
     if (money == null) return null to "${currency.code} cannot hold that many decimal places"
     val input = ManualTradeInput(entry.trade, entry.placeholderAssetCode, money)
     return input.problem()?.let { null to it } ?: (input to null)
+}
+
+/** What the reconciliation sources' own trades say the unnamed side of each placeholder was (see [suggestOtherSides]). */
+private suspend fun loadSuggestions(
+    placeholders: List<Pair<Trade, String>>,
+    reconciliationRepository: ReconciliationReadRepository,
+    tradeRepository: TradeReadRepository,
+): Map<TradeId, OtherSideSuggestion> {
+    if (placeholders.isEmpty()) return emptyMap()
+    val shadowIds = reconciliationRepository.getShadowAccounts().first().map { it.accountId }
+    if (shadowIds.isEmpty()) return emptyMap()
+    val shadowTrades =
+        placeholders
+            .flatMap { (trade, _) ->
+                tradeRepository.getTradesByAccountsAndDateRange(shadowIds, trade.timestamp - 1.seconds, trade.timestamp + 1.seconds)
+            }.distinctBy { it.id }
+    return suggestOtherSides(placeholders, shadowTrades)
+}
+
+/**
+ * The wallet links taking [accepted] implies: a person using a source's record of a placeholder has said its wallet is the
+ * account the placeholder is on, which [planAutoLinks] confirms only where the names agree and nothing else is in the way.
+ */
+private suspend fun linksFor(
+    accepted: List<OtherSideSuggestion>,
+    reconciliationRepository: ReconciliationReadRepository,
+    accountRepository: AccountReadRepository,
+): Map<AccountId, AccountId> {
+    val wallets = accepted.flatMapTo(mutableSetOf()) { listOf(it.shadowTrade.fromAccountId, it.shadowTrade.toAccountId) }
+    val shadow = reconciliationRepository.getShadowAccounts().first()
+    val links = reconciliationRepository.getLinks().first()
+    val real = realAccounts(accountRepository.getAllAccounts().first(), shadow)
+    return reconciliationRepository
+        .getSources()
+        .first()
+        .flatMap { source -> planAutoLinks(source, shadow, links, real).entries }
+        .filter { it.key in wallets }
+        .associate { it.key to it.value }
 }
