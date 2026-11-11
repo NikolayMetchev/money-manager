@@ -5,6 +5,7 @@ load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 load("//bazel/kmp:metadata.bzl", "kt_metadata_group")
 load("//bazel/kmp:native.bzl", "kt_native_group")
 load("//bazel/kmp:web.bzl", "WEB_TARGETS", "kt_web_group")
+load("//bazel/kmp:optional.bzl", "ANDROID_ONLY", "NATIVE_ONLY", "WEB_ONLY")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -28,6 +29,7 @@ kt_jvm_library(
 # On Android, as on the JVM, kotlin("test") is kotlin-test-junit (AGP's host and device tests run JUnit 4).
 kt_jvm_library(
     name = "kotlin_test_android",
+    target_compatible_with = ANDROID_ONLY,
     exports = [":kotlin_test_jvm"],
 )
 
@@ -103,6 +105,7 @@ kt_jvm_library(
     kt_native_group(
         name = "kotlin_test_" + target,
         target = target,
+        target_compatible_with = NATIVE_ONLY,
     )
     for target in NATIVE_TARGETS
 ]
@@ -113,6 +116,7 @@ kt_jvm_library(
         name = "kotlin_test_" + target,
         target = target,
         deps = ["@maven_kmp//:org_jetbrains_kotlin_kotlin_test_" + target],
+        target_compatible_with = WEB_ONLY,
     )
     for target in WEB_TARGETS
 ]
@@ -122,6 +126,7 @@ kt_jvm_library(
     kt_metadata_group(
         name = "kotlin_test_" + metadata,
         deps = ["@maven_kmp//:org_jetbrains_kotlin_kotlin_test_" + metadata],
+        target_compatible_with = WEB_ONLY if metadata == "metadataWeb" else [],
     )
     for metadata in [
         "metadata",

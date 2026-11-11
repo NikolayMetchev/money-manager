@@ -35,35 +35,35 @@ if [ -n "${BUILDBUDDY_CI_RUNNER_ROOT_DIR:-}" ]; then
 fi
 
 # `bazel test` builds every target it's given, tests or not, so one invocation builds `//...` and runs its tests.
+# Android, Kotlin/Native and the browser are optional (bazel/kmp/optional.bzl): their targets are incompatible, and `//...`
+# skips them, unless the platform's flag is on. A pull request without the matching label (build.yml) leaves it off.
+NATIVE=${NATIVE:-true}
+ANDROID=${ANDROID:-true}
+WEB=${WEB:-true}
+INSTALLER=${INSTALLER:-true}
+flags+=("--//bazel/kmp/platforms:native=$NATIVE" "--//bazel/kmp/platforms:android=$ANDROID" "--//bazel/kmp/platforms:web=$WEB")
+
 # The rest are manual, so `//...` skips them:
 # - the desktop ProGuard check: `//...` never runs ProGuard, so a new dependency that needs keep/dontwarn rules
 #   would otherwise surface only when release.yml ran. It shrinks the desktop app and checks every ServiceLoader
 #   provider survived.
-# - the Linux desktop installer.
+# - the Linux desktop installer (a pull request without the `installer` label leaves out it and the tool that times it).
 # - the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`) and the launcher that turns their output
 #   into JUnit XML, for Native Tests to run on their own runners.
-NATIVE=${NATIVE:-true}
-native_pattern='_(linuxX64|linuxArm64|mingwX64|macosArm64)(_|$)|^mm($|-linux|-macos|-windows)'
+extra=()
 if [ "$NATIVE" = true ]; then
   cross=$(bazel query "${flags[@]}" 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') || exit 1
-  extra=(//bazel/kmp/testing:native_launcher_deploy.jar $cross)
-  skip=()
-else
-  # Pull requests without the `native` label build and test no Kotlin/Native target (build.yml).
-  extra=()
-  skip=($(bazel query "${flags[@]}" "attr(name, '$native_pattern', //...)" | sed 's/^/-/')) || exit 1
+  extra+=(//bazel/kmp/testing:native_launcher_deploy.jar $cross)
 fi
-# Pull requests without the `installer` label skip the installer and the tool that times it (build.yml).
-INSTALLER=${INSTALLER:-true}
 if [ "$INSTALLER" = true ]; then
   extra+=(//app/main/jvm:installer //tools/repo-scripts:repo-scripts-tool_deploy.jar)
 fi
-bazel test "${flags[@]}" -- //... //app/main/jvm:release_service_providers_test "${extra[@]}" "${skip[@]}" 2>&1 | tee "$out/test.log"
+bazel test "${flags[@]}" -- //... //app/main/jvm:release_service_providers_test "${extra[@]}" 2>&1 | tee "$out/test.log"
 status=${PIPESTATUS[0]}
 
 # The JVM and Android host tests' coverage reports, merged into one XML report. It credits code to every test that
 # runs it, not only its own module's.
-bazel/kmp/testing/coverage.sh "$out/coverage.xml" "${flags[@]}" 2>&1 | tee "$out/coverage.log"
+ANDROID="$ANDROID" bazel/kmp/testing/coverage.sh "$out/coverage.xml" "${flags[@]}" 2>&1 | tee "$out/coverage.log"
 
 # Codecov reads the test reports (bazel-testlogs is a symlink).
 (cd -P bazel-testlogs && find . -name test.xml -print0 | tar --null -cf "$out/testlogs.tar" -T -)

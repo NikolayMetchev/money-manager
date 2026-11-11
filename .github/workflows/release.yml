@@ -134,7 +134,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.packages }}
 
       - name: Build ${{ matrix.platform }}
-        run: bazel build --stamp --remote_download_outputs=toplevel ${{ matrix.targets }}
+        run: bazel build --config=all-platforms --stamp --remote_download_outputs=toplevel ${{ matrix.targets }}
 
       - name: Name the artifact
         if: matrix.rename
@@ -186,9 +186,9 @@ jobs:
 
       - name: Link mm
         run: |
-          bazel build --remote_download_outputs=toplevel ${{ matrix.targets }}
+          bazel build --config=native --remote_download_outputs=toplevel ${{ matrix.targets }}
           mkdir -p cli-dist
-          cp $(bazel cquery --output=files 'set(${{ matrix.targets }})') cli-dist/
+          cp $(bazel cquery --config=native --output=files 'set(${{ matrix.targets }})') cli-dist/
           ls -la cli-dist
 
       - name: Upload mm (${{ matrix.platform }})

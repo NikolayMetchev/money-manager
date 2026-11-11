@@ -17,6 +17,19 @@ common --@rules_kotlin//kotlin/settings:experimental_strict_associate_dependenci
 
 test --test_output=errors
 
+# Android, Kotlin/Native and the browser are optional (bazel/kmp/optional.bzl): a target only one of them builds is
+# incompatible unless that platform's flag is on, so a plain `bazel build //...` or `bazel test //...` skips it and does
+# the JVM alone, and naming one fails as incompatible. The configs combine: `--config=android --config=web` builds the
+# JVM and both, `--config=all-platforms` every one, and `--config=no-jvm` leaves the JVM out (`--config=no-jvm
+# --config=android` is Android alone). CI sets the flags from a pull request's labels (bazel/ci/build_and_test.sh).
+build:android --//bazel/kmp/platforms:android=true
+build:native --//bazel/kmp/platforms:native=true
+build:web --//bazel/kmp/platforms:web=true
+build:all-platforms --config=android
+build:all-platforms --config=native
+build:all-platforms --config=web
+build:no-jvm --//bazel/kmp/platforms:jvm=false
+
 # Coverage: the JVM and Android host tests run under the IntelliJ coverage engine (Kover's agent), each writing a
 # binary report with its results. bazel/kmp/testing/coverage.sh then merges them into one LCOV report.
 common:coverage --define=coverage=intellij

@@ -209,6 +209,7 @@ def android_lint(name, apk, srcs, agp_version, java_source_level, variant = "deb
         srcs = srcs,
         variant = variant,
         testonly = True,
+        target_compatible_with = kwargs.get("target_compatible_with", []),
     )
     java_test(
         name = name,

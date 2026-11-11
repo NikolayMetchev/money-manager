@@ -1,9 +1,11 @@
 # The browser's SQLite worker (#84), an npm package of our own: app/db/core's WebSqliteDriver talks to it, and the
 # browser targets' tests run it in-process over memory (`@moneymanager/sqlite-worker/memory`).
 load("//bazel/kmp:web.bzl", "WEB_TARGETS", "kt_web_group", "npm_package")
+load("//bazel/kmp:optional.bzl", "WEB_ONLY")
 
 npm_package(
     name = "package",
+    target_compatible_with = WEB_ONLY,
     package_name = "@moneymanager/sqlite-worker",
     srcs = [
         "handler.mjs",
@@ -18,6 +20,7 @@ npm_package(
 [
     kt_web_group(
         name = "worker_" + target,
+        target_compatible_with = WEB_ONLY,
         npm = [":package"],
         target = target,
         visibility = ["//visibility:public"],

@@ -38,8 +38,8 @@ _argfile = rule(
     },
 )
 
-def _lint_test(name, tool, srcs, main_class, runtime_dep, config = None, data = []):
-    _argfile(name = name + "_args", srcs = srcs, tool = tool, config = config, testonly = True)
+def _lint_test(name, tool, srcs, main_class, runtime_dep, config = None, data = [], only = []):
+    _argfile(name = name + "_args", srcs = srcs, tool = tool, config = config, testonly = True, target_compatible_with = only)
     java_test(
         name = name,
         size = "small",
@@ -48,18 +48,20 @@ def _lint_test(name, tool, srcs, main_class, runtime_dep, config = None, data = 
         args = ["@$(rootpath :%s_args)" % name],
         data = [":%s_args" % name] + srcs + ([config] if config else []) + data,
         runtime_deps = [runtime_dep],
+        target_compatible_with = only,
     )
 
-def kmp_lint(name, srcs):
+def kmp_lint(name, srcs, only = []):
     """`:<name>_ktlint` and `:<name>_detekt` over srcs, the module's hand-written `.kt` files.
 
     Args:
         name: the kmp_library or kmp_test the sources belong to.
         srcs: its hand-written sources, every source set's.
+        only: `target_compatible_with` of both tests (a module no JVM builds is its platform's alone).
     """
     if not srcs:
         return
     # ktlint reads every .editorconfig above a file (app/terminal's lets Mosaic composables be PascalCase).
     editorconfigs = native.glob([".editorconfig"], allow_empty = True) + [_EDITORCONFIGS]
-    _lint_test(name + "_ktlint", "ktlint", srcs, "com.pinterest.ktlint.Main", _KTLINT, data = editorconfigs)
-    _lint_test(name + "_detekt", "detekt", srcs, "dev.detekt.cli.Main", _DETEKT, config = _DETEKT_CONFIG)
+    _lint_test(name + "_ktlint", "ktlint", srcs, "com.pinterest.ktlint.Main", _KTLINT, data = editorconfigs, only = only)
+    _lint_test(name + "_detekt", "detekt", srcs, "dev.detekt.cli.Main", _DETEKT, config = _DETEKT_CONFIG, only = only)

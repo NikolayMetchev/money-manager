@@ -91,7 +91,7 @@ jobs:
         env:
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-        run: bazel build //app/main/android-smoketest:smoketest_test
+        run: bazel build --config=android //app/main/android-smoketest:smoketest_test
 
       - name: Run release smoke test
         timeout-minutes: 20
@@ -111,7 +111,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
-          script: bazel test //app/main/android-smoketest:smoketest_test --test_output=errors
+          script: bazel test --config=android //app/main/android-smoketest:smoketest_test --test_output=errors
 
       - name: Upload test results
         if: always()
