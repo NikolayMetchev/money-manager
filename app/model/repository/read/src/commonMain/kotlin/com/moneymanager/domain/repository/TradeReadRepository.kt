@@ -31,6 +31,12 @@ interface TradeReadRepository {
         assetCode: String,
     ): Flow<List<Trade>>
 
+    /**
+     * Every trade tagged with a [entryAttributeTypeName] attribute that is not excluded: the placeholders still pending and
+     * the trades a person entered for them, which the statement's own record of the trade supersedes.
+     */
+    fun getManualEntryTrades(entryAttributeTypeName: String): Flow<List<Trade>>
+
     /** Number of trades touching [accountId] on either leg. */
     suspend fun countTradesByAccount(accountId: AccountId): Long
 

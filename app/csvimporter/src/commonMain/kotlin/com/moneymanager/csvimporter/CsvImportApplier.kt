@@ -1254,6 +1254,10 @@ suspend fun runCsvImport(
                     toAmount = assembled.toAmount,
                 )
             } + placeholderTrades
+    // A leg of a trade this file books (assembled, or a placeholder) is part of it, but the trade carries no fee, so its fee goes
+    // the same way. Only this file's own legs: the other files' are theirs.
+    val tradeLegRows: Set<Long> =
+        (assembledRowIndexes + placeholderLegs.map { it.rowIndex }).filterTo(mutableSetOf()) { isOwnRow(it) && it in unprocessedRowIndexes }
 
     // A trade carries no fee field, so a conversion row that also has a fee would otherwise drop it.
     // Emit each such fee as its own standalone movement (own account -> its fee account) so the
@@ -1262,7 +1266,7 @@ suspend fun runCsvImport(
     // key-less transfer never dedupes under a unique-id policy.
     val tradeFeeTransfers =
         finalPrep.validTransfers.mapNotNull { row ->
-            if (row.tradeTo == null) return@mapNotNull null
+            if (row.tradeTo == null && row.rowIndex !in tradeLegRows) return@mapNotNull null
             val fee = row.feeAmount ?: return@mapNotNull null
             val payer = row.feePayerId()
             val uniqueAttributes = row.attributes.filter { (name, _) -> name in uniqueIdTypeNames }
@@ -1452,7 +1456,6 @@ suspend fun runCsvImport(
             peopleToCreate = peopleToCreate,
             ownerships = personOwnerships,
             trades = importTrades,
-            tradeAttributeMutations = supersedingExclusions,
             // Trades get their own, much tighter window than the transfer reconcile below: aggregation
             // matches a group against the WHOLE in-window candidate set, so a wide window would drag a
             // later order's fills in and stop the sums matching at all.
@@ -1496,6 +1499,9 @@ suspend fun runCsvImport(
         )
 
     val importResult = importEngine.import(batch, onProgress = onProgress, batchSize = engineBatchSize)
+    // After the trades exist, not with them: were the write to fail, the placeholder would stay counted and the next apply would
+    // retire it, where excluding it first could leave neither it nor the real trade.
+    if (supersedingExclusions.isNotEmpty()) importEngine.import(ImportBatch(tradeAttributeMutations = supersedingExclusions))
 
     // Write back per-row CSV statuses from the engine outcome.
     val importedStatuses = mutableMapOf<Long, TransferId?>()

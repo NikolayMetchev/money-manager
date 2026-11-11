@@ -18,11 +18,6 @@ import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.TradeAttributeMutation
 import com.moneymanager.importengineapi.createCurrency
 import kotlinx.coroutines.flow.first
-import kotlin.math.abs
-import kotlin.time.Duration.Companion.seconds
-
-/** How far a placeholder's instant may sit from the leg it stands in for. */
-private val PLACEHOLDER_MATCH_WINDOW = 2.seconds
 
 /** What Manual Entries shows beside a placeholder trade. */
 private const val PLACEHOLDER_ENTRY_PROMPT = "enter the currency and amount of the other side"
@@ -94,10 +89,7 @@ suspend fun supersededPlaceholders(
             .mapNotNull { (it.assembly as? LegAssembly.Trade)?.unpairedAsset }
             .toSet()
     if (tradeRepository == null || codes.isEmpty() || assembled.isEmpty()) return emptyList()
-    val pending =
-        codes
-            .flatMap { tradeRepository.getPendingManualTrades(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME, it).first() }
-            .distinctBy { it.id }
+    val pending = tradeRepository.getManualEntryTrades(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME).first()
     if (pending.isEmpty()) return emptyList()
     val claimed = mutableSetOf<Trade>()
     return assembled.flatMap { trade ->
@@ -111,7 +103,8 @@ suspend fun supersededPlaceholders(
 
 private fun Trade.standsInFor(leg: CsvTransferWithAttributes): Boolean {
     val moved = leg.transfer.amount
-    val sameInstant = abs((timestamp - leg.transfer.timestamp).inWholeMilliseconds) <= PLACEHOLDER_MATCH_WINDOW.inWholeMilliseconds
+    // A placeholder takes its leg's own instant, so only the very instant is its: two like legs apart never swap.
+    val sameInstant = timestamp == leg.transfer.timestamp
     val sameLeg =
         if (leg.groupLeg?.side == GroupLegSide.DEBIT) {
             fromAccountId == leg.transfer.sourceAccountId && from.asset.id == moved.asset.id && from.amount == moved.amount

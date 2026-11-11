@@ -501,6 +501,7 @@ fun CsvImportDetailScreen(
             csvImport = import!!,
             rows = rows,
             csvImportRepository = csvImportRepository,
+            tradeRepository = tradeRepository,
             csvImportStrategyRepository = csvImportStrategyRepository,
             accountMappingRepository = accountMappingRepository,
             accountRepository = accountRepository,

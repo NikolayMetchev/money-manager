@@ -53,6 +53,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.assetAliasMap
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.PassThroughDetector
@@ -73,6 +74,7 @@ private val logger = Logger.withTag("ApplyStrategyDialog")
 @Composable
 fun ApplyStrategyDialog(
     csvImportRepository: CsvImportReadRepository,
+    tradeRepository: TradeReadRepository,
     csvImport: CsvImport,
     rows: List<CsvRow>,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
@@ -410,6 +412,7 @@ fun ApplyStrategyDialog(
                                     strategy = strategy,
                                     basePrep = basePrep,
                                     foreignFiles = crossFileLegRows(csvImport, strategy, csvImportRepository),
+                                    tradeRepository = tradeRepository,
                                     selectedExistingAccounts = selectedExistingAccounts,
                                     selectedNewAccountNames = selectedNewAccountNames,
                                     selectedSourceAccountId = selectedSourceAccountId,

@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PendingManualEntry
@@ -128,7 +129,15 @@ fun ManualEntriesScreen(
                             .getPendingManualTrades(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME, code)
                             .map { trades -> trades.map { PendingTradeEntry(it, code) } }
                     }
-                if (flows.isEmpty()) flowOf(emptyList()) else combine(flows) { it.toList().flatten() }
+                if (flows.isEmpty()) {
+                    flowOf(emptyList())
+                } else {
+                    combine(flows) {
+                        it.toList().flatten().distinctBy { entry ->
+                            entry.trade.id
+                        }
+                    }
+                }
             }
         }
     val pendingTrades by pendingTradesFlow.collectAsStateWithSchemaErrorHandling(initial = emptyList())
@@ -221,9 +230,11 @@ fun ManualEntriesScreen(
                     item(key = "pending-trades") {
                         val answers =
                             pendingTrades.mapNotNull { entry ->
-                                val currency = currencies.firstOrNull { it.id == tradeCurrencies[entry.trade.id] } ?: return@mapNotNull null
-                                val amount = parseAmount(tradeAmounts[entry.trade.id].orEmpty()) ?: return@mapNotNull null
-                                ManualTradeInput(entry.trade, entry.placeholderAssetCode, Money.fromDisplayValue(amount, currency))
+                                tradeAnswer(
+                                    entry,
+                                    currencies.firstOrNull { it.id == tradeCurrencies[entry.trade.id] },
+                                    tradeAmounts[entry.trade.id].orEmpty(),
+                                ).first
                             }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -264,6 +275,12 @@ fun ManualEntriesScreen(
                             entry = entry,
                             currencyRepository = currencyRepository,
                             currencyId = tradeCurrencies[entry.trade.id],
+                            problem =
+                                tradeAnswer(
+                                    entry,
+                                    currencies.firstOrNull { it.id == tradeCurrencies[entry.trade.id] },
+                                    tradeAmounts[entry.trade.id].orEmpty(),
+                                ).second,
                             onCurrencyChange = { tradeCurrencies[entry.trade.id] = it },
                             amountText = tradeAmounts[entry.trade.id].orEmpty(),
                             onAmountChange = { tradeAmounts[entry.trade.id] = it },
@@ -396,6 +413,7 @@ private fun PendingTradeCard(
     currencyRepository: CurrencyReadRepository,
     currencyId: CurrencyId?,
     onCurrencyChange: (CurrencyId) -> Unit,
+    problem: String?,
     amountText: String,
     onAmountChange: (String) -> Unit,
 ) {
@@ -429,15 +447,34 @@ private fun PendingTradeCard(
                 label = "Currency",
                 currencyRepository = currencyRepository,
                 modifier = Modifier.width(180.dp),
+                isError = problem != null,
             )
             OutlinedTextField(
                 value = amountText,
                 onValueChange = onAmountChange,
                 label = { Text("Amount") },
                 isError = amountText.isNotBlank() && parseAmount(amountText) == null,
+                supportingText = problem?.let { message -> { Text(message) } },
                 singleLine = true,
                 modifier = Modifier.width(160.dp),
             )
         }
     }
+}
+
+/**
+ * What a person typed for [entry] as an answer, and what is wrong with it: the answer only when [currency] and [text] make a
+ * real other side (a positive amount the currency can hold, in neither the placeholder's nor the known asset), else why not.
+ */
+private fun tradeAnswer(
+    entry: PendingTradeEntry,
+    currency: Currency?,
+    text: String,
+): Pair<ManualTradeInput?, String?> {
+    val amount = parseAmount(text)
+    if (currency == null || amount == null) return null to null
+    val money = runCatching { Money.fromDisplayValue(amount, currency) }.getOrNull()
+    if (money == null) return null to "${currency.code} cannot hold that many decimal places"
+    val input = ManualTradeInput(entry.trade, entry.placeholderAssetCode, money)
+    return input.problem()?.let { null to it } ?: (input to null)
 }
