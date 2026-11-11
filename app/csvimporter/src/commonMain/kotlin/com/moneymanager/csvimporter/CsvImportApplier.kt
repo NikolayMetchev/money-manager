@@ -1193,10 +1193,26 @@ suspend fun runCsvImport(
             .withIndex()
             .filter { (_, rule) -> rule.isCrossFileTrade() }
             .mapTo(mutableSetOf()) { it.index }
-    val heldBackRowIndexes: Set<Long> =
-        finalPrep.validTransfers
-            .filter { it.groupLeg?.ruleIndex in crossFileRuleIndexes && it.rowIndex !in assembledRowIndexes }
-            .mapTo(mutableSetOf()) { it.rowIndex }
+    val unpairedLegs =
+        finalPrep.validTransfers.filter {
+            it.groupLeg?.ruleIndex in crossFileRuleIndexes &&
+                it.rowIndex !in assembledRowIndexes
+        }
+    // A rule that names an asset books its unpaired leg against it (see below); any other leg waits.
+    val placeholderLegs = unpairedLegs.filter { strategy.unpairedAssetOf(it) != null && it.rowIndex in unprocessedRowIndexes }
+    val heldBackRowIndexes: Set<Long> = unpairedLegs.mapTo(mutableSetOf()) { it.rowIndex }
+    val manualEntryTypeId =
+        placeholderLegs
+            .takeIf { it.isNotEmpty() }
+            ?.let {
+                importEngine.getOrCreateAttributeTypes(
+                    listOf(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME),
+                )
+            }?.get(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME)
+    val placeholderTrades =
+        manualEntryTypeId?.let { unpairedLegTrades(placeholderLegs, strategy, csvImport.id, importEngine, it) }.orEmpty()
+    val supersedingExclusions =
+        supersededPlaceholders(assembledTrades, strategy, tradeRepository, AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID))
 
     // Conversion groups another source already recorded as trades (Binance's dust API reports the same
     // sweep the export splits into unpairable legs). They are matched and dropped as whole groups: see
@@ -1237,7 +1253,11 @@ suspend fun runCsvImport(
                     toAccountId = assembled.ownerAccountId,
                     toAmount = assembled.toAmount,
                 )
-            }
+            } + placeholderTrades
+    // A leg of a trade this file books (assembled, or a placeholder) is part of it, but the trade carries no fee, so its fee goes
+    // the same way. Only this file's own legs: the other files' are theirs.
+    val tradeLegRows: Set<Long> =
+        (assembledRowIndexes + placeholderLegs.map { it.rowIndex }).filterTo(mutableSetOf()) { isOwnRow(it) && it in unprocessedRowIndexes }
 
     // A trade carries no fee field, so a conversion row that also has a fee would otherwise drop it.
     // Emit each such fee as its own standalone movement (own account -> its fee account) so the
@@ -1246,7 +1266,7 @@ suspend fun runCsvImport(
     // key-less transfer never dedupes under a unique-id policy.
     val tradeFeeTransfers =
         finalPrep.validTransfers.mapNotNull { row ->
-            if (row.tradeTo == null) return@mapNotNull null
+            if (row.tradeTo == null && row.rowIndex !in tradeLegRows) return@mapNotNull null
             val fee = row.feeAmount ?: return@mapNotNull null
             val payer = row.feePayerId()
             val uniqueAttributes = row.attributes.filter { (name, _) -> name in uniqueIdTypeNames }
@@ -1479,6 +1499,9 @@ suspend fun runCsvImport(
         )
 
     val importResult = importEngine.import(batch, onProgress = onProgress, batchSize = engineBatchSize)
+    // After the trades exist, not with them: were the write to fail, the placeholder would stay counted and the next apply would
+    // retire it, where excluding it first could leave neither it nor the real trade.
+    if (supersedingExclusions.isNotEmpty()) importEngine.import(ImportBatch(tradeAttributeMutations = supersedingExclusions))
 
     // Write back per-row CSV statuses from the engine outcome.
     val importedStatuses = mutableMapOf<Long, TransferId?>()

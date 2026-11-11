@@ -71,6 +71,21 @@ class LegGroupsEditorTest {
         }
 
     @Test
+    fun aCrossFileTradeGroupNamesTheAssetAnUnpairedLegIsBookedAgainst() =
+        runEditor(listOf(LegGroupRule(name = "exchange", assembly = LegAssembly.Trade(acrossFiles = true)))) { rules ->
+            onNodeWithText(
+                "Asset to book an unpaired leg against (blank: wait for its partner)",
+            ).performScrollTo().performTextReplacement("UNKNOWN")
+            waitForIdle()
+
+            assertEquals("UNKNOWN", assertIs<LegAssembly.Trade>(rules().single().assembly).unpairedAsset)
+
+            onNodeWithText("UNKNOWN").performTextReplacement("")
+            waitForIdle()
+            assertEquals(null, assertIs<LegAssembly.Trade>(rules().single().assembly).unpairedAsset)
+        }
+
+    @Test
     fun aLinkedGroupEditsItsRelationshipType() =
         runEditor(listOf(LegGroupRule(name = "family", assembly = LegAssembly.Linked("parent", anchorWhen)))) { rules ->
             onAllNodesWithText("parent")[0].performScrollTo().performTextReplacement("family")

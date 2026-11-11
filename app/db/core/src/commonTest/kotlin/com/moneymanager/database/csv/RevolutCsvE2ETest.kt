@@ -4,13 +4,18 @@ import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.importengineapi.ManualTradeInput
+import com.moneymanager.importengineapi.createManualTradeEntries
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -188,5 +193,119 @@ class RevolutCsvE2ETest : DbTest() {
             apply(eur, usd)
             assertEquals(emptyList(), trades())
             assertEquals(emptyList(), repositories.csvImportRepository.getImportRows(eur.id, 10, 0).filter { it.errorMessage != null })
+        }
+
+    private suspend fun pendingManualTrades(): List<Trade> =
+        repositories.tradeRepository.getPendingManualTrades(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME, "UNKNOWN").first()
+
+    private val unnamedOut = row("Exchange", "2020-07-01 10:00:00", "Transfer to Revolut Ltd", "-300.00", "EUR", "477.65")
+    private val unnamedIn = row("Exchange", "2020-07-01 10:00:00", "Transfer from Revolut Ltd", "350.00", "USD", "530.00")
+
+    @Test
+    fun `an exchange row that names no currency books against Unknown and waits in Manual Entries`() =
+        runDbTest {
+            apply(stage("account-statement_eur.csv", listOf(unnamedOut)))
+
+            val placeholder = pendingManualTrades().single()
+            assertEquals("EUR", placeholder.from.asset.code)
+            assertEquals("UNKNOWN", placeholder.to.asset.code)
+            assertEquals(0, placeholder.from.toDisplayValue().compareTo(BigDecimal("300")))
+            assertEquals(false, transfers().any { it.description == "Transfer to Revolut Ltd" })
+        }
+
+    @Test
+    fun `the other side of an unnamed exchange replaces the placeholder and leaves Manual Entries`() =
+        runDbTest {
+            apply(stage("account-statement_eur.csv", listOf(unnamedOut)))
+            assertEquals(1, pendingManualTrades().size)
+
+            apply(stage("account-statement_usd.csv", listOf(unnamedIn)))
+
+            assertEquals(emptyList(), pendingManualTrades())
+            val real = trades().single { it.to.asset.code == "USD" }
+            assertEquals("EUR", real.from.asset.code)
+            assertEquals(0, real.to.toDisplayValue().compareTo(BigDecimal("350")))
+        }
+
+    @Test
+    fun `a person naming the currency and amount replaces the placeholder`() =
+        runDbTest {
+            apply(stage("account-statement_eur.csv", listOf(unnamedOut)))
+            val placeholder = pendingManualTrades().single()
+            val usd =
+                repositories.currencyRepository
+                    .getAllCurrencies()
+                    .first()
+                    .single { it.code == "USD" }
+
+            repositories.importEngine.createManualTradeEntries(
+                listOf(ManualTradeInput(placeholder, "UNKNOWN", Money.fromDisplayValue(BigDecimal("350"), usd))),
+            )
+
+            assertEquals(emptyList(), pendingManualTrades())
+            val real = trades().single { it.to.asset.code == "USD" }
+            assertEquals(0, real.to.toDisplayValue().compareTo(BigDecimal("350")))
+            assertEquals(0, real.from.toDisplayValue().compareTo(BigDecimal("300")))
+        }
+
+    @Test
+    fun `a statement leg retires the trade a person entered for its placeholder too`() =
+        runDbTest {
+            apply(stage("account-statement_eur.csv", listOf(unnamedOut)))
+            val usd =
+                repositories.currencyRepository
+                    .getAllCurrencies()
+                    .first()
+                    .single { it.code == "USD" }
+            repositories.importEngine.createManualTradeEntries(
+                listOf(ManualTradeInput(pendingManualTrades().single(), "UNKNOWN", Money.fromDisplayValue(BigDecimal("345"), usd))),
+            )
+
+            apply(stage("account-statement_usd.csv", listOf(unnamedIn)))
+
+            val counted = repositories.tradeRepository.getManualEntryTrades(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME).first()
+            assertEquals(emptyList(), counted, "neither the placeholder nor the manual trade still counts")
+            assertEquals(
+                0,
+                trades()
+                    .single {
+                        it.id !in counted.map { c -> c.id } && it.to.asset.code == "USD" &&
+                            it.description.isNotEmpty() &&
+                            it.to.toDisplayValue().compareTo(BigDecimal("350")) == 0
+                    }.from
+                    .toDisplayValue()
+                    .compareTo(BigDecimal("300")),
+            )
+        }
+
+    @Test
+    fun `a manual entry cannot name the placeholder or the known currency`() =
+        runDbTest {
+            apply(stage("account-statement_eur.csv", listOf(unnamedOut)))
+            val placeholder = pendingManualTrades().single()
+            val currencies = repositories.currencyRepository.getAllCurrencies().first()
+            for (code in listOf("UNKNOWN", "EUR")) {
+                val currency = currencies.single { it.code == code }
+                assertFailsWith<IllegalArgumentException> {
+                    repositories.importEngine.createManualTradeEntries(
+                        listOf(ManualTradeInput(placeholder, "UNKNOWN", Money.fromDisplayValue(BigDecimal("300"), currency))),
+                    )
+                }
+            }
+            assertEquals(1, pendingManualTrades().size)
+        }
+
+    @Test
+    fun `the fee on an unnamed exchange row is still booked`() =
+        runDbTest {
+            apply(
+                stage(
+                    "account-statement_eur.csv",
+                    listOf(row("Exchange", "2020-07-01 10:00:00", "Transfer to Revolut Ltd", "-300.00", "EUR", "476.15", fee = "1.50")),
+                ),
+            )
+
+            val fee = transfers().single { it.amount.toDisplayValue().compareTo(BigDecimal("1.5")) == 0 }
+            assertEquals("EUR", fee.amount.asset.code)
         }
 }
