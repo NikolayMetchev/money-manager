@@ -67,6 +67,9 @@ sealed interface LegAssembly {
      *   in its own statement): the legs of the other staged files that match the same strategy join the event, so
      *   whichever file is applied first books the trade and the other dedupes onto it. A leg with no partner yet
      *   is held back, not booked, until its partner's file is staged, so it never double-counts with the trade.
+     * @property unpairedAsset With [acrossFiles], the code of an asset to book an unpaired leg against instead of holding it
+     *   back: a trade between the leg's asset and this one (same number on both sides, as a placeholder), tagged `manual-entry` so
+     *   Manual Entries asks for the real currency and amount. The real trade, once its other side is staged, replaces it.
      */
     @Serializable
     @SerialName("trade")
@@ -74,6 +77,8 @@ sealed interface LegAssembly {
         val description: String = "Buy {to}/{from}",
         @EncodeDefault(EncodeDefault.Mode.NEVER)
         val acrossFiles: Boolean = false,
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        val unpairedAsset: String? = null,
     ) : LegAssembly
 
     /**

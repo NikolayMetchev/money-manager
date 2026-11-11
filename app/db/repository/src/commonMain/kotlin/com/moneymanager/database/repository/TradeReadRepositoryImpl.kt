@@ -66,6 +66,15 @@ class TradeReadRepositoryImpl(
             .asFlow()
             .mapToList(Dispatchers.Default)
 
+    override fun getPendingManualTrades(
+        entryAttributeTypeName: String,
+        assetCode: String,
+    ): Flow<List<Trade>> =
+        selectQueries
+            .selectPendingManualTrades(assetCode, entryAttributeTypeName, TradeMapper::mapRaw)
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+
     override suspend fun countTradesByAccount(accountId: AccountId): Long =
         withContext(Dispatchers.Default) {
             selectQueries.countByAccount(accountId.id).awaitAsOne()

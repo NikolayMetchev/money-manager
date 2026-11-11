@@ -1193,10 +1193,26 @@ suspend fun runCsvImport(
             .withIndex()
             .filter { (_, rule) -> rule.isCrossFileTrade() }
             .mapTo(mutableSetOf()) { it.index }
-    val heldBackRowIndexes: Set<Long> =
-        finalPrep.validTransfers
-            .filter { it.groupLeg?.ruleIndex in crossFileRuleIndexes && it.rowIndex !in assembledRowIndexes }
-            .mapTo(mutableSetOf()) { it.rowIndex }
+    val unpairedLegs =
+        finalPrep.validTransfers.filter {
+            it.groupLeg?.ruleIndex in crossFileRuleIndexes &&
+                it.rowIndex !in assembledRowIndexes
+        }
+    // A rule that names an asset books its unpaired leg against it (see below); any other leg waits.
+    val placeholderLegs = unpairedLegs.filter { strategy.unpairedAssetOf(it) != null && it.rowIndex in unprocessedRowIndexes }
+    val heldBackRowIndexes: Set<Long> = unpairedLegs.mapTo(mutableSetOf()) { it.rowIndex }
+    val manualEntryTypeId =
+        placeholderLegs
+            .takeIf { it.isNotEmpty() }
+            ?.let {
+                importEngine.getOrCreateAttributeTypes(
+                    listOf(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME),
+                )
+            }?.get(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME)
+    val placeholderTrades =
+        manualEntryTypeId?.let { unpairedLegTrades(placeholderLegs, strategy, csvImport.id, importEngine, it) }.orEmpty()
+    val supersedingExclusions =
+        supersededPlaceholders(assembledTrades, strategy, tradeRepository, AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID))
 
     // Conversion groups another source already recorded as trades (Binance's dust API reports the same
     // sweep the export splits into unpairable legs). They are matched and dropped as whole groups: see
@@ -1237,7 +1253,7 @@ suspend fun runCsvImport(
                     toAccountId = assembled.ownerAccountId,
                     toAmount = assembled.toAmount,
                 )
-            }
+            } + placeholderTrades
 
     // A trade carries no fee field, so a conversion row that also has a fee would otherwise drop it.
     // Emit each such fee as its own standalone movement (own account -> its fee account) so the
@@ -1436,6 +1452,7 @@ suspend fun runCsvImport(
             peopleToCreate = peopleToCreate,
             ownerships = personOwnerships,
             trades = importTrades,
+            tradeAttributeMutations = supersedingExclusions,
             // Trades get their own, much tighter window than the transfer reconcile below: aggregation
             // matches a group against the WHOLE in-window candidate set, so a wide window would drag a
             // later order's fills in and stop the sums matching at all.

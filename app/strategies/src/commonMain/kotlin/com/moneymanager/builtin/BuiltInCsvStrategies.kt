@@ -382,6 +382,15 @@ object BuiltInCsvStrategies {
     /** The leg group of a currency exchange, whose two sides sit in two currencies' files. */
     private const val REVOLUT_EXCHANGE_GROUP = "exchange"
 
+    /** The leg group of an exchange row that names no currency. */
+    private const val REVOLUT_UNNAMED_EXCHANGE_GROUP = "exchange-unnamed"
+
+    /** The `Type` of a Revolut exchange row. */
+    private const val REVOLUT_EXCHANGE_TYPE = "Exchange"
+
+    /** The asset an exchange with no named other side is booked against until a person says what it was. */
+    private const val REVOLUT_UNKNOWN_ASSET = "UNKNOWN"
+
     /** A transfer's description, capturing who the other end is. */
     private const val REVOLUT_COUNTERPARTY_PATTERN = "^(?:(?:International |SWIFT )?Transfer (?:to|from) |To |Payment from )(.+)$"
 
@@ -2088,6 +2097,11 @@ object BuiltInCsvStrategies {
      * exchange is one trade on the Revolut account whichever file is applied first. Until the other currency's file
      * is staged the row waits, rather than being booked as a transfer the trade would then double.
      *
+     * An `Exchange` row that names no currency ("Transfer to Revolut Ltd") has no known other side. It pairs with any row
+     * at its instant in another file, and until one turns up it books a trade against an `UNKNOWN` asset (the same number on
+     * both sides) tagged `manual-entry`: Manual Entries asks for the real currency and amount, and the real trade replaces
+     * it when its other side is staged.
+     *
      * The export has no transaction id, but its running balance makes a row unique, so the product, start time, type,
      * description, amount and balance together identify it. A pending row (no balance yet) is skipped until a later
      * export holds it settled; a reverted, declined or failed one is imported excluded.
@@ -2138,7 +2152,7 @@ object BuiltInCsvStrategies {
                     RuleAction.Skip,
                     conditions =
                         listOf(
-                            Condition("Description", ConditionOp.STARTS_WITH, value = "Exchanged to "),
+                            Condition("Type", ConditionOp.EQUALS, value = REVOLUT_EXCHANGE_TYPE),
                             Condition("State", ConditionOp.NOT_EQUALS, value = "COMPLETED"),
                         ),
                     name = "An exchange that did not complete is no trade, and half of one would never pair",
@@ -2154,13 +2168,20 @@ object BuiltInCsvStrategies {
                     conditions = listOf(Condition("Description", ConditionOp.STARTS_WITH, value = "Exchanged to ")),
                     name = "Both sides of an exchange are legs of one trade",
                 ),
+                // Claimed second, as the first leg claim that resolves wins: an exchange row that names no currency pairs with
+                // whichever other row sits at its instant, or waits in Manual Entries for a person to say what it was.
+                rule(
+                    RuleAction.Leg(REVOLUT_UNNAMED_EXCHANGE_GROUP, LegRole.BySign("Amount")),
+                    conditions = listOf(Condition("Type", ConditionOp.EQUALS, value = REVOLUT_EXCHANGE_TYPE)),
+                    name = "An exchange row that names no currency is a leg of a trade with an unknown other side",
+                ),
                 fee(FeeRule(amount = ValueExpr.of("Fee")), conditions = listOf(Condition("Fee", ConditionOp.POSITIVE))),
                 wholeFeeWhen("Amount", "Type", "^Fee$"),
                 accounts(AccountSide.SOURCE, fixedNaming("Currency", REVOLUT_ACCOUNT)),
                 accounts(
                     AccountSide.TARGET,
                     fixedNaming("Description", REVOLUT_ACCOUNT),
-                    conditions = listOf(Condition("Description", ConditionOp.STARTS_WITH, value = "Exchanged to ")),
+                    conditions = listOf(Condition("Type", ConditionOp.EQUALS, value = REVOLUT_EXCHANGE_TYPE)),
                 ),
                 accounts(
                     AccountSide.TARGET,
@@ -2213,6 +2234,16 @@ object BuiltInCsvStrategies {
                                 // Revolut stamps both sides of an exchange with the same second.
                                 windowSeconds = 1,
                                 assembly = LegAssembly.Trade(description = "Exchange {from} to {to}", acrossFiles = true),
+                            ),
+                            LegGroupRule(
+                                name = REVOLUT_UNNAMED_EXCHANGE_GROUP,
+                                windowSeconds = 1,
+                                assembly =
+                                    LegAssembly.Trade(
+                                        description = "Exchange {from} to {to}",
+                                        acrossFiles = true,
+                                        unpairedAsset = REVOLUT_UNKNOWN_ASSET,
+                                    ),
                             ),
                         ),
                 ),

@@ -22,6 +22,15 @@ interface TradeReadRepository {
 
     fun getTradesByAccount(accountId: AccountId): Flow<List<Trade>>
 
+    /**
+     * Trades a manual-entry rule tagged with a [entryAttributeTypeName] attribute that still have an asset coded
+     * [assetCode] on a leg and are not excluded: placeholders for an asset nobody has named, still to be entered.
+     */
+    fun getPendingManualTrades(
+        entryAttributeTypeName: String,
+        assetCode: String,
+    ): Flow<List<Trade>>
+
     /** Number of trades touching [accountId] on either leg. */
     suspend fun countTradesByAccount(accountId: AccountId): Long
 

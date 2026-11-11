@@ -28,18 +28,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PendingManualEntry
+import com.moneymanager.domain.model.Trade
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ManualEntryInput
+import com.moneymanager.importengineapi.ManualTradeInput
 import com.moneymanager.importengineapi.createManualEntries
+import com.moneymanager.importengineapi.createManualTradeEntries
 import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.formatAmount
@@ -71,6 +80,8 @@ private data class PendingEntryGroup(
 fun ManualEntriesScreen(
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     transactionRepository: TransactionReadRepository,
+    tradeRepository: TradeReadRepository,
+    currencyRepository: CurrencyReadRepository,
     maintenance: Maintenance,
     onTransactionsImported: () -> Unit,
 ) {
@@ -104,6 +115,26 @@ fun ManualEntriesScreen(
         }
     val groups by groupsFlow.collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val amounts = remember { mutableStateMapOf<TransferId, String>() }
+    val pendingTradesFlow =
+        remember(csvImportStrategyRepository, tradeRepository) {
+            csvImportStrategyRepository.getAllStrategies().flatMapLatest { strategies ->
+                val codes =
+                    strategies
+                        .flatMap { strategy -> strategy.config.legGroups.mapNotNull { (it.assembly as? LegAssembly.Trade)?.unpairedAsset } }
+                        .distinct()
+                val flows =
+                    codes.map { code ->
+                        tradeRepository
+                            .getPendingManualTrades(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME, code)
+                            .map { trades -> trades.map { PendingTradeEntry(it, code) } }
+                    }
+                if (flows.isEmpty()) flowOf(emptyList()) else combine(flows) { it.toList().flatten() }
+            }
+        }
+    val pendingTrades by pendingTradesFlow.collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val currencies by currencyRepository.getAllCurrencies().collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val tradeCurrencies = remember { mutableStateMapOf<TradeId, CurrencyId>() }
+    val tradeAmounts = remember { mutableStateMapOf<TradeId, String>() }
     var isSaving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -132,7 +163,7 @@ fun ManualEntriesScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // The saved entries drop out of the list before the save finishes, so "nothing pending" waits for it.
-        if (visibleGroups.isEmpty() && !isSaving) {
+        if (visibleGroups.isEmpty() && pendingTrades.isEmpty() && !isSaving) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
@@ -183,6 +214,59 @@ fun ManualEntriesScreen(
                             entry = group.entry,
                             amountText = amounts[matched.transferId].orEmpty(),
                             onAmountChange = { amounts[matched.transferId] = it },
+                        )
+                    }
+                }
+                if (pendingTrades.isNotEmpty()) {
+                    item(key = "pending-trades") {
+                        val answers =
+                            pendingTrades.mapNotNull { entry ->
+                                val currency = currencies.firstOrNull { it.id == tradeCurrencies[entry.trade.id] } ?: return@mapNotNull null
+                                val amount = parseAmount(tradeAmounts[entry.trade.id].orEmpty()) ?: return@mapNotNull null
+                                ManualTradeInput(entry.trade, entry.placeholderAssetCode, Money.fromDisplayValue(amount, currency))
+                            }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(text = "Exchanges with no named currency", style = MaterialTheme.typography.titleLarge)
+                            Button(
+                                onClick = {
+                                    isSaving = true
+                                    errorMessage = null
+                                    scope.launch {
+                                        try {
+                                            importEngine.createManualTradeEntries(answers)
+                                            maintenance.refreshMaterializedViews()
+                                            answers.forEach {
+                                                tradeAmounts.remove(it.original.id)
+                                                tradeCurrencies.remove(it.original.id)
+                                            }
+                                            onTransactionsImported()
+                                        } catch (cancelled: CancellationException) {
+                                            throw cancelled
+                                        } catch (expected: Exception) {
+                                            errorMessage = "Failed to create trades: ${expected.message}"
+                                        } finally {
+                                            isSaving = false
+                                        }
+                                    }
+                                },
+                                enabled = answers.isNotEmpty() && !isSaving,
+                            ) {
+                                Text("Create ${answers.size} trade${if (answers.size == 1) "" else "s"}")
+                            }
+                        }
+                    }
+                    items(pendingTrades, key = { "trade/${it.trade.id.id}" }) { entry ->
+                        PendingTradeCard(
+                            entry = entry,
+                            currencyRepository = currencyRepository,
+                            currencyId = tradeCurrencies[entry.trade.id],
+                            onCurrencyChange = { tradeCurrencies[entry.trade.id] = it },
+                            amountText = tradeAmounts[entry.trade.id].orEmpty(),
+                            onAmountChange = { tradeAmounts[entry.trade.id] = it },
                         )
                     }
                 }
@@ -295,6 +379,64 @@ private fun PendingEntryCard(
                 isError = amountText.isNotBlank() && parseAmount(amountText) == null,
                 singleLine = true,
                 modifier = Modifier.width(180.dp),
+            )
+        }
+    }
+}
+
+/** A placeholder trade waiting for the currency and amount of its [placeholderAssetCode] leg. */
+private data class PendingTradeEntry(
+    val trade: Trade,
+    val placeholderAssetCode: String,
+)
+
+@Composable
+private fun PendingTradeCard(
+    entry: PendingTradeEntry,
+    currencyRepository: CurrencyReadRepository,
+    currencyId: CurrencyId?,
+    onCurrencyChange: (CurrencyId) -> Unit,
+    amountText: String,
+    onAmountChange: (String) -> Unit,
+) {
+    val trade = entry.trade
+    val placeholderIsTo = trade.to.asset.code == entry.placeholderAssetCode
+    val known = if (placeholderIsTo) trade.from else trade.to
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = trade.description, style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text =
+                        "${trade.timestamp.displayDateTime()} • " +
+                            (if (placeholderIsTo) "gave ${formatAmount(known)} for " else "received ${formatAmount(known)} for ") +
+                            "an unnamed currency",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            CurrencyPicker(
+                selectedCurrencyId = currencyId,
+                onCurrencySelected = onCurrencyChange,
+                label = "Currency",
+                currencyRepository = currencyRepository,
+                modifier = Modifier.width(180.dp),
+            )
+            OutlinedTextField(
+                value = amountText,
+                onValueChange = onAmountChange,
+                label = { Text("Amount") },
+                isError = amountText.isNotBlank() && parseAmount(amountText) == null,
+                singleLine = true,
+                modifier = Modifier.width(160.dp),
             )
         }
     }

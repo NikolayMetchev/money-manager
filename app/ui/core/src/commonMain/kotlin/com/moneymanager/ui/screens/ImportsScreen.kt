@@ -244,6 +244,8 @@ fun ImportsScreen(
                         ManualEntriesScreen(
                             csvImportStrategyRepository = csvImportStrategyRepository,
                             transactionRepository = transactionRepository,
+                            tradeRepository = tradeRepository,
+                            currencyRepository = currencyRepository,
                             maintenance = maintenance,
                             onTransactionsImported = onTransactionsImported,
                         )

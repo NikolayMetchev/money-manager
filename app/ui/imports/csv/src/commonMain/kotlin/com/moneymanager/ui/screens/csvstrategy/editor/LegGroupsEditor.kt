@@ -153,6 +153,16 @@ private fun LegGroupRuleEditor(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
+            if (assembly.acrossFiles) {
+                OutlinedTextField(
+                    value = assembly.unpairedAsset.orEmpty(),
+                    onValueChange = { onRuleChanged(rule.copy(assembly = assembly.copy(unpairedAsset = it.ifBlank { null }))) },
+                    label = { Text("Asset to book an unpaired leg against (blank: wait for its partner)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = enabled,
+                )
+            }
         }
 
         is LegAssembly.ThroughAccount -> {

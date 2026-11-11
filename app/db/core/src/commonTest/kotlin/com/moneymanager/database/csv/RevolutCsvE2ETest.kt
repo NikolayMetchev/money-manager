@@ -4,9 +4,13 @@ import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.importengineapi.ManualTradeInput
+import com.moneymanager.importengineapi.createManualTradeEntries
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -188,5 +192,58 @@ class RevolutCsvE2ETest : DbTest() {
             apply(eur, usd)
             assertEquals(emptyList(), trades())
             assertEquals(emptyList(), repositories.csvImportRepository.getImportRows(eur.id, 10, 0).filter { it.errorMessage != null })
+        }
+
+    private suspend fun pendingManualTrades(): List<Trade> =
+        repositories.tradeRepository.getPendingManualTrades(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME, "UNKNOWN").first()
+
+    private val unnamedOut = row("Exchange", "2020-07-01 10:00:00", "Transfer to Revolut Ltd", "-300.00", "EUR", "477.65")
+    private val unnamedIn = row("Exchange", "2020-07-01 10:00:00", "Transfer from Revolut Ltd", "350.00", "USD", "530.00")
+
+    @Test
+    fun `an exchange row that names no currency books against Unknown and waits in Manual Entries`() =
+        runDbTest {
+            apply(stage("account-statement_eur.csv", listOf(unnamedOut)))
+
+            val placeholder = pendingManualTrades().single()
+            assertEquals("EUR", placeholder.from.asset.code)
+            assertEquals("UNKNOWN", placeholder.to.asset.code)
+            assertEquals(0, placeholder.from.toDisplayValue().compareTo(BigDecimal("300")))
+            assertEquals(false, transfers().any { it.description == "Transfer to Revolut Ltd" })
+        }
+
+    @Test
+    fun `the other side of an unnamed exchange replaces the placeholder and leaves Manual Entries`() =
+        runDbTest {
+            apply(stage("account-statement_eur.csv", listOf(unnamedOut)))
+            assertEquals(1, pendingManualTrades().size)
+
+            apply(stage("account-statement_usd.csv", listOf(unnamedIn)))
+
+            assertEquals(emptyList(), pendingManualTrades())
+            val real = trades().single { it.to.asset.code == "USD" }
+            assertEquals("EUR", real.from.asset.code)
+            assertEquals(0, real.to.toDisplayValue().compareTo(BigDecimal("350")))
+        }
+
+    @Test
+    fun `a person naming the currency and amount replaces the placeholder`() =
+        runDbTest {
+            apply(stage("account-statement_eur.csv", listOf(unnamedOut)))
+            val placeholder = pendingManualTrades().single()
+            val usd =
+                repositories.currencyRepository
+                    .getAllCurrencies()
+                    .first()
+                    .single { it.code == "USD" }
+
+            repositories.importEngine.createManualTradeEntries(
+                listOf(ManualTradeInput(placeholder, "UNKNOWN", Money.fromDisplayValue(BigDecimal("350"), usd))),
+            )
+
+            assertEquals(emptyList(), pendingManualTrades())
+            val real = trades().single { it.to.asset.code == "USD" }
+            assertEquals(0, real.to.toDisplayValue().compareTo(BigDecimal("350")))
+            assertEquals(0, real.from.toDisplayValue().compareTo(BigDecimal("300")))
         }
 }
