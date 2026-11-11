@@ -66,6 +66,7 @@ import com.moneymanager.reconciliation.planAutoLinks
 import com.moneymanager.reconciliation.realAccounts
 import com.moneymanager.reconciliation.suggestFees
 import com.moneymanager.reconciliation.suggestOtherSides
+import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.displayDateTime
@@ -196,6 +197,7 @@ fun ManualEntriesScreen(
     val writeVersion by importEngine.writeVersion.collectAsState()
     val withdrawals = groups.filter { it.entry.relationshipType == WellKnownIds.FEE_RELATIONSHIP_TYPE_NAME }.flatMap { it.pending }
     var found by remember { mutableStateOf(suggestionCache.peek(writeVersion) ?: ManualEntrySuggestions()) }
+    var finding by remember { mutableStateOf<Progress?>(null) }
     LaunchedEffect(loadedPendingTrades, loadedGroups, writeVersion) {
         // Until both lists are known, keep what is shown: looking now would cache the answer for an empty screen.
         if (loadedPendingTrades == null || loadedGroups == null) return@LaunchedEffect
@@ -203,16 +205,22 @@ fun ManualEntriesScreen(
         val known = suggestionCache.get(waiting, writeVersion)
         // The database or what is pending changed: what was found before may no longer hold, so show nothing until it is found again.
         if (known == null) found = ManualEntrySuggestions()
-        found =
-            known
-                ?: loadManualEntrySuggestions(
-                    pendingTrades.map { it.trade to it.placeholderAssetCode },
-                    withdrawals,
-                    reconciliationRepository,
-                    accountRepository,
-                    tradeRepository,
-                    transactionRepository,
-                ).also { suggestionCache.put(waiting, writeVersion, it) }
+        try {
+            found =
+                known
+                    ?: loadManualEntrySuggestions(
+                        pendingTrades.map { it.trade to it.placeholderAssetCode },
+                        withdrawals,
+                        reconciliationRepository,
+                        accountRepository,
+                        tradeRepository,
+                        transactionRepository,
+                        onProgress = { finding = it },
+                    ).also { suggestionCache.put(waiting, writeVersion, it) }
+        } finally {
+            // Also when a newer look replaces this one half way, so the bar never stays up for nothing.
+            finding = null
+        }
     }
     val suggestions = found.trades
     val feeSuggestions = found.fees
@@ -250,6 +258,8 @@ fun ManualEntriesScreen(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
+
+        finding?.let { SuggestionProgress(it) }
 
         Spacer(modifier = Modifier.height(16.dp))
 

@@ -10,6 +10,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
+import androidx.compose.ui.test.waitUntilDoesNotExist
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -51,6 +52,7 @@ import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.MockMode
+import dev.mokkery.answering.calls
 import dev.mokkery.answering.returns
 import dev.mokkery.every
 import dev.mokkery.everySuspend
@@ -58,6 +60,7 @@ import dev.mokkery.matcher.any
 import dev.mokkery.mock
 import dev.mokkery.verify.VerifyMode.Companion.exactly
 import dev.mokkery.verifySuspend
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -311,6 +314,71 @@ class ManualEntriesScreenTest {
             waitUntilAtLeastOneExists(hasText("records the other side", substring = true))
 
             verifySuspend(exactly(1)) { trades.getTradesByAccountsAndDateRange(any(), any(), any()) }
+        }
+
+    @Test
+    fun `a bar with the step shows while the suggestions are being found and goes when they are`() =
+        runMoneyManagerComposeUiTest {
+            val placeholder =
+                Trade(
+                    TradeId(1),
+                    timestamp = epoch,
+                    description = "Transfer to Revolut Ltd",
+                    fromAccountId = revolut,
+                    from = Money.fromDisplayValue("1000", gbp),
+                    toAccountId = revolut,
+                    to = Money.fromDisplayValue("1000", unknown),
+                )
+            val koinly =
+                Trade(
+                    TradeId(2),
+                    timestamp = epoch,
+                    description = "trade",
+                    fromAccountId = wallet,
+                    from = Money.fromDisplayValue("1000.0", gbp),
+                    toAccountId = wallet,
+                    to = Money.fromDisplayValue("0.1330735", btc),
+                )
+            // The lookup of the sources' trades waits here, so the screen is caught part way through finding them.
+            val release = CompletableDeferred<Unit>()
+            val trades: TradeReadRepository =
+                mock(MockMode.autoUnit) {
+                    every { getPendingManualTrades(any(), any()) } returns flowOf(listOf(placeholder))
+                    everySuspend { getTradesByAccountsAndDateRange(any(), any(), any()) } calls
+                        {
+                            release.await()
+                            listOf(koinly)
+                        }
+                }
+            val transactions: TransactionReadRepository =
+                mock(MockMode.autoUnit) { every { getPendingManualEntries(any(), any()) } returns flowOf(emptyList()) }
+            val engine = RecordingEngine()
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    CompositionLocalProvider(LocalImportEngine provides engine) {
+                        ManualEntriesScreen(
+                            csvImportStrategyRepository = strategies(strategy()),
+                            transactionRepository = transactions,
+                            tradeRepository = trades,
+                            currencyRepository = currencies,
+                            reconciliationRepository = reconciliation(listOf(ReconciliationLink(wallet, revolut))),
+                            accountRepository = accounts,
+                            suggestionCache = ManualEntrySuggestionCache(),
+                            onOpenSource = {},
+                            onOpenReconciliation = {},
+                            maintenance = maintenance,
+                            onTransactionsImported = {},
+                        )
+                    }
+                }
+            }
+            waitUntilAtLeastOneExists(hasText("Finding suggestions from the reconciliation sources", substring = true))
+            onNodeWithText("Looking for the sources' record of exchange 1 of 1", substring = true).assertExists()
+
+            release.complete(Unit)
+            waitUntilAtLeastOneExists(hasText("records the other side", substring = true))
+            waitUntilDoesNotExist(hasText("Finding suggestions from the reconciliation sources", substring = true))
         }
 
     @Test
