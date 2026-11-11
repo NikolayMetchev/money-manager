@@ -26,14 +26,16 @@ data class ManualEntryInput(
  *
  * With [excludedFromBalances] the entry is written excluded: the original's amount already contains it, so
  * counting it again would double it. The entry still reconciles, which is what it is recorded for.
+ *
+ * Returns the entries' ids, in the order of [inputs].
  */
 suspend fun ImportEngine.createManualEntries(
     inputs: List<ManualEntryInput>,
     description: String,
     relationshipType: String,
     excludedFromBalances: Boolean,
-) {
-    if (inputs.isEmpty()) return
+): List<TransferId> {
+    if (inputs.isEmpty()) return emptyList()
     val feeAccountKeys =
         if (relationshipType == WellKnownIds.FEE_RELATIONSHIP_TYPE_NAME) {
             inputs.map { it.original.sourceAccountId }.distinct().associateWith { LocalAccountKey("manual-entry-fee-account-of-${it.id}") }
@@ -79,6 +81,8 @@ suspend fun ImportEngine.createManualEntries(
                 relationshipTypeNames = listOf(relationshipType),
             ),
         )
+    val entryIds =
+        inputs.indices.map { requireNotNull(created.createdTransferIds[ImportRowKey.Manual(it.toLong())]) { "Entry $it was not created" } }
     // The links need the entries' ids, so they are a second write. If it fails, the entries must not stay: their
     // originals would still be pending and a retry would book every entry twice.
     var linked = false
@@ -104,6 +108,7 @@ suspend fun ImportEngine.createManualEntries(
     } finally {
         if (!linked) withContext(NonCancellable) { deleteCreatedEntries(created.createdTransferIds.values) }
     }
+    return entryIds
 }
 
 private suspend fun ImportEngine.deleteCreatedEntries(entries: Collection<TransferId>) {

@@ -54,10 +54,14 @@ import com.moneymanager.importengineapi.createManualEntries
 import com.moneymanager.importengineapi.createManualTradeEntries
 import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.reconciliation.FEE_SUGGESTION_WINDOW
+import com.moneymanager.reconciliation.FeeSuggestion
 import com.moneymanager.reconciliation.OtherSideSuggestion
+import com.moneymanager.reconciliation.acceptFeeSuggestions
 import com.moneymanager.reconciliation.acceptOtherSideSuggestions
 import com.moneymanager.reconciliation.planAutoLinks
 import com.moneymanager.reconciliation.realAccounts
+import com.moneymanager.reconciliation.suggestFees
 import com.moneymanager.reconciliation.suggestOtherSides
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.foundation.LocalImportEngine
@@ -182,9 +186,25 @@ fun ManualEntriesScreen(
             }
         }
     }
+    var feeSuggestions by remember { mutableStateOf<Map<TransferId, FeeSuggestion>>(emptyMap()) }
+    LaunchedEffect(groups) {
+        feeSuggestions =
+            loadFeeSuggestions(
+                groups.filter { it.entry.relationshipType == WellKnownIds.FEE_RELATIONSHIP_TYPE_NAME }.flatMap { it.pending },
+                reconciliationRepository,
+                transactionRepository,
+            )
+    }
     val acceptSuggestions: (List<OtherSideSuggestion>) -> Unit = { accepted ->
         runSave("Failed to use the suggestions") {
-            importEngine.acceptOtherSideSuggestions(accepted, linksFor(accepted, reconciliationRepository, accountRepository))
+            importEngine.acceptOtherSideSuggestions(
+                accepted,
+                linksFor(
+                    accepted.flatMapTo(mutableSetOf()) { listOf(it.shadowTrade.fromAccountId, it.shadowTrade.toAccountId) },
+                    reconciliationRepository,
+                    accountRepository,
+                ),
+            )
         }
     }
 
@@ -234,6 +254,23 @@ fun ManualEntriesScreen(
                             group = group,
                             amounts = amounts,
                             isSaving = isSaving,
+                            suggestions = group.pending.mapNotNull { feeSuggestions[it.transferId] },
+                            onUseSuggestions = { used ->
+                                runSave("Failed to use the suggestions") {
+                                    importEngine.acceptFeeSuggestions(
+                                        used,
+                                        description = group.entry.description,
+                                        relationshipType = group.entry.relationshipType,
+                                        excludedFromBalances = group.entry.excludedFromBalances,
+                                        links =
+                                            linksFor(
+                                                used.mapTo(mutableSetOf()) { it.netTransfer.sourceAccountId },
+                                                reconciliationRepository,
+                                                accountRepository,
+                                            ),
+                                    )
+                                }
+                            },
                             onCreate = { entries ->
                                 runSave("Failed to create transactions") {
                                     createEntries(entry = group.entry, entries = entries, importEngine = importEngine)
@@ -246,6 +283,26 @@ fun ManualEntriesScreen(
                         PendingEntryCard(
                             matched = matched,
                             entry = group.entry,
+                            suggestion = feeSuggestions[matched.transferId],
+                            busy = isSaving,
+                            onUseSuggestion = {
+                                feeSuggestions[matched.transferId]?.let { suggestion ->
+                                    runSave("Failed to use the suggestion") {
+                                        importEngine.acceptFeeSuggestions(
+                                            listOf(suggestion),
+                                            description = group.entry.description,
+                                            relationshipType = group.entry.relationshipType,
+                                            excludedFromBalances = group.entry.excludedFromBalances,
+                                            links =
+                                                linksFor(
+                                                    setOf(suggestion.netTransfer.sourceAccountId),
+                                                    reconciliationRepository,
+                                                    accountRepository,
+                                                ),
+                                        )
+                                    }
+                                }
+                            },
                             amountText = amounts[matched.transferId].orEmpty(),
                             onAmountChange = { amounts[matched.transferId] = it },
                         )
@@ -336,6 +393,8 @@ private fun PendingGroupHeader(
     group: PendingEntryGroup,
     amounts: Map<TransferId, String>,
     isSaving: Boolean,
+    suggestions: List<FeeSuggestion>,
+    onUseSuggestions: (List<FeeSuggestion>) -> Unit,
     onCreate: (List<Pair<PendingManualEntry, BigDecimal>>) -> Unit,
 ) {
     val entries =
@@ -359,6 +418,11 @@ private fun PendingGroupHeader(
             text = "${group.strategyName} — ${group.entry.name}",
             style = MaterialTheme.typography.titleLarge,
         )
+        if (suggestions.isNotEmpty()) {
+            Button(onClick = { onUseSuggestions(suggestions) }, enabled = !isSaving) {
+                Text("Use ${suggestions.size} suggested fee${if (suggestions.size == 1) "" else "s"}")
+            }
+        }
         Button(
             onClick = { onCreate(entries) },
             enabled = entries.isNotEmpty() && !hasInvalidInput && !isSaving,
@@ -372,6 +436,9 @@ private fun PendingGroupHeader(
 private fun PendingEntryCard(
     matched: PendingManualEntry,
     entry: RuleAction.ManualEntry,
+    suggestion: FeeSuggestion?,
+    busy: Boolean,
+    onUseSuggestion: () -> Unit,
     amountText: String,
     onAmountChange: (String) -> Unit,
 ) {
@@ -409,6 +476,14 @@ private fun PendingEntryCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                suggestion?.let {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "A reconciliation source charged ${formatAmount(it.fee)} on this movement",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    TextButton(onClick = onUseSuggestion, enabled = !busy) { Text("Use ${formatAmount(it.fee)} and match it") }
+                }
             }
             Spacer(modifier = Modifier.width(16.dp))
             OutlinedTextField(
@@ -534,11 +609,10 @@ private suspend fun loadSuggestions(
  * account the placeholder is on, which [planAutoLinks] confirms only where the names agree and nothing else is in the way.
  */
 private suspend fun linksFor(
-    accepted: List<OtherSideSuggestion>,
+    wallets: Set<AccountId>,
     reconciliationRepository: ReconciliationReadRepository,
     accountRepository: AccountReadRepository,
 ): Map<AccountId, AccountId> {
-    val wallets = accepted.flatMapTo(mutableSetOf()) { listOf(it.shadowTrade.fromAccountId, it.shadowTrade.toAccountId) }
     val shadow = reconciliationRepository.getShadowAccounts().first()
     val links = reconciliationRepository.getLinks().first()
     val real = realAccounts(accountRepository.getAllAccounts().first(), shadow)
@@ -548,4 +622,25 @@ private suspend fun linksFor(
         .flatMap { source -> planAutoLinks(source, shadow, links, real).entries }
         .filter { it.key in wallets }
         .associate { it.key to it.value }
+}
+
+/** What the reconciliation sources' own fee transfers say the fee of each withdrawal in [pending] was (see [suggestFees]). */
+private suspend fun loadFeeSuggestions(
+    pending: List<PendingManualEntry>,
+    reconciliationRepository: ReconciliationReadRepository,
+    transactionRepository: TransactionReadRepository,
+): Map<TransferId, FeeSuggestion> {
+    if (pending.isEmpty()) return emptyMap()
+    val shadow = reconciliationRepository.getShadowAccounts().first()
+    if (shadow.isEmpty()) return emptyMap()
+    val shadowIds = shadow.mapTo(mutableSetOf()) { it.accountId }
+    val feeAccountIds = shadow.filter { it.feeAccountFor != null }.mapTo(mutableSetOf()) { it.accountId }
+    val sourceTransfers =
+        pending
+            .flatMap { withdrawal ->
+                val slack = FEE_SUGGESTION_WINDOW + 5.seconds
+                transactionRepository.getTransactionsByDateRange(withdrawal.timestamp - slack, withdrawal.timestamp + slack).first()
+            }.filter { it.sourceAccountId in shadowIds }
+            .distinctBy { it.id }
+    return suggestFees(pending, sourceTransfers, feeAccountIds)
 }
