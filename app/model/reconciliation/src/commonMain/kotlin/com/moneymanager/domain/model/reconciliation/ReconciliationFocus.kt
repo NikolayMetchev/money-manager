@@ -6,13 +6,14 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
 
 /**
- * Where the Reconciliation tab should open: the [sourceName]'s [walletAccountId] wallet, at [month] (see
- * [reconciliationMonth]), with that wallet and month expanded so the movement a link was made for is in view.
+ * Where the Reconciliation tab should open: the movement [transactionId] (a transaction of the source), found under the
+ * [sourceName]'s [walletAccountId] wallet at [month] (see [reconciliationMonth]), with the tree opened down to it.
  */
 data class ReconciliationFocus(
     val sourceName: String,
     val walletAccountId: AccountId,
     val month: String,
+    val transactionId: Long,
 )
 
 /** The calendar month (UTC) the Reconciliation tab files [instant] under, e.g. `2021-05`. */

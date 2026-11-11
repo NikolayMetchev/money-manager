@@ -96,6 +96,7 @@ kmp_test(
         "//app/tasks",
         "//app/model/reconciliation",
         "//app/model/rules",
+        "@maven_kmp//:mokkery_core",
     ],
     device_manifest = "src/androidDeviceTest/AndroidManifest.xml",
     device_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),

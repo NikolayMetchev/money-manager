@@ -36,6 +36,7 @@ class ScreenSerializationTest {
             Screen.People,
             Screen.PeopleScroll(PersonId(2)),
             Screen.Imports(ImportTab.API),
+            Screen.Imports(ImportTab.RECONCILIATION, ReconciliationSubTab.MANUAL),
             Screen.CsvStrategies,
             Screen.CsvStrategyEditor(CsvImportId(uuid), CsvImportStrategyId(uuid)),
             Screen.ApiStrategies,

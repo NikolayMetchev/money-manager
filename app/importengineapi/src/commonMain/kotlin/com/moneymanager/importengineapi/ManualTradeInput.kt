@@ -106,3 +106,28 @@ suspend fun ImportEngine.createManualTradeEntries(inputs: List<ManualTradeInput>
     }
     return createdIds
 }
+
+/**
+ * Takes back [createManualTradeEntries]: deletes the trades it made ([created]) and lifts the exclusion from the
+ * placeholders ([placeholders]) they replaced, so those are pending in Manual Entries again.
+ */
+suspend fun ImportEngine.undoManualTradeEntries(
+    created: List<TradeId>,
+    placeholders: List<TradeId>,
+) {
+    import(
+        ImportBatch(
+            trades =
+                created.map {
+                    ImportTradeIntent(
+                        key = LocalTradeKey("manual-trade-entry-undo-${it.id}"),
+                        source = Source.Manual,
+                        operation = ImportOperation.DELETE,
+                        existingId = it,
+                    )
+                },
+            tradeAttributeMutations =
+                placeholders.map { TradeAttributeMutation.Remove(it, AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)) },
+        ),
+    )
+}

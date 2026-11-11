@@ -71,9 +71,11 @@ import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalDeviceId
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.foundation.LocalUiStateStore
+import com.moneymanager.ui.foundation.ReconciliationFocusState
 import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.navigation.NavigationHistory
+import com.moneymanager.ui.navigation.ReconciliationSubTab
 import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.navigation.ScreenSavedStateConfiguration
 import com.moneymanager.ui.navigation.mouseButtonNavigation
@@ -156,6 +158,7 @@ fun MoneyManagerApp(
         val matchPicker = remember { MatchPickerState() }
         val reconciliationCache = remember { ReconciliationCache() }
         val manualEntrySuggestionCache = remember { ManualEntrySuggestionCache() }
+        val reconciliationFocus = remember { ReconciliationFocusState() }
         val taskManager = rememberTaskManager(scope)
         // One per database: its two services share a write lock, since directory and API runs (which outlive any
         // screen) can run at once and the engine doesn't serialize their writes itself.
@@ -657,8 +660,21 @@ fun MoneyManagerApp(
                                                 selectedTab = screen.tab,
                                                 onTabSelected = { tab ->
                                                     lastImportTab = tab
-                                                    navigationHistory.replaceCurrentScreen(Screen.Imports(tab))
+                                                    navigationHistory.replaceCurrentScreen(Screen.Imports(tab, screen.reconciliationSubTab))
                                                 },
+                                                reconciliationSubTab = screen.reconciliationSubTab,
+                                                onReconciliationSubTabSelected = { subTab ->
+                                                    navigationHistory.replaceCurrentScreen(Screen.Imports(screen.tab, subTab))
+                                                },
+                                                // A step of its own, so Back returns to the Manual Entries it was made from.
+                                                onOpenReconciliation = { focus ->
+                                                    reconciliationFocus.request = focus
+                                                    lastImportTab = ImportTab.RECONCILIATION
+                                                    navigationHistory.navigateTo(
+                                                        Screen.Imports(ImportTab.RECONCILIATION, ReconciliationSubTab.EXTERNAL),
+                                                    )
+                                                },
+                                                reconciliationFocus = reconciliationFocus,
                                                 importDirectoryRepository = services.imports.importDirectoryRepository,
                                                 importTimelineRepository = services.imports.importTimelineRepository,
                                                 reconciliationRepository = services.imports.reconciliationRepository,

@@ -23,6 +23,7 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.domain.model.reconciliation.ReconciliationFocus
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
@@ -52,6 +53,7 @@ import com.moneymanager.importfilesource.DriveFolderBrowser
 import com.moneymanager.ui.foundation.ReconciliationFocusState
 import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.navigation.ImportTab
+import com.moneymanager.ui.navigation.ReconciliationSubTab
 import com.moneymanager.ui.screens.accountmapping.AccountMappingsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiSessionsScreen
 import com.moneymanager.ui.screens.csv.ImportFilesScreen
@@ -71,6 +73,9 @@ import kotlinx.serialization.builtins.serializer
 fun ImportsScreen(
     selectedTab: ImportTab,
     onTabSelected: (ImportTab) -> Unit,
+    reconciliationSubTab: ReconciliationSubTab,
+    onReconciliationSubTabSelected: (ReconciliationSubTab) -> Unit,
+    onOpenReconciliation: (ReconciliationFocus) -> Unit,
     importDirectoryRepository: ImportDirectoryReadRepository,
     importTimelineRepository: ImportTimelineReadRepository,
     reconciliationRepository: ReconciliationReadRepository,
@@ -113,7 +118,7 @@ fun ImportsScreen(
     matchPickerState: MatchPickerState = remember { MatchPickerState() },
     reconciliationCache: ReconciliationCache = remember { ReconciliationCache() },
     manualEntrySuggestionCache: ManualEntrySuggestionCache = remember { ManualEntrySuggestionCache() },
-    reconciliationFocus: ReconciliationFocusState = remember { ReconciliationFocusState() },
+    reconciliationFocus: ReconciliationFocusState,
     showImportDirectories: Boolean = true,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -232,7 +237,8 @@ fun ImportsScreen(
 
             ImportTab.RECONCILIATION -> {
                 ReconciliationImportsTab(
-                    focus = reconciliationFocus,
+                    subTab = reconciliationSubTab,
+                    onSubTabSelected = onReconciliationSubTabSelected,
                     reconciliation = {
                         ReconciliationScreen(
                             reconciliationRepository = reconciliationRepository,
@@ -257,7 +263,7 @@ fun ImportsScreen(
                             accountRepository = accountRepository,
                             suggestionCache = manualEntrySuggestionCache,
                             onOpenSource = onReconciliationSourceClick,
-                            onOpenReconciliation = { reconciliationFocus.request = it },
+                            onOpenReconciliation = onOpenReconciliation,
                             maintenance = maintenance,
                             onTransactionsImported = onTransactionsImported,
                         )
@@ -292,14 +298,12 @@ fun ImportsScreen(
     }
 }
 
-@Serializable
-private enum class ReconciliationSubTab(
-    val label: String,
-) {
-    EXTERNAL("External Account Reconciliation"),
-    MANUAL("Manual Entries"),
-    CARDS("Card Last-4"),
-}
+private fun ReconciliationSubTab.label(): String =
+    when (this) {
+        ReconciliationSubTab.EXTERNAL -> "External Account Reconciliation"
+        ReconciliationSubTab.MANUAL -> "Manual Entries"
+        ReconciliationSubTab.CARDS -> "Card Last-4"
+    }
 
 /**
  * Sub-tabs under the "Reconciliation" import tab — everything an import leaves for a person to resolve:
@@ -308,23 +312,16 @@ private enum class ReconciliationSubTab(
  */
 @Composable
 private fun ReconciliationImportsTab(
-    focus: ReconciliationFocusState,
+    subTab: ReconciliationSubTab,
+    onSubTabSelected: (ReconciliationSubTab) -> Unit,
     reconciliation: @Composable () -> Unit,
     manualEntries: @Composable () -> Unit,
     cards: @Composable () -> Unit,
 ) {
-    var subTab by rememberPersistedState(
-        "imports.reconciliationSubTab",
-        ReconciliationSubTab.serializer(),
-    ) { ReconciliationSubTab.EXTERNAL }
-    // A link to the Reconciliation tab (from a Manual Entries suggestion) lands on the external comparison.
-    LaunchedEffect(focus.request) {
-        if (focus.request != null) subTab = ReconciliationSubTab.EXTERNAL
-    }
     Column(modifier = Modifier.fillMaxSize()) {
         SecondaryTabRow(selectedTabIndex = subTab.ordinal) {
             ReconciliationSubTab.entries.forEach { entry ->
-                Tab(selected = subTab == entry, onClick = { subTab = entry }, text = { Text(entry.label) })
+                Tab(selected = subTab == entry, onClick = { onSubTabSelected(entry) }, text = { Text(entry.label()) })
             }
         }
         when (subTab) {

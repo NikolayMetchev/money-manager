@@ -83,7 +83,7 @@ private fun originOf(
         sourceName = sourceName,
         walletName = wallet?.name ?: walletId.toString(),
         leg = leg,
-        focus = ReconciliationFocus(sourceName, walletId, reconciliationMonth(leg.timestamp)),
+        focus = ReconciliationFocus(sourceName, walletId, reconciliationMonth(leg.timestamp), leg.transactionId),
     )
 }
 

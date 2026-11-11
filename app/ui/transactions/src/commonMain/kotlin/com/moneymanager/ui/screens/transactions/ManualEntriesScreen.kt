@@ -72,6 +72,7 @@ import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -138,7 +139,9 @@ fun ManualEntriesScreen(
                 if (ruleFlows.isEmpty()) flowOf(emptyList()) else combine(ruleFlows) { it.toList() }
             }
         }
-    val groups by groupsFlow.collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    // Null until the first answer: nothing pending yet is not the same as nothing pending.
+    val loadedGroups by groupsFlow.asNullable().collectAsStateWithSchemaErrorHandling(initial = null)
+    val groups = loadedGroups.orEmpty()
     val amounts = remember { mutableStateMapOf<TransferId, String>() }
     val pendingTradesFlow =
         remember(csvImportStrategyRepository, tradeRepository) {
@@ -164,7 +167,8 @@ fun ManualEntriesScreen(
                 }
             }
         }
-    val pendingTrades by pendingTradesFlow.collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val loadedPendingTrades by pendingTradesFlow.asNullable().collectAsStateWithSchemaErrorHandling(initial = null)
+    val pendingTrades = loadedPendingTrades.orEmpty()
     val currencies by currencyRepository.getAllCurrencies().collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val tradeCurrencies = remember { mutableStateMapOf<TradeId, CurrencyId>() }
     val tradeAmounts = remember { mutableStateMapOf<TradeId, String>() }
@@ -192,14 +196,20 @@ fun ManualEntriesScreen(
     val writeVersion by importEngine.writeVersion.collectAsState()
     val withdrawals = groups.filter { it.entry.relationshipType == WellKnownIds.FEE_RELATIONSHIP_TYPE_NAME }.flatMap { it.pending }
     var found by remember { mutableStateOf(suggestionCache.peek(writeVersion) ?: ManualEntrySuggestions()) }
-    LaunchedEffect(pendingTrades, withdrawals, writeVersion) {
+    LaunchedEffect(loadedPendingTrades, loadedGroups, writeVersion) {
+        // Until both lists are known, keep what is shown: looking now would cache the answer for an empty screen.
+        if (loadedPendingTrades == null || loadedGroups == null) return@LaunchedEffect
         val waiting = pendingTrades.mapTo(mutableSetOf()) { it.trade.id.id } + withdrawals.map { it.transferId.id }
+        val known = suggestionCache.get(waiting, writeVersion)
+        // The database or what is pending changed: what was found before may no longer hold, so show nothing until it is found again.
+        if (known == null) found = ManualEntrySuggestions()
         found =
-            suggestionCache.get(waiting, writeVersion)
+            known
                 ?: loadManualEntrySuggestions(
                     pendingTrades.map { it.trade to it.placeholderAssetCode },
                     withdrawals,
                     reconciliationRepository,
+                    accountRepository,
                     tradeRepository,
                     transactionRepository,
                 ).also { suggestionCache.put(waiting, writeVersion, it) }
@@ -631,3 +641,5 @@ private suspend fun linksFor(
         .filter { it.key in wallets }
         .associate { it.key to it.value }
 }
+
+private fun <T : Any> Flow<T>.asNullable(): Flow<T?> = this

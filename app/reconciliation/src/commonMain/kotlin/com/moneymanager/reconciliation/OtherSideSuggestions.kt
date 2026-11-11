@@ -10,6 +10,9 @@ import com.moneymanager.importengineapi.ManualTradeInput
 import com.moneymanager.importengineapi.createManualTradeEntries
 import com.moneymanager.importengineapi.createReconciliationMatches
 import com.moneymanager.importengineapi.setReconciliationLinks
+import com.moneymanager.importengineapi.undoManualTradeEntries
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 /** Fewest decimal places two amounts must keep for their rounding to count as agreeing (Revolut keeps two). */
 private const val MIN_COMPARED_DECIMALS = 2
@@ -32,12 +35,13 @@ data class OtherSideSuggestion(
  * The suggestion for each placeholder in [placeholders] (trade and the code of its unnamed asset) among [shadowTrades]. A
  * placeholder's known leg must be one of a shadow trade's legs: the same asset on the same side, at the same second, and an
  * amount that agrees at the decimals both keep (a statement shows two, the source eight: the longer one cut or rounded to
- * the shorter). Nothing is suggested when two shadow trades fit one placeholder, or one fits two placeholders: that is a
- * question for a person.
+ * the shorter), on a wallet that [mirrors] the placeholder's account (linked to it, or named for it). Nothing is suggested when two
+ * shadow trades fit one placeholder, or one fits two placeholders: that is a question for a person.
  */
 fun suggestOtherSides(
     placeholders: List<Pair<Trade, String>>,
     shadowTrades: List<Trade>,
+    mirrors: (wallet: AccountId, real: AccountId) -> Boolean = { _, _ -> true },
 ): Map<TradeId, OtherSideSuggestion> {
     val fits =
         placeholders.associate { (placeholder, code) ->
@@ -48,7 +52,9 @@ fun suggestOtherSides(
                     val sameSide = if (placeholderIsTo) shadow.from else shadow.to
                     val other = if (placeholderIsTo) shadow.to else shadow.from
                     OtherSideSuggestion(placeholder, code, shadow, other).takeIf {
-                        shadow.timestamp.epochSeconds == placeholder.timestamp.epochSeconds && agree(sameSide, known)
+                        shadow.timestamp.epochSeconds == placeholder.timestamp.epochSeconds &&
+                            mirrors(shadow.fromAccountId, placeholder.fromAccountId) &&
+                            agree(sameSide, known)
                     }
                 }
         }
@@ -123,6 +129,12 @@ suspend fun ImportEngine.acceptOtherSideSuggestions(
         createManualTradeEntries(
             suggestions.map { ManualTradeInput(it.placeholder, it.placeholderAssetCode, it.otherSide) },
         )
-    createReconciliationMatches(suggestions.mapIndexed { index, suggestion -> listOf(created[index], suggestion.shadowTrade.id) })
+    // The matches are a second write: were it to fail, the placeholders would be gone from Manual Entries for nothing, so put them back.
+    try {
+        createReconciliationMatches(suggestions.mapIndexed { index, suggestion -> listOf(created[index], suggestion.shadowTrade.id) })
+    } catch (failure: Exception) {
+        withContext(NonCancellable) { undoManualTradeEntries(created, suggestions.map { it.placeholder.id }) }
+        throw failure
+    }
     links.forEach { (wallet, real) -> setReconciliationLinks(wallet, setOf(real)) }
 }

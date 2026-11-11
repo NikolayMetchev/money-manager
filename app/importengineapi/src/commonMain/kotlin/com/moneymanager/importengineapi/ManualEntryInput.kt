@@ -106,12 +106,13 @@ suspend fun ImportEngine.createManualEntries(
         import(ImportBatch(relationshipMutations = links))
         linked = true
     } finally {
-        if (!linked) withContext(NonCancellable) { deleteCreatedEntries(created.createdTransferIds.values) }
+        if (!linked) withContext(NonCancellable) { deleteManualEntries(created.createdTransferIds.values) }
     }
     return entryIds
 }
 
-private suspend fun ImportEngine.deleteCreatedEntries(entries: Collection<TransferId>) {
+/** Deletes the entries [createManualEntries] made (and so the links that tie them to their originals), putting the originals back to pending. */
+suspend fun ImportEngine.deleteManualEntries(entries: Collection<TransferId>) {
     if (entries.isEmpty()) return
     import(
         ImportBatch(

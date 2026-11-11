@@ -1,6 +1,8 @@
 package com.moneymanager.ui.screens.reconciliation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -10,8 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -33,8 +37,10 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
@@ -64,6 +70,7 @@ import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.reconciliation.LegMatch
 import com.moneymanager.reconciliation.ReconciliationResult
 import com.moneymanager.reconciliation.UnlinkedWallet
+import com.moneymanager.reconciliation.UnmatchedSourceLeg
 import com.moneymanager.reconciliation.applyAutoLinks
 import com.moneymanager.reconciliation.copyToMoneyManager
 import com.moneymanager.reconciliation.createAndLinkAccounts
@@ -253,17 +260,56 @@ private fun SourceReconciliation(
     var hideUnknownAssets by rememberPersistedState("reconciliation.hideUnknownAssets", Boolean.serializer()) { true }
     var tab by rememberPersistedState("reconciliation.tab", ResultTab.serializer()) { ResultTab.UNMATCHED }
     val expanded = remember(source) { mutableStateMapOf<String, Boolean>() }
-    // The movement a link named: its wallet and month open in every list it could be in, on the tab it is waiting on.
-    LaunchedEffect(focus.request, source) {
+    val listState = rememberLazyListState()
+    // Where each row of the list is, as the list was last built, to scroll to the one a link named.
+    val indexByKey = remember { mutableMapOf<Any, Int>() }
+    var scrollToLeaf by remember { mutableStateOf<Long?>(null) }
+    // The movement a link named stays marked, as the CSV screen marks the row it was sent to.
+    var highlightedLeaf by remember(source) { mutableStateOf<Long?>(null) }
+    // The movement a link named: found among the comparison's lists, its tab and tree opened down to it, then scrolled to.
+    LaunchedEffect(focus.request, source, result) {
         val request = focus.request ?: return@LaunchedEffect
         if (request.sourceName != source.name) return@LaunchedEffect
-        tab = ResultTab.UNMATCHED
-        listOf("near", "source-only", "mm-only", "matched", "ignored").forEach { prefix ->
-            val wallet = "$prefix-${request.walletAccountId.id}"
+        val comparison = result ?: return@LaunchedEffect
+        val at = locateLeaf(comparison, request.transactionId, hideUnknownAssets)
+        if (at != null) {
+            tab = at.tab
+            val wallet = "${at.prefix}-${at.wallet.id}"
             expanded[wallet] = true
-            expanded["$wallet-${request.month}"] = true
+            expanded["$wallet-${at.month}"] = true
+            scrollToLeaf = request.transactionId
+            highlightedLeaf = request.transactionId
+        } else {
+            // Not in any list (hidden, or not compared): at least open the wallet and month it belongs to.
+            tab = ResultTab.UNMATCHED
+            listOf("near", "source-only", "mm-only", "matched", "ignored").forEach { prefix ->
+                val wallet = "$prefix-${request.walletAccountId.id}"
+                expanded[wallet] = true
+                expanded["$wallet-${request.month}"] = true
+            }
         }
         focus.clear()
+    }
+    // The list is rebuilt for the new tab and tree a frame or two later, so wait until the row has an index.
+    LaunchedEffect(scrollToLeaf) {
+        val transactionId = scrollToLeaf ?: return@LaunchedEffect
+        repeat(SCROLL_ATTEMPTS) {
+            val index = indexByKey.entries.firstOrNull { leafHolds(it.key, transactionId) }?.value
+            if (index != null) {
+                listState.scrollToItem(index)
+                // Put it in the middle: it sits at the top now, so move the list back by half of what is left of the screen.
+                withFrameNanos { }
+                val layout = listState.layoutInfo
+                layout.visibleItemsInfo.firstOrNull { it.index == index }?.let { row ->
+                    val viewport = layout.viewportEndOffset - layout.viewportStartOffset
+                    listState.scrollBy(-(viewport - row.size) / 2f)
+                }
+                scrollToLeaf = null
+                return@LaunchedEffect
+            }
+            withFrameNanos { }
+        }
+        scrollToLeaf = null
     }
 
     fun setLinks(
@@ -368,214 +414,232 @@ private fun SourceReconciliation(
         }
     }
 
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        item { SummaryHeader(source, result, hideUnknownAssets, onRefresh = { refresh() }) }
-        error?.let { message ->
-            item { Text(message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 4.dp)) }
-        }
-        // Wallets the user deliberately unlinked aren't a problem to fix, just not compared.
-        val (declined, needsAttention) = unlinked.partition { it.wallet.autoLinkDeclined }
-        listOf(
-            needsAttention to "Needs attention: ${needsAttention.size} ${source.name} wallet(s) not linked to an account",
-            declined to "Not compared: ${declined.size} wallet(s) whose links you removed",
-        ).forEach { (wallets, heading) ->
-            if (wallets.isEmpty()) return@forEach
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {
-                    Text(
-                        heading,
-                        style = MaterialTheme.typography.titleSmall,
-                        color =
-                            if (wallets ===
-                                needsAttention
-                            ) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (wallets === needsAttention) {
-                        TextButton(onClick = { createAll(createPlan) }, enabled = createPlan.isNotEmpty() && !creatingAll) {
-                            Text("Create all (${createPlan.size})")
+    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        IndexingScope(this, indexByKey).run {
+            item { SummaryHeader(source, result, hideUnknownAssets, onRefresh = { refresh() }) }
+            error?.let { message ->
+                item { Text(message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 4.dp)) }
+            }
+            // Wallets the user deliberately unlinked aren't a problem to fix, just not compared.
+            val (declined, needsAttention) = unlinked.partition { it.wallet.autoLinkDeclined }
+            listOf(
+                needsAttention to "Needs attention: ${needsAttention.size} ${source.name} wallet(s) not linked to an account",
+                declined to "Not compared: ${declined.size} wallet(s) whose links you removed",
+            ).forEach { (wallets, heading) ->
+                if (wallets.isEmpty()) return@forEach
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {
+                        Text(
+                            heading,
+                            style = MaterialTheme.typography.titleSmall,
+                            color =
+                                if (wallets ===
+                                    needsAttention
+                                ) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (wallets === needsAttention) {
+                            TextButton(onClick = { createAll(createPlan) }, enabled = createPlan.isNotEmpty() && !creatingAll) {
+                                Text("Create all (${createPlan.size})")
+                            }
                         }
                     }
                 }
+                items(wallets, key = { "unlinked-${it.wallet.accountId.id}" }) { wallet ->
+                    UnlinkedWalletCard(
+                        wallet = wallet,
+                        walletName = source.walletName(wallet.wallet),
+                        accountRepository = accountRepository,
+                        categoryRepository = categoryRepository,
+                        personRepository = personRepository,
+                        existingNames = existingNames,
+                        // "Create all" links in a second batch that would overwrite a link made meanwhile.
+                        enabled = !creatingAll,
+                        isReal = { it.id !in allShadowIds },
+                        onLink = { realId -> setLinks(wallet.wallet.accountId, setOf(realId)) },
+                    )
+                }
             }
-            items(wallets, key = { "unlinked-${it.wallet.accountId.id}" }) { wallet ->
-                UnlinkedWalletCard(
-                    wallet = wallet,
-                    walletName = source.walletName(wallet.wallet),
+            item {
+                LinkedWallets(
+                    source = source,
+                    shadowAccounts = shadowAccounts,
+                    links = links,
+                    accountNames = accountNames,
+                    counts = result?.countsByWallet(hideUnknownAssets).orEmpty(),
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
-                    existingNames = existingNames,
-                    // "Create all" links in a second batch that would overwrite a link made meanwhile.
-                    enabled = !creatingAll,
                     isReal = { it.id !in allShadowIds },
-                    onLink = { realId -> setLinks(wallet.wallet.accountId, setOf(realId)) },
+                    onSetLinks = ::setLinks,
                 )
             }
-        }
-        item {
-            LinkedWallets(
-                source = source,
-                shadowAccounts = shadowAccounts,
-                links = links,
-                accountNames = accountNames,
-                counts = result?.countsByWallet(hideUnknownAssets).orEmpty(),
-                accountRepository = accountRepository,
-                categoryRepository = categoryRepository,
-                personRepository = personRepository,
-                isReal = { it.id !in allShadowIds },
-                onSetLinks = ::setLinks,
-            )
-        }
-        val loaded = result
-        if (loaded == null) {
-            item { ReconciliationProgress(progress) }
-            return@LazyColumn
-        }
-        item {
-            SecondaryTabRow(selectedTabIndex = tab.ordinal, modifier = Modifier.padding(top = 12.dp)) {
-                ResultTab.entries.forEach { entry ->
-                    Tab(selected = tab == entry, onClick = { tab = entry }, text = { Text(entry.label) })
+            val loaded = result
+            if (loaded == null) {
+                item { ReconciliationProgress(progress) }
+                return@run
+            }
+            item {
+                SecondaryTabRow(selectedTabIndex = tab.ordinal, modifier = Modifier.padding(top = 12.dp)) {
+                    ResultTab.entries.forEach { entry ->
+                        Tab(selected = tab == entry, onClick = { tab = entry }, text = { Text(entry.label) })
+                    }
                 }
             }
-        }
-        val walletName: (AccountId) -> String = { id ->
-            shadowAccounts.firstOrNull { it.accountId == id }?.let(source::walletName) ?: accountNames[id].orEmpty()
-        }
-        when (tab) {
-            ResultTab.UNMATCHED -> {
-                // Accept all stores the exact matches under the same header too, not only the near ones listed here.
-                sectionHeading("Near matches (${loaded.nearMatches.size})") {
-                    loaded.unstoredMatches().let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
-                }
-                legGroups(
-                    prefix = "near",
-                    groups = groupByWalletAndMonth(loaded.nearMatches, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
-                    expanded = expanded,
-                    empty = "No near matches: every match agrees to the second.",
-                    headerAction = { _, wallet, month ->
-                        loaded
-                            .unstoredMatches(
-                                wallet,
-                                month,
-                            ).let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
-                    },
-                ) { match ->
-                    MatchRow(match, accountNames, onOpenLeg) {
-                        TextButton(
-                            onClick = {
-                                write(
-                                    "Matching",
-                                ) { importEngine.createReconciliationMatches(listOf(match.memberTransactions())) }
-                            },
-                            enabled = !bulkRunning,
-                        ) { Text("Accept") }
-                    }
-                }
-                val onlyInSource = loaded.missingInMm.filter { !hideUnknownAssets || !it.assetUnknownToMm }
-                sectionHeading("Only in ${source.name} (${onlyInSource.size})") {
-                    BulkButton("Ignore all", onlyInSource.size, enabled = !bulkRunning) { ignoreAll(loaded.movementsOf(onlyInSource)) }
-                }
-                item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = hideUnknownAssets, onCheckedChange = { hideUnknownAssets = it })
-                        Text("Hide assets Money Manager has never seen on the linked accounts (e.g. spam airdrops)")
-                    }
-                }
-                legGroups(
-                    prefix = "source-only",
-                    groups = groupByWalletAndMonth(onlyInSource, { it.walletAccountId }, { it.leg.timestamp }, walletName),
-                    expanded = expanded,
-                    empty = "Everything ${source.name} has on the linked wallets is in Money Manager.",
-                    headerAction = {
-                        rows,
-                        _,
-                        _,
-                        ->
-                        BulkButton("Ignore all", rows.size, enabled = !bulkRunning) { ignoreAll(loaded.movementsOf(rows)) }
-                    },
-                ) { unmatched ->
-                    LegRow(unmatched.leg, accountNames, onOpenLeg) {
-                        TextButton(
-                            onClick = { setIgnored(loaded.movementOf(unmatched), ignored = true) },
-                            enabled = !bulkRunning,
-                        ) { Text("Ignore") }
-                        TextButton(
-                            onClick = { pickerState.open(unmatched.pickerKey) },
-                            enabled = !bulkRunning,
-                        ) { Text("Select matching transactions…") }
-                    }
-                }
-                sectionHeading("Only in Money Manager (${loaded.missingInSource.size})")
-                legGroups(
-                    prefix = "mm-only",
-                    groups = groupByWalletAndMonth(loaded.missingInSource, { it.walletAccountId }, { it.leg.timestamp }, walletName),
-                    expanded = expanded,
-                    empty = "Everything on the linked accounts in ${source.name}'s date range is in ${source.name}.",
-                ) { LegRow(it.leg, accountNames, onOpenLeg) }
+            val walletName: (AccountId) -> String = { id ->
+                shadowAccounts.firstOrNull { it.accountId == id }?.let(source::walletName) ?: accountNames[id].orEmpty()
             }
+            when (tab) {
+                ResultTab.UNMATCHED -> {
+                    // Accept all stores the exact matches under the same header too, not only the near ones listed here.
+                    sectionHeading("Near matches (${loaded.nearMatches.size})") {
+                        loaded.unstoredMatches().let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
+                    }
+                    legGroups(
+                        prefix = "near",
+                        groups =
+                            groupByWalletAndMonth(
+                                loaded.nearMatches,
+                                { it.sourceLeg.accountId },
+                                { it.sourceLeg.timestamp },
+                                walletName,
+                            ),
+                        expanded = expanded,
+                        leafIds = { match -> match.sourceLegs.map { it.transactionId } },
+                        highlight = highlightedLeaf,
+                        empty = "No near matches: every match agrees to the second.",
+                        headerAction = { _, wallet, month ->
+                            loaded
+                                .unstoredMatches(
+                                    wallet,
+                                    month,
+                                ).let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
+                        },
+                    ) { match ->
+                        MatchRow(match, accountNames, onOpenLeg) {
+                            TextButton(
+                                onClick = {
+                                    write(
+                                        "Matching",
+                                    ) { importEngine.createReconciliationMatches(listOf(match.memberTransactions())) }
+                                },
+                                enabled = !bulkRunning,
+                            ) { Text("Accept") }
+                        }
+                    }
+                    val onlyInSource = loaded.missingInMm.filter { !hideUnknownAssets || !it.assetUnknownToMm }
+                    sectionHeading("Only in ${source.name} (${onlyInSource.size})") {
+                        BulkButton("Ignore all", onlyInSource.size, enabled = !bulkRunning) { ignoreAll(loaded.movementsOf(onlyInSource)) }
+                    }
+                    item {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = hideUnknownAssets, onCheckedChange = { hideUnknownAssets = it })
+                            Text("Hide assets Money Manager has never seen on the linked accounts (e.g. spam airdrops)")
+                        }
+                    }
+                    legGroups(
+                        prefix = "source-only",
+                        groups = groupByWalletAndMonth(onlyInSource, { it.walletAccountId }, { it.leg.timestamp }, walletName),
+                        expanded = expanded,
+                        leafIds = { listOf(it.leg.transactionId) },
+                        highlight = highlightedLeaf,
+                        empty = "Everything ${source.name} has on the linked wallets is in Money Manager.",
+                        headerAction = {
+                            rows,
+                            _,
+                            _,
+                            ->
+                            BulkButton("Ignore all", rows.size, enabled = !bulkRunning) { ignoreAll(loaded.movementsOf(rows)) }
+                        },
+                    ) { unmatched ->
+                        LegRow(unmatched.leg, accountNames, onOpenLeg) {
+                            TextButton(
+                                onClick = { setIgnored(loaded.movementOf(unmatched), ignored = true) },
+                                enabled = !bulkRunning,
+                            ) { Text("Ignore") }
+                            TextButton(
+                                onClick = { pickerState.open(unmatched.pickerKey) },
+                                enabled = !bulkRunning,
+                            ) { Text("Select matching transactions…") }
+                        }
+                    }
+                    sectionHeading("Only in Money Manager (${loaded.missingInSource.size})")
+                    legGroups(
+                        prefix = "mm-only",
+                        groups = groupByWalletAndMonth(loaded.missingInSource, { it.walletAccountId }, { it.leg.timestamp }, walletName),
+                        expanded = expanded,
+                        leafIds = { listOf(it.leg.transactionId) },
+                        highlight = highlightedLeaf,
+                        empty = "Everything on the linked accounts in ${source.name}'s date range is in ${source.name}.",
+                    ) { LegRow(it.leg, accountNames, onOpenLeg) }
+                }
 
-            ResultTab.MATCHED -> {
-                sectionHeading("Matched (${loaded.matched.size})") {
-                    loaded.unstoredMatches().filter { it.settled }.let {
-                        BulkButton(
-                            "Accept all",
-                            it.size,
-                            enabled = !bulkRunning,
-                        ) { storeMatches(it) }
+                ResultTab.MATCHED -> {
+                    sectionHeading("Matched (${loaded.matched.size})") {
+                        loaded.unstoredMatches().filter { it.settled }.let {
+                            BulkButton(
+                                "Accept all",
+                                it.size,
+                                enabled = !bulkRunning,
+                            ) { storeMatches(it) }
+                        }
                     }
-                }
-                legGroups(
-                    prefix = "matched",
-                    groups = groupByWalletAndMonth(loaded.matched, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
-                    expanded = expanded,
-                    empty = "Nothing matched yet — link the wallets above.",
-                    // Only the rows the matcher found: a stored one is already accepted.
-                    headerAction = { _, wallet, month ->
-                        loaded
-                            .unstoredMatches(
-                                wallet,
-                                month,
-                            ).filter { it.settled }
-                            .let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
-                    },
-                ) { match ->
-                    val matchId = match.matchId
-                    MatchRow(
-                        match,
-                        accountNames,
-                        onOpenLeg,
-                        action =
-                            if (matchId == null) {
-                                null
-                            } else {
-                                {
-                                    TextButton(
-                                        onClick = { write("Unmatching") { importEngine.deleteRelationship(RelationshipId(matchId)) } },
-                                        enabled = !bulkRunning,
-                                    ) {
-                                        Text("Unmatch")
+                    legGroups(
+                        prefix = "matched",
+                        groups = groupByWalletAndMonth(loaded.matched, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
+                        expanded = expanded,
+                        leafIds = { match -> match.sourceLegs.map { it.transactionId } },
+                        highlight = highlightedLeaf,
+                        empty = "Nothing matched yet — link the wallets above.",
+                        // Only the rows the matcher found: a stored one is already accepted.
+                        headerAction = { _, wallet, month ->
+                            loaded
+                                .unstoredMatches(
+                                    wallet,
+                                    month,
+                                ).filter { it.settled }
+                                .let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
+                        },
+                    ) { match ->
+                        val matchId = match.matchId
+                        MatchRow(
+                            match,
+                            accountNames,
+                            onOpenLeg,
+                            action =
+                                if (matchId == null) {
+                                    null
+                                } else {
+                                    {
+                                        TextButton(
+                                            onClick = { write("Unmatching") { importEngine.deleteRelationship(RelationshipId(matchId)) } },
+                                            enabled = !bulkRunning,
+                                        ) {
+                                            Text("Unmatch")
+                                        }
                                     }
-                                }
-                            },
-                    )
-                }
-                sectionHeading("Ignored (${loaded.ignored.size})")
-                legGroups(
-                    prefix = "ignored",
-                    groups = groupByWalletAndMonth(loaded.ignored, { it.walletAccountId }, { it.leg.timestamp }, walletName),
-                    expanded = expanded,
-                    empty = "No ${source.name} rows ignored.",
-                ) { ignored ->
-                    LegRow(ignored.leg, accountNames, onOpenLeg) {
-                        TextButton(
-                            onClick = { setIgnored(listOf(ignored.leg), ignored = false) },
-                            enabled = !bulkRunning,
-                        ) { Text("Un-ignore") }
+                                },
+                        )
+                    }
+                    sectionHeading("Ignored (${loaded.ignored.size})")
+                    legGroups(
+                        prefix = "ignored",
+                        groups = groupByWalletAndMonth(loaded.ignored, { it.walletAccountId }, { it.leg.timestamp }, walletName),
+                        expanded = expanded,
+                        leafIds = { listOf(it.leg.transactionId) },
+                        highlight = highlightedLeaf,
+                        empty = "No ${source.name} rows ignored.",
+                    ) { ignored ->
+                        LegRow(ignored.leg, accountNames, onOpenLeg) {
+                            TextButton(
+                                onClick = { setIgnored(listOf(ignored.leg), ignored = false) },
+                                enabled = !bulkRunning,
+                            ) { Text("Un-ignore") }
+                        }
                     }
                 }
             }
@@ -803,6 +867,8 @@ private fun <T> LazyListScope.legGroups(
     prefix: String,
     groups: List<WalletGroup<T>>,
     expanded: MutableMap<String, Boolean>,
+    leafIds: (T) -> List<Long>,
+    highlight: Long?,
     empty: String,
     headerAction: (@Composable (items: List<T>, wallet: AccountId, month: String?) -> Unit)? = null,
     row: @Composable (T) -> Unit,
@@ -845,7 +911,24 @@ private fun <T> LazyListScope.legGroups(
                 }
             }
             if (expanded[monthKey] == true) {
-                items(month.items) { Row(modifier = Modifier.padding(start = 32.dp)) { row(it) } }
+                items(month.items.size, key = { leafKey(leafIds(month.items[it]), monthKey, it) }) {
+                    val marked = highlight != null && highlight in leafIds(month.items[it])
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .then(
+                                    if (marked) {
+                                        Modifier
+                                            .background(
+                                                MaterialTheme.colorScheme.primaryContainer,
+                                            ).testTag(HIGHLIGHTED_TAG)
+                                    } else {
+                                        Modifier
+                                    },
+                                ).padding(start = 32.dp),
+                    ) { row(month.items[it]) }
+                }
             }
         }
     }
@@ -932,3 +1015,90 @@ private fun ReconciliationProgress(progress: Progress?) {
         )
     }
 }
+
+/** Frames to wait for a row to appear in the list before giving up on scrolling to it. */
+private const val SCROLL_ATTEMPTS = 30
+
+/** Where a movement sits in the comparison: its [tab], the [prefix] of the list and the [wallet] and [month] groups holding it. */
+private data class LeafLocation(
+    val tab: ResultTab,
+    val prefix: String,
+    val wallet: AccountId,
+    val month: String,
+)
+
+/** Finds [transactionId] among [result]'s lists, grouped as the screen groups them; null when it is in none (or hidden). */
+private fun locateLeaf(
+    result: ReconciliationResult,
+    transactionId: Long,
+    hideUnknownAssets: Boolean,
+): LeafLocation? {
+    fun LegMatch.holds() = sourceLegs.any { it.transactionId == transactionId }
+
+    fun UnmatchedSourceLeg.holds() = leg.transactionId == transactionId
+    return result.nearMatches.firstOrNull { it.holds() }?.let {
+        LeafLocation(ResultTab.UNMATCHED, "near", it.sourceLeg.accountId, monthKey(it.sourceLeg.timestamp))
+    } ?: result.missingInMm.firstOrNull { it.holds() && (!hideUnknownAssets || !it.assetUnknownToMm) }?.let {
+        LeafLocation(ResultTab.UNMATCHED, "source-only", it.walletAccountId, monthKey(it.leg.timestamp))
+    } ?: result.matched.firstOrNull { it.holds() }?.let {
+        LeafLocation(ResultTab.MATCHED, "matched", it.sourceLeg.accountId, monthKey(it.sourceLeg.timestamp))
+    } ?: result.ignored.firstOrNull { it.holds() }?.let {
+        LeafLocation(ResultTab.MATCHED, "ignored", it.walletAccountId, monthKey(it.leg.timestamp))
+    }
+}
+
+/** The key of a row of a list: the transactions it shows, then where it sits, so it is unique and can be searched for. */
+private fun leafKey(
+    transactionIds: List<Long>,
+    month: String,
+    index: Int,
+): String = "leaf:${transactionIds.joinToString("+")}:$month:$index"
+
+private fun leafHolds(
+    key: Any,
+    transactionId: Long,
+): Boolean {
+    val ids =
+        (key as? String)
+            ?.takeIf { it.startsWith("leaf:") }
+            ?.split(':')
+            ?.getOrNull(1)
+            ?.split('+')
+    return ids?.contains(transactionId.toString()) == true
+}
+
+/** Passes every item through to [delegate] and notes the index of each keyed one, so a row can be scrolled to by its key. */
+private class IndexingScope(
+    private val delegate: LazyListScope,
+    private val indexByKey: MutableMap<Any, Int>,
+) : LazyListScope by delegate {
+    private var next = 0
+
+    init {
+        indexByKey.clear()
+    }
+
+    override fun item(
+        key: Any?,
+        contentType: Any?,
+        content: @Composable LazyItemScope.() -> Unit,
+    ) {
+        key?.let { indexByKey[it] = next }
+        next++
+        delegate.item(key, contentType, content)
+    }
+
+    override fun items(
+        count: Int,
+        key: ((Int) -> Any)?,
+        contentType: (Int) -> Any?,
+        itemContent: @Composable LazyItemScope.(Int) -> Unit,
+    ) {
+        if (key != null) repeat(count) { indexByKey[key(it)] = next + it }
+        next += count
+        delegate.items(count, key, contentType, itemContent)
+    }
+}
+
+/** Test tag of the row a link named, which is marked in the list. */
+internal const val HIGHLIGHTED_TAG = "reconciliation-highlighted"

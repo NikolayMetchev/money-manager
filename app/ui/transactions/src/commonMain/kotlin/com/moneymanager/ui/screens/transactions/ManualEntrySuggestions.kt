@@ -6,12 +6,15 @@ import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.reconciliation.ShadowAccount
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.reconciliation.FEE_SUGGESTION_WINDOW
 import com.moneymanager.reconciliation.FeeSuggestion
 import com.moneymanager.reconciliation.OtherSideSuggestion
+import com.moneymanager.reconciliation.planAutoLinks
+import com.moneymanager.reconciliation.realAccounts
 import com.moneymanager.reconciliation.suggestFees
 import com.moneymanager.reconciliation.suggestOtherSides
 import kotlinx.coroutines.flow.first
@@ -65,6 +68,7 @@ internal suspend fun loadManualEntrySuggestions(
     placeholders: List<Pair<Trade, String>>,
     withdrawals: List<PendingManualEntry>,
     reconciliationRepository: ReconciliationReadRepository,
+    accountRepository: AccountReadRepository,
     tradeRepository: TradeReadRepository,
     transactionRepository: TransactionReadRepository,
 ): ManualEntrySuggestions {
@@ -83,9 +87,40 @@ internal suspend fun loadManualEntrySuggestions(
             .flatMap { transactionRepository.getTransactionsByDateRange(it.timestamp - slack, it.timestamp + slack).first() }
             .filter { it.sourceAccountId in shadowIds }
             .distinctBy { it.id }
+    val feeAccountIds = shadow.filter { it.feeAccountFor != null }.mapTo(mutableSetOf()) { it.accountId }
+    // A source fee a person already matched is spoken for; a wallet counts as the account it is linked to, or would be linked to.
+    val claimedFees =
+        if (withdrawals.isEmpty()) {
+            emptySet()
+        } else {
+            reconciliationRepository
+                .getLegs(
+                    feeAccountIds,
+                ).filter { it.matchIds.isNotEmpty() }
+                .mapTo(mutableSetOf()) { TransferId(it.transactionId) }
+        }
+    val mirrored = mirroredAccounts(shadow, reconciliationRepository, accountRepository)
+    val mirrors: (AccountId, AccountId) -> Boolean = { wallet, real -> (wallet to real) in mirrored }
     return ManualEntrySuggestions(
-        trades = suggestOtherSides(placeholders, shadowTrades),
-        fees = suggestFees(withdrawals, sourceTransfers, shadow.filter { it.feeAccountFor != null }.mapTo(mutableSetOf()) { it.accountId }),
+        trades = suggestOtherSides(placeholders, shadowTrades, mirrors),
+        fees = suggestFees(withdrawals, sourceTransfers, feeAccountIds, claimedFees, mirrors),
         shadowAccounts = shadow.associateBy { it.accountId },
     )
+}
+
+/** The (wallet, real account) pairs that are one account: those linked, and those [planAutoLinks] would link by name. */
+private suspend fun mirroredAccounts(
+    shadow: List<ShadowAccount>,
+    reconciliationRepository: ReconciliationReadRepository,
+    accountRepository: AccountReadRepository,
+): Set<Pair<AccountId, AccountId>> {
+    val links = reconciliationRepository.getLinks().first()
+    val real = realAccounts(accountRepository.getAllAccounts().first(), shadow)
+    val byName =
+        reconciliationRepository
+            .getSources()
+            .first()
+            .flatMap { source -> planAutoLinks(source, shadow, links, real).entries }
+            .map { it.key to it.value }
+    return links.mapTo(mutableSetOf()) { it.shadowAccountId to it.realAccountId } + byName
 }

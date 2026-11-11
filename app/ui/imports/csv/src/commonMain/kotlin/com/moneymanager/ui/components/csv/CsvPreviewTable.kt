@@ -3,6 +3,7 @@ package com.moneymanager.ui.components.csv
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -89,6 +90,12 @@ fun CsvPreviewTable(
         val targetIndex = rows.indexOfFirst { it.rowIndex == targetRowIndex }
         if (targetIndex >= 0) {
             lazyListState.animateScrollToItem(targetIndex)
+            // It sits at the top now: move the list back by half of what is left of the screen, so the row is in the middle.
+            val layout = lazyListState.layoutInfo
+            layout.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.let { row ->
+                val viewport = layout.viewportEndOffset - layout.viewportStartOffset
+                lazyListState.animateScrollBy(-(viewport - row.size) / 2f)
+            }
             scrolledToRowIndex.value = targetRowIndex
         }
     }

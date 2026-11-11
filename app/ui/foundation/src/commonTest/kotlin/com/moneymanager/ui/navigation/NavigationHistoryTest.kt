@@ -102,4 +102,16 @@ class NavigationHistoryTest {
         history.navigateBack()
         assertEquals(Screen.Accounts(), history.currentScreen)
     }
+
+    @Test
+    fun aLinkToAnotherSubTabIsAStepBackReturnsFrom() {
+        val manual = Screen.Imports(ImportTab.RECONCILIATION, ReconciliationSubTab.MANUAL)
+        val history = NavigationHistory(manual)
+
+        history.navigateTo(Screen.Imports(ImportTab.RECONCILIATION, ReconciliationSubTab.EXTERNAL))
+        assertEquals(Screen.Imports(ImportTab.RECONCILIATION, ReconciliationSubTab.EXTERNAL), history.currentScreen)
+
+        history.navigateBack()
+        assertEquals(manual, history.currentScreen)
+    }
 }

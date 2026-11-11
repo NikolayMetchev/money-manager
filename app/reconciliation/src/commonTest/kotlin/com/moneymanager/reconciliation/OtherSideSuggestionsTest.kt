@@ -84,6 +84,18 @@ class OtherSideSuggestionsTest {
     }
 
     @Test
+    fun `a wallet that is not the placeholder account is not taken`() {
+        val wrongWallet: (AccountId, AccountId) -> Boolean = { _, _ -> false }
+        val rightWallet: (AccountId, AccountId) -> Boolean = { wallet, real -> wallet == AccountId(9) && real == AccountId(1) }
+
+        assertNull(suggestOtherSides(listOf(buy to "UNKNOWN"), listOf(koinlyBuy()), wrongWallet)[buy.id])
+        assertEquals(
+            TradeId(10),
+            suggestOtherSides(listOf(buy to "UNKNOWN"), listOf(koinlyBuy()), rightWallet).getValue(buy.id).shadowTrade.id,
+        )
+    }
+
+    @Test
     fun `two source trades fitting one placeholder is left to a person`() {
         val twin = koinlyBuy().copy(id = TradeId(12))
 
