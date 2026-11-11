@@ -51,9 +51,12 @@ fun suggestOtherSides(
                 shadowTrades.mapNotNull { shadow ->
                     val sameSide = if (placeholderIsTo) shadow.from else shadow.to
                     val other = if (placeholderIsTo) shadow.to else shadow.from
+                    // The wallet and the account are those of the known leg: a trade's two legs may sit on different accounts.
+                    val sameWallet = if (placeholderIsTo) shadow.fromAccountId else shadow.toAccountId
+                    val knownAccount = if (placeholderIsTo) placeholder.fromAccountId else placeholder.toAccountId
                     OtherSideSuggestion(placeholder, code, shadow, other).takeIf {
                         shadow.timestamp.epochSeconds == placeholder.timestamp.epochSeconds &&
-                            mirrors(shadow.fromAccountId, placeholder.fromAccountId) &&
+                            mirrors(sameWallet, knownAccount) &&
                             agree(sameSide, known)
                     }
                 }
@@ -125,17 +128,17 @@ suspend fun ImportEngine.acceptOtherSideSuggestions(
     links: Map<AccountId, AccountId>,
 ) {
     if (suggestions.isEmpty()) return
-    val created =
+    val entries =
         createManualTradeEntries(
             suggestions.map { ManualTradeInput(it.placeholder, it.placeholderAssetCode, it.otherSide) },
         )
     // The matches are a second write: were it to fail, the placeholders would be gone from Manual Entries for nothing, so put them back.
     var matched = false
     try {
-        createReconciliationMatches(suggestions.mapIndexed { index, suggestion -> listOf(created[index], suggestion.shadowTrade.id) })
+        createReconciliationMatches(suggestions.mapIndexed { index, suggestion -> listOf(entries.ids[index], suggestion.shadowTrade.id) })
         matched = true
     } finally {
-        if (!matched) withContext(NonCancellable) { undoManualTradeEntries(created, suggestions.map { it.placeholder.id }) }
+        if (!matched) withContext(NonCancellable) { undoManualTradeEntries(entries.inserted, suggestions.map { it.placeholder.id }) }
     }
     links.forEach { (wallet, real) -> setReconciliationLinks(wallet, setOf(real)) }
 }

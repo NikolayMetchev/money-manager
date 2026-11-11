@@ -94,7 +94,7 @@ fun CsvPreviewTable(
             val layout = lazyListState.layoutInfo
             layout.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.let { row ->
                 val viewport = layout.viewportEndOffset - layout.viewportStartOffset
-                lazyListState.animateScrollBy(-(viewport - row.size) / 2f)
+                lazyListState.animateScrollBy(-(viewport - row.size).coerceAtLeast(0) / 2f)
             }
             scrolledToRowIndex.value = targetRowIndex
         }

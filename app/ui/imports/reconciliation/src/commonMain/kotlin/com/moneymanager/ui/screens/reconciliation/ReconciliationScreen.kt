@@ -228,10 +228,13 @@ private fun SourceReconciliation(
         refreshKey++
     }
     var result by remember { mutableStateOf(cache.peek(source.name, writeVersion)) }
+    // The wallets and links the result was made for: the one shown at first may be a kept result for inputs not loaded yet.
+    var resultFor by remember { mutableStateOf<Pair<Set<AccountId>, List<ReconciliationLink>>?>(null) }
     var progress by remember { mutableStateOf<Progress?>(null) }
     LaunchedEffect(source, shadowIds, links, refreshKey, writeVersion) {
         cache.get(source.name, shadowIds, links, writeVersion)?.let {
             result = it
+            resultFor = shadowIds to links
             return@LaunchedEffect
         }
         // The flows above start empty, so these inputs may just not have loaded; keep what was shown until they do.
@@ -249,6 +252,7 @@ private fun SourceReconciliation(
         val computed = withContext(Dispatchers.Default) { reconcile(sourceLegs, links, realLegs, onProgress = { progress = it }) }
         cache.put(source.name, shadowIds, links, writeVersion, computed)
         result = computed
+        resultFor = shadowIds to links
     }
 
     val unlinked = remember(source, shadowAccounts, links, real) { unlinkedWallets(source, shadowAccounts, links, real) }
@@ -267,10 +271,12 @@ private fun SourceReconciliation(
     // The movement a link named stays marked, as the CSV screen marks the row it was sent to.
     var highlightedLeaf by remember(source) { mutableStateOf<Long?>(null) }
     // The movement a link named: found among the comparison's lists, its tab and tree opened down to it, then scrolled to.
-    LaunchedEffect(focus.request, source, result) {
+    LaunchedEffect(focus.request, source, result, resultFor, shadowIds, links) {
         val request = focus.request ?: return@LaunchedEffect
         if (request.sourceName != source.name) return@LaunchedEffect
         val comparison = result ?: return@LaunchedEffect
+        // Wait for a comparison of the wallets and links as loaded: finding the movement in one made too soon would fail and give up.
+        if (shadowIds.isEmpty() || resultFor != (shadowIds to links)) return@LaunchedEffect
         val at = locateLeaf(comparison, request.transactionId, hideUnknownAssets)
         if (at != null) {
             tab = at.tab
@@ -302,7 +308,7 @@ private fun SourceReconciliation(
                 val layout = listState.layoutInfo
                 layout.visibleItemsInfo.firstOrNull { it.index == index }?.let { row ->
                     val viewport = layout.viewportEndOffset - layout.viewportStartOffset
-                    listState.scrollBy(-(viewport - row.size) / 2f)
+                    listState.scrollBy(-(viewport - row.size).coerceAtLeast(0) / 2f)
                 }
                 scrollToLeaf = null
                 return@LaunchedEffect
