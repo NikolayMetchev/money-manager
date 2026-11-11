@@ -1,5 +1,6 @@
 package com.moneymanager.ui.screens.csvstrategy.editor
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -136,6 +138,21 @@ private fun LegGroupRuleEditor(
                 singleLine = true,
                 enabled = enabled,
             )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = assembly.acrossFiles,
+                    onCheckedChange = { onRuleChanged(rule.copy(assembly = assembly.copy(acrossFiles = it))) },
+                    enabled = enabled,
+                )
+                Text(
+                    "The two sides sit in different staged files (pair legs across files; a leg waits until its partner is staged)",
+                    modifier =
+                        Modifier.clickable(enabled = enabled) {
+                            onRuleChanged(rule.copy(assembly = assembly.copy(acrossFiles = !assembly.acrossFiles)))
+                        },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
 
         is LegAssembly.ThroughAccount -> {

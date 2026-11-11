@@ -500,6 +500,7 @@ fun CsvImportDetailScreen(
         ApplyStrategyDialog(
             csvImport = import!!,
             rows = rows,
+            csvImportRepository = csvImportRepository,
             csvImportStrategyRepository = csvImportStrategyRepository,
             accountMappingRepository = accountMappingRepository,
             accountRepository = accountRepository,

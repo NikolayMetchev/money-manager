@@ -718,7 +718,16 @@ class CsvTransferMapper(
             // The placeholder id is the "new account" marker; two not-yet-created accounts stay distinct.
             // A trade row is exempt: the trade CHECK only requires the ASSETS to differ, so a same-account
             // cross-asset exchange (e.g. BTC→ETH inside one wallet) is valid.
+            // The same goes for a leg of a cross-file trade: the trade is the account's own exchange, so the leg has
+            // no counterparty of its own.
+            val tradeLegOfOneAccount =
+                legDetection?.leg?.let {
+                    strategy.config.legGroups
+                        .getOrNull(it.ruleIndex)
+                        ?.isCrossFileTrade()
+                } == true
             if (tradeTo == null &&
+                !tradeLegOfOneAccount &&
                 effectiveSourceAccountId == effectiveTargetAccountId &&
                 effectiveSourceAccountId != UNRESOLVED_ACCOUNT_ID
             ) {

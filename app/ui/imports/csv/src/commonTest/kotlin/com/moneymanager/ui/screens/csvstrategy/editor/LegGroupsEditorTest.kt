@@ -62,6 +62,15 @@ class LegGroupsEditorTest {
         }
 
     @Test
+    fun aTradeGroupCanPairItsLegsAcrossStagedFiles() =
+        runEditor(listOf(LegGroupRule(name = "exchange", assembly = LegAssembly.Trade()))) { rules ->
+            onNodeWithText("pair legs across files", substring = true).performScrollTo().performClick()
+            waitForIdle()
+
+            assertTrue(assertIs<LegAssembly.Trade>(rules().single().assembly).acrossFiles)
+        }
+
+    @Test
     fun aLinkedGroupEditsItsRelationshipType() =
         runEditor(listOf(LegGroupRule(name = "family", assembly = LegAssembly.Linked("parent", anchorWhen)))) { rules ->
             onAllNodesWithText("parent")[0].performScrollTo().performTextReplacement("family")
