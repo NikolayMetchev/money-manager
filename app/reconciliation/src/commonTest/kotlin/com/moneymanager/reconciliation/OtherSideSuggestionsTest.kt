@@ -24,7 +24,7 @@ class OtherSideSuggestionsTest {
     private val btc = asset(2, "BTC")
     private val unknown = asset(3, "UNKNOWN")
 
-    /** [units] of the asset in thousandths-of-a-billionth places: the 1e18-scaled integer for a decimal string. */
+    /** The 1e18-scaled integer for a decimal string, as [asset] stores it. */
     private fun money(
         asset: Currency,
         decimal: String,
@@ -78,16 +78,16 @@ class OtherSideSuggestionsTest {
 
     @Test
     fun `nothing is suggested for another second or another amount or another side`() {
-        assertNull(suggestOtherSides(listOf(buy to "UNKNOWN"), listOf(koinlyBuy("2020-05-10T01:15:29Z"))).get(buy.id))
-        assertNull(suggestOtherSides(listOf(sell to "UNKNOWN"), listOf(koinlySell("1098.50"))).get(sell.id))
-        assertNull(suggestOtherSides(listOf(sell to "UNKNOWN"), listOf(koinlyBuy())).get(sell.id))
+        assertNull(suggestOtherSides(listOf(buy to "UNKNOWN"), listOf(koinlyBuy("2020-05-10T01:15:29Z")))[buy.id])
+        assertNull(suggestOtherSides(listOf(sell to "UNKNOWN"), listOf(koinlySell("1098.50")))[sell.id])
+        assertNull(suggestOtherSides(listOf(sell to "UNKNOWN"), listOf(koinlyBuy()))[sell.id])
     }
 
     @Test
     fun `two source trades fitting one placeholder is left to a person`() {
         val twin = koinlyBuy().copy(id = TradeId(12))
 
-        assertNull(suggestOtherSides(listOf(buy to "UNKNOWN"), listOf(koinlyBuy(), twin)).get(buy.id))
+        assertNull(suggestOtherSides(listOf(buy to "UNKNOWN"), listOf(koinlyBuy(), twin))[buy.id])
     }
 
     @Test

@@ -66,14 +66,14 @@ private fun agree(
     a: Money,
     b: Money,
 ): Boolean {
-    if (a.asset.code != b.asset.code) return false
-    if (a.amount == b.amount) return true
     val left = Digits.of(a.amount)
     val right = Digits.of(b.amount)
     val decimals = minOf(left.decimalsKept, right.decimalsKept)
-    if (decimals < MIN_COMPARED_DECIMALS) return false
     // The longer amount agrees when cut or rounded to the shorter one's decimals.
-    return left.cut(decimals) == right.cut(decimals) || left.rounded(decimals) == right.rounded(decimals)
+    val agreeAtSharedDecimals =
+        decimals >= MIN_COMPARED_DECIMALS &&
+            (left.cut(decimals) == right.cut(decimals) || left.rounded(decimals) == right.rounded(decimals))
+    return a.asset.code == b.asset.code && (a.amount == b.amount || agreeAtSharedDecimals)
 }
 
 /** A stored amount's whole and fractional digits, for comparing at fewer decimals than it keeps. */

@@ -20,7 +20,6 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
 
 /**
  * A Revolut exchange row that names no currency waits in Manual Entries as a placeholder; the Koinly trade at the same instant
