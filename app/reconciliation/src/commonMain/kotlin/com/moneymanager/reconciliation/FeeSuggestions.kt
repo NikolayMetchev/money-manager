@@ -99,11 +99,12 @@ suspend fun ImportEngine.acceptFeeSuggestions(
             excludedFromBalances = excludedFromBalances,
         )
     // The matches are a second write: were it to fail, the entries would leave Manual Entries with nothing to show for it.
+    var matched = false
     try {
         createReconciliationMatches(suggestions.mapIndexed { index, suggestion -> listOf(entries[index], suggestion.feeTransfer.id) })
-    } catch (failure: Exception) {
-        withContext(NonCancellable) { deleteManualEntries(entries) }
-        throw failure
+        matched = true
+    } finally {
+        if (!matched) withContext(NonCancellable) { deleteManualEntries(entries) }
     }
     links.forEach { (wallet, real) -> setReconciliationLinks(wallet, setOf(real)) }
 }

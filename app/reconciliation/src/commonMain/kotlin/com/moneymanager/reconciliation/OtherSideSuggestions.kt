@@ -130,11 +130,12 @@ suspend fun ImportEngine.acceptOtherSideSuggestions(
             suggestions.map { ManualTradeInput(it.placeholder, it.placeholderAssetCode, it.otherSide) },
         )
     // The matches are a second write: were it to fail, the placeholders would be gone from Manual Entries for nothing, so put them back.
+    var matched = false
     try {
         createReconciliationMatches(suggestions.mapIndexed { index, suggestion -> listOf(created[index], suggestion.shadowTrade.id) })
-    } catch (failure: Exception) {
-        withContext(NonCancellable) { undoManualTradeEntries(created, suggestions.map { it.placeholder.id }) }
-        throw failure
+        matched = true
+    } finally {
+        if (!matched) withContext(NonCancellable) { undoManualTradeEntries(created, suggestions.map { it.placeholder.id }) }
     }
     links.forEach { (wallet, real) -> setReconciliationLinks(wallet, setOf(real)) }
 }
