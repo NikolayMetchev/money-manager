@@ -3,6 +3,7 @@
 package com.moneymanager.ui.screens.transactions
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -119,7 +120,7 @@ class ManualEntriesTradesTest {
         }
 
     /** The one place this file calls the screen, so a change to what the screen takes is a change here only. */
-    private fun androidx.compose.ui.test.ComposeUiTest.showScreen(engine: RecordingEngine) {
+    private fun ComposeUiTest.showScreen(engine: RecordingEngine) {
         val strategies: CsvImportStrategyReadRepository =
             mock(MockMode.autoUnit) {
                 every { getAllStrategies() } returns
