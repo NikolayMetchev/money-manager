@@ -1,7 +1,7 @@
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel/kmp:defs.bzl", "kmp_library")
-load("//bazel/kmp:web.bzl", "WEB_TARGETS", "kt_web_dist", "kt_web_executable")
 load("//bazel/kmp:optional.bzl", "WEB_ONLY")
+load("//bazel/kmp:web.bzl", "WEB_TARGETS", "kt_web_dist", "kt_web_executable")
 
 # The browser app (#84): src/main compiles for wasmJs and js, and :dist is the site that loads one of them.
 # gazelle:kmp_generate true
@@ -41,10 +41,10 @@ kmp_library(
 [
     kt_web_executable(
         name = "program_" + target,
-        target_compatible_with = WEB_ONLY,
         base_name = "money-manager",
         library = ":web_" + target,
         target = target,
+        target_compatible_with = WEB_ONLY,
     )
     for target in WEB_TARGETS
 ]
@@ -52,10 +52,10 @@ kmp_library(
 # The site: index.html and loader.mjs, which starts the wasmJs program or, without WasmGC, the js one.
 kt_web_dist(
     name = "dist",
-    target_compatible_with = WEB_ONLY,
     srcs = glob(["site/*"]),
     programs = [":program_" + target for target in WEB_TARGETS],
     runtime_jars = ["@maven_kmp//:skiko_js_wasm_runtime_jvm"],
+    target_compatible_with = WEB_ONLY,
     # Pages publishes it at app/.
     visibility = ["//webpage:__pkg__"],
 )
@@ -63,7 +63,6 @@ kt_web_dist(
 # `bazel run //app/main/web:serve [-- <port>]` serves the site at http://127.0.0.1:8080/ (the address a Google sign-in origin names).
 sh_binary(
     name = "serve",
-    target_compatible_with = WEB_ONLY,
     srcs = ["//bazel/kmp/web:serve.sh"],
     args = [
         "$(rootpath //bazel/kmp/testing/web:node)",
@@ -75,4 +74,5 @@ sh_binary(
         "//bazel/kmp/testing/web:node",
         "//bazel/kmp/web:serve.mjs",
     ],
+    target_compatible_with = WEB_ONLY,
 )

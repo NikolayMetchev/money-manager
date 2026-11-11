@@ -1,9 +1,9 @@
 load("@android_sdk//:versions.bzl", "COMPILE_SDK", "MIN_SDK", "TARGET_SDK")
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("//bazel/kmp:optional.bzl", "ANDROID_ONLY")
 load("//bazel/kmp/android:apk.bzl", "android_apk")
 load("//bazel/kmp/android:device_test.bzl", "INSTRUMENTATION_RUNNER", "android_device_test")
 load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
-load("//bazel/kmp:optional.bzl", "ANDROID_ONLY")
 
 # The release smoke test (#1024), Gradle's `:app:main:android-smoketest:pixel6api36ReleaseAndroidTest
 # -PreleaseSmokeTest=true`: a self-instrumenting `com.android.test` module that drives the installed R8-minified
@@ -12,9 +12,9 @@ load("//bazel/kmp:optional.bzl", "ANDROID_ONLY")
 
 kt_jvm_library(
     name = "smoketest_lib",
-    target_compatible_with = ANDROID_ONLY,
     testonly = True,
     srcs = glob(["src/main/kotlin/**/*.kt"]),
+    target_compatible_with = ANDROID_ONLY,
     deps = [
         "//bazel/kmp/android:android_jar",
         "@maven_kmp//:androidx_test_runner_android",
@@ -33,7 +33,6 @@ kmp_lint(
 # The module's release build type: debug-signed, not debuggable, not minified.
 android_apk(
     name = "smoketest_apk",
-    target_compatible_with = ANDROID_ONLY,
     testonly = True,
     application_id = "com.moneymanager.android.smoketest",
     compile_sdk = COMPILE_SDK,
@@ -42,15 +41,16 @@ android_apk(
     manifest = "src/main/AndroidManifest.xml",
     min_sdk = MIN_SDK,
     namespace = "com.moneymanager.android.smoketest",
+    target_compatible_with = ANDROID_ONLY,
     target_sdk = TARGET_SDK,
     test_runner = INSTRUMENTATION_RUNNER,
 )
 
 android_device_test(
     name = "smoketest_test",
-    target_compatible_with = ANDROID_ONLY,
     size = "large",
     apk = ":smoketest_apk",
     install = {"com.moneymanager": "//app/main/android:release_debug_signed"},
     package = "com.moneymanager.android.smoketest",
+    target_compatible_with = ANDROID_ONLY,
 )

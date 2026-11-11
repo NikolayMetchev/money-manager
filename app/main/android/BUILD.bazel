@@ -67,7 +67,6 @@ kmp_library(
 # still beta, so the target SDK stays on the latest stable one.
 android_lint(
     name = "lint",
-    target_compatible_with = ANDROID_ONLY,
     size = "medium",
     srcs = glob(["src/main/kotlin/**/*.kt"]),
     agp_version = AGP_VERSION,
@@ -77,4 +76,5 @@ android_lint(
         "OldTargetApi",
     ],
     java_source_level = "25",
+    target_compatible_with = ANDROID_ONLY,
 )

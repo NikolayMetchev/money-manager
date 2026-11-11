@@ -1,7 +1,7 @@
 # A browser program linked from the module beside it, for both browser targets (#84).
 load("//bazel/kmp:defs.bzl", "kmp_library")
-load("//bazel/kmp:web.bzl", "WEB_TARGETS", "kt_web_executable")
 load("//bazel/kmp:optional.bzl", "WEB_ONLY")
+load("//bazel/kmp:web.bzl", "WEB_TARGETS", "kt_web_executable")
 
 kmp_library(
     name = "hello",
@@ -16,8 +16,8 @@ kmp_library(
         name = "hello_%s_program" % target,
         base_name = "hello",
         library = ":hello_" + target,
-        target_compatible_with = WEB_ONLY,
         target = target,
+        target_compatible_with = WEB_ONLY,
         visibility = ["//bazel/kmp/web/tests:__pkg__"],
     )
     for target in WEB_TARGETS

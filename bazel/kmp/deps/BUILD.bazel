@@ -4,8 +4,8 @@
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 load("//bazel/kmp:metadata.bzl", "kt_metadata_group")
 load("//bazel/kmp:native.bzl", "kt_native_group")
-load("//bazel/kmp:web.bzl", "WEB_TARGETS", "kt_web_group")
 load("//bazel/kmp:optional.bzl", "ANDROID_ONLY", "NATIVE_ONLY", "WEB_ONLY")
+load("//bazel/kmp:web.bzl", "WEB_TARGETS", "kt_web_group")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -115,8 +115,8 @@ kt_jvm_library(
     kt_web_group(
         name = "kotlin_test_" + target,
         target = target,
-        deps = ["@maven_kmp//:org_jetbrains_kotlin_kotlin_test_" + target],
         target_compatible_with = WEB_ONLY,
+        deps = ["@maven_kmp//:org_jetbrains_kotlin_kotlin_test_" + target],
     )
     for target in WEB_TARGETS
 ]
@@ -125,8 +125,8 @@ kt_jvm_library(
 [
     kt_metadata_group(
         name = "kotlin_test_" + metadata,
-        deps = ["@maven_kmp//:org_jetbrains_kotlin_kotlin_test_" + metadata],
         target_compatible_with = WEB_ONLY if metadata == "metadataWeb" else [],
+        deps = ["@maven_kmp//:org_jetbrains_kotlin_kotlin_test_" + metadata],
     )
     for metadata in [
         "metadata",

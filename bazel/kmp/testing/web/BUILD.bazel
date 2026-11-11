@@ -1,5 +1,5 @@
-load("//bazel/kmp:web.bzl", "node_runtime")
 load("//bazel/kmp:optional.bzl", "WEB_ONLY")
+load("//bazel/kmp:web.bzl", "node_runtime")
 
 package(default_visibility = ["//visibility:public"])
 
