@@ -625,7 +625,7 @@ suspend fun applyStagedCsv(
         unprocessedRowIndexes = unprocessedRowIndexes,
         tradeRepository = tradeRepository,
         visibleAccounts = accounts,
-        foreignRows = crossFileLegRows(stagedImport, strategy, csvImportRepository),
+        foreignFiles = crossFileLegRows(stagedImport, strategy, csvImportRepository),
     )
 }
 
@@ -1011,9 +1011,7 @@ suspend fun runCsvImport(
     unprocessedRowIndexes: Set<Long> = rows.mapTo(mutableSetOf()) { it.rowIndex },
     tradeRepository: TradeReadRepository? = null,
     // The accounts the strategy sees, when the caller has just read them to build [basePrep].
-    // Legs of the other staged files that pair with this file's (see [LegAssembly.Trade.acrossFiles]), their row
-    // indexes shifted out of this file's range. They only ever join a trade; nothing else is booked for them here.
-    foreignRows: List<CsvRow> = emptyList(),
+    foreignFiles: List<ForeignFile> = emptyList(),
     visibleAccounts: List<Account>? = null,
 ): CsvImportResult {
     logger.i { "Starting CSV import with ${basePrep.validTransfers.size} valid transfers" }
@@ -1066,7 +1064,10 @@ suspend fun runCsvImport(
         accountMappingRepository.getAllMappings().first()
     val historicalAccountNames = accountRepository.getPreviousAccountNames()
 
-    val mapper =
+    val accountOwnerNames = accountRepository.getAccountOwnerNames()
+
+    // A row's `(file name)` is its own file's, so another staged file's legs are mapped with that file's name.
+    fun mapperFor(fileName: String) =
         CsvTransferMapper(
             strategy = strategy,
             columns = columns,
@@ -1080,9 +1081,11 @@ suspend fun runCsvImport(
             sourceAccountOverride = selectedSourceAccountId,
             passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
             attributeAccountMatchers = attributeAccountMatchers,
-            fileName = csvImport.originalFileName,
-            accountOwnerNames = accountRepository.getAccountOwnerNames(),
+            fileName = fileName,
+            accountOwnerNames = accountOwnerNames,
         )
+
+    val mapper = mapperFor(csvImport.originalFileName)
 
     // Handle case when all rows are already processed (rows is already filtered by the caller)
     if (rows.isEmpty()) {
@@ -1104,7 +1107,7 @@ suspend fun runCsvImport(
     val finalPrep = mappedPrep.copy(validTransfers = mappedPrep.validTransfers.map { it.withOwnFeeAccount(feeAccountOf) })
     // The other staged files' legs of a cross-file trade group, mapped with the accounts this file just resolved.
     val foreignLegs: List<CsvTransferWithAttributes> =
-        if (foreignRows.isEmpty()) {
+        if (foreignFiles.isEmpty()) {
             emptyList()
         } else {
             val crossFileRules =
@@ -1114,7 +1117,10 @@ suspend fun runCsvImport(
                         rule.isCrossFileTrade()
                     }.map { it.index }
                     .toSet()
-            mapper.prepareImport(foreignRows).validTransfers.filter { it.groupLeg?.ruleIndex in crossFileRules }
+            foreignFiles
+                .flatMap { file ->
+                    mapperFor(file.fileName).prepareImport(file.rows).validTransfers.filter { it.groupLeg?.ruleIndex in crossFileRules }
+                }.distinctForeignLegs(finalPrep.validTransfers, strategy.config.uniqueIdentifierAttributeTypes().toSet())
         }
     val validCount = finalPrep.validTransfers.size
     val errorCount = finalPrep.errorRows.size

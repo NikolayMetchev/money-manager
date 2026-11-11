@@ -158,6 +158,12 @@ fun TradeGroup.assemble(assembly: LegAssembly.Trade): AssembledTrade? {
 /** Whether this rule assembles trades whose legs may sit in different staged files (see [LegAssembly.Trade.acrossFiles]). */
 fun LegGroupRule.isCrossFileTrade(): Boolean = (assembly as? LegAssembly.Trade)?.acrossFiles == true
 
+/** Another staged file's rows, shifted out of this file's row range, with the name its `(file name)` column reads. */
+data class ForeignFile(
+    val fileName: String,
+    val rows: List<CsvRow>,
+)
+
 /**
  * The rows of the other staged files that can pair with [csvImport]'s legs in a cross-file trade rule
  * ([LegAssembly.Trade.acrossFiles]): every other, non-ignored file with the same column names, its row indexes
@@ -168,7 +174,7 @@ suspend fun crossFileLegRows(
     csvImport: CsvImport,
     strategy: CsvImportStrategy,
     csvImportRepository: CsvImportReadRepository,
-): List<CsvRow> {
+): List<ForeignFile> {
     if (strategy.config.legGroups.none { it.isCrossFileTrade() }) return emptyList()
     val names = csvImport.columns.sortedBy { it.columnIndex }.map { it.originalName }
     val siblings =
@@ -180,10 +186,34 @@ suspend fun crossFileLegRows(
     return siblings
         .mapNotNull { csvImportRepository.getImport(it.id).first() }
         .filter { sibling -> sibling.columns.sortedBy { it.columnIndex }.map { it.originalName } == names }
-        .flatMapIndexed { index, sibling ->
+        .mapIndexed { index, sibling ->
             val offset = (index + 1) * FOREIGN_ROW_INDEX_BASE
-            csvImportRepository
-                .getImportRows(sibling.id, limit = sibling.rowCount.coerceAtLeast(1), offset = 0)
-                .map { it.copy(rowIndex = offset + it.rowIndex) }
+            ForeignFile(
+                sibling.originalFileName,
+                csvImportRepository
+                    .getImportRows(sibling.id, limit = sibling.rowCount.coerceAtLeast(1), offset = 0)
+                    .map { it.copy(rowIndex = offset + it.rowIndex) },
+            )
         }
+}
+
+/**
+ * These other-file legs without the ones that repeat a leg already counted: two exports of one period hold the same
+ * exchange twice, and summing both copies would book a trade of double the amount. A leg's identity is the strategy's
+ * unique-identifier attributes ([uniqueIdentifierNames]) where it has any, else its instant, accounts, amount and side.
+ * Legs of this file ([own]) are never dropped, as they never were.
+ */
+fun List<CsvTransferWithAttributes>.distinctForeignLegs(
+    own: List<CsvTransferWithAttributes>,
+    uniqueIdentifierNames: Set<String>,
+): List<CsvTransferWithAttributes> {
+    fun CsvTransferWithAttributes.identity(): List<Any?> =
+        if (uniqueIdentifierNames.isEmpty()) {
+            val transfer = transfer
+            listOf(transfer.timestamp, transfer.sourceAccountId, transfer.targetAccountId, transfer.amount, groupLeg?.side)
+        } else {
+            attributes.filter { (name, _) -> name in uniqueIdentifierNames }.sortedBy { it.first } + groupLeg?.side
+        }
+    val seen = own.mapTo(mutableSetOf()) { it.identity() }
+    return filter { seen.add(it.identity()) }
 }

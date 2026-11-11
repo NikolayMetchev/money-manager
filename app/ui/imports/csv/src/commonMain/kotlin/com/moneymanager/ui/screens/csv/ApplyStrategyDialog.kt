@@ -26,6 +26,7 @@ import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ImportPreparation
 import com.moneymanager.csvimporter.buildCreatedAccountNameOverrides
 import com.moneymanager.csvimporter.buildPendingAccountMappings
+import com.moneymanager.csvimporter.crossFileLegRows
 import com.moneymanager.csvimporter.ensureCryptoAssets
 import com.moneymanager.csvimporter.hasBlankNewAccountNames
 import com.moneymanager.csvimporter.runCsvImport
@@ -47,6 +48,7 @@ import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
+import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
@@ -70,6 +72,7 @@ private val logger = Logger.withTag("ApplyStrategyDialog")
 @Suppress("DuplicatedCode")
 @Composable
 fun ApplyStrategyDialog(
+    csvImportRepository: CsvImportReadRepository,
     csvImport: CsvImport,
     rows: List<CsvRow>,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
@@ -406,6 +409,7 @@ fun ApplyStrategyDialog(
                                     columns = csvImport.columns,
                                     strategy = strategy,
                                     basePrep = basePrep,
+                                    foreignFiles = crossFileLegRows(csvImport, strategy, csvImportRepository),
                                     selectedExistingAccounts = selectedExistingAccounts,
                                     selectedNewAccountNames = selectedNewAccountNames,
                                     selectedSourceAccountId = selectedSourceAccountId,

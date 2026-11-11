@@ -146,4 +146,47 @@ class RevolutCsvE2ETest : DbTest() {
             apply(eur)
             assertEquals(1, trades().size)
         }
+
+    @Test
+    fun `two exports of the same period are one exchange not two`() =
+        runDbTest {
+            val eur = stage("account-statement_eur.csv", eurFile)
+            stage("account-statement_eur_again.csv", eurFile)
+            val usd = stage("account-statement_usd.csv", usdFile)
+            apply(usd)
+            assertOneExchangeTrade()
+            apply(eur)
+            assertEquals(1, trades().size)
+        }
+
+    @Test
+    fun `two exchanges a second apart in opposite directions each pair with their own other side`() =
+        runDbTest {
+            val eur =
+                stage(
+                    "account-statement_eur.csv",
+                    eurFile + listOf(row("Exchange", "2020-06-01 09:07:20", "Exchanged to EUR", "50.00", "EUR", "827.65")),
+                )
+            val usd =
+                stage(
+                    "account-statement_usd.csv",
+                    usdFile + listOf(row("Exchange", "2020-06-01 09:07:20", "Exchanged to EUR", "-57.00", "USD", "123.00")),
+                )
+            apply(usd, eur)
+            assertEquals(2, trades().size)
+        }
+
+    @Test
+    fun `an exchange that did not complete is neither a trade nor an error`() =
+        runDbTest {
+            val reverted = { currency: String, amount: String ->
+                row("Exchange", "2020-06-01 09:07:19", "Exchanged to USD", amount, currency, "0.00").dropLast(2) +
+                    listOf("REVERTED", "")
+            }
+            val eur = stage("account-statement_eur.csv", listOf(reverted("EUR", "-200.00")))
+            val usd = stage("account-statement_usd.csv", listOf(reverted("USD", "230.00")))
+            apply(eur, usd)
+            assertEquals(emptyList(), trades())
+            assertEquals(emptyList(), repositories.csvImportRepository.getImportRows(eur.id, 10, 0).filter { it.errorMessage != null })
+        }
 }

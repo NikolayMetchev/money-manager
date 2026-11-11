@@ -2135,6 +2135,15 @@ object BuiltInCsvStrategies {
                     name = "A pending row has no balance yet: the next export holds it settled",
                 ),
                 rule(
+                    RuleAction.Skip,
+                    conditions =
+                        listOf(
+                            Condition("Description", ConditionOp.STARTS_WITH, value = "Exchanged to "),
+                            Condition("State", ConditionOp.NOT_EQUALS, value = "COMPLETED"),
+                        ),
+                    name = "An exchange that did not complete is no trade, and half of one would never pair",
+                ),
+                rule(
                     RuleAction.Exclude(RuleValue.constant("Revolut state {State}")),
                     conditions = listOf(Condition("State", ConditionOp.NOT_EQUALS, value = "COMPLETED")),
                     name = "Money that never moved",
@@ -2199,6 +2208,8 @@ object BuiltInCsvStrategies {
                         listOf(
                             LegGroupRule(
                                 name = REVOLUT_EXCHANGE_GROUP,
+                                // Both sides read "Exchanged to <the currency bought>", which tells two exchanges a second apart.
+                                key = listOf(ValueExpr.of("Description")),
                                 // Revolut stamps both sides of an exchange with the same second.
                                 windowSeconds = 1,
                                 assembly = LegAssembly.Trade(description = "Exchange {from} to {to}", acrossFiles = true),
