@@ -164,21 +164,27 @@ fun ManualEntriesScreen(
     LaunchedEffect(pendingTrades) {
         suggestions = loadSuggestions(pendingTrades.map { it.trade to it.placeholderAssetCode }, reconciliationRepository, tradeRepository)
     }
-    val acceptSuggestions: (List<OtherSideSuggestion>) -> Unit = { accepted ->
+    // Every save runs the same way: block the screen, do the work, refresh, and say what failed.
+    val runSave: (String, suspend () -> Unit) -> Unit = { failure, work ->
         isSaving = true
         errorMessage = null
         scope.launch {
             try {
-                importEngine.acceptOtherSideSuggestions(accepted, linksFor(accepted, reconciliationRepository, accountRepository))
+                work()
                 maintenance.refreshMaterializedViews()
                 onTransactionsImported()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (expected: Exception) {
-                errorMessage = "Failed to use the suggestions: ${expected.message}"
+                errorMessage = "$failure: ${expected.message}"
             } finally {
                 isSaving = false
             }
+        }
+    }
+    val acceptSuggestions: (List<OtherSideSuggestion>) -> Unit = { accepted ->
+        runSave("Failed to use the suggestions") {
+            importEngine.acceptOtherSideSuggestions(accepted, linksFor(accepted, reconciliationRepository, accountRepository))
         }
     }
 
@@ -229,25 +235,9 @@ fun ManualEntriesScreen(
                             amounts = amounts,
                             isSaving = isSaving,
                             onCreate = { entries ->
-                                isSaving = true
-                                errorMessage = null
-                                scope.launch {
-                                    try {
-                                        createEntries(
-                                            entry = group.entry,
-                                            entries = entries,
-                                            importEngine = importEngine,
-                                        )
-                                        maintenance.refreshMaterializedViews()
-                                        entries.forEach { (matched, _) -> amounts.remove(matched.transferId) }
-                                        onTransactionsImported()
-                                    } catch (cancelled: CancellationException) {
-                                        throw cancelled
-                                    } catch (expected: Exception) {
-                                        errorMessage = "Failed to create transactions: ${expected.message}"
-                                    } finally {
-                                        isSaving = false
-                                    }
+                                runSave("Failed to create transactions") {
+                                    createEntries(entry = group.entry, entries = entries, importEngine = importEngine)
+                                    entries.forEach { (matched, _) -> amounts.remove(matched.transferId) }
                                 }
                             },
                         )
@@ -285,23 +275,11 @@ fun ManualEntriesScreen(
                             }
                             Button(
                                 onClick = {
-                                    isSaving = true
-                                    errorMessage = null
-                                    scope.launch {
-                                        try {
-                                            importEngine.createManualTradeEntries(answers)
-                                            maintenance.refreshMaterializedViews()
-                                            answers.forEach {
-                                                tradeAmounts.remove(it.original.id)
-                                                tradeCurrencies.remove(it.original.id)
-                                            }
-                                            onTransactionsImported()
-                                        } catch (cancelled: CancellationException) {
-                                            throw cancelled
-                                        } catch (expected: Exception) {
-                                            errorMessage = "Failed to create trades: ${expected.message}"
-                                        } finally {
-                                            isSaving = false
+                                    runSave("Failed to create trades") {
+                                        importEngine.createManualTradeEntries(answers)
+                                        answers.forEach {
+                                            tradeAmounts.remove(it.original.id)
+                                            tradeCurrencies.remove(it.original.id)
                                         }
                                     }
                                 },
