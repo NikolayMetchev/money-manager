@@ -146,6 +146,7 @@ class ManualEntriesTradesTest {
                 }
             }
         }
+        waitForIdle()
     }
 
     @Test
