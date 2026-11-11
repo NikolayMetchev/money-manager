@@ -216,6 +216,7 @@ class ManualEntriesScreenTest {
 
             onNodeWithText("Open the Koinly file row").performClick()
             onNodeWithText("Show in Reconciliation").performClick()
+            waitForIdle()
             assertEquals(listOf(koinly.id.id), opened.map { it.transactionId })
             assertEquals(listOf(ReconciliationFocus("Koinly", wallet, "2021-05")), focused)
 
@@ -295,6 +296,7 @@ class ManualEntriesScreenTest {
             waitUntilAtLeastOneExists(hasText("Koinly (Koinly · Binance) charged", substring = true))
 
             onNodeWithText("Open the Koinly file row").performClick()
+            waitForIdle()
             assertEquals(listOf(net.id.id), opened.map { it.transactionId })
 
             onNodeWithText("and match it", substring = true).performClick()
