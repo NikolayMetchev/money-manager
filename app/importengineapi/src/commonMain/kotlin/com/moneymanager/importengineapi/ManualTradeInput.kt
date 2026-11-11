@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Trade
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.WellKnownIds
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -39,10 +40,11 @@ data class ManualTradeInput(
  * never both counted, and it leaves Manual Entries with the exclusion. The replacement keeps the `manual-entry` tag, so the
  * statement's own record of the trade, should it turn up, retires it.
  *
- * If excluding fails the replacements are deleted again, leaving the placeholder pending to try once more.
+ * If excluding fails the replacements are deleted again, leaving the placeholder pending to try once more. Returns the
+ * replacements' ids, in the order of [inputs].
  */
-suspend fun ImportEngine.createManualTradeEntries(inputs: List<ManualTradeInput>) {
-    if (inputs.isEmpty()) return
+suspend fun ImportEngine.createManualTradeEntries(inputs: List<ManualTradeInput>): List<TradeId> {
+    if (inputs.isEmpty()) return emptyList()
     inputs.forEach { require(it.problem() == null) { checkNotNull(it.problem()) } }
     val entryTypeId = getOrCreateAttributeType(WellKnownIds.MANUAL_ENTRY_ATTR_TYPE_NAME)
     val keys = inputs.indices.map { LocalTradeKey("manual-trade-entry-$it") }
@@ -67,6 +69,7 @@ suspend fun ImportEngine.createManualTradeEntries(inputs: List<ManualTradeInput>
                     },
             ),
         )
+    val createdIds = keys.map { requireNotNull(created.createdTradeIds[it]) { "Manual trade entry $it was not created" } }
     var excluded = false
     try {
         import(
@@ -88,7 +91,7 @@ suspend fun ImportEngine.createManualTradeEntries(inputs: List<ManualTradeInput>
                 import(
                     ImportBatch(
                         trades =
-                            keys.mapNotNull { created.createdTradeIds[it] }.map {
+                            createdIds.map {
                                 ImportTradeIntent(
                                     key = LocalTradeKey("manual-trade-entry-undo-${it.id}"),
                                     source = Source.Manual,
@@ -101,4 +104,5 @@ suspend fun ImportEngine.createManualTradeEntries(inputs: List<ManualTradeInput>
             }
         }
     }
+    return createdIds
 }

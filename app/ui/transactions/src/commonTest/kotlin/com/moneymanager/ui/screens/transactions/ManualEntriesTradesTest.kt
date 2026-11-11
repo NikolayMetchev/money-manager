@@ -23,8 +23,10 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.ImportBatch
@@ -132,6 +134,9 @@ class ManualEntriesTradesTest {
             mock(MockMode.autoUnit) { every { getPendingManualTrades(any(), any()) } returns flowOf(listOf(placeholder)) }
         val currencies: CurrencyReadRepository =
             mock(MockMode.autoUnit) { every { getAllCurrencies() } returns flowOf(listOf(eur, usd, unknown)) }
+        val reconciliation: ReconciliationReadRepository =
+            mock(MockMode.autoUnit) { every { getShadowAccounts() } returns flowOf(emptyList()) }
+        val accounts: AccountReadRepository = mock(MockMode.autoUnit) { every { getAllAccounts() } returns flowOf(emptyList()) }
         setContent {
             ProvideSchemaAwareScope {
                 CompositionLocalProvider(LocalImportEngine provides engine) {
@@ -140,6 +145,8 @@ class ManualEntriesTradesTest {
                         transactionRepository = transactions,
                         tradeRepository = trades,
                         currencyRepository = currencies,
+                        reconciliationRepository = reconciliation,
+                        accountRepository = accounts,
                         maintenance = maintenance,
                         onTransactionsImported = {},
                     )

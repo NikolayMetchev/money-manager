@@ -246,6 +246,8 @@ fun ImportsScreen(
                             transactionRepository = transactionRepository,
                             tradeRepository = tradeRepository,
                             currencyRepository = currencyRepository,
+                            reconciliationRepository = reconciliationRepository,
+                            accountRepository = accountRepository,
                             maintenance = maintenance,
                             onTransactionsImported = onTransactionsImported,
                         )
