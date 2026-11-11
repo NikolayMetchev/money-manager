@@ -142,6 +142,14 @@ fun <K : Any, F : StagedImport<K>> StagedImportsTabs(
             }
         }
 
+        if (selectedTab == ImportTab.IGNORED && ignoredList.isNotEmpty()) {
+            item(key = "bulk") {
+                Button(onClick = { onSetIgnored(ignoredList, false) }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                    Text("Restore all (${ignoredList.size})")
+                }
+            }
+        }
+
         when {
             shown.isEmpty() -> {
                 item(key = "empty") {

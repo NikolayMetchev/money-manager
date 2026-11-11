@@ -79,12 +79,14 @@ private fun qifImport(
 private val santanderFile = qifImport("santander.qif")
 private val manualFile = qifImport("manual.qif")
 private val importedFile = qifImport("old.qif", appliedWith = bank)
+private val ignoredFile = qifImport("skip.qif").copy(ignored = true)
 
 // A factory rather than a @Composable helper: Qodana holds every function in a test source set to the
 // lowercase test-naming convention, which a PascalCase composable can't meet.
 private fun tabsContent(
     onImportAll: (List<CsvImport>) -> Unit = {},
     onReimportAll: (List<CsvImport>) -> Unit = {},
+    onSetIgnored: (List<CsvImport>, Boolean) -> Unit = { _, _ -> },
     filter: StagedImportFilter = StagedImportFilter(),
     dateRange: (CsvImport) -> ImportFileDateRange? = { null },
 ): @Composable () -> Unit =
@@ -92,7 +94,7 @@ private fun tabsContent(
         MaterialTheme {
             Column {
                 StagedImportsTabs(
-                    imports = listOf(santanderFile, manualFile, importedFile),
+                    imports = listOf(santanderFile, manualFile, importedFile, ignoredFile),
                     data =
                         StagedImportsData(
                             directories = listOf(statements, santander),
@@ -104,7 +106,7 @@ private fun tabsContent(
                         ),
                     onImportAll = onImportAll,
                     onReimportAll = onReimportAll,
-                    onSetIgnored = { _, _ -> },
+                    onSetIgnored = onSetIgnored,
                     filter = filter,
                     dateRange = dateRange,
                     header = { item { Text("Header") } },
@@ -151,6 +153,22 @@ class StagedImportsTabsTest {
             onNodeWithText("Re-import all (1)").performClick()
             waitForIdle()
             assertEquals(listOf(importedFile), reimportAll)
+        }
+    }
+
+    @Test
+    fun ignoredFiles_canAllBeRestoredAtOnce() {
+        runMoneyManagerComposeUiTest {
+            var restored: Pair<List<CsvImport>, Boolean>? = null
+            setContent(tabsContent(onSetIgnored = { files, ignore -> restored = files to ignore }))
+
+            onNodeWithText("Ignored (1)").performClick()
+            waitForIdle()
+            onNodeWithText("skip.qif").assertExists()
+
+            onNodeWithText("Restore all (1)").performClick()
+            waitForIdle()
+            assertEquals(listOf(ignoredFile) to false, restored)
         }
     }
 
