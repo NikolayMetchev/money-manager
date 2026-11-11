@@ -15,9 +15,11 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.PendingManualEntry
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
@@ -25,6 +27,8 @@ import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
 import com.moneymanager.domain.model.reconciliation.ReconciliationSource
 import com.moneymanager.domain.model.reconciliation.ShadowAccount
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
@@ -34,6 +38,7 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportResult
+import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.RelationshipMutation
 import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.foundation.LocalImportEngine
@@ -47,6 +52,7 @@ import dev.mokkery.mock
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -67,7 +73,7 @@ class ManualEntriesScreenTest {
     private val wallet = AccountId(20)
     private val walletFees = AccountId(21)
 
-    private fun strategy(): CsvImportStrategy =
+    private fun strategy(entry: RuleAction.ManualEntry? = null): CsvImportStrategy =
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = "Exchange CSV",
@@ -75,6 +81,7 @@ class ManualEntriesScreenTest {
                 CsvStrategyConfig(
                     identificationColumns = emptySet(),
                     fieldMappings = emptyMap(),
+                    rules = listOfNotNull(entry?.let { StrategyRule(conditions = emptyList(), actions = listOf(it)) }),
                     legGroups =
                         listOf(
                             LegGroupRule(
@@ -208,5 +215,73 @@ class ManualEntriesScreenTest {
             assertEquals(koinly.to, created.toAmount)
             val match = engine.batches.flatMap { it.relationshipMutations }.single() as RelationshipMutation.Create
             assertEquals(setOf(500L, 2L), match.members.map { it.transactionId.id }.toSet())
+        }
+
+    @Test
+    fun `taking the suggested fee of a withdrawal books it and stores the match`() =
+        runMoneyManagerComposeUiTest {
+            val entry = RuleAction.ManualEntry(name = "Withdrawal fee", description = "Withdrawal fee", relationshipType = "fee")
+            val withdrawal =
+                PendingManualEntry(
+                    transferId = TransferId(10),
+                    timestamp = epoch,
+                    description = "Withdraw",
+                    sourceAccountId = AccountId(2),
+                    sourceAccountName = "Binance",
+                    targetAccountId = AccountId(3),
+                    targetAccountName = "Binance Funding",
+                    amount = Money.fromDisplayValue("0.27986608", btc),
+                )
+            val net =
+                Transfer(
+                    TransferId(11),
+                    timestamp = Instant.parse("2021-05-26T19:48:36Z"),
+                    description = "net",
+                    sourceAccountId = wallet,
+                    targetAccountId = AccountId(30),
+                    amount = Money.fromDisplayValue("0.27931608", btc),
+                )
+            val fee =
+                net.copy(
+                    id = TransferId(12),
+                    description = "fee",
+                    targetAccountId = walletFees,
+                    amount = Money.fromDisplayValue("0.00055", btc),
+                )
+            val transactions: TransactionReadRepository =
+                mock(MockMode.autoUnit) {
+                    every { getPendingManualEntries(any(), any()) } returns flowOf(listOf(withdrawal))
+                    every { getTransactionsByDateRange(any(), any()) } returns flowOf(listOf(net, fee))
+                }
+            val trades: TradeReadRepository =
+                mock(MockMode.autoUnit) { every { getPendingManualTrades(any(), any()) } returns flowOf(emptyList()) }
+            val engine = RecordingEngine()
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    CompositionLocalProvider(LocalImportEngine provides engine) {
+                        ManualEntriesScreen(
+                            csvImportStrategyRepository = strategies(strategy(entry)),
+                            transactionRepository = transactions,
+                            tradeRepository = trades,
+                            currencyRepository = currencies,
+                            reconciliationRepository = reconciliation,
+                            accountRepository = accounts,
+                            maintenance = maintenance,
+                            onTransactionsImported = {},
+                        )
+                    }
+                }
+            }
+            waitUntilAtLeastOneExists(hasText("A reconciliation source charged", substring = true))
+
+            onNodeWithText("and match it", substring = true).performClick()
+            waitUntil(timeoutMillis = 5_000) { engine.batches.flatMap { it.relationshipMutations }.size >= 2 }
+
+            val created = engine.batches.flatMap { it.transfers }.single()
+            assertEquals(fee.amount, created.amount)
+            val matches = engine.batches.flatMap { it.relationshipMutations }.filterIsInstance<RelationshipMutation.Create>()
+            assertTrue(matches.any { match -> match.members.map { it.transactionId.id }.toSet() == setOf(600L, 12L) })
+            assertTrue(created.rowKey is ImportRowKey.Manual)
         }
 }
