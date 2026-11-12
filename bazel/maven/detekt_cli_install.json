@@ -9,24 +9,24 @@
     "org.jetbrains.kotlin:kotlin-stdlib-common": -1997958569,
     "org.jetbrains.kotlin:kotlin-stdlib-jdk7": -1754760516,
     "org.jetbrains.kotlin:kotlin-stdlib-jdk8": -800531621,
-    "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": -1768393331,
+    "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": 729622606,
     "repositories": -1949687017
   },
   "__RESOLVED_ARTIFACTS_HASH": {
     "com.github.ben-manes.caffeine:caffeine": -1026251128,
     "com.google.errorprone:error_prone_annotations": 1692443710,
-    "dev.detekt:detekt-api": 1147737027,
-    "dev.detekt:detekt-cli": 1205125208,
-    "dev.detekt:detekt-core": 1530230613,
-    "dev.detekt:detekt-kotlin-analysis-api": -534727324,
+    "dev.detekt:detekt-api": 121322230,
+    "dev.detekt:detekt-cli": -813396276,
+    "dev.detekt:detekt-core": 1664615635,
+    "dev.detekt:detekt-kotlin-analysis-api": 664455096,
     "dev.detekt:detekt-kotlin-analysis-api-standalone": 1792988730,
-    "dev.detekt:detekt-metrics": 984601606,
+    "dev.detekt:detekt-metrics": -1040147455,
     "dev.detekt:detekt-parser": 103573970,
     "dev.detekt:detekt-psi-utils": -2074480221,
     "dev.detekt:detekt-report-checkstyle": 1224772071,
     "dev.detekt:detekt-report-html": 1215111632,
-    "dev.detekt:detekt-report-markdown": 925352211,
-    "dev.detekt:detekt-report-sarif": 803020530,
+    "dev.detekt:detekt-report-markdown": 1188138849,
+    "dev.detekt:detekt-report-sarif": 1988980874,
     "dev.detekt:detekt-rules": 549539975,
     "dev.detekt:detekt-rules-comments": -912088072,
     "dev.detekt:detekt-rules-complexity": -1018737990,
@@ -37,10 +37,10 @@
     "dev.detekt:detekt-rules-performance": -1394814680,
     "dev.detekt:detekt-rules-potential-bugs": -119149878,
     "dev.detekt:detekt-rules-style": 518954678,
-    "dev.detekt:detekt-tooling": -1649997402,
+    "dev.detekt:detekt-tooling": -293850527,
     "dev.detekt:detekt-utils": 1733092599,
     "dev.drewhamilton.poko:poko-annotations-jvm": 550186451,
-    "io.github.detekt.sarif4k:sarif4k-jvm": -1619330921,
+    "io.github.detekt.sarif4k:sarif4k-jvm": 183721774,
     "org.checkerframework:checker-qual": -863272591,
     "org.jcommander:jcommander": 2144713982,
     "org.jetbrains.intellij.deps.kotlinx:kotlinx-coroutines-core": -1017859488,
@@ -55,9 +55,9 @@
     "org.jetbrains.kotlin:kotlin-stdlib-jdk8": -1939007263,
     "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": -2111075747,
     "org.jetbrains.kotlinx:kotlinx-html-jvm": 678607198,
-    "org.jetbrains.kotlinx:kotlinx-serialization-core": -982144045,
-    "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm": 307194866,
-    "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": -2140906444,
+    "org.jetbrains.kotlinx:kotlinx-serialization-core": 1978591905,
+    "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm": 1763091531,
+    "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": -1858364042,
     "org.jetbrains:annotations": -1663747638,
     "org.snakeyaml:snakeyaml-engine": 630414738
   },
@@ -322,15 +322,15 @@
     },
     "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm": {
       "shasums": {
-        "jar": "bcfddcac76159058ba0953af05938c17111d238cd41be7191874656454d62f1a"
+        "jar": "db2eb98f585a408970ce726af9dfbaccbdfe5df498ccd9dba9918d208974302d"
       },
-      "version": "1.12.0"
+      "version": "1.13.0"
     },
     "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": {
       "shasums": {
-        "jar": "879eb73e46cb63253ab0fa7cca4448f5c96bca1a16ff377abcb71ebab60e0631"
+        "jar": "389b0dd9b4b952db889c160a2478b1cbe54680804f5315756108389dbe9df251"
       },
-      "version": "1.12.0"
+      "version": "1.13.0"
     },
     "org.jetbrains:annotations": {
       "shasums": {
