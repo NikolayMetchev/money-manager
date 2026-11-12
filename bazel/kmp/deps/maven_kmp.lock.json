@@ -79,8 +79,8 @@
       "kotlinx-coroutines-test": "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0",
       "kotlinx-datetime": "org.jetbrains.kotlinx:kotlinx-datetime:0.8.0",
       "kotlinx-io-core": "org.jetbrains.kotlinx:kotlinx-io-core:0.9.2",
-      "kotlinx-serialization-core": "org.jetbrains.kotlinx:kotlinx-serialization-core:1.12.0",
-      "kotlinx-serialization-json": "org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0",
+      "kotlinx-serialization-core": "org.jetbrains.kotlinx:kotlinx-serialization-core:1.13.0",
+      "kotlinx-serialization-json": "org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0",
       "ktor-client-auth": "io.ktor:ktor-client-auth:3.6.1",
       "ktor-client-cio": "io.ktor:ktor-client-cio:3.6.1",
       "ktor-client-core": "io.ktor:ktor-client-core:3.6.1",
@@ -159,11 +159,11 @@
       "org.jetbrains.kotlinx:kotlinx-coroutines-bom": "1.11.0",
       "org.jetbrains.kotlinx:kotlinx-coroutines-core": "1.11.0",
       "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm": "1.11.0",
-      "org.jetbrains.kotlinx:kotlinx-serialization-bom": "1.12.0",
-      "org.jetbrains.kotlinx:kotlinx-serialization-core": "1.12.0",
-      "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm": "1.12.0",
-      "org.jetbrains.kotlinx:kotlinx-serialization-json": "1.12.0",
-      "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": "1.12.0",
+      "org.jetbrains.kotlinx:kotlinx-serialization-bom": "1.13.0",
+      "org.jetbrains.kotlinx:kotlinx-serialization-core": "1.13.0",
+      "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm": "1.13.0",
+      "org.jetbrains.kotlinx:kotlinx-serialization-json": "1.13.0",
+      "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm": "1.13.0",
       "org.jetbrains:annotations": "26.1.0",
       "org.slf4j:slf4j-api": "2.0.20"
     },
@@ -21593,22 +21593,22 @@
     },
     "org.jetbrains.kotlinx:kotlinx-serialization-core": {
       "android": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-core-jvm-1.12.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.12.0/kotlinx-serialization-core-jvm-1.12.0.jar",
-            "sha256": "bcfddcac76159058ba0953af05938c17111d238cd41be7191874656454d62f1a"
+            "name": "kotlinx-serialization-core-jvm-1.13.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.13.0/kotlinx-serialization-core-jvm-1.13.0.jar",
+            "sha256": "db2eb98f585a408970ce726af9dfbaccbdfe5df498ccd9dba9918d208974302d"
           }
         ]
       },
       "js": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-core-js-1.12.0.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-js/1.12.0/kotlinx-serialization-core-js-1.12.0.klib",
-            "sha256": "261fab5f6e96d3c0249f00194498025746d2cfe7795204733e1839db7d8b53f9"
+            "name": "kotlinx-serialization-core-js-1.13.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-js/1.13.0/kotlinx-serialization-core-js-1.13.0.klib",
+            "sha256": "70d80d0119e00315803487f9933055c3b98d61b5f493d86f5c394ff9a2363df4"
           }
         ],
         "deps": [
@@ -21616,51 +21616,51 @@
         ]
       },
       "jvm": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-core-jvm-1.12.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.12.0/kotlinx-serialization-core-jvm-1.12.0.jar",
-            "sha256": "bcfddcac76159058ba0953af05938c17111d238cd41be7191874656454d62f1a"
+            "name": "kotlinx-serialization-core-jvm-1.13.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.13.0/kotlinx-serialization-core-jvm-1.13.0.jar",
+            "sha256": "db2eb98f585a408970ce726af9dfbaccbdfe5df498ccd9dba9918d208974302d"
           }
         ]
       },
       "linuxArm64": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-core-linuxArm64Main-1.12.0.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-linuxarm64/1.12.0/kotlinx-serialization-core-linuxarm64-1.12.0.klib",
-            "sha256": "d8a93b8a45648db7ee153ba04e91c447cd1c10871a121fc9aafebc52941253a1"
+            "name": "kotlinx-serialization-core-linuxArm64Main-1.13.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-linuxarm64/1.13.0/kotlinx-serialization-core-linuxarm64-1.13.0.klib",
+            "sha256": "8e62f572b9695565202e30af87b8bd6f4ef56c86a186c89096b20cf3d8bda30d"
           }
         ]
       },
       "linuxX64": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-core-linuxX64Main-1.12.0.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-linuxx64/1.12.0/kotlinx-serialization-core-linuxx64-1.12.0.klib",
-            "sha256": "5d10a03f2dd1eb7e3342db71a84400c675f9ba9423edc7c6087cff38ba4c48bd"
+            "name": "kotlinx-serialization-core-linuxX64Main-1.13.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-linuxx64/1.13.0/kotlinx-serialization-core-linuxx64-1.13.0.klib",
+            "sha256": "29e1b5ff187c44126d0715917209455cc03ee0a234678d56ce6ca678f021d6f5"
           }
         ]
       },
       "macosArm64": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-core-macosArm64Main-1.12.0.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-macosarm64/1.12.0/kotlinx-serialization-core-macosarm64-1.12.0.klib",
-            "sha256": "a8e8252a1b4150c05b8653a628d1580c3edfbe64ef52bce1d5a0750dce727e76"
+            "name": "kotlinx-serialization-core-macosArm64Main-1.13.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-macosarm64/1.13.0/kotlinx-serialization-core-macosarm64-1.13.0.klib",
+            "sha256": "fd7c969d017719f3b7aa24c292b174b581fde452c2a8fc7886857e4b778ff67a"
           }
         ]
       },
       "metadata": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-core-metadata-1.12.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core/1.12.0/kotlinx-serialization-core-1.12.0.jar",
+            "name": "kotlinx-serialization-core-metadata-1.13.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core/1.13.0/kotlinx-serialization-core-1.13.0.jar",
             "sha256": "e4d4b24318e2dd6d6fff8bf2a92e93270237438d6ca97d13542cc1bfd1eb7a34"
           }
         ],
@@ -21669,11 +21669,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-core-metadata-1.12.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core/1.12.0/kotlinx-serialization-core-1.12.0.jar",
+            "name": "kotlinx-serialization-core-metadata-1.13.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core/1.13.0/kotlinx-serialization-core-1.13.0.jar",
             "sha256": "e4d4b24318e2dd6d6fff8bf2a92e93270237438d6ca97d13542cc1bfd1eb7a34"
           }
         ],
@@ -21682,34 +21682,34 @@
         ]
       },
       "mingwX64": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-core-mingwX64Main-1.12.0.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-mingwx64/1.12.0/kotlinx-serialization-core-mingwx64-1.12.0.klib",
-            "sha256": "69c22b7f4f03a932189b6e2b126873cc46a4cd17bf4fbf141319b9dbc26d937a"
+            "name": "kotlinx-serialization-core-mingwX64Main-1.13.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-mingwx64/1.13.0/kotlinx-serialization-core-mingwx64-1.13.0.klib",
+            "sha256": "8925fcaefbc6232ba7838f31e1fcac32fc0e5eff743bdd755977eed3a3b20067"
           }
         ]
       },
       "wasmJs": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-core-wasm-js-1.12.0.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-wasm-js/1.12.0/kotlinx-serialization-core-wasm-js-1.12.0.klib",
-            "sha256": "fde8ad760d5a137b1fbf9b5b009e05e6d3ce00483460d16ac4d78067b8f1be63"
+            "name": "kotlinx-serialization-core-wasm-js-1.13.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-wasm-js/1.13.0/kotlinx-serialization-core-wasm-js-1.13.0.klib",
+            "sha256": "23a42a4c5e2faaf8b9c069172a46e0e0dc4fb97631aad62edbacf9812c80561f"
           }
         ]
       }
     },
     "org.jetbrains.kotlinx:kotlinx-serialization-json": {
       "android": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-json-jvm-1.12.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.12.0/kotlinx-serialization-json-jvm-1.12.0.jar",
-            "sha256": "879eb73e46cb63253ab0fa7cca4448f5c96bca1a16ff377abcb71ebab60e0631"
+            "name": "kotlinx-serialization-json-jvm-1.13.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.13.0/kotlinx-serialization-json-jvm-1.13.0.jar",
+            "sha256": "389b0dd9b4b952db889c160a2478b1cbe54680804f5315756108389dbe9df251"
           }
         ],
         "deps": [
@@ -21717,12 +21717,12 @@
         ]
       },
       "js": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-json-js-1.12.0.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-js/1.12.0/kotlinx-serialization-json-js-1.12.0.klib",
-            "sha256": "7c17ca55d3322aa18f87de7d9f6ecf8397da025cfd733192599f2b88cf9eca6d"
+            "name": "kotlinx-serialization-json-js-1.13.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-js/1.13.0/kotlinx-serialization-json-js-1.13.0.klib",
+            "sha256": "cf704209d5a33aa6665eaf19680f9e3d1e2bde4fb164dadea422bac6b6dc7173"
           }
         ],
         "deps": [
@@ -21731,12 +21731,12 @@
         ]
       },
       "jvm": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-json-jvm-1.12.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.12.0/kotlinx-serialization-json-jvm-1.12.0.jar",
-            "sha256": "879eb73e46cb63253ab0fa7cca4448f5c96bca1a16ff377abcb71ebab60e0631"
+            "name": "kotlinx-serialization-json-jvm-1.13.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.13.0/kotlinx-serialization-json-jvm-1.13.0.jar",
+            "sha256": "389b0dd9b4b952db889c160a2478b1cbe54680804f5315756108389dbe9df251"
           }
         ],
         "deps": [
@@ -21744,12 +21744,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-json-linuxArm64Main-1.12.0.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-linuxarm64/1.12.0/kotlinx-serialization-json-linuxarm64-1.12.0.klib",
-            "sha256": "e61f9f379b2e4a759d262de125589f95446b8422dc1d7b888208255875dada75"
+            "name": "kotlinx-serialization-json-linuxArm64Main-1.13.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-linuxarm64/1.13.0/kotlinx-serialization-json-linuxarm64-1.13.0.klib",
+            "sha256": "1bc36d0c859134982d206f80eac856436c10d7a041c3e6395db554ed371e2d9f"
           }
         ],
         "deps": [
@@ -21757,12 +21757,12 @@
         ]
       },
       "linuxX64": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-json-linuxX64Main-1.12.0.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-linuxx64/1.12.0/kotlinx-serialization-json-linuxx64-1.12.0.klib",
-            "sha256": "6cf48695d71ca42819ef7e12ee50b080e8e6d552487d0d23d6dc1bb78a6ab570"
+            "name": "kotlinx-serialization-json-linuxX64Main-1.13.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-linuxx64/1.13.0/kotlinx-serialization-json-linuxx64-1.13.0.klib",
+            "sha256": "70cbf86b762b3be586ca36aebed1890a2ad325c105b07e1c0e9b4db1edf01fe6"
           }
         ],
         "deps": [
@@ -21770,12 +21770,12 @@
         ]
       },
       "macosArm64": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-json-macosArm64Main-1.12.0.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-macosarm64/1.12.0/kotlinx-serialization-json-macosarm64-1.12.0.klib",
-            "sha256": "9ea0f247d940fe73fdc64f9dc907f9c40c162c2972b900406d85330d9a279057"
+            "name": "kotlinx-serialization-json-macosArm64Main-1.13.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-macosarm64/1.13.0/kotlinx-serialization-json-macosarm64-1.13.0.klib",
+            "sha256": "cc7e1e6a62e2eec1115188bdb71c18e41ca0d01165ef4358340ecbdbccba03c2"
           }
         ],
         "deps": [
@@ -21783,12 +21783,12 @@
         ]
       },
       "metadata": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-json-metadata-1.12.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json/1.12.0/kotlinx-serialization-json-1.12.0.jar",
-            "sha256": "8ba4a911b74e9e73b1af1bdc8bb98432d8ce421f378db535616e2efac4c9dcae"
+            "name": "kotlinx-serialization-json-metadata-1.13.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json/1.13.0/kotlinx-serialization-json-1.13.0.jar",
+            "sha256": "b40a0d893bb5bbaebbc57f20266cd74951fce088b8ad21c1e819b41973119a7d"
           }
         ],
         "deps": [
@@ -21799,12 +21799,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-json-metadata-1.12.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json/1.12.0/kotlinx-serialization-json-1.12.0.jar",
-            "sha256": "8ba4a911b74e9e73b1af1bdc8bb98432d8ce421f378db535616e2efac4c9dcae"
+            "name": "kotlinx-serialization-json-metadata-1.13.0.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json/1.13.0/kotlinx-serialization-json-1.13.0.jar",
+            "sha256": "b40a0d893bb5bbaebbc57f20266cd74951fce088b8ad21c1e819b41973119a7d"
           }
         ],
         "deps": [
@@ -21815,12 +21815,12 @@
         ]
       },
       "mingwX64": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-json-mingwX64Main-1.12.0.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-mingwx64/1.12.0/kotlinx-serialization-json-mingwx64-1.12.0.klib",
-            "sha256": "156fdcc713f1c8e670aaf12d51f817ed8d1eb41ac8b8a3de92ed14f96dc0cd87"
+            "name": "kotlinx-serialization-json-mingwX64Main-1.13.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-mingwx64/1.13.0/kotlinx-serialization-json-mingwx64-1.13.0.klib",
+            "sha256": "19b571dbf54729e6f8155b0e34f918081470e28ce1f687eb3b5cd88db3741d2f"
           }
         ],
         "deps": [
@@ -21828,12 +21828,12 @@
         ]
       },
       "wasmJs": {
-        "version": "1.12.0",
+        "version": "1.13.0",
         "files": [
           {
-            "name": "kotlinx-serialization-json-wasm-js-1.12.0.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-wasm-js/1.12.0/kotlinx-serialization-json-wasm-js-1.12.0.klib",
-            "sha256": "62a75feab6c382b591804183523bb57dc7a3c385ae29dd198de51a9a7ecc88ac"
+            "name": "kotlinx-serialization-json-wasm-js-1.13.0.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-wasm-js/1.13.0/kotlinx-serialization-json-wasm-js-1.13.0.klib",
+            "sha256": "937bed236a156abd51364d7136b127de7d93716e2186d0d64c680e2582b2a651"
           }
         ],
         "deps": [
