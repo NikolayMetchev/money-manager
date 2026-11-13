@@ -257,7 +257,7 @@ class AssetAliasTest : DbTest() {
         }
 
     @Test
-    fun `the currency list installs its names as aliases, which stay its own`() =
+    fun `the currency list installs its names as aliases that stay its own`() =
         runDbTest {
             val key = StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)
             val list =

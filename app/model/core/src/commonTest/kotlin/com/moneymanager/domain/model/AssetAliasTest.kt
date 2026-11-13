@@ -54,7 +54,7 @@ class AssetAliasTest {
     }
 
     @Test
-    fun `a currency written as its name, then a country, resolves to its code`() {
+    fun `a currency written as its name and then a country resolves to its code`() {
         assertEquals("EUR", resolveName("EURO FRANCE"))
         assertEquals("USD", resolveName("US DOLLAR UNITED STATES"))
         assertEquals("USD", resolveName("US  dollar".uppercase()))
