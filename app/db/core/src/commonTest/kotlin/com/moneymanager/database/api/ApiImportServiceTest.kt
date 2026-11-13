@@ -41,16 +41,6 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Instant
 
-/** A transfer to a counterparty Monzo identifies by id, whose account name a person must confirm. */
-private val MONZO_COUNTERPARTY_TRANSACTIONS_JSON =
-    """
-    {"transactions": [
-      {"id": "tx_2", "account_id": "${MonzoApiFixtures.ACCOUNT_ID}", "created": "2024-06-04T09:15:00.000Z", "amount": -2500,
-       "currency": "GBP", "description": "PAYMENT TO ALICE", "merchant": null,
-       "counterparty": {"id": "cp_alice_001", "name": "Alice"}}
-    ]}
-    """.trimIndent()
-
 /**
  * [ApiImportService] against a real database and a mocked provider: "Download & import all" downloads and
  * imports each connection as child tasks, isolates a failing provider, and hands back sessions whose
@@ -304,7 +294,7 @@ class ApiImportServiceTest : DbTest() {
     @Test
     fun `a session whose counterparties need confirming comes back as needing attention`() =
         runDbTest {
-            monzoTransactionsJson = MONZO_COUNTERPARTY_TRANSACTIONS_JSON
+            monzoTransactionsJson = MonzoApiFixtures.COUNTERPARTY_TRANSACTIONS_JSON
             val monzo = connection("Monzo")
             val vault = unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzoSecrets)))
 
@@ -319,7 +309,7 @@ class ApiImportServiceTest : DbTest() {
     @Test
     fun `counterparties the listener confirms are imported under its names`() =
         runDbTest {
-            monzoTransactionsJson = MONZO_COUNTERPARTY_TRANSACTIONS_JSON
+            monzoTransactionsJson = MonzoApiFixtures.COUNTERPARTY_TRANSACTIONS_JSON
             val monzo = connection("Monzo")
             val vault = unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzoSecrets)))
             val asked = mutableListOf<String>()
