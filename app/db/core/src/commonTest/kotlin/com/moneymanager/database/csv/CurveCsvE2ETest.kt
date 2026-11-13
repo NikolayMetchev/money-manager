@@ -3,9 +3,10 @@ package com.moneymanager.database.csv
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkApplyResult
-import com.moneymanager.csvimporter.addAttributeToken
+import com.moneymanager.csvimporter.BulkReimportResult
+import com.moneymanager.csvimporter.assignFundingReferences
 import com.moneymanager.csvimporter.bulkApplyCsv
-import com.moneymanager.csvimporter.findUnmatchedFundingReferences
+import com.moneymanager.csvimporter.findFundingReferences
 import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AttributeTypeId
@@ -16,7 +17,6 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.importengineapi.getOrCreateAttributeType
-import com.moneymanager.importengineapi.setAccountAttributeValue
 import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
@@ -510,38 +510,37 @@ class CurveCsvE2ETest : DbTest() {
             assertEquals(listOf(curve.id), reference.imports)
             assertEquals(listOf("Curve CSV"), reference.strategyNames)
 
-            val cardAccountId =
-                repositories.accountRepository
-                    .getAllAccounts()
-                    .first()
-                    .first { it.name == "Crypto.com Card" }
-                    .id
+            // A wrong pick first: the card lands on ALDI, and its row follows it there.
+            val wrong = assignCards("7721" to "ALDI")
+            assertEquals(1, wrong.filesImported)
+            assertEquals(0, wrong.filesFailed)
             val typeId = repositories.importEngine.getOrCreateAttributeType(reference.attributeTypeName)
-            val existing =
-                repositories.accountAttributeRepository
-                    .getByAccount(cardAccountId)
-                    .first()
-                    .single { it.attributeType.id == typeId }
-            repositories.importEngine.setAccountAttributeValue(
-                accountId = cardAccountId,
-                typeId = typeId,
-                value = addAttributeToken(existing.value, reference.value),
-                existingAttributeId = existing.id,
-            )
-            // Assigning the card re-imports the files that reference it (Card Last-4's prepareReimport).
-            val reimports = repositories.reimports(maintenance)
-            val files = reference.imports.map { repositories.csvImportRepository.getImport(it).first()!! }
-            val rerun = reimports.reimportAll(reimports.planAll(files), accountId = null, currencyId = null, onProgress = {})
+            val aldi = funding("7721")
+            assertEquals(accountId("ALDI"), aldi.owner)
+            assertTrue(aldi.ownedByToken)
+
+            // Changing it takes the card off ALDI and gives it to the card account, which keeps its other card. 1142
+            // joins the same account in the same apply, and the Curve file both reference is re-imported once.
+            val cardAccountId = accountId("Crypto.com Card")
+            val rerun = assignCards("7721" to "Crypto.com Card", "1142" to "Crypto.com Card")
             assertEquals(1, rerun.filesImported)
             assertEquals(0, rerun.filesFailed)
+            assertTrue(
+                repositories.accountAttributeRepository
+                    .getByAccount(accountId("ALDI"))
+                    .first()
+                    .none { it.attributeType.id == typeId },
+                "ALDI's emptied card attribute is deleted",
+            )
+            assertEquals(cardAccountId, funding("7721").owner)
 
             val cardAttributes =
                 repositories.accountAttributeRepository
                     .getByAccount(cardAccountId)
                     .first()
                     .filter { it.attributeType.id == typeId }
-            assertEquals(listOf("9999 7721"), cardAttributes.map { it.value }, "the card joins the account set")
-            assertEquals(listOf("1142"), unmatchedFundingReferences().map { it.value })
+            assertEquals(listOf("9999 7721 1142"), cardAttributes.map { it.value }, "the card joins the account set")
+            assertEquals(emptyList(), unmatchedFundingReferences().map { it.value })
 
             repositories.maintenanceService.refreshMaterializedViews()
             assertTrue(transfersBetween("Curve card 7721", "Curve").single().isExcluded(), "the 7721 row is reconciled")
@@ -550,13 +549,38 @@ class CurveCsvE2ETest : DbTest() {
             assertCurveNetsToZero()
         }
 
-    private suspend fun unmatchedFundingReferences() =
-        findUnmatchedFundingReferences(
+    private suspend fun unmatchedFundingReferences() = fundingReferences().filterNot { it.assigned }
+
+    private suspend fun fundingReferences() =
+        findFundingReferences(
             imports = repositories.csvImportRepository.getAllImports().first(),
             strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
             csvImportRepository = repositories.csvImportRepository,
             attributeAccountMatchers = AttributeAccountMatcher.registry(repositories.accountAttributeRepository.getAll().first()),
         )
+
+    private suspend fun funding(value: String) = fundingReferences().single { it.value == value }
+
+    private suspend fun accountId(name: String) =
+        repositories.accountRepository
+            .getAllAccounts()
+            .first()
+            .first { it.name == name }
+            .id
+
+    /** What Card Last-4's Apply does: moves each card to its account, then re-imports the files that reference any of them, once. */
+    private suspend fun assignCards(vararg assignments: Pair<String, String>): BulkReimportResult {
+        val changes = assignments.associate { (value, accountName) -> funding(value) to accountId(accountName) }
+        val reimports = repositories.reimports(maintenance)
+        val files =
+            changes.keys
+                .flatMap { it.imports }
+                .distinct()
+                .map { repositories.csvImportRepository.getImport(it).first()!! }
+        val plan = reimports.planAll(files)
+        repositories.importEngine.assignFundingReferences(changes, repositories.accountAttributeRepository)
+        return reimports.reimportAll(plan, accountId = null, currencyId = null, onProgress = {})
+    }
 
     @Test
     fun reimport_afterCardRegistered_isANoOp() =

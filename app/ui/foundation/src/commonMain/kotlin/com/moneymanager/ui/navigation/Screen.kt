@@ -123,6 +123,8 @@ sealed class Screen : NavKey {
     data class CsvImportDetail(
         val importId: CsvImportId,
         val scrollToRowIndex: Long? = null,
+        /** Column name to the cell values the file's table opens filtered to. */
+        val columnFilter: Map<String, Set<String>> = emptyMap(),
     ) : Screen() {
         override val title: String get() = "CSV Import"
     }

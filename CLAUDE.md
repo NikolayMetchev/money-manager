@@ -579,10 +579,14 @@ source** (built-ins: Koinly, Accointing). Its data never touches real accounts:
 
 **The Reconciliation tab** (Imports → Reconciliation) holds everything an import leaves for a person to
 resolve, as sub-tabs: External Account Reconciliation (the sources above), Manual Entries (the
-`ManualEntry` rule action: records waiting for an amount a person types), and Card Last-4. Card Last-4 lists funding references that no account owns: values in
-any CSV strategy's `fundingAttributeMatch` column that its attribute type doesn't resolve. Assigning one
-adds the value to the account's token set (`addAttributeToken`, so an account can own several cards) and
-re-imports the files that reference it.
+`ManualEntry` rule action: records waiting for an amount a person types), and Card Last-4. Card Last-4 lists the funding references imports carry
+(`findFundingReferences`): values in any CSV strategy's `fundingAttributeMatch` column, unassigned ones (that the
+attribute type doesn't resolve) first, then each assigned one with its owner. Picking an account only marks a card
+changed; **Apply** saves every change in one write (`assignFundingReferences`: each value joins its account's token
+set, `addAttributeToken`, so an account can own several cards, and a card picked wrongly leaves its old owner), then
+re-imports the files that reference any changed card, each once. It runs as a `TaskManager` task, shown with the
+re-import dialog's progress indicators. A card an account
+matches only by a pattern is changed in the account editor.
 
 **Re-import is delete + re-run.** Re-importing a staged file (CSV, QIF, Excel or PDF: `Reimports`, `app/csvimporter`) or an API session (`executeApiReimport`) goes through `executeSourceRerun`
 (`app/importengineapi`): it deletes every transfer and trade the source created, resets its records, runs the normal

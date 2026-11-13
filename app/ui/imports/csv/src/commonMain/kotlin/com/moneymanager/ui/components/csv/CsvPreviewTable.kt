@@ -77,6 +77,7 @@ fun CsvPreviewTable(
     amountColumnIndex: Int? = null,
     failedRowIndexes: Set<Long> = emptySet(),
     scrollToRowIndex: Long? = null,
+    initialColumnFilter: Map<String, Set<String>> = emptyMap(),
     onDuplicateSourceClick: ((TransferId, Boolean) -> Unit)? = null,
     onTransferClick: ((TransferId, Boolean) -> Unit)? = null,
 ) {
@@ -123,7 +124,11 @@ fun CsvPreviewTable(
             }
         }
 
-    var filter by remember { mutableStateOf(CsvRowFilter()) }
+    // A filter the caller opens the table with (by column name), started over only when it asks for another one.
+    var filter by
+        remember(initialColumnFilter, columns.isEmpty()) {
+            mutableStateOf(CsvRowFilter.byColumnName(columns, initialColumnFilter))
+        }
     val filteredRows = remember(rows, filter) { filter.apply(rows) }
     val distinctValues =
         remember(rows, columns) { columns.associate { it.columnIndex to distinctColumnValues(rows, it.columnIndex) } }

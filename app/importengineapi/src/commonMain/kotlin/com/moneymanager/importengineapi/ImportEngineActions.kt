@@ -220,29 +220,37 @@ suspend fun ImportEngine.createAccount(
 ): AccountId = createAccounts(listOf(account), shadowSource) { source }.single()
 
 /**
- * Sets [accountId]'s ungrouped attribute of [typeId] to [value]: rewrites [existingAttributeId] when the
- * account already holds one, otherwise adds it. Grouped attributes of the same type are left alone.
+ * Sets [accountId]'s attribute of [typeId] in [groupKey] to [value]: rewrites [existingAttributeId] when the
+ * account already holds one, otherwise adds it. A blank [value] deletes [existingAttributeId] instead.
  */
-suspend fun ImportEngine.setAccountAttributeValue(
-    accountId: AccountId,
-    typeId: AttributeTypeId,
-    value: String,
-    existingAttributeId: Long?,
-) {
-    val attribute = NewAttribute(typeId, value)
-    import(
-        ImportBatch.manualEdits(
-            accounts =
-                listOf(
-                    ImportAccountIntent(
-                        key = LocalAccountKey("set-attribute"),
-                        source = Source.Manual,
-                        operation = ImportOperation.UPDATE,
-                        existingId = accountId,
-                        updatedAttributes = existingAttributeId?.let { mapOf(it to attribute) } ?: emptyMap(),
-                        attributes = if (existingAttributeId == null) listOf(attribute) else emptyList(),
-                    ),
-                ),
-        ),
-    )
+data class AccountAttributeEdit(
+    val accountId: AccountId,
+    val typeId: AttributeTypeId,
+    val value: String,
+    val existingAttributeId: Long?,
+    val groupKey: String = "",
+)
+
+/**
+ * Applies every one of [edits] in one batch, so a value moved from one account to another is never held by
+ * both or by neither.
+ */
+suspend fun ImportEngine.setAccountAttributeValues(edits: List<AccountAttributeEdit>) {
+    if (edits.isEmpty()) return
+    val intents =
+        edits.mapIndexed { index, edit ->
+            val attribute = NewAttribute(edit.typeId, edit.value, edit.groupKey)
+            val existing = edit.existingAttributeId
+            val blank = edit.value.isBlank()
+            ImportAccountIntent(
+                key = LocalAccountKey("set-attribute-$index"),
+                source = Source.Manual,
+                operation = ImportOperation.UPDATE,
+                existingId = edit.accountId,
+                deletedAttributeIds = if (blank && existing != null) setOf(existing) else emptySet(),
+                updatedAttributes = if (!blank && existing != null) mapOf(existing to attribute) else emptyMap(),
+                attributes = if (!blank && existing == null) listOf(attribute) else emptyList(),
+            )
+        }
+    import(ImportBatch.manualEdits(accounts = intents))
 }

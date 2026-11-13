@@ -9,7 +9,7 @@ import com.moneymanager.csvimporter.Reimports
 import com.moneymanager.csvimporter.ScanResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.discoverImportableFolders
-import com.moneymanager.csvimporter.findUnmatchedFundingReferences
+import com.moneymanager.csvimporter.findFundingReferences
 import com.moneymanager.csvimporter.needsSourceAccountOverride
 import com.moneymanager.csvimporter.redownloadImportDirectory
 import com.moneymanager.csvimporter.scanImportDirectory
@@ -382,12 +382,12 @@ class ImportDirectoryService(
     private suspend fun unassignedCards(csv: BulkApplyResult): List<NeedsAttention> {
         val imported = csv.files.filter { it.status == BulkFileStatus.IMPORTED }.mapTo(mutableSetOf()) { it.fileId }
         if (imported.isEmpty()) return emptyList()
-        return findUnmatchedFundingReferences(
+        return findFundingReferences(
             imports = csvImportRepository.getAllImports().first().filter { it.id.toString() in imported },
             strategies = csvImportStrategyRepository.getAllStrategies().first(),
             csvImportRepository = csvImportRepository,
             attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first()),
-        ).map { NeedsAttention(it.value, NeedsAttentionReason.UNASSIGNED_CARD) }
+        ).filterNot { it.assigned }.map { NeedsAttention(it.value, NeedsAttentionReason.UNASSIGNED_CARD) }
     }
 
     /**

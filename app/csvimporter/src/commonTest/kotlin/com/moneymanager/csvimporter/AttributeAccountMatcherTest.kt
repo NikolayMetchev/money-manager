@@ -117,4 +117,39 @@ class AttributeAccountMatcherTest {
         assertEquals("7721", addAttributeToken(null, "7721"))
         assertEquals("7721", addAttributeToken("", "7721"))
     }
+
+    @Test
+    fun `an account holds a value it lists as a token but not one only its pattern matches`() {
+        val matcher =
+            AttributeAccountMatcher.from(
+                listOf(attribute(accountId = 1, value = "9999 7721"), attribute(accountId = 2, value = "11.*")),
+            )
+
+        assertTrue(matcher.holdsToken(AccountId(1), " 7721 "))
+        assertEquals(AccountId(2), matcher.match("1142"))
+        assertFalse(matcher.holdsToken(AccountId(2), "1142"))
+        assertFalse(matcher.holdsToken(AccountId(2), "7721"))
+    }
+
+    @Test
+    fun `removing a token keeps the others in order`() {
+        assertEquals("9999 1142", removeAttributeToken("9999, 7721 1142", " 7721 "))
+        assertEquals("9999", removeAttributeToken("7721 9999", "7721"))
+    }
+
+    @Test
+    fun `removing a token matches it case-insensitively`() {
+        assertEquals("9999", removeAttributeToken("9999 CRV*CARD", "crv*card"))
+    }
+
+    @Test
+    fun `removing a token the set lacks keeps the set`() {
+        assertEquals("9999 7721", removeAttributeToken("9999 7721", "1142"))
+    }
+
+    @Test
+    fun `removing the only token leaves a blank value`() {
+        assertEquals("", removeAttributeToken("7721", "7721"))
+        assertEquals("", removeAttributeToken(null, "7721"))
+    }
 }

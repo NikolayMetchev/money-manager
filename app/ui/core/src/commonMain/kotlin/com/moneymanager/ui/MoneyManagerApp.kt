@@ -706,6 +706,11 @@ fun MoneyManagerApp(
                                                 onCsvImportClick = { importId ->
                                                     navigationHistory.navigateTo(Screen.CsvImportDetail(importId))
                                                 },
+                                                onCsvImportRowsClick = { importId, columnFilter ->
+                                                    navigationHistory.navigateTo(
+                                                        Screen.CsvImportDetail(importId, columnFilter = columnFilter),
+                                                    )
+                                                },
                                                 onReconciliationLegClick = { leg ->
                                                     navigationHistory.navigateTo(
                                                         Screen.AccountTransactions(
@@ -858,6 +863,7 @@ fun MoneyManagerApp(
                                             CsvImportDetailScreen(
                                                 importId = screen.importId,
                                                 scrollToRowIndex = screen.scrollToRowIndex,
+                                                columnFilter = screen.columnFilter,
                                                 csvImportRepository = services.imports.csvImportRepository,
                                                 csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
                                                 accountMappingRepository = services.imports.accountMappingRepository,

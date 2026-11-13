@@ -69,6 +69,7 @@ import kotlinx.coroutines.launch
 fun CsvImportDetailScreen(
     importId: CsvImportId,
     scrollToRowIndex: Long? = null,
+    columnFilter: Map<String, Set<String>> = emptyMap(),
     csvImportRepository: CsvImportReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
@@ -417,6 +418,7 @@ fun CsvImportDetailScreen(
                         amountColumnIndex = amountColumnIndex,
                         failedRowIndexes = failedRowIndexes,
                         scrollToRowIndex = scrollToRowIndex,
+                        initialColumnFilter = columnFilter,
                         onDuplicateSourceClick = { transferId, isPositiveAmount ->
                             scope.launch {
                                 val csvSource =

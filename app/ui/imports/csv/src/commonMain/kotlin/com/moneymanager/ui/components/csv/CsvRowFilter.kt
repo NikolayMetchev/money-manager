@@ -1,5 +1,6 @@
 package com.moneymanager.ui.components.csv
 
+import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 
@@ -23,6 +24,20 @@ internal data class CsvRowFilter(
             columns.all { (index, values) -> values.isEmpty() || row.values.getOrElse(index) { "" } in values }
 
     fun apply(rows: List<CsvRow>): List<CsvRow> = if (isActive) rows.filter(::matches) else rows
+
+    companion object {
+        /** The filter keeping, in each of [columns] named in [values], the rows with one of its values; unknown names are ignored. */
+        fun byColumnName(
+            columns: List<CsvColumn>,
+            values: Map<String, Set<String>>,
+        ): CsvRowFilter =
+            CsvRowFilter(
+                columns =
+                    columns
+                        .mapNotNull { column -> values[column.originalName]?.takeIf { it.isNotEmpty() }?.let { column.columnIndex to it } }
+                        .toMap(),
+            )
+    }
 }
 
 /** The distinct values of one column, in order, for its filter menu. */
