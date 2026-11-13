@@ -4,12 +4,16 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasProgressBarRangeInfo
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
@@ -89,6 +93,31 @@ class ApiConnectionsVaultE2ETest : DbTest() {
             waitUntil(timeoutMillis = 10_000) { onAllNodesWithText("Connected · monz…3456").fetchSemanticsNodes().isNotEmpty() }
             waitUntil(timeoutMillis = 10_000) { connectionRowFor("Monzo") != null }
             waitForIdle()
+        }
+    }
+
+    @Test
+    fun deleting_a_credential_removes_it_from_the_vault() {
+        runMoneyManagerComposeUiTest {
+            val orphan = StoredApiCredential(strategyName = "Gone Bank", token = "gone-token-abcdef", createdAtEpochMillis = 1)
+            val vault = runBlocking { unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzo, orphan))) }
+            showConnections(vault)
+
+            waitUntil(timeoutMillis = 10_000) { onAllNodesWithText("Connected · monz…3456").fetchSemanticsNodes().isNotEmpty() }
+            // A credential whose strategy isn't installed has a row of its own, so it can be deleted too.
+            onNode(hasScrollAction()).performScrollToNode(hasText("Not installed · gone…cdef"))
+
+            // Its row is the list's last, so its Delete button is the last one composed.
+            onAllNodesWithText("Delete").let { it[it.fetchSemanticsNodes().lastIndex] }.performClick()
+            onNodeWithText("Delete the Gone Bank credentials?").assertExists()
+            onNode(hasText("Delete").and(hasAnyAncestor(isDialog()))).performClick()
+
+            waitUntil(timeoutMillis = 10_000) { vault.bundleOrNull()?.apiCredential("Gone Bank") == null }
+            waitUntilDoesNotExist(hasText("Delete the Gone Bank credentials?"), timeoutMillis = 10_000)
+            waitForIdle()
+            assertEquals(listOf("Monzo"), vault.bundleOrNull()?.apiCredentials?.map { it.strategyName })
+            // A marker stays behind, so merging with a backup that still holds the credential won't bring it back.
+            assertEquals(listOf("Gone Bank"), vault.bundleOrNull()?.deletedApiCredentials?.map { it.key })
         }
     }
 

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -168,6 +169,27 @@ fun ApiConnectionsScreen(
                     },
                 )
             }
+            // Secrets outlive their strategy (they are keyed by name, so a reinstall reconnects), which leaves
+            // credentials for uninstalled strategies with no row of their own. List them so they can be deleted.
+            val installedNames = sorted.map { it.name }.toSet()
+            val orphaned =
+                bundle
+                    ?.apiCredentials
+                    .orEmpty()
+                    .filter { it.strategyName !in installedNames }
+                    .sortedBy { it.strategyName.lowercase() }
+            if (orphaned.isNotEmpty()) {
+                item(key = "orphaned-header") {
+                    Text(
+                        "Saved credentials for strategies that aren't installed",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                items(orphaned, key = { "orphaned:${it.strategyName}" }) { credential ->
+                    OrphanedCredentialRow(credential)
+                }
+            }
         }
     }
 }
@@ -235,6 +257,7 @@ private fun ApiConnectionRow(
                 if (expanded) {
                     TextButton(onClick = { onExpandedChange(false) }) { Text("Close") }
                 } else if (credential != null) {
+                    DeleteCredentialButton(strategyName = strategy.name)
                     OutlinedButton(onClick = { onExpandedChange(true) }) { Text("Update credentials") }
                 } else {
                     Button(onClick = { onExpandedChange(true) }) { Text("Connect") }
@@ -418,6 +441,85 @@ private fun ApiCredentialForm(
         }
     }
 }
+
+@Composable
+private fun OrphanedCredentialRow(credential: StoredApiCredential) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(credential.strategyName, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Not installed · ${maskToken(credential.token)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            DeleteCredentialButton(strategyName = credential.strategyName)
+        }
+    }
+}
+
+/**
+ * Removes [strategyName]'s secrets from the credential vault, after asking. The database's secret-free connection
+ * row and its downloaded sessions stay, so connecting again later picks the history back up.
+ */
+@Composable
+private fun DeleteCredentialButton(strategyName: String) {
+    val vault = LocalCredentialVault.current
+    val scope = rememberSchemaAwareCoroutineScope()
+    var confirming by remember(strategyName) { mutableStateOf(false) }
+    var deleting by remember(strategyName) { mutableStateOf(false) }
+    var errorMessage by remember(strategyName) { mutableStateOf<String?>(null) }
+
+    TextButton(onClick = { confirming = true }, enabled = !deleting) { Text("Delete") }
+
+    if (confirming) {
+        AlertDialog(
+            onDismissRequest = { if (!deleting) confirming = false },
+            title = { Text("Delete the $strategyName credentials?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "They are removed from your credential file, so $strategyName can't download until you connect it " +
+                            "again. Sessions already downloaded and imported stay.",
+                    )
+                    errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deleting = true
+                        errorMessage = null
+                        scope.launch {
+                            try {
+                                val deletedAt = Clock.System.now().toEpochMilliseconds()
+                                vault.update("Delete the $strategyName credentials") { it.withoutApiCredential(strategyName, deletedAt) }
+                                confirming = false
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (expected: Exception) {
+                                errorMessage = deleteFailureMessage(expected)
+                            } finally {
+                                deleting = false
+                            }
+                        }
+                    },
+                    enabled = !deleting,
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirming = false }, enabled = !deleting) { Text("Cancel") }
+            },
+        )
+    }
+}
+
+private fun deleteFailureMessage(error: Throwable): String =
+    when (error) {
+        is CredentialVaultLockedException -> "Unlock your credential file to delete these credentials."
+        else -> "Couldn't delete the credentials: ${error.message ?: error::class.simpleName}"
+    }
 
 /** Enough to recognise which token is stored, not enough to be worth a screenshot. */
 private fun maskToken(token: String): String {
