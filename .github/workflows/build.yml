@@ -179,6 +179,7 @@ jobs:
             --runner_exec_properties=remote-snapshot-save-policy=always \
             --run_from_branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}" --run_from_commit="$GITHUB_SHA" \
             --env=REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --env=NATIVE="$NATIVE" --env=ANDROID="$ANDROID" --env=WEB="$WEB" --env=INSTALLER="$INSTALLER" \
             --remote_run_header="x-buildbuddy-platform.secret-env-overrides=GOOGLE_OAUTH_CLIENT_ID=$GOOGLE_OAUTH_CLIENT_ID,GOOGLE_OAUTH_CLIENT_SECRET=$GOOGLE_OAUTH_CLIENT_SECRET" \
             --invocation_id_file=remote-run.id \
             --script="bazel/ci/build_and_test.sh $BAZEL_FLAGS"
