@@ -134,8 +134,15 @@ object BuiltInCsvStrategies {
     /** The Crypto.com Crypto strategy's leg group pairing dust conversions and wallet swaps. */
     private const val CRYPTO_COM_CONVERSION_GROUP = "conversion"
 
-    /** Account name prefix shared with the Wise API import strategy ("Wise: " + currency code). */
-    private const val WISE_ACCOUNT_PREFIX = "Wise: "
+    /** The one account every Wise currency balance lives in (an account holds one balance per currency). */
+    private const val WISE_ACCOUNT = "Wise"
+
+    /** Wise itself as a counterparty: the account its fees go to and its interest comes from. */
+    private const val WISE_INSTITUTION_ACCOUNT = "TransferWise"
+
+    /** Columns the Wise strategy's rules write: a balance-to-balance conversion's credited currency and amount. */
+    private const val WISE_TO_CURRENCY_COLUMN = "Conversion currency"
+    private const val WISE_TO_AMOUNT_COLUMN = "Conversion amount"
 
     /**
      * The Curve conduit account. Matches [com.moneymanager.builtin.BuiltInPassThroughs.curve]'s
@@ -1284,10 +1291,11 @@ object BuiltInCsvStrategies {
      * Each row carries both sides of the transaction (Source and Target columns) and a Direction
      * column saying which side is the user's Wise balance. A row preprocessing rule swaps the
      * Source/Target values for IN rows so all field mappings can read the Source-side columns,
-     * then flips the resolved accounts. The per-currency Wise balance is resolved by templating
-     * the currency code into the account name used by the Wise API import ("Wise: EUR").
-     * Balance-to-balance conversions (same name on both sides, different currencies) route the
-     * target to the other Wise balance instead of a counterparty account.
+     * then flips the resolved accounts. Every row books to the one account "Wise", which holds a
+     * balance per currency, as Revolut's does. A balance-to-balance conversion (same name on both
+     * sides, different currencies) is a trade inside that account: the source currency out, the
+     * target currency in. Wise itself as the counterparty ("Wise", paying interest) is the
+     * "TransferWise" account its fees already go to, so it never collides with the own account.
      *
      * Wise's export omits interest-earned rows, but each monthly "Assets fee" (wise-id like
      * `ACCRUAL_CHARGE-…`) implies one, so a manual-entry rule asks for the mirroring interest
@@ -1323,6 +1331,21 @@ object BuiltInCsvStrategies {
                         fieldType = TransferField.TIMEZONE,
                         timezoneId = "UTC",
                     ),
+                // Blank except on a conversion, whose rule fills them in: only that row is a trade.
+                TransferField.TO_AMOUNT to
+                    AmountParsingMapping(
+                        fieldType = TransferField.TO_AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = WISE_TO_AMOUNT_COLUMN,
+                    ),
+                TransferField.TO_CURRENCY to
+                    CurrencyLookupMapping(fieldType = TransferField.TO_CURRENCY, value = ValueExpr(listOf(WISE_TO_CURRENCY_COLUMN))),
+            )
+        val conversion =
+            listOf(
+                Condition("Source name", ConditionOp.EQUALS_PATH, otherPath = "Target name"),
+                Condition("Source name", ConditionOp.NOT_BLANK),
+                Condition("Source currency", ConditionOp.NOT_EQUALS_PATH, otherPath = "Target currency"),
             )
         val rules =
             listOf(
@@ -1342,26 +1365,18 @@ object BuiltInCsvStrategies {
                     RuleAction.Flip,
                     conditions = listOf(Condition("Direction", ConditionOp.EQUALS, value = "IN")),
                 ),
-                accounts(
-                    AccountSide.SOURCE,
-                    naming(
-                        "Source currency",
-                        trim = true,
-                        name =
-                            WISE_ACCOUNT_PREFIX + AccountNaming.VALUE_PLACEHOLDER,
-                    ),
+                accounts(AccountSide.SOURCE, fixedNaming("Source currency", WISE_ACCOUNT)),
+                rule(
+                    RuleAction.SetValue(WISE_TO_CURRENCY_COLUMN, RuleValue.read("Target currency")),
+                    RuleAction.SetValue(WISE_TO_AMOUNT_COLUMN, RuleValue.read("Target amount (after fees)")),
+                    conditions = conversion,
+                    name = "A balance-to-balance conversion is a trade: the target currency comes in",
                 ),
-                // A balance-to-balance conversion (same name on both sides, different currencies) goes to the
-                // other Wise balance rather than a counterparty.
+                accounts(AccountSide.TARGET, fixedNaming("Target currency", WISE_ACCOUNT), conditions = conversion),
                 accounts(
                     AccountSide.TARGET,
-                    naming("Target currency", trim = true, name = WISE_ACCOUNT_PREFIX + AccountNaming.VALUE_PLACEHOLDER),
-                    conditions =
-                        listOf(
-                            Condition("Source name", ConditionOp.EQUALS_PATH, otherPath = "Target name"),
-                            Condition("Source name", ConditionOp.NOT_BLANK),
-                            Condition("Source currency", ConditionOp.NOT_EQUALS_PATH, otherPath = "Target currency"),
-                        ),
+                    fixedNaming("Target name", WISE_INSTITUTION_ACCOUNT),
+                    conditions = listOf(Condition("Target name", ConditionOp.EQUALS, value = WISE_ACCOUNT)),
                 ),
                 accounts(AccountSide.TARGET, AccountNaming(value = ValueExpr.of("Target name", "Source name"))),
                 fee(
