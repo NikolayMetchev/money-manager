@@ -133,6 +133,18 @@ class ApiSessionPlanningTest {
         )
     }
 
+    @Test
+    fun bulkDownloadImportSummary_saysOnlyWhatRan() {
+        assertEquals(
+            "Downloaded 2 of 2 connection(s).",
+            bulkDownloadImportSummary(credentialCount = 2, downloadedCount = 2, sessionCount = 0, importedCount = 0, needsReviewCount = 0),
+        )
+        assertEquals(
+            "Imported 0 of 0 session(s).",
+            bulkDownloadImportSummary(credentialCount = 0, downloadedCount = 0, sessionCount = 0, importedCount = 0, needsReviewCount = 0),
+        )
+    }
+
     private fun credential(
         id: Long,
         strategyId: ApiImportStrategyId?,

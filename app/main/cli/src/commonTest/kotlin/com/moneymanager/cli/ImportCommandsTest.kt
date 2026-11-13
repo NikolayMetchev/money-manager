@@ -204,7 +204,7 @@ class ImportCommandsTest {
             }
         }
 
-    // What the desktop app's "Download all" + "Import all" and "Download & import all" buttons run.
+    // What the desktop app's "Download all" + "Import all" buttons and the CLI's import run.
     private suspend fun runDesktopImports(fixture: Fixture) {
         val database = fixture.cli.databaseManager.openDatabase(fixture.db)
         try {

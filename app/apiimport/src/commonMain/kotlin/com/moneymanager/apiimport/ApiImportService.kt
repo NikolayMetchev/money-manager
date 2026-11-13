@@ -141,11 +141,15 @@ data class ApiDownloadAndImportAllResult(
  * Every callback defaults to doing nothing, so a front end (the CLI) passes only the ones it needs.
  *
  * @property onSessionCreated a credential's download created a session, before any request is made.
+ * @property confirmCounterparties asked, during a bulk import, for the account names of a session's new
+ *   counterparties: the names to import it with, or null to leave it for a person. The queue waits for the
+ *   answer, so later sessions still import in order.
  */
 class ApiImportListener(
     val onSessionCreated: (ApiCredentialId, ApiSessionId) -> Unit = { _, _ -> },
     val onDownloaded: (ApiCredentialId, ApiSessionDownloadResult) -> Unit = { _, _ -> },
     val onImported: (ApiSessionId, ApiSessionImportResult) -> Unit = { _, _ -> },
+    val confirmCounterparties: suspend (ApiSessionNeedsAttention) -> Map<String, String>? = { null },
 ) {
     companion object {
         val None = ApiImportListener()
@@ -360,10 +364,11 @@ class ApiImportService(
      * import needs counterparty names confirmed comes back in [ApiDownloadAndImportAllResult.needsAttention]
      * rather than being imported with unconfirmed names; a session imported under an older strategy revision
      * is left for re-import. Credentials in [forceFullIds] ignore what earlier sessions already covered.
-     * [importSessions] false only downloads. [refreshViews] false leaves the materialized views to the
+     * [importSessions] false only downloads; [downloadSessions] false only imports the sessions earlier
+     * downloads left, without unlocking the vault. [refreshViews] false leaves the materialized views to the
      * caller; otherwise each import refreshes them. Every download or import that fails is reported on [task].
      *
-     * The vault is unlocked once up front, so the parallel downloads don't each prompt.
+     * When downloading, the vault is unlocked once up front, so the parallel downloads don't each prompt.
      *
      * @throws CredentialVaultLockedException when the vault stays locked.
      */
@@ -374,12 +379,13 @@ class ApiImportService(
         forceFullIds: Set<ApiCredentialId> = emptySet(),
         listener: ApiImportListener = ApiImportListener.None,
         importSessions: Boolean = true,
+        downloadSessions: Boolean = true,
         refreshViews: Boolean = true,
     ): ApiDownloadAndImportAllResult {
-        credentialVault.requireUnlocked("Download all APIs")
+        if (downloadSessions) credentialVault.requireUnlocked("Download all APIs")
         val strategyByCredential = targets.associate { it.id to resolveStrategy(it) }
         val readyToImport = Channel<ApiSession>(Channel.UNLIMITED)
-        var downloadsLeft = targets.size
+        var downloadsLeft = if (downloadSessions) targets.size else 0
         val downloads = mutableListOf<ApiCredentialDownload>()
         val sessions = mutableListOf<ApiSessionImport>()
         val needsAttention = mutableListOf<ApiSessionNeedsAttention>()
@@ -390,29 +396,11 @@ class ApiImportService(
                 targets
                     .map { credential ->
                         async {
-                            val strategyName = strategyByCredential[credential.id]?.name
-                            // Each connection fails on its own: one provider's error mustn't cancel the other
-                            // downloads or the import queue.
-                            val downloaded =
-                                task.awaitChild(
-                                    key = apiDownloadTaskKey(credential.id),
-                                    title = strategyName?.let { "Download $it" } ?: "Download",
-                                    initialDetail = "Fetching credentials.",
-                                    finalDetail = { it.message },
-                                ) { download(this, credential, credential.id in forceFullIds, listener) }
-                            val error = downloaded?.exceptionOrNull()?.let { it.message ?: it::class.simpleName }
-                            val outcome = downloaded?.getOrNull()
-                            downloads += ApiCredentialDownload(credential, strategyName, outcome, error)
-                            when {
-                                error != null -> {
-                                    task.reportIssue("${strategyName ?: "Connection"}: download failed: $error")
-                                }
-
-                                outcome is ApiDownloadOutcome.NotDownloaded -> {
-                                    task.reportIssue("${strategyName ?: "Connection"}: not downloaded: ${outcome.message}")
-                                }
+                            if (downloadSessions) {
+                                val strategyName = strategyByCredential[credential.id]?.name
+                                downloads += downloadForBulk(task, credential, strategyName, forceFullIds, listener)
+                                downloadsLeft--
                             }
-                            downloadsLeft--
                             // Queued even when the download failed: sessions left from earlier downloads still
                             // hold data the next download won't fetch again.
                             if (importSessions) {
@@ -435,7 +423,13 @@ class ApiImportService(
                     sessions += ApiSessionImport(session, null, ApiSessionImportStatus.SKIPPED_NO_STRATEGY)
                     continue
                 }
-                task.report("Importing session #${session.id}; $downloadsLeft download(s) still running.")
+                task.report(
+                    if (downloadSessions) {
+                        "Importing session #${session.id}; $downloadsLeft download(s) still running."
+                    } else {
+                        "Importing session #${session.id}."
+                    },
+                )
                 sessions += importQueued(task, session, strategy, listener, refreshViews, needsAttention)
             }
         }
@@ -446,8 +440,38 @@ class ApiImportService(
         )
     }
 
+    // One credential's download in "Download & import all". Each connection fails on its own: one provider's
+    // error mustn't cancel the other downloads or the import queue.
+    private suspend fun downloadForBulk(
+        task: TaskScope,
+        credential: ApiCredential,
+        strategyName: String?,
+        forceFullIds: Set<ApiCredentialId>,
+        listener: ApiImportListener,
+    ): ApiCredentialDownload {
+        val downloaded =
+            task.awaitChild(
+                key = apiDownloadTaskKey(credential.id),
+                title = strategyName?.let { "Download $it" } ?: "Download",
+                initialDetail = "Fetching credentials.",
+                finalDetail = { it.message },
+            ) { download(this, credential, credential.id in forceFullIds, listener) }
+        val error = downloaded?.exceptionOrNull()?.let { it.message ?: it::class.simpleName }
+        val outcome = downloaded?.getOrNull()
+        when {
+            error != null -> {
+                task.reportIssue("${strategyName ?: "Connection"}: download failed: $error")
+            }
+
+            outcome is ApiDownloadOutcome.NotDownloaded -> {
+                task.reportIssue("${strategyName ?: "Connection"}: not downloaded: ${outcome.message}")
+            }
+        }
+        return ApiCredentialDownload(credential, strategyName, outcome, error)
+    }
+
     // One queued session of "Download & import all": left for a person when its counterparties need
-    // confirming, else imported as its own child task. A failure is reported and the queue moves on.
+    // confirming and the listener doesn't confirm them, else imported as its own child task. A failure is reported and the queue moves on.
     private suspend fun importQueued(
         task: TaskScope,
         session: ApiSession,
@@ -465,17 +489,24 @@ class ApiImportService(
                 logger.e(expected) { "Checking counterparties of session ${session.id} failed: ${expected.message}" }
                 return failedImport(task, session, strategy, expected)
             }
-        if (counterparties.isNotEmpty()) {
-            needsAttention += ApiSessionNeedsAttention(session, strategy, counterparties)
-            return ApiSessionImport(session, strategy.name, ApiSessionImportStatus.NEEDS_ATTENTION)
-        }
+        val counterpartyAccountNames =
+            if (counterparties.isEmpty()) {
+                emptyMap()
+            } else {
+                val attention = ApiSessionNeedsAttention(session, strategy, counterparties)
+                task.report("Waiting for the counterparties of ${strategy.name} session #${session.id} to be confirmed.")
+                listener.confirmCounterparties(attention) ?: run {
+                    needsAttention += attention
+                    return ApiSessionImport(session, strategy.name, ApiSessionImportStatus.NEEDS_ATTENTION)
+                }
+            }
         val imported =
             task.awaitChild(
                 key = apiImportTaskKey(session.id),
                 title = "Import ${strategy.name}",
                 initialDetail = "Starting import for session #${session.id}.",
                 finalDetail = { it.displaySummary() },
-            ) { import(this, session.id, strategy, refreshViews = refreshViews) }
+            ) { import(this, session.id, strategy, counterpartyAccountNames, refreshViews) }
         val result = imported?.getOrNull()
         return when {
             result != null -> {
