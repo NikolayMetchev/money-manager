@@ -65,7 +65,7 @@ class BuiltInCsvStrategyInstallTest : DbTest() {
             val rules = strategy.config.rules
             assertIs<AccountFromRulesMapping>(strategy.config.fieldMappings[TransferField.SOURCE_ACCOUNT])
             val source = rules.namings(AccountSide.SOURCE).single()
-            assertEquals("Wise: {value}", source.name)
+            assertEquals("Wise", source.name)
             assertEquals("Source currency", source.value.primaryPath)
 
             assertIs<AccountFromRulesMapping>(strategy.config.fieldMappings[TransferField.TARGET_ACCOUNT])

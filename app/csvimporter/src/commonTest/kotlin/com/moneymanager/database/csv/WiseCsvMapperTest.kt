@@ -41,12 +41,11 @@ class WiseCsvMapperTest {
     private val currenciesById = currencies.associateBy { it.id }
     private val currenciesByCode = currencies.associateBy { it.code }
 
-    private val wiseEur = Account(id = AccountId(10), name = "Wise: EUR", openingDate = Clock.System.now())
-    private val wiseGbp = Account(id = AccountId(11), name = "Wise: GBP", openingDate = Clock.System.now())
+    private val wise = Account(id = AccountId(10), name = "Wise", openingDate = Clock.System.now())
     private val teodora = Account(id = AccountId(20), name = "Teodora Veselinova", openingDate = Clock.System.now())
     private val transferwise = Account(id = AccountId(21), name = "TransferWise", openingDate = Clock.System.now())
     private val defaultAccounts =
-        listOf(wiseEur, wiseGbp, teodora, transferwise).associateBy { it.name }
+        listOf(wise, teodora, transferwise).associateBy { it.name }
 
     private val columnNames =
         listOf(
@@ -140,11 +139,11 @@ class WiseCsvMapperTest {
         )
 
     @Test
-    fun `OUT card payment routes from the source-currency Wise account to the counterparty`() {
+    fun `OUT card payment routes from the Wise account to the counterparty`() {
         val result = mapper().mapRow(wiseRow())
 
         assertIs<MappingResult.Success>(result)
-        assertEquals(wiseEur.id, result.transfer.sourceAccountId)
+        assertEquals(wise.id, result.transfer.sourceAccountId)
         // "Avolta - Tenerife" is unknown so a new account placeholder is used
         assertEquals(AccountId(-1), result.transfer.targetAccountId)
         assertEquals(listOf(NewAccount("Avolta - Tenerife", -1L)), result.newAccounts)
@@ -153,7 +152,7 @@ class WiseCsvMapperTest {
     }
 
     @Test
-    fun `IN transfer swaps sides so money flows from the counterparty into the target-currency Wise account`() {
+    fun `IN transfer swaps sides so money flows from the counterparty into the Wise account`() {
         val row =
             wiseRow(
                 id = "TRANSFER-1709494792",
@@ -170,14 +169,14 @@ class WiseCsvMapperTest {
 
         assertIs<MappingResult.Success>(result)
         assertEquals(AccountId(30), result.transfer.sourceAccountId)
-        assertEquals(wiseGbp.id, result.transfer.targetAccountId)
+        assertEquals(wise.id, result.transfer.targetAccountId)
         assertEquals(BigInteger(250000L), result.transfer.amount.amount)
         assertEquals(gbp, result.transfer.amount.asset)
         assertTrue(result.newAccounts.isEmpty())
     }
 
     @Test
-    fun `balance conversion routes both sides to Wise accounts`() {
+    fun `balance conversion is a trade inside the Wise account`() {
         val row =
             wiseRow(
                 id = "BALANCE-1",
@@ -189,11 +188,51 @@ class WiseCsvMapperTest {
         val result = mapper().mapRow(row)
 
         assertIs<MappingResult.Success>(result)
-        assertEquals(wiseEur.id, result.transfer.sourceAccountId)
-        assertEquals(wiseGbp.id, result.transfer.targetAccountId)
-        // Wise-side (source) amount is recorded
+        assertEquals(wise.id, result.transfer.sourceAccountId)
+        assertEquals(wise.id, result.transfer.targetAccountId)
+        // The source currency leaves and the target currency arrives
         assertEquals(BigInteger(10000L), result.transfer.amount.amount)
         assertEquals(eur, result.transfer.amount.asset)
+        assertEquals(BigInteger(8500L), result.tradeTo?.amount)
+        assertEquals(gbp, result.tradeTo?.asset)
+    }
+
+    @Test
+    fun `cross-currency payment to someone else is a transfer, not a trade`() {
+        val row =
+            wiseRow(
+                id = "TRANSFER-2",
+                sourceAmount = "89.19",
+                sourceCurrency = "GBP",
+                targetName = "Teodora Veselinova",
+                targetAmount = "200.0",
+                targetCurrency = "BGN",
+            )
+        val result = mapper().mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(null, result.tradeTo)
+    }
+
+    @Test
+    fun `interest paid by Wise comes from TransferWise rather than the Wise account`() {
+        val row =
+            wiseRow(
+                id = "ASSETS_DISTRIBUTION_INTEREST-01a19b0d",
+                direction = "IN",
+                sourceName = "Wise",
+                sourceAmount = "1.14",
+                sourceCurrency = "EUR",
+                targetName = "Nikolay Metchev",
+                targetAmount = "1.14",
+                targetCurrency = "EUR",
+            )
+        val result = mapper().mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(transferwise.id, result.transfer.sourceAccountId)
+        assertEquals(wise.id, result.transfer.targetAccountId)
+        assertEquals(BigInteger(114L), result.transfer.amount.amount)
     }
 
     @Test
@@ -211,7 +250,7 @@ class WiseCsvMapperTest {
         val result = mapper().mapRow(row)
 
         assertIs<MappingResult.Success>(result)
-        assertEquals(wiseEur.id, result.transfer.sourceAccountId)
+        assertEquals(wise.id, result.transfer.sourceAccountId)
         assertEquals(transferwise.id, result.transfer.targetAccountId)
         assertEquals(BigInteger(6L), result.transfer.amount.amount)
         assertEquals("Assets fee 18326272", result.transfer.description)
@@ -278,7 +317,7 @@ class WiseCsvMapperTest {
         val result = mapper().mapRow(row)
 
         assertIs<MappingResult.Success>(result)
-        assertEquals(wiseGbp.id, result.transfer.sourceAccountId)
+        assertEquals(wise.id, result.transfer.sourceAccountId)
         assertEquals(teodora.id, result.transfer.targetAccountId)
         // 89.19 converted is the main movement; the 1.18 fee is its own linked fee transfer.
         assertEquals(BigInteger(8919L), result.transfer.amount.amount)
@@ -357,7 +396,7 @@ class WiseCsvMapperTest {
     }
 
     @Test
-    fun `missing Wise currency account is discovered as a new source account`() {
+    fun `missing Wise account is discovered as a new source account`() {
         val row =
             wiseRow(
                 sourceAmount = "50.00",
@@ -366,14 +405,14 @@ class WiseCsvMapperTest {
                 targetAmount = "50.00",
                 targetCurrency = "BGN",
             )
-        val result = mapper().mapRow(row)
+        val result = mapper(defaultAccounts - "Wise").mapRow(row)
 
         assertIs<MappingResult.Success>(result)
         assertEquals(AccountId(-1), result.transfer.sourceAccountId)
-        assertEquals(listOf(NewAccount("Wise: BGN", -1L)), result.newAccounts)
+        assertEquals(listOf(NewAccount("Wise", -1L)), result.newAccounts)
         val discovered = result.discoveredMappings.single()
         assertEquals("BGN", discovered.csvValue)
-        assertEquals("Wise: BGN", discovered.targetAccountName)
+        assertEquals("Wise", discovered.targetAccountName)
     }
 
     @Test
@@ -387,7 +426,7 @@ class WiseCsvMapperTest {
                 createdAt = Clock.System.now(),
                 updatedAt = Clock.System.now(),
             )
-        val accounts = defaultAccounts - "Wise: EUR" + ("My Euro Wallet" to renamedAccount)
+        val accounts = defaultAccounts - "Wise" + ("My Euro Wallet" to renamedAccount)
         val result =
             mapper(accounts = accounts, accountMappings = listOf(mapping))
                 .mapRow(wiseRow(targetName = "TransferWise"))
@@ -410,11 +449,11 @@ class WiseCsvMapperTest {
                     targetName = "TransferWise",
                 ),
             )
-        val preparation = mapper().prepareImport(rows)
+        val preparation = mapper(defaultAccounts - "Wise").prepareImport(rows)
 
         assertEquals(2, preparation.validTransfers.size)
         assertEquals(
-            setOf(NewAccount("Avolta - Tenerife", -1L), NewAccount("Wise: BGN", -1L)),
+            setOf(NewAccount("Avolta - Tenerife", -1L), NewAccount("Wise", -1L)),
             preparation.newAccounts,
         )
         assertTrue(preparation.errorRows.isEmpty())

@@ -386,8 +386,8 @@ object BuiltInApiStrategies {
                                 ApiAccountMappings(
                                     // Balances only have a "name" when the user explicitly names them (null by
                                     // default), which made account names fall back to the opaque balance id.
-                                    // Use the currency code instead so accounts are named "Wise: EUR" etc.,
-                                    // matching the accounts the built-in Wise CSV strategy resolves per-row.
+                                    // Use the currency code instead so accounts are named "Wise: EUR" etc. (The
+                                    // Wise CSV strategy books every currency to one "Wise" account instead.)
                                     descriptionField = "currency",
                                     ownersArrayField = null,
                                     currencyField = "currency",

@@ -29,6 +29,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -36,9 +37,9 @@ import kotlin.time.Instant
  * End-to-end test for importing a Wise transaction-history CSV with the built-in
  * seeded "Wise CSV" strategy.
  *
- * The Wise export mixes currencies; the strategy resolves the per-row source account
- * from the currency column ("Wise: EUR", "Wise: GBP"), so no source account selection
- * is required in the Apply Strategy dialog.
+ * The Wise export mixes currencies; the strategy books every row to the one "Wise" account,
+ * which holds a balance per currency, so no source account selection is required in the
+ * Apply Strategy dialog.
  */
 @OptIn(ExperimentalTestApi::class)
 class ImportWiseCsvE2ETest {
@@ -62,12 +63,9 @@ class ImportWiseCsvE2ETest {
                 val databaseComponent = openDatabaseComponent(db)
                 databaseComponent.installBuiltInCsvStrategies()
 
-                // The Wise API import would normally have created the per-currency accounts
-                for (name in listOf("Wise: EUR", "Wise: GBP")) {
-                    databaseComponent.accountRepository.createAccount(
-                        Account(id = AccountId(0), name = name, openingDate = Clock.System.now()),
-                    )
-                }
+                databaseComponent.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Wise", openingDate = Clock.System.now()),
+                )
 
                 val csvContent = wiseCsvContent()
                 val lines = csvContent.lines().filter { it.isNotBlank() }
@@ -143,8 +141,8 @@ class ImportWiseCsvE2ETest {
 
     /**
      * Regression test for importing on a fresh database with no accounts at all: the dialog
-     * must still prepare the import, offer the per-currency Wise accounts ("Wise: EUR",
-     * "Wise: GBP") as new accounts to create, and enable the import button. Previously the
+     * must still prepare the import, offer the "Wise" account
+     * as a new account to create, and enable the import button. Previously the
      * preview was gated on at least one account existing, so a fresh database showed
      * "Import 0 Transfers" with no way to proceed.
      */
@@ -207,10 +205,9 @@ class ImportWiseCsvE2ETest {
             waitUntilExactlyOneExists(hasText("Wise CSV"), timeoutMillis = 10000)
             waitForIdle()
 
-            // The per-currency source accounts are offered as new accounts alongside counterparties
+            // The Wise account is offered as a new account alongside counterparties
             waitUntilAtLeastOneExists(hasText("New Account Handling"), timeoutMillis = 15000)
-            waitUntilAtLeastOneExists(hasText("Wise: EUR"), timeoutMillis = 10000)
-            waitUntilAtLeastOneExists(hasText("Wise: GBP"), timeoutMillis = 10000)
+            waitUntilAtLeastOneExists(hasText("Wise"), timeoutMillis = 10000)
             waitUntilAtLeastOneExists(hasText("Avolta - Tenerife"), timeoutMillis = 10000)
 
             // All five rows import even though no account existed beforehand
@@ -219,11 +216,11 @@ class ImportWiseCsvE2ETest {
             waitUntilDoesNotExist(hasText("Apply Import Strategy"), timeoutMillis = 30000)
             waitForIdle()
 
-            // The per-currency Wise accounts were created during the import
+            // The one Wise account was created during the import, and no per-currency ones
             runBlocking {
                 val accounts = databaseComponent.accountRepository.getAllAccounts().first()
-                assertNotNull(accounts.singleOrNull { it.name == "Wise: EUR" }, "Wise: EUR account is created")
-                assertNotNull(accounts.singleOrNull { it.name == "Wise: GBP" }, "Wise: GBP account is created")
+                assertNotNull(accounts.singleOrNull { it.name == "Wise" }, "Wise account is created")
+                assertTrue(accounts.none { it.name.startsWith("Wise: ") }, "no per-currency Wise accounts")
             }
         }
     }
