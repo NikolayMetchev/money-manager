@@ -516,7 +516,7 @@ class CurveCsvE2ETest : DbTest() {
             assertEquals(1, wrong.filesImported)
             assertEquals(0, wrong.filesFailed)
             val typeId = repositories.importEngine.getOrCreateAttributeType(reference.attributeTypeName)
-            val aldi = funding("7721")
+            val aldi = fundingReferences().single { it.value == "7721" }
             assertEquals(accountId("ALDI"), aldi.owner)
             assertTrue(aldi.ownedByToken)
 
@@ -533,7 +533,7 @@ class CurveCsvE2ETest : DbTest() {
                     .none { it.attributeType.id == typeId },
                 "ALDI's emptied card attribute is deleted",
             )
-            assertEquals(cardAccountId, funding("7721").owner)
+            assertEquals(cardAccountId, fundingReferences().single { it.value == "7721" }.owner)
 
             val cardAttributes =
                 repositories.accountAttributeRepository
@@ -559,8 +559,6 @@ class CurveCsvE2ETest : DbTest() {
             csvImportRepository = repositories.csvImportRepository,
             attributeAccountMatchers = AttributeAccountMatcher.registry(repositories.accountAttributeRepository.getAll().first()),
         )
-
-    private suspend fun funding(value: String) = fundingReferences().single { it.value == value }
 
     private suspend fun accountId(name: String) =
         repositories.accountRepository

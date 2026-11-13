@@ -57,7 +57,7 @@ suspend fun planFundingReferenceMoves(
     )
 
     val attributes = accountAttributeRepository.getAll().first().filter { it.attributeType.name in typeNames }
-    val original = attributes.associate { Slot(it.accountId, it.attributeType.name, it.groupKey) to it }
+    val original = attributes.associateBy { Slot(it.accountId, it.attributeType.name, it.groupKey) }
     val current = original.mapValuesTo(linkedMapOf()) { (_, attribute) -> attribute.value }
     for ((reference, accountId) in moves) {
         reference.owner?.let { owner ->
