@@ -58,15 +58,23 @@ fi
 if [ "$INSTALLER" = true ]; then
   extra+=(//app/main/jvm:installer //tools/repo-scripts:repo-scripts-tool_deploy.jar)
 fi
-bazel test "${flags[@]}" -- //... //app/main/jvm:release_service_providers_test "${extra[@]}" 2>&1 | tee "$out/test.log"
+# The build event file names the tests this invocation ran (a skipped one has no testSummary), so the reports below
+# leave out what bazel-testlogs keeps from earlier runs: a remote runner resumes a snapshot with its output tree.
+bep=$(mktemp)
+bazel test "${flags[@]}" --build_event_json_file="$bep" -- //... //app/main/jvm:release_service_providers_test "${extra[@]}" 2>&1 | tee "$out/test.log"
 status=${PIPESTATUS[0]}
 
 # The JVM and Android host tests' coverage reports, merged into one XML report. It credits code to every test that
 # runs it, not only its own module's.
 ANDROID="$ANDROID" bazel/kmp/testing/coverage.sh "$out/coverage.xml" "${flags[@]}" 2>&1 | tee "$out/coverage.log"
 
-# Codecov reads the test reports (bazel-testlogs is a symlink).
-(cd -P bazel-testlogs && find . -name test.xml -print0 | tar --null -cf "$out/testlogs.tar" -T -)
+# Codecov reads the test reports (bazel-testlogs is a symlink). A test's report is <package>/<name>/test.xml, under
+# external/<repo>/ for another repository's.
+grep -o '"testSummary":{"label":"[^"]*"' "$bep" | sed 's/.*"label":"//; s/"$//' | sort -u |
+  sed -E 's#^@@?([^/]*)//#external/\1/#; s#^//##; s#:#/#; s#^/##; s#//+#/#g; s#$#/test.xml#' |
+  (cd -P bazel-testlogs && while read -r report; do [ ! -f "$report" ] || printf '%s\0' "$report"; done |
+    tar --null -cf "$out/testlogs.tar" -T -)
+rm -f "$bep"
 
 if [ "$status" -eq 0 ]; then
   if [ "$INSTALLER" = true ]; then
