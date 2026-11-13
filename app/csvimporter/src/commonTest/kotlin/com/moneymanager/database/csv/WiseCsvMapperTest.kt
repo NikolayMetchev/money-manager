@@ -198,7 +198,7 @@ class WiseCsvMapperTest {
     }
 
     @Test
-    fun `cross-currency payment to someone else is a transfer, not a trade`() {
+    fun `cross-currency payment to someone else is a transfer rather than a trade`() {
         val row =
             wiseRow(
                 id = "TRANSFER-2",
@@ -222,10 +222,8 @@ class WiseCsvMapperTest {
                 direction = "IN",
                 sourceName = "Wise",
                 sourceAmount = "1.14",
-                sourceCurrency = "EUR",
                 targetName = "Nikolay Metchev",
                 targetAmount = "1.14",
-                targetCurrency = "EUR",
             )
         val result = mapper().mapRow(row)
 
