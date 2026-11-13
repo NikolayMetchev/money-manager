@@ -1,6 +1,5 @@
 package com.moneymanager.csvimporter
 
-import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvImport
@@ -56,7 +55,7 @@ fun CsvImportStrategy.contentScore(
  *    The threshold keeps a file that merely *contains* a few matching rows (e.g. crypto.com's
  *    crypto_ file carrying the odd viban_purchase) from being misrouted — such files are skipped.
  *    With [wholeDocument] (a PDF's lines, where a statement names its issuer on one line of hundreds, or
- *    a QIF file, whose fixed columns say nothing of the bank and whose rows may each look like another's)
+ *    a QIF or OFX file, whose fixed columns say nothing of the bank and whose rows may each look like another's)
  *    every row is scored and one matching row is enough.
  * 3. **Fallback**: a candidate carrying no signals at all (no content rules, no filename pattern)
  *    matches on columns alone — the pre-existing behavior for single-strategy column sets.
@@ -126,8 +125,8 @@ private fun CsvImportStrategy.matchesFileName(fileName: String): Boolean {
 /**
  * Picks the strategy for the staged [csvImport] (see [selectForCsv]), reading what it needs from
  * [csvImportRepository]. A PDF import is matched on its text lines, whatever rows a strategy has staged from
- * them since, so it can match again (and differently) once its strategies change. A QIF import is matched on
- * all its rows, as a whole document.
+ * them since, so it can match again (and differently) once its strategies change. A QIF or OFX import is
+ * matched on all its rows, as a whole document.
  */
 suspend fun List<CsvImportStrategy>.selectForImport(
     csvImport: CsvImport,
@@ -140,7 +139,7 @@ suspend fun List<CsvImportStrategy>.selectForImport(
         val rows = staged.rows.mapIndexed { index, values -> CsvRow(index + 1L, values) }
         return selectForCsv(csvImport.originalFileName, columns, rows, wholeDocument = true)
     }
-    if (importFileKind(csvImport.originalFileName) == ImportFileKind.QIF) {
+    if (importFileKind(csvImport.originalFileName)?.isDocument == true) {
         val rows = csvImportRepository.getImportRows(csvImport.id, limit = maxOf(csvImport.rowCount, 1), offset = 0)
         return selectForCsv(csvImport.originalFileName, csvImport.columns, rows, wholeDocument = true)
     }

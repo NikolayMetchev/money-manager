@@ -36,7 +36,7 @@ internal class ImportDirectoriesCommand : SuspendingCliktCommand(name = "dirs") 
     ).flag()
 
     override fun help(context: Context): String =
-        "Download every included import directory (local and Google Drive) and import every new CSV/QIF file"
+        "Download every included import directory (local and Google Drive) and import every new CSV/QIF/OFX file"
 
     override suspend fun run() {
         ImportRun(runtime).run(directories = DirectoriesRequest(dirs, apply = !downloadOnly, redownload = redownload), apis = null)

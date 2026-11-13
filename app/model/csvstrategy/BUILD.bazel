@@ -3,6 +3,7 @@
 # gazelle:kmp_plugins serialization
 # gazelle:kmp_export //app/model/accountmapping
 # gazelle:kmp_export //app/model/core
+# gazelle:kmp_export //app/model/ofx
 # gazelle:kmp_export //app/model/qif
 # gazelle:kmp_export //app/model/rules
 # gazelle:kmp_export @maven_kmp//:kotlinx_serialization_core jvmMain
@@ -28,6 +29,7 @@ kmp_library(
     exports = [
         "//app/model/accountmapping",
         "//app/model/core",
+        "//app/model/ofx",
         "//app/model/qif",
         "//app/model/rules",
         "@maven_kmp//:kotlinx_serialization_core",

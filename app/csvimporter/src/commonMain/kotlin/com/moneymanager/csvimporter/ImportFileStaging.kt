@@ -19,7 +19,7 @@ suspend fun importFileChecksum(
 ): String = if (kind.isBinary) sha256Hex(bytes) else sha256Hex(bytes.decodeToString())
 
 /**
- * Stages [bytes] as a CSV import the way [kind] is read: a CSV as is, a QIF from its records ([stageQifImport]),
+ * Stages [bytes] as a CSV import the way [kind] is read: a CSV as is, a QIF or OFX file from its transactions ([stageDocumentImport]),
  * an Excel workbook from its first worksheet, a PDF from its text lines ([stagePdfImport]). A file whose
  * [checksum] is already staged isn't staged again; its existing import is returned. The one way a file is
  * staged, from an import folder or a picked file. Excel and PDF parsing throw where the platform can't read them.
@@ -46,8 +46,8 @@ suspend fun ImportEngine.stageImportFile(
                 )
             }
 
-            ImportFileKind.QIF -> {
-                stageQifImport(fileName, bytes.decodeToString(), checksum, lastModified)
+            ImportFileKind.QIF, ImportFileKind.OFX -> {
+                stageDocumentImport(kind, fileName, bytes, checksum, lastModified)
             }
 
             ImportFileKind.XLSX -> {

@@ -25,7 +25,7 @@ enum class ImportDirectoryProvider(
 
 /**
  * A configured import directory: a local folder or Google Drive folder. On a manual download the app
- * lists the folder and stages new/changed importable files (.csv/.qif) into the Imports tabs, tracked
+ * lists the folder and stages new/changed importable files (.csv/.qif/.ofx/.xlsx/.pdf) into the Imports tabs, tracked
  * per file via [ImportDirectoryFile].
  *
  * @property folderRef Whatever the platform backend needs to open the folder: a local absolute

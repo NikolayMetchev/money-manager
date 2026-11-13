@@ -46,7 +46,7 @@ data class ReimportRepositories(
 )
 
 /**
- * Re-imports the staged [files] (CSV, QIF, Excel or PDF; one or many, the same dialog either way) so strategy and mapping
+ * Re-imports the staged [files] (CSV, QIF, OFX, Excel or PDF; one or many, the same dialog either way) so strategy and mapping
  * changes take effect retroactively: what they created is deleted and they are imported again, together with every other
  * file that depends on what they created ([Reimports.planAll]), and the hand edits are put back. Each file keeps the strategy,
  * account and currency it was imported with; the pickers only appear for files that created nothing to read them from.

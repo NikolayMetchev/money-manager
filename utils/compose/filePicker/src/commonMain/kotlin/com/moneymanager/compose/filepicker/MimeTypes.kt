@@ -11,6 +11,7 @@ internal fun mimeTypesToExtensions(mimeTypes: List<String>): List<String> =
                 "text/plain" -> listOf(".txt", ".csv")
                 "application/json" -> listOf(".json")
                 "application/qif", "application/x-qif" -> listOf(".qif")
+                "application/ofx", "application/x-ofx", "text/ofx" -> listOf(".ofx")
                 "text/tab-separated-values" -> listOf(".tsv")
                 "application/vnd.ms-excel" -> listOf(".csv", ".xls")
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> listOf(".xlsx")

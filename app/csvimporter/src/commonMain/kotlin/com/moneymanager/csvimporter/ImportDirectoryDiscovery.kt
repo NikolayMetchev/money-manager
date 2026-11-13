@@ -10,7 +10,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Traverses the folder tree rooted at [rootFolderRef] all the way down and returns every folder that
- * DIRECTLY contains an importable file (.csv/.qif), so the caller can create one import directory per
+ * DIRECTLY contains an importable file (.csv/.qif/.ofx/.xlsx/.pdf), so the caller can create one import directory per
  * such folder. [openFolder] resolves an `ImportFileSource` for a folder ref; `displayPath` strings are
  * built from [rootDisplayPath] plus subfolder names for the UI. Cycles/symlinks are guarded by a
  * visited set and [maxDepth]. [onFound] is called as each folder is found, before the whole walk ends,

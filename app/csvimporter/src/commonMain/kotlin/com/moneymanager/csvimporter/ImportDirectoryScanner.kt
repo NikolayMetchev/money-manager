@@ -21,12 +21,12 @@ import kotlin.time.Instant
 
 private val scanLogger = Logger.withTag("ImportDirectoryScanner")
 
-/** True if [fileName] is an importable file (.csv/.qif/.xlsx/.pdf). Used by directory discovery. */
+/** True if [fileName] is an importable file (.csv/.qif/.ofx/.xlsx/.pdf). Used by directory discovery. */
 internal fun isSupportedImportFile(fileName: String): Boolean = importFileKind(fileName) != null
 
 /**
  * Scans one configured [directory]: lists its files and DOWNLOADS new/changed **supported** files
- * (.csv → CSV staging, .qif → CSV staging of its records, .xlsx → CSV staging of its first worksheet, .pdf → CSV staging
+ * (.csv → CSV staging, .qif and .ofx → CSV staging of their transactions, .xlsx → CSV staging of its first worksheet, .pdf → CSV staging
  * of its text lines) into the Imports section. Unsupported files are skipped without downloading. Excel
  * (Apache POI) and PDF (pdfium) parsing are JVM-only; elsewhere such a file is recorded as a per-file scan
  * failure rather than crashing the scan. It does NOT apply a strategy — the user runs the existing "Import All".

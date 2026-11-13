@@ -22,6 +22,7 @@ import com.moneymanager.domain.model.csvstrategy.ReconciliationConfig
 import com.moneymanager.domain.model.csvstrategy.ReferenceDate
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.ofx.OfxColumns
 import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
@@ -64,6 +65,7 @@ object BuiltInCsvStrategies {
     val freetradeCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000018")
     val marcusCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000019")
     val revolutCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000001a")
+    val barclaycardOfxStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000001b")
 
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
@@ -408,6 +410,20 @@ object BuiltInCsvStrategies {
     private const val AMEX_ACCOUNT = "American Express"
     private const val AMEX_PAYMENT_RECEIVED = "^(?:PAYMENT|DIRECT DEBIT) RECEIVED\\b"
 
+    private const val BARCLAYCARD_ACCOUNT = "Barclaycard"
+
+    /**
+     * A Barclaycard transaction's FITID: its posting date-time and a per-day counter (`20190722000000001`), which tells
+     * a Barclaycard export from another institution's OFX file.
+     */
+    private const val BARCLAYCARD_FITID = "^\\d{17}$"
+
+    /** A payment into the card (`Payment By Direct Debit`), which never says who paid. */
+    private const val BARCLAYCARD_PAYMENT = "(?i)^payment\\b"
+
+    /** A foreign spend's memo: the card, then the amount and currency it was made in (`1234/8.64 US DOLLAR UNITED STATES`). */
+    private const val BARCLAYCARD_FOREIGN_MEMO = "^\\d+/(\\S.*)$"
+
     /** The column the American Express PDF strategy assembles a row's date in ("2 Jan"). */
     private const val AMEX_PDF_DATE = "date"
 
@@ -432,6 +448,7 @@ object BuiltInCsvStrategies {
             buildSantanderQifStrategy(now, qifCurrencyId),
             buildAmexQifStrategy(now, qifCurrencyId),
             buildAmexPdfStrategy(now, qifCurrencyId),
+            buildBarclaycardOfxStrategy(now),
             buildWiseCsvStrategy(now),
             buildMonzoCsvStrategy(now),
             buildMarcusCsvStrategy(now, qifCurrencyId),
@@ -1765,6 +1782,73 @@ object BuiltInCsvStrategies {
                     fieldMappings = fieldMappings,
                     rules = rules,
                     contentMatchRules = listOf(Condition(QifColumns.COL_MEMO, ConditionOp.MATCHES, AMEX_PROCESS_DATE)),
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(QIF_STATEMENT_RECONCILE_WINDOW_SECONDS),
+                    placeholderReconcileWindow = STATEMENT_PLACEHOLDER_WINDOW,
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Built-in OFX strategy for Barclaycard's transaction downloads: one credit-card statement per file, in the
+     * currency its `CURDEF` names, dated by day. Downloads overlap (a month's partial file and its full one), so the
+     * FITID identifies a transaction across them. A payment into the card names no payer: a placeholder, which
+     * reconciles against the paying bank's own record of it, as American Express's does. Barclaycard writes a foreign
+     * spend's original currency as words in the memo, not as OFX's `ORIGCURRENCY`, so it is kept as an attribute.
+     */
+    fun buildBarclaycardOfxStrategy(now: Instant): CsvImportStrategy {
+        val fieldMappings =
+            mapOf(
+                accountFromRules(TransferField.SOURCE_ACCOUNT),
+                accountFromRules(TransferField.TARGET_ACCOUNT),
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = OfxColumns.COL_DATE,
+                        dateFormat = "yyyy-MM-dd",
+                    ),
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(
+                        fieldType = TransferField.DESCRIPTION,
+                        value = ValueExpr.of(OfxColumns.COL_NAME),
+                    ),
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = OfxColumns.COL_AMOUNT,
+                    ),
+                TransferField.CURRENCY to
+                    CurrencyLookupMapping(fieldType = TransferField.CURRENCY, value = ValueExpr.of(OfxColumns.COL_CURRENCY)),
+                TransferField.TIMEZONE to HardCodedTimezoneMapping(fieldType = TransferField.TIMEZONE, timezoneId = "UTC"),
+            )
+        val rules =
+            listOf(
+                attribute(OfxColumns.COL_FITID, "barclaycard-fitid", unique = true),
+                attribute(
+                    OfxColumns.COL_MEMO,
+                    "barclaycard-foreign-spend",
+                    extraction = Extraction(pattern = BARCLAYCARD_FOREIGN_MEMO, outputTemplate = "$1"),
+                ),
+                // Negative = a purchase on the card; positive = a refund or a payment into it.
+                incomingWhenPositive(OfxColumns.COL_AMOUNT),
+                accounts(AccountSide.SOURCE, fixedNaming(OfxColumns.COL_DATE, BARCLAYCARD_ACCOUNT)),
+                accounts(
+                    AccountSide.TARGET,
+                    naming(OfxColumns.COL_NAME, pattern = BARCLAYCARD_PAYMENT, unidentified = true),
+                    AccountNaming(value = ValueExpr.of(OfxColumns.COL_NAME)),
+                ),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(barclaycardOfxStrategyId),
+            name = "Barclaycard (OFX)",
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = OfxColumns.headers.toSet(),
+                    fieldMappings = fieldMappings,
+                    rules = rules,
+                    contentMatchRules = listOf(Condition(OfxColumns.COL_FITID, ConditionOp.MATCHES, BARCLAYCARD_FITID)),
                     crossSourceReconcileWindow = SettlementWindow.Elapsed(QIF_STATEMENT_RECONCILE_WINDOW_SECONDS),
                     placeholderReconcileWindow = STATEMENT_PLACEHOLDER_WINDOW,
                 ),

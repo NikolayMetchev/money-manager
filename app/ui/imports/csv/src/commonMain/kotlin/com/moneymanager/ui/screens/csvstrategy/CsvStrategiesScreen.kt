@@ -43,8 +43,8 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.documentKind
 import com.moneymanager.domain.model.csvstrategy.isPdfStrategy
-import com.moneymanager.domain.model.csvstrategy.isQifStrategy
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
@@ -280,8 +280,7 @@ fun CsvStrategiesScreen(
             kind =
                 when {
                     editingStrategy.isPdfStrategy() -> SampleFileKind.PDF
-                    editingStrategy.isQifStrategy() -> SampleFileKind.QIF
-                    else -> SampleFileKind.CSV
+                    else -> sampleFileKindOf(editingStrategy.documentKind()) ?: SampleFileKind.CSV
                 },
             onCsvSelected = { csvImport ->
                 dismiss()

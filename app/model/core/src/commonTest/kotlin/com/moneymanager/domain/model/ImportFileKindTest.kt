@@ -9,6 +9,7 @@ class ImportFileKindTest {
     fun `reads the kind from the extension in any case`() {
         assertEquals(ImportFileKind.CSV, importFileKind("statement.csv"))
         assertEquals(ImportFileKind.QIF, importFileKind("Bank.QIF"))
+        assertEquals(ImportFileKind.OFX, importFileKind("202104.ofx"))
         assertEquals(ImportFileKind.XLSX, importFileKind("export.2024.xlsx"))
         assertEquals(ImportFileKind.PDF, importFileKind("amex.Pdf"))
     }

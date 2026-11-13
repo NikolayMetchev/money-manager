@@ -19,7 +19,7 @@ A personal finance money manager built with **Kotlin Multiplatform** and **Compo
 * **Multi-currency** — locale-aware formatting; amounts stored as integers with per-currency scale factors
 * **Categories** — hierarchical (parent/child) categorisation
 * **People & ownership** — track counterparties and who owns which accounts
-* **Importing** — CSV, QIF, and live JSON-API imports through a unified import engine
+* **Importing** — CSV, QIF, OFX, and live JSON-API imports through a unified import engine
   * Built-in strategies for **Monzo**, **Starling** and **Wise**
   * Reusable, user-definable CSV column-mapping and API strategies
 * **Reconciliation** — cross-source deduplication detects the same transaction seen from different
@@ -115,12 +115,12 @@ The main modules (see [`CLAUDE.md`](CLAUDE.md) for the full table and the
 | Module | Purpose |
 |--------|---------|
 | `bazel/` | The build: Kotlin Multiplatform rules, the Gazelle extension that writes the BUILD files, the Maven resolver and the module checks ([how it works](bazel/README.md)) |
-| `utils/*` | Platform-neutral helpers: `bigdecimal`, `currency`, `archive`, `files`, `credentialvault`, `localsettings`, `rest`, `httpclient`, `sqlite3`, parsers (CSV, QIF, XLSX), Compose widgets |
+| `utils/*` | Platform-neutral helpers: `bigdecimal`, `currency`, `archive`, `files`, `credentialvault`, `localsettings`, `rest`, `httpclient`, `sqlite3`, parsers (CSV, QIF, OFX, XLSX), Compose widgets |
 | `app/model/core/`, `app/model/*` | Domain model; the strategy vocabulary (`app/model/rules`) shared by CSV and API imports |
 | `app/model/repository/read/`, `app/model/repository/write/` | `*ReadRepository` / `*WriteRepository` interfaces |
 | `app/db/*` | SQLDelight schema, read/write SQL, repository implementations, `DatabaseManager` |
 | `app/importengineapi/` | DB-free import/write API: `ImportBatch`/`ImportResult` and `ImportEngine.*` helpers |
-| `app/csvimporter/`, `app/apiimporter/` | Importers that build an `ImportBatch` (DB-free); QIF files are staged as CSV imports |
+| `app/csvimporter/`, `app/apiimporter/` | Importers that build an `ImportBatch` (DB-free); QIF and OFX files are staged as CSV imports |
 | `app/importer/` | Central import engine: applies an `ImportBatch` and deduplicates. The sole DB writer |
 | `app/importdirectory/`, `app/apiimport/` | Import-folder and API-connection orchestration shared by the desktop app and the CLI |
 | `app/session/` | Headless database bootstrap shared by every front end |

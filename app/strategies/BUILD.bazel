@@ -30,5 +30,8 @@ kmp_library(
         "//app/model/passthrough",
         "//app/model/qif",
     ],
-    deps = ["//app/model/rules"],
+    deps = [
+        "//app/model/ofx",
+        "//app/model/rules",
+    ],
 )

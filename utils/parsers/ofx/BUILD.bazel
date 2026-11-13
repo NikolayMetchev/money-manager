@@ -1,0 +1,39 @@
+# gazelle:kmp_generate true
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
+
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+kmp_library(
+    name = "ofx",
+    android = True,
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    android = True,
+    associate = ":ofx",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+    deps = ["//bazel/kmp/deps:kotlin_test"],
+)

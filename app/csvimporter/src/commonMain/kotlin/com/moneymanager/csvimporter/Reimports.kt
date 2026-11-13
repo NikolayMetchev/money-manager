@@ -94,7 +94,7 @@ data class ReimportAllPlan(
 }
 
 /**
- * The one way to re-import staged files (CSV, QIF, Excel or PDF), one or many: [planAll] finds every file that depends on
+ * The one way to re-import staged files (CSV, QIF, OFX, Excel or PDF), one or many: [planAll] finds every file that depends on
  * them and [reimportAll] deletes what they all created and runs their records through the normal import again, each with
  * the strategy, account and currency it was imported with. Also the [CascadeRerunner] every re-import (API
  * sessions included) re-imports the other files it takes along with, whole.

@@ -218,6 +218,9 @@ kmp_modules(
         "//tools/repo-scripts:test_module",
         "//utils/browser:browser_module",
         "//utils/browser:test_module",
+        "//utils/parsers/ofx:ofx_module",
+        "//utils/parsers/ofx:test_module",
+        "//app/model/ofx:ofx_module",
     ],
     visibility = ["//visibility:public"],
 )
