@@ -233,6 +233,68 @@ class CredentialVaultImplTest {
     }
 
     @Test
+    fun `a deletion is not undone by merging with a copy that still holds the credential`() {
+        val saved = monzo.copy(createdAtEpochMillis = 1)
+        val local = CredentialBundle(apiCredentials = listOf(saved)).withoutApiCredential("Monzo", deletedAtEpochMillis = 2)
+        val remote = CredentialBundle(apiCredentials = listOf(saved))
+
+        for (merged in listOf(local.mergedWith(remote), remote.mergedWith(local))) {
+            assertNull(merged.apiCredential("Monzo"))
+            assertEquals(listOf(DeletedCredential("Monzo", 2)), merged.deletedApiCredentials)
+        }
+    }
+
+    @Test
+    fun `a credential saved after a deletion elsewhere wins over it`() {
+        val deleted = CredentialBundle().withoutApiCredential("Monzo", deletedAtEpochMillis = 2)
+        val resaved = CredentialBundle().withApiCredential(monzo.copy(createdAtEpochMillis = 3))
+
+        for (merged in listOf(deleted.mergedWith(resaved), resaved.mergedWith(deleted))) {
+            assertEquals(3, merged.apiCredential("Monzo")?.createdAtEpochMillis)
+            assertEquals(emptyList(), merged.deletedApiCredentials)
+        }
+    }
+
+    @Test
+    fun `saving a credential clears its deletion marker`() {
+        val bundle =
+            CredentialBundle()
+                .withoutApiCredential("Monzo", deletedAtEpochMillis = 2)
+                .withoutGoogleAccount("client", deletedAtEpochMillis = 2)
+                .withApiCredential(monzo)
+                .withGoogleAccount(StoredGoogleAccount("client", "refresh", signedInAtEpochMillis = 3))
+
+        assertEquals(emptyList(), bundle.deletedApiCredentials)
+        assertEquals(emptyList(), bundle.deletedGoogleAccounts)
+    }
+
+    @Test
+    fun `a Google sign-out wins over an earlier sign-in and loses to a later one`() {
+        val signedOut = CredentialBundle().withoutGoogleAccount("client", deletedAtEpochMillis = 5)
+        val earlier = CredentialBundle(googleAccounts = listOf(StoredGoogleAccount("client", "old", signedInAtEpochMillis = 4)))
+        val later = CredentialBundle(googleAccounts = listOf(StoredGoogleAccount("client", "new", signedInAtEpochMillis = 6)))
+
+        assertNull(earlier.mergedWith(signedOut).googleAccount("client"))
+        assertNull(signedOut.mergedWith(earlier).googleAccount("client"))
+        assertEquals("new", later.mergedWith(signedOut).googleAccount("client")?.refreshToken)
+        assertEquals("new", signedOut.mergedWith(later).googleAccount("client")?.refreshToken)
+    }
+
+    @Test
+    fun `deletion markers survive a lock and unlock`() =
+        runTest {
+            val vault = inMemoryCredentialVault()
+            vault.create(vault.defaultPath()!!, TEST_VAULT_PASSWORD)
+            vault.update("test") { it.withApiCredential(monzo) }
+            vault.update("test") { it.withoutApiCredential("Monzo", deletedAtEpochMillis = 7) }
+
+            vault.lock()
+            vault.unlock(TEST_VAULT_PASSWORD)
+
+            assertEquals(listOf(DeletedCredential("Monzo", 7)), vault.bundleOrNull()?.deletedApiCredentials)
+        }
+
+    @Test
     fun `encryptedBytes returns the file as stored or null before it exists`() =
         runTest {
             val storage = InMemoryVaultStorage()

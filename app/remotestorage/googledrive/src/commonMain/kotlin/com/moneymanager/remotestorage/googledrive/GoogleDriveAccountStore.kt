@@ -5,6 +5,7 @@ import com.moneymanager.credentialvault.StoredGoogleAccount
 import com.moneymanager.credentialvault.VaultState
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Clock
 
 /** A cached OAuth access token and the epoch-millis instant it expires. */
 data class StoredAccessToken(
@@ -40,6 +41,7 @@ private val accessTokensLock = Mutex()
  */
 class GoogleDriveAccountStore(
     private val vault: CredentialVault,
+    private val clock: Clock = Clock.System,
 ) {
     suspend fun refreshToken(clientId: String): String? = account(clientId)?.refreshToken
 
@@ -52,7 +54,8 @@ class GoogleDriveAccountStore(
         refreshToken: String,
         grantedScopes: Set<String>,
     ) {
-        vault.update(REASON) { it.withGoogleAccount(StoredGoogleAccount(clientId, refreshToken, grantedScopes)) }
+        val signedInAt = clock.now().toEpochMilliseconds()
+        vault.update(REASON) { it.withGoogleAccount(StoredGoogleAccount(clientId, refreshToken, grantedScopes, signedInAt)) }
     }
 
     suspend fun accessToken(clientId: String): StoredAccessToken? {
@@ -88,7 +91,8 @@ class GoogleDriveAccountStore(
 
     suspend fun clear(clientId: String) {
         clearAccessToken(clientId)
-        vault.update(REASON) { it.withoutGoogleAccount(clientId) }
+        val deletedAt = clock.now().toEpochMilliseconds()
+        vault.update(REASON) { it.withoutGoogleAccount(clientId, deletedAt) }
     }
 
     private suspend fun account(clientId: String): StoredGoogleAccount? = vault.requireUnlocked(REASON).googleAccount(clientId)
