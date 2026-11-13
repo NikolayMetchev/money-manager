@@ -427,6 +427,9 @@ object BuiltInCsvStrategies {
      */
     private const val BARCLAYCARD_FOREIGN_MEMO = "^\\d+/([\\d.,]+) (\\S.*)$"
 
+    /** The sterling fee a foreign spend's memo ends with (`Transaction Fee £0.62`), included in the row's amount. */
+    private const val BARCLAYCARD_TRANSACTION_FEE = "Transaction Fee £([\\d.,]+)"
+
     /** The column the American Express PDF strategy assembles a row's date in ("2 Jan"). */
     private const val AMEX_PDF_DATE = "date"
 
@@ -1800,6 +1803,7 @@ object BuiltInCsvStrategies {
      * reconciles against the paying bank's own record of it, as American Express's does. Barclaycard writes a foreign
      * spend's original amount and currency in the memo, the currency as words and followed by the country
      * (`1234/8.10 EURO FRANCE`), not as OFX's `ORIGCURRENCY`: the currency resolves by its name (see `resolveAssetCode`).
+     * The non-sterling transaction fee follows it (`Transaction Fee £0.62`), already part of the sterling amount.
      */
     fun buildBarclaycardOfxStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
@@ -1839,6 +1843,16 @@ object BuiltInCsvStrategies {
                     ),
                     conditions = listOf(Condition(OfxColumns.COL_MEMO, ConditionOp.MATCHES, BARCLAYCARD_FOREIGN_MEMO)),
                     name = "Foreign spend",
+                ),
+                rule(
+                    RuleAction.Fee(
+                        FeeRule(
+                            amount = ValueExpr(listOf(OfxColumns.COL_MEMO), Extraction(BARCLAYCARD_TRANSACTION_FEE, "$1")),
+                            includedInAmount = true,
+                        ),
+                    ),
+                    conditions = listOf(Condition(OfxColumns.COL_MEMO, ConditionOp.MATCHES, BARCLAYCARD_TRANSACTION_FEE)),
+                    name = "Transaction fee",
                 ),
                 // Negative = a purchase on the card; positive = a refund or a payment into it.
                 incomingWhenPositive(OfxColumns.COL_AMOUNT),

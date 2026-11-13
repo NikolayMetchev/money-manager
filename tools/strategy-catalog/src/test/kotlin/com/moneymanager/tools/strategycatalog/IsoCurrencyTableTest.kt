@@ -16,6 +16,7 @@ class IsoCurrencyTableTest {
         assertEquals(jdkIsoCurrencies(), published)
         val byCode = published.associateBy { it.code }
         assertEquals(CurrencyExportEntry("GBP", "British Pound", 2, setOf("POUND STERLING")), byCode["GBP"])
+        assertEquals(setOf("U.S. DOLLAR"), byCode.getValue("USD").aliases)
         assertEquals(0, byCode.getValue("JPY").fractionDigits)
         assertEquals(3, byCode.getValue("KWD").fractionDigits)
         assertEquals(null, byCode.getValue("XAU").fractionDigits)

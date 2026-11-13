@@ -25,11 +25,13 @@ internal fun jdkIsoCurrencies(): List<CurrencyExportEntry> =
 
 /**
  * Names statements write a currency as that differ from the JDK's English name. An asset's own name already
- * resolves (Barclaycard's `EURO`, `US DOLLAR`), so only the others are listed: ISO 4217's own wording, mostly.
+ * resolves (Barclaycard's `EURO`, `US DOLLAR`), so only the others are listed: ISO 4217's own wording, and
+ * Barclaycard's dotted `U.S. DOLLAR`.
  */
 internal val currencyNameAliases: Map<String, Set<String>> =
     mapOf(
         "GBP" to setOf("POUND STERLING"),
+        "USD" to setOf("U.S. DOLLAR"),
     )
 
 /** The catalog's currency-list artifact for [currencies]. */
