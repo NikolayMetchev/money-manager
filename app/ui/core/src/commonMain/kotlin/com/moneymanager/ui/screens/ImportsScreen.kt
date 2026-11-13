@@ -49,6 +49,8 @@ import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.importfilesource.DriveFolderBrowser
+import com.moneymanager.ui.components.imports.resolveImportDirectories
+import com.moneymanager.ui.components.imports.stagedImportPath
 import com.moneymanager.ui.foundation.ReconciliationFocusState
 import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.navigation.ImportTab
@@ -103,6 +105,8 @@ fun ImportsScreen(
     importEngine: ImportEngine,
     deviceId: DeviceId,
     onCsvImportClick: (CsvImportId) -> Unit,
+    // Opens a file with its table filtered (column name to the values kept).
+    onCsvImportRowsClick: (CsvImportId, Map<String, Set<String>>) -> Unit = { id, _ -> onCsvImportClick(id) },
     onTimelineFileClick: (ImportFileDateRange) -> Unit,
     onCsvStrategiesClick: () -> Unit,
     onAddCredentialClick: () -> Unit,
@@ -269,22 +273,25 @@ fun ImportsScreen(
                     cards = {
                         CardLast4Screen(
                             csvImportRepository = csvImportRepository,
+                            importDirectoryRepository = importDirectoryRepository,
+                            onOpenFile = onCsvImportRowsClick,
                             csvImportStrategyRepository = csvImportStrategyRepository,
                             accountAttributeRepository = accountAttributeRepository,
                             accountRepository = accountRepository,
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
-                            prepareReimport = { ids ->
+                            prepareReimport = { ids, onProgress ->
                                 val reimports = importDirectoryService.reimports
                                 val files =
                                     ids.mapNotNull { id -> csvImportRepository.getImport(id).first() }
-                                // The files keep the account and currency they were imported with.
-                                val plan = reimports.planAll(files)
-                                reimports.checkReimportable(plan, accountId = null, currencyId = null)
+                                val directories =
+                                    resolveImportDirectories(
+                                        importDirectoryRepository.csvImportDirectories().first(),
+                                        importDirectoryRepository.getAllDirectories().first(),
+                                    )
+                                val reimport = reimports.prepareAll(files, onProgress) { stagedImportPath(it, directories) }
                                 val run: suspend () -> BulkReimportResult = {
-                                    reimports
-                                        .reimportAll(plan, accountId = null, currencyId = null, onProgress = {})
-                                        .also { if (it.transfersCreated > 0) onTransactionsImported() }
+                                    reimport().also { if (it.transfersCreated > 0) onTransactionsImported() }
                                 }
                                 run
                             },

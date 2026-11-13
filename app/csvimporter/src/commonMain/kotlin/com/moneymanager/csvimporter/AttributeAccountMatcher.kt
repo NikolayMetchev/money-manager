@@ -24,12 +24,22 @@ import com.moneymanager.regex.escapeRegex
  */
 class AttributeAccountMatcher private constructor(
     private val patterns: List<Pair<PortableRegex, AccountId>>,
+    private val tokens: Map<AccountId, Set<String>>,
 ) {
     /** The single account whose pattern matches [value], or null when none or more than one does. */
     fun match(value: String): AccountId? = matchingAccounts(value).singleOrNull()
 
     /** True when more than one account's pattern matches [value], which is why [match] declines it. */
     fun matchesSeveral(value: String): Boolean = matchingAccounts(value).size > 1
+
+    /**
+     * True when [accountId] holds [value] itself as a token (case-insensitively), not merely a pattern that
+     * matches it: only then can the value be taken off that account without touching its other matches.
+     */
+    fun holdsToken(
+        accountId: AccountId,
+        value: String,
+    ): Boolean = tokens[accountId].orEmpty().any { it.equals(value.trim(), ignoreCase = true) }
 
     private fun matchingAccounts(value: String): Set<AccountId> =
         patterns.mapNotNull { (regex, accountId) -> accountId.takeIf { regex.containsMatchIn(value) } }.toSet()
@@ -38,16 +48,18 @@ class AttributeAccountMatcher private constructor(
         /** Splits an attribute value into its individual pattern tokens (whitespace/comma-separated). */
         private val TOKEN_DELIMITER = Regex("[\\s,]+")
 
-        fun from(attributes: List<AccountAttribute>): AttributeAccountMatcher =
-            AttributeAccountMatcher(
-                attributes.flatMap { attribute ->
-                    attribute.value
-                        .split(TOKEN_DELIMITER)
-                        .map { it.trim() }
-                        .filter { it.isNotEmpty() }
-                        .map { compileToken(it) to attribute.accountId }
-                },
+        fun from(attributes: List<AccountAttribute>): AttributeAccountMatcher = of(attributes.map { it.accountId to it.value })
+
+        /** A matcher over attribute [values] (each account with one attribute value), as [from] reads them from attributes. */
+        fun of(values: List<Pair<AccountId, String>>): AttributeAccountMatcher {
+            val tokens = values.map { (accountId, value) -> accountId to attributeTokens(value) }
+            return AttributeAccountMatcher(
+                tokens.flatMap { (accountId, values) -> values.map { compileToken(it) to accountId } },
+                tokens.groupBy({ it.first }, { it.second }).mapValues { (_, lists) -> lists.flatten().toSet() },
             )
+        }
+
+        private fun attributeTokens(value: String): List<String> = value.split(TOKEN_DELIMITER).map { it.trim() }.filter { it.isNotEmpty() }
 
         /** Compiles a token as a regex, falling back to a literal match when it isn't valid regex syntax. */
         private fun compileToken(token: String): PortableRegex =

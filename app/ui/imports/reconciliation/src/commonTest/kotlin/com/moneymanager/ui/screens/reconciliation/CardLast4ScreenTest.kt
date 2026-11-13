@@ -2,10 +2,14 @@
 
 package com.moneymanager.ui.screens.reconciliation
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.domain.model.AccountAttribute
@@ -27,16 +31,22 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
+import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.presenter.error.ProvideSchemaAwareScope
+import com.moneymanager.tasks.TaskManager
+import com.moneymanager.ui.tasks.LocalTaskManager
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.answering.returns
 import dev.mokkery.every
 import dev.mokkery.everySuspend
 import dev.mokkery.matcher.any
 import dev.mokkery.mock
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -99,25 +109,37 @@ class CardLast4ScreenTest {
     private val personRepository: PersonReadRepository =
         mock { every { getAllPeople() } returns flowOf(emptyList()) }
 
+    private val importDirectoryRepository: ImportDirectoryReadRepository =
+        mock {
+            every { csvImportDirectories() } returns flowOf(emptyMap())
+            every { getAllDirectories() } returns flowOf(emptyList())
+        }
+
     private fun runScreen(
         fundingMatch: AttributeAccountMatch?,
         attributes: List<AccountAttribute> = emptyList(),
+        onOpenFile: (CsvImportId, Map<String, Set<String>>) -> Unit = { _, _ -> },
         assertions: ComposeUiTest.() -> Unit,
     ) {
         val strategyRepository: CsvImportStrategyReadRepository =
             mock { every { getAllStrategies() } returns flowOf(listOf(strategy(fundingMatch))) }
         runMoneyManagerComposeUiTest {
             setContent {
-                ProvideSchemaAwareScope {
-                    CardLast4Screen(
-                        csvImportRepository = csvImportRepository,
-                        csvImportStrategyRepository = strategyRepository,
-                        accountAttributeRepository = attributeRepository(attributes),
-                        accountRepository = accountRepository,
-                        categoryRepository = categoryRepository,
-                        personRepository = personRepository,
-                        prepareReimport = { { BulkReimportResult(0, 0, 0, 0, 0) } },
-                    )
+                val tasks = remember { TaskManager(CoroutineScope(Dispatchers.Default)) }
+                CompositionLocalProvider(LocalTaskManager provides tasks) {
+                    ProvideSchemaAwareScope {
+                        CardLast4Screen(
+                            csvImportRepository = csvImportRepository,
+                            importDirectoryRepository = importDirectoryRepository,
+                            csvImportStrategyRepository = strategyRepository,
+                            accountAttributeRepository = attributeRepository(attributes),
+                            accountRepository = accountRepository,
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            prepareReimport = { _, _ -> { BulkReimportResult(0, 0, 0, 0, 0) } },
+                            onOpenFile = onOpenFile,
+                        )
+                    }
                 }
             }
             assertions()
@@ -131,10 +153,28 @@ class CardLast4ScreenTest {
             onNodeWithText("2 transactions in 1 file", substring = true).assertIsDisplayed()
             onNodeWithText("Card Aggregator", substring = true).assertIsDisplayed()
             onNodeWithText("Card belongs to").assertIsDisplayed()
+            // Nothing is picked yet, so there is nothing to apply.
+            onNodeWithText("Apply").assertIsNotEnabled()
         }
 
     @Test
-    fun cardOwnedByAnAccountIsNotListed() =
+    fun goToOpensTheFileFilteredToTheCardsRows() {
+        val opened = mutableListOf<Pair<CsvImportId, Map<String, Set<String>>>>()
+        runScreen(
+            fundingMatch = AttributeAccountMatch("Card", "card-last4"),
+            onOpenFile = { id, filter -> opened += id to filter },
+        ) {
+            waitUntilAtLeastOneExists(hasText("4647"))
+            onNodeWithText("Transaction History.csv (2 transactions)").assertIsDisplayed()
+            onNodeWithText("Go to").performClick()
+            waitForIdle()
+        }
+        // The file's own cells, untrimmed, so its column filter keeps both rows.
+        assertEquals(listOf(csvImport.id to mapOf("Card" to setOf("4647", " 4647 "))), opened)
+    }
+
+    @Test
+    fun cardOwnedByAnAccountIsListedAsAssigned() =
         runScreen(
             fundingMatch = AttributeAccountMatch("Card", "card-last4"),
             attributes =
@@ -148,6 +188,32 @@ class CardLast4ScreenTest {
                 ),
         ) {
             waitUntilAtLeastOneExists(hasText("Every referenced card is assigned to an account."))
+            // Folded until opened.
+            onNodeWithText("4647").assertDoesNotExist()
+            onNodeWithText("Assigned (1)").performClick()
+            waitUntilAtLeastOneExists(hasText("4647"))
+            onNodeWithText("4647").assertIsDisplayed()
+            onNodeWithText("A pattern on this account", substring = true).assertDoesNotExist()
+        }
+
+    @Test
+    fun cardMatchedOnlyByAPatternPointsToTheAccountEditor() =
+        runScreen(
+            fundingMatch = AttributeAccountMatch("Card", "card-last4"),
+            attributes =
+                listOf(
+                    AccountAttribute(
+                        id = 1,
+                        accountId = AccountId(7),
+                        attributeType = AttributeType(AttributeTypeId(-8), "card-last4"),
+                        value = "46.*",
+                    ),
+                ),
+        ) {
+            waitUntilAtLeastOneExists(hasText("Assigned (1)"))
+            onNodeWithText("Assigned (1)").performClick()
+            waitUntilAtLeastOneExists(hasText("A pattern on this account", substring = true))
+            onNodeWithText("A pattern on this account", substring = true).assertIsDisplayed()
         }
 
     @Test
