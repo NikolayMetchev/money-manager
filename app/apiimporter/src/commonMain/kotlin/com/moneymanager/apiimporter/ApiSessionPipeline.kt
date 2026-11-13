@@ -10,6 +10,7 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.assetAliasMap
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiRequestSigner
@@ -215,6 +216,7 @@ suspend fun importApiSession(
                     importEngine = importEngine,
                     counterpartyAccountNames = counterpartyAccountNames,
                     passThroughAccounts = passThroughAccounts,
+                    assetAliases = reads.cryptoRepository.assetAliasMap(),
                     onProgress = onProgress ?: {},
                 )
             val people =

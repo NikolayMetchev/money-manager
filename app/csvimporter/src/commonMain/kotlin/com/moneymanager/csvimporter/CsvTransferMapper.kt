@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
+import com.moneymanager.domain.model.codesByName
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -1383,9 +1384,15 @@ class CsvTransferMapper(
             strategy.config.assetCodes.canonical(rules.resolve(lookup.value) { getColumnValue(it, values).trim() })
         }
 
+    private val assetCodeByName by lazy {
+        codesByName(
+            existingCurrenciesByCode.values.map { it.code to it.name } + existingCryptoByCode.values.map { it.code to it.name },
+        )
+    }
+
     // Fiat first; fall back to crypto so a strategy can denominate a leg in a crypto asset.
     private fun lookupAsset(code: String): Asset? =
-        resolveAssetCode(strategy.config.assetCodes.canonical(code), assetAliases) {
+        resolveAssetCode(strategy.config.assetCodes.canonical(code), assetAliases, assetCodeByName) {
             it in existingCurrenciesByCode ||
                 it in existingCryptoByCode
         }.let { existingCurrenciesByCode[it] ?: existingCryptoByCode[it] }

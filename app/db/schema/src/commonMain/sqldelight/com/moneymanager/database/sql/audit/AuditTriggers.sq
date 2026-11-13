@@ -429,8 +429,8 @@ CREATE TRIGGER trigger_asset_alias_delete_audit
 AFTER DELETE ON asset_alias
 FOR EACH ROW
 BEGIN
-    INSERT INTO asset_alias_audit (audit_timestamp, audit_type_id, alias, asset_id, published)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.alias, old.asset_id, old.published);
+    INSERT INTO asset_alias_audit (audit_timestamp, audit_type_id, alias, asset_id, publisher)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.alias, old.asset_id, old.publisher);
 END;
 
 -- trigger_asset_alias_insert_audit
@@ -438,8 +438,8 @@ CREATE TRIGGER trigger_asset_alias_insert_audit
 AFTER INSERT ON asset_alias
 FOR EACH ROW
 BEGIN
-    INSERT INTO asset_alias_audit (audit_timestamp, audit_type_id, alias, asset_id, published)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.alias, new.asset_id, new.published);
+    INSERT INTO asset_alias_audit (audit_timestamp, audit_type_id, alias, asset_id, publisher)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.alias, new.asset_id, new.publisher);
 END;
 
 -- trigger_asset_alias_update_audit
@@ -447,8 +447,8 @@ CREATE TRIGGER trigger_asset_alias_update_audit
 AFTER UPDATE ON asset_alias
 FOR EACH ROW
 BEGIN
-    INSERT INTO asset_alias_audit (audit_timestamp, audit_type_id, alias, asset_id, published)
-    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.alias, new.asset_id, new.published);
+    INSERT INTO asset_alias_audit (audit_timestamp, audit_type_id, alias, asset_id, publisher)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, new.alias, new.asset_id, new.publisher);
 END;
 
 -- trigger_person_account_ownership_delete_audit

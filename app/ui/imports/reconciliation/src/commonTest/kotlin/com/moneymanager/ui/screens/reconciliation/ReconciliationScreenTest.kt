@@ -484,6 +484,10 @@ class ReconciliationScreenTest {
             focus.request = ReconciliationFocus(koinly.name, wallet.accountId, reconciliationMonth(t0), 35)
 
             showLegs(sourceLegs, listOf(leg(900, binance, "9999", t0 + 100.days)), focus = focus)
+            // The comparison runs off the UI thread, which waitForIdle doesn't wait for: wait for the scroll to land.
+            waitUntil(timeoutMillis = 10_000) {
+                focus.request == null && onAllNodesWithText("leg 35", substring = true).fetchSemanticsNodes().isNotEmpty()
+            }
             waitForIdle()
 
             // Fifty rows are open, and the one asked for is marked and in the middle of the screen.

@@ -8,7 +8,9 @@ import com.moneymanager.database.json.CurrencyListExportCodec
 import com.moneymanager.database.json.HolidayCalendarExportCodec
 import com.moneymanager.database.json.PassThroughExportCodec
 import com.moneymanager.database.json.StrategyArtifactCodec
+import com.moneymanager.domain.model.AliasPublisher
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.AssetAlias
 import com.moneymanager.domain.model.AssetExportKind
 import com.moneymanager.domain.model.CurrencyExportEntry
 import com.moneymanager.domain.model.CurrencyListExport
@@ -20,6 +22,7 @@ import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.passthrough.export.PassThroughExport
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
+import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.HolidayCalendarReadRepository
@@ -35,6 +38,7 @@ import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.domain.strategy.StrategyParseResult
 import com.moneymanager.domain.strategy.libraryKind
 import com.moneymanager.importengineapi.AccountMappingMutation
+import com.moneymanager.importengineapi.AssetAliasMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportCurrencyIntent
@@ -58,6 +62,7 @@ class StrategyLibraryService(
     private val accountMappingRepository: AccountMappingReadRepository,
     private val passThroughAccountRepository: PassThroughAccountReadRepository,
     private val currencyRepository: CurrencyReadRepository,
+    private val cryptoRepository: CryptoReadRepository,
     private val holidayCalendarRepository: HolidayCalendarReadRepository,
     private val csvStrategyExportService: CsvStrategyExportService,
     private val apiStrategyExportService: ApiStrategyExportService,
@@ -91,11 +96,25 @@ class StrategyLibraryService(
 
         val listCurrencies = currencyRepository.getSystemCreatedCurrencies().first()
         if (listCurrencies.isNotEmpty()) {
+            val listAliases =
+                cryptoRepository
+                    .getAssetAliases()
+                    .first()
+                    .filter { it.publisher == AliasPublisher.CURRENCY_LIST }
+                    .groupBy({ it.assetCode }, { it.alias })
             val export =
                 CurrencyListExport(
                     version = appVersion.value,
                     name = StrategyFileNaming.CURRENCIES_NAME,
-                    currencies = listCurrencies.map { CurrencyExportEntry(it.code, it.name, it.fractionDigits) },
+                    currencies =
+                        listCurrencies.map {
+                            CurrencyExportEntry(
+                                it.code,
+                                it.name,
+                                it.fractionDigits,
+                                listAliases[it.code].orEmpty().toSet(),
+                            )
+                        },
                 )
             entries +=
                 entry(StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME), CurrencyListExportCodec.encode(export))
@@ -220,10 +239,19 @@ class StrategyLibraryService(
                 .first()
                 .map { it.code }
                 .toSet()
-        val missing = CurrencyListExportCodec.decode(json).currencies.filter { it.code !in existing }
-        if (missing.isEmpty()) return
+        val listed = CurrencyListExportCodec.decode(json).currencies
+        val missing = listed.filter { it.code !in existing }
+        // An alias a person or the crypto list set stays theirs: the list only adds the names nobody has taken.
+        val taken = cryptoRepository.getAssetAliases().first().mapTo(mutableSetOf()) { it.alias }
+        val aliases =
+            listed
+                .flatMap { entry -> entry.aliases.map { AssetAlias(it, entry.code, AliasPublisher.CURRENCY_LIST) } }
+                .filter { it.alias !in taken }
+                .map { AssetAliasMutation.Set(it.alias, it.assetCode, it.publisher) }
+        if (missing.isEmpty() && aliases.isEmpty()) return
         importEngine.import(
             ImportBatch(
+                assetAliasMutations = aliases,
                 currencies =
                     missing.map {
                         ImportCurrencyIntent(

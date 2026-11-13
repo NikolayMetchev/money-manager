@@ -16,6 +16,7 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
+import com.moneymanager.domain.model.codesByName
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
@@ -230,10 +231,9 @@ suspend fun ensureCryptoAssets(
     cryptoRepository: CryptoReadRepository?,
 ): List<CryptoAsset> {
     if (cryptoRepository == null) return emptyList()
-    val fiatCodes = currencies.mapTo(mutableSetOf()) { it.code.uppercase() }
-    val existingCrypto = cryptoRepository.getAllCryptoAssets().first().mapTo(mutableSetOf()) { it.code.uppercase() }
+    val known = KnownAssets(currencies, cryptoRepository.getAllCryptoAssets().first(), cryptoRepository.assetAliasMap())
     createCryptoAssets(
-        collectCryptoCodes(strategy, columns, fileName, rows, fiatCodes, existingCrypto, cryptoRepository.assetAliasMap()),
+        collectCryptoCodes(strategy, columns, fileName, rows, known),
         importEngine,
     )
     return cryptoRepository.getAllCryptoAssets().first()
@@ -258,9 +258,7 @@ suspend fun prepareImports(
     cryptoRepository: CryptoReadRepository?,
     onPrepared: suspend (index: Int, file: CsvImport) -> Unit = { _, _ -> },
 ): List<CryptoAsset> {
-    val fiatCodes = currencies.mapTo(mutableSetOf()) { it.code.uppercase() }
-    val existingCrypto = cryptoRepository?.getAllCryptoAssets()?.first()?.mapTo(mutableSetOf()) { it.code.uppercase() }
-    val assetAliases = cryptoRepository?.assetAliasMap().orEmpty()
+    val known = cryptoRepository?.let { KnownAssets(currencies, it.getAllCryptoAssets().first(), it.assetAliasMap()) }
     val writes = Mutex()
     val reports = Mutex()
     val codes =
@@ -270,16 +268,14 @@ suspend fun prepareImports(
                     async(Dispatchers.Default) {
                         val staged = stageForStrategy(listed, strategies, csvImportRepository, importEngine, writes)
                         val fileCodes =
-                            if (staged == null || existingCrypto == null) {
+                            if (staged == null || known == null) {
                                 emptySet()
                             } else {
                                 cryptoCodesForImport(
                                     staged.first,
                                     staged.second,
                                     csvImportRepository,
-                                    fiatCodes,
-                                    existingCrypto,
-                                    assetAliases,
+                                    known,
                                 )
                             }
                         reports.withLock { onPrepared(index, listed) }
@@ -322,20 +318,32 @@ private suspend fun cryptoCodesForImport(
     csvImport: CsvImport,
     strategy: CsvImportStrategy,
     csvImportRepository: CsvImportReadRepository,
-    fiatCodes: Set<String>,
-    existingCrypto: Set<String>,
-    assetAliases: Map<String, String>,
+    known: KnownAssets,
 ): Set<String> {
     // Scan ALL rows, not just importable ones: a re-import remaps already-IMPORTED rows too (value
     // updates, transfer→trade conversions), and their tickers must resolve at plan time. For a fresh
     // import every row is unimported, so this is the same set.
     val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
-    return collectCryptoCodes(strategy, csvImport.columns, csvImport.originalFileName, allRows, fiatCodes, existingCrypto, assetAliases)
+    return collectCryptoCodes(strategy, csvImport.columns, csvImport.originalFileName, allRows, known)
+}
+
+// The database's assets as [resolveAssetCode] reads them: codes, aliases and names (currencies first).
+private class KnownAssets(
+    currencies: List<Currency>,
+    crypto: List<CryptoAsset>,
+    private val aliases: Map<String, String>,
+) {
+    private val codes = (currencies.map { it.code } + crypto.map { it.code }).mapTo(mutableSetOf()) { it.uppercase() }
+    private val codeByName = codesByName(currencies.map { it.code to it.name } + crypto.map { it.code to it.name })
+
+    fun isAsset(code: String): Boolean = code in codes
+
+    fun resolve(code: String): String = resolveAssetCode(code, aliases, codeByName, ::isAsset)
 }
 
 /**
  * Scans [rows] of [strategy]'s currency-lookup columns and returns every non-fiat ticker not already
- * an [existingCryptoCodes] asset. Any non-fiat code qualifies (unconditional — no per-strategy flag).
+ * a [known] asset. Any non-fiat code qualifies (unconditional — no per-strategy flag).
  * Pure; does not create anything.
  */
 private fun collectCryptoCodes(
@@ -343,9 +351,7 @@ private fun collectCryptoCodes(
     columns: List<CsvColumn>,
     fileName: String,
     rows: List<CsvRow>,
-    fiatCodes: Set<String>,
-    existingCryptoCodes: Set<String>,
-    assetAliases: Map<String, String>,
+    known: KnownAssets,
 ): Set<String> {
     val indexByName = columnIndexWithRuleColumns(columns, strategy.config)
 
@@ -374,12 +380,8 @@ private fun collectCryptoCodes(
         for (expr in readableExprs) {
             val raw = rules.resolve(expr) { record.text(it)?.trim() }
             if (raw.isBlank()) continue
-            val code =
-                resolveAssetCode(strategy.config.assetCodes.canonical(raw), assetAliases) {
-                    it in fiatCodes ||
-                        it in existingCryptoCodes
-                }
-            if (code.isNotEmpty() && code !in fiatCodes && code !in existingCryptoCodes) {
+            val code = known.resolve(strategy.config.assetCodes.canonical(raw))
+            if (code.isNotEmpty() && !known.isAsset(code)) {
                 codes += code
             }
         }

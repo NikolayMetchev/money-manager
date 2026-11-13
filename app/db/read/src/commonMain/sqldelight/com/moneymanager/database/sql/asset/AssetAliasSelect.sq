@@ -1,5 +1,5 @@
 selectAll:
-SELECT asset_alias.alias, upper(asset_details.code) AS asset_code, asset_alias.published
+SELECT asset_alias.alias, upper(asset_details.code) AS asset_code, asset_alias.publisher
 FROM asset_alias
 JOIN asset_details ON asset_details.id = asset_alias.asset_id
 ORDER BY asset_alias.alias;
