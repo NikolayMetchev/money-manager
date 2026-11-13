@@ -78,7 +78,7 @@
       "kotlinx-coroutines-swing": "org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0",
       "kotlinx-coroutines-test": "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0",
       "kotlinx-datetime": "org.jetbrains.kotlinx:kotlinx-datetime:0.8.0",
-      "kotlinx-io-core": "org.jetbrains.kotlinx:kotlinx-io-core:0.9.2",
+      "kotlinx-io-core": "org.jetbrains.kotlinx:kotlinx-io-core:0.9.3",
       "kotlinx-serialization-core": "org.jetbrains.kotlinx:kotlinx-serialization-core:1.13.0",
       "kotlinx-serialization-json": "org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0",
       "ktor-client-auth": "io.ktor:ktor-client-auth:3.6.1",
@@ -21343,22 +21343,22 @@
     },
     "org.jetbrains.kotlinx:kotlinx-io-bytestring": {
       "android": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-bytestring-jvm-0.9.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-jvm/0.9.2/kotlinx-io-bytestring-jvm-0.9.2.jar",
-            "sha256": "51825a5067a9944f767861ed090f04523a28326d7371096940c41801a11882db"
+            "name": "kotlinx-io-bytestring-jvm-0.9.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-jvm/0.9.3/kotlinx-io-bytestring-jvm-0.9.3.jar",
+            "sha256": "1fbdd7ff70ea386a55846ce1fe3d8f6a80b315a9d75ab1098b5ee87e942b1a0c"
           }
         ]
       },
       "js": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-bytestring-js-0.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-js/0.9.2/kotlinx-io-bytestring-js-0.9.2.klib",
-            "sha256": "acdc7fab3ea4dcb93e373c7852eb22c72d0e29a5b83a2cb495848143f148d432"
+            "name": "kotlinx-io-bytestring-js-0.9.3.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-js/0.9.3/kotlinx-io-bytestring-js-0.9.3.klib",
+            "sha256": "d9460c06ca53d13b47d94de79ab7a0a5e2f7afbcac594e8383999f864e46f984"
           }
         ],
         "deps": [
@@ -21366,52 +21366,52 @@
         ]
       },
       "jvm": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-bytestring-jvm-0.9.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-jvm/0.9.2/kotlinx-io-bytestring-jvm-0.9.2.jar",
-            "sha256": "51825a5067a9944f767861ed090f04523a28326d7371096940c41801a11882db"
+            "name": "kotlinx-io-bytestring-jvm-0.9.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-jvm/0.9.3/kotlinx-io-bytestring-jvm-0.9.3.jar",
+            "sha256": "1fbdd7ff70ea386a55846ce1fe3d8f6a80b315a9d75ab1098b5ee87e942b1a0c"
           }
         ]
       },
       "linuxArm64": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-bytestring-linuxArm64Main-0.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-linuxarm64/0.9.2/kotlinx-io-bytestring-linuxarm64-0.9.2.klib",
-            "sha256": "4a026665218b9241e701f9ea66c900ae597fdaa0d235eef353f2babdd0edf242"
+            "name": "kotlinx-io-bytestring-linuxArm64Main-0.9.3.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-linuxarm64/0.9.3/kotlinx-io-bytestring-linuxarm64-0.9.3.klib",
+            "sha256": "ab97efd155bd4ef9c394f6d150f304c78313a877b11583344c78594c959b931b"
           }
         ]
       },
       "linuxX64": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-bytestring-linuxX64Main-0.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-linuxx64/0.9.2/kotlinx-io-bytestring-linuxx64-0.9.2.klib",
-            "sha256": "13d6790213f9474b27b833cd167d9e4108b961f59818de09aa45ff9034a7548a"
+            "name": "kotlinx-io-bytestring-linuxX64Main-0.9.3.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-linuxx64/0.9.3/kotlinx-io-bytestring-linuxx64-0.9.3.klib",
+            "sha256": "c7b187351665fb2bf6aa955e3ddb0e8dbea6f63ceebc2fac552056354f013900"
           }
         ]
       },
       "macosArm64": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-bytestring-macosArm64Main-0.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-macosarm64/0.9.2/kotlinx-io-bytestring-macosarm64-0.9.2.klib",
-            "sha256": "27d9c5ce599012d57890596753dac5f52faa281bc9fd77f84bde8dd487413a68"
+            "name": "kotlinx-io-bytestring-macosArm64Main-0.9.3.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-macosarm64/0.9.3/kotlinx-io-bytestring-macosarm64-0.9.3.klib",
+            "sha256": "e39d7a4e69df00dcf1a50a37b2a70fcbf8a0518691e1d05c0fc5bb44db53ae73"
           }
         ]
       },
       "metadata": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-bytestring-metadata-0.9.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring/0.9.2/kotlinx-io-bytestring-0.9.2.jar",
-            "sha256": "43c016b977b6d9e7a3bf08dd1691cd032f93fe1b85d25705af744bc1cf34b4f0"
+            "name": "kotlinx-io-bytestring-metadata-0.9.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring/0.9.3/kotlinx-io-bytestring-0.9.3.jar",
+            "sha256": "0af510810dfe35e37cbfff54f29b827974eb19451a4889b4c46f32a964b87b62"
           }
         ],
         "source_sets": [
@@ -21419,12 +21419,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-bytestring-metadata-0.9.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring/0.9.2/kotlinx-io-bytestring-0.9.2.jar",
-            "sha256": "43c016b977b6d9e7a3bf08dd1691cd032f93fe1b85d25705af744bc1cf34b4f0"
+            "name": "kotlinx-io-bytestring-metadata-0.9.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring/0.9.3/kotlinx-io-bytestring-0.9.3.jar",
+            "sha256": "0af510810dfe35e37cbfff54f29b827974eb19451a4889b4c46f32a964b87b62"
           }
         ],
         "source_sets": [
@@ -21432,34 +21432,34 @@
         ]
       },
       "mingwX64": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-bytestring-mingwX64Main-0.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-mingwx64/0.9.2/kotlinx-io-bytestring-mingwx64-0.9.2.klib",
-            "sha256": "b0497f1959f9ed50e2a886d7ee40a77508d23807649290ea0540ea5c35a311e8"
+            "name": "kotlinx-io-bytestring-mingwX64Main-0.9.3.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-mingwx64/0.9.3/kotlinx-io-bytestring-mingwx64-0.9.3.klib",
+            "sha256": "5be378d80b1979bf1d011c9f4bcd3aff6384ed21680f7c1a04d4dd9f0cb726e2"
           }
         ]
       },
       "wasmJs": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-bytestring-wasm-js-0.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-wasm-js/0.9.2/kotlinx-io-bytestring-wasm-js-0.9.2.klib",
-            "sha256": "f6d31228a70ea9a3da59c39297c48a706e593e57c70cac6ec8281f224863448b"
+            "name": "kotlinx-io-bytestring-wasm-js-0.9.3.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-bytestring-wasm-js/0.9.3/kotlinx-io-bytestring-wasm-js-0.9.3.klib",
+            "sha256": "2dc490af3d90944b4e796031aee437e09a550788c64677225b2798fc05d10efe"
           }
         ]
       }
     },
     "org.jetbrains.kotlinx:kotlinx-io-core": {
       "android": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-core-jvm-0.9.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-jvm/0.9.2/kotlinx-io-core-jvm-0.9.2.jar",
-            "sha256": "51b0df8a02b10050ebfccc732a63d02357c5cf9daa69cbee04e13c0dd1448736"
+            "name": "kotlinx-io-core-jvm-0.9.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-jvm/0.9.3/kotlinx-io-core-jvm-0.9.3.jar",
+            "sha256": "a10e0a56aa4f0b3a1381d6747f493cd0fe0f1089a66175790f268c468327816e"
           }
         ],
         "deps": [
@@ -21467,12 +21467,12 @@
         ]
       },
       "js": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-core-js-0.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-js/0.9.2/kotlinx-io-core-js-0.9.2.klib",
-            "sha256": "802d24a4f807ed5add0dd2c4c0ec0e5d3fdb5a82e5464bb8b2b309985ca58712"
+            "name": "kotlinx-io-core-js-0.9.3.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-js/0.9.3/kotlinx-io-core-js-0.9.3.klib",
+            "sha256": "2289cae7243f1bfe8a6a68b3ff38575a33c337760c964ad1a0dbca8e5d86c354"
           }
         ],
         "deps": [
@@ -21481,12 +21481,12 @@
         ]
       },
       "jvm": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-core-jvm-0.9.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-jvm/0.9.2/kotlinx-io-core-jvm-0.9.2.jar",
-            "sha256": "51b0df8a02b10050ebfccc732a63d02357c5cf9daa69cbee04e13c0dd1448736"
+            "name": "kotlinx-io-core-jvm-0.9.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-jvm/0.9.3/kotlinx-io-core-jvm-0.9.3.jar",
+            "sha256": "a10e0a56aa4f0b3a1381d6747f493cd0fe0f1089a66175790f268c468327816e"
           }
         ],
         "deps": [
@@ -21494,12 +21494,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-core-linuxArm64Main-0.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-linuxarm64/0.9.2/kotlinx-io-core-linuxarm64-0.9.2.klib",
-            "sha256": "fa4e056af2eabae15996748e97e713c71a49df9068c96cedc17a96376f8186b1"
+            "name": "kotlinx-io-core-linuxArm64Main-0.9.3.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-linuxarm64/0.9.3/kotlinx-io-core-linuxarm64-0.9.3.klib",
+            "sha256": "99ff471970ad712d5d43df36d3d5a6c713d2af5eb5087699dba6646efb97381c"
           }
         ],
         "deps": [
@@ -21507,12 +21507,12 @@
         ]
       },
       "linuxX64": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-core-linuxX64Main-0.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-linuxx64/0.9.2/kotlinx-io-core-linuxx64-0.9.2.klib",
-            "sha256": "d52721827098e9de461cf5088b8c2daf527a9a18e927d5e1a1b7502f80d96b47"
+            "name": "kotlinx-io-core-linuxX64Main-0.9.3.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-linuxx64/0.9.3/kotlinx-io-core-linuxx64-0.9.3.klib",
+            "sha256": "f2fe80fd5030cf6689ee4990c50d06c16c6f882075ea7379365ee2bcfdf7c3cc"
           }
         ],
         "deps": [
@@ -21520,12 +21520,12 @@
         ]
       },
       "macosArm64": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-core-macosArm64Main-0.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-macosarm64/0.9.2/kotlinx-io-core-macosarm64-0.9.2.klib",
-            "sha256": "0323d56fcd98f354207a6795d055f671a5d843c9d2a07a53be0deed27a022053"
+            "name": "kotlinx-io-core-macosArm64Main-0.9.3.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-macosarm64/0.9.3/kotlinx-io-core-macosarm64-0.9.3.klib",
+            "sha256": "60592f7523c8bb160fdf9e3bfba5d72626b814a6f597e07da8fedded3c7f9f7f"
           }
         ],
         "deps": [
@@ -21533,12 +21533,12 @@
         ]
       },
       "metadata": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-core-metadata-0.9.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core/0.9.2/kotlinx-io-core-0.9.2.jar",
-            "sha256": "af5e76812cce227aaca15b8b07d1167bec1619dacf6d55e6cefc74a68ce3b354"
+            "name": "kotlinx-io-core-metadata-0.9.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core/0.9.3/kotlinx-io-core-0.9.3.jar",
+            "sha256": "153084d5b0579ad833f43a82b09999a7ff9cb171063f0aa326b7207b1dedfd5a"
           }
         ],
         "deps": [
@@ -21549,12 +21549,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-core-metadata-0.9.2.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core/0.9.2/kotlinx-io-core-0.9.2.jar",
-            "sha256": "af5e76812cce227aaca15b8b07d1167bec1619dacf6d55e6cefc74a68ce3b354"
+            "name": "kotlinx-io-core-metadata-0.9.3.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core/0.9.3/kotlinx-io-core-0.9.3.jar",
+            "sha256": "153084d5b0579ad833f43a82b09999a7ff9cb171063f0aa326b7207b1dedfd5a"
           }
         ],
         "deps": [
@@ -21565,12 +21565,12 @@
         ]
       },
       "mingwX64": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-core-mingwX64Main-0.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-mingwx64/0.9.2/kotlinx-io-core-mingwx64-0.9.2.klib",
-            "sha256": "fad548a9c7e5665ec91da418a54f5f6fac2152f60ed553e39bba600bccb762e6"
+            "name": "kotlinx-io-core-mingwX64Main-0.9.3.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-mingwx64/0.9.3/kotlinx-io-core-mingwx64-0.9.3.klib",
+            "sha256": "ddf59ebb13dd8c8de7bad1b17c5657b025e97029813706bc182797d1d3f08f8b"
           }
         ],
         "deps": [
@@ -21578,12 +21578,12 @@
         ]
       },
       "wasmJs": {
-        "version": "0.9.2",
+        "version": "0.9.3",
         "files": [
           {
-            "name": "kotlinx-io-core-wasm-js-0.9.2.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-wasm-js/0.9.2/kotlinx-io-core-wasm-js-0.9.2.klib",
-            "sha256": "a134bd008f0d390fb722b5992f7bd9da47742c14c9b74f496dcf589099e7e682"
+            "name": "kotlinx-io-core-wasm-js-0.9.3.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-io-core-wasm-js/0.9.3/kotlinx-io-core-wasm-js-0.9.3.klib",
+            "sha256": "3bed768d24694f9e43871d5e95ce9872b536998cdd75ccdaa3da19a8c9d89739"
           }
         ],
         "deps": [
