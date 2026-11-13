@@ -2,6 +2,7 @@ package com.moneymanager.database.api
 
 import com.moneymanager.apiimport.ApiDownloadAndImportAllResult
 import com.moneymanager.apiimport.ApiDownloadOutcome
+import com.moneymanager.apiimport.ApiImportListener
 import com.moneymanager.apiimport.ApiImportService
 import com.moneymanager.apiimport.ApiSessionImportStatus
 import com.moneymanager.apiimport.apiDownloadTaskKey
@@ -39,16 +40,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Instant
-
-/** A transfer to a counterparty Monzo identifies by id, whose account name a person must confirm. */
-private val MONZO_COUNTERPARTY_TRANSACTIONS_JSON =
-    """
-    {"transactions": [
-      {"id": "tx_2", "account_id": "${MonzoApiFixtures.ACCOUNT_ID}", "created": "2024-06-04T09:15:00.000Z", "amount": -2500,
-       "currency": "GBP", "description": "PAYMENT TO ALICE", "merchant": null,
-       "counterparty": {"id": "cp_alice_001", "name": "Alice"}}
-    ]}
-    """.trimIndent()
 
 /**
  * [ApiImportService] against a real database and a mocked provider: "Download & import all" downloads and
@@ -246,6 +237,28 @@ class ApiImportServiceTest : DbTest() {
         }
 
     @Test
+    fun `download and import all can only import what earlier downloads left`() =
+        runDbTest {
+            val monzo = connection("Monzo")
+            val vault = unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzoSecrets)))
+            val service = service(vault)
+            backgroundScope.runTask { service.downloadAndImportAll(this, listOf(monzo), importSessions = false) }
+            val session = repositories.apiSessionRepository.getSessionsByDevice(deviceId()).single()
+
+            val (imported, tasks) = backgroundScope.runTask { service.downloadAndImportAll(this, listOf(monzo), downloadSessions = false) }
+
+            assertEquals(emptyList(), imported.credentials, "nothing is downloaded")
+            assertEquals(listOf(session.id), repositories.apiSessionRepository.getSessionsByDevice(deviceId()).map { it.id })
+            assertEquals(listOf(ApiSessionImportStatus.IMPORTED), imported.sessions.map { it.status })
+            assertEquals("Imported 1 of 1 session(s).", imported.summary())
+            assertTrue(tasks.none { it.key == apiDownloadTaskKey(monzo.id) }, "no download task")
+
+            val (again, _) = backgroundScope.runTask { service.downloadAndImportAll(this, listOf(monzo), downloadSessions = false) }
+
+            assertEquals(emptyList(), again.sessions, "an imported session isn't imported again")
+        }
+
+    @Test
     fun `a session already being imported elsewhere comes back as failed and the queue moves on`() =
         runDbTest {
             val monzo = connection("Monzo")
@@ -281,7 +294,7 @@ class ApiImportServiceTest : DbTest() {
     @Test
     fun `a session whose counterparties need confirming comes back as needing attention`() =
         runDbTest {
-            monzoTransactionsJson = MONZO_COUNTERPARTY_TRANSACTIONS_JSON
+            monzoTransactionsJson = MonzoApiFixtures.COUNTERPARTY_TRANSACTIONS_JSON
             val monzo = connection("Monzo")
             val vault = unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzoSecrets)))
 
@@ -291,6 +304,35 @@ class ApiImportServiceTest : DbTest() {
             val attention = result.needsAttention.single()
             assertEquals(listOf("cp_alice_001"), attention.counterparties.map { it.counterpartyId })
             assertEquals(emptySet(), repositories.apiSessionRepository.getImportedSessionRevisions(), "nothing is imported")
+        }
+
+    @Test
+    fun `counterparties the listener confirms are imported under its names`() =
+        runDbTest {
+            monzoTransactionsJson = MonzoApiFixtures.COUNTERPARTY_TRANSACTIONS_JSON
+            val monzo = connection("Monzo")
+            val vault = unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzoSecrets)))
+            val asked = mutableListOf<String>()
+            val listener =
+                ApiImportListener(
+                    confirmCounterparties = { attention ->
+                        asked += attention.counterparties.map { it.counterpartyId }
+                        attention.counterparties.associate { it.counterpartyId to "Alice Confirmed" }
+                    },
+                )
+
+            val (result, _) = backgroundScope.runTask { service(vault).downloadAndImportAll(this, listOf(monzo), listener = listener) }
+
+            assertEquals(listOf("cp_alice_001"), asked)
+            assertEquals(1, result.importedCount)
+            assertEquals(emptyList(), result.needsAttention)
+            assertTrue(
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .any { it.name == "Alice Confirmed" },
+                "the counterparty's account takes the confirmed name",
+            )
         }
 
     @Test

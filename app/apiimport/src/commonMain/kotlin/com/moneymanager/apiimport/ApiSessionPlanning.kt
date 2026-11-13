@@ -129,8 +129,9 @@ internal fun bulkDownloadImportSummary(
     needsReviewCount: Int,
 ): String =
     buildList {
-        add("Downloaded $downloadedCount of $credentialCount connection(s).")
-        add("Imported $importedCount of $sessionCount session(s).")
+        // A download-only run queues nothing and an import-only run downloads nothing: say only what ran.
+        if (credentialCount > 0) add("Downloaded $downloadedCount of $credentialCount connection(s).")
+        if (sessionCount > 0 || credentialCount == 0) add("Imported $importedCount of $sessionCount session(s).")
         if (needsReviewCount > 0) {
             add("$needsReviewCount session(s) need new counterparties confirmed; import them from their cards.")
         }

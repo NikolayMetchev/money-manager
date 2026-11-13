@@ -21,5 +21,15 @@ object MonzoApiFixtures {
         ]}
         """.trimIndent()
 
+    /** A transfer to a counterparty Monzo identifies by id, whose account name a person must confirm. */
+    val COUNTERPARTY_TRANSACTIONS_JSON =
+        """
+        {"transactions": [
+          {"id": "tx_2", "account_id": "$ACCOUNT_ID", "created": "2024-06-04T09:15:00.000Z", "amount": -2500,
+           "currency": "GBP", "description": "PAYMENT TO ALICE", "merchant": null,
+           "counterparty": {"id": "cp_alice_001", "name": "Alice"}}
+        ]}
+        """.trimIndent()
+
     const val EMPTY_TRANSACTIONS_JSON = """{"transactions": []}"""
 }

@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,7 +62,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.moneymanager.apiimport.API_DOWNLOAD_IMPORT_ALL_TASK_KEY
+import com.moneymanager.apiimport.API_DOWNLOAD_ALL_TASK_KEY
+import com.moneymanager.apiimport.API_IMPORT_ALL_TASK_KEY
 import com.moneymanager.apiimport.API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY
 import com.moneymanager.apiimport.ApiImportListener
 import com.moneymanager.apiimport.ApiImportService
@@ -70,6 +72,7 @@ import com.moneymanager.apiimport.apiImportTaskKey
 import com.moneymanager.apiimport.displaySummary
 import com.moneymanager.apiimport.filterCredentialsByStrategy
 import com.moneymanager.apiimport.sessionImportedAtCurrentRevision
+import com.moneymanager.apiimport.sessionsToImportInBulk
 import com.moneymanager.apiimport.splitSessionsByImportState
 import com.moneymanager.apiimport.startApiSessionsArchiveImport
 import com.moneymanager.apiimport.storeNewSigningKey
@@ -122,6 +125,7 @@ import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.displayDate
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -207,7 +211,8 @@ fun ApiSessionsScreen(
     // full re-sweep.
     var forceFullDownloadByCredential by remember { mutableStateOf<Set<ApiCredentialId>>(emptySet()) }
     var signingKeyErrorByCredential by remember { mutableStateOf<Map<ApiCredentialId, String>>(emptyMap()) }
-    var pendingImport by remember { mutableStateOf<PendingApiImport?>(null) }
+    // Confirmations waiting for a person, shown one at a time: a card's import, or a bulk run waiting on [answer].
+    var pendingImports by remember { mutableStateOf<List<PendingApiImport>>(emptyList()) }
     var pendingReimport by remember { mutableStateOf<PendingApiReimport?>(null) }
     var pendingReimportAll by remember { mutableStateOf<PendingApiReimportAll?>(null) }
 
@@ -269,6 +274,17 @@ fun ApiSessionsScreen(
                 refresh()
                 onTransactionsImported()
             },
+            confirmCounterparties = { attention ->
+                val answer = CompletableDeferred<Map<String, String>?>()
+                val pending = PendingApiImport(attention.session, attention.strategy, attention.counterparties, answer)
+                pendingImports = pendingImports + pending
+                try {
+                    answer.await()
+                } finally {
+                    // A cancelled run takes its question with it.
+                    pendingImports = pendingImports - pending
+                }
+            },
         )
 
     fun startImport(
@@ -302,7 +318,7 @@ fun ApiSessionsScreen(
         }
     }
 
-    fun downloadAndImportAll(targets: List<ApiCredential>) {
+    fun downloadAll(targets: List<ApiCredential>) {
         val forceFullIds = forceFullDownloadByCredential.intersect(targets.map { it.id }.toSet())
         forceFullDownloadByCredential = forceFullDownloadByCredential - forceFullIds
         scope.launch {
@@ -313,12 +329,26 @@ fun ApiSessionsScreen(
                 return@launch
             }
             taskManager.start(
-                key = API_DOWNLOAD_IMPORT_ALL_TASK_KEY,
-                title = "Download & import all",
+                key = API_DOWNLOAD_ALL_TASK_KEY,
+                title = "Download all",
                 initialDetail = "Downloading ${targets.size} API connection(s).",
             ) {
-                apiImportService.downloadAndImportAll(this, targets, forceFullIds, importListener).summary()
+                apiImportService
+                    .downloadAndImportAll(this, targets, forceFullIds, importListener, importSessions = false)
+                    .summary()
             }
+        }
+    }
+
+    fun importAll(targets: List<ApiCredential>) {
+        taskManager.start(
+            key = API_IMPORT_ALL_TASK_KEY,
+            title = "Import all",
+            initialDetail = "Importing the sessions of ${targets.size} API connection(s).",
+        ) {
+            apiImportService
+                .downloadAndImportAll(this, targets, listener = importListener, downloadSessions = false)
+                .summary()
         }
     }
 
@@ -444,12 +474,26 @@ fun ApiSessionsScreen(
                         onStrategySelected = { selectedStrategyId = it },
                         modifier = Modifier.weight(1f),
                     )
-                    // Follows the strategy filter, so the same button can refresh just one provider's sessions.
+                    // Both follow the strategy filter, so they can refresh just one provider's sessions.
                     Button(
-                        onClick = { downloadAndImportAll(filteredCredentials) },
-                        enabled = !tasks.isRunning(API_DOWNLOAD_IMPORT_ALL_TASK_KEY),
+                        onClick = { downloadAll(filteredCredentials) },
+                        enabled = !tasks.isRunning(API_DOWNLOAD_ALL_TASK_KEY),
                     ) {
-                        Text("Download & import all (${filteredCredentials.size})")
+                        Text("Download all (${filteredCredentials.size})")
+                    }
+                    // What "Import all" would import: sessions never imported. One imported under an older
+                    // strategy revision is left for its card's re-import.
+                    val importableCount =
+                        sessionsToImportInBulk(
+                            sessions = filteredCredentials.flatMap { sessionsByCredential[it.id].orEmpty() },
+                            credentialIds = filteredCredentials.filter { it.strategyId != null }.map { it.id }.toSet(),
+                            everImportedSessionIds = importedSessionRevisions.map { it.sessionId }.toSet(),
+                        ).size
+                    Button(
+                        onClick = { importAll(filteredCredentials) },
+                        enabled = importableCount > 0 && !tasks.isRunning(API_IMPORT_ALL_TASK_KEY),
+                    ) {
+                        Text("Import all ($importableCount)")
                     }
                 }
 
@@ -596,7 +640,7 @@ fun ApiSessionsScreen(
                                                 // isImportingSession and its progress carry across the handoff.
                                                 startImport(session, strategy, emptyMap())
                                             } else {
-                                                pendingImport =
+                                                pendingImports = pendingImports +
                                                     PendingApiImport(
                                                         session = session,
                                                         strategy = strategy,
@@ -645,19 +689,30 @@ fun ApiSessionsScreen(
         }
     }
 
-    pendingImport?.let { import ->
-        CounterpartyConfirmationDialog(
-            counterparties = import.counterparties,
-            onDismiss = { pendingImport = null },
-            onConfirm = { namesByCounterpartyId ->
-                pendingImport = null
-                startImport(
-                    session = import.session,
-                    strategy = import.strategy,
-                    counterpartyAccountNames = namesByCounterpartyId,
-                )
-            },
-        )
+    pendingImports.firstOrNull()?.let { import ->
+        // Keyed, so the next question opens with its own names rather than the last one's edits.
+        key(import) {
+            CounterpartyConfirmationDialog(
+                counterparties = import.counterparties,
+                onDismiss = {
+                    pendingImports = pendingImports - import
+                    import.answer?.complete(null)
+                },
+                onConfirm = { namesByCounterpartyId ->
+                    pendingImports = pendingImports - import
+                    val answer = import.answer
+                    if (answer != null) {
+                        answer.complete(namesByCounterpartyId)
+                    } else {
+                        startImport(
+                            session = import.session,
+                            strategy = import.strategy,
+                            counterpartyAccountNames = namesByCounterpartyId,
+                        )
+                    }
+                },
+            )
+        }
     }
 
     pendingReimport?.let { reimport ->
@@ -719,10 +774,12 @@ fun ApiSessionsScreen(
     }
 }
 
-private data class PendingApiImport(
+// [answer] is set when a bulk run asked and waits for the names (null: leave the session for later).
+private class PendingApiImport(
     val session: ApiSession,
     val strategy: ApiImportStrategy,
     val counterparties: List<ApiCounterpartySuggestion>,
+    val answer: CompletableDeferred<Map<String, String>?>? = null,
 )
 
 private data class PendingApiReimport(
