@@ -89,16 +89,15 @@ internal object OfxMarkup {
         tokens: List<Token>,
         index: Int,
         stack: ArrayDeque<Builder>,
-    ): Int {
-        val next = tokens.getOrNull(index + 1)
-        return when {
-            next is Token.Text -> {
+    ): Int =
+        when (val next = tokens.getOrNull(index + 1)) {
+            is Token.Text -> {
                 stack.last().children += OfxElement(token.name, value = next.text)
                 val closed = (tokens.getOrNull(index + 2) as? Token.Close)?.name == token.name
                 if (closed) index + 2 else index + 1
             }
 
-            next is Token.Close && next.name == token.name -> {
+            is Token.Close if next.name == token.name -> {
                 stack.last().children += OfxElement(token.name, value = "")
                 index + 1
             }
@@ -108,7 +107,6 @@ internal object OfxMarkup {
                 index
             }
         }
-    }
 
     /** Ends the open aggregate named [name] and any left open inside it; a stray closing tag is ignored. */
     private fun close(

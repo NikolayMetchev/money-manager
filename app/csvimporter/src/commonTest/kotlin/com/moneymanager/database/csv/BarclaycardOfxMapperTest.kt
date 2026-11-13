@@ -8,7 +8,6 @@ import com.moneymanager.csvimporter.parseOfxAsCsv
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.CurrencyScaleFactors
@@ -111,7 +110,7 @@ class BarclaycardOfxMapperTest {
         assertEquals(barclaycard.id, r.transfer.sourceAccountId)
         assertEquals("STREAMING SERVICE", r.newAccounts.single().name)
         assertEquals("STREAMING SERVICE", r.transfer.description)
-        assertEquals<Asset>(gbp, r.transfer.amount.asset)
+        assertEquals(gbp, r.transfer.amount.asset)
         assertEquals("20190722000000001", r.attributes.toMap()["barclaycard-fitid"])
         assertNull(r.attributes.toMap()["barclaycard-foreign-spend"])
         assertFalse(strategy.needsSourceAccountOverride())

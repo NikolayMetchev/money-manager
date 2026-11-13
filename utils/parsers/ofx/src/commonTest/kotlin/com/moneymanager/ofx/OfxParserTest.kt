@@ -246,10 +246,14 @@ class OfxParserTest {
 
     @Test
     fun parseDateTime_variants() {
-        assertEquals(OfxDateTime("2019-07-22", "00:00:00", null), OfxDateTime.parse("20190722000000"))
-        assertEquals(OfxDateTime("2020-01-05", null, null), OfxDateTime.parse("20200105"))
-        assertEquals(OfxDateTime("2024-04-02", "13:45:01", "-07:00"), OfxDateTime.parse("20240402134501.000[-7:MST]"))
-        assertEquals(OfxDateTime("2024-04-02", "00:00:00", "+05:30"), OfxDateTime.parse("20240402000000[5.5]"))
+        val expected =
+            mapOf(
+                "20190722000000" to OfxDateTime("2019-07-22", "00:00:00", null),
+                "20200105" to OfxDateTime("2020-01-05", null, null),
+                "20240402134501.000[-7:MST]" to OfxDateTime("2024-04-02", "13:45:01", "-07:00"),
+                "20240402000000[5.5]" to OfxDateTime("2024-04-02", "00:00:00", "+05:30"),
+            )
+        assertEquals(expected, expected.keys.associateWith { OfxDateTime.parse(it) })
         assertNull(OfxDateTime.parse("2024"))
     }
 }
