@@ -1,7 +1,7 @@
 upsert:
-INSERT INTO asset_alias(alias, asset_id, published)
+INSERT INTO asset_alias(alias, asset_id, publisher)
 VALUES (?, ?, ?)
-ON CONFLICT(alias) DO UPDATE SET asset_id = excluded.asset_id, published = excluded.published;
+ON CONFLICT(alias) DO UPDATE SET asset_id = excluded.asset_id, publisher = excluded.publisher;
 
 delete:
 DELETE FROM asset_alias WHERE alias = ?;

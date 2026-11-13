@@ -320,7 +320,7 @@ CREATE TABLE asset_alias_audit (
     audit_type_id INTEGER NOT NULL,
     alias TEXT NOT NULL,
     asset_id INTEGER NOT NULL,
-    published INTEGER NOT NULL,
+    publisher INTEGER NOT NULL,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 

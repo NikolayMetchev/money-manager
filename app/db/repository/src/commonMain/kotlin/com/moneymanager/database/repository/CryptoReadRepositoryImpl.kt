@@ -5,6 +5,7 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.CryptoMapper
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
+import com.moneymanager.domain.model.AliasPublisher
 import com.moneymanager.domain.model.AssetAlias
 import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.CryptoId
@@ -42,7 +43,7 @@ class CryptoReadRepositoryImpl(
 
     override fun getAssetAliases(): Flow<List<AssetAlias>> =
         aliasQueries
-            .selectAll { alias, assetCode, published -> AssetAlias(alias, assetCode, published != 0L) }
+            .selectAll { alias, assetCode, publisher -> AssetAlias(alias, assetCode, AliasPublisher.fromId(publisher)) }
             .asFlow()
             .mapToList(Dispatchers.Default)
 

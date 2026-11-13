@@ -421,8 +421,11 @@ object BuiltInCsvStrategies {
     /** A payment into the card (`Payment By Direct Debit`), which never says who paid. */
     private const val BARCLAYCARD_PAYMENT = "(?i)^payment\\b"
 
-    /** A foreign spend's memo: the card, then the amount and currency it was made in (`1234/8.64 US DOLLAR UNITED STATES`). */
-    private const val BARCLAYCARD_FOREIGN_MEMO = "^\\d+/(\\S.*)$"
+    /**
+     * A foreign spend's memo: the card, then the amount and currency it was made in, the currency as words and followed
+     * by the country (`1234/8.64 US DOLLAR UNITED STATES`).
+     */
+    private const val BARCLAYCARD_FOREIGN_MEMO = "^\\d+/([\\d.,]+) (\\S.*)$"
 
     /** The column the American Express PDF strategy assembles a row's date in ("2 Jan"). */
     private const val AMEX_PDF_DATE = "date"
@@ -1795,7 +1798,8 @@ object BuiltInCsvStrategies {
      * currency its `CURDEF` names, dated by day. Downloads overlap (a month's partial file and its full one), so the
      * FITID identifies a transaction across them. A payment into the card names no payer: a placeholder, which
      * reconciles against the paying bank's own record of it, as American Express's does. Barclaycard writes a foreign
-     * spend's original currency as words in the memo, not as OFX's `ORIGCURRENCY`, so it is kept as an attribute.
+     * spend's original amount and currency in the memo, the currency as words and followed by the country
+     * (`1234/8.10 EURO FRANCE`), not as OFX's `ORIGCURRENCY`: the currency resolves by its name (see `resolveAssetCode`).
      */
     fun buildBarclaycardOfxStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
@@ -1826,10 +1830,15 @@ object BuiltInCsvStrategies {
         val rules =
             listOf(
                 attribute(OfxColumns.COL_FITID, "barclaycard-fitid", unique = true),
-                attribute(
-                    OfxColumns.COL_MEMO,
-                    "barclaycard-foreign-spend",
-                    extraction = Extraction(pattern = BARCLAYCARD_FOREIGN_MEMO, outputTemplate = "$1"),
+                rule(
+                    RuleAction.Foreign(
+                        ForeignAmount(
+                            amount = ValueExpr(listOf(OfxColumns.COL_MEMO), Extraction(BARCLAYCARD_FOREIGN_MEMO, "$1")),
+                            currency = ValueExpr(listOf(OfxColumns.COL_MEMO), Extraction(BARCLAYCARD_FOREIGN_MEMO, "$2")),
+                        ),
+                    ),
+                    conditions = listOf(Condition(OfxColumns.COL_MEMO, ConditionOp.MATCHES, BARCLAYCARD_FOREIGN_MEMO)),
+                    name = "Foreign spend",
                 ),
                 // Negative = a purchase on the card; positive = a refund or a payment into it.
                 incomingWhenPositive(OfxColumns.COL_AMOUNT),

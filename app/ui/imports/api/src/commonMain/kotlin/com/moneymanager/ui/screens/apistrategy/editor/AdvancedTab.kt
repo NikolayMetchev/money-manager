@@ -150,7 +150,8 @@ internal fun AdvancedTab(
         Text(
             text =
                 "Suffixes stripped from a raw code before it is looked up as an asset (e.g. Kraken's " +
-                    "Earn holding \"XETH.F\" -> \"XETH\").",
+                    "Earn holding \"XETH.F\" -> \"XETH\"). A code no asset has is then read as an asset's name or alias, " +
+                    "so \"EURO FRANCE\" books EUR.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

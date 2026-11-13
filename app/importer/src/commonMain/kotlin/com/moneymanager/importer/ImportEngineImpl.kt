@@ -239,7 +239,7 @@ class ImportEngineImpl(
         // After the batch's currencies and crypto assets exist, as an alias names its asset by code.
         for (m in batch.assetAliasMutations) {
             when (m) {
-                is AssetAliasMutation.Set -> cryptoRepository.setAssetAlias(m.alias, m.assetCode, m.published)
+                is AssetAliasMutation.Set -> cryptoRepository.setAssetAlias(m.alias, m.assetCode, m.publisher)
                 is AssetAliasMutation.Remove -> cryptoRepository.removeAssetAlias(m.alias)
             }
         }

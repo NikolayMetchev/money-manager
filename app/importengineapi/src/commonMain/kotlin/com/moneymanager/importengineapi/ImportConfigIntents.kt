@@ -1,6 +1,7 @@
 package com.moneymanager.importengineapi
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AliasPublisher
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CsvImportId
@@ -53,7 +54,7 @@ sealed interface AssetAliasMutation {
     data class Set(
         val alias: String,
         val assetCode: String,
-        val published: Boolean = false,
+        val publisher: AliasPublisher = AliasPublisher.PERSON,
     ) : AssetAliasMutation
 
     data class Remove(

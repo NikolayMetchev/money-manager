@@ -4,6 +4,7 @@ import app.cash.sqldelight.async.coroutines.awaitAsOne
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
+import com.moneymanager.domain.model.AliasPublisher
 import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CryptoRegistry
@@ -78,7 +79,7 @@ class CryptoWriteRepositoryImpl(
     override suspend fun setAssetAlias(
         alias: String,
         assetCode: String,
-        published: Boolean,
+        publisher: AliasPublisher,
     ): Unit =
         withContext(Dispatchers.Default) {
             val aliasCode = alias.trim().uppercase()
@@ -87,7 +88,7 @@ class CryptoWriteRepositoryImpl(
             require(aliasCode != code) { "'$aliasCode' can't be an alias of itself" }
             val assetId =
                 requireNotNull(aliasSelectQueries.selectAssetIdByCode(code).awaitAsOneOrNull()) { "No asset has the code '$code'" }
-            aliasWriteQueries.upsert(aliasCode, assetId, if (published) 1L else 0L)
+            aliasWriteQueries.upsert(aliasCode, assetId, publisher.id)
         }
 
     override suspend fun removeAssetAlias(alias: String): Unit =

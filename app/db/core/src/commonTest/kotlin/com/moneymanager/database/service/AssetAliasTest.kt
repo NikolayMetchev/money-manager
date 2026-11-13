@@ -2,14 +2,17 @@ package com.moneymanager.database.service
 
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.database.json.AssetListExportCodec
+import com.moneymanager.database.json.CurrencyListExportCodec
 import com.moneymanager.database.json.StrategyArtifactCodec
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.AliasPublisher
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.AssetAlias
 import com.moneymanager.domain.model.AssetExportEntry
 import com.moneymanager.domain.model.AssetExportKind
 import com.moneymanager.domain.model.AssetListExport
 import com.moneymanager.domain.model.CryptoId
+import com.moneymanager.domain.model.CurrencyListExport
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.assetAliasMap
 import com.moneymanager.domain.strategy.StrategyFileNaming
@@ -21,6 +24,7 @@ import com.moneymanager.importengineapi.LocalCryptoKey
 import com.moneymanager.importengineapi.removeAssetAlias
 import com.moneymanager.importengineapi.setAssetAlias
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.testCurrencies
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -237,7 +241,7 @@ class AssetAliasTest : DbTest() {
             val own = repositories.assetExportService.toExport(version).assets
             assertEquals(listOf("LUNA", "OTHER"), own.map { it.code })
             assertEquals(setOf("MINE"), own.first().aliases)
-            assertTrue(aliases().single { it.alias == "LUNC" }.published)
+            assertEquals(AliasPublisher.CRYPTO_LIST, aliases().single { it.alias == "LUNC" }.publisher)
         }
 
     @Test
@@ -250,5 +254,31 @@ class AssetAliasTest : DbTest() {
             repositories.strategyLibrary.applyIncoming(key, json, emptyMap())
             assertEquals(before, aliases())
             assertEquals(catalogHash(cryptoList), localCryptoListHash())
+        }
+
+    @Test
+    fun `the currency list installs its names as aliases, which stay its own`() =
+        runDbTest {
+            val key = StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)
+            val list =
+                CurrencyListExport(
+                    name = StrategyFileNaming.CURRENCIES_NAME,
+                    currencies =
+                        testCurrencies.map { if (it.code == "GBP") it.copy(aliases = setOf("POUND STERLING")) else it },
+                )
+            val json = CurrencyListExportCodec.encode(list)
+            repositories.strategyLibrary.applyIncoming(key, json, emptyMap())
+            repositories.strategyLibrary.applyIncoming(key, json, emptyMap())
+
+            assertEquals(listOf(AssetAlias("POUND STERLING", "GBP", AliasPublisher.CURRENCY_LIST)), aliases())
+            val local = repositories.strategyLibrary.listLocal(version).first { it.key == key }
+            assertEquals(repositories.strategyLibrary.canonicalHash(key, json), local.contentHash)
+            assertTrue(
+                repositories.assetExportService
+                    .toExport(version)
+                    .assets
+                    .none { it.aliases.isNotEmpty() },
+            )
+            assertEquals(null, localCryptoListHash())
         }
 }

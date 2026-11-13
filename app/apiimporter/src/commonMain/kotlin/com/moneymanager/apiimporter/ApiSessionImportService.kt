@@ -29,8 +29,10 @@ import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
+import com.moneymanager.domain.model.codesByName
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
+import com.moneymanager.domain.model.resolveAssetCode
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.Condition
@@ -3122,8 +3124,13 @@ private class CurrencyCache(
 ) {
     private val mutex = Mutex()
     private var currenciesByCode: Map<String, Currency>? = null
+    private var codeByName: Map<String, String> = emptyMap()
 
-    suspend fun getCurrency(code: String): Currency? = loadCurrencies()[code.uppercase()]
+    // A code, else a currency's name, as a CSV row's is read (see [resolveAssetCode]).
+    suspend fun getCurrency(code: String): Currency? {
+        val currencies = loadCurrencies()
+        return currencies[resolveAssetCode(code.trim().uppercase(), emptyMap(), codeByName) { it in currencies }]
+    }
 
     private suspend fun loadCurrencies(): Map<String, Currency> =
         mutex.withLock {
@@ -3132,6 +3139,7 @@ private class CurrencyCache(
 
             currencyRepository.getAllCurrencies().first().associateBy { it.code.uppercase() }.also {
                 currenciesByCode = it
+                codeByName = codesByName(it.values.map { currency -> currency.code to currency.name })
             }
         }
 }

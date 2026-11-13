@@ -1,5 +1,6 @@
 package com.moneymanager.database.service
 
+import com.moneymanager.domain.model.AliasPublisher
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.AssetAlias
 import com.moneymanager.domain.model.AssetExportEntry
@@ -32,7 +33,7 @@ class AssetExportService(
             cryptoRepository
                 .getAssetAliases()
                 .first()
-                .filterNot { it.published }
+                .filter { it.publisher == AliasPublisher.PERSON }
                 .byAsset()
         val listedCurrencies = currencyRepository.getSystemCreatedCurrencies().first().mapTo(mutableSetOf()) { it.code }
         val listedCrypto = cryptoRepository.getSystemCreatedCryptoAssets().first().mapTo(mutableSetOf()) { it.code }
@@ -53,7 +54,7 @@ class AssetExportService(
             cryptoRepository
                 .getAssetAliases()
                 .first()
-                .filter { it.published }
+                .filter { it.publisher == AliasPublisher.CRYPTO_LIST }
                 .byAsset()
         val listedCrypto = cryptoRepository.getSystemCreatedCryptoAssets().first().mapTo(mutableSetOf()) { it.code }
         val entries =
@@ -90,15 +91,15 @@ class AssetExportService(
      * alias. Existing assets are never renamed or removed (transfers reference them), and an alias the file doesn't
      * list stays.
      */
-    suspend fun importAssets(export: AssetListExport) = apply(export, Source.Manual, published = false)
+    suspend fun importAssets(export: AssetListExport) = apply(export, Source.Manual, AliasPublisher.PERSON)
 
     /** Applies the catalog's crypto list: [importAssets], with what it adds marked as the list's. */
-    suspend fun installPublishedCryptoList(export: AssetListExport) = apply(export, Source.System, published = true)
+    suspend fun installPublishedCryptoList(export: AssetListExport) = apply(export, Source.System, AliasPublisher.CRYPTO_LIST)
 
     private suspend fun apply(
         export: AssetListExport,
         source: Source,
-        published: Boolean,
+        publisher: AliasPublisher,
     ) {
         val currencyCodes = currencyRepository.getAllCurrencies().first().mapTo(mutableSetOf()) { it.code }
         val cryptoCodes = cryptoRepository.getAllCryptoAssets().first().mapTo(mutableSetOf()) { it.code }
@@ -120,7 +121,7 @@ class AssetExportService(
                         ImportCryptoIntent(key = LocalCryptoKey(it.code), source = source, code = it.code, name = it.name)
                     },
                 assetAliasMutations =
-                    export.assets.flatMap { asset -> asset.aliases.map { AssetAliasMutation.Set(it, asset.code, published) } },
+                    export.assets.flatMap { asset -> asset.aliases.map { AssetAliasMutation.Set(it, asset.code, publisher) } },
             ),
         )
     }

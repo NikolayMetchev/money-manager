@@ -1,5 +1,6 @@
 package com.moneymanager.domain.repository.write
 
+import com.moneymanager.domain.model.AliasPublisher
 import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.Source
@@ -52,7 +53,7 @@ interface CryptoWriteRepository : CryptoReadRepository {
     suspend fun setAssetAlias(
         alias: String,
         assetCode: String,
-        published: Boolean = false,
+        publisher: AliasPublisher = AliasPublisher.PERSON,
     )
 
     suspend fun removeAssetAlias(alias: String)

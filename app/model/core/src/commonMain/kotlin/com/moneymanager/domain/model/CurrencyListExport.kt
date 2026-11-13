@@ -1,6 +1,7 @@
 package com.moneymanager.domain.model
 
 import com.moneymanager.domain.model.serialization.SortedByListSerializer
+import com.moneymanager.domain.model.serialization.SortedStringSetSerializer
 import kotlinx.serialization.Serializable
 
 /**
@@ -23,6 +24,9 @@ data class CurrencyExportEntry(
     val name: String,
     /** The ISO minor-unit width (2 for GBP, 0 for JPY), which native and the browser pad amounts to; null for none. */
     val fractionDigits: Int? = null,
+    /** Other names a statement writes the currency as (`POUND STERLING`), installed as its aliases; see `resolveAssetCode`. */
+    @Serializable(with = SortedStringSetSerializer::class)
+    val aliases: Set<String> = emptySet(),
 )
 
 object SortedCurrencyExportEntryListSerializer : SortedByListSerializer<CurrencyExportEntry>(

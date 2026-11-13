@@ -27,6 +27,7 @@ import com.moneymanager.domain.model.apistrategy.ApiValueSet
 import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.apistrategy.TransferDirection
+import com.moneymanager.domain.model.codesByName
 import com.moneymanager.domain.model.resolveAssetCode
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
@@ -875,15 +876,21 @@ suspend fun importApiSessionExchange(
         }
     }
 
-    val fiatByCode = currencyRepository.getAllCurrencies().first().associateBy { it.code.uppercase() }
-    val existingCryptoCodes = cryptoRepository.getAllCryptoAssets().first().mapTo(mutableSetOf()) { it.code.uppercase() }
+    val fiat = currencyRepository.getAllCurrencies().first()
+    val existingCrypto = cryptoRepository.getAllCryptoAssets().first()
+    val fiatByCode = fiat.associateBy { it.code.uppercase() }
+    val existingCryptoCodes = existingCrypto.mapTo(mutableSetOf()) { it.code.uppercase() }
+    val assetCodeByName = codesByName(fiat.map { it.code to it.name } + existingCrypto.map { it.code to it.name })
     val assetAliases = cryptoRepository.assetAliasMap()
 
     // Normalize provider-specific asset codes before any currency/crypto lookup — strip a sub-holding
     // suffix (Kraken Earn "XETH.F" -> "XETH"), then resolve aliases ("XXBT" -> "BTC") — so every
     // form of one asset resolves to it instead of failing resolution and silently dropping the item.
     fun canonicalAsset(code: String): String =
-        resolveAssetCode(strategy.config.assetCodes.canonical(code), assetAliases) { it in fiatByCode || it in existingCryptoCodes }
+        resolveAssetCode(strategy.config.assetCodes.canonical(code), assetAliases, assetCodeByName) {
+            it in fiatByCode ||
+                it in existingCryptoCodes
+        }
     val ledgerReconciled = reconcileTradesAgainstLedger(parsed.trades, parsed.ledgerTradeLegs, ::canonicalAsset)
     val trades = ledgerReconciled.trades
     // Enrichment endpoints (e.g. Kraken DepositStatus/WithdrawStatus) supply on-chain address/network/
