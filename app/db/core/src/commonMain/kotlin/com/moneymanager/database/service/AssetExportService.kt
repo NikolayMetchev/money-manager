@@ -104,6 +104,17 @@ class AssetExportService(
         val currencyCodes = currencyRepository.getAllCurrencies().first().mapTo(mutableSetOf()) { it.code }
         val cryptoCodes = cryptoRepository.getAllCryptoAssets().first().mapTo(mutableSetOf()) { it.code }
         val (currencies, cryptos) = export.assets.partition { it.kind == AssetExportKind.CURRENCY }
+        // A published list never takes over an alias someone else set (a person's own mapping in particular).
+        val othersAliases =
+            if (publisher == AliasPublisher.PERSON) {
+                emptySet()
+            } else {
+                cryptoRepository
+                    .getAssetAliases()
+                    .first()
+                    .filter { it.publisher != publisher }
+                    .mapTo(mutableSetOf()) { it.alias }
+            }
         importEngine.import(
             ImportBatch(
                 currencies =
@@ -121,7 +132,9 @@ class AssetExportService(
                         ImportCryptoIntent(key = LocalCryptoKey(it.code), source = source, code = it.code, name = it.name)
                     },
                 assetAliasMutations =
-                    export.assets.flatMap { asset -> asset.aliases.map { AssetAliasMutation.Set(it, asset.code, publisher) } },
+                    export.assets.flatMap { asset ->
+                        asset.aliases.filter { it !in othersAliases }.map { AssetAliasMutation.Set(it, asset.code, publisher) }
+                    },
             ),
         )
     }

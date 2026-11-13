@@ -281,4 +281,34 @@ class AssetAliasTest : DbTest() {
             )
             assertEquals(null, localCryptoListHash())
         }
+
+    @Test
+    fun `installing the currency list keeps an alias of that name a person set`() =
+        runDbTest {
+            repositories.importEngine.setAssetAlias("POUND STERLING", "EUR")
+            val key = StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)
+            val list =
+                CurrencyListExport(
+                    name = StrategyFileNaming.CURRENCIES_NAME,
+                    currencies =
+                        testCurrencies.map { if (it.code == "GBP") it.copy(aliases = setOf("POUND STERLING")) else it },
+                )
+            repositories.strategyLibrary.applyIncoming(key, CurrencyListExportCodec.encode(list), emptyMap())
+
+            assertEquals(listOf(AssetAlias("POUND STERLING", "EUR", AliasPublisher.PERSON)), aliases())
+        }
+
+    @Test
+    fun `installing the crypto list keeps an alias of that name a person set`() =
+        runDbTest {
+            createCrypto("OTHER")
+            repositories.importEngine.setAssetAlias("LUNC", "OTHER")
+            repositories.strategyLibrary.applyIncoming(
+                StrategyKey(StrategyKind.CRYPTO_ASSETS, StrategyFileNaming.CRYPTO_ASSETS_NAME),
+                AssetListExportCodec.encode(cryptoList),
+                emptyMap(),
+            )
+
+            assertEquals(AssetAlias("LUNC", "OTHER", AliasPublisher.PERSON), aliases().single { it.alias == "LUNC" })
+        }
 }

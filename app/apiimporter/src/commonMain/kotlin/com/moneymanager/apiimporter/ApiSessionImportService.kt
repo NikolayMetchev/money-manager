@@ -649,6 +649,8 @@ suspend fun importApiSessionTransactions(
     importEngine: ImportEngine,
     counterpartyAccountNames: Map<String, String> = emptyMap(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
+    // The database's asset aliases, so a currency the feed writes as an alias (`POUND STERLING`) resolves.
+    assetAliases: Map<String, String> = emptyMap(),
     onProgress: suspend (Progress) -> Unit = {},
 ): ApiSessionImportResult {
     val setup =
@@ -659,6 +661,7 @@ suspend fun importApiSessionTransactions(
             accountsSessionId = accountsSessionId,
             strategy = strategy,
             importEngine = importEngine,
+            assetAliases = assetAliases,
             onProgress = onProgress,
             passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
         )
@@ -765,6 +768,7 @@ private suspend fun setupImportSession(
     accountsSessionId: ApiSessionId?,
     strategy: ApiImportStrategy,
     importEngine: ImportEngine,
+    assetAliases: Map<String, String>,
     onProgress: suspend (Progress) -> Unit,
     passThroughDetector: PassThroughDetector? = null,
 ): ImportSetup {
@@ -815,7 +819,7 @@ private suspend fun setupImportSession(
     val accountsById = enrichAccountsWithIdentifiers(parsedAccountsById, strategy, identifierResponsePairs)
     val transactionResponses = responses.filter { requestsById[it.requestId]?.resolveAccountExternalId(strategy) != null }
 
-    val currencyCache = CurrencyCache(currencyRepository)
+    val currencyCache = CurrencyCache(currencyRepository, assetAliases)
     val attributeTypeCache = AttributeTypeCache(importEngine)
     val transactionRules = strategy.config.bankFeedMappings().rules
     val counterpartyIdField = strategy.config.bankFeedMappings().counterpartyIdField
@@ -3121,6 +3125,7 @@ private fun firstLastName(fullName: String): String {
 
 private class CurrencyCache(
     private val currencyRepository: CurrencyReadRepository,
+    private val assetAliases: Map<String, String>,
 ) {
     private val mutex = Mutex()
     private var currenciesByCode: Map<String, Currency>? = null
@@ -3129,7 +3134,7 @@ private class CurrencyCache(
     // A code, else a currency's name, as a CSV row's is read (see [resolveAssetCode]).
     suspend fun getCurrency(code: String): Currency? {
         val currencies = loadCurrencies()
-        return currencies[resolveAssetCode(code.trim().uppercase(), emptyMap(), codeByName) { it in currencies }]
+        return currencies[resolveAssetCode(code.trim().uppercase(), assetAliases, codeByName) { it in currencies }]
     }
 
     private suspend fun loadCurrencies(): Map<String, Currency> =

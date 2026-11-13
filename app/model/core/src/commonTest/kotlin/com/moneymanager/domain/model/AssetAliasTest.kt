@@ -63,6 +63,7 @@ class AssetAliasTest {
     @Test
     fun `a name only an alias knows resolves through the alias`() {
         assertEquals("GBP", resolveName("POUND STERLING GREAT BRITAIN", aliases = mapOf("POUND STERLING" to "GBP")))
+        assertEquals("GBP", resolveName("POUND  STERLING", aliases = mapOf("POUND STERLING" to "GBP")))
     }
 
     @Test

@@ -45,7 +45,8 @@ fun resolveAssetCode(
     resolveKnownCode(code, aliases, isAsset)?.let { return it }
     if (CryptoRegistry.lookup(code) != null) return code
     val words = code.trim().split(WHITESPACE)
-    codeByName[words.joinToString(" ")]?.let { return it }
+    val whole = words.joinToString(" ")
+    (resolveKnownCode(whole, aliases, isAsset) ?: codeByName[whole])?.let { return it }
     for (count in words.size - 1 downTo 1) {
         val leading = words.subList(0, count).joinToString(" ")
         (resolveKnownCode(leading, aliases, isAsset) ?: codeByName[leading])?.let { return it }

@@ -241,11 +241,12 @@ class StrategyLibraryService(
                 .toSet()
         val listed = CurrencyListExportCodec.decode(json).currencies
         val missing = listed.filter { it.code !in existing }
-        val held = cryptoRepository.getAssetAliases().first().toSet()
+        // An alias a person or the crypto list set stays theirs: the list only adds the names nobody has taken.
+        val taken = cryptoRepository.getAssetAliases().first().mapTo(mutableSetOf()) { it.alias }
         val aliases =
             listed
                 .flatMap { entry -> entry.aliases.map { AssetAlias(it, entry.code, AliasPublisher.CURRENCY_LIST) } }
-                .filter { it !in held }
+                .filter { it.alias !in taken }
                 .map { AssetAliasMutation.Set(it.alias, it.assetCode, it.publisher) }
         if (missing.isEmpty() && aliases.isEmpty()) return
         importEngine.import(
