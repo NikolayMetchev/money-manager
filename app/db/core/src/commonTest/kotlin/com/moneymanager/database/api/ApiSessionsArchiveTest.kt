@@ -2,6 +2,7 @@ package com.moneymanager.database.api
 
 import com.moneymanager.apiimporter.ApiSessionsArchive
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,7 +36,14 @@ class ApiSessionsArchiveTest : DbTest() {
             assertEquals(1, again.sessionsAlreadyPresent)
 
             sessions.deleteSession(sessionId)
-            val restored = ApiSessionsArchive.import(exported, deviceId, sessions, strategies, repositories.importEngine)
+            val progress = mutableListOf<Progress>()
+            val restored =
+                ApiSessionsArchive.import(exported, deviceId, sessions, strategies, repositories.importEngine) { progress += it }
+            // Counted over the requests written, so the bar fills as each one lands.
+            assertEquals(listOf(null, 0, 1, 2), progress.map { it.processed })
+            assertEquals(2, progress.last().total)
+            assertEquals(1f, progress.last().fraction)
+            assertEquals("Restoring Monzo session 1 of 1", progress.last().detail)
             assertEquals(1, restored.sessionsImported)
             assertTrue(restored.missingStrategies.isEmpty())
 

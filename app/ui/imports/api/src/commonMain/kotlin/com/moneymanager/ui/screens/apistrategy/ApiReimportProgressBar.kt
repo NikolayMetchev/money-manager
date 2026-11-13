@@ -13,9 +13,10 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.tasks.Progress
 
 /**
- * The phase text plus bar shown while an API re-import runs. Shared by the single-session and
- * bulk dialogs so both read the same, and determinate whenever the run knows its fraction —
- * a re-import is long enough that a spinner alone leaves the user guessing.
+ * The phase text plus bar shown while an API re-import or a sessions-archive import runs. Shared by the
+ * single-session and bulk re-import dialogs and the API Sessions header so all read the same, and
+ * determinate whenever the run knows its fraction: these runs are long enough that a spinner alone leaves
+ * the user guessing.
  */
 @Composable
 internal fun ApiReimportProgress(

@@ -327,16 +327,24 @@ fun ApiSessionsScreen(
             mimeTypes = listOf("application/json"),
             onResult = { result ->
                 if (result != null) {
-                    scope.launch {
-                        archiveMessage =
+                    archiveMessage = null
+                    taskManager.start(
+                        key = API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY,
+                        title = "Import API sessions",
+                        initialDetail = "Reading the file",
+                    ) {
+                        val summary =
                             ApiSessionsArchive.importAndDescribe(
                                 result.content,
                                 deviceId,
                                 apiSessionRepository,
                                 apiImportStrategyRepository,
                                 importEngine,
+                                onProgress = { report(it) },
                             )
+                        archiveMessage = summary
                         refresh()
+                        summary
                     }
                 }
             },
@@ -369,13 +377,21 @@ fun ApiSessionsScreen(
                             .onFailure { archiveMessage = "Failed to export API sessions: ${it.message}" }
                     }
                 }) { Text("Export") }
-                TextButton(onClick = { importPicker.launch() }) { Text("Import") }
+                TextButton(
+                    onClick = { importPicker.launch() },
+                    enabled = !tasks.isRunning(API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY),
+                ) { Text("Import") }
                 TextButton(onClick = onApiStrategiesClick) { Text("Strategies") }
                 TextButton(onClick = onAddCredentialClick) { Text("+ Connect") }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        tasks.runningProgress(API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY)?.let {
+            ApiReimportProgress(it)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
         archiveMessage?.let {
             Text(text = it, style = MaterialTheme.typography.bodyMedium)
@@ -1895,6 +1911,8 @@ private fun StrategyFilterDropdown(
 }
 
 private const val ALL_STRATEGIES_LABEL = "All strategies"
+
+private const val API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY = "api-sessions-archive-import"
 
 private fun List<TaskState>.runningProgress(key: String): Progress? = firstOrNull { it.key == key && it.isRunning }?.progress
 
