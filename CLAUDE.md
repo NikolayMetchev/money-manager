@@ -582,9 +582,11 @@ resolve, as sub-tabs: External Account Reconciliation (the sources above), Manua
 `ManualEntry` rule action: records waiting for an amount a person types), and Card Last-4. Card Last-4 lists the funding references imports carry
 (`findFundingReferences`): values in any CSV strategy's `fundingAttributeMatch` column, unassigned ones (that the
 attribute type doesn't resolve) first, then each assigned one with its owner. Picking an account only marks a card
-changed; **Apply** saves every change in one write (`assignFundingReferences`: each value joins its account's token
-set, `addAttributeToken`, so an account can own several cards, and a card picked wrongly leaves its old owner), then
-re-imports the files that reference any changed card, each once. It runs as a `TaskManager` task, shown with the
+changed; **Apply** plans the moves (`planFundingReferenceMoves`: each value joins its account's token set,
+`addAttributeToken`, so an account can own several cards, and a card picked wrongly leaves its old owner), matches every
+card the imports carry against the planned values, and refuses a move whose card wouldn't end up owned by its account
+alone (a pattern on the old owner still matching it). It then saves every change in one write and re-imports the files
+of every card whose owner changed (a token can match other cards too, `7721` in `CARD-7721`), each once. It runs as a `TaskManager` task, shown with the
 re-import dialog's progress indicators. A card an account
 matches only by a pattern is changed in the account editor.
 

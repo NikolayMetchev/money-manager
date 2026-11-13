@@ -48,8 +48,11 @@ class AttributeAccountMatcher private constructor(
         /** Splits an attribute value into its individual pattern tokens (whitespace/comma-separated). */
         private val TOKEN_DELIMITER = Regex("[\\s,]+")
 
-        fun from(attributes: List<AccountAttribute>): AttributeAccountMatcher {
-            val tokens = attributes.map { attribute -> attribute.accountId to attributeTokens(attribute.value) }
+        fun from(attributes: List<AccountAttribute>): AttributeAccountMatcher = of(attributes.map { it.accountId to it.value })
+
+        /** A matcher over attribute [values] (each account with one attribute value), as [from] reads them from attributes. */
+        fun of(values: List<Pair<AccountId, String>>): AttributeAccountMatcher {
+            val tokens = values.map { (accountId, value) -> accountId to attributeTokens(value) }
             return AttributeAccountMatcher(
                 tokens.flatMap { (accountId, values) -> values.map { compileToken(it) to accountId } },
                 tokens.groupBy({ it.first }, { it.second }).mapValues { (_, lists) -> lists.flatten().toSet() },

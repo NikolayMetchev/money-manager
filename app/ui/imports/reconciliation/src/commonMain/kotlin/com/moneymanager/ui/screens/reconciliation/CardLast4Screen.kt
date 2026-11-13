@@ -38,8 +38,9 @@ import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.FundingReference
 import com.moneymanager.csvimporter.FundingReferenceFile
-import com.moneymanager.csvimporter.assignFundingReferences
+import com.moneymanager.csvimporter.applyFundingReferenceMoves
 import com.moneymanager.csvimporter.findFundingReferences
+import com.moneymanager.csvimporter.planFundingReferenceMoves
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
@@ -152,10 +153,12 @@ fun CardLast4Screen(
         val id =
             taskManager.start(CARD_ASSIGNMENT_TASK_KEY, title, "Planning the re-import") {
                 try {
-                    // Planned first: a refusal must leave every card where it was, so it can be retried.
-                    val reimport = prepareReimport(changes.keys.flatMap { it.imports }.distinct(), ::report)
+                    // Planned first: a refusal must leave every card where it was, so it can be retried. Every card whose
+                    // owner the moves change is re-imported, not just the picked ones: a token can match other cards too.
+                    val moves = planFundingReferenceMoves(changes, references.orEmpty(), accountAttributeRepository)
+                    val reimport = prepareReimport(moves.affected.flatMap { it.imports }.distinct(), ::report)
                     report("Saving the cards")
-                    importEngine.assignFundingReferences(changes, accountAttributeRepository)
+                    importEngine.applyFundingReferenceMoves(moves)
                     val result = reimport()
                     if (result.filesFailed > 0) {
                         reportIssue("${result.filesFailed} file(s) failed to re-import; retry them from their import screen")

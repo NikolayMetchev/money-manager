@@ -4,9 +4,10 @@ import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.BulkReimportResult
-import com.moneymanager.csvimporter.assignFundingReferences
+import com.moneymanager.csvimporter.applyFundingReferenceMoves
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.csvimporter.findFundingReferences
+import com.moneymanager.csvimporter.planFundingReferenceMoves
 import com.moneymanager.database.assertBulkProgress
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AttributeTypeId
@@ -570,15 +571,17 @@ class CurveCsvE2ETest : DbTest() {
 
     /** What Card Last-4's Apply does: moves each card to its account, then re-imports the files that reference any of them, once. */
     private suspend fun assignCards(vararg assignments: Pair<String, String>): BulkReimportResult {
-        val changes = assignments.associate { (value, accountName) -> funding(value) to accountId(accountName) }
+        val observed = fundingReferences()
+        val changes = assignments.associate { (value, accountName) -> observed.single { it.value == value } to accountId(accountName) }
+        val moves = planFundingReferenceMoves(changes, observed, repositories.accountAttributeRepository)
         val reimports = repositories.reimports(maintenance)
         val files =
-            changes.keys
+            moves.affected
                 .flatMap { it.imports }
                 .distinct()
                 .map { repositories.csvImportRepository.getImport(it).first()!! }
         val reimport = reimports.prepareAll(files, onProgress = {})
-        repositories.importEngine.assignFundingReferences(changes, repositories.accountAttributeRepository)
+        repositories.importEngine.applyFundingReferenceMoves(moves)
         return reimport()
     }
 
