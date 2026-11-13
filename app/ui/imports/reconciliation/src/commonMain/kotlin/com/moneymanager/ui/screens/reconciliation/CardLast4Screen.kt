@@ -154,7 +154,7 @@ fun CardLast4Screen(
                 try {
                     // Planned first: a refusal must leave every card where it was, so it can be retried.
                     val reimport = prepareReimport(changes.keys.flatMap { it.imports }.distinct(), ::report)
-                    report("Saving the cards", null)
+                    report("Saving the cards")
                     importEngine.assignFundingReferences(changes, accountAttributeRepository)
                     val result = reimport()
                     if (result.filesFailed > 0) {

@@ -284,23 +284,14 @@ fun ImportsScreen(
                                 val reimports = importDirectoryService.reimports
                                 val files =
                                     ids.mapNotNull { id -> csvImportRepository.getImport(id).first() }
-                                // The files keep the account and currency they were imported with.
                                 val directories =
                                     resolveImportDirectories(
                                         importDirectoryRepository.csvImportDirectories().first(),
                                         importDirectoryRepository.getAllDirectories().first(),
                                     )
-                                val plan = reimports.planAll(files, onProgress)
-                                reimports.checkReimportable(plan, accountId = null, currencyId = null)
+                                val reimport = reimports.prepareAll(files, onProgress) { stagedImportPath(it, directories) }
                                 val run: suspend () -> BulkReimportResult = {
-                                    reimports
-                                        .reimportAll(
-                                            plan,
-                                            accountId = null,
-                                            currencyId = null,
-                                            onProgress = onProgress,
-                                            fileLabel = { stagedImportPath(it, directories) },
-                                        ).also { if (it.transfersCreated > 0) onTransactionsImported() }
+                                    reimport().also { if (it.transfersCreated > 0) onTransactionsImported() }
                                 }
                                 run
                             },

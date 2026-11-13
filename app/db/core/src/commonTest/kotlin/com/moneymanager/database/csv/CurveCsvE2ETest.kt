@@ -577,9 +577,9 @@ class CurveCsvE2ETest : DbTest() {
                 .flatMap { it.imports }
                 .distinct()
                 .map { repositories.csvImportRepository.getImport(it).first()!! }
-        val plan = reimports.planAll(files)
+        val reimport = reimports.prepareAll(files, onProgress = {})
         repositories.importEngine.assignFundingReferences(changes, repositories.accountAttributeRepository)
-        return reimports.reimportAll(plan, accountId = null, currencyId = null, onProgress = {})
+        return reimport()
     }
 
     @Test

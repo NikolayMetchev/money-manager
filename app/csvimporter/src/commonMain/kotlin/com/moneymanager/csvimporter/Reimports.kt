@@ -208,6 +208,21 @@ class Reimports(
     ): BulkReimportResult = writeLock.withLock { reimportAllLocked(plan, accountId, currencyId, onProgress, fileLabel, stopRequested) }
 
     /**
+     * Plans [files]' re-import ([planAll]) and refuses it now if any file can't be imported again ([checkReimportable]),
+     * so a caller's own write can sit between the two and is never made for a re-import that would be refused. Returns
+     * the run: [reimportAll] of the plan, each file keeping the account and currency it was imported with.
+     */
+    suspend fun prepareAll(
+        files: List<CsvImport>,
+        onProgress: suspend (Progress) -> Unit,
+        fileLabel: (CsvImport) -> String = { it.originalFileName },
+    ): suspend () -> BulkReimportResult {
+        val plan = planAll(files, onProgress)
+        checkReimportable(plan, accountId = null, currencyId = null)
+        return { reimportAll(plan, accountId = null, currencyId = null, onProgress = onProgress, fileLabel = fileLabel) }
+    }
+
+    /**
      * Throws [RerunBlockedException] when some file of [plan] would be deleted but can't be imported again. [reimportAll]
      * checks this itself; a caller with its own write to make first checks beforehand, so a refusal leaves that undone too.
      */
