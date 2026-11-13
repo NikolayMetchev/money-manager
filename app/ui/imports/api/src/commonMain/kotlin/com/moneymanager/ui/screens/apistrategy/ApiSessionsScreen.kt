@@ -62,6 +62,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneymanager.apiimport.API_DOWNLOAD_IMPORT_ALL_TASK_KEY
+import com.moneymanager.apiimport.API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY
 import com.moneymanager.apiimport.ApiImportListener
 import com.moneymanager.apiimport.ApiImportService
 import com.moneymanager.apiimport.apiDownloadTaskKey
@@ -70,6 +71,7 @@ import com.moneymanager.apiimport.displaySummary
 import com.moneymanager.apiimport.filterCredentialsByStrategy
 import com.moneymanager.apiimport.sessionImportedAtCurrentRevision
 import com.moneymanager.apiimport.splitSessionsByImportState
+import com.moneymanager.apiimport.startApiSessionsArchiveImport
 import com.moneymanager.apiimport.storeNewSigningKey
 import com.moneymanager.apiimporter.ApiCounterpartySuggestion
 import com.moneymanager.apiimporter.ApiImportReads
@@ -328,23 +330,15 @@ fun ApiSessionsScreen(
             onResult = { result ->
                 if (result != null) {
                     archiveMessage = null
-                    taskManager.start(
-                        key = API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY,
-                        title = "Import API sessions",
-                        initialDetail = "Reading the file",
-                    ) {
-                        val summary =
-                            ApiSessionsArchive.importAndDescribe(
-                                result.content,
-                                deviceId,
-                                apiSessionRepository,
-                                apiImportStrategyRepository,
-                                importEngine,
-                                onProgress = { report(it) },
-                            )
+                    taskManager.startApiSessionsArchiveImport(
+                        result.content,
+                        deviceId,
+                        apiSessionRepository,
+                        apiImportStrategyRepository,
+                        importEngine,
+                    ) { summary ->
                         archiveMessage = summary
                         refresh()
-                        summary
                     }
                 }
             },
@@ -1911,8 +1905,6 @@ private fun StrategyFilterDropdown(
 }
 
 private const val ALL_STRATEGIES_LABEL = "All strategies"
-
-private const val API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY = "api-sessions-archive-import"
 
 private fun List<TaskState>.runningProgress(key: String): Progress? = firstOrNull { it.key == key && it.isRunning }?.progress
 
