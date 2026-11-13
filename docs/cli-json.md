@@ -169,7 +169,7 @@ sharing a baseline form a line, and columns stay two or more spaces apart. A fil
 ### `import dirs [--dir NAME]… [--download-only] [--redownload]`, `import apis [--strategy NAME]… [--force-full] [--download-only]`, `import all [--force-full] [--download-only]`
 
 These commands download and import. `import dirs` downloads every included import directory (local and Google
-Drive), or only the `--dir` folders and their subfolders, and then imports every new CSV and QIF file.
+Drive), or only the `--dir` folders and their subfolders, and then imports every new CSV, QIF and OFX file.
 `--redownload` first re-stages the files that are already staged. `import apis` makes sure every installed API
 strategy with secrets in the vault has a connection, downloads every connection in parallel (or only the
 `--strategy` ones), and imports the new sessions. `import all` runs both at once. Live progress goes to stderr,
@@ -190,7 +190,7 @@ and the materialized views are refreshed once at the end.
 - `foldersCreated`: how many subfolders were discovered and added as directories.
 - `redownload`, with `--redownload` only: `{ replaced, unchanged, blocked, reimportSuggested, failures }`, each a
   list of file names.
-- `files`: `[{ id, file, format: "csv" | "qif", status, strategy, transfers, duplicates, error }]`. `status` is
+- `files`: `[{ id, file, format: "csv" | "qif" | "ofx", status, strategy, transfers, duplicates, error }]`. `status` is
   `imported`, `nothingToImport`, `skipped` or `failed`. `error` is present only when the file failed.
 - `failures`: folders that couldn't be downloaded or searched at all.
 

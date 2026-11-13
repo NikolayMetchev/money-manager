@@ -146,7 +146,7 @@ fun ImportFilesScreen(
                     val outcome =
                         importPickedFiles(results, fileName = { it.fileName }) { result ->
                             val kind =
-                                requireNotNull(importFileKind(result.fileName)) { "not a CSV, QIF, Excel or PDF file" }
+                                requireNotNull(importFileKind(result.fileName)) { "not a CSV, QIF, OFX, Excel or PDF file" }
                             val checksum = importFileChecksum(kind, result.bytes)
                             if (csvImportRepository.findImportsByChecksum(checksum).isNotEmpty()) {
                                 return@importPickedFiles false
@@ -323,7 +323,7 @@ fun ImportFilesScreen(
                     if (imports.isEmpty()) {
                         item(key = "no-files") {
                             Text(
-                                "No files yet. Click '+ Import files' to add CSV, QIF, Excel or PDF files" +
+                                "No files yet. Click '+ Import files' to add CSV, QIF, OFX, Excel or PDF files" +
                                     if (directories != null) ", or download a directory." else ".",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -361,6 +361,7 @@ private val IMPORT_FILE_MIME_TYPES =
         "text/plain",
         "application/qif",
         "application/x-qif",
+        "application/x-ofx",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/pdf",
         "application/octet-stream",

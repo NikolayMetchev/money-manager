@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
  * and the date-range lines on the CSV and API import screens.
  */
 interface ImportTimelineReadRepository {
-    /** One entry per staged import (CSV, QIF, Excel or PDF) that produced transactions. */
+    /** One entry per staged import (CSV, QIF, OFX, Excel or PDF) that produced transactions. */
     fun getCsvImportDateRanges(): Flow<List<ImportFileDateRange>>
 
     /** One entry per API session that produced transactions. */

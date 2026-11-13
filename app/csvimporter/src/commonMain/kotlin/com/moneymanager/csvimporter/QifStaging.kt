@@ -2,9 +2,9 @@ package com.moneymanager.csvimporter
 
 import com.moneymanager.csv.CsvParseResult
 import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.createCsvImport
 import com.moneymanager.qif.QifParser
 import com.moneymanager.qif.QifRecord
 import kotlin.time.Instant
@@ -52,22 +52,10 @@ private fun QifRecord.row(
         accountName.orEmpty(),
     )
 
-/**
- * Stages the QIF text [content] as a CSV import of its rows ([parseQifAsCsv]): the one way a QIF file is staged,
- * from an import folder or a picked file. From then on it is a CSV import like any other.
- */
+/** Stages the QIF text [content] ([stageDocumentImport]). */
 suspend fun ImportEngine.stageQifImport(
     fileName: String,
     content: String,
     fileChecksum: String,
     fileLastModified: Instant,
-): CsvImportId {
-    val parsed = parseQifAsCsv(content)
-    return createCsvImport(
-        fileName = fileName,
-        headers = parsed.headers,
-        rows = parsed.rows,
-        fileChecksum = fileChecksum,
-        fileLastModified = fileLastModified,
-    )
-}
+): CsvImportId = stageDocumentImport(ImportFileKind.QIF, fileName, content.encodeToByteArray(), fileChecksum, fileLastModified)

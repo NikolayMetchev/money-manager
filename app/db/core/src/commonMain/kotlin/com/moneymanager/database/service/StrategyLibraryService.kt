@@ -128,7 +128,7 @@ class StrategyLibraryService(
         json: String,
     ): StrategyParseResult =
         when (key.kind) {
-            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.XLSX, StrategyKind.PDF -> {
+            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.OFX, StrategyKind.XLSX, StrategyKind.PDF -> {
                 val export = CsvStrategyExportCodec.decode(json)
                 val refs = csvStrategyExportService.parseExport(export).unresolvedReferences
                 StrategyParseResult(key, refs)
@@ -170,14 +170,41 @@ class StrategyLibraryService(
         resolutions: Map<CsvUnresolvedReference, CsvResolution>,
     ) {
         when (key.kind) {
-            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.XLSX, StrategyKind.PDF -> applyCsv(key.name, json, resolutions)
-            StrategyKind.API -> applyApi(key.name, json)
-            StrategyKind.PASS_THROUGH -> applyPassThrough(key.name, json)
-            StrategyKind.GLOBAL_MAPPINGS -> applyGlobalMappings(json, resolutions)
-            StrategyKind.CURRENCIES -> applyCurrencies(json)
-            StrategyKind.HOLIDAY_CALENDAR -> applyHolidayCalendar(key.name, json)
-            StrategyKind.ASSETS -> assetExportService.importAssets(AssetListExportCodec.decode(json))
-            StrategyKind.CRYPTO_ASSETS -> assetExportService.installPublishedCryptoList(AssetListExportCodec.decode(json))
+            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.OFX, StrategyKind.XLSX, StrategyKind.PDF -> {
+                applyCsv(
+                    key.name,
+                    json,
+                    resolutions,
+                )
+            }
+
+            StrategyKind.API -> {
+                applyApi(key.name, json)
+            }
+
+            StrategyKind.PASS_THROUGH -> {
+                applyPassThrough(key.name, json)
+            }
+
+            StrategyKind.GLOBAL_MAPPINGS -> {
+                applyGlobalMappings(json, resolutions)
+            }
+
+            StrategyKind.CURRENCIES -> {
+                applyCurrencies(json)
+            }
+
+            StrategyKind.HOLIDAY_CALENDAR -> {
+                applyHolidayCalendar(key.name, json)
+            }
+
+            StrategyKind.ASSETS -> {
+                assetExportService.importAssets(AssetListExportCodec.decode(json))
+            }
+
+            StrategyKind.CRYPTO_ASSETS -> {
+                assetExportService.installPublishedCryptoList(AssetListExportCodec.decode(json))
+            }
         }
     }
 

@@ -119,11 +119,19 @@ fun DeleteCsvStrategyDialog(
 }
 
 /** The kind of staged file a strategy reads, and so the sample files its editor offers. */
-enum class SampleFileKind { CSV, PDF, QIF }
+enum class SampleFileKind { CSV, PDF, QIF, OFX }
+
+/** The sample files a strategy reading [documentKind] (QIF or OFX) is edited against; null for any other strategy. */
+fun sampleFileKindOf(documentKind: ImportFileKind?): SampleFileKind? =
+    when (documentKind) {
+        ImportFileKind.QIF -> SampleFileKind.QIF
+        ImportFileKind.OFX -> SampleFileKind.OFX
+        ImportFileKind.CSV, ImportFileKind.XLSX, ImportFileKind.PDF, null -> null
+    }
 
 /**
  * Dialog for selecting a staged import to use as sample data when editing a strategy: a PDF strategy reads PDF
- * imports, a QIF strategy (over the fixed QIF columns) QIF files, and any other strategy every other import.
+ * imports, a QIF or OFX strategy (over the format's fixed columns) files of that format, and any other strategy every other import.
  */
 @Composable
 fun SelectCsvImportDialog(
@@ -141,8 +149,7 @@ fun SelectCsvImportDialog(
         allImports.filter {
             when {
                 it.id in pdfImportIds -> SampleFileKind.PDF
-                importFileKind(it.originalFileName) == ImportFileKind.QIF -> SampleFileKind.QIF
-                else -> SampleFileKind.CSV
+                else -> sampleFileKindOf(importFileKind(it.originalFileName)) ?: SampleFileKind.CSV
             } == kind
         }
 

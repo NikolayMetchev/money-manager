@@ -33,7 +33,7 @@ sealed interface Source {
     data object Reconciliation : Source
 
     /**
-     * Created during a CSV import (a QIF, Excel or PDF file is staged as one too); [rowIndex] is the originating row when
+     * Created during a CSV import (a QIF, OFX, Excel or PDF file is staged as one too); [rowIndex] is the originating row when
      * known. [statementAccountId] is the account whose statement the row is (see [Source.statementAccountId]), which the
      * engine sets from the transfer's `statementAccount`.
      */

@@ -4,7 +4,7 @@ import com.moneymanager.domain.model.AccountId
 import kotlin.time.Instant
 
 enum class TimelineSourceKind {
-    /** A staged file: CSV, QIF, Excel or PDF. */
+    /** A staged file: CSV, QIF, OFX, Excel or PDF. */
     CSV,
     API,
     MANUAL,

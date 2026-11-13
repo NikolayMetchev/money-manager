@@ -372,6 +372,7 @@ private val kindFilterChips =
     listOf(
         StrategyKind.CSV to "CSV",
         StrategyKind.QIF to "QIF",
+        StrategyKind.OFX to "OFX",
         StrategyKind.XLSX to "Excel",
         StrategyKind.PDF to "PDF",
         StrategyKind.API to "API",
@@ -385,6 +386,7 @@ private fun StrategyKind.displayName(): String =
     when (this) {
         StrategyKind.CSV -> "CSV import strategy"
         StrategyKind.QIF -> "QIF import strategy"
+        StrategyKind.OFX -> "OFX import strategy"
         StrategyKind.XLSX -> "Excel import strategy"
         StrategyKind.PDF -> "PDF import strategy"
         StrategyKind.API -> "API import strategy"

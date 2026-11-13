@@ -5,7 +5,6 @@ import com.moneymanager.csv.CsvParseResult
 import com.moneymanager.csv.CsvParser
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.ImportDirectoryId
-import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.CsvRowLink
@@ -192,13 +191,7 @@ private suspend fun prepareFromSource(
             else -> {
                 val content = bytes.decodeToString()
                 val rows =
-                    if (importFileKind(staged.originalFileName) ==
-                        ImportFileKind.QIF
-                    ) {
-                        parseQifAsCsv(content)
-                    } else {
-                        parseStagedCsv(content)
-                    }
+                    importFileKind(staged.originalFileName)?.let { parseDocumentAsCsv(it, bytes) } ?: parseStagedCsv(content)
                 rows to sha256Hex(content)
             }
         }

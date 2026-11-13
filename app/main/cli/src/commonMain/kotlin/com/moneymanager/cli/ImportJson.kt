@@ -8,7 +8,6 @@ import com.moneymanager.apiimport.ApiSessionImportStatus
 import com.moneymanager.csvimporter.BulkFileOutcome
 import com.moneymanager.csvimporter.BulkFileStatus
 import com.moneymanager.csvimporter.DirectoryRedownloadResult
-import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.importdirectory.ImportAllResult
 import kotlinx.serialization.Serializable
@@ -160,12 +159,12 @@ internal fun ImportAllResult.toJson(): DirectoriesImportJson =
 
 private fun DirectoryRedownloadResult.toJson() = RedownloadJson(replaced, unchanged, blocked, reimportSuggested, failures)
 
-// Every staged file is a CSV import; a QIF file still reports as one.
+// Every staged file is a CSV import; a QIF or OFX file still reports as one.
 private fun BulkFileOutcome.toJson() =
     FileImportJson(
         id = fileId,
         file = fileName,
-        format = if (importFileKind(fileName) == ImportFileKind.QIF) "qif" else "csv",
+        format = importFileKind(fileName)?.takeIf { it.isDocument }?.name?.lowercase() ?: "csv",
         status =
             when (status) {
                 BulkFileStatus.IMPORTED -> "imported"

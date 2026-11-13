@@ -34,7 +34,6 @@ import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CryptoAsset
-import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
@@ -166,7 +165,7 @@ fun ApplyStrategyDialog(
                     csvImport.originalFileName,
                     csvImport.columns,
                     rows,
-                    wholeDocument = importFileKind(csvImport.originalFileName) == ImportFileKind.QIF,
+                    wholeDocument = importFileKind(csvImport.originalFileName)?.isDocument == true,
                 )
             selectedStrategy = matching ?: strategies.firstOrNull()
         }

@@ -126,6 +126,7 @@ private val acronyms =
         "http" to "HTTP",
         "csv" to "CSV",
         "qif" to "QIF",
+        "ofx" to "OFX",
         "iso" to "ISO",
         "utc" to "UTC",
         "hmac" to "HMAC",

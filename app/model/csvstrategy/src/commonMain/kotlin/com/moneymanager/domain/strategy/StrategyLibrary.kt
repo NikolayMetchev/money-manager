@@ -1,14 +1,15 @@
 package com.moneymanager.domain.strategy
 
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.documentKind
 import com.moneymanager.domain.model.csvstrategy.isPdfStrategy
-import com.moneymanager.domain.model.csvstrategy.isQifStrategy
 import com.moneymanager.domain.model.csvstrategy.isXlsxStrategy
 
 /**
  * The kinds of strategy artifact stored in the shared library, one file per artifact on the remote.
- * CSV, QIF, XLSX and PDF are all `csv_import_strategy` rows (the others ride the CSV engine); they
+ * CSV, QIF, OFX, XLSX and PDF are all `csv_import_strategy` rows (the others ride the CSV engine); they
  * are separated here only so the filename suffix records which kind a file is ([libraryKind]). [GLOBAL_MAPPINGS] is
  * the single combined file holding all global account mappings. [PASS_THROUGH] is one pass-through
  * (conduit) account definition per file. [CURRENCIES] is the reference list of currencies a database is
@@ -23,6 +24,7 @@ import com.moneymanager.domain.model.csvstrategy.isXlsxStrategy
 enum class StrategyKind {
     CSV,
     QIF,
+    OFX,
     XLSX,
     PDF,
     API,
@@ -38,7 +40,8 @@ enum class StrategyKind {
 fun CsvImportStrategy.libraryKind(): StrategyKind =
     when {
         isPdfStrategy() -> StrategyKind.PDF
-        isQifStrategy() -> StrategyKind.QIF
+        documentKind() == ImportFileKind.QIF -> StrategyKind.QIF
+        documentKind() == ImportFileKind.OFX -> StrategyKind.OFX
         isXlsxStrategy() -> StrategyKind.XLSX
         else -> StrategyKind.CSV
     }
@@ -91,6 +94,7 @@ object StrategyFileNaming {
     private const val SUFFIX = ".json"
     private const val CSV_INFIX = ".csv"
     private const val QIF_INFIX = ".qif"
+    private const val OFX_INFIX = ".ofx"
     private const val XLSX_INFIX = ".xlsx"
     private const val PDF_INFIX = ".pdf"
     private const val API_INFIX = ".api"
@@ -103,6 +107,7 @@ object StrategyFileNaming {
         when (key.kind) {
             StrategyKind.CSV -> "${key.name}$CSV_INFIX$SUFFIX"
             StrategyKind.QIF -> "${key.name}$QIF_INFIX$SUFFIX"
+            StrategyKind.OFX -> "${key.name}$OFX_INFIX$SUFFIX"
             StrategyKind.XLSX -> "${key.name}$XLSX_INFIX$SUFFIX"
             StrategyKind.PDF -> "${key.name}$PDF_INFIX$SUFFIX"
             StrategyKind.API -> "${key.name}$API_INFIX$SUFFIX"
@@ -137,6 +142,10 @@ object StrategyFileNaming {
 
             stem.endsWith(QIF_INFIX) -> {
                 StrategyKey(StrategyKind.QIF, stem.removeSuffix(QIF_INFIX))
+            }
+
+            stem.endsWith(OFX_INFIX) -> {
+                StrategyKey(StrategyKind.OFX, stem.removeSuffix(OFX_INFIX))
             }
 
             stem.endsWith(API_INFIX) -> {
