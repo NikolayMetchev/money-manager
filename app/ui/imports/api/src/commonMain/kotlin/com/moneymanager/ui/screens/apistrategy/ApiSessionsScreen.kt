@@ -62,6 +62,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneymanager.apiimport.API_DOWNLOAD_IMPORT_ALL_TASK_KEY
+import com.moneymanager.apiimport.API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY
 import com.moneymanager.apiimport.ApiImportListener
 import com.moneymanager.apiimport.ApiImportService
 import com.moneymanager.apiimport.apiDownloadTaskKey
@@ -70,6 +71,7 @@ import com.moneymanager.apiimport.displaySummary
 import com.moneymanager.apiimport.filterCredentialsByStrategy
 import com.moneymanager.apiimport.sessionImportedAtCurrentRevision
 import com.moneymanager.apiimport.splitSessionsByImportState
+import com.moneymanager.apiimport.startApiSessionsArchiveImport
 import com.moneymanager.apiimport.storeNewSigningKey
 import com.moneymanager.apiimporter.ApiCounterpartySuggestion
 import com.moneymanager.apiimporter.ApiImportReads
@@ -327,15 +329,15 @@ fun ApiSessionsScreen(
             mimeTypes = listOf("application/json"),
             onResult = { result ->
                 if (result != null) {
-                    scope.launch {
-                        archiveMessage =
-                            ApiSessionsArchive.importAndDescribe(
-                                result.content,
-                                deviceId,
-                                apiSessionRepository,
-                                apiImportStrategyRepository,
-                                importEngine,
-                            )
+                    archiveMessage = null
+                    taskManager.startApiSessionsArchiveImport(
+                        result.content,
+                        deviceId,
+                        apiSessionRepository,
+                        apiImportStrategyRepository,
+                        importEngine,
+                    ) { summary ->
+                        archiveMessage = summary
                         refresh()
                     }
                 }
@@ -369,13 +371,21 @@ fun ApiSessionsScreen(
                             .onFailure { archiveMessage = "Failed to export API sessions: ${it.message}" }
                     }
                 }) { Text("Export") }
-                TextButton(onClick = { importPicker.launch() }) { Text("Import") }
+                TextButton(
+                    onClick = { importPicker.launch() },
+                    enabled = !tasks.isRunning(API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY),
+                ) { Text("Import") }
                 TextButton(onClick = onApiStrategiesClick) { Text("Strategies") }
                 TextButton(onClick = onAddCredentialClick) { Text("+ Connect") }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        tasks.runningProgress(API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY)?.let {
+            ApiReimportProgress(it)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
         archiveMessage?.let {
             Text(text = it, style = MaterialTheme.typography.bodyMedium)

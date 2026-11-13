@@ -12,6 +12,7 @@ import com.moneymanager.importengineapi.ensureApiCredential
 import com.moneymanager.importengineapi.insertApiRequest
 import com.moneymanager.importengineapi.insertApiResponse
 import com.moneymanager.importengineapi.recordApiDownloadCoverage
+import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -134,26 +135,33 @@ object ApiSessionsArchive {
         sessions: ApiSessionReadRepository,
         strategies: ApiImportStrategyReadRepository,
         engine: ImportEngine,
+        onProgress: suspend (Progress) -> Unit = {},
     ): String =
         @Suppress("TooGenericExceptionCaught")
         try {
-            import(content, deviceId, sessions, strategies, engine).summary()
+            import(content, deviceId, sessions, strategies, engine, onProgress).summary()
         } catch (expected: Exception) {
             "Failed to import API sessions: ${expected.message}"
         }
 
+    /**
+     * Restores every session in [content] this database lacks. [onProgress] counts the requests written, as
+     * a session's requests are most of the work (a large export holds tens of thousands of responses).
+     */
     suspend fun import(
         content: String,
         deviceId: DeviceId,
         sessions: ApiSessionReadRepository,
         strategies: ApiImportStrategyReadRepository,
         engine: ImportEngine,
+        onProgress: suspend (Progress) -> Unit = {},
     ): ApiSessionsArchiveImportResult {
+        onProgress(Progress("Reading the file"))
         val file = json.decodeFromString(ArchiveFile.serializer(), content)
         require(file.version == VERSION) { "Unsupported API sessions export version: ${file.version}" }
-        var imported = 0
         var present = 0
         val missing = mutableSetOf<String>()
+        val toRestore = mutableListOf<SessionToRestore>()
         for (entry in file.strategies) {
             val strategy: ApiImportStrategy? = strategies.getStrategyByName(entry.name).first()
             if (strategy == null) {
@@ -166,29 +174,46 @@ object ApiSessionsArchive {
                 val createdAt = Instant.fromEpochMilliseconds(session.createdAt)
                 if (createdAt in existing) {
                     present++
-                    continue
+                } else {
+                    toRestore += SessionToRestore(entry.name, session, createdAt, credentialId)
                 }
-                restoreSession(session, createdAt, deviceId, credentialId, engine)
-                imported++
             }
         }
-        return ApiSessionsArchiveImportResult(imported, present, missing)
+        val totalRequests = toRestore.sumOf { it.session.requests.size }
+        var requestsDone = 0
+        toRestore.forEachIndexed { index, restore ->
+            val detail = "Restoring ${restore.strategyName} session ${index + 1} of ${toRestore.size}"
+            onProgress(Progress.counted(detail, requestsDone, totalRequests))
+            restoreSession(restore, deviceId, engine) {
+                requestsDone++
+                onProgress(Progress.counted(detail, requestsDone, totalRequests))
+            }
+        }
+        return ApiSessionsArchiveImportResult(toRestore.size, present, missing)
     }
+
+    private class SessionToRestore(
+        val strategyName: String,
+        val session: ArchiveSession,
+        val createdAt: Instant,
+        val credentialId: ApiCredentialId,
+    )
 
     /** Writes one session; a failure partway removes it again, so it is never left half imported. */
     @Suppress("TooGenericExceptionCaught")
     private suspend fun restoreSession(
-        session: ArchiveSession,
-        createdAt: Instant,
+        restore: SessionToRestore,
         deviceId: DeviceId,
-        credentialId: ApiCredentialId,
         engine: ImportEngine,
+        onRequestWritten: suspend () -> Unit,
     ) {
-        val sessionId = engine.createApiSession(deviceId, createdAt, credentialId)
+        val session = restore.session
+        val sessionId = engine.createApiSession(deviceId, restore.createdAt, restore.credentialId)
         try {
             for (request in session.requests) {
                 val requestId = engine.insertApiRequest(sessionId, request.method, request.url, request.headers)
                 request.response?.let { engine.insertApiResponse(requestId, sessionId, it) }
+                onRequestWritten()
             }
             for ((endpoint, until) in session.coverage) {
                 engine.recordApiDownloadCoverage(sessionId, endpoint, Instant.fromEpochMilliseconds(until))

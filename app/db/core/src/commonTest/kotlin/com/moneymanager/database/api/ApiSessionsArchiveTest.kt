@@ -1,10 +1,19 @@
 package com.moneymanager.database.api
 
+import com.moneymanager.apiimport.API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY
+import com.moneymanager.apiimport.startApiSessionsArchiveImport
 import com.moneymanager.apiimporter.ApiSessionsArchive
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.tasks.Progress
+import com.moneymanager.tasks.TaskManager
+import com.moneymanager.tasks.TaskStatus
 import com.moneymanager.test.database.DbTest
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
@@ -35,7 +44,14 @@ class ApiSessionsArchiveTest : DbTest() {
             assertEquals(1, again.sessionsAlreadyPresent)
 
             sessions.deleteSession(sessionId)
-            val restored = ApiSessionsArchive.import(exported, deviceId, sessions, strategies, repositories.importEngine)
+            val progress = mutableListOf<Progress>()
+            val restored =
+                ApiSessionsArchive.import(exported, deviceId, sessions, strategies, repositories.importEngine) { progress += it }
+            // Counted over the requests written, so the bar fills as each one lands.
+            assertEquals(listOf(null, 0, 1, 2), progress.map { it.processed })
+            assertEquals(2, progress.last().total)
+            assertEquals(1f, progress.last().fraction)
+            assertEquals("Restoring Monzo session 1 of 1", progress.last().detail)
             assertEquals(1, restored.sessionsImported)
             assertTrue(restored.missingStrategies.isEmpty())
 
@@ -49,6 +65,44 @@ class ApiSessionsArchiveTest : DbTest() {
             )
             assertEquals(listOf("""{"accounts":[]}"""), sessions.getResponsesBySession(session.id).map { it.json })
             assertEquals(mapOf("transactions" to coveredUntil), sessions.getDownloadCoverageBySession(session.id))
+        }
+
+    @Test
+    fun `an archive import runs as one task at a time and hands back its summary`() =
+        runDbTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val manager = TaskManager(backgroundScope)
+            val finished = CompletableDeferred<String>()
+            val release = CompletableDeferred<Unit>()
+
+            fun start(onFinished: suspend (String) -> Unit) =
+                manager.startApiSessionsArchiveImport(
+                    """{"version":1,"strategies":[{"name":"No Such Strategy","sessions":[]}]}""",
+                    deviceId,
+                    repositories.apiSessionRepository,
+                    repositories.apiImportStrategyRepository,
+                    repositories.importEngine,
+                    onFinished,
+                )
+
+            assertNotNull(
+                start { summary ->
+                    release.await()
+                    finished.complete(summary)
+                },
+            )
+            assertNull(start {}, "a second import waits for the first")
+            release.complete(Unit)
+
+            val summary = "Imported 0 session(s). Skipped sessions for unknown strategies: No Such Strategy"
+            assertEquals(summary, finished.await())
+            val task =
+                manager.tasks
+                    .first { tasks -> tasks.any { it.key == API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY && !it.isRunning } }
+                    .single { it.key == API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY }
+            assertEquals("Import API sessions", task.title)
+            assertEquals(TaskStatus.SUCCEEDED, task.status)
+            assertEquals(summary, task.progress.detail)
         }
 
     @Test
