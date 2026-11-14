@@ -377,8 +377,7 @@ private val kindFilterChips =
         StrategyKind.PDF to "PDF",
         StrategyKind.API to "API",
         StrategyKind.PASS_THROUGH to "Pass-through",
-        StrategyKind.CURRENCIES to "Currencies",
-        StrategyKind.CRYPTO_ASSETS to "Crypto",
+        StrategyKind.ASSET_LIST to "Assets",
         StrategyKind.HOLIDAY_CALENDAR to "Locations",
     )
 
@@ -392,8 +391,7 @@ private fun StrategyKind.displayName(): String =
         StrategyKind.API -> "API import strategy"
         StrategyKind.PASS_THROUGH -> "Pass-through definition"
         StrategyKind.GLOBAL_MAPPINGS -> "Global account mappings"
-        StrategyKind.CURRENCIES -> "Currency list"
         StrategyKind.HOLIDAY_CALENDAR -> "Location (holiday calendar)"
-        StrategyKind.ASSETS -> "Assets and aliases"
-        StrategyKind.CRYPTO_ASSETS -> "Crypto asset list"
+        StrategyKind.ASSETS -> "Your own assets and aliases"
+        StrategyKind.ASSET_LIST -> "Currencies, crypto assets and their aliases"
     }

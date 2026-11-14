@@ -4,17 +4,16 @@ package com.moneymanager.domain.model
 data class AssetAlias(
     val alias: String,
     val assetCode: String,
-    /** Who set it: a person, or one of the catalog's published lists. */
+    /** Who set it: a person, or the catalog's published asset list. */
     val publisher: AliasPublisher = AliasPublisher.PERSON,
 )
 
-/** Who set an [AssetAlias]. Each published list's local copy is the aliases it set, so they must be told apart. */
+/** Who set an [AssetAlias]. The published list's local copy is the aliases it set, so it must be told apart from a person's. */
 enum class AliasPublisher(
     val id: Long,
 ) {
     PERSON(0),
-    CRYPTO_LIST(1),
-    CURRENCY_LIST(2),
+    ASSET_LIST(1),
     ;
 
     companion object {

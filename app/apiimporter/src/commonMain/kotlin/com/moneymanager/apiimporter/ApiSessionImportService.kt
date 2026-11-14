@@ -3180,7 +3180,7 @@ private const val DEFAULT_MINOR_UNIT_DECIMALS = 2
  * the raw integer would treat it as already being in the app's own (much higher) storage scale,
  * silently truncating every amount toward zero — the provider's minor-unit width and the app's
  * storage scale are unrelated. The width is the currency's ISO minor unit
- * ([Currency.fractionDigits], from the catalog's currency list), else 2; [decimalPlacesOverrides] lets a strategy
+ * ([Currency.fractionDigits], from the catalog's asset list), else 2; [decimalPlacesOverrides] lets a strategy
  * correct a provider that doesn't follow the ISO standard for a given currency.
  */
 internal fun minorUnitsToMoney(

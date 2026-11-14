@@ -12,14 +12,13 @@ import com.moneymanager.domain.model.csvstrategy.isXlsxStrategy
  * CSV, QIF, OFX, XLSX and PDF are all `csv_import_strategy` rows (the others ride the CSV engine); they
  * are separated here only so the filename suffix records which kind a file is ([libraryKind]). [GLOBAL_MAPPINGS] is
  * the single combined file holding all global account mappings. [PASS_THROUGH] is one pass-through
- * (conduit) account definition per file. [CURRENCIES] is the reference list of currencies a database is
- * seeded with (one file, [StrategyFileNaming.CURRENCIES_NAME]); applying it only adds missing codes.
+ * (conduit) account definition per file.
  * [HOLIDAY_CALENDAR] is one location (holiday calendar) per file, named by its code; applying it replaces that
  * location. [ASSETS] is the single file holding a database's own assets and aliases ([StrategyFileNaming.ASSETS_NAME]);
  * like the global mappings it is personal, and applying it only adds.
- * [CRYPTO_ASSETS] is the published crypto list and its aliases ([StrategyFileNaming.CRYPTO_ASSETS_NAME]), rendered from
- * the crypto catalog; applying it only adds, like the currency list.
- * location.
+ * [ASSET_LIST] is the catalog's published assets and their aliases ([StrategyFileNaming.ASSET_LIST_NAME]): the ISO 4217
+ * currencies and the crypto catalog's coins, as currencies are assets too. A new database installs them from here,
+ * and applying it only adds.
  */
 enum class StrategyKind {
     CSV,
@@ -30,10 +29,9 @@ enum class StrategyKind {
     API,
     GLOBAL_MAPPINGS,
     PASS_THROUGH,
-    CURRENCIES,
     HOLIDAY_CALENDAR,
     ASSETS,
-    CRYPTO_ASSETS,
+    ASSET_LIST,
 }
 
 /** Which of the CSV engine's kinds this strategy's library file is. */
@@ -67,7 +65,7 @@ data class LocalStrategyEntry(
 
 /**
  * Unresolved references found while parsing an incoming artifact, to be resolved before applying, and the names of
- * the entities the artifact itself creates ([provides], such as the currency list's codes), which resolve those
+ * the entities the artifact itself creates ([provides], such as the asset list's currency codes), which resolve those
  * references in the other artifacts installed with it.
  */
 data class StrategyParseResult(
@@ -86,11 +84,8 @@ object StrategyFileNaming {
     /** The name of the single [StrategyKind.ASSETS] artifact. */
     const val ASSETS_NAME: String = "assets"
 
-    /** The name of the single [StrategyKind.CURRENCIES] artifact. */
-    const val CURRENCIES_NAME: String = "ISO 4217 currencies"
-
-    /** The name of the single [StrategyKind.CRYPTO_ASSETS] artifact. */
-    const val CRYPTO_ASSETS_NAME: String = "Crypto assets"
+    /** The name of the single [StrategyKind.ASSET_LIST] artifact. */
+    const val ASSET_LIST_NAME: String = "Assets and aliases"
     private const val SUFFIX = ".json"
     private const val CSV_INFIX = ".csv"
     private const val QIF_INFIX = ".qif"
@@ -99,8 +94,7 @@ object StrategyFileNaming {
     private const val PDF_INFIX = ".pdf"
     private const val API_INFIX = ".api"
     private const val PASS_THROUGH_INFIX = ".passthrough"
-    private const val CURRENCIES_INFIX = ".currencies"
-    private const val CRYPTO_ASSETS_INFIX = ".crypto"
+    private const val ASSET_LIST_INFIX = ".assets"
     private const val HOLIDAY_CALENDAR_INFIX = ".calendar"
 
     fun fileName(key: StrategyKey): String =
@@ -113,10 +107,9 @@ object StrategyFileNaming {
             StrategyKind.API -> "${key.name}$API_INFIX$SUFFIX"
             StrategyKind.GLOBAL_MAPPINGS -> "$GLOBAL_MAPPINGS_NAME$SUFFIX"
             StrategyKind.PASS_THROUGH -> "${key.name}$PASS_THROUGH_INFIX$SUFFIX"
-            StrategyKind.CURRENCIES -> "${key.name}$CURRENCIES_INFIX$SUFFIX"
             StrategyKind.HOLIDAY_CALENDAR -> "${key.name}$HOLIDAY_CALENDAR_INFIX$SUFFIX"
             StrategyKind.ASSETS -> "$ASSETS_NAME$SUFFIX"
-            StrategyKind.CRYPTO_ASSETS -> "${key.name}$CRYPTO_ASSETS_INFIX$SUFFIX"
+            StrategyKind.ASSET_LIST -> "${key.name}$ASSET_LIST_INFIX$SUFFIX"
         }
 
     /** Parses a remote filename back into a [StrategyKey], or null if it isn't a library file. */
@@ -156,12 +149,8 @@ object StrategyFileNaming {
                 StrategyKey(StrategyKind.PASS_THROUGH, stem.removeSuffix(PASS_THROUGH_INFIX))
             }
 
-            stem.endsWith(CURRENCIES_INFIX) -> {
-                StrategyKey(StrategyKind.CURRENCIES, stem.removeSuffix(CURRENCIES_INFIX))
-            }
-
-            stem.endsWith(CRYPTO_ASSETS_INFIX) -> {
-                StrategyKey(StrategyKind.CRYPTO_ASSETS, stem.removeSuffix(CRYPTO_ASSETS_INFIX))
+            stem.endsWith(ASSET_LIST_INFIX) -> {
+                StrategyKey(StrategyKind.ASSET_LIST, stem.removeSuffix(ASSET_LIST_INFIX))
             }
 
             stem.endsWith(HOLIDAY_CALENDAR_INFIX) -> {

@@ -1,13 +1,11 @@
 package com.moneymanager.tools.strategycatalog
 
 import com.moneymanager.domain.model.CurrencyExportEntry
-import com.moneymanager.domain.model.CurrencyListExport
-import com.moneymanager.domain.strategy.StrategyFileNaming
 import java.util.Locale
 import java.util.Currency as JavaCurrency
 
 /**
- * The ISO 4217 list as this JDK reports it, the catalog's currency list. Names are English so the list is the same
+ * The ISO 4217 list as this JDK reports it: the currencies of the catalog's asset list. Names are English so the list is the same
  * whatever locale the build runs under. A code with no minor unit (gold, SDR, testing codes: -1 to the JDK) has no
  * fraction digits. Each code carries its [currencyNameAliases].
  */
@@ -33,7 +31,3 @@ internal val currencyNameAliases: Map<String, Set<String>> =
         "GBP" to setOf("POUND STERLING"),
         "USD" to setOf("U.S. DOLLAR"),
     )
-
-/** The catalog's currency-list artifact for [currencies]. */
-internal fun currencyListExport(currencies: List<CurrencyExportEntry>): CurrencyListExport =
-    CurrencyListExport(name = StrategyFileNaming.CURRENCIES_NAME, currencies = currencies)

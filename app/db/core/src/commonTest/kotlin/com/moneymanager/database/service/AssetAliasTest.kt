@@ -2,7 +2,6 @@ package com.moneymanager.database.service
 
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.database.json.AssetListExportCodec
-import com.moneymanager.database.json.CurrencyListExportCodec
 import com.moneymanager.database.json.StrategyArtifactCodec
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AliasPublisher
@@ -12,7 +11,6 @@ import com.moneymanager.domain.model.AssetExportEntry
 import com.moneymanager.domain.model.AssetExportKind
 import com.moneymanager.domain.model.AssetListExport
 import com.moneymanager.domain.model.CryptoId
-import com.moneymanager.domain.model.CurrencyListExport
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.assetAliasMap
 import com.moneymanager.domain.strategy.StrategyFileNaming
@@ -29,11 +27,12 @@ import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
 
-/** Asset aliases through the engine, the export, the catalog's crypto list and a real import. */
+/** Asset aliases through the engine, the export, the catalog's asset list and a real import. */
 class AssetAliasTest : DbTest() {
     override val installBuiltInStrategies: Boolean = true
 
@@ -203,111 +202,118 @@ class AssetAliasTest : DbTest() {
             )
         }
 
-    private val cryptoList =
+    private val listKey = StrategyKey(StrategyKind.ASSET_LIST, StrategyFileNaming.ASSET_LIST_NAME)
+
+    // The test databases' seeded currencies are SYSTEM-created, as the list installs them, so the list names them all.
+    private val assetList =
         AssetListExport(
             assets =
-                listOf(
-                    AssetExportEntry("LUNA", "Terra", AssetExportKind.CRYPTO, aliases = setOf("LUNC")),
-                    AssetExportEntry("BTC", "Bitcoin", AssetExportKind.CRYPTO, aliases = setOf("XXBT")),
-                    AssetExportEntry("USD", "US Dollar", AssetExportKind.CURRENCY, 2, aliases = setOf("ZUSD")),
-                ),
+                testCurrencies.map {
+                    AssetExportEntry(
+                        it.code,
+                        it.name,
+                        AssetExportKind.CURRENCY,
+                        it.fractionDigits,
+                        aliases = if (it.code == "USD") setOf("ZUSD") else emptySet(),
+                    )
+                } +
+                    listOf(
+                        AssetExportEntry("LUNA", "Terra", AssetExportKind.CRYPTO, aliases = setOf("LUNC")),
+                        AssetExportEntry("BTC", "Bitcoin", AssetExportKind.CRYPTO, aliases = setOf("XXBT")),
+                    ),
         )
 
-    private suspend fun localCryptoListHash(): String? =
+    private suspend fun localAssetListHash(): String? =
         repositories
             .strategyLibrary
             .listLocal(version)
-            .firstOrNull { it.key == StrategyKey(StrategyKind.CRYPTO_ASSETS, StrategyFileNaming.CRYPTO_ASSETS_NAME) }
+            .firstOrNull { it.key == listKey }
             ?.contentHash
 
     private fun catalogHash(export: AssetListExport): String =
-        StrategyArtifactCodec.canonicalHash(StrategyKind.CRYPTO_ASSETS, AssetListExportCodec.encode(export))
+        StrategyArtifactCodec.canonicalHash(StrategyKind.ASSET_LIST, AssetListExportCodec.encode(export))
 
     @Test
-    fun `the installed crypto list keeps the catalog hash whatever else the database gains`() =
+    fun `the installed asset list keeps the catalog hash whatever else the database gains`() =
         runDbTest {
-            assertEquals(null, localCryptoListHash())
-            repositories.strategyLibrary.applyIncoming(
-                StrategyKey(StrategyKind.CRYPTO_ASSETS, StrategyFileNaming.CRYPTO_ASSETS_NAME),
-                AssetListExportCodec.encode(cryptoList),
-                emptyMap(),
-            )
-            assertEquals(catalogHash(cryptoList), localCryptoListHash())
+            assertNotEquals(catalogHash(assetList), localAssetListHash())
+            repositories.strategyLibrary.applyIncoming(listKey, AssetListExportCodec.encode(assetList), emptyMap())
+            assertEquals(catalogHash(assetList), localAssetListHash())
 
             createCrypto("OTHER")
             repositories.importEngine.setAssetAlias("MINE", "LUNA")
-            assertEquals(catalogHash(cryptoList), localCryptoListHash())
+            assertEquals(catalogHash(assetList), localAssetListHash())
 
             val own = repositories.assetExportService.toExport(version).assets
             assertEquals(listOf("LUNA", "OTHER"), own.map { it.code })
             assertEquals(setOf("MINE"), own.first().aliases)
-            assertEquals(AliasPublisher.CRYPTO_LIST, aliases().single { it.alias == "LUNC" }.publisher)
+            assertEquals(AliasPublisher.ASSET_LIST, aliases().single { it.alias == "LUNC" }.publisher)
+            assertEquals(AliasPublisher.ASSET_LIST, aliases().single { it.alias == "ZUSD" }.publisher)
         }
 
     @Test
     fun `installing the list again adds nothing`() =
         runDbTest {
-            val key = StrategyKey(StrategyKind.CRYPTO_ASSETS, StrategyFileNaming.CRYPTO_ASSETS_NAME)
-            val json = AssetListExportCodec.encode(cryptoList)
-            repositories.strategyLibrary.applyIncoming(key, json, emptyMap())
+            val json = AssetListExportCodec.encode(assetList)
+            repositories.strategyLibrary.applyIncoming(listKey, json, emptyMap())
             val before = aliases()
-            repositories.strategyLibrary.applyIncoming(key, json, emptyMap())
+            repositories.strategyLibrary.applyIncoming(listKey, json, emptyMap())
             assertEquals(before, aliases())
-            assertEquals(catalogHash(cryptoList), localCryptoListHash())
+            assertEquals(catalogHash(assetList), localAssetListHash())
         }
 
     @Test
-    fun `the currency list installs its names as aliases that stay its own`() =
+    fun `the asset list installs currency names as aliases that stay its own`() =
         runDbTest {
-            val key = StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)
             val list =
-                CurrencyListExport(
-                    name = StrategyFileNaming.CURRENCIES_NAME,
-                    currencies =
-                        testCurrencies.map { if (it.code == "GBP") it.copy(aliases = setOf("POUND STERLING")) else it },
+                AssetListExport(
+                    assets =
+                        testCurrencies.map {
+                            AssetExportEntry(
+                                it.code,
+                                it.name,
+                                AssetExportKind.CURRENCY,
+                                it.fractionDigits,
+                                aliases = if (it.code == "GBP") setOf("POUND STERLING") else emptySet(),
+                            )
+                        },
                 )
-            val json = CurrencyListExportCodec.encode(list)
-            repositories.strategyLibrary.applyIncoming(key, json, emptyMap())
-            repositories.strategyLibrary.applyIncoming(key, json, emptyMap())
+            val json = AssetListExportCodec.encode(list)
+            repositories.strategyLibrary.applyIncoming(listKey, json, emptyMap())
+            repositories.strategyLibrary.applyIncoming(listKey, json, emptyMap())
 
-            assertEquals(listOf(AssetAlias("POUND STERLING", "GBP", AliasPublisher.CURRENCY_LIST)), aliases())
-            val local = repositories.strategyLibrary.listLocal(version).first { it.key == key }
-            assertEquals(repositories.strategyLibrary.canonicalHash(key, json), local.contentHash)
+            assertEquals(listOf(AssetAlias("POUND STERLING", "GBP", AliasPublisher.ASSET_LIST)), aliases())
+            assertEquals(repositories.strategyLibrary.canonicalHash(listKey, json), localAssetListHash())
             assertTrue(
                 repositories.assetExportService
                     .toExport(version)
                     .assets
                     .none { it.aliases.isNotEmpty() },
             )
-            assertEquals(null, localCryptoListHash())
         }
 
     @Test
-    fun `installing the currency list keeps an alias of that name a person set`() =
+    fun `installing the asset list keeps a currency alias of that name a person set`() =
         runDbTest {
             repositories.importEngine.setAssetAlias("POUND STERLING", "EUR")
-            val key = StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)
             val list =
-                CurrencyListExport(
-                    name = StrategyFileNaming.CURRENCIES_NAME,
-                    currencies =
-                        testCurrencies.map { if (it.code == "GBP") it.copy(aliases = setOf("POUND STERLING")) else it },
+                AssetListExport(
+                    assets =
+                        listOf(
+                            AssetExportEntry("GBP", "British Pound", AssetExportKind.CURRENCY, 2, aliases = setOf("POUND STERLING")),
+                        ),
                 )
-            repositories.strategyLibrary.applyIncoming(key, CurrencyListExportCodec.encode(list), emptyMap())
+            repositories.strategyLibrary.applyIncoming(listKey, AssetListExportCodec.encode(list), emptyMap())
 
             assertEquals(listOf(AssetAlias("POUND STERLING", "EUR", AliasPublisher.PERSON)), aliases())
         }
 
     @Test
-    fun `installing the crypto list keeps an alias of that name a person set`() =
+    fun `installing the asset list keeps a crypto alias of that name a person set`() =
         runDbTest {
             createCrypto("OTHER")
             repositories.importEngine.setAssetAlias("LUNC", "OTHER")
-            repositories.strategyLibrary.applyIncoming(
-                StrategyKey(StrategyKind.CRYPTO_ASSETS, StrategyFileNaming.CRYPTO_ASSETS_NAME),
-                AssetListExportCodec.encode(cryptoList),
-                emptyMap(),
-            )
+            repositories.strategyLibrary.applyIncoming(listKey, AssetListExportCodec.encode(assetList), emptyMap())
 
             assertEquals(AssetAlias("LUNC", "OTHER", AliasPublisher.PERSON), aliases().single { it.alias == "LUNC" })
         }
