@@ -43,11 +43,13 @@ WEB=${WEB:-true}
 INSTALLER=${INSTALLER:-true}
 flags+=("--//bazel/kmp/platforms:native=$NATIVE" "--//bazel/kmp/platforms:android=$ANDROID" "--//bazel/kmp/platforms:web=$WEB")
 
-# The rest are manual, so `//...` skips them:
+# The rest are manual, so `//...` skips them. A pull request without the `installer` label leaves out the first two
+# (and the tool that times the installer): the installer is built from the ProGuard jars, so the check costs nothing
+# once it is built, and without it ProGuard is minutes of the run.
 # - the desktop ProGuard check: `//...` never runs ProGuard, so a new dependency that needs keep/dontwarn rules
 #   would otherwise surface only when release.yml ran. It shrinks the desktop app and checks every ServiceLoader
 #   provider survived.
-# - the Linux desktop installer (a pull request without the `installer` label leaves out it and the tool that times it).
+# - the Linux desktop installer.
 # - the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`) and the launcher that turns their output
 #   into JUnit XML, for Native Tests to run on their own runners.
 extra=()
@@ -56,12 +58,12 @@ if [ "$NATIVE" = true ]; then
   extra+=(//bazel/kmp/testing:native_launcher_deploy.jar $cross)
 fi
 if [ "$INSTALLER" = true ]; then
-  extra+=(//app/main/jvm:installer //tools/repo-scripts:repo-scripts-tool_deploy.jar)
+  extra+=(//app/main/jvm:release_service_providers_test //app/main/jvm:installer //tools/repo-scripts:repo-scripts-tool_deploy.jar)
 fi
 # The build event file names the tests this invocation ran (a skipped one has no testSummary), so the reports below
 # leave out what bazel-testlogs keeps from earlier runs: a remote runner resumes a snapshot with its output tree.
 bep=$(mktemp)
-bazel test "${flags[@]}" --build_event_json_file="$bep" -- //... //app/main/jvm:release_service_providers_test "${extra[@]}" 2>&1 | tee "$out/test.log"
+bazel test "${flags[@]}" --build_event_json_file="$bep" -- //... "${extra[@]}" 2>&1 | tee "$out/test.log"
 status=${PIPESTATUS[0]}
 
 # The JVM and Android host tests' coverage reports, merged into one XML report. It credits code to every test that
