@@ -2,6 +2,7 @@ package com.moneymanager.ui.screens.transactions
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -564,56 +565,73 @@ private fun PendingTradeCard(
     val trade = entry.trade
     val placeholderIsTo = trade.to.asset.code == entry.placeholderAssetCode
     val known = if (placeholderIsTo) trade.from else trade.to
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = trade.description, style = MaterialTheme.typography.titleMedium)
+    val details: @Composable (Modifier) -> Unit = { modifier ->
+        Column(modifier = modifier) {
+            Text(text = trade.description, style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text =
+                    "${trade.timestamp.displayDateTime()} • " +
+                        (if (placeholderIsTo) "gave ${formatAmount(known)} for " else "received ${formatAmount(known)} for ") +
+                        "an unnamed currency",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            suggestion?.let {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text =
-                        "${trade.timestamp.displayDateTime()} • " +
-                            (if (placeholderIsTo) "gave ${formatAmount(known)} for " else "received ${formatAmount(known)} for ") +
-                            "an unnamed currency",
+                    text = "${origin?.label ?: "A reconciliation source"} records the other side as ${formatAmount(it.otherSide)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                suggestion?.let {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "${origin?.label ?: "A reconciliation source"} records the other side as ${formatAmount(it.otherSide)}",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    TextButton(onClick = onUseSuggestion, enabled = !busy) { Text("Use ${formatAmount(it.otherSide)} and match it") }
-                    origin?.let { source -> SuggestionLinks(source, onOpenSource, onOpenReconciliation) }
+                TextButton(onClick = onUseSuggestion, enabled = !busy) { Text("Use ${formatAmount(it.otherSide)} and match it") }
+                origin?.let { source -> SuggestionLinks(source, onOpenSource, onOpenReconciliation) }
+            }
+        }
+    }
+    val currencyField: @Composable (Modifier) -> Unit = { modifier ->
+        CurrencyPicker(
+            selectedCurrencyId = currencyId,
+            onCurrencySelected = onCurrencyChange,
+            label = "Currency",
+            currencyRepository = currencyRepository,
+            modifier = modifier,
+            isError = problem != null,
+        )
+    }
+    val amountField: @Composable (Modifier) -> Unit = { modifier ->
+        OutlinedTextField(
+            value = amountText,
+            onValueChange = onAmountChange,
+            label = { Text("Amount") },
+            isError = amountText.isNotBlank() && parseAmount(amountText) == null,
+            supportingText = problem?.let { message -> { Text(message) } },
+            singleLine = true,
+            modifier = modifier,
+        )
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        // Beside the details the two fields take 340dp, which would squeeze the details to nothing on a phone.
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            if (maxWidth >= SIDE_BY_SIDE_MIN_WIDTH) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    details(Modifier.weight(1f))
+                    currencyField(Modifier.width(180.dp))
+                    amountField(Modifier.width(160.dp))
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    details(Modifier.fillMaxWidth())
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        currencyField(Modifier.weight(1f))
+                        amountField(Modifier.weight(1f))
+                    }
                 }
             }
-            CurrencyPicker(
-                selectedCurrencyId = currencyId,
-                onCurrencySelected = onCurrencyChange,
-                label = "Currency",
-                currencyRepository = currencyRepository,
-                modifier = Modifier.width(180.dp),
-                isError = problem != null,
-            )
-            OutlinedTextField(
-                value = amountText,
-                onValueChange = onAmountChange,
-                label = { Text("Amount") },
-                isError = amountText.isNotBlank() && parseAmount(amountText) == null,
-                supportingText = problem?.let { message -> { Text(message) } },
-                singleLine = true,
-                modifier = Modifier.width(160.dp),
-            )
         }
     }
 }
+
+private val SIDE_BY_SIDE_MIN_WIDTH = 560.dp
 
 /**
  * What a person typed for [entry] as an answer, and what is wrong with it: the answer only when [currency] and [text] make a

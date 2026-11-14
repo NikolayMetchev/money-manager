@@ -35,13 +35,10 @@ suspend fun AccountWriteRepository.createAccountsBatch(accounts: List<Account>):
 
 suspend fun AccountWriteRepository.updateAccount(account: Account): Long = updateAccount(account, TEST_SOURCE)
 
-suspend fun AccountWriteRepository.updateAccountWithAttributes(
-    account: Account?,
+suspend fun AccountWriteRepository.addAccountAttributes(
     accountId: AccountId,
-    deletedAttributeIds: Set<Long>,
-    updatedAttributes: Map<Long, NewAttribute>,
     newAttributes: List<NewAttribute>,
-): Long = updateAccountWithAttributes(account, accountId, deletedAttributeIds, updatedAttributes, newAttributes, TEST_SOURCE)
+): Long = updateAccountWithAttributes(null, accountId, emptySet(), emptyMap(), newAttributes, TEST_SOURCE)
 
 suspend fun PersonWriteRepository.createPerson(person: Person): PersonId = createPerson(person, TEST_SOURCE)
 

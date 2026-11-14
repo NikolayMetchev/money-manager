@@ -28,14 +28,17 @@ class AccountMappingWriteRepositoryImpl(
     ): Long =
         withContext(coroutineContext) {
             val now = Clock.System.now()
-            writeQueries.insert(
-                strategy_id = strategyId?.id?.toString(),
-                value_pattern = valuePattern.pattern,
-                account_id = accountId.id,
-                created_at = now.toEpochMilliseconds(),
-                updated_at = now.toEpochMilliseconds(),
-            )
-            writeQueries.lastInsertRowId().awaitAsOne()
+            // One transaction, so the row id is read on the connection that inserted it (native keeps separate readers).
+            writeQueries.transactionWithResult {
+                writeQueries.insert(
+                    strategy_id = strategyId?.id?.toString(),
+                    value_pattern = valuePattern.pattern,
+                    account_id = accountId.id,
+                    created_at = now.toEpochMilliseconds(),
+                    updated_at = now.toEpochMilliseconds(),
+                )
+                writeQueries.lastInsertRowId().awaitAsOne()
+            }
         }
 
     override suspend fun createMappings(mappings: List<AccountMapping>): Unit =

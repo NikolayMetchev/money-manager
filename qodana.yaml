@@ -405,6 +405,25 @@ exclude:
       - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/navigation/Screen.kt
   - name: UnusedSymbol
     paths:
+      # [2][5] — the domain model every module reads: the IDE build of 2026-11 (QDJVM-262.12654) stopped finding its
+      # other modules' usages in a full scan, reporting 91 symbols of 41 files unused (Money, Person, WellKnownIds, …),
+      # each of which other modules reference. Its native sources are listed below.
+      - app/model/core/src/commonMain
+      # [2][5] — the same scan: API-import helpers the API screens
+      # (app/ui/imports/api) call; the crypto catalog's refresher (the entry points) and its `size` (its test); ArchiveCodec.pack (the sync and the vault).
+      - app/apiimport/src/commonMain/kotlin/com/moneymanager/apiimport/ApiCredentialVaultSupport.kt
+      - app/apiimport/src/commonMain/kotlin/com/moneymanager/apiimport/ApiImportTaskKeys.kt
+      - app/apiimport/src/commonMain/kotlin/com/moneymanager/apiimport/ApiSessionPlanning.kt
+      - app/apiimport/src/commonMain/kotlin/com/moneymanager/apiimport/ApiSessionsArchiveImport.kt
+      - app/cryptodata/src/commonMain/kotlin/com/moneymanager/cryptodata/BundledCryptoCatalog.kt
+      - app/cryptodata/src/commonMain/kotlin/com/moneymanager/cryptodata/HttpCryptoCatalogRefresher.kt
+      - utils/archive/src/commonMain/kotlin/com/moneymanager/archive/ArchiveCodec.kt
+      # [5] — native and nonJvm actuals of common expects, and the browser rules' JVM fixture, which no JVM module links.
+      - app/importfilesource/di/src/nativeMain/kotlin/com/moneymanager/importfilesource/di/CreateImportFileSourceFactory.native.kt
+      - app/main/cli/src/nativeMain/kotlin/com/moneymanager/cli/CliServices.native.kt
+      - utils/localsettings/di/src/nativeMain/kotlin/com/moneymanager/localsettings/di/CreateLocalSettings.native.kt
+      - utils/parsers/xlsx/src/nonJvmMain/kotlin/com/moneymanager/xlsx/XlsxParser.nonJvm.kt
+      - bazel/kmp/web/tests/greeting/jvm/greeting/Platform.kt
       # [5] — `sources` and `queries` are read by every method of the file; the linter reaches its SQLDelight queries as
       # compiled classes and reported both properties unused on two scans in a row.
       - app/db/repository/src/commonMain/kotlin/com/moneymanager/database/repository/TransferSourceReadRepositoryImpl.kt
