@@ -221,6 +221,7 @@ kmp_modules(
         "//utils/parsers/ofx:ofx_module",
         "//utils/parsers/ofx:test_module",
         "//app/model/ofx:ofx_module",
+        "//app/ui/settings:test_module",
     ],
     visibility = ["//visibility:public"],
 )

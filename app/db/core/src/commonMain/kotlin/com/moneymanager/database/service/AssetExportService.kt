@@ -46,20 +46,21 @@ class AssetExportService(
     }
 
     /**
-     * The local copy of the catalog's crypto list: what installing it left, whatever else the database has since
-     * gained. Only an alias it set makes a currency part of it.
+     * The local copy of the catalog's asset list: the currencies and coins installing it created, with the aliases it
+     * set, whatever else the database has since gained.
      */
-    suspend fun toPublishedCryptoList(appVersion: AppVersion): AssetListExport {
+    suspend fun toPublishedAssetList(appVersion: AppVersion): AssetListExport {
         val aliases =
             cryptoRepository
                 .getAssetAliases()
                 .first()
-                .filter { it.publisher == AliasPublisher.CRYPTO_LIST }
+                .filter { it.publisher == AliasPublisher.ASSET_LIST }
                 .byAsset()
+        val listedCurrencies = currencyRepository.getSystemCreatedCurrencies().first().mapTo(mutableSetOf()) { it.code }
         val listedCrypto = cryptoRepository.getSystemCreatedCryptoAssets().first().mapTo(mutableSetOf()) { it.code }
         val entries =
             assetEntries(aliases) { asset ->
-                if (asset.kind == AssetExportKind.CURRENCY) asset.aliases.isNotEmpty() else asset.code in listedCrypto
+                asset.code in (if (asset.kind == AssetExportKind.CURRENCY) listedCurrencies else listedCrypto)
             }
         return AssetListExport(version = appVersion.value, assets = entries)
     }
@@ -93,8 +94,8 @@ class AssetExportService(
      */
     suspend fun importAssets(export: AssetListExport) = apply(export, Source.Manual, AliasPublisher.PERSON)
 
-    /** Applies the catalog's crypto list: [importAssets], with what it adds marked as the list's. */
-    suspend fun installPublishedCryptoList(export: AssetListExport) = apply(export, Source.System, AliasPublisher.CRYPTO_LIST)
+    /** Applies the catalog's asset list: [importAssets], with what it adds marked as the list's. */
+    suspend fun installPublishedAssetList(export: AssetListExport) = apply(export, Source.System, AliasPublisher.ASSET_LIST)
 
     private suspend fun apply(
         export: AssetListExport,

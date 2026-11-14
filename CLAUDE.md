@@ -191,7 +191,7 @@ workflow because label events start it: any other label's run skips, without can
 | `app/importer/` | `ImportEngineImpl` — the **sole** DB writer (consumes write repositories) |
 | `app/csvimporter/`, `app/apiimporter/` | Parse/download sources and build an `ImportBatch` (DB-free, enforced). A QIF or OFX file (a document format, `ImportFileKind.isDocument`) is staged as a CSV import of its rows over its fixed columns (`stageDocumentImport`: `QifColumns`, one row per transaction or split; `OfxColumns`, one row per `STMTTRN`, its date-time split into Date, Time and UTC Offset), so from then on it is a CSV import like any other. A document is matched to a strategy as a whole (any one row may name the institution), and `documentKind()` tells a QIF or OFX strategy by its identification columns |
 | `app/reconciliation/` | Source-agnostic reconciliation: leg matcher + shadow→real auto-link planner (DB-free, enforced) |
-| `app/strategies/` | Built-in strategy/pass-through definitions in Kotlin — rendered to the `webpage/strategy-library` catalog site by `tools/strategy-catalog` on Pages deploys (DB-free, nothing checked in or seeded). The catalog also publishes the ISO 4217 currency list (see **Money and Currency Handling**) |
+| `app/strategies/` | Built-in strategy/pass-through definitions in Kotlin — rendered to the `webpage/strategy-library` catalog site by `tools/strategy-catalog` on Pages deploys (DB-free, nothing checked in or seeded). The catalog also publishes the asset list: the ISO 4217 currencies and crypto coins with their aliases (see **Money and Currency Handling**) |
 | `app/strategycatalog/` (+ `di/`) | Browse/install the published strategy catalog (`StrategyCatalogController`) |
 | `app/importfilesource/{core,localfolder}/` | `ImportFileSource` abstraction for import directories; local-folder / Android SAF implementations |
 | `app/remotestorage/core/` | Generic `RemoteStorageProvider` interface + factory (DB-free, backend-agnostic) |
@@ -233,20 +233,20 @@ workflow because label events start it: any other label's run skips, without can
 `CurrencyScaleFactors` (in `app/model/core`) documents why. Assuming 100 is how you get spurious
 "Rounding necessary" failures, so `Currency.scaleFactor` has no default — always pass it explicitly.
 
-**The currency list**: the app bundles none. A new database holds none (strategies name a currency by its ISO code); they all come from the strategy catalog's `StrategyKind.CURRENCIES` artifact,
-rendered from the Pages build's JDK with each code's ISO minor unit (`CurrencyExportEntry.fractionDigits`, stored in
-`currency.fraction_digits`, which native and the browser format with). Installing only adds missing codes and
-never renames or deletes. Only SYSTEM-created currencies (seeded or installed) count as the local copy, so
-user-created ones don't show up as a change. Each entry also lists the other names statements write the currency as
-(`CurrencyExportEntry.aliases`, curated in `IsoCurrencyTable`: `POUND STERLING`), installed as `asset_alias` rows the currency
-list publishes (`AliasPublisher.CURRENCY_LIST`). Test databases seed USD and EUR (`testCurrencies`, `test/app/db`).
+**The asset list**: currencies are assets, so the catalog publishes them and the crypto coins as one `StrategyKind.ASSET_LIST`
+artifact, "Assets and aliases" (`AssetListExport`, built by `assetListExport` in `tools/strategy-catalog`), which the catalog's
+Assets chip and "Install all" bring. The app bundles no currency: a new database holds none (strategies name a currency by its
+ISO code) until the list is installed. Its CURRENCY entries are every ISO 4217 currency of the Pages build's JDK, with each code's
+ISO minor unit (`fractionDigits`, stored in `currency.fraction_digits`, which native and the browser format with) and the other
+names statements write it as (curated in `IsoCurrencyTable`: `POUND STERLING`). Its CRYPTO entries are the bundled `coins.tsv`'s
+coins (a coin sharing an ISO code is left out); a row whose third column names another code is an alias of it, a coin or a
+currency (Kraken's `ZUSD`). Installing only adds missing assets and never renames or deletes; what it adds is SYSTEM-created
+and its aliases are published by it (`AliasPublisher.ASSET_LIST`), and only those are the local copy the catalog compares, so
+user-created assets, imported coins and a person's own aliases don't show up as a change. Test databases seed GBP, USD and EUR
+as SYSTEM-created (`testCurrencies`, `test/app/db`).
 
-**Crypto assets and aliases**: a new database holds no crypto asset either; an import creates each code it meets, named from the
-bundled `coins.tsv`, whose third column makes a row an alias of another code. The catalog publishes the same dataset as
-one `StrategyKind.CRYPTO_ASSETS` artifact (`AssetListExport`, the coins and their aliases, with any currency an alias names),
-and installing it only adds, like the currency list: its assets are SYSTEM-created and its aliases published by it (`AliasPublisher.CRYPTO_LIST`), which is the
-local copy the catalog compares, so a person's own aliases and imported coins don't show up as a change. A person edits
-aliases on the Assets screen, which also exports and imports `assets.json` (`StrategyKind.ASSETS`, `AssetExportService`): a
+**A database's own assets and aliases**: an import creates each crypto code it meets that the database lacks, named from
+`coins.tsv`. A person edits aliases on the Assets screen, which also exports and imports `assets.json` (`StrategyKind.ASSETS`, `AssetExportService`): a
 database's own assets and aliases, personal like the global mappings, so strategy sync carries it and the catalog refuses it.
 An alias joins what is imported from then on: re-import to move what's booked. A trade whose two sides resolve to one asset
 fails its import, as a trade needs two assets; a CSV row naming two codes an alias joined, for different amounts, is a row error for the same reason.

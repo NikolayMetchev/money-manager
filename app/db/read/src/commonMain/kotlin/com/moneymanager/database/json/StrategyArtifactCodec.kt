@@ -39,15 +39,11 @@ object StrategyArtifactCodec {
                     PassThroughExportCodec.encode(PassThroughExportCodec.decode(json).copy(version = ""))
                 }
 
-                StrategyKind.CURRENCIES -> {
-                    CurrencyListExportCodec.encode(CurrencyListExportCodec.decode(json).copy(version = ""))
-                }
-
                 StrategyKind.HOLIDAY_CALENDAR -> {
                     HolidayCalendarExportCodec.encode(HolidayCalendarExportCodec.decode(json).copy(version = ""))
                 }
 
-                StrategyKind.ASSETS, StrategyKind.CRYPTO_ASSETS -> {
+                StrategyKind.ASSETS, StrategyKind.ASSET_LIST -> {
                     AssetListExportCodec.encode(AssetListExportCodec.decode(json).copy(version = ""))
                 }
             }
@@ -82,10 +78,6 @@ object StrategyArtifactCodec {
                 PassThroughExportCodec.decode(json).name
             }
 
-            StrategyKind.CURRENCIES -> {
-                CurrencyListExportCodec.decode(json).name
-            }
-
             StrategyKind.HOLIDAY_CALENDAR -> {
                 HolidayCalendarExportCodec.decode(json).calendar.id
             }
@@ -94,8 +86,8 @@ object StrategyArtifactCodec {
                 StrategyFileNaming.ASSETS_NAME
             }
 
-            StrategyKind.CRYPTO_ASSETS -> {
-                StrategyFileNaming.CRYPTO_ASSETS_NAME
+            StrategyKind.ASSET_LIST -> {
+                StrategyFileNaming.ASSET_LIST_NAME
             }
         }
 

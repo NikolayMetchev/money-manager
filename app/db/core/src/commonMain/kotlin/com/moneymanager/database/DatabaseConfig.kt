@@ -34,7 +34,7 @@ object DatabaseConfig {
     /**
      * Seeds [currencies] for a freshly created database, recording
      * SYSTEM provenance for each — the provenance that marks a currency as part of the catalog's
-     * currency list (see `StrategyLibraryService`). The app seeds none (a person installs the list from the
+     * asset list (see `StrategyLibraryService`). The app seeds none (a person installs the list from the
      * catalog); tests seed the few they use. Runs after Schema.create (which already seeded the lookups and the
      * system device).
      */

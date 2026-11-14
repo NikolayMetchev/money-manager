@@ -19,7 +19,7 @@ interface CryptoReadRepository {
      */
     fun getAssetAliases(): Flow<List<AssetAlias>>
 
-    /** Crypto assets the system created: installed from the catalog's crypto list, rather than by an import or a person. */
+    /** Crypto assets the system created: installed from the catalog's asset list, rather than by an import or a person. */
     fun getSystemCreatedCryptoAssets(): Flow<List<CryptoAsset>>
 }
 

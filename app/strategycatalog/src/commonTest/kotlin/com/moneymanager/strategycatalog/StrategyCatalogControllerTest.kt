@@ -81,8 +81,9 @@ class StrategyCatalogControllerTest {
     private val monzoKey = StrategyKey(StrategyKind.CSV, "Monzo CSV")
     private val curveKey = StrategyKey(StrategyKind.PASS_THROUGH, "Curve")
 
-    private val currenciesKey = StrategyKey(StrategyKind.CURRENCIES, "Currencies")
-    private val currenciesEntry = CatalogEntry("Currencies", StrategyKind.CURRENCIES, "Currencies.currencies.json", "hash:currencies-json")
+    private val currenciesKey = StrategyKey(StrategyKind.ASSET_LIST, "Assets and aliases")
+    private val currenciesEntry =
+        CatalogEntry("Assets and aliases", StrategyKind.ASSET_LIST, "Assets and aliases.assets.json", "hash:assets-json")
 
     private fun manifest(extra: List<CatalogEntry> = emptyList()): String =
         CatalogManifestCodec.encode(
@@ -108,7 +109,7 @@ class StrategyCatalogControllerTest {
                 ) {
                     "index.json" -> respond(manifest(extra))
                     "Monzo CSV.csv.json" -> respond("monzo-json")
-                    "Currencies.currencies.json" -> respond("currencies-json")
+                    "Assets and aliases.assets.json" -> respond("assets-json")
                     "Curve.passthrough.json" -> respond("curve-json")
                     else -> respondError(HttpStatusCode.NotFound)
                 }
@@ -280,7 +281,7 @@ class StrategyCatalogControllerTest {
             assertEquals(
                 listOf(gbp, xyz),
                 controller.previewInstall(library, setOf(monzoKey)).single().unresolvedReferences,
-                "without the currency list, GBP is unresolved",
+                "without the asset list, GBP is unresolved",
             )
             val withList =
                 controller
@@ -291,6 +292,6 @@ class StrategyCatalogControllerTest {
             assertEquals(listOf(xyz), withList[monzoKey], "the list adds GBP, not XYZ")
 
             controller.install(library, version, setOf(monzoKey, currenciesKey))
-            assertEquals(currenciesKey, library.applyOrder.first(), "the currency list installs before the strategy naming GBP")
+            assertEquals(currenciesKey, library.applyOrder.first(), "the asset list installs before the strategy naming GBP")
         }
 }

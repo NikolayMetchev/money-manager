@@ -1,5 +1,6 @@
 package com.moneymanager.ui.screens.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
@@ -49,7 +51,7 @@ import kotlinx.coroutines.launch
 private val logger = Logger.withTag("StrategyCloudCard")
 
 /** How the user chose to resolve a conflicting artifact (changed on both sides since the last sync). */
-private enum class ConflictChoice {
+internal enum class ConflictChoice {
     /** Upload the local version, overwriting the Drive copy. */
     KEEP_MINE,
 
@@ -356,65 +358,121 @@ private fun StatusSummary(
     }
 }
 
+/** How the sync screen groups its rows: what needs a decision, what will move, and what already matches. */
+private enum class SyncGroup(
+    val title: String,
+    val expandedByDefault: Boolean,
+) {
+    CLASHING("Clashing", true),
+    UNSYNCED("Unsynced", true),
+    SYNCED("Synced", false),
+}
+
+private fun StrategyItemStatus.group(): SyncGroup =
+    when (this) {
+        StrategyItemStatus.IN_SYNC -> SyncGroup.SYNCED
+
+        StrategyItemStatus.CONFLICT, StrategyItemStatus.UNREADABLE -> SyncGroup.CLASHING
+
+        StrategyItemStatus.NEW_LOCAL,
+        StrategyItemStatus.LOCAL_AHEAD,
+        StrategyItemStatus.REMOTE_AHEAD,
+        StrategyItemStatus.AVAILABLE,
+        -> SyncGroup.UNSYNCED
+    }
+
 @Composable
-private fun StrategyItemList(
+internal fun StrategyItemList(
     items: List<StrategyItem>,
     selectedToPull: List<StrategyKey>,
     conflictChoices: Map<StrategyKey, ConflictChoice>,
     onToggle: (StrategyKey, Boolean) -> Unit,
     onConflictChoice: (StrategyKey, ConflictChoice) -> Unit,
 ) {
+    val byGroup = items.groupBy { it.status.group() }
+    val expanded = remember { mutableStateMapOf<SyncGroup, Boolean>() }
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        items.forEach { item ->
-            val pullable =
-                item.status == StrategyItemStatus.AVAILABLE ||
-                    item.status == StrategyItemStatus.REMOTE_AHEAD
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                if (pullable) {
-                    Checkbox(
-                        checked = selectedToPull.contains(item.key),
-                        onCheckedChange = { onToggle(item.key, it) },
-                    )
-                } else {
-                    // Keep names aligned with the checkboxed rows.
-                    Spacer(Modifier.width(48.dp))
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = item.key.displayLabel(), style = MaterialTheme.typography.bodyMedium)
-                    item.error?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                    }
-                }
-                if (item.status == StrategyItemStatus.CONFLICT) {
-                    // A conflict needs an explicit direction: upload the local version or take Drive's.
-                    val choice = conflictChoices[item.key]
-                    FilterChip(
-                        selected = choice == ConflictChoice.KEEP_MINE,
-                        onClick = { onConflictChoice(item.key, ConflictChoice.KEEP_MINE) },
-                        label = { Text("Keep mine") },
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    FilterChip(
-                        selected = choice == ConflictChoice.TAKE_DRIVE,
-                        onClick = { onConflictChoice(item.key, ConflictChoice.TAKE_DRIVE) },
-                        label = { Text("Take Drive") },
-                    )
-                } else if (item.replaceable()) {
-                    // Drive's copy can't be read (another app version's format): offer to overwrite it with ours.
-                    FilterChip(
-                        selected = conflictChoices[item.key] == ConflictChoice.KEEP_MINE,
-                        onClick = { onConflictChoice(item.key, ConflictChoice.KEEP_MINE) },
-                        label = { Text("Replace on Drive") },
-                    )
-                } else {
-                    Text(
-                        text = statusLabel(item.status),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontStyle = FontStyle.Italic,
-                        color = statusColor(item.status),
-                    )
+        SyncGroup.entries.forEach { group ->
+            val groupItems = byGroup[group].orEmpty()
+            if (groupItems.isEmpty()) return@forEach
+            val open = expanded[group] ?: group.expandedByDefault
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { expanded[group] = !open }
+                        .testTag("strategySyncGroup_${group.name}"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${if (open) "▾" else "▸"} ${group.title} (${groupItems.size})",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            }
+            if (open) {
+                groupItems.forEach { item ->
+                    StrategyItemRow(item, selectedToPull, conflictChoices, onToggle, onConflictChoice)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun StrategyItemRow(
+    item: StrategyItem,
+    selectedToPull: List<StrategyKey>,
+    conflictChoices: Map<StrategyKey, ConflictChoice>,
+    onToggle: (StrategyKey, Boolean) -> Unit,
+    onConflictChoice: (StrategyKey, ConflictChoice) -> Unit,
+) {
+    val pullable =
+        item.status == StrategyItemStatus.AVAILABLE ||
+            item.status == StrategyItemStatus.REMOTE_AHEAD
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        if (pullable) {
+            Checkbox(
+                checked = selectedToPull.contains(item.key),
+                onCheckedChange = { onToggle(item.key, it) },
+            )
+        } else {
+            // Keep names aligned with the checkboxed rows.
+            Spacer(Modifier.width(48.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = item.key.displayLabel(), style = MaterialTheme.typography.bodyMedium)
+            item.error?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+        }
+        if (item.status == StrategyItemStatus.CONFLICT) {
+            // A conflict needs an explicit direction: upload the local version or take Drive's.
+            val choice = conflictChoices[item.key]
+            FilterChip(
+                selected = choice == ConflictChoice.KEEP_MINE,
+                onClick = { onConflictChoice(item.key, ConflictChoice.KEEP_MINE) },
+                label = { Text("Keep mine") },
+            )
+            Spacer(Modifier.width(4.dp))
+            FilterChip(
+                selected = choice == ConflictChoice.TAKE_DRIVE,
+                onClick = { onConflictChoice(item.key, ConflictChoice.TAKE_DRIVE) },
+                label = { Text("Take Drive") },
+            )
+        } else if (item.replaceable()) {
+            // Drive's copy can't be read (another app version's format): offer to overwrite it with ours.
+            FilterChip(
+                selected = conflictChoices[item.key] == ConflictChoice.KEEP_MINE,
+                onClick = { onConflictChoice(item.key, ConflictChoice.KEEP_MINE) },
+                label = { Text("Replace on Drive") },
+            )
+        } else {
+            Text(
+                text = statusLabel(item.status),
+                style = MaterialTheme.typography.bodySmall,
+                fontStyle = FontStyle.Italic,
+                color = statusColor(item.status),
+            )
         }
     }
 }
@@ -454,8 +512,7 @@ private fun StrategyKey.displayLabel(): String =
         StrategyKind.PDF -> "$name (PDF)"
         StrategyKind.API -> "$name (API)"
         StrategyKind.PASS_THROUGH -> "$name (Pass-through)"
-        StrategyKind.CURRENCIES -> "$name (Currencies)"
         StrategyKind.HOLIDAY_CALENDAR -> "$name (Location)"
-        StrategyKind.ASSETS -> "Assets and aliases"
-        StrategyKind.CRYPTO_ASSETS -> "$name (Crypto list)"
+        StrategyKind.ASSETS -> "Your own assets and aliases"
+        StrategyKind.ASSET_LIST -> "$name (Catalog list)"
     }

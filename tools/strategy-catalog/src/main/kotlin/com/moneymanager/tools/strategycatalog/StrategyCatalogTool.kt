@@ -7,7 +7,6 @@ import com.moneymanager.cryptodata.BundledCryptoCatalog
 import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.database.json.AssetListExportCodec
 import com.moneymanager.database.json.CsvStrategyExportCodec
-import com.moneymanager.database.json.CurrencyListExportCodec
 import com.moneymanager.database.json.HolidayCalendarExportCodec
 import com.moneymanager.database.json.PassThroughExportCodec
 import com.moneymanager.database.json.StrategyArtifactCodec
@@ -38,7 +37,7 @@ private const val GBP_CURRENCY_CODE = "GBP"
 
 /**
  * Generates the strategy catalog for the GitHub Pages site: renders every Kotlin built-in definition
- * (app/strategies), the ISO 4217 currency list, the crypto list and Strata's locations to their portable JSON artifacts and writes
+ * (app/strategies), the asset list (ISO 4217 currencies and crypto coins) and Strata's locations to their portable JSON artifacts and writes
  * `<webpageDir>/strategy-library/` — index.json plus one file per artifact. Nothing is checked in; CI
  * runs this before uploading the `webpage/` directory to Pages.
  */
@@ -77,13 +76,10 @@ internal fun builtInArtifacts(): Map<StrategyKey, String> {
         artifacts[StrategyKey(StrategyKind.PASS_THROUGH, definition.name)] = PassThroughExportCodec.encode(definition.toExport())
     }
 
-    // The app bundles no currencies or locations: a new database installs them from here, rendered from this JDK and
-    // from Strata when the site is published. The crypto list comes from the dataset the app also bundles.
-    artifacts[StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)] =
-        CurrencyListExportCodec.encode(currencyListExport(jdkIsoCurrencies()))
-
-    artifacts[StrategyKey(StrategyKind.CRYPTO_ASSETS, StrategyFileNaming.CRYPTO_ASSETS_NAME)] =
-        AssetListExportCodec.encode(cryptoAssetListExport(BundledCryptoCatalog.rows, jdkIsoCurrencies()))
+    // The app bundles no assets or locations: a new database installs them from here, the currencies rendered from this
+    // JDK, the coins from the dataset the app also bundles, and the locations from Strata when the site is published.
+    artifacts[StrategyKey(StrategyKind.ASSET_LIST, StrategyFileNaming.ASSET_LIST_NAME)] =
+        AssetListExportCodec.encode(assetListExport(BundledCryptoCatalog.rows, jdkIsoCurrencies()))
 
     for (calendar in strataHolidayCalendars()) {
         artifacts[StrategyKey(StrategyKind.HOLIDAY_CALENDAR, calendar.id)] =

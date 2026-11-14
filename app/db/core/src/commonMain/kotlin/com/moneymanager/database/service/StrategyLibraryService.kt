@@ -4,16 +4,11 @@ import com.moneymanager.database.json.AccountMappingExportCodec
 import com.moneymanager.database.json.ApiStrategyExportCodec
 import com.moneymanager.database.json.AssetListExportCodec
 import com.moneymanager.database.json.CsvStrategyExportCodec
-import com.moneymanager.database.json.CurrencyListExportCodec
 import com.moneymanager.database.json.HolidayCalendarExportCodec
 import com.moneymanager.database.json.PassThroughExportCodec
 import com.moneymanager.database.json.StrategyArtifactCodec
-import com.moneymanager.domain.model.AliasPublisher
 import com.moneymanager.domain.model.AppVersion
-import com.moneymanager.domain.model.AssetAlias
 import com.moneymanager.domain.model.AssetExportKind
-import com.moneymanager.domain.model.CurrencyExportEntry
-import com.moneymanager.domain.model.CurrencyListExport
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.calendar.HolidayCalendarExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
@@ -22,9 +17,7 @@ import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.domain.model.passthrough.export.PassThroughExport
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
-import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
-import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.HolidayCalendarReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.strategy.CsvReferenceType
@@ -38,12 +31,9 @@ import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.domain.strategy.StrategyParseResult
 import com.moneymanager.domain.strategy.libraryKind
 import com.moneymanager.importengineapi.AccountMappingMutation
-import com.moneymanager.importengineapi.AssetAliasMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.ImportBatch
-import com.moneymanager.importengineapi.ImportCurrencyIntent
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.LocalCurrencyKey
 import com.moneymanager.importengineapi.createApiStrategy
 import com.moneymanager.importengineapi.createPassThroughAccount
 import com.moneymanager.importengineapi.updateApiStrategy
@@ -61,8 +51,6 @@ class StrategyLibraryService(
     private val apiStrategyRepository: ApiImportStrategyReadRepository,
     private val accountMappingRepository: AccountMappingReadRepository,
     private val passThroughAccountRepository: PassThroughAccountReadRepository,
-    private val currencyRepository: CurrencyReadRepository,
-    private val cryptoRepository: CryptoReadRepository,
     private val holidayCalendarRepository: HolidayCalendarReadRepository,
     private val csvStrategyExportService: CsvStrategyExportService,
     private val apiStrategyExportService: ApiStrategyExportService,
@@ -94,32 +82,6 @@ class StrategyLibraryService(
             entries += entry(StrategyKey(StrategyKind.GLOBAL_MAPPINGS, StrategyFileNaming.GLOBAL_MAPPINGS_NAME), json)
         }
 
-        val listCurrencies = currencyRepository.getSystemCreatedCurrencies().first()
-        if (listCurrencies.isNotEmpty()) {
-            val listAliases =
-                cryptoRepository
-                    .getAssetAliases()
-                    .first()
-                    .filter { it.publisher == AliasPublisher.CURRENCY_LIST }
-                    .groupBy({ it.assetCode }, { it.alias })
-            val export =
-                CurrencyListExport(
-                    version = appVersion.value,
-                    name = StrategyFileNaming.CURRENCIES_NAME,
-                    currencies =
-                        listCurrencies.map {
-                            CurrencyExportEntry(
-                                it.code,
-                                it.name,
-                                it.fractionDigits,
-                                listAliases[it.code].orEmpty().toSet(),
-                            )
-                        },
-                )
-            entries +=
-                entry(StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME), CurrencyListExportCodec.encode(export))
-        }
-
         for (calendar in holidayCalendarRepository.getAll().first()) {
             val json = HolidayCalendarExportCodec.encode(HolidayCalendarExport(version = appVersion.value, calendar = calendar))
             entries += entry(StrategyKey(StrategyKind.HOLIDAY_CALENDAR, calendar.id), json)
@@ -130,13 +92,10 @@ class StrategyLibraryService(
             entries += entry(StrategyKey(StrategyKind.ASSETS, StrategyFileNaming.ASSETS_NAME), AssetListExportCodec.encode(assets))
         }
 
-        val cryptoList = assetExportService.toPublishedCryptoList(appVersion)
-        if (cryptoList.assets.isNotEmpty()) {
+        val assetList = assetExportService.toPublishedAssetList(appVersion)
+        if (assetList.assets.isNotEmpty()) {
             entries +=
-                entry(
-                    StrategyKey(StrategyKind.CRYPTO_ASSETS, StrategyFileNaming.CRYPTO_ASSETS_NAME),
-                    AssetListExportCodec.encode(cryptoList),
-                )
+                entry(StrategyKey(StrategyKind.ASSET_LIST, StrategyFileNaming.ASSET_LIST_NAME), AssetListExportCodec.encode(assetList))
         }
 
         return entries
@@ -153,17 +112,12 @@ class StrategyLibraryService(
                 StrategyParseResult(key, refs)
             }
 
-            // API strategies, pass-through definitions, the currency list and locations carry no entity references.
+            // API strategies, pass-through definitions and locations carry no entity references.
             StrategyKind.API, StrategyKind.PASS_THROUGH, StrategyKind.HOLIDAY_CALENDAR -> {
                 StrategyParseResult(key, emptyList())
             }
 
-            StrategyKind.CURRENCIES -> {
-                val codes = CurrencyListExportCodec.decode(json).currencies.mapTo(mutableSetOf()) { it.code }
-                StrategyParseResult(key, emptyList(), provides = mapOf(CsvReferenceType.CURRENCY to codes))
-            }
-
-            StrategyKind.ASSETS, StrategyKind.CRYPTO_ASSETS -> {
+            StrategyKind.ASSETS, StrategyKind.ASSET_LIST -> {
                 val codes =
                     AssetListExportCodec
                         .decode(json)
@@ -209,10 +163,6 @@ class StrategyLibraryService(
                 applyGlobalMappings(json, resolutions)
             }
 
-            StrategyKind.CURRENCIES -> {
-                applyCurrencies(json)
-            }
-
             StrategyKind.HOLIDAY_CALENDAR -> {
                 applyHolidayCalendar(key.name, json)
             }
@@ -221,49 +171,10 @@ class StrategyLibraryService(
                 assetExportService.importAssets(AssetListExportCodec.decode(json))
             }
 
-            StrategyKind.CRYPTO_ASSETS -> {
-                assetExportService.installPublishedCryptoList(AssetListExportCodec.decode(json))
+            StrategyKind.ASSET_LIST -> {
+                assetExportService.installPublishedAssetList(AssetListExportCodec.decode(json))
             }
         }
-    }
-
-    /**
-     * Union semantics: adds every listed code the database lacks, as SYSTEM so it joins the local list.
-     * Existing currencies are never renamed or removed (transfers reference them), so a code dropped
-     * from the published list keeps the local list differing until the user deletes it.
-     */
-    private suspend fun applyCurrencies(json: String) {
-        val existing =
-            currencyRepository
-                .getAllCurrencies()
-                .first()
-                .map { it.code }
-                .toSet()
-        val listed = CurrencyListExportCodec.decode(json).currencies
-        val missing = listed.filter { it.code !in existing }
-        // An alias a person or the crypto list set stays theirs: the list only adds the names nobody has taken.
-        val taken = cryptoRepository.getAssetAliases().first().mapTo(mutableSetOf()) { it.alias }
-        val aliases =
-            listed
-                .flatMap { entry -> entry.aliases.map { AssetAlias(it, entry.code, AliasPublisher.CURRENCY_LIST) } }
-                .filter { it.alias !in taken }
-                .map { AssetAliasMutation.Set(it.alias, it.assetCode, it.publisher) }
-        if (missing.isEmpty() && aliases.isEmpty()) return
-        importEngine.import(
-            ImportBatch(
-                assetAliasMutations = aliases,
-                currencies =
-                    missing.map {
-                        ImportCurrencyIntent(
-                            key = LocalCurrencyKey(it.code),
-                            source = Source.System,
-                            code = it.code,
-                            name = it.name,
-                            fractionDigits = it.fractionDigits,
-                        )
-                    },
-            ),
-        )
     }
 
     /**

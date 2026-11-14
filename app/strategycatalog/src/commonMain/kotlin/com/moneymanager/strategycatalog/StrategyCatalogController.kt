@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-private val REFERENCE_DATA_KINDS = setOf(StrategyKind.CURRENCIES, StrategyKind.CRYPTO_ASSETS, StrategyKind.HOLIDAY_CALENDAR)
+private val REFERENCE_DATA_KINDS = setOf(StrategyKind.ASSET_LIST, StrategyKind.HOLIDAY_CALENDAR)
 
 /** How a catalog artifact stands relative to the local database. */
 enum class CatalogItemStatus {
@@ -113,7 +113,7 @@ class StrategyCatalogController(
 
     /**
      * Downloads the artifacts for [keys] and reports their unresolved references (install preview). A reference that
-     * another of them provides (a currency code in the currency list) isn't reported: [install] applies the provider
+     * another of them provides (a currency code in the asset list) isn't reported: [install] applies the provider
      * first.
      */
     suspend fun previewInstall(

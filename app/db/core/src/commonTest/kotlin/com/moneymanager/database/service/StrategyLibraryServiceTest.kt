@@ -1,14 +1,15 @@
 package com.moneymanager.database.service
 
-import com.moneymanager.database.json.CurrencyListExportCodec
+import com.moneymanager.database.json.AssetListExportCodec
 import com.moneymanager.database.json.HolidayCalendarExportCodec
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.AssetExportEntry
+import com.moneymanager.domain.model.AssetExportKind
+import com.moneymanager.domain.model.AssetListExport
 import com.moneymanager.domain.model.CsvImportStrategyId
-import com.moneymanager.domain.model.CurrencyExportEntry
-import com.moneymanager.domain.model.CurrencyListExport
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
@@ -235,30 +236,29 @@ class StrategyLibraryServiceTest : DbTest() {
         }
 
     @Test
-    fun `currency list lists seeded currencies - skips user-created ones - and installs only missing codes`() =
+    fun `the asset list lists seeded currencies - skips user-created ones - and installs only missing codes`() =
         runDbTest {
             val library = repositories.strategyLibrary
             val engine = repositories.importEngine
-            val key = StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)
+            val key = StrategyKey(StrategyKind.ASSET_LIST, StrategyFileNaming.ASSET_LIST_NAME)
             engine.createCurrency("ZZZ", "Hand-made", null, Source.Manual)
 
             val entry = library.listLocal(version).first { it.key == key }
-            val listed = CurrencyListExportCodec.decode(entry.json).currencies.map { it.code }
+            val listed = AssetListExportCodec.decode(entry.json).assets.map { it.code }
             // The test seed (GBP, USD, EUR); the user's own currency isn't part of the list.
             assertEquals(listOf("EUR", "GBP", "USD"), listed)
 
             val published =
-                CurrencyListExport(
-                    name = StrategyFileNaming.CURRENCIES_NAME,
-                    currencies =
+                AssetListExport(
+                    assets =
                         listOf(
-                            CurrencyExportEntry("GBP", "Renamed Pound"),
-                            CurrencyExportEntry("JPY", "Japanese Yen"),
-                            CurrencyExportEntry("ZZZ", "Published name"),
+                            AssetExportEntry("GBP", "Renamed Pound", AssetExportKind.CURRENCY),
+                            AssetExportEntry("JPY", "Japanese Yen", AssetExportKind.CURRENCY),
+                            AssetExportEntry("ZZZ", "Published name", AssetExportKind.CURRENCY),
                         ),
                 )
-            library.applyIncoming(key, CurrencyListExportCodec.encode(published), emptyMap())
-            library.applyIncoming(key, CurrencyListExportCodec.encode(published), emptyMap())
+            library.applyIncoming(key, AssetListExportCodec.encode(published), emptyMap())
+            library.applyIncoming(key, AssetListExportCodec.encode(published), emptyMap())
 
             val currencies =
                 repositories.currencyRepository
@@ -271,7 +271,7 @@ class StrategyLibraryServiceTest : DbTest() {
             assertEquals(
                 listOf("EUR", "GBP", "JPY", "USD"),
                 library.listLocal(version).first { it.key == key }.let {
-                    CurrencyListExportCodec.decode(it.json).currencies.map { c -> c.code }
+                    AssetListExportCodec.decode(it.json).assets.map { c -> c.code }
                 },
             )
         }
@@ -279,10 +279,21 @@ class StrategyLibraryServiceTest : DbTest() {
     @Test
     fun `a database holding the published list hashes as it`() =
         runDbTest {
-            val key = StrategyKey(StrategyKind.CURRENCIES, StrategyFileNaming.CURRENCIES_NAME)
-            val published = CurrencyListExport(name = StrategyFileNaming.CURRENCIES_NAME, currencies = testCurrencies.reversed())
+            val key = StrategyKey(StrategyKind.ASSET_LIST, StrategyFileNaming.ASSET_LIST_NAME)
+            val published =
+                AssetListExport(
+                    assets =
+                        testCurrencies.reversed().map {
+                            AssetExportEntry(
+                                it.code,
+                                it.name,
+                                AssetExportKind.CURRENCY,
+                                it.fractionDigits,
+                            )
+                        },
+                )
             val local = repositories.strategyLibrary.listLocal(version).first { it.key == key }
-            assertEquals(local.contentHash, repositories.strategyLibrary.canonicalHash(key, CurrencyListExportCodec.encode(published)))
+            assertEquals(local.contentHash, repositories.strategyLibrary.canonicalHash(key, AssetListExportCodec.encode(published)))
         }
 
     @Test
