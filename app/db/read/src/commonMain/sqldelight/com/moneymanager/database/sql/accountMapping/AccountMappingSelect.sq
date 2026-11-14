@@ -5,3 +5,7 @@ SELECT * FROM account_mapping ORDER BY id;
 -- Select a mapping by ID
 selectById:
 SELECT * FROM account_mapping WHERE id = ?;
+
+-- The global mapping with this exact pattern, if any (at most one: idx_account_mapping_global_unique)
+selectGlobalIdByPattern:
+SELECT id FROM account_mapping WHERE strategy_id IS NULL AND value_pattern = ?;

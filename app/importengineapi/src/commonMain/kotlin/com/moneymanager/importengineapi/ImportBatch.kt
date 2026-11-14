@@ -346,10 +346,14 @@ data class ImportOrderIntent(
     val tradeKeys: List<LocalTradeKey> = emptyList(),
 )
 
-/** A request to merge [deletedId] into [survivingId] (reassign its transfers, then delete it). */
+/**
+ * A request to merge [deletedId] into [survivingId] (reassign its transfers, then delete it). With [mapDeletedName],
+ * imports that name the deleted account go to the survivor from then on (a global account mapping the unmerge removes).
+ */
 data class AccountMergeRequest(
     val deletedId: AccountId,
     val survivingId: AccountId,
+    val mapDeletedName: Boolean = false,
 )
 
 /**

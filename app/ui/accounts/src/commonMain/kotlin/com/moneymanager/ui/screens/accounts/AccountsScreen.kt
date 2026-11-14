@@ -414,6 +414,7 @@ fun DeleteAccountDialog(
     var selectedTargetAccount by remember { mutableStateOf<Account?>(null) }
     var dropdownExpanded by remember { mutableStateOf(false) }
     var targetSearchQuery by remember { mutableStateOf("") }
+    var mapDeletedName by remember { mutableStateOf(true) }
     val importEngine = LocalImportEngine.current
 
     val allAccounts by accountRepository
@@ -511,6 +512,22 @@ fun DeleteAccountDialog(
                             }
                         }
                     }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !isBusy) { mapDeletedName = !mapDeletedName }
+                                .testTag("mergeMapDeletedNameCheckbox"),
+                    ) {
+                        Checkbox(checked = mapDeletedName, onCheckedChange = null, enabled = !isBusy)
+                        Text(
+                            text =
+                                "Send future imports of \"${account.name}\" to the surviving account " +
+                                    "(adds a global account mapping)",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                     if (hasConflicts) {
                         Text(
                             text =
@@ -546,6 +563,7 @@ fun DeleteAccountDialog(
                                 AccountMergeRequest(
                                     deletedId = account.id,
                                     survivingId = selectedTargetAccount!!.id,
+                                    mapDeletedName = mapDeletedName,
                                 ),
                             ),
                     ),

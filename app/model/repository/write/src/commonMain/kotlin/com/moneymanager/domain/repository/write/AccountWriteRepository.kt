@@ -54,11 +54,16 @@ interface AccountWriteRepository : AccountReadRepository {
      *
      * The deleted account's DELETE audit entry is sourced as a merge on the current device.
      *
+     * With [mapDeletedName], imports that name the deleted account land on the survivor from then on: a global
+     * account mapping matching the deleted account's exact name, recorded with the merge so [unmergeAccount]
+     * deletes it. An existing global mapping of that pattern is left as it is.
+     *
      * @return the id of the recorded merge.
      */
     suspend fun mergeAccounts(
         deletedAccount: AccountId,
         survivingAccount: AccountId,
+        mapDeletedName: Boolean = false,
     ): MergeId
 
     /**
