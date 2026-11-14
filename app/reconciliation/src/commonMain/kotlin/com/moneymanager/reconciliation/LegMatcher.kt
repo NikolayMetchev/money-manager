@@ -244,8 +244,9 @@ fun reconcile(
         }
 
     nextStep()
-    // Pass 1: the same second, first come first served (the legs are indistinguishable anyway).
-    for (leg in inScopeSource) {
+    // Pass 1: the same second, first come first served (the legs are indistinguishable anyway). A leg a stored match
+    // already paired is skipped, or a second real record of the same movement would be offered as a match of its own.
+    for (leg in inScopeSource.filter { it !in matchedSource }) {
         val best =
             realByKey[keyOf(leg)]
                 ?.firstOrNull { it !in consumed && it.timestamp.epochSeconds == leg.timestamp.epochSeconds }

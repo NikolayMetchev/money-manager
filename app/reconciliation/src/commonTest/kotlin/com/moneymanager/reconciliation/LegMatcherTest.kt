@@ -370,6 +370,20 @@ class LegMatcherTest {
     }
 
     @Test
+    fun `a leg in a stored match is not matched again to a second real record of the same movement`() {
+        // Koinly's reward stored against one Crypto.com record, while Money Manager holds a second record of it at the
+        // same second: the second is Money Manager's own, not another match to accept.
+        val source = listOf(leg(wallet, sourceRewards, "5", t0, matchIds = setOf(7)))
+        val stored = leg(binance, stakingRewards, "5", t0, matchIds = setOf(7))
+        val duplicate = leg(binance, stakingRewards, "5", t0)
+
+        val result = reconcile(source, links, listOf(stored, duplicate))
+
+        assertEquals(7L, result.matches.single().matchId)
+        assertEquals(listOf(duplicate), result.missingInSource.map { it.leg })
+    }
+
+    @Test
     fun `a stored match with one side gone falls back to normal matching`() {
         val source = listOf(leg(wallet, sourceRewards, "5", t0, matchIds = setOf(7)))
         val real = listOf(leg(binance, stakingRewards, "5", t0 + 1.hours))
