@@ -106,7 +106,7 @@ class MergeAccountDialogTest {
             onNodeWithTag("mergeMapDeletedNameCheckbox").performClick()
             onNode(isToggleable()).assertIsOff()
 
-            assertEquals(AccountMergeRequest(deletedId = old.id, survivingId = current.id, mapDeletedName = false), merge(engine))
+            assertEquals(AccountMergeRequest(deletedId = old.id, survivingId = current.id), merge(engine))
         }
     }
 }
