@@ -17,6 +17,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.write.AccountWriteRepository
+import com.moneymanager.regex.escapeRegex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
@@ -158,10 +159,40 @@ class AccountWriteRepositoryImpl(
     override suspend fun mergeAccounts(
         deletedAccount: AccountId,
         survivingAccount: AccountId,
+        mapDeletedName: Boolean,
     ): MergeId =
         withContext(Dispatchers.Default) {
-            database.transactionWithResult { MergeId(merge(deletedAccount, survivingAccount, parentMergeId = null)) }
+            database.transactionWithResult {
+                val deletedName = selectQueries.selectById(deletedAccount.id).awaitAsOne().name
+                val mergeId = merge(deletedAccount, survivingAccount, parentMergeId = null)
+                // After the merge: its cascade delete takes any mapping still pointing at the deleted account.
+                if (mapDeletedName) mapNameToSurvivor(deletedName, survivingAccount, mergeId)
+                MergeId(mergeId)
+            }
         }
+
+    /**
+     * Routes imports that name [deletedName] to [survivingAccount] with a global mapping of that exact name, recorded
+     * under [mergeId] so unmerge removes it. A global mapping of the same pattern already says where that name goes.
+     */
+    private suspend fun mapNameToSurvivor(
+        deletedName: String,
+        survivingAccount: AccountId,
+        mergeId: Long,
+    ) {
+        val pattern = "^${escapeRegex(deletedName)}$"
+        if (database.accountMappingSelectQueries.selectGlobalIdByPattern(pattern).awaitAsOneOrNull() != null) return
+        val now = Clock.System.now().toEpochMilliseconds()
+        val mappingQueries = database.accountMappingWriteQueries
+        mappingQueries.insert(
+            strategy_id = null,
+            value_pattern = pattern,
+            account_id = survivingAccount.id,
+            created_at = now,
+            updated_at = now,
+        )
+        mergeWriteQueries.insertMergeMapping(merge_id = mergeId, mapping_id = mappingQueries.lastInsertRowId().awaitAsOne())
+    }
 
     /**
      * Merges [deletedAccount] into [survivingAccount] inside the caller's transaction, then their fee accounts the
@@ -428,6 +459,10 @@ class AccountWriteRepositoryImpl(
             survivingAccount = merge.surviving_account_id,
         )
         mergeWriteQueries.restoreStatementSources(deletedAccount = merge.deleted_account_id, mergeId = mergeId.id)
+        // The restored account takes its imports back.
+        mergeSelectQueries.selectMappingIdsForMerge(mergeId.id).awaitAsList().forEach { mappingId ->
+            database.accountMappingWriteQueries.deleteById(mappingId)
+        }
 
         mergeWriteQueries.markReversed(mergeId.id)
     }

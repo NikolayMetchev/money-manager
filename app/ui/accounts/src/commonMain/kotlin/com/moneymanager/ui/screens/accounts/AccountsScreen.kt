@@ -7,12 +7,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.material3.Checkbox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
@@ -414,6 +416,7 @@ fun DeleteAccountDialog(
     var selectedTargetAccount by remember { mutableStateOf<Account?>(null) }
     var dropdownExpanded by remember { mutableStateOf(false) }
     var targetSearchQuery by remember { mutableStateOf("") }
+    var mapDeletedName by remember { mutableStateOf(true) }
     val importEngine = LocalImportEngine.current
 
     val allAccounts by accountRepository
@@ -511,6 +514,22 @@ fun DeleteAccountDialog(
                             }
                         }
                     }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .toggleable(value = mapDeletedName, enabled = !isBusy, role = Role.Checkbox) { mapDeletedName = it }
+                                .testTag("mergeMapDeletedNameCheckbox"),
+                    ) {
+                        Checkbox(checked = mapDeletedName, onCheckedChange = null, enabled = !isBusy)
+                        Text(
+                            text =
+                                "Send future imports of \"${account.name}\" to the surviving account " +
+                                    "(adds a global account mapping)",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                     if (hasConflicts) {
                         Text(
                             text =
@@ -546,6 +565,7 @@ fun DeleteAccountDialog(
                                 AccountMergeRequest(
                                     deletedId = account.id,
                                     survivingId = selectedTargetAccount!!.id,
+                                    mapDeletedName = mapDeletedName,
                                 ),
                             ),
                     ),

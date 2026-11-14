@@ -464,7 +464,7 @@ class ImportEngineImpl(
         }
 
         // ----- MERGE / UNMERGE (before deletes: a merge already removes the absorbed account) -----
-        batch.accountMerges.forEach { accountRepository.mergeAccounts(it.deletedId, it.survivingId) }
+        batch.accountMerges.forEach { accountRepository.mergeAccounts(it.deletedId, it.survivingId, it.mapDeletedName) }
         batch.accountUnmerges.forEach { accountRepository.unmergeAccount(it) }
 
         // ----- DELETE phase (dependents first) -----

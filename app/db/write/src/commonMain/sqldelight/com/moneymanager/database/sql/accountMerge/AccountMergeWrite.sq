@@ -21,6 +21,10 @@ insertMergeAttribute:
 INSERT INTO account_merge_attribute(merge_id, attribute_id)
 VALUES (?, ?);
 
+insertMergeMapping:
+INSERT INTO account_merge_mapping(merge_id, mapping_id)
+VALUES (?, ?);
+
 markReversed:
 UPDATE account_merge SET reversed = 1 WHERE id = ?;
 
