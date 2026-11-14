@@ -24,7 +24,7 @@ Read from the plugin's sync aspect (`intellij.libraries.bazel.aspect.sdk`), whic
 | `:<name>_jvm` (`kt_jvm_library`) | A Kotlin JVM module: every `commonMain`, `jvmAndroidMain` and `jvmMain` file in **one** module, its jar classpath (Maven jars included), its compiler plugins. |
 | `:test_jvm_lib` (`kt_jvm_library`, testonly) | A test module with `associates`, so `internal` resolves. |
 | `:<name>_<target>` (`kt_native_klib`), `:test_<target>_bin` | Nothing: our own rules, which the aspect doesn't know. |
-| `:<name>_ide_native` (`kt_jvm_library`, manual) | A Kotlin JVM module for `commonMain` + `nonJvmMain` + `nativeMain` + `linuxMain`, depending on its modules' own `_ide_native` (workaround 1 below), synced because `.bazelproject` sets `allow_manual_targets_sync`. `appleMain`/`mingwMain` files still belong to no module. |
+| `:<name>_ide_native` (`kmp_ide_module`, manual) | A Kotlin JVM module, never compiled (its jar is empty, so a sync can't fail on native-only APIs), for `commonMain` + `nonJvmMain` + `nativeMain` + `linuxMain`, depending on its modules' own `_ide_native` (workaround 1 below), synced because `.bazelproject` sets `allow_manual_targets_sync`. `appleMain`/`mingwMain` files still belong to no module. |
 | `:sqldelight` | Its srcjar is a generated source of `:<name>_sqldelight_jvm`, so SQLDelight's generated API resolves (on the JVM). |
 
 ## What that predicts
