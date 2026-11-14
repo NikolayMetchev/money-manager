@@ -11,3 +11,13 @@ derive_targets_from_directories: true
 # Each native module's `:<name>_ide_native` (bazel/kmp/defs.bzl) is the only module that owns its nativeMain and
 # linuxMain sources. It is manual, so `bazel build //...` never compiles it.
 allow_manual_targets_sync: true
+
+# The release packaging: `:release_jars` is a JavaInfo (ProGuard's output), so a sync would shrink the app (minutes,
+# even remote) for jars no module needs. Everything here is manual and only reached by allow_manual_targets_sync.
+targets:
+  -//app/main/jvm:release_jars
+  -//app/main/jvm:release
+  -//app/main/jvm:release_service_providers_test
+  -//app/main/jvm:app_image
+  -//app/main/jvm:app_image_aot
+  -//app/main/jvm:installer

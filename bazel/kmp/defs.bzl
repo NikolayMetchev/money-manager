@@ -22,6 +22,7 @@ load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+load(":ide.bzl", "kmp_ide_module")
 load(":metadata.bzl", "kt_metadata_library")
 load(":module_info.bzl", "module_info")
 load("@bazel_skylib//lib:structs.bzl", "structs")
@@ -164,13 +165,14 @@ def _module_name(native_targets, jvm):
 
 def _ide_native(name, common_srcs, non_jvm_srcs, native_srcs, linux_srcs, deps, native_deps, exports, cinterops,
                 sqldelight, module_name, plugins, visibility):
-    """`:<name>_ide_native`: a JVM compile of `commonMain ← nonJvmMain ← nativeMain ← linuxMain`, only so the
+    """`:<name>_ide_native`: a JVM module of `commonMain + nonJvmMain + nativeMain + linuxMain`, only so the
     JetBrains Bazel plugin has a module that owns the native sources (it reads `KtJvmInfo`, not our klibs; see
     docs/bazel/ide-evaluation.md). It is analysed against the JVM stdlib, so `kotlinx.cinterop` and `platform.*`
     stay red, and appleMain/mingwMain still belong to no module. It depends on its modules' own IDE targets, so a
     nativeMain declaration another module's nativeMain uses resolves; a module without native sources aliases
-    its `_jvm`. A Maven library only the native source sets use has no JVM jar, so it is left out. Manual: nothing
-    builds it, and much of it wouldn't compile."""
+    its `_jvm`. A Maven library only the native source sets use has no JVM jar, so it is left out. Much of it
+    wouldn't compile on the JVM, and a sync builds every module's jars, so it is a `kmp_ide_module`, which never
+    runs kotlinc. Manual: nothing else needs it."""
     if not (non_jvm_srcs or native_srcs or linux_srcs):
         native.alias(
             name = name + "_ide_native",
@@ -179,18 +181,10 @@ def _ide_native(name, common_srcs, non_jvm_srcs, native_srcs, linux_srcs, deps, 
             visibility = visibility,
         )
         return
-    fragments = _fragments([
-        ("commonMain", common_srcs, True),
-        ("nonJvmMain", non_jvm_srcs, False),
-        ("nativeMain", native_srcs, False),
-        ("linuxMain", linux_srcs, True),
-    ])
     own = [":%s_sqldelight_jvm" % name] if sqldelight else []
-    kt_jvm_library(
+    kmp_ide_module(
         name = name + "_ide_native",
-        srcs = fragments.srcs,
-        fragment_srcs = fragments.fragment_srcs,
-        fragment_refines = fragments.fragment_refines,
+        srcs = common_srcs + non_jvm_srcs + native_srcs + linux_srcs,
         deps = _on_ide_native(deps + exports + [d for d in native_deps if not _is_library(d) and d not in cinterops]) + own,
         exports = _on_ide_native(exports) + own,
         module_name = module_name,
