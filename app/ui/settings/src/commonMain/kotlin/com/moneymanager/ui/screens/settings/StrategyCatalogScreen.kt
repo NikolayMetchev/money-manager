@@ -381,7 +381,7 @@ private val kindFilterChips =
         StrategyKind.HOLIDAY_CALENDAR to "Locations",
     )
 
-private fun StrategyKind.displayName(): String =
+internal fun StrategyKind.displayName(): String =
     when (this) {
         StrategyKind.CSV -> "CSV import strategy"
         StrategyKind.QIF -> "QIF import strategy"

@@ -51,7 +51,7 @@ import kotlinx.coroutines.launch
 private val logger = Logger.withTag("StrategyCloudCard")
 
 /** How the user chose to resolve a conflicting artifact (changed on both sides since the last sync). */
-private enum class ConflictChoice {
+internal enum class ConflictChoice {
     /** Upload the local version, overwriting the Drive copy. */
     KEEP_MINE,
 
@@ -382,7 +382,7 @@ private fun StrategyItemStatus.group(): SyncGroup =
     }
 
 @Composable
-private fun StrategyItemList(
+internal fun StrategyItemList(
     items: List<StrategyItem>,
     selectedToPull: List<StrategyKey>,
     conflictChoices: Map<StrategyKey, ConflictChoice>,
