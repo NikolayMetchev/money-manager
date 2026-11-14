@@ -29,11 +29,11 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.addAccountAttributes
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createOwnership
 import com.moneymanager.test.database.createPerson
 import com.moneymanager.test.database.reimports
-import com.moneymanager.test.database.addAccountAttributes
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
