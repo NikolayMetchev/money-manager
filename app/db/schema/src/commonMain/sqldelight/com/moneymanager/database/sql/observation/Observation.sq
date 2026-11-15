@@ -1,0 +1,174 @@
+-- Observations (#1419): what one owner says about one output slot of a source. A slot is a deterministic name
+-- (main, fee, conduit/<n>, reversal, trade, manual-entry), so a re-import finds the same observation again and
+-- updates it in place. transaction_id is the transaction the matcher assigned it to; several observations of one
+-- movement share a transaction, whose transfer or trade row holds the merge of their values.
+--
+-- kind says which value table holds the observation's values: transfer_observation or trade_observation.
+CREATE TABLE observation (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    transaction_id INTEGER NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('TRANSFER', 'TRADE')),
+    FOREIGN KEY (transaction_id) REFERENCES transaction_id(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_observation_transaction ON observation(transaction_id);
+
+-- Every observation has exactly one owner, in one of the three tables below, which also holds its slot. An
+-- owner says one thing per slot: UNIQUE(owner, slot).
+
+-- An observation one import record owns.
+CREATE TABLE observation_record (
+    observation_id INTEGER PRIMARY KEY NOT NULL,
+    record_id INTEGER NOT NULL,
+    slot TEXT NOT NULL,
+    FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE,
+    FOREIGN KEY (record_id) REFERENCES import_record(id) ON DELETE RESTRICT,
+    UNIQUE (record_id, slot)
+);
+
+-- An observation an import group owns (an output several records make together).
+CREATE TABLE observation_group (
+    observation_id INTEGER PRIMARY KEY NOT NULL,
+    group_id INTEGER NOT NULL,
+    slot TEXT NOT NULL,
+    FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES import_group(id) ON DELETE RESTRICT,
+    UNIQUE (group_id, slot)
+);
+
+-- An observation a person made: a transaction created by hand. Its owner is the provenance row of that creation
+-- (an entity_source written by Source.Manual), which says who made it, on which device and when.
+CREATE TABLE observation_manual (
+    observation_id INTEGER PRIMARY KEY NOT NULL,
+    entity_source_id INTEGER NOT NULL,
+    slot TEXT NOT NULL,
+    FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE,
+    FOREIGN KEY (entity_source_id) REFERENCES entity_source(id) ON DELETE RESTRICT,
+    UNIQUE (entity_source_id, slot)
+);
+
+CREATE TRIGGER observation_record_one_owner
+BEFORE INSERT ON observation_record
+WHEN EXISTS (SELECT 1 FROM observation_group WHERE observation_id = new.observation_id)
+  OR EXISTS (SELECT 1 FROM observation_manual WHERE observation_id = new.observation_id)
+BEGIN
+    SELECT RAISE(ABORT, 'observation already has an owner');
+END;
+
+CREATE TRIGGER observation_group_one_owner
+BEFORE INSERT ON observation_group
+WHEN EXISTS (SELECT 1 FROM observation_record WHERE observation_id = new.observation_id)
+  OR EXISTS (SELECT 1 FROM observation_manual WHERE observation_id = new.observation_id)
+BEGIN
+    SELECT RAISE(ABORT, 'observation already has an owner');
+END;
+
+CREATE TRIGGER observation_manual_one_owner
+BEFORE INSERT ON observation_manual
+WHEN EXISTS (SELECT 1 FROM observation_record WHERE observation_id = new.observation_id)
+  OR EXISTS (SELECT 1 FROM observation_group WHERE observation_id = new.observation_id)
+BEGIN
+    SELECT RAISE(ABORT, 'observation already has an owner');
+END;
+
+-- A transfer observation's values, shaped like the transfer row they merge into. Accounts restrict deletion: a
+-- merge moves these references to the survivor first (account_merge_observation), and removing an account's
+-- observations is a deliberate step, never a cascade.
+CREATE TABLE transfer_observation (
+    observation_id INTEGER PRIMARY KEY NOT NULL,
+    timestamp INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    source_account_id INTEGER NOT NULL,
+    target_account_id INTEGER NOT NULL,
+    asset_id INTEGER NOT NULL,
+    -- Arbitrary-precision minor-unit amount as a decimal string, like transfer.amount.
+    amount TEXT NOT NULL,
+    CHECK (source_account_id != target_account_id),
+    FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE,
+    FOREIGN KEY (source_account_id) REFERENCES account(id) ON DELETE RESTRICT,
+    FOREIGN KEY (target_account_id) REFERENCES account(id) ON DELETE RESTRICT,
+    FOREIGN KEY (asset_id) REFERENCES asset(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_transfer_observation_source ON transfer_observation(source_account_id);
+CREATE INDEX idx_transfer_observation_target ON transfer_observation(target_account_id);
+
+-- A trade observation's values, shaped like the trade row.
+CREATE TABLE trade_observation (
+    observation_id INTEGER PRIMARY KEY NOT NULL,
+    timestamp INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    from_account_id INTEGER NOT NULL,
+    from_asset_id INTEGER NOT NULL,
+    from_amount TEXT NOT NULL,
+    to_account_id INTEGER NOT NULL,
+    to_asset_id INTEGER NOT NULL,
+    to_amount TEXT NOT NULL,
+    CHECK (from_account_id != to_account_id OR from_asset_id != to_asset_id),
+    FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE,
+    FOREIGN KEY (from_account_id) REFERENCES account(id) ON DELETE RESTRICT,
+    FOREIGN KEY (to_account_id) REFERENCES account(id) ON DELETE RESTRICT,
+    FOREIGN KEY (from_asset_id) REFERENCES asset(id) ON DELETE RESTRICT,
+    FOREIGN KEY (to_asset_id) REFERENCES asset(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_trade_observation_from ON trade_observation(from_account_id);
+CREATE INDEX idx_trade_observation_to ON trade_observation(to_account_id);
+
+CREATE TRIGGER transfer_observation_kind
+BEFORE INSERT ON transfer_observation
+WHEN (SELECT kind FROM observation WHERE id = new.observation_id) != 'TRANSFER'
+BEGIN
+    SELECT RAISE(ABORT, 'observation is not a transfer');
+END;
+
+CREATE TRIGGER trade_observation_kind
+BEFORE INSERT ON trade_observation
+WHEN (SELECT kind FROM observation WHERE id = new.observation_id) != 'TRADE'
+BEGIN
+    SELECT RAISE(ABORT, 'observation is not a trade');
+END;
+
+-- The attributes an observation reports, keyed like transfer_attribute (group_key '' = ungrouped).
+CREATE TABLE observation_attribute (
+    observation_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    group_key TEXT NOT NULL,
+    attribute_value TEXT NOT NULL,
+    PRIMARY KEY (observation_id, attribute_type_id, group_key),
+    FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE,
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+);
+
+-- The facts the rank-merge reads (precise > approximate, named > placeholder, itemised > gross). Each is its own
+-- table, keyed by observation, so a row exists exactly when the fact holds.
+
+-- The observation's time is approximate (a date with no time of day, or a time the source rounds).
+CREATE TABLE observation_approximate_time (
+    observation_id INTEGER PRIMARY KEY NOT NULL,
+    FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE
+);
+
+-- An end of the observation names a placeholder account rather than the real one: 'source' or 'target' (a trade's
+-- from and to), as the unidentified-counterparty attribute says it.
+CREATE TABLE observation_placeholder_end (
+    observation_id INTEGER NOT NULL,
+    end_name TEXT NOT NULL CHECK (end_name IN ('source', 'target')),
+    PRIMARY KEY (observation_id, end_name),
+    FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE
+);
+
+-- The observation's amount is gross: it includes a fee the source doesn't itemise.
+CREATE TABLE observation_gross_amount (
+    observation_id INTEGER PRIMARY KEY NOT NULL,
+    FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE
+);
+
+-- Each observation with its owner, whichever table holds it: owner_kind RECORD, GROUP or MANUAL, and owner_id the
+-- record, group or entity_source id.
+CREATE VIEW observation_owner AS
+SELECT observation_id, 'RECORD' AS owner_kind, record_id AS owner_id, slot FROM observation_record
+UNION ALL
+SELECT observation_id, 'GROUP' AS owner_kind, group_id AS owner_id, slot FROM observation_group
+UNION ALL
+SELECT observation_id, 'MANUAL' AS owner_kind, entity_source_id AS owner_id, slot FROM observation_manual;

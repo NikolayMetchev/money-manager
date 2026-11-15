@@ -27,9 +27,12 @@ import com.moneymanager.domain.repository.write.DeviceWriteRepository
 import com.moneymanager.domain.repository.write.ExchangeOrderWriteRepository
 import com.moneymanager.domain.repository.write.HolidayCalendarWriteRepository
 import com.moneymanager.domain.repository.write.ImportDirectoryWriteRepository
+import com.moneymanager.domain.repository.write.ImportRecordWriteRepository
+import com.moneymanager.domain.repository.write.ObservationWriteRepository
 import com.moneymanager.domain.repository.write.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
+import com.moneymanager.domain.repository.write.PersonOverrideWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
@@ -80,6 +83,9 @@ interface DatabaseComponent {
     val importDirectoryRepository: ImportDirectoryWriteRepository
     val importTimelineRepository: ImportTimelineReadRepository
     val reconciliationLinkRepository: ReconciliationLinkWriteRepository
+    val importRecordRepository: ImportRecordWriteRepository
+    val observationRepository: ObservationWriteRepository
+    val personOverrideRepository: PersonOverrideWriteRepository
     val maintenanceService: DatabaseMaintenanceService
     val personAccountOwnershipRepository: PersonAccountOwnershipWriteRepository
     val personAttributeRepository: PersonAttributeWriteRepository

@@ -1,0 +1,36 @@
+selectRecordById:
+SELECT
+    import_record.id,
+    import_record.content_hash,
+    csv_import_record.csv_import_id,
+    csv_import_record.row_index,
+    api_import_record.api_session_id,
+    api_import_record.api_request_id,
+    api_import_record.json_path
+FROM import_record
+LEFT JOIN csv_import_record ON csv_import_record.record_id = import_record.id
+LEFT JOIN api_import_record ON api_import_record.record_id = import_record.id
+WHERE import_record.id = ?;
+
+selectCsvRecordsByImport:
+SELECT import_record.id, import_record.content_hash, csv_import_record.row_index
+FROM csv_import_record
+JOIN import_record ON import_record.id = csv_import_record.record_id
+WHERE csv_import_record.csv_import_id = ?
+ORDER BY csv_import_record.row_index;
+
+selectApiRecordsBySession:
+SELECT import_record.id, import_record.content_hash, api_import_record.api_request_id, api_import_record.json_path
+FROM api_import_record
+JOIN import_record ON import_record.id = api_import_record.record_id
+WHERE api_import_record.api_session_id = ?
+ORDER BY api_import_record.api_request_id, api_import_record.json_path;
+
+selectGroupIdByKey:
+SELECT id FROM import_group WHERE strategy_id = ? AND group_name = ? AND key_value = ?;
+
+selectGroupsByStrategy:
+SELECT id, group_name, key_value FROM import_group WHERE strategy_id = ? ORDER BY group_name, key_value;
+
+selectGroupMembers:
+SELECT record_id FROM import_group_member WHERE group_id = ? ORDER BY record_id;

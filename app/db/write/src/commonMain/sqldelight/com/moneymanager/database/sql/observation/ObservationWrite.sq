@@ -1,0 +1,94 @@
+insertObservation:
+INSERT INTO observation (transaction_id, kind) VALUES (?, ?);
+
+lastInsertedId:
+SELECT last_insert_rowid();
+
+insertRecordOwner:
+INSERT INTO observation_record (observation_id, record_id, slot) VALUES (?, ?, ?);
+
+insertGroupOwner:
+INSERT INTO observation_group (observation_id, group_id, slot) VALUES (?, ?, ?);
+
+insertManualOwner:
+INSERT INTO observation_manual (observation_id, entity_source_id, slot) VALUES (?, ?, ?);
+
+insertTransferValues:
+INSERT INTO transfer_observation (observation_id, timestamp, description, source_account_id, target_account_id, asset_id, amount)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+updateTransferValues:
+UPDATE transfer_observation
+SET timestamp = ?, description = ?, source_account_id = ?, target_account_id = ?, asset_id = ?, amount = ?
+WHERE observation_id = ?;
+
+insertTradeValues:
+INSERT INTO trade_observation (observation_id, timestamp, description, from_account_id, from_asset_id, from_amount, to_account_id, to_asset_id, to_amount)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateTradeValues:
+UPDATE trade_observation
+SET timestamp = ?, description = ?, from_account_id = ?, from_asset_id = ?, from_amount = ?, to_account_id = ?, to_asset_id = ?, to_amount = ?
+WHERE observation_id = ?;
+
+deleteAttributes:
+DELETE FROM observation_attribute WHERE observation_id = ?;
+
+insertAttribute:
+INSERT INTO observation_attribute (observation_id, attribute_type_id, group_key, attribute_value) VALUES (?, ?, ?, ?);
+
+deleteApproximateTime:
+DELETE FROM observation_approximate_time WHERE observation_id = ?;
+
+insertApproximateTime:
+INSERT INTO observation_approximate_time (observation_id) VALUES (?);
+
+deletePlaceholderEnds:
+DELETE FROM observation_placeholder_end WHERE observation_id = ?;
+
+insertPlaceholderEnd:
+INSERT INTO observation_placeholder_end (observation_id, end_name) VALUES (?, ?);
+
+deleteGrossAmount:
+DELETE FROM observation_gross_amount WHERE observation_id = ?;
+
+insertGrossAmount:
+INSERT INTO observation_gross_amount (observation_id) VALUES (?);
+
+assignTransaction:
+UPDATE observation SET transaction_id = ? WHERE id = ?;
+
+deleteObservation:
+DELETE FROM observation WHERE id = ?;
+
+-- Account merges: record which ends point at the deleted account, then move them; unmerge moves exactly those back.
+recordTransferMergeMoves:
+INSERT INTO account_merge_observation (merge_id, observation_id, moved_source, moved_target)
+SELECT :mergeId, observation_id, source_account_id = :deletedAccountId, target_account_id = :deletedAccountId
+FROM transfer_observation
+WHERE source_account_id = :deletedAccountId OR target_account_id = :deletedAccountId;
+
+recordTradeMergeMoves:
+INSERT INTO account_merge_observation (merge_id, observation_id, moved_source, moved_target)
+SELECT :mergeId, observation_id, from_account_id = :deletedAccountId, to_account_id = :deletedAccountId
+FROM trade_observation
+WHERE from_account_id = :deletedAccountId OR to_account_id = :deletedAccountId;
+
+moveMergedSources:
+UPDATE transfer_observation SET source_account_id = :accountId
+WHERE observation_id IN (SELECT observation_id FROM account_merge_observation WHERE merge_id = :mergeId AND moved_source = 1);
+
+moveMergedTargets:
+UPDATE transfer_observation SET target_account_id = :accountId
+WHERE observation_id IN (SELECT observation_id FROM account_merge_observation WHERE merge_id = :mergeId AND moved_target = 1);
+
+moveMergedFroms:
+UPDATE trade_observation SET from_account_id = :accountId
+WHERE observation_id IN (SELECT observation_id FROM account_merge_observation WHERE merge_id = :mergeId AND moved_source = 1);
+
+moveMergedTos:
+UPDATE trade_observation SET to_account_id = :accountId
+WHERE observation_id IN (SELECT observation_id FROM account_merge_observation WHERE merge_id = :mergeId AND moved_target = 1);
+
+deleteMergeMoves:
+DELETE FROM account_merge_observation WHERE merge_id = ?;

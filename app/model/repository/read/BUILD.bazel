@@ -7,6 +7,7 @@
 # gazelle:kmp_export //app/model/csv
 # gazelle:kmp_export //app/model/csvstrategy
 # gazelle:kmp_export //app/model/importdirectory
+# gazelle:kmp_export //app/model/observation
 # gazelle:kmp_export //app/model/passthrough
 # gazelle:kmp_export //app/model/reconciliation
 # gazelle:kmp_export //app/model/timeline
@@ -37,6 +38,7 @@ kmp_library(
         "//app/model/csv",
         "//app/model/csvstrategy",
         "//app/model/importdirectory",
+        "//app/model/observation",
         "//app/model/passthrough",
         "//app/model/reconciliation",
         "//app/model/timeline",

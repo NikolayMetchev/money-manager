@@ -1,0 +1,77 @@
+-- Person-owned inputs (#1419): what a person decided about a transaction, kept apart from what imports observe so
+-- an import never overwrites or replays them. A transaction's effective values are the rank-merge of its
+-- observations with these on top. Every table keys on transaction_id, which is never deleted, so a decision
+-- outlives a transaction an import removes and returns when it does.
+
+-- A field of a transfer a person set by hand. field is the transfer column's name; value is that column's value as
+-- stored (a decimal string for the amount, epoch millis for the timestamp, an id for an account or asset).
+CREATE TABLE transfer_override (
+    transaction_id INTEGER NOT NULL,
+    field TEXT NOT NULL CHECK (field IN ('timestamp', 'description', 'source_account_id', 'target_account_id', 'asset_id', 'amount')),
+    value TEXT NOT NULL,
+    PRIMARY KEY (transaction_id, field),
+    FOREIGN KEY (transaction_id) REFERENCES transaction_id(id) ON DELETE RESTRICT
+);
+
+-- A transfer attribute a person set (or changed) by hand.
+CREATE TABLE transfer_attribute_override (
+    transaction_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    group_key TEXT NOT NULL,
+    attribute_value TEXT NOT NULL,
+    PRIMARY KEY (transaction_id, attribute_type_id, group_key),
+    FOREIGN KEY (transaction_id) REFERENCES transaction_id(id) ON DELETE RESTRICT,
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+);
+
+-- A transfer attribute a person removed by hand: observations reporting it no longer put it back.
+CREATE TABLE transfer_attribute_removal (
+    transaction_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    group_key TEXT NOT NULL,
+    PRIMARY KEY (transaction_id, attribute_type_id, group_key),
+    FOREIGN KEY (transaction_id) REFERENCES transaction_id(id) ON DELETE RESTRICT,
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+);
+
+-- A trade attribute a person set by hand (trade attributes have no group key).
+CREATE TABLE trade_attribute_override (
+    transaction_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    attribute_value TEXT NOT NULL,
+    PRIMARY KEY (transaction_id, attribute_type_id),
+    FOREIGN KEY (transaction_id) REFERENCES transaction_id(id) ON DELETE RESTRICT,
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+);
+
+-- A trade attribute a person removed by hand.
+CREATE TABLE trade_attribute_removal (
+    transaction_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    PRIMARY KEY (transaction_id, attribute_type_id),
+    FOREIGN KEY (transaction_id) REFERENCES transaction_id(id) ON DELETE RESTRICT,
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+);
+
+-- A person fixed an observation to a transaction; the matcher takes it as given.
+CREATE TABLE observation_pin (
+    observation_id INTEGER PRIMARY KEY NOT NULL,
+    transaction_id INTEGER NOT NULL,
+    FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE,
+    FOREIGN KEY (transaction_id) REFERENCES transaction_id(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_observation_pin_transaction ON observation_pin(transaction_id);
+
+-- A person said two observations are different movements; the matcher never puts them on one transaction. Stored
+-- once per pair, the lower id first.
+CREATE TABLE observation_split (
+    observation_a_id INTEGER NOT NULL,
+    observation_b_id INTEGER NOT NULL,
+    PRIMARY KEY (observation_a_id, observation_b_id),
+    CHECK (observation_a_id < observation_b_id),
+    FOREIGN KEY (observation_a_id) REFERENCES observation(id) ON DELETE CASCADE,
+    FOREIGN KEY (observation_b_id) REFERENCES observation(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_observation_split_b ON observation_split(observation_b_id);

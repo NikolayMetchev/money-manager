@@ -185,6 +185,13 @@ class CsvImportWriteRepositoryImpl(
                 }
                 csvImportWriteQueries.clearParkedEntitySourceRows(importId)
 
+                csvImportWriteQueries.parkRecordRows(importId)
+                rowIndexRemap.forEach { (oldIndex, newIndex) ->
+                    csvImportWriteQueries.moveRecordRow(newIndex = newIndex, importId = importId, oldIndex = oldIndex)
+                }
+                csvImportWriteQueries.deleteParkedRecordObservations(importId)
+                csvImportWriteQueries.deleteParkedRecords(importId)
+
                 xlsxBytes?.let { csvImportWriteQueries.updateXlsxBlobBytes(it, importId) }
                 pdf?.let { storePdf(importId, it) }
             }
@@ -214,6 +221,8 @@ class CsvImportWriteRepositoryImpl(
                 csvImportWriteQueries.deleteDirectoryFilesForImport(id.id.toString())
                 // Its rows' links go with it; their matched entries would otherwise block the delete.
                 database.forgetMatchedSources(id, rows = null)
+                csvImportWriteQueries.deleteImportRecordObservations(id.id.toString())
+                csvImportWriteQueries.deleteImportRecords(id.id.toString())
 
                 tableManager.dropCsvTable(import.table_name)
 

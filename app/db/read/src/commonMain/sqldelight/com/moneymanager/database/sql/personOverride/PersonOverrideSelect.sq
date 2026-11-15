@@ -1,0 +1,39 @@
+selectTransferOverrides:
+SELECT field, value FROM transfer_override WHERE transaction_id = ? ORDER BY field;
+
+selectTransferAttributeOverrides:
+SELECT attribute_type_id, group_key, attribute_value
+FROM transfer_attribute_override
+WHERE transaction_id = ?
+ORDER BY attribute_type_id, group_key;
+
+selectTransferAttributeRemovals:
+SELECT attribute_type_id, group_key
+FROM transfer_attribute_removal
+WHERE transaction_id = ?
+ORDER BY attribute_type_id, group_key;
+
+selectTradeAttributeOverrides:
+SELECT attribute_type_id, attribute_value
+FROM trade_attribute_override
+WHERE transaction_id = ?
+ORDER BY attribute_type_id;
+
+selectTradeAttributeRemovals:
+SELECT attribute_type_id
+FROM trade_attribute_removal
+WHERE transaction_id = ?
+ORDER BY attribute_type_id;
+
+-- The pin's transaction kind is its observation's.
+selectPins:
+SELECT observation_pin.observation_id, observation_pin.transaction_id, observation.kind
+FROM observation_pin
+JOIN observation ON observation.id = observation_pin.observation_id
+WHERE observation_pin.observation_id IN ?
+ORDER BY observation_pin.observation_id;
+
+selectSplits:
+SELECT observation_a_id, observation_b_id
+FROM observation_split
+WHERE observation_a_id IN :ids OR observation_b_id IN :ids;

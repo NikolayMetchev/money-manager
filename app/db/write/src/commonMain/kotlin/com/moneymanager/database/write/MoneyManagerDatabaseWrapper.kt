@@ -41,7 +41,10 @@ class MoneyManagerDatabaseWrapper(
     val entitySourceWriteQueries get() = writeDb.entitySourceWriteQueries
     val exchangeOrderWriteQueries get() = writeDb.exchangeOrderWriteQueries
     val importDirectoryWriteQueries get() = writeDb.importDirectoryWriteQueries
+    val importRecordWriteQueries get() = writeDb.importRecordWriteQueries
     val maintenanceWriteQueries get() = writeDb.maintenanceWriteQueries
+    val observationWriteQueries get() = writeDb.observationWriteQueries
+    val personOverrideWriteQueries get() = writeDb.personOverrideWriteQueries
     val personAttributeWriteQueries get() = writeDb.personAttributeWriteQueries
     val personWriteQueries get() = writeDb.personWriteQueries
     val passThroughAccountWriteQueries get() = writeDb.passThroughAccountWriteQueries

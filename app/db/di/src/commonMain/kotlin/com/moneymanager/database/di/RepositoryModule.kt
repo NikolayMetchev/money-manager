@@ -17,10 +17,13 @@ import com.moneymanager.database.repository.DeviceReadRepositoryImpl
 import com.moneymanager.database.repository.ExchangeOrderReadRepositoryImpl
 import com.moneymanager.database.repository.HolidayCalendarReadRepositoryImpl
 import com.moneymanager.database.repository.ImportDirectoryReadRepositoryImpl
+import com.moneymanager.database.repository.ImportRecordReadRepositoryImpl
 import com.moneymanager.database.repository.ImportTimelineReadRepositoryImpl
+import com.moneymanager.database.repository.ObservationReadRepositoryImpl
 import com.moneymanager.database.repository.PassThroughAccountReadRepositoryImpl
 import com.moneymanager.database.repository.PersonAccountOwnershipReadRepositoryImpl
 import com.moneymanager.database.repository.PersonAttributeReadRepositoryImpl
+import com.moneymanager.database.repository.PersonOverrideReadRepositoryImpl
 import com.moneymanager.database.repository.PersonReadRepositoryImpl
 import com.moneymanager.database.repository.ReconciliationReadRepositoryImpl
 import com.moneymanager.database.repository.RelationshipReadRepositoryImpl
@@ -46,9 +49,12 @@ import com.moneymanager.database.repository.write.DeviceWriteRepositoryImpl
 import com.moneymanager.database.repository.write.ExchangeOrderWriteRepositoryImpl
 import com.moneymanager.database.repository.write.HolidayCalendarWriteRepositoryImpl
 import com.moneymanager.database.repository.write.ImportDirectoryWriteRepositoryImpl
+import com.moneymanager.database.repository.write.ImportRecordWriteRepositoryImpl
+import com.moneymanager.database.repository.write.ObservationWriteRepositoryImpl
 import com.moneymanager.database.repository.write.PassThroughAccountWriteRepositoryImpl
 import com.moneymanager.database.repository.write.PersonAccountOwnershipWriteRepositoryImpl
 import com.moneymanager.database.repository.write.PersonAttributeWriteRepositoryImpl
+import com.moneymanager.database.repository.write.PersonOverrideWriteRepositoryImpl
 import com.moneymanager.database.repository.write.PersonWriteRepositoryImpl
 import com.moneymanager.database.repository.write.ReconciliationLinkWriteRepositoryImpl
 import com.moneymanager.database.repository.write.RelationshipTypeWriteRepositoryImpl
@@ -82,10 +88,13 @@ import com.moneymanager.domain.repository.DeviceReadRepository
 import com.moneymanager.domain.repository.ExchangeOrderReadRepository
 import com.moneymanager.domain.repository.HolidayCalendarReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
+import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
+import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
+import com.moneymanager.domain.repository.PersonOverrideReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.RelationshipReadRepository
@@ -110,9 +119,12 @@ import com.moneymanager.domain.repository.write.DeviceWriteRepository
 import com.moneymanager.domain.repository.write.ExchangeOrderWriteRepository
 import com.moneymanager.domain.repository.write.HolidayCalendarWriteRepository
 import com.moneymanager.domain.repository.write.ImportDirectoryWriteRepository
+import com.moneymanager.domain.repository.write.ImportRecordWriteRepository
+import com.moneymanager.domain.repository.write.ObservationWriteRepository
 import com.moneymanager.domain.repository.write.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
+import com.moneymanager.domain.repository.write.PersonOverrideWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
@@ -302,6 +314,42 @@ object RepositoryModule {
         database: MoneyManagerDatabaseWrapper,
         reader: ReconciliationReadRepository,
     ): ReconciliationLinkWriteRepository = ReconciliationLinkWriteRepositoryImpl(database, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideImportRecordReadRepository(database: MoneyManagerDatabaseWrapper): ImportRecordReadRepository =
+        ImportRecordReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideImportRecordWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: ImportRecordReadRepository,
+    ): ImportRecordWriteRepository = ImportRecordWriteRepositoryImpl(database, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideObservationReadRepository(database: MoneyManagerDatabaseWrapper): ObservationReadRepository =
+        ObservationReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideObservationWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: ObservationReadRepository,
+    ): ObservationWriteRepository = ObservationWriteRepositoryImpl(database, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun providePersonOverrideReadRepository(database: MoneyManagerDatabaseWrapper): PersonOverrideReadRepository =
+        PersonOverrideReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun providePersonOverrideWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        reader: PersonOverrideReadRepository,
+    ): PersonOverrideWriteRepository = PersonOverrideWriteRepositoryImpl(database, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)

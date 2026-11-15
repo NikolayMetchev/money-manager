@@ -1,0 +1,29 @@
+insertRecord:
+INSERT INTO import_record (content_hash) VALUES (?);
+
+lastInsertedId:
+SELECT last_insert_rowid();
+
+insertCsvRecord:
+INSERT INTO csv_import_record (record_id, csv_import_id, row_index) VALUES (?, ?, ?);
+
+insertApiRecord:
+INSERT INTO api_import_record (record_id, api_session_id, api_request_id, json_path) VALUES (?, ?, ?, ?);
+
+updateContentHash:
+UPDATE import_record SET content_hash = ? WHERE id = ?;
+
+deleteRecord:
+DELETE FROM import_record WHERE id = ?;
+
+insertGroupIfMissing:
+INSERT OR IGNORE INTO import_group (strategy_id, group_name, key_value) VALUES (?, ?, ?);
+
+deleteGroupMembers:
+DELETE FROM import_group_member WHERE group_id = ?;
+
+insertGroupMember:
+INSERT INTO import_group_member (group_id, record_id) VALUES (?, ?);
+
+deleteGroup:
+DELETE FROM import_group WHERE id = ?;

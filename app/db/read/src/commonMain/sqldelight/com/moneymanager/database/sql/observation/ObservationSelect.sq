@@ -1,0 +1,43 @@
+selectHeaderById:
+SELECT observation.id, observation.transaction_id, observation.kind, observation_owner.owner_kind, observation_owner.owner_id, observation_owner.slot
+FROM observation
+JOIN observation_owner ON observation_owner.observation_id = observation.id
+WHERE observation.id = ?;
+
+selectHeadersByOwner:
+SELECT observation.id, observation.transaction_id, observation.kind, observation_owner.owner_kind, observation_owner.owner_id, observation_owner.slot
+FROM observation
+JOIN observation_owner ON observation_owner.observation_id = observation.id
+WHERE observation_owner.owner_kind = ? AND observation_owner.owner_id = ?
+ORDER BY observation_owner.slot;
+
+selectHeadersByTransaction:
+SELECT observation.id, observation.transaction_id, observation.kind, observation_owner.owner_kind, observation_owner.owner_id, observation_owner.slot
+FROM observation
+JOIN observation_owner ON observation_owner.observation_id = observation.id
+WHERE observation.transaction_id = ?
+ORDER BY observation.id;
+
+selectTransferValues:
+SELECT * FROM transfer_observation WHERE observation_id = ?;
+
+selectTradeValues:
+SELECT * FROM trade_observation WHERE observation_id = ?;
+
+selectAttributes:
+SELECT attribute_type_id, group_key, attribute_value
+FROM observation_attribute
+WHERE observation_id = ?
+ORDER BY attribute_type_id, group_key;
+
+countApproximateTime:
+SELECT COUNT(*) FROM observation_approximate_time WHERE observation_id = ?;
+
+selectPlaceholderEnds:
+SELECT end_name FROM observation_placeholder_end WHERE observation_id = ? ORDER BY end_name;
+
+countGrossAmount:
+SELECT COUNT(*) FROM observation_gross_amount WHERE observation_id = ?;
+
+selectKind:
+SELECT kind FROM observation WHERE id = ?;
