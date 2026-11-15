@@ -30,7 +30,7 @@
       "androidx-test-runner": "androidx.test:runner:1.7.0",
       "androidx-test-uiautomator": "androidx.test.uiautomator:uiautomator:2.4.1",
       "atomicfu": "org.jetbrains.kotlinx:atomicfu:0.33.0",
-      "bignum": "com.ionspin.kotlin:bignum:0.3.10",
+      "bignum": "com.ionspin.kotlin:bignum:0.4.0",
       "clikt": "com.github.ajalt.clikt:clikt:5.1.0",
       "clikt-core": "com.github.ajalt.clikt:clikt-core:5.1.0",
       "compose-animation-core-desktop": "org.jetbrains.compose.animation:animation-core-desktop:1.12.2",
@@ -126,6 +126,7 @@
     "forces": {
       "com.google.code.findbugs:jsr305": "3.0.2",
       "com.google.errorprone:error_prone_annotations": "2.52.0",
+      "com.ionspin.kotlin:bignum-mingwx64": "0.3.10",
       "com.squareup:javawriter": "2.5.1",
       "commons-io:commons-io": "2.22.0",
       "dev.drewhamilton.poko:poko-annotations": "0.23.2",
@@ -10817,22 +10818,22 @@
     },
     "com.ionspin.kotlin:bignum": {
       "android": {
-        "version": "0.3.10",
+        "version": "0.4.0",
         "files": [
           {
-            "name": "bignum-jvm-0.3.10.jar",
-            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-jvm/0.3.10/bignum-jvm-0.3.10.jar",
-            "sha256": "c5c718466ef822290ed6ea2013dee788c468a993fa53f34d0e07acc8d6ef087d"
+            "name": "bignum-jvm-0.4.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-jvm/0.4.0/bignum-jvm-0.4.0.jar",
+            "sha256": "bcc2880a0ac57a1f6fa9ca13585f7aafb38b0f5aee20eeaf27d83b932aeade97"
           }
         ]
       },
       "js": {
-        "version": "0.3.10",
+        "version": "0.4.0",
         "files": [
           {
-            "name": "bignum-js-0.3.10.klib",
-            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-js/0.3.10/bignum-js-0.3.10.klib",
-            "sha256": "e324f08f897767d98ec88acd908ff741fc022fea2f84d70388e4434a771f0497"
+            "name": "bignum-js-0.4.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-js/0.4.0/bignum-js-0.4.0.klib",
+            "sha256": "137654d77bfeb36132771f3d9fdf7dbf4ee4102b755c4258519f3d96c4192702"
           }
         ],
         "deps": [
@@ -10840,52 +10841,52 @@
         ]
       },
       "jvm": {
-        "version": "0.3.10",
+        "version": "0.4.0",
         "files": [
           {
-            "name": "bignum-jvm-0.3.10.jar",
-            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-jvm/0.3.10/bignum-jvm-0.3.10.jar",
-            "sha256": "c5c718466ef822290ed6ea2013dee788c468a993fa53f34d0e07acc8d6ef087d"
+            "name": "bignum-jvm-0.4.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-jvm/0.4.0/bignum-jvm-0.4.0.jar",
+            "sha256": "bcc2880a0ac57a1f6fa9ca13585f7aafb38b0f5aee20eeaf27d83b932aeade97"
           }
         ]
       },
       "linuxArm64": {
-        "version": "0.3.10",
+        "version": "0.4.0",
         "files": [
           {
-            "name": "bignum.klib",
-            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-linuxarm64/0.3.10/bignum-linuxarm64-0.3.10.klib",
-            "sha256": "f4d114276ae6f98538980dc1b9221e52acce428b38dfa5205b35e6592e4e71da"
+            "name": "bignum-linuxArm64Main-0.4.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-linuxarm64/0.4.0/bignum-linuxarm64-0.4.0.klib",
+            "sha256": "43f934a32154b2da7c471f5d7e57ef640ad0856e4af3ae87e3de72bbb3775772"
           }
         ]
       },
       "linuxX64": {
-        "version": "0.3.10",
+        "version": "0.4.0",
         "files": [
           {
-            "name": "bignum.klib",
-            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-linuxx64/0.3.10/bignum-linuxx64-0.3.10.klib",
-            "sha256": "c2bbdde1370838ae12fa806317826b2ac65d181f29189af7226fc3377dbaf1eb"
+            "name": "bignum-linuxX64Main-0.4.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-linuxx64/0.4.0/bignum-linuxx64-0.4.0.klib",
+            "sha256": "62473d69a824616b12c99320deaa0b79bed59952b0b4dd1c9c7c6c2c871274c1"
           }
         ]
       },
       "macosArm64": {
-        "version": "0.3.10",
+        "version": "0.4.0",
         "files": [
           {
-            "name": "bignum.klib",
-            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-macosarm64/0.3.10/bignum-macosarm64-0.3.10.klib",
-            "sha256": "5bf92670ac38b3fc53e91a75ce4c8f1745e109630573d42196fe784ee585bb0b"
+            "name": "bignum-macosArm64Main-0.4.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-macosarm64/0.4.0/bignum-macosarm64-0.4.0.klib",
+            "sha256": "7a8b3a9beccd3e8d05aa8771bd434d7ea5ec9e7c178aa01cd120581d3ec23aa0"
           }
         ]
       },
       "metadata": {
-        "version": "0.3.10",
+        "version": "0.4.0",
         "files": [
           {
-            "name": "bignum-metadata-0.3.10.jar",
-            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum/0.3.10/bignum-0.3.10.jar",
-            "sha256": "9183f3da7a4944ca41ef9f79f51a6a178cbc021936de44e6e9265c6f040eb45c"
+            "name": "bignum-metadata-0.4.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum/0.4.0/bignum-0.4.0.jar",
+            "sha256": "e7c9910b1d298a2745f8fd251a5441f9484cb7e3a769f2833b68786a91d2a24c"
           }
         ],
         "source_sets": [
@@ -10893,12 +10894,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "0.3.10",
+        "version": "0.4.0",
         "files": [
           {
-            "name": "bignum-metadata-0.3.10.jar",
-            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum/0.3.10/bignum-0.3.10.jar",
-            "sha256": "9183f3da7a4944ca41ef9f79f51a6a178cbc021936de44e6e9265c6f040eb45c"
+            "name": "bignum-metadata-0.4.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum/0.4.0/bignum-0.4.0.jar",
+            "sha256": "e7c9910b1d298a2745f8fd251a5441f9484cb7e3a769f2833b68786a91d2a24c"
           }
         ],
         "source_sets": [
@@ -10916,12 +10917,12 @@
         ]
       },
       "wasmJs": {
-        "version": "0.3.10",
+        "version": "0.4.0",
         "files": [
           {
-            "name": "bignum-wasm-js-0.3.10.klib",
-            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-wasm-js/0.3.10/bignum-wasm-js-0.3.10.klib",
-            "sha256": "94fe7ed94e2a79291b29d4c90be87245a499161227de71aefd3f4311f407ff54"
+            "name": "bignum-wasm-js-0.4.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-wasm-js/0.4.0/bignum-wasm-js-0.4.0.klib",
+            "sha256": "4dd9f200b2860ffa1351ac60e0f4a611809f5541ae01d78a15dabae50f28abc2"
           }
         ]
       }

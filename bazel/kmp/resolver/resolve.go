@@ -231,6 +231,8 @@ type node struct {
 	// on a BOM, the versions it aligns. Neither is a dependency: they only raise versions (Resolve).
 	platforms   []Coordinate
 	constraints []Coordinate
+	// version is the one its files are, when a force on the platform module it redirects to differs from the root's.
+	version string
 }
 
 type Resolver struct {
@@ -325,7 +327,21 @@ func (r *Resolver) load(p Platform, c Coordinate) (*node, error) {
 			// Excluding the module it points at leaves this one with nothing, as in Gradle.
 			return &node{}, nil
 		}
-		return r.node(p, Coordinate{at.Group, at.Module, at.Version})
+		target := Coordinate{at.Group, at.Module, at.Version}
+		// As in Gradle, a force reaches the platform module too: a release that never published one platform's
+		// module keeps that platform on an older one.
+		v, forced := r.forced(p, target.Module())
+		if !forced || v == target.Version {
+			return r.node(p, target)
+		}
+		target.Version = v
+		platform, err := r.node(p, target)
+		if err != nil {
+			return nil, err
+		}
+		pinned := *platform
+		pinned.version = v
+		return &pinned, nil
 	}
 	n := &node{}
 	for _, f := range api.Files {
@@ -620,7 +636,11 @@ func (r *Resolver) Resolve(p Platform, roots []Coordinate) (map[string]Resolved,
 		if err != nil {
 			return err
 		}
-		res := Resolved{Version: c.Version, Files: n.files, SourceSets: n.sourceSets}
+		resolved := c.Version
+		if n.version != "" {
+			resolved = n.version
+		}
+		res := Resolved{Version: resolved,Files: n.files, SourceSets: n.sourceSets}
 		out[module] = res
 		for _, d := range n.api {
 			res.Deps = append(res.Deps, d.Module())

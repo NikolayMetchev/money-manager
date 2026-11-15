@@ -231,7 +231,10 @@ ANDROIDX_TEST_SERVICES_STORAGE = "1.6.0"  # renovate: androidx.test.services:sto
 ANDROIDX_TEST_UIAUTOMATOR = "2.4.1"  # renovate: androidx.test.uiautomator:uiautomator
 ANDROIDX_TRACING = "2.0.5"  # renovate: androidx.tracing:tracing
 ATOMICFU = "0.33.0"  # renovate: org.jetbrains.kotlinx:atomicfu
-BIGNUM = "0.3.10"  # renovate: com.ionspin.kotlin:bignum
+BIGNUM = "0.4.0"  # renovate: com.ionspin.kotlin:bignum
+# bignum 0.4.0 never published its mingwX64 module, so Windows stays on the last one that exists. Renovate bumps it
+# when a newer one appears; drop the force once it matches BIGNUM.
+BIGNUM_MINGWX64 = "0.3.10"  # renovate: com.ionspin.kotlin:bignum-mingwx64
 CLIKT = "5.1.0"  # renovate: com.github.ajalt.clikt:clikt
 COMMONS_IO = "2.22.0"  # renovate: commons-io:commons-io
 COMPOSE_CHARTS = "1.0.0"  # renovate: io.github.ehsannarmani:compose-charts
@@ -465,6 +468,7 @@ maven_kmp.install(
     forces = {
         "com.google.code.findbugs:jsr305": JSR305,
         "com.google.errorprone:error_prone_annotations": ERRORPRONE,
+        "com.ionspin.kotlin:bignum-mingwx64": BIGNUM_MINGWX64,
         "com.squareup:javawriter": JAVAWRITER,
         "commons-io:commons-io": COMMONS_IO,
         "dev.drewhamilton.poko:poko-annotations": POKO,

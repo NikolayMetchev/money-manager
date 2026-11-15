@@ -160,6 +160,32 @@ func TestPickVariantAcceptsOneNamingNoUsage(t *testing.T) {
 	}
 }
 
+func TestForceReachesThePlatformModule(t *testing.T) {
+	// bignum 0.4.0's root module points mingwX64 at a bignum-mingwx64 0.4.0 that was never published.
+	files := map[string][]byte{
+		"/g/lib/2/lib-2.module": []byte(`{"variants": [{"name": "jvmApiElements-published",
+			"attributes": {"org.gradle.usage": "java-api", "org.jetbrains.kotlin.platform.type": "jvm"},
+			"available-at": {"url": "../../lib-jvm/2/lib-jvm-2.module", "group": "g", "module": "lib-jvm", "version": "2"}}]}`),
+		"/g/lib-jvm/1/lib-jvm-1.module": []byte(`{"variants": [{"name": "jvmApiElements",
+			"attributes": {"org.gradle.usage": "java-api", "org.jetbrains.kotlin.platform.type": "jvm"},
+			"files": [{"name": "lib-jvm-1.jar", "url": "lib-jvm-1.jar"}]}]}`),
+		"/g/lib-jvm/1/lib-jvm-1.jar": []byte("jar"),
+	}
+	for _, c := range []Coordinate{{"g", "lib", "2"}, {"g", "lib-jvm", "1"}} {
+		path, body := pom(c.Group, c.Artifact, c.Version, "")
+		files[path] = body
+	}
+	r := NewResolver(repository(t, files), map[string]string{"g:lib-jvm": "1"}, nil)
+
+	got, _, err := r.Resolve(platforms["jvm"], []Coordinate{{"g", "lib", "2"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res, ok := got["g:lib"]; !ok || res.Version != "1" || len(res.Files) != 1 || res.Files[0].Name != "lib-jvm-1.jar" {
+		t.Errorf("resolved %+v, want g:lib 1 with lib-jvm-1.jar", got)
+	}
+}
+
 func TestRuntimeOnlyLibraryResolvesOnTheJvm(t *testing.T) {
 	// The Compose Gradle plugin publishes only a shadowed runtime jar; Gradle compiles against it too.
 	files := map[string][]byte{
