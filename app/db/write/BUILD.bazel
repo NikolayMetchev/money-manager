@@ -70,6 +70,7 @@ kmp_library(
     deps = [
         "//app/db/rawsql",
         "//app/model/calendar",
+        "//app/model/observation",
         "//utils/coroutines",
         "//utils/regex",
         "@maven_kmp//:kotlinx_datetime",

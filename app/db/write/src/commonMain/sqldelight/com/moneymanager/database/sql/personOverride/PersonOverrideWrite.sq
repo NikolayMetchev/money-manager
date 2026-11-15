@@ -1,0 +1,42 @@
+upsertTransferOverride:
+INSERT OR REPLACE INTO transfer_override (transaction_id, field, value) VALUES (?, ?, ?);
+
+deleteTransferOverride:
+DELETE FROM transfer_override WHERE transaction_id = ? AND field = ?;
+
+upsertTransferAttributeOverride:
+INSERT OR REPLACE INTO transfer_attribute_override (transaction_id, attribute_type_id, group_key, attribute_value)
+VALUES (?, ?, ?, ?);
+
+deleteTransferAttributeOverride:
+DELETE FROM transfer_attribute_override WHERE transaction_id = ? AND attribute_type_id = ? AND group_key = ?;
+
+insertTransferAttributeRemoval:
+INSERT OR IGNORE INTO transfer_attribute_removal (transaction_id, attribute_type_id, group_key) VALUES (?, ?, ?);
+
+deleteTransferAttributeRemoval:
+DELETE FROM transfer_attribute_removal WHERE transaction_id = ? AND attribute_type_id = ? AND group_key = ?;
+
+upsertTradeAttributeOverride:
+INSERT OR REPLACE INTO trade_attribute_override (transaction_id, attribute_type_id, attribute_value) VALUES (?, ?, ?);
+
+deleteTradeAttributeOverride:
+DELETE FROM trade_attribute_override WHERE transaction_id = ? AND attribute_type_id = ?;
+
+insertTradeAttributeRemoval:
+INSERT OR IGNORE INTO trade_attribute_removal (transaction_id, attribute_type_id) VALUES (?, ?);
+
+deleteTradeAttributeRemoval:
+DELETE FROM trade_attribute_removal WHERE transaction_id = ? AND attribute_type_id = ?;
+
+upsertPin:
+INSERT OR REPLACE INTO observation_pin (observation_id, transaction_id) VALUES (?, ?);
+
+deletePin:
+DELETE FROM observation_pin WHERE observation_id = ?;
+
+insertSplit:
+INSERT OR IGNORE INTO observation_split (observation_a_id, observation_b_id) VALUES (?, ?);
+
+deleteSplit:
+DELETE FROM observation_split WHERE observation_a_id = ? AND observation_b_id = ?;

@@ -89,3 +89,17 @@ CREATE INDEX idx_account_merge_mapping_mapping ON account_merge_mapping(mapping_
 -- core fields are snapshotted above, since the cascade delete leaves no recoverable trace of them.
 -- account_merge_attribute is the mirror image: it tracks what the merge added to the SURVIVOR, which the
 -- cascade delete knows nothing about.
+
+-- The observations whose account references the merge moved from the deleted account to the survivor, and which end
+-- (a transfer's source/target, a trade's from/to) pointed at it, so unmerge moves back exactly those.
+CREATE TABLE account_merge_observation (
+    merge_id INTEGER NOT NULL,
+    observation_id INTEGER NOT NULL,
+    moved_source INTEGER NOT NULL,
+    moved_target INTEGER NOT NULL,
+    PRIMARY KEY (merge_id, observation_id),
+    FOREIGN KEY (merge_id) REFERENCES account_merge(id) ON DELETE CASCADE,
+    FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_account_merge_observation_observation ON account_merge_observation(observation_id);

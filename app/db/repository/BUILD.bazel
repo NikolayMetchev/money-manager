@@ -50,6 +50,7 @@ kmp_library(
     ],
     deps = [
         "//app/model/calendar",
+        "//app/model/observation",
         "//utils/bigdecimal",
         "//utils/coroutines",
         "//utils/regex",

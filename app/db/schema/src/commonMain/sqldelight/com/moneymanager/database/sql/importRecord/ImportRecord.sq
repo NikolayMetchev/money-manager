@@ -1,0 +1,73 @@
+-- Import records (#1419): one per staged row or API item a source reports, keyed stably so a re-import can tell
+-- which of the source's records changed. content_hash is the record's content as staged: with the strategy's hash
+-- unchanged, an unchanged hash means the record's observations are unchanged too.
+--
+-- The supertype holds what every record has; csv_import_record and api_import_record say where it came from, and a
+-- record has exactly one of them. Deleting a record deletes its subtype row, but not the observations it owns
+-- (observation_record restricts that): those are removed first, deliberately, by whoever removes the record.
+CREATE TABLE import_record (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content_hash TEXT NOT NULL
+);
+
+-- A staged CSV, QIF, OFX, Excel or PDF row. row_index is the staging table's row; re-staging a file in place
+-- renumbers its rows, and moves these with them (CsvImportWrite.sq, moveRecordRow).
+CREATE TABLE csv_import_record (
+    record_id INTEGER PRIMARY KEY NOT NULL,
+    csv_import_id TEXT NOT NULL,
+    row_index INTEGER NOT NULL,
+    FOREIGN KEY (record_id) REFERENCES import_record(id) ON DELETE CASCADE,
+    FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id) ON DELETE RESTRICT,
+    UNIQUE (csv_import_id, row_index)
+);
+
+-- An item of a downloaded API response: the request that fetched it and where in its JSON it sits.
+CREATE TABLE api_import_record (
+    record_id INTEGER PRIMARY KEY NOT NULL,
+    api_session_id INTEGER NOT NULL,
+    api_request_id INTEGER NOT NULL,
+    json_path TEXT NOT NULL,
+    FOREIGN KEY (record_id) REFERENCES import_record(id) ON DELETE CASCADE,
+    FOREIGN KEY (api_session_id) REFERENCES api_session(id) ON DELETE RESTRICT,
+    FOREIGN KEY (api_request_id) REFERENCES api_request(id) ON DELETE RESTRICT,
+    UNIQUE (api_request_id, json_path)
+);
+
+CREATE INDEX idx_api_import_record_session ON api_import_record(api_session_id);
+
+-- No record may be both a CSV row and an API item.
+CREATE TRIGGER csv_import_record_one_kind
+BEFORE INSERT ON csv_import_record
+WHEN EXISTS (SELECT 1 FROM api_import_record WHERE record_id = new.record_id)
+BEGIN
+    SELECT RAISE(ABORT, 'import record is already an API item');
+END;
+
+CREATE TRIGGER api_import_record_one_kind
+BEFORE INSERT ON api_import_record
+WHEN EXISTS (SELECT 1 FROM csv_import_record WHERE record_id = new.record_id)
+BEGIN
+    SELECT RAISE(ABORT, 'import record is already a CSV row');
+END;
+
+-- The records one LegGroupRule joins into one output (a trade's legs, a pass-through pair, the members of a Linked
+-- group), across files when the rule is acrossFiles. The group, not any one record, owns that output's observations.
+-- strategy_id is a CSV or an API strategy's id (both are TEXT uuids, in two tables, so no foreign key); group_name is
+-- the rule's name and key_value the key its records share.
+CREATE TABLE import_group (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    strategy_id TEXT NOT NULL,
+    group_name TEXT NOT NULL,
+    key_value TEXT NOT NULL,
+    UNIQUE (strategy_id, group_name, key_value)
+);
+
+CREATE TABLE import_group_member (
+    group_id INTEGER NOT NULL,
+    record_id INTEGER NOT NULL,
+    PRIMARY KEY (group_id, record_id),
+    FOREIGN KEY (group_id) REFERENCES import_group(id) ON DELETE CASCADE,
+    FOREIGN KEY (record_id) REFERENCES import_record(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_import_group_member_record ON import_group_member(record_id);

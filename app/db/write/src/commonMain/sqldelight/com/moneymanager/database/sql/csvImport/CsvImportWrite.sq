@@ -84,3 +84,37 @@ VALUES (?, ?, ?, ?);
 
 deletePdfLines:
 DELETE FROM pdf_import_line WHERE csv_import_id = ?;
+
+-- Import records move with their rows like the provenance above (#1419): park, move, then drop the records whose row
+-- the new file no longer has. Their observations go first (observation_record restricts deleting a record that still
+-- owns some): the source no longer says them, and the file's next sync re-materializes what they were on.
+parkRecordRows:
+UPDATE csv_import_record SET row_index = -row_index WHERE csv_import_id = ? AND row_index > 0;
+
+moveRecordRow:
+UPDATE csv_import_record SET row_index = :newIndex WHERE csv_import_id = :importId AND row_index = -:oldIndex;
+
+deleteParkedRecordObservations:
+DELETE FROM observation WHERE id IN (
+    SELECT observation_record.observation_id
+    FROM observation_record
+    JOIN csv_import_record ON csv_import_record.record_id = observation_record.record_id
+    WHERE csv_import_record.csv_import_id = ? AND csv_import_record.row_index < 0
+);
+
+deleteParkedRecords:
+DELETE FROM import_record WHERE id IN (
+    SELECT record_id FROM csv_import_record WHERE csv_import_id = ? AND row_index < 0
+);
+
+-- Deleting a staged file deletes its records, and their observations first.
+deleteImportRecordObservations:
+DELETE FROM observation WHERE id IN (
+    SELECT observation_record.observation_id
+    FROM observation_record
+    JOIN csv_import_record ON csv_import_record.record_id = observation_record.record_id
+    WHERE csv_import_record.csv_import_id = ?
+);
+
+deleteImportRecords:
+DELETE FROM import_record WHERE id IN (SELECT record_id FROM csv_import_record WHERE csv_import_id = ?);
