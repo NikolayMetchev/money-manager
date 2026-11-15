@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.RelationshipRole
 import com.moneymanager.domain.model.RelationshipType
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
+import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
@@ -110,6 +111,21 @@ private fun Transfer.values() = TransferValues(timestamp, description, sourceAcc
 private fun TransferAuditEntry.values() = TransferValues(timestamp, description, sourceAccountId, targetAccountId, amount)
 
 /**
+ * The values of a trade an import created, which tell its replacement apart from the other trades its file creates:
+ * a trade's provenance names only the file, not a row, as several rows may make one trade.
+ */
+data class TradeValues(
+    val timestamp: Instant,
+    val description: String,
+    val fromAccountId: AccountId,
+    val from: Money,
+    val toAccountId: AccountId,
+    val to: Money,
+)
+
+private fun Trade.values() = TradeValues(timestamp, description, fromAccountId, from, toAccountId, to)
+
+/**
  * A hand edit of a transfer an import created. A re-import deletes the transfer and creates it again
  * from the same record, then re-applies the edit to the new one. Only what a person changed last is
  * kept: a field an import changed after the hand edit is the import's again.
@@ -153,6 +169,8 @@ data class ManualEdit(
 data class ManualTradeEdit(
     val tradeId: TradeId,
     val record: Source,
+    /** The trade as the import left it: what the replacement is matched on. */
+    val imported: TradeValues? = null,
     /** Each hand-edited type with the trade's value of it (null: removed by hand). */
     val attributes: Map<AttributeTypeId, String?>,
 ) {
@@ -177,6 +195,8 @@ data class ManualRelationship(
         val role: RelationshipRole,
         val record: Source? = null,
         val values: TransferValues? = null,
+        /** A trade member's values, like [values] for a transfer. */
+        val tradeValues: TradeValues? = null,
     )
 
     fun describe(): String = "\"${type.name}\" link between ${members.size} transactions"
@@ -367,14 +387,39 @@ suspend fun captureRerunLinks(
                     .filterKeys { it in file.tradeIds }
                     .entries
             }.associate { it.key to it.value }
-    val tradeEdits =
-        reads.tradeRepository
-            ?.getHandSetAttributes(createdTrades.keys)
-            .orEmpty()
-            .map { (id, attributes) -> ManualTradeEdit(id, createdTrades.getValue(id), attributes) }
+    val handSet = reads.tradeRepository?.getHandSetAttributes(createdTrades.keys).orEmpty()
     val createdTransfers = files.flatMap { it.createdTransfers.entries }.associate { it.key to it.value }
-    return RerunLinks(tradeEdits, captureManualRelationships(createdTransfers, createdTrades, reads))
+    val relationships = captureManualRelationships(createdTransfers, createdTrades, reads)
+    // Read only the trades whose replacements must be found, as they are before the re-import deletes them.
+    val tradeValues =
+        tradeValuesOf(
+            handSet.keys +
+                relationships.flatMap { r ->
+                    r.members.mapNotNull { (it.transactionId as? TradeId)?.takeIf { id -> id in createdTrades } }
+                },
+            reads,
+        )
+    val tradeEdits = handSet.map { (id, attributes) -> ManualTradeEdit(id, createdTrades.getValue(id), tradeValues[id], attributes) }
+    return RerunLinks(
+        tradeEdits,
+        relationships.map { r ->
+            r.copy(members = r.members.map { m -> m.copy(tradeValues = (m.transactionId as? TradeId)?.let(tradeValues::get)) })
+        },
+    )
 }
+
+private suspend fun tradeValuesOf(
+    ids: Collection<TradeId>,
+    reads: RerunReads,
+): Map<TradeId, TradeValues> =
+    if (ids.isEmpty()) {
+        emptyMap()
+    } else {
+        reads.tradeRepository
+            ?.getTradesByIds(ids)
+            .orEmpty()
+            .mapValues { it.value.values() }
+    }
 
 /** The hand-made relationships over any of [transfers] or [trades] (what a re-import may delete), with each member's record. */
 private suspend fun captureManualRelationships(
@@ -698,6 +743,7 @@ private class Replacements(
     private val transfersByRecord: Map<Source, List<TransferId>>,
     private val tradesByRecord: Map<Source, List<TradeId>>,
     val transfers: Map<TransferId, Transfer>,
+    private val trades: Map<TradeId, TradeValues>,
 ) {
     private val newTransfer = mutableMapOf<TransferId, Transfer>()
     private val newTrade = mutableMapOf<TradeId, TradeId>()
@@ -718,13 +764,16 @@ private class Replacements(
                 newTransfer[old] = it
             }
 
+    /** The trade [record] created again that is closest to [values]: a file's trades all share one record. */
     fun trade(
         old: TradeId,
         record: Source,
+        values: TradeValues?,
     ): TradeId? =
         newTrade[old] ?: tradesByRecord[record]
             .orEmpty()
-            .firstOrNull { it.id !in claimed }
+            .filter { it.id !in claimed }
+            .maxByOrNull { candidate -> values?.let { tradeMatchScore(it, trades[candidate]) } ?: 0 }
             ?.also {
                 claimed += it.id
                 newTrade[old] = it
@@ -753,7 +802,13 @@ private class Replacements(
                         transfers.values.flatten(),
                     )
                 }
-            return Replacements(transfers, trades, current)
+            val tradeValues =
+                trades.values
+                    .flatten()
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { tradeValuesOf(it, reads) }
+                    .orEmpty()
+            return Replacements(transfers, trades, current, tradeValues)
         }
     }
 }
@@ -801,7 +856,7 @@ private suspend fun ImportEngine.reapplyManualEdits(
     val linksNotReapplied = mutableListOf<String>()
     val tradeMutations = mutableListOf<TradeAttributeMutation>()
     tradeEdits.forEach { edit ->
-        val replacement = replacements.trade(edit.tradeId, edit.record)
+        val replacement = replacements.trade(edit.tradeId, edit.record, edit.imported)
         if (replacement == null) {
             linksNotReapplied += edit.describe()
         } else {
@@ -830,7 +885,7 @@ private suspend fun ImportEngine.reapplyManualEdits(
                         id.id !in deletedIds -> id
                         record == null -> null
                         id is TransferId -> member.values?.let { replacements.transfer(id, record, it)?.id }
-                        id is TradeId -> replacements.trade(id, record)
+                        id is TradeId -> replacements.trade(id, record, member.tradeValues)
                         else -> null
                     }
                 replacement?.let { RelationshipMember(it, member.role) }
@@ -867,6 +922,23 @@ private fun matchScore(
     imported: TransferValues,
     candidate: TransferValues,
 ): Int = TransferField.entries.count { it.of(imported) == it.of(candidate) }
+
+private fun tradeMatchScore(
+    imported: TradeValues,
+    candidate: TradeValues?,
+): Int =
+    if (candidate == null) {
+        0
+    } else {
+        listOf<(TradeValues) -> Any>(
+            { it.timestamp },
+            { it.description },
+            { it.fromAccountId },
+            { it.from },
+            { it.toAccountId },
+            { it.to },
+        ).count { field -> field(imported) == field(candidate) }
+    }
 
 private fun ManualEdit.updateOf(replacement: Transfer): ImportTransfer {
     val editedTypeIds = attributes.keys.map { it.id }.toSet()

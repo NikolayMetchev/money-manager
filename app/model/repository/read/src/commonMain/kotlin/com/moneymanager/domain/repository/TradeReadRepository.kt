@@ -11,6 +11,9 @@ import kotlin.time.Instant
 interface TradeReadRepository {
     fun getTradeById(id: TradeId): Flow<Trade?>
 
+    /** The trades of [ids] that exist, by id. */
+    suspend fun getTradesByIds(ids: Collection<TradeId>): Map<TradeId, Trade>
+
     /** The attributes set on trade [id] (e.g. `excluded` with its reason), ordered by type name. */
     fun getAttributes(id: TradeId): Flow<List<TradeAttribute>>
 
