@@ -415,7 +415,8 @@ class ReconciliationScreenTest {
         runCatching { onAllNodes(hasScrollAction())[0].performScrollToNode(matcher) }.isSuccess
 
     private fun ComposeUiTest.clickText(text: String) {
-        reveal(hasText(text))
+        // The result loads off the UI thread, which waitForIdle doesn't wait for: until it lands there are no tabs.
+        waitUntil(timeoutMillis = 10_000) { reveal(hasText(text)) || onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
         onNodeWithText(text).performClick()
         waitForIdle()
     }
