@@ -812,6 +812,95 @@ class ReconciliationScreenTest {
         }
     }
 
+    @Test
+    fun linksAWalletToAnAccountAnotherWalletAlreadyMirrors() {
+        runMoneyManagerComposeUiTest {
+            val coinbase = ShadowAccount(AccountId(100), "Koinly · Coinbase", "Koinly")
+            val pro = ShadowAccount(AccountId(101), "Koinly · Coinbase Pro", "Koinly")
+            val accounts =
+                listOf(Account(id = AccountId(1), name = "Coinbase", openingDate = epoch)) +
+                    listOf(coinbase, pro).map { Account(id = it.accountId, name = it.name, openingDate = epoch) }
+            val batches = mutableListOf<ImportBatch>()
+            setContent {
+                provideScreenScopes {
+                    CompositionLocalProvider(
+                        LocalImportEngine provides
+                            importEngine { batch ->
+                                ImportResult().also { batches += batch }
+                            },
+                    ) {
+                        ReconciliationScreen(
+                            reconciliationRepository =
+                                reconciliationRepository(
+                                    listOf(koinly),
+                                    listOf(coinbase, pro),
+                                    links = flowOf(listOf(ReconciliationLink(coinbase.accountId, AccountId(1)))),
+                                ),
+                            accountRepository = accountRepository(accounts),
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            transactionRepository = transactionRepository,
+                            onOpenLeg = {},
+                        )
+                    }
+                }
+            }
+
+            waitForIdle()
+            onNodeWithText("Select...").performClick()
+            waitForIdle()
+            onNodeWithText("Coinbase", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            waitUntil(timeoutMillis = 10_000) { batches.any { it.reconciliationLinkMutations.isNotEmpty() } }
+            assertEquals(
+                listOf(ReconciliationLinkMutation.SetLinks(pro.accountId, setOf(AccountId(1)))),
+                batches.flatMap { it.reconciliationLinkMutations },
+            )
+        }
+    }
+
+    @Test
+    fun showsARefusedLinkOnTheWalletItWasFor() {
+        runMoneyManagerComposeUiTest {
+            val wallet = ShadowAccount(AccountId(100), "Koinly · Ledger", "Koinly")
+            val accounts =
+                listOf(
+                    Account(id = AccountId(1), name = "Cold storage", openingDate = epoch),
+                    Account(id = wallet.accountId, name = wallet.name, openingDate = epoch),
+                )
+            val engine =
+                importEngine { batch ->
+                    require(batch.reconciliationLinkMutations.isEmpty()) { "refused" }
+                    ImportResult()
+                }
+            setContent {
+                provideScreenScopes {
+                    CompositionLocalProvider(LocalImportEngine provides engine) {
+                        ReconciliationScreen(
+                            reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(wallet)),
+                            accountRepository = accountRepository(accounts),
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            transactionRepository = transactionRepository,
+                            onOpenLeg = {},
+                        )
+                    }
+                }
+            }
+
+            waitForIdle()
+            onNodeWithText("Select...").performClick()
+            waitForIdle()
+            onNodeWithText("Cold storage", useUnmergedTree = true).performClick()
+
+            waitUntil(
+                timeoutMillis = 10_000,
+            ) { onAllNodes(hasTestTag("link-error"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+            onNodeWithText("Linking failed: refused", useUnmergedTree = true).assertIsDisplayed()
+        }
+    }
+
     private companion object {
         const val MAX_GROUPS = 20
     }

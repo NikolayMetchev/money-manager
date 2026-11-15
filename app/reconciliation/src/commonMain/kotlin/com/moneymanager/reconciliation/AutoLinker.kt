@@ -72,8 +72,8 @@ fun planAutoLinks(
 
 /**
  * Wallets of [source] that still need the user: no link, with a best-guess real account to offer. An account another
- * wallet of the source already mirrors is never offered: the engine allows one wallet per real account, so the link
- * would be refused.
+ * wallet of the source already mirrors is offered only when nothing else is close: sharing one (Coinbase Pro's
+ * wallet in the Coinbase account) is the exception.
  */
 fun unlinkedWallets(
     source: ReconciliationSource,
@@ -87,7 +87,10 @@ fun unlinkedWallets(
     val offerable = realAccounts.filter { it.id !in takenReal }
     return shadowAccounts
         .filter { source.isLinkable(it) && it.accountId !in linkedWallets }
-        .map { wallet -> UnlinkedWallet(wallet, suggestRealAccount(source.walletName(wallet), offerable)) }
+        .map { wallet ->
+            val name = source.walletName(wallet)
+            UnlinkedWallet(wallet, suggestRealAccount(name, offerable) ?: suggestRealAccount(name, realAccounts))
+        }
 }
 
 /**

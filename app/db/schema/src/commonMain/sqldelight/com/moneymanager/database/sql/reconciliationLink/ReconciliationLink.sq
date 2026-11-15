@@ -1,8 +1,8 @@
 -- Links a shadow account (one carrying the 'reconciliation-source' attribute, -9) to the real accounts
 -- whose transactions it mirrors, so the reconciliation screen can compare the two. Many real accounts
 -- may link to one shadow account (a source's single "Binance" wallet vs Binance, Binance Earn, ...).
--- A real account links to at most one shadow account per source; the import engine enforces that
--- (the source lives on the shadow account's attribute, out of reach of a table constraint).
+-- A real account may also link to several of a source's shadow accounts (Coinbase and Coinbase Pro
+-- both moved into one Coinbase account): reconciliation compares them as one link group.
 --
 -- Excluded from the audit trail (see EXCLUDED_FROM_AUDIT in MoneyManagerDatabaseWrapper) like
 -- account_mapping; its edits are folded into the sync change token instead.

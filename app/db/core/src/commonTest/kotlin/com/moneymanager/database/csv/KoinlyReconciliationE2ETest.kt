@@ -840,7 +840,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
                 ),
             )
 
-            // A shadow account can't be a link target, and a real account links to one wallet per source.
+            // A shadow account can't be a link target.
             assertFailsWith<IllegalArgumentException> {
                 repositories.importEngine.setReconciliationLinks(
                     shadowBinance,
@@ -848,7 +848,6 @@ class KoinlyReconciliationE2ETest : DbTest() {
                 )
             }
             repositories.importEngine.setReconciliationLinks(shadowBinance, setOf(binance))
-            assertFailsWith<IllegalArgumentException> { repositories.importEngine.setReconciliationLinks(shadowCoinbase, setOf(binance)) }
 
             val reconciliation = repositories.reconciliationLinkRepository
             val links = reconciliation.getLinks().first()

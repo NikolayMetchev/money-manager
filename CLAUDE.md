@@ -554,10 +554,11 @@ source** (built-ins: Koinly, Accointing). Its data never touches real accounts:
   transfers on their own accounts for dedupe, shadow data is isolated in both directions — no exclusion
   attribute needed, trades included.
 - Shadow **wallets** (names starting with `linkableAccountPrefix`) are linked to real accounts in
-  `reconciliation_account_link` (many real → one wallet; one wallet per source per real account),
+  `reconciliation_account_link` (many to many: wallets and real accounts joined by links form one link group, so Coinbase and Coinbase
+  Pro can both be compared with the one Coinbase account),
   written via `ReconciliationLinkMutation`. The Reconciliation tab auto-links exact name matches and
   lists the rest as "needs attention" (link to an existing account or create one).
-- `reconcile()` (`app/reconciliation`) matches legs per link group on (asset, signed amount): exact
+- `reconcile()` (`app/reconciliation`) matches legs per link group (`linkGroups`) on (asset, signed amount): exact
   second, then nearest within 24h, then summed per (group, asset, second) so a fee booked separately on
   one side still matches the other side's gross leg. Whatever is left is compared at the decimals both sides keep of that
   asset (the most any leg shows), nearest within 24h: a source stops short of the 18 places a real leg can hold, truncating some assets and
