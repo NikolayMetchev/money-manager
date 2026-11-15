@@ -1,9 +1,11 @@
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_forbid_deps //app/db/core //app/di/core //app/ui/core
-# The engine is the sole writer, and only ImportEngineImpl may take a write repository.
+# The engine is the sole writer, and only ImportEngineImpl (and ObservationMaterialization, its materialize step) may
+# take a write repository.
 # gazelle:kmp_forbid_reference \b[A-Za-z]+WriteRepository\b route writes through the ImportEngine (CLAUDE.md, "Database Writes")
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/ImportEngineImpl.kt
+# gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/ObservationMaterialization.kt
 # gazelle:kmp_export //app/importengineapi
 # gazelle:kmp_export //app/model/core
 # gazelle:kmp_export //app/model/csv
@@ -24,7 +26,10 @@ kmp_library(
         "//app/ui/core",
     ],
     forbidden_reference = "\\b[A-Za-z]+WriteRepository\\b",
-    forbidden_reference_allowed = ["src/commonMain/kotlin/com/moneymanager/importer/ImportEngineImpl.kt"],
+    forbidden_reference_allowed = [
+        "src/commonMain/kotlin/com/moneymanager/importer/ImportEngineImpl.kt",
+        "src/commonMain/kotlin/com/moneymanager/importer/ObservationMaterialization.kt",
+    ],
     forbidden_reference_reason = "route writes through the ImportEngine (CLAUDE.md, \"Database Writes\")",
     native_targets = [
         "linuxArm64",
@@ -48,6 +53,7 @@ kmp_library(
     ],
     deps = [
         "//app/model/calendar",
+        "//app/model/observation",
         "//app/model/rules",
         "//utils/bigdecimal",
         "@maven_kmp//:kotlinx_coroutines_core",

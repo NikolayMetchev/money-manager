@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.observation.ImportGroupId
 import com.moneymanager.domain.model.observation.ImportRecordId
+import com.moneymanager.domain.model.observation.MaterializedTransaction
 import com.moneymanager.domain.model.observation.Observation
 import com.moneymanager.domain.model.observation.ObservationAttribute
 import com.moneymanager.domain.model.observation.ObservationContent
@@ -44,6 +45,64 @@ class ObservationReadRepositoryImpl(
             .selectHeadersByTransaction(transactionId.id, ::Header)
             .awaitAsList()
             .map { load(it) }
+
+    override suspend fun getMaterialized(transactionId: TransactionId): MaterializedTransaction? =
+        when (transactionId) {
+            is TransferId -> {
+                queries
+                    .selectMaterializedTransfer(transactionId.id) { timestamp, description, source, target, asset, amount ->
+                        ObservedValues.Transfer(
+                            timestamp = Instant.fromEpochMilliseconds(timestamp),
+                            description = description,
+                            sourceAccountId = AccountId(source),
+                            targetAccountId = AccountId(target),
+                            assetId = ObservedAssetId(asset),
+                            amount = BigInteger(amount),
+                        )
+                    }.awaitAsOneOrNull()
+                    ?.let { values ->
+                        val attributes =
+                            queries
+                                .selectMaterializedTransferAttributes(transactionId.id) { typeId, groupKey, value ->
+                                    ObservationAttribute(AttributeTypeId(typeId), groupKey, value)
+                                }.awaitAsList()
+                        MaterializedTransaction(values, attributes.toSet())
+                    }
+            }
+
+            else -> {
+                queries
+                    .selectMaterializedTrade(
+                        transactionId.id,
+                    ) { timestamp, description, from, fromAsset, fromAmount, to, toAsset, toAmount ->
+                        ObservedValues.Trade(
+                            timestamp = Instant.fromEpochMilliseconds(timestamp),
+                            description = description,
+                            fromAccountId = AccountId(from),
+                            fromAssetId = ObservedAssetId(fromAsset),
+                            fromAmount = BigInteger(fromAmount),
+                            toAccountId = AccountId(to),
+                            toAssetId = ObservedAssetId(toAsset),
+                            toAmount = BigInteger(toAmount),
+                        )
+                    }.awaitAsOneOrNull()
+                    ?.let { values ->
+                        val attributes =
+                            queries
+                                .selectMaterializedTradeAttributes(transactionId.id) { typeId, value ->
+                                    ObservationAttribute(AttributeTypeId(typeId), "", value)
+                                }.awaitAsList()
+                        MaterializedTransaction(values, attributes.toSet())
+                    }
+            }
+        }
+
+    override suspend fun getAccountsWithObservations(accountIds: Collection<AccountId>): Set<AccountId> =
+        if (accountIds.isEmpty()) {
+            emptySet()
+        } else {
+            queries.selectAccountsWithObservations(accountIds.map { it.id }).awaitAsList().mapTo(mutableSetOf(), ::AccountId)
+        }
 
     private class Header(
         val id: Long,
