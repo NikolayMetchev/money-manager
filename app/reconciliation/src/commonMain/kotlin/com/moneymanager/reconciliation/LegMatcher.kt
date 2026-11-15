@@ -74,7 +74,15 @@ data class ReconciliationResult(
      * candidates on the other side of it.
      */
     val unclaimedReal: List<UnmatchedRealLeg> = emptyList(),
+    /** Each linked wallet's link group (see [linkGroups]); a real leg's [UnmatchedRealLeg.walletAccountId] is its group. */
+    val groupOfWallet: Map<AccountId, AccountId> = emptyMap(),
 ) {
+    /** Whether [a] and [b] are wallets of one link group, so a real leg either can be matched to belongs to both. */
+    fun sameGroup(
+        a: AccountId,
+        b: AccountId,
+    ): Boolean = (groupOfWallet[a] ?: a) == (groupOfWallet[b] ?: b)
+
     /** Stored matches and those that agree to the second. */
     val matched: List<LegMatch> get() = matches.filter { it.settled }
 
@@ -121,8 +129,9 @@ private val STEPS =
  * (see [ReconciliationLeg.matchIds]) pair up within a link group whatever their times and amounts. A stored match
  * left with legs on one side only (its partner was deleted) is ignored, so those legs are matched as usual.
  *
- * Legs are compared per **link group** — a wallet (shadow account) plus every real account linked to it
- * — so a source that books one "Binance" wallet can be compared against several real Binance accounts. A
+ * Legs are compared per **link group** — wallets (shadow accounts) and the real accounts linked to them, joined
+ * through shared links (see [linkGroups]) — so a source that books one "Binance" wallet can be compared against
+ * several real Binance accounts, and two wallets (Coinbase, Coinbase Pro) against the one account both moved into. A
  * pair matches on (group, asset, signed amount), first at the same second (exact), then nearest within
  * [fuzzyWindow]; each leg is used once, so repeated identical movements pair up one-to-one. A final pass
  * sums the leftover legs of each movement (see [ReconciliationLeg.movementKey]) per group and asset — how
@@ -174,17 +183,13 @@ fun reconcile(
             .filterNot { it.isExcluded }
             .takeIf { it.isNotEmpty() }
             ?.let { legs -> legs.minOf { it.timestamp }..legs.maxOf { it.timestamp } }
-    // One source's links: the engine allows a real account one wallet per source, which is what lets
-    // each real leg belong to exactly one group.
-    require(links.groupBy { it.realAccountId }.values.all { it.size == 1 }) {
-        "reconcile() takes one source's links; a real account is linked to several wallets"
-    }
-    val walletByReal: Map<AccountId, AccountId> = links.associate { it.realAccountId to it.shadowAccountId }
-    val linkedWallets: Set<AccountId> = links.mapTo(mutableSetOf()) { it.shadowAccountId }
+    val groups = linkGroups(links)
+    val groupOfWallet = groups.wallets
+    val groupOfRealAccount = groups.reals
 
-    fun groupOfSource(accountId: AccountId?): AccountId? = accountId?.takeIf { it in linkedWallets }
+    fun groupOfSource(accountId: AccountId?): AccountId? = accountId?.let(groupOfWallet::get)
 
-    fun groupOfReal(accountId: AccountId?): AccountId? = accountId?.let(walletByReal::get)
+    fun groupOfReal(accountId: AccountId?): AccountId? = accountId?.let(groupOfRealAccount::get)
 
     val inScopeSource =
         sourceLegs.filter { leg ->
@@ -404,7 +409,7 @@ fun reconcile(
             .filter { leg ->
                 val group = groupOfSource(leg.accountId)
                 group != null && leg.isIgnored && groupOfSource(leg.counterpartyAccountId) != group
-            }.map { UnmatchedSourceLeg(it, groupOfSource(it.accountId)!!, assetUnknownToMm = false) }
+            }.map { UnmatchedSourceLeg(it, it.accountId, assetUnknownToMm = false) }
 
     return ReconciliationResult(
         sourceRange = sourceRange,
@@ -414,7 +419,7 @@ fun reconcile(
                 val group = groupOfSource(leg.accountId)!!
                 UnmatchedSourceLeg(
                     leg = leg,
-                    walletAccountId = group,
+                    walletAccountId = leg.accountId,
                     assetUnknownToMm = leg.amount.asset.id !in realAssetsByGroup[group].orEmpty(),
                 )
             },
@@ -424,6 +429,7 @@ fun reconcile(
                 .map { UnmatchedRealLeg(it, groupOfReal(it.accountId)!!) },
         ignored = ignored,
         unclaimedReal = linkedReal.filter { it !in consumed }.map { UnmatchedRealLeg(it, groupOfReal(it.accountId)!!) },
+        groupOfWallet = groupOfWallet,
     )
 }
 
@@ -562,3 +568,40 @@ private data class MatchKey(
     val assetId: AssetId,
     val signedAmount: BigInteger,
 )
+
+/** Each wallet's and each real account's link group, named by the group's lowest wallet id (see [linkGroups]). */
+internal class LinkGroups(
+    val wallets: Map<AccountId, AccountId>,
+    val reals: Map<AccountId, AccountId>,
+)
+
+/**
+ * The link groups of one source's [links]: wallets and real accounts joined by links, directly or through each other.
+ * A real account may mirror several wallets (Coinbase and Coinbase Pro both moved into one Coinbase account), so its
+ * legs are compared against all of their legs, and a transfer between those wallets is internal to the group.
+ */
+internal fun linkGroups(links: List<ReconciliationLink>): LinkGroups {
+    val parent = mutableMapOf<AccountId, AccountId>()
+
+    fun find(wallet: AccountId): AccountId {
+        var root = wallet
+        while (parent.getValue(root) != root) root = parent.getValue(root)
+        return root
+    }
+    links.forEach { parent.getOrPut(it.shadowAccountId) { it.shadowAccountId } }
+
+    // Every root is its set's lowest wallet id, so a group's name doesn't depend on the order of the links.
+    fun union(
+        a: AccountId,
+        b: AccountId,
+    ) {
+        val (low, high) = listOf(find(a), find(b)).sortedBy { it.id }
+        parent[high] = low
+    }
+    links.groupBy({ it.realAccountId }, { it.shadowAccountId }).values.forEach { wallets ->
+        wallets.zipWithNext().forEach { (a, b) -> union(a, b) }
+    }
+    val wallets = parent.keys.associateWith(::find)
+    val reals = links.associate { it.realAccountId to wallets.getValue(it.shadowAccountId) }
+    return LinkGroups(wallets, reals)
+}

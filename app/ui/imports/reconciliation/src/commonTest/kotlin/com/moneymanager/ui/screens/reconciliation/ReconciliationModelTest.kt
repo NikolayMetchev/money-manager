@@ -97,6 +97,26 @@ class ReconciliationModelTest {
     }
 
     @Test
+    fun pickerShowsALegASiblingWalletsNearMatchClaims() {
+        val sibling = AccountId(101)
+        val koinly = leg(wallet, "5", t0)
+        val siblingSource = leg(sibling, "5", t0 - 1.hours)
+        val claimed = leg(binance, "5", t0 + 1.hours)
+        val result =
+            ReconciliationResult(
+                sourceRange = null,
+                matches = listOf(LegMatch(siblingSource, claimed)),
+                missingInMm = listOf(UnmatchedSourceLeg(koinly, wallet, assetUnknownToMm = false)),
+                missingInSource = emptyList(),
+                groupOfWallet = mapOf(wallet to wallet, sibling to wallet),
+            )
+
+        val candidates = result.pickerCandidates(listOf(koinly), wallet, window = 3.days, sameAssetOnly = true)
+
+        assertEquals(listOf(claimed to false), candidates.map { it.leg to it.selectable })
+    }
+
+    @Test
     fun aMovementIsEveryUnmatchedLegOfItsRowOnTheWallet() {
         val trade = leg(wallet, "5", t0, movement = "c1:3")
         val fee = leg(wallet, "-0.1", t0, movement = "c1:3")

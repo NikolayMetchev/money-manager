@@ -116,8 +116,8 @@ sealed interface RelationshipMutation {
 sealed interface ReconciliationLinkMutation {
     /**
      * Replaces every link of [shadowAccountId] with links to [realAccountIds] (empty = unlink it). The
-     * engine rejects a non-shadow [shadowAccountId], a shadow account among [realAccountIds], and a real
-     * account already linked to another shadow account of the same source.
+     * engine rejects a non-shadow [shadowAccountId] and a shadow account among [realAccountIds]. A real account may
+     * be linked to several shadow accounts of one source; reconciliation compares them as one link group.
      */
     data class SetLinks(
         val shadowAccountId: AccountId,

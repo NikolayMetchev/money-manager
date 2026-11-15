@@ -119,11 +119,11 @@ fun ReconciliationResult.pickerCandidates(
 
     val free =
         unclaimedReal
-            .filter { it.walletAccountId == wallet && eligible(it.leg) }
+            .filter { sameGroup(it.walletAccountId, wallet) && eligible(it.leg) }
             .map { PickerCandidate(it.leg, it.leg.timestamp - at) }
     val claimed =
         nearMatches
-            .filter { match -> match.sourceLeg.accountId == wallet }
+            .filter { match -> sameGroup(match.sourceLeg.accountId, wallet) }
             .flatMap { match -> match.realLegs.filter(::eligible).map { PickerCandidate(it, it.timestamp - at, match) } }
     return (free + claimed).sortedWith(compareBy({ it.leg.timestamp }, { it.leg.transactionId }))
 }

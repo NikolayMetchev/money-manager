@@ -119,6 +119,50 @@ class LegMatcherTest {
     }
 
     @Test
+    fun `two wallets linked to one account are one group`() {
+        val coinbase = AccountId(110) // shadow "Accointing · Coinbase"
+        val pro = AccountId(111) // shadow "Accointing · Coinbase Pro"
+        val real = AccountId(10)
+        val shared = listOf(ReconciliationLink(coinbase, real), ReconciliationLink(pro, real))
+        val source =
+            listOf(
+                leg(coinbase, sourceRewards, "1", t0),
+                // Coinbase → Coinbase Pro: internal to the group, as it is inside the one real account.
+                leg(coinbase, pro, "-5", t0 + 1.hours),
+                leg(pro, coinbase, "5", t0 + 1.hours),
+                leg(pro, sourceRewards, "2", t0 + 2.hours),
+                leg(pro, sourceRewards, "3", t0 + 3.hours),
+            )
+        val realLegs = listOf(leg(real, stakingRewards, "1", t0), leg(real, stakingRewards, "2", t0 + 2.hours))
+
+        val result = reconcile(source, shared, realLegs)
+
+        assertEquals(2, result.matched.size)
+        assertEquals(listOf(pro to ada("3")), result.missingInMm.map { it.walletAccountId to it.leg.amount })
+        assertTrue(result.missingInSource.isEmpty())
+        assertTrue(result.sameGroup(coinbase, pro))
+    }
+
+    @Test
+    fun `link groups are named by their lowest wallet whatever the link order`() {
+        val links =
+            listOf(
+                ReconciliationLink(AccountId(13), AccountId(2)),
+                ReconciliationLink(AccountId(12), AccountId(1)),
+                ReconciliationLink(AccountId(11), AccountId(2)),
+                ReconciliationLink(AccountId(12), AccountId(2)),
+                ReconciliationLink(AccountId(14), AccountId(3)),
+            )
+
+        for (order in listOf(links, links.reversed())) {
+            val groups = linkGroups(order)
+            assertEquals(setOf(AccountId(11)), (11L..13L).map { groups.wallets.getValue(AccountId(it)) }.toSet())
+            assertEquals(AccountId(14), groups.wallets.getValue(AccountId(14)))
+            assertEquals(AccountId(11), groups.reals.getValue(AccountId(1)))
+        }
+    }
+
+    @Test
     fun `excluded real legs and legs on unlinked shadow accounts are out of scope`() {
         val unlinkedWallet = AccountId(102)
         val source = listOf(leg(wallet, sourceRewards, "1", t0), leg(unlinkedWallet, sourceRewards, "3", t0))

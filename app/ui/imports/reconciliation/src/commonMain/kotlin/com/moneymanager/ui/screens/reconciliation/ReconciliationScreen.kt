@@ -318,14 +318,17 @@ private fun SourceReconciliation(
         scrollToLeaf = null
     }
 
+    // Shown on the wallet the person was linking, which may be far below the list's top.
+    val linkErrors = remember(source) { mutableStateMapOf<AccountId, String>() }
+
     fun setLinks(
         shadow: AccountId,
         realIds: Set<AccountId>,
     ) {
         scope.launch {
             runCatchingUnlessCancelled { importEngine.setReconciliationLinks(shadow, realIds) }
-                .onSuccess { error = null }
-                .onFailure { error = it.message }
+                .onSuccess { linkErrors.remove(shadow) }
+                .onFailure { linkErrors[shadow] = "Linking failed: ${it.message}" }
         }
     }
 
@@ -466,6 +469,7 @@ private fun SourceReconciliation(
                         // "Create all" links in a second batch that would overwrite a link made meanwhile.
                         enabled = !creatingAll,
                         isReal = { it.id !in allShadowIds },
+                        linkError = linkErrors[wallet.wallet.accountId],
                         onLink = { realId -> setLinks(wallet.wallet.accountId, setOf(realId)) },
                     )
                 }
@@ -481,6 +485,7 @@ private fun SourceReconciliation(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     isReal = { it.id !in allShadowIds },
+                    linkErrors = linkErrors,
                     onSetLinks = ::setLinks,
                 )
             }
@@ -754,6 +759,7 @@ private fun UnlinkedWalletCard(
     existingNames: Set<String>,
     enabled: Boolean,
     isReal: (Account) -> Boolean,
+    linkError: String?,
     onLink: (AccountId) -> Unit,
 ) {
     val declined = wallet.wallet.autoLinkDeclined
@@ -791,6 +797,7 @@ private fun UnlinkedWalletCard(
                 enabled = enabled,
                 accountFilter = isReal,
             )
+            linkError?.let { LinkError(it) }
             TextButton(onClick = { showCreateDialog = true }, enabled = enabled) { Text("Create new account") }
         }
     }
@@ -817,6 +824,7 @@ private fun LinkedWallets(
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
     isReal: (Account) -> Boolean,
+    linkErrors: Map<AccountId, String>,
     onSetLinks: (AccountId, Set<AccountId>) -> Unit,
 ) {
     val linksByWallet = links.groupBy({ it.shadowAccountId }, { it.realAccountId })
@@ -864,6 +872,7 @@ private fun LinkedWallets(
                         accountFilter = { isReal(it) && it.id !in realIds },
                     )
                 }
+                linkErrors[wallet.accountId]?.let { LinkError(it) }
             }
         }
     }
@@ -1108,3 +1117,13 @@ private class IndexingScope(
 
 /** Test tag of the row a link named, which is marked in the list. */
 internal const val HIGHLIGHTED_TAG = "reconciliation-highlighted"
+
+@Composable
+private fun LinkError(message: String) {
+    Text(
+        message,
+        color = MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.padding(vertical = 4.dp).testTag("link-error"),
+    )
+}

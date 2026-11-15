@@ -2491,21 +2491,9 @@ class ImportEngineImpl(
         for (m in mutations) {
             when (m) {
                 is ReconciliationLinkMutation.SetLinks -> {
-                    val source =
-                        requireNotNull(sourceByShadow[m.shadowAccountId]) { "Account ${m.shadowAccountId} is not a shadow account" }
+                    require(m.shadowAccountId in sourceByShadow) { "Account ${m.shadowAccountId} is not a shadow account" }
                     val shadowTargets = m.realAccountIds.filter { it in sourceByShadow }
                     require(shadowTargets.isEmpty()) { "Cannot link a shadow account to shadow account(s) $shadowTargets" }
-                    // One shadow account per source per real account, or the matcher couldn't tell which
-                    // wallet a real leg belongs to.
-                    val taken =
-                        repository.getLinks().first().filter { link ->
-                            link.shadowAccountId != m.shadowAccountId &&
-                                link.realAccountId in m.realAccountIds &&
-                                sourceByShadow[link.shadowAccountId] == source
-                        }
-                    require(taken.isEmpty()) {
-                        "Account(s) ${taken.map { it.realAccountId }} already linked to another '$source' shadow account"
-                    }
                     repository.setLinks(m.shadowAccountId, m.realAccountIds)
                     // Unlinking a wallet completely is a decision automatic linking must respect;
                     // linking it again withdraws that decision.
