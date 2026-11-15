@@ -24,3 +24,46 @@ SELECT COUNT(*) FROM pending_materialized_view_changes;
 
 selectCurrencyCodes:
 SELECT code FROM currency ORDER BY code;
+
+-- Rows in every audit table, by table: the re-import oracle checks an unchanged source's re-import writes none.
+countAuditRowsByTable:
+SELECT 'account_attribute_audit' AS table_name, COUNT(*) AS row_count FROM account_attribute_audit
+UNION ALL
+SELECT 'account_audit' AS table_name, COUNT(*) AS row_count FROM account_audit
+UNION ALL
+SELECT 'api_import_strategy_audit' AS table_name, COUNT(*) AS row_count FROM api_import_strategy_audit
+UNION ALL
+SELECT 'asset_alias_audit' AS table_name, COUNT(*) AS row_count FROM asset_alias_audit
+UNION ALL
+SELECT 'category_audit' AS table_name, COUNT(*) AS row_count FROM category_audit
+UNION ALL
+SELECT 'crypto_audit' AS table_name, COUNT(*) AS row_count FROM crypto_audit
+UNION ALL
+SELECT 'csv_import_application_audit' AS table_name, COUNT(*) AS row_count FROM csv_import_application_audit
+UNION ALL
+SELECT 'csv_import_strategy_audit' AS table_name, COUNT(*) AS row_count FROM csv_import_strategy_audit
+UNION ALL
+SELECT 'currency_audit' AS table_name, COUNT(*) AS row_count FROM currency_audit
+UNION ALL
+SELECT 'exchange_order_audit' AS table_name, COUNT(*) AS row_count FROM exchange_order_audit
+UNION ALL
+SELECT 'holiday_calendar_audit' AS table_name, COUNT(*) AS row_count FROM holiday_calendar_audit
+UNION ALL
+SELECT 'import_directory_audit' AS table_name, COUNT(*) AS row_count FROM import_directory_audit
+UNION ALL
+SELECT 'pass_through_account_audit' AS table_name, COUNT(*) AS row_count FROM pass_through_account_audit
+UNION ALL
+SELECT 'person_account_ownership_audit' AS table_name, COUNT(*) AS row_count FROM person_account_ownership_audit
+UNION ALL
+SELECT 'person_attribute_audit' AS table_name, COUNT(*) AS row_count FROM person_attribute_audit
+UNION ALL
+SELECT 'person_audit' AS table_name, COUNT(*) AS row_count FROM person_audit
+UNION ALL
+SELECT 'trade_attribute_audit' AS table_name, COUNT(*) AS row_count FROM trade_attribute_audit
+UNION ALL
+SELECT 'trade_audit' AS table_name, COUNT(*) AS row_count FROM trade_audit
+UNION ALL
+SELECT 'transfer_attribute_audit' AS table_name, COUNT(*) AS row_count FROM transfer_attribute_audit
+UNION ALL
+SELECT 'transfer_audit' AS table_name, COUNT(*) AS row_count FROM transfer_audit
+;

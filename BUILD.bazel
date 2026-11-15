@@ -222,6 +222,8 @@ kmp_modules(
         "//utils/parsers/ofx:test_module",
         "//app/model/ofx:ofx_module",
         "//app/ui/settings:test_module",
+        "//test/app/reimportoracle:reimportoracle_module",
+        "//test/app/reimportoracle:test_module",
     ],
     visibility = ["//visibility:public"],
 )

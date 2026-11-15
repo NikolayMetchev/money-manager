@@ -1,0 +1,38 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_generate true
+# Every scenario imports its files into a fresh database many times over.
+# gazelle:kmp_test_size large
+
+kmp_library(
+    name = "reimportoracle",
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//app/cryptodata",
+        "//app/csvimporter",
+        "//app/db/di",
+        "//app/db/write",
+        "//app/importengineapi",
+        "//app/model/core",
+        "//app/model/csv",
+        "//app/model/reconciliation",
+        "//app/model/rules",
+        "//test/app/db",
+        "@maven_kmp//:kotlinx_coroutines_core",
+        "@maven_kmp//:kotlinx_datetime",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    size = "large",
+    associate = ":reimportoracle",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "//test/app/db/read:read_for_tests",
+        "@maven_kmp//:kotlinx_coroutines_test",
+        "@maven_kmp//:sqldelight_async_extensions",
+    ],
+)
