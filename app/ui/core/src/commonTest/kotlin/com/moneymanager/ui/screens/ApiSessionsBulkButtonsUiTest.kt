@@ -5,6 +5,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
@@ -109,6 +110,9 @@ class ApiSessionsBulkButtonsUiTest : DbTest() {
 
             onNodeWithText("Download all (1)").performClick()
             waitUntilAtLeastOneExists(hasText("Import all (1)"), timeoutMillis = 10_000)
+            // The session appears (and Import all lights up) before its download finishes: importing it mid-download
+            // would find no counterparties yet. "Download all" is enabled again once its task is done.
+            waitUntilAtLeastOneExists(hasText("Download all (1)") and isEnabled(), timeoutMillis = 10_000)
             onNodeWithText("Import all (1)").assertIsEnabled().performClick()
 
             waitUntilAtLeastOneExists(hasText("Confirm Counterparties"), timeoutMillis = 10_000)

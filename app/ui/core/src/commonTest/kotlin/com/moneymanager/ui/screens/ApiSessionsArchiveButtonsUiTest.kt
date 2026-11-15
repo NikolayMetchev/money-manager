@@ -66,5 +66,8 @@ class ApiSessionsArchiveButtonsUiTest : DbTest() {
             }
             waitUntilAtLeastOneExists(hasText("Export"))
             onNodeWithText("Import").assertExists()
+            // The header renders before the credentials load: end on the loaded (empty) list, so the test never tears
+            // down mid-load.
+            waitUntilAtLeastOneExists(hasText("No credentials yet", substring = true), timeoutMillis = 10_000)
         }
 }
