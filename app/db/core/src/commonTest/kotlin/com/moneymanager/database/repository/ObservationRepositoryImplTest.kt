@@ -21,7 +21,6 @@ import com.moneymanager.domain.model.observation.ObservationAttribute
 import com.moneymanager.domain.model.observation.ObservationContent
 import com.moneymanager.domain.model.observation.ObservationEnd
 import com.moneymanager.domain.model.observation.ObservationFacts
-import com.moneymanager.domain.model.observation.ObservationId
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.observation.ObservationPin
 import com.moneymanager.domain.model.observation.ObservationSplit
@@ -255,7 +254,6 @@ class ObservationRepositoryImplTest : DbTest() {
                 carriedRows = emptyList(),
                 rowIndexRemap = mapOf(1L to 2L, 3L to 3L),
                 xlsxBytes = null,
-                pdf = null,
             )
 
             assertEquals(
@@ -359,6 +357,6 @@ class ObservationRepositoryImplTest : DbTest() {
             assertEquals(setOf(ObservationSplit(a, b)), overrides.getSplits(listOf(b)))
             overrides.unsplit(ObservationSplit(a, b))
             assertEquals(emptySet(), overrides.getSplits(listOf(a, b)))
-            assertEquals(emptyList(), overrides.getPins(emptyList<ObservationId>()))
+            assertEquals(emptyList(), overrides.getPins(emptyList()))
         }
 }
