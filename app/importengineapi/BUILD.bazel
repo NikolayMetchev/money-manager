@@ -1,6 +1,10 @@
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_forbid_deps //app/db/core //app/di/core //app/ui/core
+# gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_jdk jvmMain
+# gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_openssl3_prebuilt nativeMain
+# gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_jdk androidMain
+# gazelle:kmp_keep_dep @maven_kmp//:cryptography_provider_webcrypto webMain
 # gazelle:kmp_export //app/model/accountmapping
 # gazelle:kmp_export //app/model/apistrategy
 # gazelle:kmp_export //app/model/calendar
@@ -14,17 +18,25 @@
 # gazelle:kmp_export //app/tasks
 # gazelle:kmp_export //utils/bigdecimal jvmMain
 
-load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 kmp_library(
     name = "importengineapi",
     android = True,
+    android_deps = ["@maven_kmp//:cryptography_provider_jdk"],
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     forbidden_deps = [
         "//app/db/core",
         "//app/di/core",
         "//app/ui/core",
     ],
+    jvm_deps = ["@maven_kmp//:cryptography_provider_jdk"],
+    keep_deps = [
+        "@maven_kmp//:cryptography_provider_jdk",
+        "@maven_kmp//:cryptography_provider_openssl3_prebuilt",
+        "@maven_kmp//:cryptography_provider_webcrypto",
+    ],
+    native_deps = ["@maven_kmp//:cryptography_provider_openssl3_prebuilt"],
     native_targets = [
         "linuxArm64",
         "linuxX64",
@@ -32,6 +44,7 @@ kmp_library(
         "mingwX64",
     ],
     visibility = ["//visibility:public"],
+    web_deps = ["@maven_kmp//:cryptography_provider_webcrypto"],
     web_targets = [
         "wasmJs",
         "js",
@@ -51,7 +64,37 @@ kmp_library(
         "//utils/bigdecimal",
     ],
     deps = [
+        "//app/model/observation",
         "//utils/regex",
+        "@maven_kmp//:cryptography_core",
         "@maven_kmp//:kotlinx_coroutines_core",
+    ],
+)
+
+kmp_test(
+    name = "test",
+    android = True,
+    associate = ":importengineapi",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    forbidden_deps = [
+        "//app/db/core",
+        "//app/di/core",
+        "//app/ui/core",
+    ],
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+    deps = [
+        "//app/model/core",
+        "//app/model/observation",
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:kotlinx_coroutines_test",
     ],
 )

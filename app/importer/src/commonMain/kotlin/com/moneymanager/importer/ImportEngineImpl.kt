@@ -74,6 +74,8 @@ import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.EditGate
+import com.moneymanager.importengineapi.ExpandedRow
+import com.moneymanager.importengineapi.ExpansionRow
 import com.moneymanager.importengineapi.HolidayCalendarMutation
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
@@ -85,12 +87,17 @@ import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.LegLink
+import com.moneymanager.importengineapi.LegLinkTarget
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalCryptoKey
 import com.moneymanager.importengineapi.LocalCurrencyKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.LocalTradeKey
+import com.moneymanager.importengineapi.ObservationExpander
+import com.moneymanager.importengineapi.ObservationKey
+import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.ReconciliationLinkMutation
@@ -103,6 +110,7 @@ import com.moneymanager.importengineapi.bankKeyFromExternalId
 import com.moneymanager.importengineapi.bankKeysFrom
 import com.moneymanager.importengineapi.forRow
 import com.moneymanager.importengineapi.normalizeNameKey
+import com.moneymanager.importengineapi.observationOwner
 import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -807,31 +815,24 @@ class ImportEngineImpl(
      */
     private suspend fun writeConversionTrades(toImport: List<Classified>) {
         val occurrences = mutableMapOf<List<Any>, Int>()
-        val trades = mutableListOf<NewTrade>()
-        for (classified in toImport) {
-            val transfer = classified.transfer
-            val conversion = transfer.conversion ?: continue
-            val amount = requireNotNull(transfer.amount)
-            val timestamp = requireNotNull(transfer.timestamp)
-            val account = requireId(if (conversion.incoming) transfer.toAccount else transfer.fromAccount)
-            val (from, to) = if (conversion.incoming) amount to conversion.settled else conversion.settled to amount
-            // Keyed on the persisted millisecond, as createTrades matches on it (see the leg-group trade loop).
-            val key = listOf(timestamp.toEpochMilliseconds(), account, from, to)
-            val occurrence = occurrences[key] ?: 0
-            occurrences[key] = occurrence + 1
-            trades +=
+        val trades =
+            toImport.mapNotNull { ObservationExpander.expandConversion(it.transfer) }.map { trade ->
+                // Keyed on the persisted millisecond, as createTrades matches on it (see the leg-group trade loop).
+                val key = listOf(trade.timestamp.toEpochMilliseconds(), trade.accountId, trade.fromAmount, trade.toAmount)
+                val occurrence = occurrences[key] ?: 0
+                occurrences[key] = occurrence + 1
                 NewTrade(
-                    timestamp = timestamp,
-                    description = "Convert ${from.asset.code} to ${to.asset.code}",
-                    fromAccountId = account,
-                    fromAmount = from,
-                    toAccountId = account,
-                    toAmount = to,
-                    source = transfer.source.forRow(requireNotNull(transfer.rowKey)),
+                    timestamp = trade.timestamp,
+                    description = trade.description,
+                    fromAccountId = trade.accountId,
+                    fromAmount = trade.fromAmount,
+                    toAccountId = trade.accountId,
+                    toAmount = trade.toAmount,
+                    source = trade.provenance,
                     occurrence = occurrence,
-                    attributes = transfer.attributes.filter { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID },
+                    attributes = trade.attributes,
                 )
-        }
+            }
         if (trades.isNotEmpty()) tradeRepository.createTrades(trades)
     }
 
@@ -1961,15 +1962,7 @@ class ImportEngineImpl(
         if (toImport.isEmpty() && toUpdate.isEmpty()) return emptyList()
 
         val effectiveBatchSize = batchSize.coerceAtLeast(1)
-        // Fast-path the common single-transaction case (default batchSize) so it doesn't copy the whole
-        // list into a one-element chunk.
-        val chunks =
-            when {
-                toImport.isEmpty() -> emptyList()
-                effectiveBatchSize >= toImport.size -> listOf(toImport)
-                else -> toImport.chunked(effectiveBatchSize)
-            }
-        if (chunks.isEmpty()) {
+        if (toImport.isEmpty()) {
             // No creates, only updates: apply them in their own transaction.
             val (updates, updateSources) = buildUpdates(toUpdate, engineOwnedTypeId)
             transactionRepository.importTransfers(
@@ -1983,33 +1976,26 @@ class ImportEngineImpl(
             return emptyList()
         }
 
-        // Resolve (get-or-create) every relationship type named by a batch relationship once, so
-        // buildCreatePayload (not suspend) can look ids up synchronously.
+        // Resolve (get-or-create) every relationship type named by a batch relationship once, so the
+        // expander (pure) can look ids up synchronously.
         val batchRelTypeIds: Map<String, RelationshipTypeId> =
             toImport
                 .flatMap { it.transfer.batchRelationships }
                 .map { it.typeName }
                 .distinct()
                 .associateWith { relationshipTypeRepository.getOrCreate(it) }
+        val expanded = ObservationExpander.expandTransfers(toImport.toExpansionRows(), batchRelTypeIds)
 
         val total = toImport.size
         val createdIds = mutableListOf<TransferId>()
-        // Spend-leg real ids from already-written chunks, keyed by (to-import index, leg index), so
-        // later chunks can resolve reversal targets that point across a chunk boundary.
-        val resolvedSpendLegIds = mutableMapOf<LegKey, TransferId>()
-        // Main-transfer real ids from already-written chunks, keyed by row key, so a batch relationship
-        // whose target landed in an earlier chunk (its temp id is no longer resolvable) still links.
-        val priorMainIdsByRowKey = mutableMapOf<ImportRowKey, TransferId>()
+        // Real ids of the legs already-written chunks created, so a link whose target landed in an earlier
+        // chunk (its temp id no longer resolvable) still links by real id.
+        val priorIds = mutableMapOf<ObservationKey, TransferId>()
         var written = 0
+        // Fast-path the common single-transaction case (default batchSize) so it doesn't copy the whole list.
+        val chunks = if (effectiveBatchSize >= expanded.size) listOf(expanded) else expanded.chunked(effectiveBatchSize)
         chunks.forEachIndexed { index, chunk ->
-            val payload =
-                buildCreatePayload(
-                    chunk,
-                    chunkStartIndex = index * effectiveBatchSize,
-                    resolvedSpendLegIds,
-                    priorMainIdsByRowKey,
-                    batchRelTypeIds,
-                )
+            val payload = buildCreatePayload(chunk, priorIds)
             // Updates ride with the final create chunk (one transaction in the common single-chunk case).
             val (updates, updateSources) =
                 if (index == chunks.lastIndex) buildUpdates(toUpdate, engineOwnedTypeId) else emptyList<TransferUpdate>() to emptyList()
@@ -2023,15 +2009,8 @@ class ImportEngineImpl(
                     updateSources = updateSources,
                 )
             // Keep only the main transfers' ids (fee transfers are interleaved), aligned to [toImport].
-            val chunkMainIds = payload.mainResultIndices.map { allCreatedIds[it] }
-            createdIds += chunkMainIds
-            // Record this chunk's main ids by row key so later chunks can resolve cross-chunk batch links.
-            chunk.forEachIndexed { i, classified ->
-                classified.transfer.rowKey?.let { priorMainIdsByRowKey[it] = chunkMainIds[i] }
-            }
-            payload.spendResultIndices.forEach { (legKey, resultIndex) ->
-                resolvedSpendLegIds[legKey] = allCreatedIds[resultIndex]
-            }
+            createdIds += payload.mainResultIndices.map { allCreatedIds[it] }
+            chunk.flatMap { it.legs }.forEachIndexed { i, leg -> priorIds[leg.key] = allCreatedIds[i] }
             written += chunk.size
             onProgress?.invoke(
                 Progress(
@@ -2046,6 +2025,34 @@ class ImportEngineImpl(
         return createdIds
     }
 
+    /** What the expander needs of each row to import: the row and what classification decided about it. */
+    private fun List<Classified>.toExpansionRows(): List<ExpansionRow> {
+        val owners = map { it.transfer.observationOwner() }
+        return map { classified ->
+            ExpansionRow(
+                transfer = classified.transfer,
+                conduitStatement = classified.conduitStatement,
+                supersedesLegs = classified.supersededLegs.isNotEmpty(),
+                reversals =
+                    classified.reversalLinks.mapValues { (_, link) ->
+                        val target =
+                            when (val reversed = link.target) {
+                                is ReversalTarget.Existing -> {
+                                    LegLinkTarget.Existing(reversed.id)
+                                }
+
+                                is ReversalTarget.BatchRow -> {
+                                    LegLinkTarget.Expanded(
+                                        ObservationKey(owners[reversed.toImportIndex], ObservationSlot.conduit(reversed.legIndex)),
+                                    )
+                                }
+                            }
+                        LegLink(target, link.typeId)
+                    },
+            )
+        }
+    }
+
     /** The transfers (with fees expanded), attributes, relationships and sources to create for one chunk. */
     private class CreatePayload(
         val transfers: List<Transfer>,
@@ -2054,194 +2061,50 @@ class ImportEngineImpl(
         val sources: List<Source>,
         // Indices into [transfers] of each main transfer, so callers map results back to chunk order.
         val mainResultIndices: List<Int>,
-        // Pass-through spend legs: (to-import index, leg index) -> index into [transfers], so callers
-        // can record the created spend-leg ids and later chunks can resolve cross-chunk reversal
-        // targets to real ids.
-        val spendResultIndices: Map<LegKey, Int>,
     )
 
+    /**
+     * Writes [chunk]'s expanded legs with negative temp ids, so newAttributes/newRelationships can be keyed before
+     * real ids exist. A link resolves to a leg of this chunk by its temp id (the repository's in-batch id map is per
+     * importTransfers call, so a main and its fee and spend legs stay in one chunk), else to a leg [priorIds] holds
+     * from an earlier chunk; one to a leg of a later chunk is dropped.
+     */
     private fun buildCreatePayload(
-        chunk: List<Classified>,
-        chunkStartIndex: Int,
-        // Real spend-leg ids created by earlier chunks, keyed by (to-import index, leg index), so a
-        // reversal target that landed in a previous chunk (its temp id is no longer resolvable) still
-        // links by real id.
-        priorSpendLegIds: Map<LegKey, TransferId>,
-        // Real main-transfer ids created by earlier chunks, keyed by row key, so a batch relationship
-        // whose target landed in a previous chunk still links by real id.
-        priorMainIdsByRowKey: Map<ImportRowKey, TransferId>,
-        // Resolved relationship-type ids for every type named by a batch relationship in this batch.
-        batchRelTypeIds: Map<String, RelationshipTypeId>,
+        chunk: List<ExpandedRow>,
+        priorIds: Map<ObservationKey, TransferId>,
     ): CreatePayload {
-        // Assign negative temp ids so newAttributes/newRelationships can be keyed before real ids exist.
-        // A main transfer carrying a fee expands into two transfers (main + fee) created in this same
-        // chunk; the fee is linked to the main via a `fee` relationship resolved by the repository's
-        // in-batch id map (which is per importTransfers call, so a main and its fee must stay together).
-        val transfersToCreate = mutableListOf<Transfer>()
+        val legs = chunk.flatMap { it.legs }
+        val tempIds = legs.indices.map { TransferId(-(it + 1).toLong()) }
+        // Last wins, as the expander's own row-key lookup does.
+        val tempIdByKey = legs.zip(tempIds).associate { (leg, id) -> leg.key to id }
         val newAttributes = mutableMapOf<TransferId, List<NewAttribute>>()
         val newRelationships = mutableMapOf<TransferId, List<NewRelationship>>()
-        val orderedSources = mutableListOf<Source>()
-        val mainResultIndices = mutableListOf<Int>()
-        // Spend-leg temp ids keyed by (to-import index, leg index), for reversal links targeting an
-        // earlier row of this chunk; targets from earlier chunks resolve through [priorSpendLegIds]
-        // instead (temp ids only resolve within one importTransfers call).
-        val spendTempIdByLeg = mutableMapOf<LegKey, TransferId>()
-        val spendResultIndices = mutableMapOf<LegKey, Int>()
-        var tempCounter = 0
-        // Pre-assign a temp id for every main transfer up front, so a batch relationship can reference
-        // another row's main transfer regardless of their relative order in this chunk (a debit leg may
-        // appear before or after the credit leg it links to).
-        val mainTempIds = chunk.map { TransferId(-(++tempCounter).toLong()) }
-        val mainTempIdByRowKey: Map<ImportRowKey, TransferId> =
-            chunk.mapIndexedNotNull { i, c -> c.transfer.rowKey?.let { it to mainTempIds[i] } }.toMap()
-        chunk.forEachIndexed { chunkIndex, classified ->
-            val t = classified.transfer
-            val mainTempId = mainTempIds[chunkIndex]
-            val fee = t.fee
-            val feeTempId = if (fee != null) TransferId(-(++tempCounter).toLong()) else null
-            val passThrough = t.passThrough
-            // One spend leg per conduit in the chain (C1→C2, …, Cn→merchant).
-            val spendTempIds = passThrough?.conduits?.map { TransferId(-(++tempCounter).toLong()) }
+        legs.forEachIndexed { i, leg ->
+            if (leg.attributes.isNotEmpty()) newAttributes[tempIds[i]] = leg.attributes
             val relationships =
-                buildList {
-                    addAll(t.relationships)
-                    if (fee != null && feeTempId != null) {
-                        add(NewRelationship(relatedTransferId = feeTempId, typeId = fee.relationshipTypeId))
-                    }
-                    if (passThrough != null && spendTempIds != null) {
-                        add(NewRelationship(relatedTransferId = spendTempIds.first(), typeId = passThrough.relationshipTypeId))
-                    }
-                    classified.conduitStatement?.takeIf { it.conduitIndex == 0 }?.let {
-                        add(NewRelationship(relatedTransferId = it.statementLegId, typeId = it.relationshipTypeId))
-                    }
-                    // Link to sibling transfers created in this batch (this chunk's temp id, or an
-                    // earlier chunk's real id). Targets that weren't created (deduped/errored) resolve
-                    // to null and are skipped.
-                    for (br in t.batchRelationships) {
-                        val targetId = mainTempIdByRowKey[br.relatedRowKey] ?: priorMainIdsByRowKey[br.relatedRowKey]
-                        val typeId = batchRelTypeIds[br.typeName]
-                        if (targetId != null && typeId != null) {
-                            add(NewRelationship(relatedTransferId = targetId, typeId = typeId))
+                leg.links.mapNotNull { link ->
+                    val target =
+                        when (val t = link.target) {
+                            is LegLinkTarget.Existing -> t.id
+                            is LegLinkTarget.Expanded -> tempIdByKey[t.key] ?: priorIds[t.key]
                         }
-                    }
+                    target?.let { NewRelationship(relatedTransferId = it, typeId = link.typeId) }
                 }
-            val rowKey = requireNotNull(t.rowKey)
-
-            // Appends one leg created in this chunk, sharing the main transfer's timestamp and provenance
-            // (resolved against the leg's own row key when given, so a fee/spend leg's audit can point at
-            // its own source node). Used for the main transfer and its expanded fee / pass-through spend
-            // legs so the construction lives in one place.
-            fun addLeg(
-                tempId: TransferId,
-                description: String,
-                source: AccountRef,
-                target: AccountRef,
-                amount: Money,
-                legRowKey: ImportRowKey?,
-            ) {
-                val sourceId = requireId(source)
-                val targetId = requireId(target)
-                // A transfer must move between two distinct accounts (enforced by a DB CHECK). The CSV path
-                // collapses degenerate pass-through chains upstream (collapsePassThroughChain); this guards
-                // the invariant for every producer with a clear error instead of an opaque SQLite failure.
-                require(sourceId != targetId) {
-                    "Refusing to create a self-transfer on account ${sourceId.id} for \"$description\""
-                }
-                transfersToCreate +=
-                    Transfer(
-                        id = tempId,
-                        timestamp = requireNotNull(t.timestamp),
-                        description = description,
-                        sourceAccountId = sourceId,
-                        targetAccountId = targetId,
-                        amount = amount,
-                    )
-                orderedSources += t.source.forRow(legRowKey ?: rowKey)
-            }
-            mainResultIndices += transfersToCreate.size
-            addLeg(
-                mainTempId,
-                t.description,
-                requireNotNull(t.fromAccount),
-                requireNotNull(t.toAccount),
-                requireNotNull(t.amount),
-                rowKey,
-            )
-            if (t.attributes.isNotEmpty()) newAttributes[mainTempId] = t.attributes
-            if (relationships.isNotEmpty()) newRelationships[mainTempId] = relationships
-            // Legs derived from an excluded movement (e.g. a cancelled/deleted row) are excluded with it,
-            // or its fee and spend legs would still move balances.
-            val exclusion = t.attributes.filter { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
-            // Except a chain whose movement into its conduit was reconciled away while it superseded another
-            // record's onward legs: this row is now the record of what the conduit did with the money.
-            val spendExclusion = exclusion.takeIf { classified.supersededLegs.isEmpty() }.orEmpty()
-            // The fee is a real movement out of the main transfer's account; counts in balances.
-            if (fee != null && feeTempId != null) {
-                addLeg(feeTempId, fee.description, fee.source, fee.target, fee.amount, fee.rowKey)
-                if (exclusion.isNotEmpty()) newAttributes[feeTempId] = exclusion
-            }
-            // The pass-through spend legs, one per adjacent pair of the chain (C1→C2, …, Cn→merchant),
-            // same amount as the funding leg (the main transfer). Each movement links to the next leg
-            // via the pass-through relationship (main→leg1→leg2→…), so every conduit nets to zero and
-            // the spend is counted once. Outgoing charge: funding card -> C1, legs run towards the
-            // merchant. Incoming refund/cancellation: funding C1 -> card, each leg reversed.
-            if (passThrough != null && spendTempIds != null) {
-                val nodes = passThrough.conduits + passThrough.merchantTarget
-                for (legIndex in passThrough.conduits.indices) {
-                    val spendTempId = spendTempIds[legIndex]
-                    addLeg(
-                        spendTempId,
-                        passThrough.spendDescriptions[legIndex],
-                        if (passThrough.incoming) nodes[legIndex + 1] else nodes[legIndex],
-                        if (passThrough.incoming) nodes[legIndex] else nodes[legIndex + 1],
-                        passThrough.amount,
-                        passThrough.rowKey,
-                    )
-                    val conduitStatement = classified.conduitStatement
-                    if (spendExclusion.isNotEmpty()) {
-                        newAttributes[spendTempId] = spendExclusion
-                    } else if (conduitStatement != null && legIndex >= conduitStatement.conduitIndex) {
-                        // Beyond a conduit whose own statement is imported: that statement is the record.
-                        newAttributes[spendTempId] = listOf(NewAttribute(conduitStatement.exclusionTypeId, "reconciled"))
-                    }
-                    val legKey = LegKey(chunkStartIndex + chunkIndex, legIndex)
-                    spendTempIdByLeg[legKey] = spendTempId
-                    spendResultIndices[legKey] = transfersToCreate.lastIndex
-                    val legRelationships = mutableListOf<NewRelationship>()
-                    if (legIndex < spendTempIds.lastIndex) {
-                        legRelationships += NewRelationship(spendTempIds[legIndex + 1], passThrough.relationshipTypeId)
-                    }
-                    // The chain's movement into the conduit whose statement it reconciled with, and every leg the
-                    // statement supersedes beyond it, link to that statement row: the exclusions stay explained,
-                    // and are lifted (reconciledPartnerUnhideUpdates) if either side is ever deleted.
-                    if (conduitStatement != null && legIndex >= conduitStatement.conduitIndex - 1) {
-                        legRelationships += NewRelationship(conduitStatement.statementLegId, conduitStatement.relationshipTypeId)
-                    }
-                    // Reversal pairing: this spend leg (primary) reverses an earlier one (related) — an existing
-                    // transfer, an earlier row's spend leg in this chunk (temp id), or an earlier
-                    // chunk's spend leg (already-created real id).
-                    val reversalLink = classified.reversalLinks[legIndex]
-                    if (reversalLink != null) {
-                        val reversalTargetId =
-                            when (val target = reversalLink.target) {
-                                is ReversalTarget.Existing -> {
-                                    target.id
-                                }
-
-                                is ReversalTarget.BatchRow -> {
-                                    spendTempIdByLeg[LegKey(target.toImportIndex, target.legIndex)]
-                                        ?: priorSpendLegIds[LegKey(target.toImportIndex, target.legIndex)]
-                                }
-                            }
-                        if (reversalTargetId != null) {
-                            legRelationships += NewRelationship(reversalTargetId, reversalLink.typeId)
-                        }
-                    }
-                    if (legRelationships.isNotEmpty()) newRelationships[spendTempId] = legRelationships
-                }
-            }
+            if (relationships.isNotEmpty()) newRelationships[tempIds[i]] = relationships
         }
-        return CreatePayload(transfersToCreate, newAttributes, newRelationships, orderedSources, mainResultIndices, spendResultIndices)
+        val transfers =
+            legs.mapIndexed { i, leg ->
+                Transfer(
+                    id = tempIds[i],
+                    timestamp = leg.timestamp,
+                    description = leg.description,
+                    sourceAccountId = leg.sourceAccountId,
+                    targetAccountId = leg.targetAccountId,
+                    amount = leg.amount,
+                )
+            }
+        val mainResultIndices = chunk.runningFold(0) { start, row -> start + row.legs.size }.dropLast(1)
+        return CreatePayload(transfers, newAttributes, newRelationships, legs.map { it.provenance }, mainResultIndices)
     }
 
     /**

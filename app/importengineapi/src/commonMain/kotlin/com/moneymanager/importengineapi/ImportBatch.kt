@@ -21,6 +21,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.observation.ImportGroupKey
 import kotlin.jvm.JvmInline
 import kotlin.time.Instant
 
@@ -313,6 +314,10 @@ data class ImportTradeIntent(
     val attributes: List<NewAttribute> = emptyList(),
     /** As [ImportTransfer.ownedAttributes]: owned values absent from [attributes] are removed on a dedupe. */
     val ownedAttributes: Map<AttributeTypeId, Set<String>?> = emptyMap(),
+    /** The record or group whose observation this trade is (see [observationKey]); null for one nothing staged backs. */
+    val owner: ObservationOwnerKey? = null,
+    /** The slot of [owner] this trade fills: [ObservationSlot.TRADE], or [ObservationSlot.MANUAL_ENTRY] for a placeholder. */
+    val observationSlot: String = ObservationSlot.TRADE,
 ) : WriteIntent
 
 /** Builder-chosen placeholder identity for an exchange order upserted in this batch. */
@@ -553,6 +558,16 @@ data class ImportTransfer(
      * as the `timestamp-approximate` attribute, so a later import sees it on the persisted leg.
      */
     val approximateUntil: Instant? = null,
+    /**
+     * The `LegGroupRule` group this transfer is the output of, when several records join into it; its observations
+     * then belong to the group rather than to any one record (see [observationOwner]).
+     */
+    val group: ImportGroupKey? = null,
+    /**
+     * The slot of its owner this transfer fills: [ObservationSlot.MAIN] for the movement a record reports, or
+     * [ObservationSlot.FEE] for a charge a record reports without a movement to hang it on (a trade row's fee).
+     */
+    val observationSlot: String = ObservationSlot.MAIN,
     /** [ImportOperation.CREATE] (default), or UPDATE/DELETE of [existingId]. */
     override val operation: ImportOperation = ImportOperation.CREATE,
     /** The transfer to UPDATE/DELETE (required for those operations). */
