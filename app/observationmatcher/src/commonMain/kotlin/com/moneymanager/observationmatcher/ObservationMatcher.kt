@@ -176,12 +176,13 @@ class ObservationMatcher(
     ): Boolean {
         val pinX = x.firstNotNullOfOrNull { pinned[it] }
         val pinY = y.firstNotNullOfOrNull { pinned[it] }
-        if (pinX != null && pinY != null && pinX != pinY) return false
-        return x.all { i ->
-            y.all { j ->
-                setOf(i, j) !in apart && (i in pinned || j in pinned || paired(observations[i], observations[j]))
+        val pinsConflict = pinX != null && pinY != null && pinX != pinY
+        return !pinsConflict &&
+            x.all { i ->
+                y.all { j ->
+                    setOf(i, j) !in apart && (i in pinned || j in pinned || paired(observations[i], observations[j]))
+                }
             }
-        }
     }
 
     /**

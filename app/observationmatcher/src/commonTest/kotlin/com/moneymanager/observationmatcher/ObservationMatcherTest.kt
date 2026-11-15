@@ -59,10 +59,10 @@ class ObservationMatcherTest {
 
     @Test
     fun `api items with the same fields either way round are one unless their ids differ`() {
-        val a = transfer(1, "session-1", "k-a", source = 10, target = 20)
+        val a = transfer(1, "session-1", "k-a")
         val b = transfer(2, "session-1", "k-b", source = 20, target = 10)
-        val c = transfer(3, "session-2", "k-c", source = 10, target = 20, apiId = "x")
-        val d = transfer(4, "session-2", "k-d", source = 10, target = 20, apiId = "y")
+        val c = transfer(3, "session-2", "k-c", apiId = "x")
+        val d = transfer(4, "session-2", "k-d", apiId = "y")
 
         val result = matcher(API).match(listOf(a, b, c, d))
 
@@ -89,7 +89,7 @@ class ObservationMatcherTest {
     @Test
     fun `a fuzzy duplicate joins the nearest record and not the first`() {
         // Two £1,000 deposits a day apart in one export; a re-export of the later one, an hour off.
-        val early = transfer(1, "csv-a", "k-1", description = "GBP Deposit", amount = 1000, hour = 0)
+        val early = transfer(1, "csv-a", "k-1", description = "GBP Deposit", amount = 1000)
         val late = transfer(2, "csv-a", "k-2", description = "GBP Deposit", amount = 1000, hour = 24)
         val again = transfer(3, "csv-b", "k-0", description = "GBP Deposit.", amount = 1000, hour = 25)
 
@@ -120,7 +120,7 @@ class ObservationMatcherTest {
 
     @Test
     fun `a group never chains near neighbours that are not near each other`() {
-        val a = transfer(1, "csv-a", "k-a", description = "Rent", hour = 0)
+        val a = transfer(1, "csv-a", "k-a", description = "Rent")
         val b = transfer(2, "csv-b", "k-b", description = "Rent", hour = 48)
         val c = transfer(3, "csv-c", "k-c", description = "Rent", hour = 96)
 
@@ -225,7 +225,7 @@ class ObservationMatcherTest {
 
     @Test
     fun `the scope reaches what shares a transaction and what a rule pairs transitively`() {
-        val incoming = transfer(1, "csv-new", "k-new", hour = 0)
+        val incoming = transfer(1, "csv-new", "k-new")
         val near = transfer(2, "csv-a", "k-a", stored = 2, current = 100, hour = 48)
         val sameTransaction = transfer(3, "csv-b", "k-b", stored = 3, current = 100, description = "Other", hour = 72)
         val pairedWithThat = transfer(4, "csv-c", "k-c", stored = 4, current = 200, description = "Other", hour = 120)
@@ -252,7 +252,7 @@ class ObservationMatcherTest {
         val scope =
             listOf(
                 // Three like deposits over two files, where file order would hand the re-export to the wrong one.
-                transfer(1, "csv-a", "k-1", description = "GBP Deposit", amount = 1000, hour = 0, stored = 1, current = 100),
+                transfer(1, "csv-a", "k-1", description = "GBP Deposit", amount = 1000, stored = 1, current = 100),
                 transfer(2, "csv-a", "k-2", description = "GBP Deposit", amount = 1000, hour = 30, stored = 2, current = 101),
                 transfer(3, "csv-b", "k-3", description = "GBP Deposit", amount = 1000, hour = 20),
                 transfer(4, "csv-b", "k-4", description = "GBP Deposit", amount = 1000, hour = 10),
