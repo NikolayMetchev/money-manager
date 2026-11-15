@@ -522,76 +522,82 @@ class KoinlyReconciliationE2ETest : DbTest() {
         }
 
     @Test
-    fun handEditsOfAFilesLaterTradeStayOnThatTradeAfterReimport() =
-        runDbTest {
-            val laterTrade =
-                row(
-                    "ID (read-only)" to "K6",
-                    "Date (UTC)" to "2020-08-10 12:00:00",
-                    "Type" to "trade",
-                    "From Wallet (read-only)" to "Coinbase;coinbase",
-                    "From Amount" to "100.0",
-                    "From Currency" to "GBP;12",
-                    "To Wallet (read-only)" to "Coinbase;coinbase",
-                    "To Amount" to "50.0",
-                    "To Currency" to "KNCL;1841",
-                )
-            val file = stage("a.csv", listOf(coinbaseDeposit, coinbaseTrade, laterTrade))
-            applyAll(listOf(file))
-            val later = Instant.parse("2020-08-10T12:00:00Z")
+    fun handEditsOfAFilesLaterTradeStayOnThatTradeAfterReimport() = runDbTest { checkHandEditsOfALaterTradeAfterReimport(exclude = true) }
 
-            suspend fun trades(): Pair<Trade, Trade> {
-                val coinbase = assertNotNull(accountByName("Koinly · Coinbase")).id
-                val all = repositories.tradeRepository.getTradesByAccount(coinbase).first()
-                assertEquals(2, all.size)
-                return all.single { it.timestamp != later } to all.single { it.timestamp == later }
-            }
-            val real = repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now), Source.Manual)
-            val other = repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Shop", openingDate = now), Source.Manual)
-            val gbp = assertNotNull(repositories.currencyRepository.getCurrencyByCode("GBP").first())
-            repositories.importEngine.import(
-                ImportBatch(
-                    transfers =
-                        listOf(
-                            ImportTransfer(
-                                source = Source.Manual,
-                                timestamp = later,
-                                description = "Card payment",
-                                fromAccount = AccountRef.Existing(real),
-                                toAccount = AccountRef.Existing(other),
-                                amount = Money.fromDisplayValue(BigDecimal("100"), gbp),
-                            ),
-                        ),
-                ),
+    // Alone, the match finds its trade by its own captured values, not through the exclusion's replacement.
+    @Test
+    fun aHandMatchOfAFilesLaterTradeStaysOnThatTradeAfterReimport() =
+        runDbTest { checkHandEditsOfALaterTradeAfterReimport(exclude = false) }
+
+    private suspend fun checkHandEditsOfALaterTradeAfterReimport(exclude: Boolean) {
+        val laterTrade =
+            row(
+                "ID (read-only)" to "K6",
+                "Date (UTC)" to "2020-08-10 12:00:00",
+                "Type" to "trade",
+                "From Wallet (read-only)" to "Coinbase;coinbase",
+                "From Amount" to "100.0",
+                "From Currency" to "GBP;12",
+                "To Wallet (read-only)" to "Coinbase;coinbase",
+                "To Amount" to "50.0",
+                "To Currency" to "KNCL;1841",
             )
-            val realTransfer = transfersOn(real).single().id
-            val (_, laterBefore) = trades()
-            repositories.importEngine.createReconciliationMatch(listOf(laterBefore.id, realTransfer))
-            repositories.importEngine.setTradeExcluded(laterBefore.id, "hand-excluded")
+        val file = stage("a.csv", listOf(coinbaseDeposit, coinbaseTrade, laterTrade))
+        applyAll(listOf(file))
+        val later = Instant.parse("2020-08-10T12:00:00Z")
 
-            reimport(file)
-
-            // A file's trades share one provenance record, so its replacement is told apart by its values.
-            val (first, second) = trades()
-            assertNotEquals(laterBefore.id, second.id, "the re-import made the trade again")
-            assertEquals("hand-excluded", excludedReason(second.id))
-            assertNull(excludedReason(first.id))
-            val legs = repositories.reconciliationLinkRepository.getLegs(shadowIds())
-            val matchId =
-                legs
-                    .filter { it.transactionId == second.id.id }
-                    .flatMap { it.matchIds }
-                    .toSet()
-                    .single()
-            assertTrue(legs.filter { it.transactionId == first.id.id }.all { it.matchIds.isEmpty() })
-            assertEquals(
-                setOf(matchId),
-                repositories.reconciliationLinkRepository
-                    .getLegs(setOf(real))
-                    .single()
-                    .matchIds,
-            )
+        suspend fun trades(): Pair<Trade, Trade> {
+            val coinbase = assertNotNull(accountByName("Koinly · Coinbase")).id
+            val all = repositories.tradeRepository.getTradesByAccount(coinbase).first()
+            assertEquals(2, all.size)
+            return all.single { it.timestamp != later } to all.single { it.timestamp == later }
         }
+        val real = repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now), Source.Manual)
+        val other = repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Shop", openingDate = now), Source.Manual)
+        val gbp = assertNotNull(repositories.currencyRepository.getCurrencyByCode("GBP").first())
+        repositories.importEngine.import(
+            ImportBatch(
+                transfers =
+                    listOf(
+                        ImportTransfer(
+                            source = Source.Manual,
+                            timestamp = later,
+                            description = "Card payment",
+                            fromAccount = AccountRef.Existing(real),
+                            toAccount = AccountRef.Existing(other),
+                            amount = Money.fromDisplayValue(BigDecimal("100"), gbp),
+                        ),
+                    ),
+            ),
+        )
+        val realTransfer = transfersOn(real).single().id
+        val (_, laterBefore) = trades()
+        repositories.importEngine.createReconciliationMatch(listOf(laterBefore.id, realTransfer))
+        if (exclude) repositories.importEngine.setTradeExcluded(laterBefore.id, "hand-excluded")
+
+        reimport(file)
+
+        // A file's trades share one provenance record, so its replacement is told apart by its values.
+        val (first, second) = trades()
+        assertNotEquals(laterBefore.id, second.id, "the re-import made the trade again")
+        assertEquals(if (exclude) "hand-excluded" else null, excludedReason(second.id))
+        assertNull(excludedReason(first.id))
+        val legs = repositories.reconciliationLinkRepository.getLegs(shadowIds())
+        val matchId =
+            legs
+                .filter { it.transactionId == second.id.id }
+                .flatMap { it.matchIds }
+                .toSet()
+                .single()
+        assertTrue(legs.filter { it.transactionId == first.id.id }.all { it.matchIds.isEmpty() })
+        assertEquals(
+            setOf(matchId),
+            repositories.reconciliationLinkRepository
+                .getLegs(setOf(real))
+                .single()
+                .matchIds,
+        )
+    }
 
     @Test
     fun aStoredMatchAndAnIgnoredRowSurviveReimportingTheSource() =

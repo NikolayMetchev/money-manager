@@ -400,8 +400,14 @@ class ReconciliationScreenTest {
         waitForIdle()
     }
 
-    /** Opens every collapsed wallet and month group of the visible tab. */
+    /** Waits for the result to load off the UI thread (waitForIdle doesn't), then for [text] to show. */
+    private fun ComposeUiTest.awaitText(text: String) {
+        waitUntil(timeoutMillis = 10_000) { reveal(hasText(text)) || onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    /** Opens every collapsed wallet and month group of the visible tab, once the result has loaded. */
     private fun ComposeUiTest.expandAll() {
+        awaitText("Unmatched")
         val collapsed = hasText("▸", substring = true) and !hasText("Linked wallets", substring = true)
         repeat(MAX_GROUPS) {
             if (!reveal(collapsed)) return
@@ -415,8 +421,7 @@ class ReconciliationScreenTest {
         runCatching { onAllNodes(hasScrollAction())[0].performScrollToNode(matcher) }.isSuccess
 
     private fun ComposeUiTest.clickText(text: String) {
-        // The result loads off the UI thread, which waitForIdle doesn't wait for: until it lands there are no tabs.
-        waitUntil(timeoutMillis = 10_000) { reveal(hasText(text)) || onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        awaitText(text)
         onNodeWithText(text).performClick()
         waitForIdle()
     }
@@ -510,7 +515,7 @@ class ReconciliationScreenTest {
                     listOf(leg(10, wallet.accountId, "5", t0), leg(11, wallet.accountId, "6", t0 + 1.hours)),
                     listOf(leg(20, binance, "5", t0 + 1.hours), leg(21, binance, "6", t0 + 2.hours)),
                 )
-            reveal(hasText("Near matches (2)"))
+            awaitText("Near matches (2)")
             expandAll()
             // The month header's button sits in the same row, so it is composed once the month is revealed.
             reveal(hasText("2024-01 (2)", substring = true))
