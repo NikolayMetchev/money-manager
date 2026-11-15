@@ -643,6 +643,54 @@ class KoinlyReconciliationE2ETest : DbTest() {
         }
 
     @Test
+    fun aStoredMatchSurvivesReimportingAllOfOverlappingExportsImportedOutOfOrder() =
+        runDbTest {
+            // Staged first, imported second: its row matches the deposit the other export created.
+            val older = stage("2020-2025.csv", listOf(coinbaseDeposit))
+            val newer = stage("transactions.csv", listOf(coinbaseDeposit))
+            applyAll(listOf(newer))
+            applyAll(listOf(older))
+            val deposit = koinlyDeposit()
+            val real = repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now), Source.Manual)
+            val other = repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Shop", openingDate = now), Source.Manual)
+            val gbp = assertNotNull(repositories.currencyRepository.getCurrencyByCode("GBP").first())
+            repositories.importEngine.import(
+                ImportBatch(
+                    transfers =
+                        listOf(
+                            ImportTransfer(
+                                source = Source.Manual,
+                                timestamp = Instant.parse("2020-07-03T08:22:32Z"),
+                                description = "Card payment",
+                                fromAccount = AccountRef.Existing(real),
+                                toAccount = AccountRef.Existing(other),
+                                amount = Money.fromDisplayValue(BigDecimal("500"), gbp),
+                            ),
+                        ),
+                ),
+            )
+            repositories.importEngine.createReconciliationMatch(listOf(deposit.id, transfersOn(real).single().id))
+
+            val reimports = repositories.reimports(maintenance)
+            val result = reimports.runPlan(reimports.planAll(listOf(older, newer)))
+
+            assertEquals(1, result.reappliedLinks.reapplied, "${result.reappliedLinks}")
+            assertNotEquals(deposit.id, koinlyDeposit().id)
+            val matchId =
+                repositories.reconciliationLinkRepository
+                    .getLegs(setOf(real))
+                    .single()
+                    .matchIds
+                    .single()
+            val depositLegs =
+                repositories.reconciliationLinkRepository.getLegs(shadowIds()).filter {
+                    it.transactionId ==
+                        koinlyDeposit().id.id
+                }
+            assertTrue(depositLegs.isNotEmpty() && depositLegs.all { matchId in it.matchIds }, "$depositLegs")
+        }
+
+    @Test
     fun anExclusionWithoutAReasonStillReadsAsExcluded() =
         runDbTest {
             applyAll(listOf(stage("a.csv", listOf(coinbaseDeposit))))

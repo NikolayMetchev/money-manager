@@ -20,6 +20,7 @@ import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
@@ -352,6 +353,14 @@ suspend fun planSourceRerun(
     )
 }
 
+/**
+ * When [this] file was last imported, the order a re-import runs files in. Not when it was staged: overlapping exports
+ * (two Koinly exports sharing rows) are often staged in one order and imported in another, and the first imported
+ * created what the rest matched onto. Run in staging order, a later one would create it instead, and the records a
+ * person matched by hand would create nothing to rebuild the match over.
+ */
+fun CsvImport.rerunOrder(): Instant = lastAppliedAt ?: importTimestamp
+
 /** [imports] as [RerunFile]s, in the order they were imported: the order a re-import runs them in. */
 suspend fun rerunFiles(
     imports: Collection<CsvImportId>,
@@ -363,7 +372,7 @@ suspend fun rerunFiles(
             reads.csvImportRepository
                 .getImport(importId)
                 .first()
-                ?.importTimestamp to
+                ?.rerunOrder() to
                 RerunFile(
                     file = file,
                     createdTransfers = reads.transferSourceRepository.getTransfersCreatedBy(file),

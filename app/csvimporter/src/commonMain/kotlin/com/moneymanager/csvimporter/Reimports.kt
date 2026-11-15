@@ -28,6 +28,7 @@ import com.moneymanager.importengineapi.RerunReads
 import com.moneymanager.importengineapi.captureRerunLinks
 import com.moneymanager.importengineapi.executeRerun
 import com.moneymanager.importengineapi.manualEditsOf
+import com.moneymanager.importengineapi.rerunOrder
 import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.CancellationException
@@ -171,7 +172,7 @@ class Reimports(
                         }
                     }.awaitAll()
                     .filterNotNull()
-                    .sortedWith(compareBy { it.first.importTimestamp })
+                    .sortedWith(compareBy { it.first.rerunOrder() })
             }
         val loaded = fileReads.map { it.first }
         val rerunFiles = fileReads.mapNotNull { it.second }
