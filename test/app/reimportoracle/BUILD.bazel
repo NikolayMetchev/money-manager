@@ -2,7 +2,7 @@ load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 # gazelle:kmp_generate true
 # Every scenario imports its files into a fresh database many times over.
-# gazelle:kmp_test_size enormous
+# gazelle:kmp_test_size large
 
 kmp_library(
     name = "reimportoracle",
@@ -26,7 +26,7 @@ kmp_library(
 
 kmp_test(
     name = "test",
-    size = "enormous",
+    size = "large",
     associate = ":reimportoracle",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     deps = [

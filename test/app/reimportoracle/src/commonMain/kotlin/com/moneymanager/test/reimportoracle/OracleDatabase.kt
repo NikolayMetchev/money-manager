@@ -248,7 +248,7 @@ class OracleDatabase private constructor(
                 db.installBuiltInPassThroughs()
                 val oracle = OracleDatabase(wrapper, db, scenario)
                 oracle.setUp()
-                return oracle.block()
+                return block(oracle)
             } finally {
                 wrapper.close()
                 CryptoRegistry.resetForTest()

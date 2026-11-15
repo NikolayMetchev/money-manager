@@ -95,7 +95,7 @@ object OracleCorpus {
                             listOf(
                                 freetradeCash("Interest", "INTEREST_FROM_CASH", "2026-02-16T00:00:00.000Z", "0.02"),
                                 freetradeCash("Top up", "TOP_UP", "2026-03-01T10:28:23.178Z", "1000.00"),
-                                freetradeOrder("BUY", "2026-03-02T08:49:09.042Z", "998.64", "202.00000000"),
+                                freetradeBuy(),
                             ),
                         ),
                     ),
@@ -409,25 +409,22 @@ private fun freetradeCash(
     "Total Amount in Account Currency" to total,
 )
 
-private fun freetradeOrder(
-    side: String,
-    time: String,
-    total: String,
-    quantity: String,
-) = freetradeRow(
-    "Title" to "Example Fund",
-    "Type" to "ORDER",
-    "Timestamp" to time,
-    "Account Currency" to "GBP",
-    "Total Amount in Account Currency" to total,
-    "Buy / Sell" to side,
-    "Ticker" to "EXFD",
-    "ISIN" to "GB0000000001",
-    "Stamp Duty" to "0.00",
-    "Quantity" to quantity,
-    "Venue" to "London Stock Exchange",
-    "Order ID" to "ORDER$time",
-)
+/** The ISA's one order: the top-up buying 202 units of a fund. */
+private fun freetradeBuy() =
+    freetradeRow(
+        "Title" to "Example Fund",
+        "Type" to "ORDER",
+        "Timestamp" to "2026-03-02T08:49:09.042Z",
+        "Account Currency" to "GBP",
+        "Total Amount in Account Currency" to "998.64",
+        "Buy / Sell" to "BUY",
+        "Ticker" to "EXFD",
+        "ISIN" to "GB0000000001",
+        "Stamp Duty" to "0.00",
+        "Quantity" to "202.00000000",
+        "Venue" to "London Stock Exchange",
+        "Order ID" to "ORDER2026-03-02T08:49:09.042Z",
+    )
 
 /** (Amex's date, Santander's date, amount) of each card payment. */
 private val AMEX_PAYMENTS =
