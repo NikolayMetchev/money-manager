@@ -415,7 +415,10 @@ class ReconciliationScreenTest {
         runCatching { onAllNodes(hasScrollAction())[0].performScrollToNode(matcher) }.isSuccess
 
     private fun ComposeUiTest.clickText(text: String) {
-        reveal(hasText(text))
+        // The screen reconciles off the test clock, so idling doesn't wait for what it then shows.
+        waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) {
+            reveal(hasText(text)) || onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+        }
         onNodeWithText(text).performClick()
         waitForIdle()
     }
@@ -849,6 +852,9 @@ class ReconciliationScreenTest {
             waitForIdle()
             onNodeWithText("Select...").performClick()
             waitForIdle()
+            waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) {
+                onAllNodesWithText("Coinbase", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+            }
             onNodeWithText("Coinbase", useUnmergedTree = true).performClick()
             waitForIdle()
 
@@ -892,6 +898,9 @@ class ReconciliationScreenTest {
             waitForIdle()
             onNodeWithText("Select...").performClick()
             waitForIdle()
+            waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) {
+                onAllNodesWithText("Cold storage", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+            }
             onNodeWithText("Cold storage", useUnmergedTree = true).performClick()
 
             waitUntil(
@@ -903,5 +912,6 @@ class ReconciliationScreenTest {
 
     private companion object {
         const val MAX_GROUPS = 20
+        const val LOAD_TIMEOUT_MS = 10_000L
     }
 }
