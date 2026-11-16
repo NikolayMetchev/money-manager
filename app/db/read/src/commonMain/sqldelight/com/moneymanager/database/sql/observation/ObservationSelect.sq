@@ -147,3 +147,56 @@ WHERE observation.transaction_id IN :transactionIds
       )
     )
   );
+
+-- The values, attributes and facts of every observation naming one of :accountIds, each in one query (#1433): a match
+-- scope's observations load in a fixed number of queries rather than several per observation.
+selectTransferValuesOnAccounts:
+SELECT * FROM transfer_observation
+WHERE source_account_id IN :accountIds OR target_account_id IN :accountIds;
+
+selectTradeValuesOnAccounts:
+SELECT * FROM trade_observation
+WHERE from_account_id IN :accountIds OR to_account_id IN :accountIds;
+
+selectAttributesOnAccounts:
+SELECT observation_id, attribute_type_id, group_key, attribute_value
+FROM observation_attribute
+WHERE observation_id IN (
+  SELECT observation_id FROM transfer_observation WHERE source_account_id IN :accountIds OR target_account_id IN :accountIds
+  UNION
+  SELECT observation_id FROM trade_observation WHERE from_account_id IN :accountIds OR to_account_id IN :accountIds
+)
+ORDER BY observation_id, attribute_type_id, group_key;
+
+selectApproximateTimeOnAccounts:
+SELECT observation_id FROM observation_approximate_time
+WHERE observation_id IN (
+  SELECT observation_id FROM transfer_observation WHERE source_account_id IN :accountIds OR target_account_id IN :accountIds
+  UNION
+  SELECT observation_id FROM trade_observation WHERE from_account_id IN :accountIds OR to_account_id IN :accountIds
+);
+
+selectPlaceholderEndsOnAccounts:
+SELECT observation_id, end_name FROM observation_placeholder_end
+WHERE observation_id IN (
+  SELECT observation_id FROM transfer_observation WHERE source_account_id IN :accountIds OR target_account_id IN :accountIds
+  UNION
+  SELECT observation_id FROM trade_observation WHERE from_account_id IN :accountIds OR to_account_id IN :accountIds
+)
+ORDER BY observation_id, end_name;
+
+selectGrossAmountOnAccounts:
+SELECT observation_id FROM observation_gross_amount
+WHERE observation_id IN (
+  SELECT observation_id FROM transfer_observation WHERE source_account_id IN :accountIds OR target_account_id IN :accountIds
+  UNION
+  SELECT observation_id FROM trade_observation WHERE from_account_id IN :accountIds OR to_account_id IN :accountIds
+);
+
+selectOwnEndsOnAccounts:
+SELECT observation_id, end_name FROM observation_own_end
+WHERE observation_id IN (
+  SELECT observation_id FROM transfer_observation WHERE source_account_id IN :accountIds OR target_account_id IN :accountIds
+  UNION
+  SELECT observation_id FROM trade_observation WHERE from_account_id IN :accountIds OR to_account_id IN :accountIds
+);
