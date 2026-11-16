@@ -1026,10 +1026,11 @@ class ImportEngineImpl(
             val (c, id) = duplicate
             val approximate = c.transfer.approximateUntil != null
             observer.record(row.main.key, row.main.provenance, id) { observer.transferContent(row.main, approximate) }
-            val fee = c.transfer.fee ?: continue
-            val feeLeg = row.legs.firstOrNull { it.key.slot == ObservationSlot.FEE } ?: continue
-            val feeId = feeLegs[id to fee.relationshipTypeId] ?: continue
-            observer.record(feeLeg.key, feeLeg.provenance, feeId) { observer.transferContent(feeLeg, approximate) }
+            val feeLeg = row.legs.firstOrNull { it.key.slot == ObservationSlot.FEE }
+            val feeId = c.transfer.fee?.let { feeLegs[id to it.relationshipTypeId] }
+            if (feeLeg != null && feeId != null) {
+                observer.record(feeLeg.key, feeLeg.provenance, feeId) { observer.transferContent(feeLeg, approximate) }
+            }
         }
     }
 
