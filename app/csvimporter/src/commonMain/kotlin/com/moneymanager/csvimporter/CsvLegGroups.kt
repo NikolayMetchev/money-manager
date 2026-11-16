@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
+import com.moneymanager.domain.model.observation.ImportGroupKey
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.importengineapi.LocalTradeKey
 import kotlinx.coroutines.flow.first
@@ -71,6 +72,20 @@ data class AssembledTrade(
  */
 fun AssembledTrade.tradeKey(csvImportId: CsvImportId): LocalTradeKey =
     LocalTradeKey("$CSV_TRADE_KEY_PREFIX${csvImportId.id}-${group.ownRowIndexes.min()}")
+
+/**
+ * The group that owns this assembled trade's observation: the rule's name and the legs' shared key, with the event's
+ * earliest instant, since one key can hold several events (see [chainGroupLegs]). Nothing in it depends on row
+ * indexes or file order, so every file of an `acrossFiles` trade names the same group.
+ */
+fun AssembledTrade.groupKey(strategy: CsvImportStrategy): ImportGroupKey {
+    val leg = requireNotNull(group.rows.first().groupLeg)
+    return ImportGroupKey(
+        strategyId = strategy.id.toString(),
+        groupName = strategy.config.legGroups[leg.ruleIndex].name,
+        keyValue = "${leg.key}|${timestamp.toEpochMilliseconds()}",
+    )
+}
 
 /**
  * The legs of rule [ruleIndex] among [rows], split into events: within each key, a leg joins the current

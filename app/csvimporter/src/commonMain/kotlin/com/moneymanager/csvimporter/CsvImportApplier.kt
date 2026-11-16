@@ -29,6 +29,7 @@ import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.ownedAttributeValues
 import com.moneymanager.domain.model.csvstrategy.uniqueIdentifierAttributeTypes
+import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.resolveAssetCode
 import com.moneymanager.domain.model.rules.ColumnRecord
@@ -59,6 +60,8 @@ import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.LocalTradeKey
+import com.moneymanager.importengineapi.ObservationOwnerKey
+import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.TradeDedupePolicy
@@ -1242,6 +1245,7 @@ suspend fun runCsvImport(
                 toAmount = credit,
                 attributes = attributesFor(row.attributes),
                 ownedAttributes = ownedAttributes,
+                owner = ObservationOwnerKey.Record(ImportRecordKey.CsvRow(csvImport.id, row.rowIndex)),
             )
         } +
             assembledTrades.map { assembled ->
@@ -1254,6 +1258,7 @@ suspend fun runCsvImport(
                     fromAmount = assembled.fromAmount,
                     toAccountId = assembled.ownerAccountId,
                     toAmount = assembled.toAmount,
+                    owner = ObservationOwnerKey.Group(assembled.groupKey(strategy)),
                 )
             } + placeholderTrades
     // A leg of a trade this file books (assembled, or a placeholder) is part of it, but the trade carries no fee, so its fee goes
@@ -1285,6 +1290,7 @@ suspend fun runCsvImport(
                 attributes = attributesFor(uniqueAttributes) + exclusion,
                 ownedAttributes = ownedAttributes.filterKeys { it.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID },
                 uniqueKey = uniqueAttributes.takeIf { uniqueIdTypeNames.isNotEmpty() }?.toMap(),
+                observationSlot = ObservationSlot.FEE,
             )
         }
 

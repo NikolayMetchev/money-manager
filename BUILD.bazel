@@ -227,6 +227,7 @@ kmp_modules(
         "//app/model/observation:observation_module",
         "//app/observationmatcher:observationmatcher_module",
         "//app/observationmatcher:test_module",
+        "//app/importengineapi:test_module",
     ],
     visibility = ["//visibility:public"],
 )
