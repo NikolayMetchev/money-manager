@@ -28,6 +28,7 @@ import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.codesByName
+import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.resolveAssetCode
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
@@ -59,6 +60,8 @@ import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalOrderKey
 import com.moneymanager.importengineapi.LocalTradeKey
+import com.moneymanager.importengineapi.ObservationOwnerKey
+import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.getOrCreateAttributeType
@@ -663,6 +666,8 @@ private data class ParsedExchangeTransfer(
     val approximateUntil: Instant? = null,
     /** The value of the `excluded` attribute when the rules exclude this movement from balances. */
     val excludedValue: String? = null,
+    /** The observation slot of its JSON item it fills: the item's own movement, or the fee it reports beside it. */
+    val observationSlot: String = ObservationSlot.MAIN,
 )
 
 private data class ParsedOrder(
@@ -1043,6 +1048,7 @@ suspend fun importApiSessionExchange(
                 toAmount = toAmount,
                 attributes = exclusion(t.excludedValue),
                 ownedAttributes = ownedExclusion,
+                owner = ObservationOwnerKey.Record(ImportRecordKey.ApiItem(sessionId, t.requestId, t.jsonPath)),
             )
         t.orderId?.let { tradeKeysByOrderRef.getOrPut(it, ::mutableListOf).add(tradeKey) }
         // A trade carries no fee slot, so emit any fee as its own movement to the fee account.
@@ -1066,7 +1072,13 @@ suspend fun importApiSessionExchange(
                         requestId = t.requestId,
                         jsonPath = t.jsonPath,
                         txnIdAttr = txnIdAttr,
-                    ).let { it.copy(attributes = it.attributes + exclusion(t.excludedValue), ownedAttributes = ownedExclusion) }
+                    ).let {
+                        it.copy(
+                            attributes = it.attributes + exclusion(t.excludedValue),
+                            ownedAttributes = ownedExclusion,
+                            observationSlot = ObservationSlot.FEE,
+                        )
+                    }
             }
         }
     }
@@ -1188,6 +1200,7 @@ suspend fun importApiSessionExchange(
                 transfer.copy(
                     // The exchange account is every movement's own end: the feed is its statement.
                     statementAccount = exchangeRef,
+                    observationSlot = tx.observationSlot,
                     // A bank export naming this exchange records the same deposit/withdrawal with its real far
                     // end (the user's own bank account); this lets it reconcile against that record instead of
                     // both debiting (or crediting) the exchange.
@@ -1623,6 +1636,7 @@ private fun parseExchangeTransfer(
                 approximateUntil = approximateUntil,
                 // A fee charged for an excluded movement is excluded with it.
                 excludedValue = outcome.excludedValue(),
+                observationSlot = ObservationSlot.FEE,
             )
     }
     return result

@@ -11,10 +11,13 @@ import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
+import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.LocalTradeKey
+import com.moneymanager.importengineapi.ObservationOwnerKey
+import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.importengineapi.TradeAttributeMutation
 import com.moneymanager.importengineapi.createCurrency
 import kotlinx.coroutines.flow.first
@@ -69,6 +72,8 @@ suspend fun unpairedLegTrades(
             toAccountId = owner,
             toAmount = if (debit) unknown else known,
             attributes = listOf(NewAttribute(manualEntryTypeId, PLACEHOLDER_ENTRY_PROMPT)),
+            owner = ObservationOwnerKey.Record(ImportRecordKey.CsvRow(csvImportId, leg.rowIndex)),
+            observationSlot = ObservationSlot.MANUAL_ENTRY,
         )
     }
 }

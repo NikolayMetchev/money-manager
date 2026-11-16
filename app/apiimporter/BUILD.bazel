@@ -47,6 +47,7 @@ kmp_library(
         "@maven_kmp//:kotlinx_serialization_json",
     ],
     deps = [
+        "//app/model/observation",
         "//app/model/rules",
         "//utils/bigdecimal",
         "@maven_kmp//:kermit",

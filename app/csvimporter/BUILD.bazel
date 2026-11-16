@@ -66,6 +66,7 @@ kmp_library(
         "@maven_kmp//:kotlinx_coroutines_core",
     ],
     deps = [
+        "//app/model/observation",
         "//app/model/ofx",
         "//app/model/rules",
         "//utils/bigdecimal",
